@@ -5,7 +5,7 @@ import type {
   DownloadRequest, DeleteRequest, RecordTracker,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
-  DiscoverInterests, ForYouPage,
+  DiscoverInterests, ForYouPage, MetadataSuggestions,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -102,6 +102,13 @@ export const recordsApi = {
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),
   similar:        (id: number) =>
     apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
+  /**
+   * The manuscript's own title and abstract, read from its Docling structure
+   * (IR-406), for the Publish dialog's prefill (IR-409). Owner-only; anyone
+   * else gets a 404. No model and no vendor call, so polling it is free.
+   */
+  metadataSuggestions: (id: number) =>
+    apiClient.get<MetadataSuggestions>(`/records/${id}/metadata-suggestions/`),
   /**
    * The Novelty check (IR-312): published work close to this Proposal.
    * Owner-only; anyone else gets a 404. `checked` is false when no comparison

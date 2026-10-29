@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 
 import type { MyReviewsRow } from "@/types/reviews";
 
-import { holderLine, readView, routingLine, viewSearch, waitLabel } from "./myReviews";
+import { dueLabel, holderLine, overdueLabel, readView, routingLine, viewSearch, waitLabel } from "./myReviews";
 
 function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
   return {
@@ -18,26 +18,27 @@ function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
     waiting_since: "2026-10-01T00:00:00Z", waiting_days: 2, waiting_on: null,
     outcome: null, outcome_label: null, decided_at: null,
     can_claim: false, can_assign: false,
+    due_at: null, original_due_at: null, is_overdue: false, clock_paused: false, overdue_days: null,
     ...overrides,
   };
 }
 
 describe("readView", () => {
-  it("defaults to To review, every outcome, and your own reviews", () => {
+  it("defaults to To review, every outcome, your own reviews, soonest due first", () => {
     expect(readView(new URLSearchParams())).toEqual({
-      view: { tab: "to_review", outcome: null, office: null },
+      view: { tab: "to_review", outcome: null, office: null, sort: "due", overdue: false },
       replace: null,
     });
   });
 
   it("reads the tab, the outcome and the office from the URL", () => {
     const { view } = readView(new URLSearchParams("tab=done&outcome=finding&office=itso"));
-    expect(view).toEqual({ tab: "done", outcome: "finding", office: "itso" });
+    expect(view).toEqual({ tab: "done", outcome: "finding", office: "itso", sort: "due", overdue: false });
   });
 
   it("treats an unknown tab or outcome as the default, since the URL is untrusted", () => {
     const { view } = readView(new URLSearchParams("tab=awaiting&outcome=approved"));
-    expect(view).toEqual({ tab: "to_review", outcome: null, office: null });
+    expect(view).toEqual({ tab: "to_review", outcome: null, office: null, sort: "due", overdue: false });
   });
 
   it("drops an outcome outside Done, where it filters nothing", () => {
@@ -61,11 +62,11 @@ describe("readView", () => {
 
 describe("viewSearch", () => {
   it("leaves every default out of the URL", () => {
-    expect(viewSearch({ tab: "to_review", outcome: null, office: null })).toBe("");
+    expect(viewSearch({ tab: "to_review", outcome: null, office: null, sort: "due", overdue: false })).toBe("");
   });
 
   it("keeps what differs from the default", () => {
-    expect(viewSearch({ tab: "done", outcome: "cleared", office: "itso" }))
+    expect(viewSearch({ tab: "done", outcome: "cleared", office: "itso", sort: "due", overdue: false }))
       .toBe("tab=done&outcome=cleared&office=itso");
   });
 });
@@ -111,5 +112,49 @@ describe("waitLabel", () => {
     expect(waitLabel(0)).toBe("Today");
     expect(waitLabel(1)).toBe("1 day");
     expect(waitLabel(9)).toBe("9 days");
+  });
+});
+
+describe("sort and the overdue filter in the URL (IR-622)", () => {
+  it("reads the sort and the overdue filter on the current tabs", () => {
+    const { view } = readView(new URLSearchParams("tab=in_review&sort=waiting&overdue=1"));
+    expect(view).toMatchObject({ tab: "in_review", sort: "waiting", overdue: true });
+  });
+
+  it("treats an unknown sort or overdue value as the default", () => {
+    const { view } = readView(new URLSearchParams("sort=title&overdue=yes"));
+    expect(view).toMatchObject({ sort: "due", overdue: false });
+  });
+
+  it("drops both on Done, which is always newest first and never overdue", () => {
+    const { view } = readView(new URLSearchParams("tab=done&sort=waiting&overdue=1"));
+    expect(view).toMatchObject({ sort: "due", overdue: false });
+  });
+
+  it("writes only what differs from soonest-due, everything", () => {
+    expect(viewSearch({ tab: "to_review", outcome: null, office: null, sort: "waiting", overdue: true }))
+      .toBe("sort=waiting&overdue=1");
+  });
+});
+
+describe("dueLabel", () => {
+  it("names the day in Manila, where the deadline is 23:59", () => {
+    expect(dueLabel("2025-11-07T15:59:00+00:00")).toBe("Due Fri 7 Nov");
+  });
+
+  it("uses Manila's date even where the browser's clock is still on the day before", () => {
+    expect(dueLabel("2025-11-07T16:30:00Z")).toBe("Due Sat 8 Nov");
+  });
+});
+
+describe("overdueLabel", () => {
+  it("counts working days, as the server does", () => {
+    expect(overdueLabel(1)).toBe("1 working day overdue");
+    expect(overdueLabel(2)).toBe("2 working days overdue");
+  });
+
+  it("says Overdue before a working day has been missed", () => {
+    expect(overdueLabel(0)).toBe("Overdue");
+    expect(overdueLabel(null)).toBe("Overdue");
   });
 });

@@ -291,6 +291,23 @@ jobs:
       - name: Build the backend image
         run: docker compose -f docker-compose.yml build backend
 
+      # IR-620: beat's only job is ADR-043's hourly deadline task. Booting it
+      # proves the service starts and loads that entry; validating the file
+      # alone would not. --no-deps skips db and migrate, which beat does not
+      # touch until a worker runs the task. The secret is the same throwaway
+      # the Backend job uses. `timeout` ends the run, so its exit code is not
+      # the verdict: the two greps are.
+      - name: Boot celery-beat and see its schedule
+        run: |
+          docker compose -f docker-compose.yml up -d redis
+          docker compose -f docker-compose.yml run --rm --no-deps \
+            -e SECRET_KEY=ci-only-not-a-real-secret \
+            celery-beat sh -c 'timeout 30 celery -A config beat -l debug --schedule=/tmp/celerybeat-schedule' \
+            > beat.log 2>&1 || true
+          cat beat.log
+          grep -q 'beat: Starting' beat.log
+          grep -q 'deadline-notifications apps.reviews.tasks.send_deadline_notifications' beat.log
+
   security:
     name: Security
     runs-on: ubuntu-latest

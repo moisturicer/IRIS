@@ -253,9 +253,9 @@ def test_open_and_overdue_now_from_the_open_assignments():
     result = compute(Log(), parties=("itso", "ktto"), open_assignments=open_now)
 
     assert result["open_now"] == [
-        {"party": "itso", "open": 4, "unseated": 1, "open_seats": 4, "undated": 1,
+        {"party": "itso", "open_count": 4, "unseated": 1, "open_seats": 4, "undated": 1,
          "paused": 1, "overdue": 1, "overdue_seats": 2},
-        {"party": "ktto", "open": 0, "unseated": 0, "open_seats": 0, "undated": 0,
+        {"party": "ktto", "open_count": 0, "unseated": 0, "open_seats": 0, "undated": 0,
          "paused": 0, "overdue": 0, "overdue_seats": 0},
     ]
 
@@ -315,7 +315,7 @@ class AnalyticsEndpointTests(APITestCase):
         by_type = next(c for c in data["time_in_stage"] if c["record_type"] is not None)
         self.assertEqual(by_type["record_type"], "Thesis / Research")
         self.assertEqual(data["open_now"], [{
-            "party": "itso", "open": 1, "unseated": 0, "open_seats": 1, "undated": 0,
+            "party": "itso", "open_count": 1, "unseated": 0, "open_seats": 1, "undated": 0,
             "paused": 0, "overdue": 1, "overdue_seats": 1,
         }])
         self.assertNotIn("ierc", str([c["party"] for key in ("time_in_stage", "throughput",
@@ -333,6 +333,22 @@ class AnalyticsEndpointTests(APITestCase):
         self.assertEqual([p["party"] for p in everyone["parties"]],
                          ["adviser", "itso", "ierc", "ktto", "rdco"])
         self.assertEqual({row["party"] for row in ierc["throughput"]}, {"ierc"})
+
+    def test_scoping_removes_other_offices_before_events_are_loaded(self):
+        self.turn(self.records[0], "itso", 0, 4)
+        self.turn(self.records[1], "ierc", 0, 8)
+        scoped = list(analytics.scoped_events(("itso",)))
+        self.assertEqual(len(scoped), 2)
+        self.assertTrue(all(
+            (event.metadata.get("party") or event.metadata.get("to_party")) == "itso"
+            for event in scoped
+        ))
+        RecordAssignment.objects.create(record=self.records[0], party="itso")
+        RecordAssignment.objects.create(record=self.records[1], party="ierc")
+        self.assertEqual(
+            [assignment.party for assignment in analytics.scoped_open_assignments(("itso",))],
+            ["itso"],
+        )
 
     def test_an_office_may_not_ask_for_another_office(self):
         self.assertEqual(self.get(self.itso, office="ierc").status_code, 403)

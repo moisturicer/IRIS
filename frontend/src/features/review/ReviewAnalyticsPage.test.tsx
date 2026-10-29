@@ -25,7 +25,7 @@ function payload(overrides: Partial<WorkflowAnalytics> = {}): { data: WorkflowAn
       generated_at: "2026-10-29T01:00:00Z",
       range: { from: null, to: null },
       thresholds: { median: 5, p90: 10 },
-      open_now: [{ party: "itso", open: 4, unseated: 1, open_seats: 4, undated: 1,
+      open_now: [{ party: "itso", open_count: 4, unseated: 1, open_seats: 4, undated: 1,
                    paused: 1, overdue: 1, overdue_seats: 2 }],
       time_in_stage: [
         { party: "itso", record_type: null, records: 12, turns: 12, median_hours: 30,
@@ -105,6 +105,38 @@ describe("ReviewAnalyticsPage", () => {
     renderScreen(<ReviewAnalyticsPage />);
 
     expect(await screen.findByText(/could not be loaded/i)).toBeInTheDocument();
+  });
+
+  it("retries a failed load without leaving the page", async () => {
+    analytics.mockRejectedValueOnce(new Error("offline"));
+    renderScreen(<ReviewAnalyticsPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("table", { name: /open now/i })).toBeInTheDocument();
+    expect(analytics).toHaveBeenCalledTimes(2);
+  });
+
+  it("rejects a reversed date range before requesting figures", async () => {
+    renderScreen(<ReviewAnalyticsPage />);
+    await screen.findByRole("table", { name: /open now/i });
+    const from = screen.getByLabelText("From");
+    const to = screen.getByLabelText("To");
+    // Native date values are set as complete dates.
+    const { fireEvent } = await import("@testing-library/react");
+    fireEvent.change(from, { target: { value: "2026-11-10" } });
+    await waitFor(() => expect(analytics).toHaveBeenLastCalledWith(
+      { office: "", from: "2026-11-10", to: "" }));
+    const requests = analytics.mock.calls.length;
+    fireEvent.change(to, { target: { value: "2026-11-01" } });
+    expect(await screen.findByRole("alert")).toHaveTextContent("From must be on or before To.");
+    expect(analytics).toHaveBeenCalledTimes(requests);
+  });
+
+  it("states the empty-log state without suggesting completed data exists", async () => {
+    analytics.mockResolvedValue(payload({ data_since: null, time_in_stage: [],
+      throughput: [], revision_cycles: [], preserved_by_office: [] }));
+    renderScreen(<ReviewAnalyticsPage />);
+    expect(await screen.findByText(/No workflow events have been recorded yet/)).toBeInTheDocument();
+    expect(screen.getByText("No completed turns in this range.")).toBeInTheDocument();
   });
 
   it("has no blocking accessibility violations", async () => {

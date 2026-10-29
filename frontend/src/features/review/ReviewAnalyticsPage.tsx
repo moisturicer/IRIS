@@ -3,9 +3,12 @@ import { useEffect, useState, type ReactNode } from "react";
 import { reviewsApi } from "@/api/reviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { Input, Select, Skeleton } from "@/components/ui";
-import { formatDate } from "@/lib/utils";
+import { Button, Input, Select, Skeleton } from "@/components/ui";
 import type { AnalyticsTimeInStage, WorkflowAnalytics } from "@/types/reviews";
+
+const formatDate = (value: string) => new Intl.DateTimeFormat("en-US", {
+  month: "short", day: "numeric", year: "numeric", timeZone: "Asia/Manila",
+}).format(new Date(value.length === 10 ? value + "T00:00:00+08:00" : value));
 
 /**
  * Workflow analytics (IR-626, ADR-043).
@@ -47,6 +50,7 @@ function Section({ id, title, note, children }: {
 }
 
 export default function ReviewAnalyticsPage() {
+  const [reload, setReload] = useState(0);
   const [office, setOffice] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
@@ -57,7 +61,13 @@ export default function ReviewAnalyticsPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  const invalidRange = Boolean(from && to && from > to);
+
   useEffect(() => {
+    if (invalidRange) {
+      setLoading(false);
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setLoadError(null);
@@ -76,7 +86,7 @@ export default function ReviewAnalyticsPage() {
     return () => {
       cancelled = true;
     };
-  }, [office, from, to]);
+  }, [office, from, to, reload, invalidRange]);
 
   const label = (party: string) =>
     data?.parties.find((p) => p.party === party)?.label ?? party.toUpperCase();
@@ -113,11 +123,14 @@ export default function ReviewAnalyticsPage() {
         </div>
       </div>
 
+      {invalidRange && <p role="alert" className="mb-4 text-sm text-brand">From must be on or before To.</p>}
+
       {loadError ? (
         <EmptyState tone="error" icon="fa-triangle-exclamation" title={loadError}
-                    message="Try again in a moment." />
+                    message="Please try loading the figures again."
+                    action={<Button type="button" onClick={() => setReload((n) => n + 1)}>Try again</Button>} />
       ) : loading && !data ? (
-        <Skeleton className="h-64 w-full" />
+        <div role="status" aria-label="Loading workflow analytics"><Skeleton className="h-64 w-full" /></div>
       ) : data && (
         <div aria-busy={loading}>
           {loading && <p role="status" className="mb-3 text-sm text-stone-600">Updating…</p>}
@@ -129,7 +142,7 @@ export default function ReviewAnalyticsPage() {
           </p>
 
           <Section id="open-now" title="Open now"
-                   note="Overdue counts only assignments with a due date whose clock is running. A clock waiting on the owner is paused. Due dates exist only on assignments opened since they were introduced (IR-619), or for an office with a configured turnaround; the rest are under No due date, never counted as on time.">
+                   note="Overdue counts only assignments with a due date whose clock is running. A clock waiting on the owner is paused. Older assignments and offices without a configured turnaround may have no due date; these are listed separately, never counted as on time.">
             <table className={TABLE} aria-labelledby="open-now">
               <thead>
                 <tr>
@@ -141,7 +154,7 @@ export default function ReviewAnalyticsPage() {
                 {data.open_now.map((row) => (
                   <tr key={row.party}>
                     <th scope="row" className={`${CELL} font-medium`}>{label(row.party)}</th>
-                    {[row.open, row.unseated, row.open_seats, row.overdue, row.overdue_seats,
+                    {[row.open_count, row.unseated, row.open_seats, row.overdue, row.overdue_seats,
                       row.paused, row.undated].map((n, i) => <td key={i} className={CELL}>{n}</td>)}
                   </tr>
                 ))}
@@ -184,7 +197,8 @@ export default function ReviewAnalyticsPage() {
             </ul>
           </Section>
 
-          <Section id="throughput" title="Records entering and leaving, by week">
+          <Section id="throughput" title="Records entering and leaving, by week"
+                   note="Counts office visits. A record returning to the same office in one week counts again.">
             {data.throughput.length === 0 ? (
               <p className="text-sm text-stone-600">No records entered or left in this range.</p>
             ) : (
@@ -210,7 +224,7 @@ export default function ReviewAnalyticsPage() {
           </Section>
 
           <Section id="revision-cycles" title="New versions and preserved clearances"
-                   note="A new version answering a revision request, and how many offices' clearances it kept. These are operational counts, not the ADR-004 comparison.">
+                   note="A new version answering a revision request, and how many offices' clearances it kept. These counts describe the workflow in use; they do not measure how much time clearance preservation saved.">
             {data.revision_cycles.length === 0 ? (
               <p className="text-sm text-stone-600">No new versions in this range.</p>
             ) : (

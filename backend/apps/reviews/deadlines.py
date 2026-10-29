@@ -26,6 +26,20 @@ def working_days_after(day, count):
     return day
 
 
+def working_days_between(start, end, holidays):
+    """Working dates after `start` through `end`; the same date is zero."""
+    days = 0
+    while start < end:
+        start += timedelta(days=1)
+        days += start.weekday() < 5 and start not in holidays
+    return days
+
+
+def overdue_working_days(due_at, now, holidays):
+    """How many Manila working days have passed since the due date. Zero on a weekend after it."""
+    return working_days_between(due_at.astimezone(MANILA).date(), now.astimezone(MANILA).date(), holidays)
+
+
 def end_of_day(day):
     return datetime.combine(day, time(23, 59), tzinfo=MANILA)
 
@@ -56,7 +70,7 @@ def revision_pending(assignment):
 def with_deadlines(queryset, *, prefix=""):
     """Batch list facts so My Reviews' SQL count stays independent of page size."""
     return queryset.prefetch_related(
-        f"{prefix}extensions",
+        f"{prefix}extensions__actor",
         Prefetch(f"{prefix}resubmission_requests",
                  queryset=ResubmissionRequest.objects.filter(state=ResubmissionRequestState.OPEN),
                  to_attr="deadline_open_revisions"),
@@ -125,11 +139,7 @@ def sync_document_pause(assignment, *, now):
     if start is None:
         return
     holidays = set(Holiday.objects.values_list("date", flat=True))
-    day, end = start.astimezone(MANILA).date(), now.astimezone(MANILA).date()
-    days = 0
-    while day < end:
-        day += timedelta(days=1)
-        days += day.weekday() < 5 and day not in holidays
+    days = working_days_between(start.astimezone(MANILA).date(), now.astimezone(MANILA).date(), holidays)
     if days:
         due = end_of_day(working_days_after(assignment.due_at.astimezone(MANILA).date(), days))
         _move(assignment, due, f"Document request pause: {days} working days.", system=True)
@@ -159,6 +169,9 @@ def deadline_payload(assignment, user=None, *, readable=True):
         "extensions": [{"id": e.pk, "previous_due_at": e.previous_due_at.isoformat(),
                         "due_at": e.due_at.isoformat(), "reason": e.reason if readable else None,
                         "system": e.system, "actor": e.actor_id if readable else None,
+                        # Who moved it, for the Review timeline (IR-623).
+                        "actor_name": (e.actor.get_full_name() or e.actor.email)
+                        if readable and e.actor else None,
                         "created_at": e.created_at.isoformat()}
                        for e in assignment.extensions.all()],
     }

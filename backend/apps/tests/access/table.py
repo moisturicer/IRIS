@@ -30,7 +30,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cells import (
-    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, Call, Case, KnownDefect, Ref, Upload, row,
+    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, Call, Case, Ref, Upload, row,
+
 )
 
 # -- shorthands -------------------------------------------------------------
@@ -343,6 +344,14 @@ REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
             data={"due_at": "2099-12-31T23:59:00+08:00", "reason": "Committee unavailable"},
         ),
     }),
+    # IR-623: the coordinator console names no object, so nothing is hidden:
+    # every signed-in caller but ITSO's coordinator is refused outright.
+    "reviews-office": Entry({
+        "GET": _case(
+            row(ANON, DENY, DENY, DENY, DENY, DENY, OK, DENY, DENY),
+            query={"office": "itso"},
+        ),
+    }),
 }
 
 # IR-616: every remaining app is declared; there is no pending exemption.
@@ -391,11 +400,8 @@ REVIEWS = {
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
     "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
-    "pin-generate": Entry({"POST": _case(
-        row(ANON, KnownDefect(HIDE, "IR-635", "201 and title emailed"), OK, OK, OK, OK, OK, OK,
-            KnownDefect(HIDE, "IR-635", "201 and title emailed")),
-        data={"record_id": Ref("record")}, objects=("record",),
-    )}),
+    "pin-generate": Entry({"POST": _case(READS_RECORD, data={"record_id": Ref("record")}, objects=("record",))}),
+
     "pin-verify": Entry({"POST": _case(SIGNED_IN, data={"record_id": Ref("record"), "pin": "invalid"})}),
     "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=ASSIGNMENT, data={})}),
     "assignment-assign": Entry({m: _case(COORDINATOR, kwargs=ASSIGNMENT,

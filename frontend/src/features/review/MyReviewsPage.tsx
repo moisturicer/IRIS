@@ -18,9 +18,12 @@ import type { MyReviewsPage as Page, MyReviewsRow, MyReviewsTab } from "@/types/
 import { AssignReviewerDialog } from "./AssignReviewerDialog";
 import {
   OUTCOME_FILTERS,
+  SORTS,
   TABS,
   WAITING_ON_LABEL,
+  dueLabel,
   holderLine,
+  overdueLabel,
   readView,
   routingLine,
   viewSearch,
@@ -67,13 +70,15 @@ export default function MyReviewsPage() {
     if (replace != null) setParams(replace, { replace: true });
   }, [replace, setParams]);
 
-  const { tab, outcome, office } = view;
+  const { tab, outcome, office, overdue } = view;
+  // Done is always newest first, and the server refuses a sort there.
+  const sort = tab === "done" ? null : view.sort;
 
   /** Reload the tab; whether it worked, so an act announces only what is shown. */
   const load = useCallback(async (): Promise<boolean> => {
     setLoadError(null);
     try {
-      const { data } = await reviewsApi.mine({ tab, outcome, office, cursor: null });
+      const { data } = await reviewsApi.mine({ tab, outcome, office, cursor: null, sort, overdue });
       setPage(data);
       return true;
     } catch {
@@ -81,7 +86,7 @@ export default function MyReviewsPage() {
       setLoadError("My Reviews could not be loaded.");
       return false;
     }
-  }, [tab, outcome, office]);
+  }, [tab, outcome, office, sort, overdue]);
 
   useEffect(() => {
     let cancelled = false;
@@ -96,8 +101,14 @@ export default function MyReviewsPage() {
   }, [load]);
 
   const go = (next: Partial<MyReviewsView>) => {
-    const merged = { ...view, ...next };
-    if (merged.tab !== "done") merged.outcome = null;
+    const merged: MyReviewsView = { ...view, ...next };
+    // Each tab keeps only its own controls: outcome on Done, sort and overdue elsewhere.
+    if (merged.tab === "done") {
+      merged.sort = "due";
+      merged.overdue = false;
+    } else {
+      merged.outcome = null;
+    }
     setAnnouncement("");
     setParams(viewSearch(merged));
   };
@@ -106,7 +117,7 @@ export default function MyReviewsPage() {
     if (!page?.next) return;
     setLoadingMore(true);
     try {
-      const { data } = await reviewsApi.mine({ tab, outcome, office, cursor: page.next });
+      const { data } = await reviewsApi.mine({ tab, outcome, office, cursor: page.next, sort, overdue });
       setPage({ ...data, rows: [...page.rows, ...data.rows] });
     } catch {
       setLoadError("More of Done could not be loaded.");
@@ -154,12 +165,24 @@ export default function MyReviewsPage() {
       <PageHeader
         title="My Reviews"
         description="What you need to review, what you have opened, and what you have finished."
-        actions={canAccess(viewer?.role_name as RoleName | undefined, "reviewAnalytics") && (
-          <Link to={pathFor("reviewAnalytics")}
-                className={cn("text-sm font-medium text-brand hover:underline", FOCUS_RING)}>
-            Workflow analytics
-          </Link>
-        )}
+        actions={
+          <div className="flex flex-wrap items-center gap-3">
+            {canAccess(viewer?.role_name as RoleName | undefined, "reviewAnalytics") && (
+              <Link to={pathFor("reviewAnalytics")}
+                    className={cn("inline-flex min-h-11 items-center text-sm font-medium text-brand hover:underline", FOCUS_RING)}>
+                Workflow analytics
+              </Link>
+            )}
+            {coordinatorOffice && (
+              <Link to="/review/office"
+                className={cn("inline-flex min-h-11 items-center gap-2 rounded-lg border border-stone-200 px-3 text-small font-semibold text-stone-700 hover:border-brand hover:text-brand", COLOUR_TRANSITION, FOCUS_RING)}>
+                <i className="fas fa-users-gear" aria-hidden />
+                {officeLabel} console
+              </Link>
+            )}
+          </div>
+        }
+
       />
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -243,18 +266,37 @@ export default function MyReviewsPage() {
                 type="button"
                 aria-pressed={outcome === f.key}
                 onClick={() => go({ outcome: f.key })}
-                className={cn(
-                  "min-h-9 px-3 rounded-full border text-small font-medium",
-                  COLOUR_TRANSITION,
-                  FOCUS_RING,
-                  outcome === f.key
-                    ? "border-brand bg-brand-50 text-brand"
-                    : "border-stone-200 text-stone-600 hover:border-stone-400",
-                )}
+                className={chipClass(outcome === f.key)}
               >
                 {f.label}
               </button>
             ))}
+          </div>
+        )}
+
+        {tab !== "done" && (
+          <div className="mb-4 flex flex-wrap items-center gap-2">
+            <div role="group" aria-label="Sort" className="flex flex-wrap gap-2">
+              {SORTS.map((s) => (
+                <button
+                  key={s.key}
+                  type="button"
+                  aria-pressed={view.sort === s.key}
+                  onClick={() => go({ sort: s.key })}
+                  className={chipClass(view.sort === s.key)}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              aria-pressed={overdue}
+              onClick={() => go({ overdue: !overdue })}
+              className={chipClass(overdue)}
+            >
+              Overdue only
+            </button>
           </div>
         )}
 
@@ -263,7 +305,7 @@ export default function MyReviewsPage() {
         ) : loadError && !page ? (
           <EmptyState icon="fa-triangle-exclamation" tone="error" title="Could not load My Reviews" message={loadError} />
         ) : rows.length === 0 ? (
-          <EmptyState icon={EMPTY_ICON[tab]} {...emptyCopy(tab, outcome, office ? officeLabel : access?.offices[0]?.toUpperCase())} />
+          <EmptyState icon={EMPTY_ICON[tab]} {...emptyCopy(tab, outcome, overdue, office ? officeLabel : access?.offices[0]?.toUpperCase())} />
         ) : (
           <ul className="space-y-3">
             {rows.map((r) => (
@@ -310,6 +352,16 @@ export default function MyReviewsPage() {
   );
 }
 
+/** A filter or sort chip: pressed is brand-tinted, and its label says what it is. */
+function chipClass(pressed: boolean) {
+  return cn(
+    "min-h-9 px-3 rounded-full border text-small font-medium",
+    COLOUR_TRANSITION,
+    FOCUS_RING,
+    pressed ? "border-brand bg-brand-50 text-brand" : "border-stone-200 text-stone-600 hover:border-stone-400",
+  );
+}
+
 const EMPTY_ICON: Record<MyReviewsTab, string> = {
   to_review: "fa-inbox",
   in_review: "fa-book-open",
@@ -317,7 +369,10 @@ const EMPTY_ICON: Record<MyReviewsTab, string> = {
 };
 
 /** Empty states say what arrives there, not "no data" (ui-ux/16 §5). */
-function emptyCopy(tab: MyReviewsTab, outcome: string | null, office: string | undefined) {
+function emptyCopy(tab: MyReviewsTab, outcome: string | null, overdue: boolean, office: string | undefined) {
+  if (overdue) {
+    return { title: "Nothing overdue", message: "Turn off Overdue only to see everything here." };
+  }
   if (tab === "to_review") {
     return {
       title: "Nothing to review",
@@ -359,6 +414,14 @@ function ReviewRow({ row, tab, busy, error, onClaim, onAssign }: ReviewRowProps)
     <>
       <span className="font-semibold text-stone-800">{holderLine(row)}</span>
       {row.waiting_on && tab !== "done" && <Badge variant="warning">{WAITING_ON_LABEL[row.waiting_on]}</Badge>}
+      {/* Overdue is said in words; the badge's tone only repeats it (IR-622). */}
+      {row.is_overdue && <Badge variant="danger">{overdueLabel(row.overdue_days)}</Badge>}
+      {row.due_at && (
+        <span className="text-stone-600">
+          {dueLabel(row.due_at)}
+          {row.clock_paused && " · clock paused"}
+        </span>
+      )}
       {tab === "done" && (
         <Badge variant={row.outcome == null ? "default" : "success"}>
           {row.outcome_label ?? "Completed by your office"}

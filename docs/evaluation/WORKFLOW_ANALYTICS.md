@@ -52,7 +52,7 @@ are inclusive dates.
 | **Time in stage** | Per party, and per party and record type: from the party receiving the record (`SUBMITTED`, `ROUTED` with `opened`, or a `RESUBMITTED` that reopens a party with no clock running) to its `ASSIGNMENT_CLOSED` with `how` `completed`. A revision or a document request does not stop the clock, and a seat reassignment does not restart it. A turn counts in the range its close falls in, in full. **Median**, and the **90th percentile by nearest rank** (the smallest value at or above 90% of the sorted turns) |
 | **Not measured** | Per party: closes with no start in the log (the record entered before IR-144's deployment; never shown as zero) and turns ended by a decision or a withdrawal (not finished, so not a duration), both within the range; and clocks running now, whatever the range |
 | **Open now** | Active assignments, the pool among them (no open seat), open seats, assignments with no due date (opened before IR-619, or a party with no Turnaround), paused (an open revision or document request), overdue (a due date, a running clock, and past it: `deadline_payload`'s rule), and the open seats on overdue assignments. Not filtered by date |
-| **Throughput** | Per party per week: clock starts (entered) and `ASSIGNMENT_CLOSED` rows of any kind (left) |
+| **Throughput** | Per party per week: clock starts (entered) and `ASSIGNMENT_CLOSED` rows of any kind (left); repeated visits by the same Record count again |
 | **New versions** | Per policy: `RESUBMITTED` rows the office took part in (re-reviewed, reset or preserved), those that preserved at least one of the office's clearances, and the `CLEARANCE_PRESERVED` rows |
 
 ## Small numbers

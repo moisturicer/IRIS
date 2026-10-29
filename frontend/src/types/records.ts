@@ -221,6 +221,19 @@ export type Capability =
   | "comment_public"
   | "cite";
 
+/**
+ * `GET /records/<id>/metadata-suggestions/` (IR-406; spec §4.5). `pending`
+ * while Docling reads the manuscript, `ready` once it has, `failed` when it
+ * could not (an image-only scan included), `unsupported` when there is no
+ * manuscript extraction at all. A `ready` field with nothing found is null.
+ * There is deliberately no confidence value: Docling gives none.
+ */
+export interface MetadataSuggestions {
+  state:       "pending" | "ready" | "failed" | "unsupported";
+  suggestions: { title: string | null; abstract: string | null };
+  source:      "pdf_structure";
+}
+
 export interface RecordDetail extends RecordListItem {
   /** Server-computed action offers (ADR-032 §10); every action re-checks authority. */
   capabilities:   Capability[];
@@ -658,6 +671,43 @@ export interface TrackerResubmission {
   resolved_by:  string | null;
 }
 
+/**
+ * A seat a coordinator moved to another member (IR-623). The names and the
+ * reason are null to a viewer who may not read the review (IR-479).
+ */
+export interface TrackerReassignment {
+  seat:      number;
+  party:     Party;
+  label:     string;
+  from_name: string | null;
+  to_name:   string | null;
+  by_name:   string | null;
+  reason:    string | null;
+  at:        string | null;
+}
+
+/** One movement of an assignment's due date (ADR-043 §6): by a coordinator, or by a document pause. */
+export interface DeadlineExtension {
+  id:              number;
+  previous_due_at: string;
+  due_at:          string;
+  /** Null, as `actor` is, to a viewer who may not read the review. */
+  reason:          string | null;
+  /** Moved by IRIS itself, for a document-request pause; no person did it. */
+  system:          boolean;
+  actor:           number | null;
+  actor_name:      string | null;
+  created_at:      string;
+}
+
+/** An assignment's due-date history on the tracker. Only what the timeline reads is typed. */
+export interface TrackerDeadlineHistory {
+  assignment: number;
+  party:      Party;
+  label:      string;
+  extensions: DeadlineExtension[];
+}
+
 export interface RecordTracker {
   record_id:             number;
   record_type:           string | null;
@@ -680,6 +730,10 @@ export interface RecordTracker {
   document_requests:     DocumentRequest[] | null;
   clearances:            RecordClearance[];
   resubmission:          RecordResubmission;
+  /** Coordinators' reassignments (IR-623). Optional: a fixture may leave it out. */
+  reassignments?:               TrackerReassignment[];
+  /** Every assignment's due date and its extensions (ADR-043, IR-619). */
+  assignment_deadline_history?: TrackerDeadlineHistory[];
 }
 
 export interface RecordFormData {

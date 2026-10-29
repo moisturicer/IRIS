@@ -180,14 +180,14 @@ def _open_now(open_assignments, parties, now):
     before IR-619, or for a party with no Turnaround) is counted as undated,
     never as on time.
     """
-    rows = {p: {"party": p, "open": 0, "unseated": 0, "open_seats": 0, "undated": 0,
+    rows = {p: {"party": p, "open_count": 0, "unseated": 0, "open_seats": 0, "undated": 0,
                 "paused": 0, "overdue": 0, "overdue_seats": 0} for p in parties}
     for a in open_assignments:
         row = rows.get(a.party)
         if row is None:
             continue
         overdue = is_overdue(a.due_at, paused=a.paused, now=now)
-        row["open"] += 1
+        row["open_count"] += 1
         row["unseated"] += a.open_seats == 0
         row["open_seats"] += a.open_seats
         row["undated"] += a.due_at is None
@@ -216,7 +216,7 @@ def compute(events, *, parties, record_types, now, open_assignments=(),
     closed = [t for t in closed if t.party in parties]
     entries = [(p, at) for p, at in entries if p in parties]
     in_window = [t for t in closed if in_range(t.ended_at)]
-    completed = [t for t in in_window if t.how == "completed" and t.started_at is not None]
+    completed = [t for t in in_window if t.how == AssignmentState.COMPLETED and t.started_at is not None]
     return {
         "open_now": _open_now(open_assignments, parties, now),
         "time_in_stage": _time_in_stage(completed, record_types),
@@ -264,7 +264,7 @@ def _unmeasured(closed, running, parties):
     for turn in closed:
         if turn.started_at is None:
             rows[turn.party]["started_before_log"] += 1
-        elif turn.how != "completed":
+        elif turn.how != AssignmentState.COMPLETED:
             rows[turn.party]["ended_not_completed"] += 1
     for _record, party in running:
         if party in rows:

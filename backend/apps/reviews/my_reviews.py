@@ -59,7 +59,9 @@ from core.permissions import (
     office_parties_of,
 )
 
+from .deadlines import deadline_payload, overdue_working_days, with_deadlines
 from .models import (
+    Holiday,
     RecordAssignment,
     ResubmissionRequest,
     Review,
@@ -143,6 +145,31 @@ def _tab(raw) -> MyReviewsTab:
 #: Done's filters (ADR-032 §9). `REVISION_REQUESTED` is shown on its rows
 #: and listed under All, but is not a filter of its own.
 _FILTERS = tuple(o for o in ReviewOutcome if o is not ReviewOutcome.REVISION_REQUESTED)
+
+
+#: Current tabs' orders (IR-622). Soonest due is the default; Done is always newest first.
+SORT_DUE, SORT_WAITING = "due", "waiting"
+
+
+def _sort(raw, tab):
+    if not raw:
+        return SORT_DUE
+    if tab == MyReviewsTab.DONE:
+        raise MyReviewsError("Done is always newest first; it takes no sort.")
+    if raw not in (SORT_DUE, SORT_WAITING):
+        raise MyReviewsError(f"Unknown sort {raw!r}.")
+    return raw
+
+
+def _overdue_only(raw, tab) -> bool:
+    """`overdue=1` keeps overdue rows only. Done has none: a finished seat is never overdue."""
+    if not raw:
+        return False
+    if tab == MyReviewsTab.DONE:
+        raise MyReviewsError("Nothing in Done is overdue; it takes no overdue filter.")
+    if raw != "1":
+        raise MyReviewsError(f"Unknown overdue filter {raw!r}.")
+    return True
 
 
 def _outcome_filter(raw):
@@ -347,6 +374,8 @@ def _row(*, kind, pk, record, party, party_label, **fields) -> dict:
         "decided_at": None,
         "can_claim": False,
         "can_assign": False,
+        **deadline_payload(None),
+        "overdue_days": None,
     }
     row.update(fields)
     return row
@@ -360,8 +389,6 @@ def _row_party(stage) -> Party:
 
 
 def _seat_row(seat, scope, *, since=None, **fields):
-    from .deadlines import deadline_payload
-
     assignment = seat.assignment
     reviewer = seat.reviewer
     return _row(
@@ -376,10 +403,9 @@ def _seat_row(seat, scope, *, since=None, **fields):
     )
 
 
-def _current_rows(scope, tab) -> list[dict]:
-    """To review or In review: seats, then (To review only) the pool."""
+def _current_rows(scope, tab, sort) -> list[dict]:
+    """To review or In review: seats, then (To review only) the pool, in `sort` order."""
     user = scope.user
-    from .deadlines import deadline_payload, with_deadlines
     rows = []
     state = SeatState.ASSIGNED if tab == MyReviewsTab.TO_REVIEW else SeatState.IN_REVIEW
     seats = with_deadlines(_current_seats(scope, state).select_related(
@@ -404,6 +430,9 @@ def _current_rows(scope, tab) -> list[dict]:
 
     _add_context(rows)
     rows.sort(key=lambda r: r["waiting_since"])
+    if sort == SORT_DUE:
+        # Stable, so rows due together, and undated rows, stay longest-waiting first.
+        rows.sort(key=lambda r: (r["due_at"] is None, parse_datetime(r["due_at"] or "") or 0))
     return rows
 
 
@@ -456,9 +485,22 @@ def _add_context(rows):
             row["waiting_on"] = "document"
 
 
-def _done_rows(scope, outcome, cursor) -> tuple[list[dict], str | None]:
-    from .deadlines import with_deadlines
+def _add_overdue_days(rows):
+    """
+    How many working days each overdue row is late (IR-622). Counted here, not
+    in the browser, because ADR-043's calendar has holidays the client cannot
+    know. One holiday read per request, and none when nothing is overdue.
+    """
+    late = [r for r in rows if r["is_overdue"]]
+    if not late:
+        return
+    now = timezone.now()
+    holidays = set(Holiday.objects.values_list("date", flat=True))
+    for row in late:
+        row["overdue_days"] = overdue_working_days(parse_datetime(row["due_at"]), now, holidays)
 
+
+def _done_rows(scope, outcome, cursor) -> tuple[list[dict], str | None]:
     seats = _done_seats(scope)
     reviews = _seatless_reviews(scope)
     if outcome is not None:
@@ -488,7 +530,11 @@ def _done_rows(scope, outcome, cursor) -> tuple[list[dict], str | None]:
             "decided_at": when.isoformat(),
         }
         if kind == SEAT:
-            rows.append(_seat_row(item, scope, **decided))
+            row = _seat_row(item, scope, **decided)
+            # A finished seat's work is done, even while its assignment stays
+            # active for a colleague's seat: the assignment's clock is not theirs.
+            row["is_overdue"] = False
+            rows.append(row)
         else:
             rows.append(_row(
                 kind=REVIEW, pk=item.pk, record=item.record,
@@ -518,19 +564,26 @@ def _counts(scope) -> dict:
     }
 
 
-def my_reviews(user, *, tab=None, outcome=None, office=None, cursor=None) -> dict:
+def my_reviews(user, *, tab=None, outcome=None, office=None, cursor=None,
+               sort=None, overdue=None) -> dict:
     """
     One tab of `user`'s My Reviews: `{rows, counts, next}`. `next` is the Done
-    page after this one, or None. Raises `MyReviewsRefused` (403) for an
-    office view the caller may not see and `MyReviewsError` (400) for a
-    parameter it cannot read.
+    page after this one, or None. `sort` and `overdue` apply to To review and
+    In review only; like `outcome`, `overdue` never narrows the counts.
+    Raises `MyReviewsRefused` (403) for an office view the caller may not see
+    and `MyReviewsError` (400) for a parameter it cannot read.
     """
     scope = _scope(user, office)
     tab = _tab(tab)
     outcome = _outcome_filter(outcome)
+    sort = _sort(sort, tab)
+    overdue_only = _overdue_only(overdue, tab)
     next_cursor = None
     if tab == MyReviewsTab.DONE:
         rows, next_cursor = _done_rows(scope, outcome, _decode(cursor))
     else:
-        rows = _current_rows(scope, tab)
+        rows = _current_rows(scope, tab, sort)
+        if overdue_only:
+            rows = [r for r in rows if r["is_overdue"]]
+        _add_overdue_days(rows)
     return {"rows": rows, "counts": _counts(scope), "next": next_cursor}
