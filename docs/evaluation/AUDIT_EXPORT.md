@@ -57,6 +57,14 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 | Type | Written when | `metadata` |
 |---|---|---|
 | `ASSIGNMENT_EXTENDED` | A coordinator extends an assignment, or a completed document-request pause moves its deadline | `assignment`, `party`, `extension`, `previous_due_at`, `due_at` (ISO-8601 timestamps), `reason`, `system` (true for a pause) |
+| `ASSIGNMENT_ESCALATED` | The hourly job records the latest overdue escalation moment (IR-621) | `assignment`, `party`, `due_at` (ISO-8601), `step` (0 initially, incremented every five working days), `overdue_working_days`, `recipients` (visible coordinator user ids) |
+
+Escalations have no actor. Their audit row is mandatory and commits with the
+sent-moment ledger; an audit failure rolls back the moment so the next tick
+can retry. Recipients are the visibility-checked intended recipients;
+notification delivery remains best effort and failures are logged. An empty
+recipient list records a moment with no eligible coordinator. Escalation
+changes no workflow state, clearance or Seat.
 
 The actor is null on a system Extension. Its reason is deliberately recorded
 as the explanation for a changed deadline. Unlike IR-144's best-effort events,

@@ -1,5 +1,5 @@
 """
-Reminders before and on an assignment's due date (ADR-043 §7–§8, IR-620).
+Assignment reminders and overdue escalation (ADR-043 §7–§8, IR-620–IR-621).
 
 The hourly beat task calls `run_deadline_notifications`, which asks the
 database what is owed now. An assignment owes at most one moment at a time,
@@ -7,10 +7,9 @@ the latest, so after downtime a superseded moment is skipped rather than
 sent late. The `DeadlineMoment` ledger's unique key is the idempotency.
 
 Nothing here decides, clears, routes or withdraws: it only writes
-notifications and the ledger.
+notifications, the ledger and escalation audit events.
 """
 import logging
-from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from django.db import IntegrityError, transaction
@@ -20,6 +19,7 @@ from apps.notifications.services import notify_deadline
 from core.enums import AssignmentState, Party, ResubmissionRequestState, SeatState
 from core.permissions import OFFICE_PARTY_BY_ROLE, is_office_coordinator
 
+from .deadlines import overdue_working_days, working_days_between
 from .models import DeadlineMoment, Holiday, RecordAssignment
 
 logger = logging.getLogger(__name__)
@@ -31,16 +31,9 @@ Kind = DeadlineMoment.Kind
 REMINDERS = {
     Kind.DUE_SOON: ("Review Due Soon", '{party} review of "{title}" is due on {due}.'),
     Kind.DUE_TODAY: ("Review Due Today", '{party} review of "{title}" is due today.'),
+    Kind.ESCALATION: ("Review Overdue",
+                      '{party} review of "{title}" is {days} overdue. Reviewer: {reviewers}.'),
 }
-
-
-def _working_days_between(start, end, holidays):
-    """Working days in (start, end], as Manila dates."""
-    days = 0
-    while start < end:
-        start += timedelta(days=1)
-        days += start.weekday() < 5 and start not in holidays
-    return days
 
 
 def current_moment(due_at, now, holidays):
@@ -48,10 +41,11 @@ def current_moment(due_at, now, holidays):
     today = now.astimezone(MANILA).date()
     due = due_at.astimezone(MANILA).date()
     if now > due_at:
-        return None
+        overdue = overdue_working_days(due_at, now, holidays)
+        return (Kind.ESCALATION, (overdue - 1) // 5) if overdue else None
     if today >= due:
         return Kind.DUE_TODAY, 0
-    if _working_days_between(today, due, holidays) <= 2:
+    if working_days_between(today, due, holidays) <= 2:
         return Kind.DUE_SOON, 0
     return None
 
@@ -88,8 +82,23 @@ def _paused(assignment):
         state=ResubmissionRequestState.OPEN).exists()
 
 
+def _reviewer_names(assignment):
+    names = [s.reviewer.get_full_name() or s.reviewer.email for s in assignment.seats.all()
+             if s.state not in (SeatState.WITHDRAWN, SeatState.DONE) and s.reviewer]
+    return ", ".join(names) or "unclaimed"
+
+
+def _escalation_recipients(assignment):
+    coordinators = _coordinators(assignment.party)
+    if coordinators:
+        return coordinators
+    logger.warning("No coordinator for %s assignment %s; escalating to RDCO coordinators",
+                   assignment.party, assignment.pk)
+    return _coordinators(Party.RDCO) if assignment.party != Party.RDCO else []
+
+
 @transaction.atomic
-def _send(pk, record_id, due_at, kind, step):
+def _send(pk, record_id, due_at, kind, step, overdue=0):
     # Workflow lock order: record, then assignment. Recheck under the lock, so
     # a completion, withdrawal or Extension that just committed wins.
     from apps.records.models import Record
@@ -99,6 +108,8 @@ def _send(pk, record_id, due_at, kind, step):
                   .select_related("record", "record__adviser").get(pk=pk))
     if assignment.state != AssignmentState.ACTIVE or assignment.due_at != due_at or _paused(assignment):
         return 0
+    if kind == Kind.ESCALATION and assignment.party == Party.ADVISER:
+        return 0
     try:
         with transaction.atomic():
             DeadlineMoment.objects.create(assignment=assignment, due_at=due_at, kind=kind, step=step)
@@ -107,8 +118,17 @@ def _send(pk, record_id, due_at, kind, step):
     record = assignment.record
     type_name, template = REMINDERS[kind]
     message = template.format(party=Party(assignment.party).label, title=record.title,
-                              due=f"{due_at.astimezone(MANILA):%a %d %b %Y}")
-    for user in _readable(record, _reminder_recipients(assignment)):
+                              due=f"{due_at.astimezone(MANILA):%a %d %b %Y}",
+                              days=f"{overdue} working day{'s' * (overdue != 1)}",
+                              reviewers=_reviewer_names(assignment) if overdue else "")
+    recipients = (_escalation_recipients(assignment) if kind == Kind.ESCALATION
+                  else _reminder_recipients(assignment))
+    recipients = _readable(record, recipients)
+    if kind == Kind.ESCALATION:
+        from apps.audit.workflow import assignment_escalated
+
+        assignment_escalated(assignment, step=step, overdue=overdue, recipients=recipients)
+    for user in recipients:
         notify_deadline(record, user, type_name=type_name, message=message)
     return 1
 
@@ -128,7 +148,8 @@ def run_deadline_notifications(now=None):
         if moment is None:
             continue
         try:
-            sent += _send(pk, record_id, due_at, *moment)
+            sent += _send(pk, record_id, due_at, *moment,
+                          overdue=overdue_working_days(due_at, now, holidays))
         except Exception:
             logger.exception("Deadline moment %s failed for assignment %s", moment[0], pk)
     return sent
