@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen } from "@/test/render";
-import type { StreamingState } from "../hooks/useAskStream";
+import type { StreamingState } from "../conversation/answerStream";
 
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
 

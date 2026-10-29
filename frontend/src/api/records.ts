@@ -28,6 +28,10 @@ export const recordsApi = {
     apiClient.put<DiscoverInterests>("/records/interests/", body),
   forYou:         (cursor?: string, params?: Record<string, unknown>) =>
     apiClient.get<ForYouPage>("/records/for-you/", { params: { ...params, ...(cursor ? { cursor } : {}) } }),
+  // For you feedback, owned by the signed-in account (IR-576).
+  notInterested:  (id: number) => apiClient.post(`/records/${id}/not-interested/`),
+  undoNotInterested: (id: number) => apiClient.delete(`/records/${id}/not-interested/`),
+  resetInterests: () => apiClient.delete<DiscoverInterests>("/records/interests/"),
 
   // My Library's *My research* list -- a plain array, not paginated, of
   // the narrow rows `MyResearchSerializer` returns (IR-410).
@@ -98,6 +102,15 @@ export const recordsApi = {
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),
   similar:        (id: number) =>
     apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
+  /**
+   * The Novelty check (IR-312): published work close to this Proposal.
+   * Owner-only; anyone else gets a 404. `checked` is false when no comparison
+   * ran (not indexed yet); `threshold` is the similarity a match had to reach.
+   */
+  relatedResearch: (id: number) =>
+    apiClient.get<{ checked: boolean; results: SemanticSearchResult[]; threshold: number }>(
+      `/records/${id}/related-research/`,
+    ),
   create:         (data: RecordFormData) => apiClient.post<RecordDetail>("/records/", data),
   update:         (id: number, data: Partial<RecordFormData>) => apiClient.patch<RecordDetail>(`/records/${id}/`, data),
   /**

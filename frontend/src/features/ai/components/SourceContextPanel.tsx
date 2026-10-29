@@ -5,7 +5,13 @@ import { OpenPassageLink, PassageQuote } from "./PassageQuote";
 interface SourceContextPanelProps {
   open:       boolean;
   /**
-   * The Passages the latest reply cited, in marker order. A reopened
+   * The question of the answer these passages belong to: the selected one,
+   * which is the latest until the reader picks another (IR-562). `null`
+   * before anything has been answered.
+   */
+  question?:  string | null;
+  /**
+   * The Passages the selected reply cited, in marker order. A reopened
    * Conversation's reply (IR-298) carries only the pointer — record, chunk,
    * page — until IR-299 re-resolves the quote and title at read time.
    */
@@ -16,8 +22,9 @@ interface SourceContextPanelProps {
 }
 
 /**
- * What the latest answer was grounded in: the quote, the page, and whose work
- * it is.
+ * What the selected answer was grounded in: the quote, the page, and whose
+ * work it is. It names the answer it describes, so it can never be read as
+ * evidence for a different one (IR-562).
  *
  * **Nothing is fetched here any more (IR-284).** The panel used to request one
  * `RecordDetail` per citation, which meant a spinner, an N+1 and a card that
@@ -31,7 +38,7 @@ interface SourceContextPanelProps {
  * Lightened for IR-329: flat list rows, not bordered cards -- chips in the
  * answer text carry citation detail now, this is just a reference list.
  */
-export function SourceContextPanel({ open, citations, sources, onClose }: SourceContextPanelProps) {
+export function SourceContextPanel({ open, question = null, citations, sources, onClose }: SourceContextPanelProps) {
   return (
     <aside
       // Collapses by width, matching `ConversationSidebar`'s own transition,
@@ -44,10 +51,10 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
     >
       <div className="w-[min(100vw,320px)] sm:w-[300px] flex flex-col h-full">
       <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-stone-200/60">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-[14px] font-bold text-stone-800">Referenced passages</h2>
-          <p className="text-[12px] text-stone-500 mt-0.5">
-            The exact text behind the latest answer
+          <p className="text-[12px] text-stone-500 mt-0.5 line-clamp-2">
+            {question ? <>For “{question}”</> : "The exact text behind the answer"}
           </p>
         </div>
         <button
@@ -60,7 +67,7 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
         </button>
       </div>
 
-      <SourcePassages citations={citations} sources={sources} />
+      <SourcePassages citations={citations} sources={sources} answered={question !== null} />
       </div>
     </aside>
   );
@@ -71,14 +78,23 @@ export function SourceContextPanel({ open, citations, sources, onClose }: Source
  * Beside the answer on a wide page, and in the sources drawer on a phone
  * (IR-570), so the two cannot show them differently.
  */
-export function SourcePassages({ citations, sources }: Pick<SourceContextPanelProps, "citations" | "sources">) {
+export function SourcePassages({
+  citations,
+  sources,
+  answered = false,
+}: Pick<SourceContextPanelProps, "citations" | "sources"> & {
+  /** Whether there is an answer at all: one that cited nothing says so. */
+  answered?: boolean;
+}) {
   const cardFor = (recordId: number) => sources.find((s) => s.id === recordId);
 
   return (
     <div className="flex-1 overflow-y-auto scrollbar-thin p-3 space-y-2.5">
       {citations.length === 0 && (
         <p className="text-[14px] text-stone-500 text-center py-8 px-2">
-          Ask a question to see the passages IRIS used in its answer.
+          {answered
+            ? "This answer cited no passages."
+            : "Ask a question to see the passages IRIS used in its answer."}
         </p>
       )}
 

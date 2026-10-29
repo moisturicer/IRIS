@@ -1,4 +1,4 @@
-"""
+﻿"""
 The declared expected-access table (IR-615).
 
 Keyed by app, then URL name, then HTTP method. Every route
@@ -50,12 +50,12 @@ SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE)
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY)
 
-#: ADR-022 §Amendment 4 point 4, recorded 2026-09-24: `authorize_record_documents`
+#: ADR-022 Â§Amendment 4 point 4, recorded 2026-09-24: `authorize_record_documents`
 #: answers 403 even to a caller who cannot see the Record, because the Record id
 #: is the caller's own parameter. The documents app's upload and listing routes
 #: only; every other route follows the 404 convention.
 DOCUMENTS_EXCEPTION = (
-    "ADR-022 §Amendment 4 point 4: authorize_record_documents answers 403 to a caller "
+    "ADR-022 Â§Amendment 4 point 4: authorize_record_documents answers 403 to a caller "
     "who cannot see the Record, whose id they supplied (IR-153)"
 )
 
@@ -108,6 +108,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-interests": Entry({
         "GET": _case(SIGNED_IN),
         "PUT": _case(SIGNED_IN, data={}),
+        "DELETE": _case(SIGNED_IN),
+    }),
+    # IR-576: dismiss only a readable Record; Undo deletes only one's own
+    # feedback and returns the same empty success for hidden or missing ids.
+    "record-not-interested": Entry({
+        "POST": _case(READS_RECORD, kwargs=RECORD, data={}),
+        "DELETE": _case(SIGNED_IN, kwargs=RECORD),
     }),
     "record-mine": Entry({"GET": _case(SIGNED_IN)}),
 
@@ -130,6 +137,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
         ),
     }),
     "record-similar": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
+    # ADR-029: novelty results belong only to the Proposal's owner.
+    "record-related-research": Entry({
+        "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
+    }),
     "record-tracker": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     "record-increment-access": Entry({"POST": _case(READS_RECORD, kwargs=RECORD, data={})}),
     # The manuscript's own text, for the person publishing it (IR-406).
@@ -140,7 +151,7 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # before lookup, so a non-office caller's 403 is the same for a missing id.
     "record-tags": Entry({"PATCH": _case(OFFICE_ONLY, kwargs=RECORD, data={"is_ip": True})}),
 
-    # -- document requests (ADR-022 §5, §Amendment 5) --------------------
+    # -- document requests (ADR-022 Â§5, Â§Amendment 5) --------------------
     # Read by participation, never by role: the owner, and anyone who can
     # staff a party that took part -- the Adviser, ITSO's whole pool. RDCO
     # took no part in `record`, so sees it but not its requests.
@@ -305,7 +316,7 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
         ),
     }),
 
-    # -- deciding a document request (ADR-022 §Amendment 4) -------------
+    # -- deciding a document request (ADR-022 Â§Amendment 4) -------------
     # 404 off a visible Record; 403 to a visible reader who is not the
     # requesting party; the party, not the person: ITSO's whole pool.
     "document-request-detail": Entry({
@@ -323,7 +334,7 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
 }
 
 REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
-    # ADR-043 §6: only this office's coordinator, with the same hidden-id
+    # ADR-043 Â§6: only this office's coordinator, with the same hidden-id
     # convention as seats. The document request supplies its assignment id.
     "assignment-extend": Entry({
         "POST": _case(
@@ -356,7 +367,7 @@ ACCOUNTS = {
     "user-detail": Entry({m: _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")},
                                  **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                           for m in ("GET", "PUT", "PATCH")}),
-    "user-change-role": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"role": "Adviser"})}),
+    "user-change-role": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"role_name": "Adviser"})}),
     "user-coordinator": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"is_office_coordinator": True})}),
     "user-lock": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={})}),
     "user-locked": Entry({"GET": _case(RDCO_ONLY)}),
@@ -379,7 +390,7 @@ REVIEWS = {
     "reviews-mine": Entry({"GET": _case(SIGNED_IN)}),
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
-    "reviews-analytics": Entry({"GET": _case(row(ANON, DENY, DENY, KnownDefect(DENY, "IR-636", "501 through dropped IsStaff"), STUB, STUB, STUB, STUB, DENY))}),
+    "reviews-analytics": Entry({"GET": _case(row(ANON, DENY, DENY, DENY, STUB, STUB, STUB, STUB, DENY))}),
     "pin-generate": Entry({"POST": _case(READS_RECORD, data={"record_id": Ref("record")}, objects=("record",))}),
     "pin-verify": Entry({"POST": _case(SIGNED_IN, data={"record_id": Ref("record"), "pin": "invalid"})}),
     "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=ASSIGNMENT, data={})}),
@@ -431,10 +442,13 @@ NOTIFICATIONS = {
 }
 OPPORTUNITIES = {
     "opportunity-list": Entry({"GET": _case(SIGNED_IN), "POST": _case(POSTER, data={"title": "Call"})}),
-    "opportunity-detail": Entry({m: _case(SIGNED_IN if m == "GET" else POSTER,
-                                        kwargs={"pk": Ref("opportunity")},
-                                        **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {}))
-                                 for m in ("GET", "PUT", "PATCH", "DELETE")}),
+    # IR-121: an Adviser edits only their own call; RDCO moderates either.
+    "opportunity-detail": Entry({m: [
+        _case(SIGNED_IN if m == "GET" else RDCO_ONLY, kwargs={"pk": Ref("opportunity")},
+              **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
+        _case(SIGNED_IN if m == "GET" else POSTER, kwargs={"pk": Ref("adviser_opportunity")},
+              **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
+    ] for m in ("GET", "PUT", "PATCH", "DELETE")}),
     "opportunity-calendar": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")})}),
     "api-root": Shadowed(by="opportunity-list", why="The empty-prefix list matches before the router root."),
 }
