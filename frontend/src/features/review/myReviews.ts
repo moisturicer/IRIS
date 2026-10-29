@@ -1,4 +1,4 @@
-import type { MyReviewsRow, MyReviewsTab, ReviewOutcome } from "@/types/reviews";
+import type { MyReviewsRow, MyReviewsSort, MyReviewsTab, ReviewOutcome } from "@/types/reviews";
 
 /**
  * My Reviews' own small rules (IR-268): the URL contract and how a row is
@@ -23,11 +23,20 @@ export const OUTCOME_FILTERS: { key: ReviewOutcome; label: string }[] = [
   { key: "published", label: "Published" },
 ];
 
+/** The current tabs' orders (IR-622). Soonest due is the default. */
+export const SORTS: { key: MyReviewsSort; label: string }[] = [
+  { key: "due",     label: "Soonest due" },
+  { key: "waiting", label: "Longest waiting" },
+];
+
 export interface MyReviewsView {
   tab:     MyReviewsTab;
   outcome: ReviewOutcome | null;
   /** A coordinator's office view; null is your own reviews. */
   office:  string | null;
+  /** To review and In review only: Done is always newest first and never overdue. */
+  sort:    MyReviewsSort;
+  overdue: boolean;
 }
 
 /** The retired Review Queue's `?status=`, read once and replaced. */
@@ -57,10 +66,13 @@ export function readView(params: URLSearchParams): { view: MyReviewsView; replac
     ? rawTab
     : (legacy && LEGACY_STATUS[legacy]) || "to_review";
   const rawOutcome = params.get("outcome");
+  const current = tab !== "done";
   const view: MyReviewsView = {
     tab,
-    outcome: tab === "done" && isFilter(rawOutcome) ? rawOutcome : null,
+    outcome: !current && isFilter(rawOutcome) ? rawOutcome : null,
     office: params.get("office") || null,
+    sort: current && params.get("sort") === "waiting" ? "waiting" : "due",
+    overdue: current && params.get("overdue") === "1",
   };
   return { view, replace: legacy != null ? viewSearch(view) : null };
 }
@@ -71,7 +83,32 @@ export function viewSearch(view: MyReviewsView): string {
   if (view.tab !== "to_review") params.set("tab", view.tab);
   if (view.outcome) params.set("outcome", view.outcome);
   if (view.office) params.set("office", view.office);
+  if (view.sort !== "due") params.set("sort", view.sort);
+  if (view.overdue) params.set("overdue", "1");
   return params.toString();
+}
+
+/**
+ * The server's due date as a day name, read in Manila, where every deadline
+ * falls at 23:59 (ADR-043). This formats an instant the server chose; it
+ * computes no date of its own.
+ */
+const DUE_DAY = new Intl.DateTimeFormat("en-GB", {
+  weekday: "short", day: "numeric", month: "short", timeZone: "Asia/Manila",
+});
+
+export function dueLabel(dueAt: string): string {
+  return `Due ${DUE_DAY.format(new Date(dueAt)).replace(",", "")}`;
+}
+
+/**
+ * How late a row is, in the working days the server counted. Before a
+ * working day has been missed (a weekend after a Friday deadline) it is just
+ * Overdue, since "0 working days overdue" reads like a contradiction.
+ */
+export function overdueLabel(days: number | null): string {
+  if (!days) return "Overdue";
+  return days === 1 ? "1 working day overdue" : `${days} working days overdue`;
 }
 
 /** Who holds a row: the office, then you, a colleague, or nobody yet. */

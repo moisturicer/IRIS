@@ -56,3 +56,30 @@ movement transaction. Metadata: assignment id, party, extension id,
 previous_due_at, due_at, reason, system. A failed audit insert rolls back the
 Extension and date movement. New-Version clocks retain earlier Extension rows
 as history; `original_due_at` names the current Version's original deadline.
+
+## My Reviews (IR-622)
+
+Every My Reviews row carries the `deadline_payload` fields. A Done decision with
+no seat behind it carries the empty payload (`due_at` null, never overdue). A
+done seat is never overdue either, even though its assignment can stay active
+while a colleague's seat on it is still open.
+Rows also carry `overdue_days`: the Manila working days, holidays excluded,
+from the due date through today. It is null unless `is_overdue`, and 0 on a
+weekend just after a Friday deadline. The server counts it because the
+browser cannot know the holiday table. One holiday read per request, and
+none when no row is overdue, so the query count stays flat in the rows.
+
+`GET /api/v1/reviews/mine/` takes two parameters for To review and In review:
+
+| Parameter | Values | Effect |
+|---|---|---|
+| `sort` | `due` (default), `waiting` | `due`: soonest due first, undated rows last, ties and undated rows longest-waiting first. `waiting`: longest waiting first, the order before IR-622 |
+| `overdue` | `1` | Overdue rows only. Like `outcome`, it never narrows `counts` |
+
+Done refuses both with 400, because it is always newest first and nothing in
+it is overdue. Any other value is also a 400.
+
+The interface keeps both in the URL (`?sort=waiting&overdue=1`), next to `tab`.
+It shows "Due Fri 7 Nov" formatted in Asia/Manila. Overdue is said in words
+("2 working days overdue", or "Overdue" before a working day has been
+missed); the badge's colour only repeats it.
