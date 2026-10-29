@@ -1582,3 +1582,15 @@ Authority: ADR-042 and general-tools specification §9–§11 (scenarios A01–A
 **Evidence (2026-10-30).** `apps/reviews/test_reminders.py`: **28 passed** against PostgreSQL, including simultaneous escalation, repeat/catch-up, weekend/holiday, extension/pause, Adviser exclusion, RDCO fallback, visibility, unchanged workflow data and audit rollback/retry. The repeat regression failed on the original scheduler and passed with escalation implemented. Scoped flake8 and Django migration consistency passed; Django check reports only the existing Axes deprecation warning. Audit migrations through `0007` applied successfully to a disposable `pg_dump`/restore copy of the development database; `sqlmigrate audit 0007` confirms a SQL no-op (choices only), and the copy was removed afterwards. Full-suite and CI evidence are recorded on the PR. No human approval is claimed.
 
 **IR-623 CI follow-up (2026-10-29).** The workload count field is renamed from `open` to `open_count` in the backend response, TypeScript type, renderer and HTTP/UI fixtures. It counts unfinished seats; it is not `DocumentRequestState.OPEN`. The shared vocabulary guard is unchanged. The HTTP fixture changes deliberately to pin the new field name. Focused checks and updated CI results are recorded on PR #322.
+
+## IR-641 - Accepted account recovery contract
+
+[ADR-045](../adr/045-account-recovery-contract.md) defines both recovery
+journeys: account eligibility, HTTP contracts, token lifecycle and races,
+passwords and credential invalidation, privacy and limits, committed delivery,
+accessible states, audit, configuration and required automated evidence.
+Lee Jasmin Adolfo approved the contract on 2026-10-30; the ADR links the recorded
+human decision. IR-642 and IR-643 have been reassessed and are ready for
+implementation. No recovery implementation or automated coverage is claimed.
+Existing behavior is a baseline, not evidence that the accepted guarantees
+already exist. PR #334 passed all four CI checks before merge.

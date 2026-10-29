@@ -100,12 +100,8 @@ class AffiliationDisplayTests(APITestCase):
     """
 
     def setUp(self):
-        # Reuse the rows seeded by accounts/0003 rather than creating new ones.
-        # That migration inserts College/Department/Course with **explicit ids**,
-        # which leaves the Postgres identity sequence at 1 while rows already
-        # occupy 1..N -- so a plain College.objects.create() here raises
-        # IntegrityError "duplicate key value violates accounts_college_pkey".
-        # Reusing the seed data is both realistic and immune to that.
+        # Reuse the rows seeded by accounts/0003 rather than creating new ones:
+        # it is the reference data a real deployment has.
         self.course     = Course.objects.select_related("department__college").first()
         self.assertIsNotNone(self.course, "accounts/0003 should have seeded courses")
         self.department = self.course.department
