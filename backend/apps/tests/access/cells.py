@@ -35,9 +35,10 @@ class Outcome(enum.Enum):
     DENY = 403
     HIDE = 404
     OK = 0
+    STUB = 501  # A declared, unimplemented endpoint; never accepted by OK.
 
 
-ANON, DENY, HIDE, OK = Outcome.ANON, Outcome.DENY, Outcome.HIDE, Outcome.OK
+ANON, DENY, HIDE, OK, STUB = Outcome.ANON, Outcome.DENY, Outcome.HIDE, Outcome.OK, Outcome.STUB
 
 #: Statuses that are never an `OK`: each is a refusal, a wrong method, or a fault.
 NOT_PERMITTED = {401, 403, 404, 405}
@@ -82,6 +83,7 @@ class Call:
     query: dict = field(default_factory=dict)
     data: dict | None = None
     format: str = "json"
+    objects: tuple[str, ...] = ()  # Body/query ids governed by object visibility.
 
     @property
     def refs(self) -> set[str]:
@@ -103,7 +105,7 @@ class Call:
     @property
     def object_refs(self) -> set[str]:
         """The fixtures named in the path: what makes this an object route."""
-        return {v.name for v in self.kwargs.values() if isinstance(v, Ref)}
+        return {v.name for v in self.kwargs.values() if isinstance(v, Ref)} | set(self.objects)
 
 
 def resolve(value, lookup: Callable[[Ref], object], token: str):
@@ -197,6 +199,8 @@ def judge(declared: Cell, observed: Observed) -> tuple[bool, str]:
             )
         return True, ""
 
+    if declared is STUB:
+        return (status == 501, "" if status == 501 else f"expected declared stub 501, got {status}")
     if status >= 500:
         return False, f"server error {status}: {body[:300]!r}"
     if declared is OK:

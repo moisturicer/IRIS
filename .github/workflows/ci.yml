@@ -176,7 +176,26 @@ jobs:
         # because the run reported no per-test timing at all. A suite that
         # cannot say which test was slow cannot be fixed from its own
         # evidence.
-        run: pytest -ra --durations=25
+        run: pytest -ra --durations=25 --junitxml=pytest-results.xml
+
+      - name: Report authorization matrix duration
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report = Path("pytest-results.xml")
+          if report.exists():
+              cases = [case for case in ET.parse(report).iter("testcase")
+                       if case.get("classname", "").startswith((
+                           "apps.tests.test_access_matrix", "apps.ai.tests.test_access_matrix_bodies"))]
+              seconds = sum(float(case.get("time", "0")) for case in cases)
+              line = f"Authorization matrix: {len(cases)} tests, {seconds:.3f}s (JUnit test durations, including setup/teardown)."
+              print(line)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+                  summary.write(line + "\n")
+          PY
 
   frontend:
     name: Frontend

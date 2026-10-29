@@ -36,6 +36,22 @@
 
 **Status:** implemented and focused tests verified; CI rerun and independent human approval remain outstanding. Deterministic provider tests establish call counts, not production vendor performance.
 
+## IR-616 authorization coverage across every app (NFR-S4)
+
+**Design:** IR-611 slice 4, ADR-009, ADR-019's private Conversations and ADR-022's hidden-object convention. This extends IR-615 without changing application authorization.
+
+- `apps/tests/access/table.py` declares accounts, reviews, AI, notifications, audit and opportunities in addition to records and documents. The pending/partial app mechanism is removed. Every route and method must have an entry; Django admin and the development toolbar retain IR-615's explicit namespace exclusions.
+- Owned Conversation, AskRun and ResearchRun routes are exercised as all nine role/relation columns, including role-less superuser. Body-addressed Conversation and PIN requests also probe missing ids. A Conversation fixture contains a private Turn.
+- `apps/ai/tests/test_access_matrix_bodies.py` checks readable evidence is present and unreadable evidence absent from JSON answers, live SSE and semantic-search passages/cards. Reopened history and queued replay/reconnect recheck visibility; queued checks cover both legacy and public-1 protocols. Only deterministic provider fakes are used.
+- Notification tests observe unread lists before and after individual/bulk mark-read, including a shared broadcast and another reader's direct notification. Profile-edit tests prove a user cannot grant themselves a role, staff/superuser status or office-coordinator status.
+- Source review found two mismatches, filed and linked separately: **IR-635**, PIN generation resolves a hidden Record and emails its title; **IR-636**, the manually bound analytics route drops its declared office-only permission. Expected rules remain intact under `KnownDefect` markers until the separate fixes land. The declared analytics stub has an explicit 501 expectation; ordinary permitted routes still reject every 5xx.
+
+**Verification in progress (2026-10-29):** [CI run 40870491466](https://github.com/moisturicer/IRIS/actions/runs/40870491466) executed the full backend suite: **4,422 passed, 5 failed, 1 xfailed**. Frontend, Security and Docker Compose passed. The combined matrix/body-check duration was **16.025 seconds across 40 tests**, including test setup/teardown (JUnit sum, not total CI wall time). Backend flake8 passed. The five failures exposed test-definition errors, corrected deliberately: `role_name` rather than a nonnumeric `role`; legacy protocol requested by omitting the parameter, not unsupported `protocol=legacy`; ADR-019 retains transcript questions/answers and drops unreadable citation pointers, rather than deleting the Turn; IR-121 permits an Adviser to edit their own call but not RDCO's, now tested with both fixtures. No intended access rule was relaxed. A fresh CI run must verify those corrections.
+
+Local Docker failed with `OSError: Cannot allocate memory` importing migrations from the Windows bind mount, then engine API hangs/500 errors. The container-local retry was also blocked. Compilation and `git diff --check` passed; no local database pass is claimed. CI reports the combined matrix/body-check JUnit durations in Backend logs and its job summary.
+
+**Status:** implementation under verification, not Done. Independent approval and separate defect-fix PRs remain required.
+
 ## IR-615 every route is declared in the authorization matrix (NFR-S4)
 
 **Design:** IR-611's spec (slice 3), [ADR-009](../adr/009-authorization-model.md), and the 404-versus-403 convention of [ADR-022 §Amendment 4](../adr/022-explicit-document-requests.md), including its one recorded exception.

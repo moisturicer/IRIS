@@ -2,8 +2,8 @@
 The declared expected-access table (IR-615).
 
 Keyed by app, then URL name, then HTTP method. Every route
-`routes.enumerate_routes()` finds must appear here, or be in an app listed in
-`PENDING`, or in a namespace `routes.OUT_OF_SCOPE_NAMESPACES` names; anything
+`routes.enumerate_routes()` finds must appear here, or in a namespace
+`routes.OUT_OF_SCOPE_NAMESPACES` names; anything
 else fails `test_access_matrix` with the route's name.
 
 **Never edit a row to make a failing route pass** (IR-611). A row says what
@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cells import (
-    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, Call, Case, Ref, Upload, row,
+    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, STUB, Call, Case, KnownDefect, Ref, Upload, row,
 )
 
 # -- shorthands -------------------------------------------------------------
@@ -79,18 +79,6 @@ class Shadowed:
 
     by: str
     why: str
-
-
-#: Apps whose routes are not declared yet. IR-616 (slice 4) declares them and
-#: deletes this mapping; until then their routes are reported, not fired.
-PENDING = {
-    "accounts": "IR-616",
-    "reviews": "IR-616",
-    "ai": "IR-616",
-    "notifications": "IR-616",
-    "audit": "IR-616",
-    "opportunities": "IR-616",
-}
 
 
 def _case(cells, **call) -> Case:
@@ -357,14 +345,121 @@ REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
     }),
 }
 
-TABLE: dict[str, dict[str, Entry | Shadowed]] = {
-    "records": RECORDS,
-    "documents": DOCUMENTS_APP,
+# IR-616: every remaining app is declared; there is no pending exemption.
+PUBLIC = row(OK, OK, OK, OK, OK, OK, OK, OK, OK)
+PRIVATE = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
+COORDINATOR = row(ANON, HIDE, DENY, DENY, DENY, DENY, OK, DENY, HIDE)
+REVIEWER = row(ANON, DENY, DENY, OK, OK, OK, OK, OK, DENY)
+POSTER = row(ANON, DENY, DENY, OK, DENY, DENY, DENY, OK, DENY)
+
+ACCOUNTS = {
+    "auth-register": Entry({"POST": _case(PUBLIC, data={})}),
+    # Missing credentials are rejected for every caller, including signed-in users.
+    "auth-login": Entry({"POST": _case(row(*([ANON]*9)), data={})}),
+    "auth-logout": Entry({"POST": _case(SIGNED_IN, data={})}),
+    "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
+    "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
+    "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),
+    "user-list": Entry({"GET": _case(RDCO_ONLY)}),
+    "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
+    "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
+                      for m in ("GET", "PUT", "PATCH")}),
+    "user-detail": Entry({m: _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")},
+                                 **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
+                          for m in ("GET", "PUT", "PATCH")}),
+    "user-change-role": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"role_name": "Adviser"})}),
+    "user-coordinator": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"is_office_coordinator": True})}),
+    "user-lock": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={})}),
+    "user-locked": Entry({"GET": _case(RDCO_ONLY)}),
+    "user-unlock": Entry({"POST": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={})}),
+    "role-request-list": Entry({"GET": _case(RDCO_ONLY)}),
+    "role-request-detail": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("role_request")}, data={"action": "approve"})}),
+    "user-sessions": Entry({"GET": _case(RDCO_ONLY)}),
+    "user-session-revoke": Entry({"DELETE": _case(RDCO_ONLY, kwargs={"jti": Ref("session_token", "jti")})}),
+    "college-list": Entry({"GET": _case(PUBLIC)}),
+    "department-list": Entry({"GET": _case(PUBLIC)}),
+    "course-list": Entry({"GET": _case(PUBLIC)}),
+    "system-setting": Entry({"GET": _case(SIGNED_IN, kwargs={"key": "matrix-setting"}),
+                             "PATCH": _case(RDCO_ONLY, kwargs={"key": "matrix-setting"}, data={"value": "updated"})}),
 }
 
-# IR-619 adds one route while IR-616 still owns the rest of reviews. Partial
-# declarations are fired and validated like full ones, but do not claim that
-# the app's remaining routes have been audited.
-PARTIAL: dict[str, dict[str, Entry | Shadowed]] = {"reviews": REVIEW_DEADLINES}
-DECLARED = {**TABLE, **PARTIAL}
+ASSIGNMENT = {"pk": Ref("assignment")}
+SEAT = {"pk": Ref("seat")}
+REVIEWS = {
+    **REVIEW_DEADLINES,
+    "reviews-mine": Entry({"GET": _case(SIGNED_IN)}),
+    "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
+    "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
+    "reviews-analytics": Entry({"GET": _case(row(ANON, DENY, DENY, KnownDefect(DENY, "IR-636", "501 through dropped IsStaff"), STUB, STUB, STUB, STUB, DENY))}),
+    "pin-generate": Entry({"POST": _case(
+        row(ANON, KnownDefect(HIDE, "IR-635", "201 and title emailed"), OK, OK, OK, OK, OK, OK,
+            KnownDefect(HIDE, "IR-635", "201 and title emailed")),
+        data={"record_id": Ref("record")}, objects=("record",),
+    )}),
+    "pin-verify": Entry({"POST": _case(SIGNED_IN, data={"record_id": Ref("record"), "pin": "invalid"})}),
+    "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=ASSIGNMENT, data={})}),
+    "assignment-assign": Entry({m: _case(COORDINATOR, kwargs=ASSIGNMENT,
+                                       **({} if m == "GET" else {"data": {"reviewer": Ref("reviewer_target")}}))
+                               for m in ("GET", "POST")}),
+    "assignment-add-reviewer": Entry({m: _case(SEAT_ACTS, kwargs=ASSIGNMENT,
+                                             **({} if m == "GET" else {"data": {"reviewer": Ref("reviewer_target")}}))
+                                     for m in ("GET", "POST")}),
+    "seat-open": Entry({"POST": _case(SEAT_ACTS, kwargs=SEAT, data={})}),
+    "seat-reassign": Entry({"POST": _case(COORDINATOR, kwargs=SEAT, data={"reviewer": Ref("reviewer_target")})}),
+    "seat-withdraw": Entry({"POST": _case(COORDINATOR, kwargs=SEAT, data={})}),
+}
 
+AI = {
+    "ai-ask": Entry({"POST": [
+        _case(SIGNED_IN, data={"question": ""}),
+        _case(PRIVATE, data={"question": "What is this research?", "conversation_id": Ref("conversation")}, objects=("conversation",)),
+    ]}),
+    "ai-ask-stream": Entry({"POST": [
+        _case(SIGNED_IN, data={"question": ""}),
+        _case(PRIVATE, data={"question": "What is this research?", "conversation_id": Ref("conversation")}, objects=("conversation",)),
+    ]}),
+    "ai-search": Entry({"POST": _case(SIGNED_IN, data={"query": ""})}),
+    "ai-status": Entry({"GET": _case(SIGNED_IN)}),
+    "ai-paper-brief": Entry({"POST": _case(READS_RECORD, kwargs=RECORD, data={})}),
+    "ai-record-overview": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
+    "ai-conversations": Entry({"GET": _case(SIGNED_IN), "POST": _case(SIGNED_IN, data={"title": "Matrix"})}),
+    "ai-conversation-detail": Entry({m: _case(PRIVATE, kwargs={"pk": Ref("conversation")},
+                                            **({} if m in ("GET", "DELETE") else {"data": {"title": "Renamed"}}))
+                                    for m in ("GET", "PUT", "PATCH", "DELETE")}),
+    "ai-research-run": Entry({"GET": _case(PRIVATE, kwargs={"pk": Ref("research_run")})}),
+    "ai-ask-run-stream": Entry({"GET": _case(PRIVATE, kwargs={"pk": Ref("ask_run")})}),
+    "ai-ask-run-cancel": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
+    "ai-ask-run-retry": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
+    "ai-embed-record": Entry({"POST": _case(OFFICE_ONLY, kwargs=RECORD, data={})}),
+    "ai-embed-all": Entry({"POST": _case(OFFICE_ONLY, data={})}),
+    "ai-embed-jobs": Entry({"GET": _case(OFFICE_ONLY)}),
+}
+
+NOTIFICATIONS = {
+    "notification-list": Entry({"GET": _case(SIGNED_IN)}),
+    "notification-read": Entry({"PATCH": [
+        _case(PRIVATE, kwargs={"pk": Ref("notification")}, data={}),
+        _case(row(ANON, OK, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs={"pk": Ref("student_broadcast")}, data={}),
+        _case(row(ANON, HIDE, HIDE, HIDE, OK, OK, OK, HIDE, HIDE), kwargs={"pk": Ref("office_broadcast")}, data={}),
+    ]}),
+    "notification-mark-all-read": Entry({"POST": _case(SIGNED_IN, data={})}),
+}
+OPPORTUNITIES = {
+    "opportunity-list": Entry({"GET": _case(SIGNED_IN), "POST": _case(POSTER, data={"title": "Call"})}),
+    # IR-121: an Adviser edits only their own call; RDCO moderates either.
+    "opportunity-detail": Entry({m: [
+        _case(SIGNED_IN if m == "GET" else RDCO_ONLY, kwargs={"pk": Ref("opportunity")},
+              **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
+        _case(SIGNED_IN if m == "GET" else POSTER, kwargs={"pk": Ref("adviser_opportunity")},
+              **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
+    ] for m in ("GET", "PUT", "PATCH", "DELETE")}),
+    "opportunity-calendar": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")})}),
+    "api-root": Shadowed(by="opportunity-list", why="The empty-prefix list matches before the router root."),
+}
+TABLE: dict[str, dict[str, Entry | Shadowed]] = {
+    "records": RECORDS, "documents": DOCUMENTS_APP, "accounts": ACCOUNTS,
+    "reviews": REVIEWS, "ai": AI, "notifications": NOTIFICATIONS,
+    "audit": {"audit-list": Entry({"GET": _case(RDCO_ONLY)})},
+    "opportunities": OPPORTUNITIES,
+}
+DECLARED = TABLE
