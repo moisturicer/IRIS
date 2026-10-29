@@ -156,8 +156,8 @@ Two consequences: the audit log cannot answer any question about the workflow, a
 | 5 | ~~`is_staff` seeding voids role-based restriction~~ | **High** | **Closed** — bypass removed, `accounts/0009` reverses the seeding, verified by `apps/tests/test_authorization_matrix.py` | IR-165 |
 | 6 | Hardcoded credentials, permissive CORS, unset `ALLOWED_HOSTS` | **High** | Open | IR-61 |
 | 7 | ~~Audit readable by all four offices, not only RDCO~~ | **Medium** | **Closed** — `IsAdmin` with `ADMIN_ROLES = {RDCO}`, asserted per-role | IR-165 |
-| 8 | ~~No session inactivity expiry (NFR-S2)~~ | **Medium** | **Fixed, pending review** — idle sessions refused server-side; polling does not count as activity | IR-166 |
-| 9 | ~~Audit log not immutable (NFR-S5)~~ | **Medium** | **Fixed, pending review** — PostgreSQL trigger refuses every changing UPDATE and every DELETE, and the FKs no longer `SET_NULL`, so attribution cannot be stripped; TRUNCATE and the owner dropping the trigger remain possible by deliberate migration | IR-166 |
+| 8 | ~~No session inactivity expiry (NFR-S2)~~ | **Medium** | **Closed** (PR #307, 2026-10-29) — idle sessions refused server-side; polling does not count as activity | IR-166 |
+| 9 | ~~Audit log not immutable (NFR-S5)~~ | **Medium** | **Closed** (PR #307, 2026-10-29) — PostgreSQL trigger refuses every changing UPDATE and every DELETE, and the FKs no longer `SET_NULL`, so attribution cannot be stripped; TRUNCATE and the owner dropping the trigger remain possible by deliberate migration | IR-166 |
 | 10 | No automated tests — no regression detection on any control | **High** | **Partially closed** — a pytest harness exists and `apps/tests/test_authorization_matrix.py` now regression-tests role × action authorization in both directions. Other controls remain uncovered | IR-163, IR-165 |
 | 11 | External AI transmission permission unconfirmed | **Medium** | **Decision required** | — |
 | 12 | No backups, no rehearsed restore before the pilot | **High** | Open | Epic D |
