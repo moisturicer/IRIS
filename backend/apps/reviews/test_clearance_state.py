@@ -14,6 +14,8 @@ from datetime import datetime, timedelta, timezone as tz
 
 from apps.reviews.clearance_state import (
     CLEARANCE_OFFICES,
+    carryover,
+    carryover_version,
     declining_office,
     is_preserved,
 )
@@ -70,6 +72,68 @@ class IsPreservedTests:
         assert is_preserved(
             status="cleared", clearance_updated_at=LATER, last_resubmitted_at=LATER
         ) is False
+
+
+class CarryoverTests:
+    """Preserved *or reset* across the latest version (IR-624). The client
+    renders whichever the server names and infers neither."""
+
+    def _carryover(self, status, *, created=T0, updated=T0, resubmitted=LATER):
+        return carryover(
+            status=status, clearance_created_at=created,
+            clearance_updated_at=updated, last_resubmitted_at=resubmitted,
+        )
+
+    def test_a_clearance_that_survived_the_version_is_preserved(self):
+        assert self._carryover("cleared") == "preserved"
+
+    def test_a_clearance_the_version_set_back_to_pending_is_reset(self):
+        """IERC asked for the revision; `submit_new_version` reset its row,
+        writing `updated_at` at or after the resubmission."""
+        assert self._carryover("pending", updated=LATER) == "reset"
+        assert self._carryover("pending", updated=LATER_STILL) == "reset"
+
+    def test_an_office_still_undecided_and_untouched_is_neither(self):
+        """Pending since before the version and not reset by it: it never
+        concluded, so there was nothing to keep or reset."""
+        assert self._carryover("pending", updated=T0) is None
+
+    def test_an_office_first_routed_after_the_version_is_not_reset(self):
+        """A row created after the resubmission was never set back."""
+        assert self._carryover("pending", created=LATER_STILL, updated=LATER_STILL) is None
+
+    def test_an_office_that_reviewed_the_new_version_is_neither(self):
+        """Re-cleared, or found against, on the new version: ordinary review."""
+        assert self._carryover("cleared", updated=LATER_STILL) is None
+        assert self._carryover("not_cleared", updated=LATER_STILL) is None
+
+    def test_nothing_carries_over_on_a_record_never_resubmitted(self):
+        assert self._carryover("cleared", resubmitted=None) is None
+        assert self._carryover("pending", updated=LATER, resubmitted=None) is None
+
+
+class CarryoverVersionTests:
+    """The version each carryover applies to (IR-416, IR-624)."""
+
+    VERSIONS = [(1, T0 - timedelta(days=1)), (2, T0 + timedelta(days=1)), (3, LATER_STILL)]
+
+    def test_a_preserved_clearance_names_the_version_it_was_cleared_on(self):
+        """Cleared after v2 went in and before v3: cleared on v2."""
+        assert carryover_version(
+            "preserved", clearance_updated_at=T0 + timedelta(days=2), versions=self.VERSIONS,
+        ) == 2
+
+    def test_a_reset_clearance_names_the_version_awaiting_review(self):
+        assert carryover_version("reset", clearance_updated_at=LATER, versions=self.VERSIONS) == 3
+
+    def test_no_version_is_invented(self):
+        """Versions began with IR-416; a clearance older than every version
+        names none rather than an invented v1."""
+        assert carryover_version(
+            "preserved", clearance_updated_at=T0 - timedelta(days=2), versions=self.VERSIONS,
+        ) is None
+        assert carryover_version("reset", clearance_updated_at=LATER, versions=[]) is None
+        assert carryover_version(None, clearance_updated_at=LATER, versions=self.VERSIONS) is None
 
 
 class DecliningOfficeTests:
