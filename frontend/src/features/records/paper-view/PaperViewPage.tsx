@@ -27,6 +27,7 @@ import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
+import { ContinueProposal } from "../ContinueProposal";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
@@ -953,9 +954,18 @@ export default function PaperViewPage() {
                 </div>
               </div>
 
-              {/* Slots: lineage ("Developed from Proposal #123 →", IR-417)
-                  renders here once the payload carries it -- never an empty
-                  or made-up state (spec §4.11). The version picker (IR-416)
+              {record.lineage?.derived_from && (
+                <Link to={`/records/${record.lineage.derived_from.id}`} className="text-small underline">
+                  Developed from Proposal #{record.lineage.derived_from.id} — View proposal
+                </Link>
+              )}
+              {record.lineage?.continued_as && (
+                <Link to={`/records/${record.lineage.continued_as.id}`} className="text-small underline">
+                  Continued as {record.lineage.continued_as.record_type_name} #{record.lineage.continued_as.id}
+                </Link>
+              )}
+              {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
+              {/* The version picker (IR-416)
                   only with two or more versions to choose between, or one
                   beside the owner's unsubmitted revision (IR-273). */}
               {(versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1)) && (

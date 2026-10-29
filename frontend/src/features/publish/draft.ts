@@ -63,6 +63,8 @@ export function stateFromDraft(
       year: record.year_accomplished ?? blank.year,
       adviser: (record.adviser ?? undefined) as number,
       authors: (record.authors ?? []).map((a) => a.name).filter(Boolean),
+      keywords: (record.keywords ?? []).join(", "),
+      owner_emails: record.owners?.map((owner) => owner.email).join(", "),
       classification: byName(lists.classifications, record.classification),
       psced: byName(lists.psceds, record.psced),
       is_ip: Boolean(record.is_ip),
