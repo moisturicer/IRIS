@@ -26,7 +26,11 @@ RAISED = 599
 
 def _send(client, route: Route, method: str, call: Call, world: World, user, missing: str | None):
     def lookup(ref: Ref):
-        return MISSING_PK if ref.name == missing else world.value(ref.name, ref.attr)
+        if ref.name == missing:
+            import uuid
+            value = world.value(ref.name, ref.attr)
+            return uuid.UUID(int=MISSING_PK) if isinstance(value, uuid.UUID) else MISSING_PK
+        return world.value(ref.name, ref.attr)
 
     kwargs = resolve_value(call.kwargs, lookup, world.download_token)
     url = reverse(route.name, kwargs=kwargs)
@@ -67,7 +71,7 @@ def _send(client, route: Route, method: str, call: Call, world: World, user, mis
 def observe(client, route: Route, method: str, call: Call, world: World, role: str,
             waiver: str = "") -> Observed:
     user = world.users[role]
-    missing_ids = [v.name for v in call.kwargs.values() if isinstance(v, Ref)]
+    missing_ids = sorted(call.object_refs)
     return Observed(
         response=_send(client, route, method, call, world, user, None),
         missing=tuple(_send(client, route, method, call, world, user, m) for m in missing_ids),
