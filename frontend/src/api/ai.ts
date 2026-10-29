@@ -1,4 +1,5 @@
-import { apiClient } from "./client";
+import { apiClient, refreshSession } from "./client";
+import { IDLE_HEADER, idleSeconds, markReported } from "@/lib/activity";
 import { API_BASE } from "@/lib/constants";
 import { readSSE, type SSEEvent } from "@/lib/sse";
 import { useAuthStore } from "@/store/auth.store";
@@ -59,9 +60,8 @@ async function checkComparisonLimit(recordIds?: number[]): Promise<void> {
 
 /**
  * `/ai/ask/stream/` as Server-Sent Events (IR-329). Goes through `fetch`
- * directly, not `apiClient` -- `EventSource` can't carry the auth header,
- * and this bypasses axios's 401-refresh interceptor too (accepted gap: a
- * session that expires mid-stream just surfaces as a stream failure).
+ * directly, not `apiClient` -- `EventSource` can't carry the auth header --
+ * so `openStream` does what the axios interceptors would (IR-634).
  */
 async function* streamAsk(
   body: Record<string, unknown>,
@@ -88,15 +88,19 @@ async function* resumeAskRun(
   );
 }
 
+/**
+ * What `apiClient`'s interceptors do, for `fetch`: report idleness, so a
+ * stream does not keep an idle session alive, and on a 401 refresh once and
+ * retry (IR-166, IR-634). A 401 is refused at authentication, before anything
+ * runs, so sending the request again is safe. When the refresh fails the user
+ * has been logged out and redirected, and the 401 surfaces as a stream error.
+ */
 async function* openStream(url: string, init: RequestInit): AsyncGenerator<SSEEvent> {
-  const token = useAuthStore.getState().accessToken;
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      ...(init.headers as Record<string, string> | undefined),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  let response = await send(url, init, useAuthStore.getState().accessToken);
+  if (response.status === 401) {
+    const access = await refreshSession();
+    if (access) response = await send(url, init, access);
+  }
 
   if (!response.ok) {
     let detail = "IRIS could not answer right now.";
@@ -110,6 +114,16 @@ async function* openStream(url: string, init: RequestInit): AsyncGenerator<SSEEv
   }
 
   yield* readSSE(response);
+}
+
+function send(url: string, init: RequestInit, token: string | null): Promise<Response> {
+  const headers: Record<string, string> = {
+    ...(init.headers as Record<string, string> | undefined),
+    [IDLE_HEADER]: String(idleSeconds()),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  markReported();
+  return fetch(url, { ...init, headers });
 }
 
 /**
