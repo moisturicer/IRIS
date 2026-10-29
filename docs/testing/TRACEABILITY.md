@@ -1,5 +1,15 @@
 # Requirements Traceability
 
+## IR-417 · Proposal continuation and lineage
+
+**Design:** [ADR-032 §6 and §12](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
+
+An owner of an approved Proposal may create one Thesis / Research or Project draft through `POST /records/<id>/continue-as/`. The service locks the Proposal and the unconditional `record_one_continuation` database constraint prevents duplicates, including after soft deletion. It copies title, abstract, keywords, classification, PSCED, authors, owners and Adviser without saving the Proposal or copying its manuscript, review or consent. Each lineage link is filtered through `visible_to`. The route is declared in the cross-role access matrix. Historical migration fixtures deliberately use models from the actually applied migration state: reversing another app may also reverse dependent Record migrations, while a target migration's dependency closure may omit Record columns still present in the database. Their backfill assertions are unchanged.
+
+My Library and Paper View offer the action from server-computed availability. The child opens the existing Publish dialog. Keywords and owner emails are editable in its shared Details form; owner changes require active existing accounts, retain the acting owner, exclude the Adviser, and are draft-only. A continuation requires its own manuscript before submission and enters normal adviser-first review. Direct submission remains available.
+
+**Evidence:** `apps/records/test_continuation.py` covers preservation, editable metadata, authorization, lineage visibility, manuscript upload/submission and concurrent requests (one 201, one 409, one child). `test_capabilities.py` pairs offers with endpoints. `test_my_research_list.py` includes the new availability field and constant-query check; its exact-field assertion was deliberately updated for the expanded contract. Frontend: `ContinueProposal.test.tsx`, `PublishDialog.test.tsx`, `MyLibraryPage.test.tsx`, and `PaperViewPage.test.tsx` exercise the accessible controls, refusal, Publish reuse and both lineage directions. Focused backend: 22 passed; library API: 13 passed; focused frontend: 170 passed; TypeScript passed with the lockfile's dependencies. Final full-suite and copied-database migration results are recorded on the PR.
+
 **Purpose.** The single mapping from requirement to evidence.
 **Owns.** Requirement → design → implementation → test → evidence → status, for every SRS requirement.
 **Does not own.** The requirements themselves ([`../SRS.md`](../SRS.md) is the only baseline) · test strategy ([`TEST_PLAN.md`](TEST_PLAN.md)).
@@ -189,7 +199,41 @@ services (`reviews.routing`, `seats`, `office_review`, `decisions`, `revisions`,
 an audit failure can never abort the workflow transaction (the IR-216 guarantee). Migration
 `audit/0004` adds the types and widens `event_type` to 40 characters. Keys and the metric
 recipes: [`../evaluation/AUDIT_EXPORT.md`](../evaluation/AUDIT_EXPORT.md). Display, filters and
-CSV export are IR-529.
+CSV export are implemented by IR-529 (below).
+
+### IR-529 audit viewer and CSV export
+
+The RDCO Audit Log declares every backend type in grouped filters and shows actor,
+timestamp (including time), Record link, and labelled metadata. Record, actor, event
+and inclusive date filters share one validated API query with the CSV export.
+`GET /api/v1/audit/export/` exports all matching rows in insertion order, with the
+17 fixed columns mapped in `AUDIT_EXPORT.md`; no write route is introduced.
+Deleted subjects retain their IDs; absent metadata and missing events are explicit.
+Actor roles are current lookup values, not invented historical snapshots.
+
+**Tests:** `apps/audit/tests/test_csv_export.py` covers RDCO-only access (including
+other roles with `is_staff`), filter parity, all rows beyond pagination, CSV escaping
+and formula protection, retained deleted IDs, invalid filters, empty exports,
+read-only methods, and 7,200-second turnaround plus one preserved clearance computed
+solely from CSV. `frontend/src/features/audit/AuditLogPage.test.tsx` checks every
+backend type against the selectable options, labelled details, actor and Record,
+filter/export parity, error feedback, and automated accessibility.
+
+**Deliberate test correction:** IR-166's route-inventory assertion equated no detail
+endpoint with exactly one collection route. IR-529 adds a read-only CSV collection.
+The test now exercises GET/PUT/PATCH/DELETE on a specific event URL and requires 404;
+both collection routes separately reject writes. The immutability guarantee remains.
+
+**Executed evidence (2026-10-30):** the Docker PostgreSQL run of `apps/audit`
+passed all 56 tests using a separate `DB_NAME=ir529_verification` test namespace
+(the pre-existing default test schema had a duplicate-column migration error).
+The four Audit Log page tests passed, including axe checks. With locked frontend
+dependencies installed, the full frontend suite passed 1,282 tests in 103 files;
+`tsc --noEmit`, changed-file ESLint, the production build, audit flake8 and
+`manage.py check` passed (existing Axes configuration warning). Full backend and
+PR CI results are recorded in the linked IR-529 pull request.
+The export is also declared `RDCO_ONLY` in the endpoint authorization matrix;
+its route declaration and every role are checked by `apps/tests/test_access_matrix.py`.
 
 **Recorded deviation from the card:** its "Clocks" rule starts a clock at `RESUBMITTED` for
 `reset_parties`. A party that asked never stopped its clock, so none restarts for it. The

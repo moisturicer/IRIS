@@ -60,6 +60,8 @@ export function metadataSchema(selfId: number | null, { submitted = false }: { s
     adviser: submitted ? (z.any() as unknown as typeof adviser) : adviser,
 
     authors: z.array(z.string().trim().min(1)).min(1, "Add at least one author."),
+    keywords: z.string().optional(),
+    owner_emails: z.string().optional(),
 
     classification: z.number().int().positive().optional(),
     psced:          z.number().int().positive().optional(),
@@ -145,6 +147,9 @@ export function metadataPayload(
     for_commercialization:  values.for_commercialization,
   };
   if (unloaded.classification) delete payload.classification;
+  const commaList = (value: string) => value.split(",").map((item) => item.trim()).filter(Boolean);
+  if (values.keywords !== undefined) payload.keywords = commaList(values.keywords);
+  if (!submitted && values.owner_emails !== undefined) payload.owner_emails = commaList(values.owner_emails);
   if (unloaded.psced) delete payload.psced;
   if (submitted) for (const field of FIXED_ONCE_SUBMITTED) delete payload[field];
   return payload;

@@ -376,6 +376,31 @@ describe("Mark as completed is retired", () => {
 });
 
 const OWNER_ID = 40;
+
+describe("Proposal lineage", () => {
+  beforeEach(() => {
+    shownRecord = { ...approvedProposal, capabilities: ["continue_as"], lineage: {
+      derived_from: null, continued_as: { id: 456, title: "Full thesis", record_type_name: "Thesis / Research" },
+    } };
+  });
+
+  it("renders the supplied child link and continuation actions", async () => {
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+    expect(await screen.findByRole("link", { name: "Continued as Thesis / Research #456" })).toHaveAttribute("href", "/records/456");
+    expect(screen.getByRole("button", { name: "Continue as Thesis" })).toBeInTheDocument();
+  });
+
+  it("links a child back to its Proposal and hides actions when not offered", async () => {
+    shownRecord = { ...record, capabilities: [], lineage: {
+      derived_from: { id: 123, title: "Proposal", record_type_name: "Proposal" }, continued_as: null,
+    } };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+    expect(await screen.findByRole("link", { name: "Developed from Proposal #123 — View proposal" })).toHaveAttribute("href", "/records/123");
+    expect(screen.queryByRole("button", { name: "Continue as Thesis" })).not.toBeInTheDocument();
+  });
+});
 const OPEN_REVIEW = { name: "Open review" } as const;
 const RESUBMIT = { name: "Resubmit for review" } as const;
 

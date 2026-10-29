@@ -42,7 +42,7 @@ from core.permissions import DELETE_CAPABILITY
 
 # Keys ADR-032 names that no endpoint serves yet, plus `decide`, the legacy
 # decision form IR-260 removed. The server must never offer one.
-UNBUILT = {"continue_as", "set_visibility", "comment_public", "decide"}
+UNBUILT = {"set_visibility", "comment_public", "decide"}
 
 
 def _rolled_back(call):
@@ -104,6 +104,26 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
 
     def proposal_with_adviser(self):
         return self.at_adviser(RecordTypeName.PROPOSAL)
+
+    def accepted_proposal(self):
+        record = self.at_adviser(RecordTypeName.PROPOSAL)
+        self.decided(record, self.adviser, "accept")
+        return record
+
+    def continued_proposal(self):
+        record = self.accepted_proposal()
+        self.client.force_authenticate(self.owner)
+        response = self.client.post(
+            reverse("record-continue-as", args=[record.pk]),
+            {"record_type": self._thesis_type_id()}, format="json",
+        )
+        assert response.status_code == 201, response.data
+        return record
+
+    def _thesis_type_id(self):
+        from apps.records.models import RecordType
+
+        return RecordType.objects.get_or_create(name=RecordTypeName.THESIS_RESEARCH)[0].pk
 
     # --- the probes: one real call per capability -------------------------------------
 
@@ -201,6 +221,9 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 u, "post", url("record-submit", r), {"dpa_accepted": True},
             ),
             "create_version": lambda r, u, d: self._call(u, "post", url("record-new-version", r)),
+            "continue_as": lambda r, u, d: self._call(
+                u, "post", url("record-continue-as", r), {"record_type": self._thesis_type_id()},
+            ),
             "open_review": open_review,
             "comment_review": lambda r, u, d: self._call(
                 u, "post", url("record-review-comments", r), {"body": "A question on section 3."},
@@ -289,6 +312,15 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 "cite", "open_review", "accept_proposal", "reject",
                 "request_document", "request_revision", "comment_review",
             },
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+        },
+        # An accepted Proposal's owner may continue it once (ADR-032 §6, IR-417).
+        "accepted_proposal": {
+            "owner": {"cite", "continue_as", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+        },
+        "continued_proposal": {
+            "owner": {"cite", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
     }

@@ -166,6 +166,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Record starts as draft — notification fires only when the owner calls /submit/
         self._queue_manuscript_extraction_if_present(serializer, record)
 
+    @transaction.atomic
     def update(self, request, *args, **kwargs):
         """
         An owner edits only a `draft`, or a record awaiting their revision
@@ -177,6 +178,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         from .versions import details_editable
 
+        record = self.get_object()
+        Record.objects.select_for_update().get(pk=record.pk)
         record = self.get_object()
         if not details_editable(record):
             return Response(
@@ -277,6 +280,7 @@ class RecordViewSet(viewsets.ModelViewSet):
     # how this action ended up unprotected despite looking otherwise. Real
     # enforcement is the "submit" branch in get_permissions().
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def submit(self, request, pk=None):
         """
         POST /records/<id>/submit/
@@ -292,6 +296,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         Revised work uses the dedicated resubmission action.
         """
         record = self.get_object()  # enforces IsRecordOwner object permission
+        Record.objects.select_for_update().get(pk=record.pk)
+        record = self.get_object()
 
         if record.pipeline_status != PipelineStatus.DRAFT:
             return Response(
@@ -308,6 +314,11 @@ class RecordViewSet(viewsets.ModelViewSet):
         if not record.adviser_id:
             return Response(
                 {"detail": "An adviser must be assigned before a record can be submitted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if record.derived_from_id and not record.abstract_file:
+            return Response(
+                {"abstract_file": "Upload the full manuscript before submitting this continuation."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if record.owners.filter(user_id=record.adviser_id).exists():
@@ -830,6 +841,38 @@ class RecordViewSet(viewsets.ModelViewSet):
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
 
+    @action(detail=True, methods=["post"], url_path="continue-as")
+    def continue_as(self, request, pk=None):
+        """
+        POST /records/<id>/continue-as/  {"record_type": <id>}
+
+        An owner of an accepted Proposal starts its continuation: a new Thesis
+        or Project `draft` linked back to it (ADR-032 §6, IR-417). Answers 201
+        with the draft's detail, which Publish then opens. 404 for a record the
+        caller cannot see, 403 for one they do not own, 400 for a record or
+        type that cannot be continued, 409 once it already has been.
+        """
+        from .continuation import ContinuationRefused, continue_proposal
+        from .models import RecordType
+
+        proposal = self.get_object()
+        record_type = RecordType.objects.filter(pk=request.data.get("record_type")).first() \
+            if str(request.data.get("record_type", "")).isdigit() else None
+        if record_type is None:
+            return Response(
+                {"record_type": "Choose Thesis / Research or Project."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            child = continue_proposal(proposal, request.user, record_type)
+        except ContinuationRefused as exc:
+            return Response({"detail": exc.message}, status=exc.status_code)
+        child = self.get_queryset().get(pk=child.pk)
+        return Response(
+            RecordDetailSerializer(child, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=True, methods=["post"])
     def decide(self, request, pk=None):
         """
@@ -1023,8 +1066,13 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         from apps.reviews.tracker import workflow_facts
 
+        from django.db.models import Exists, OuterRef
+
         qs = (
             Record.objects.filter(owners__user=request.user).distinct()
+            .annotate(has_continuation=Exists(
+                Record.objects.with_deleted().filter(derived_from_id=OuterRef("pk"))
+            ))
             .select_related("record_type", "adviser")
             .prefetch_related("authors")
             .order_by("-updated_at", "-pk")

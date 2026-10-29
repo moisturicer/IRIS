@@ -46,6 +46,12 @@ beforeEach(() => {
 });
 
 describe("My Library: an author's research", () => {
+  it("offers continuation only when the server permits it", async () => {
+    mine([ownRecord({ pipeline_status: "approved", workflow_state: "approved", can_continue: true })]);
+    renderScreen(<MyLibraryPage />);
+    expect(await screen.findByRole("button", { name: "Continue as Thesis" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue as Project" })).toBeInTheDocument();
+  });
   it("opens on the author's research, with the server's status and Continue into Publish for a draft", async () => {
     mine([ownRecord({})]);
     const { container } = renderScreen(<MyLibraryPage />);

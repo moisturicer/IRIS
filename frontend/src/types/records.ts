@@ -67,6 +67,7 @@ export interface ForYouPage {
  * stay on Paper View, so the list costs the same queries for any length.
  */
 export interface MyResearchItem {
+  can_continue?:        boolean;
   id:                   number;
   title:                string;
   record_type_name:     string | null;
@@ -235,6 +236,10 @@ export interface MetadataSuggestions {
 }
 
 export interface RecordDetail extends RecordListItem {
+  lineage?: {
+    derived_from: { id: number; title: string; record_type_name: string | null } | null;
+    continued_as: { id: number; title: string; record_type_name: string | null } | null;
+  };
   /** Server-computed action offers (ADR-032 §10); every action re-checks authority. */
   capabilities:   Capability[];
   year_completed:  number | null;
@@ -760,6 +765,8 @@ export interface RecordTracker {
 }
 
 export interface RecordFormData {
+  keywords?:             string[];
+  owner_emails?:         string[];
   title:                 string;
   year_accomplished?:    number;
   year_completed?:       number;
