@@ -7,7 +7,7 @@ The seat endpoints (ADR-032 §4, IR-415). Mounted at `/api/v1/`.
     POST assignments/<id>/add-reviewer/  {"reviewer": id}  a seat holder adds a colleague
     GET  assignments/<id>/add-reviewer/  who they may add (IR-269)
     POST seats/<id>/open/                the holder opens their review
-    POST seats/<id>/reassign/            {"reviewer": id}  a coordinator moves a seat
+    POST seats/<id>/reassign/            {"reviewer": id, "reason": str}  a coordinator moves a seat
     POST seats/<id>/withdraw/            a coordinator takes a seat away
 
 Nomination has no endpoint: it happens inside routing (IR-261), which calls
@@ -222,7 +222,10 @@ class ReassignView(APIView):
         reviewer, refused = _reviewer_from(request)
         if refused:
             return refused
-        return _run(lambda: seats.reassign(seat, request.user, reviewer), user=request.user, created=True)
+        return _run(
+            lambda: seats.reassign(seat, request.user, reviewer, reason=request.data.get("reason")),
+            user=request.user, created=True,
+        )
 
 
 class WithdrawView(APIView):

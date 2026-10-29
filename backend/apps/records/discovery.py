@@ -1,4 +1,4 @@
-"""Owner-scoped metadata discovery for IR-567."""
+"""Owner-scoped metadata discovery: IR-567, and IR-576's feedback and reset."""
 
 from collections import deque
 from datetime import timedelta
@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from core.enums import PUBLICLY_VISIBLE_STATUSES
 
 from .models import (
-    Classification, DiscoveryFeedSnapshot, DiscoveryInterests,
+    Classification, DiscoveryDismissal, DiscoveryFeedSnapshot, DiscoveryInterests,
     PSCEDClassification, Record,
 )
 from .filters import RecordFilter
@@ -60,17 +60,57 @@ def _validated_ids(data, field, model):
 def put_interests(user, data):
     classification_ids = _validated_ids(data, "classification_ids", Classification)
     psced_ids = _validated_ids(data, "psced_ids", PSCEDClassification)
-    interests = _interests(user)
-    interests = DiscoveryInterests.objects.select_for_update().get(pk=interests.pk)
+    interests = _locked_interests(user)
     if (
         set(interests.classifications.values_list("pk", flat=True)) != classification_ids
         or set(interests.psced.values_list("pk", flat=True)) != psced_ids
     ):
         interests.classifications.set(classification_ids)
         interests.psced.set(psced_ids)
-        interests.revision += 1
-        interests.save(update_fields=["revision"])
+        _invalidate(interests)
     return Response(_interests_payload(interests))
+
+
+def _invalidate(interests):
+    """Bump the revision: every outstanding cursor goes stale (409), and the
+    next feed is a fresh snapshot."""
+    interests.revision += 1
+    interests.save(update_fields=["revision"])
+
+
+def _locked_interests(user):
+    return DiscoveryInterests.objects.select_for_update().get(pk=_interests(user).pk)
+
+
+@transaction.atomic
+def reset_interests(user):
+    """Clear chosen Areas and every Not interested. Saved papers are not feedback."""
+    interests = _locked_interests(user)
+    interests.classifications.clear()
+    interests.psced.clear()
+    DiscoveryDismissal.objects.filter(user=user).delete()
+    DiscoveryFeedSnapshot.objects.filter(user=user).delete()
+    _invalidate(interests)
+    return Response(_interests_payload(interests))
+
+
+@transaction.atomic
+def dismiss(user, record):
+    """Not interested. Pages already frozen drop it too, so cursors stay valid:
+    removing an item reorders nothing, so the revision is left alone."""
+    _locked_interests(user)  # Serialised with a reset, which would otherwise miss it.
+    _, created = DiscoveryDismissal.objects.get_or_create(user=user, record=record)
+    return Response(status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+
+@transaction.atomic
+def undo_dismissal(user, record_id):
+    """Undo restores the Record under a fresh snapshot, not into an old one."""
+    interests = _locked_interests(user)
+    deleted, _ = DiscoveryDismissal.objects.filter(user=user, record_id=record_id).delete()
+    if deleted:
+        _invalidate(interests)
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 def _catalogue(user, filters=None):
@@ -80,6 +120,7 @@ def _catalogue(user, filters=None):
         .select_related("classification", "psced", "record_type", "ai_overview")
         .prefetch_related("authors")
         .annotate(file_count=Count("files", distinct=True))
+        .exclude(pk__in=DiscoveryDismissal.objects.filter(user=user).values("record_id"))
         .order_by("-created_at", "-pk")
     )
     if filters:

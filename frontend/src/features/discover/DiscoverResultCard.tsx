@@ -23,6 +23,8 @@ interface DiscoverResultCardProps {
   onCite:          () => void;
   reason?:         ForYouItem["reason"];
   expanded?:       boolean;
+  /** For you only: hide this recommendation for the reader's account (IR-576). */
+  onNotInterested?: () => void;
 }
 
 /**
@@ -33,7 +35,7 @@ interface DiscoverResultCardProps {
  * so the card names none rather than guessing one; citation and download
  * counts do not exist, so views are the only figure.
  */
-export function DiscoverResultCard({ record, searchHighlight, onCite, reason, expanded = false }: DiscoverResultCardProps) {
+export function DiscoverResultCard({ record, searchHighlight, onCite, reason, expanded = false, onNotInterested }: DiscoverResultCardProps) {
   const [starred, setStarred] = useState(() => isStarred(record.id));
   const abstract = record.abstract?.trim() ?? "";
   const hook = cardHook({ abstract, ai_hook: record.ai_hook });
@@ -129,6 +131,21 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
           >
             <CitationIcon className="w-[13px] h-[13px]" />
           </button>
+          {onNotInterested && (
+            <button
+              type="button"
+              onClick={onNotInterested}
+              aria-label="Not interested"
+              title="Not interested"
+              className={cn(
+                "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50 flex items-center justify-center",
+                COLOUR_TRANSITION,
+                FOCUS_RING,
+              )}
+            >
+              <i className="far fa-eye-slash text-[13px]" aria-hidden />
+            </button>
+          )}
         </>
       }
     />

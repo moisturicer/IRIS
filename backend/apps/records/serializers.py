@@ -3,7 +3,7 @@ from rest_framework import serializers
 from core.enums import PipelineStatus, ReviewDecision
 
 from apps.documents.validators import pdf_upload_problem
-from apps.reviews.clearance_state import clearance_payload, resubmission_payload
+from apps.reviews.clearance_state import clearance_payload, record_versions, resubmission_payload
 
 from .models import (
     Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
@@ -382,8 +382,12 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         against a different definition (IR-139).
         """
         readable = self._readable(obj)
+        versions = record_versions(obj)
         return [
-            clearance_payload(c, last_resubmitted_at=obj.last_resubmitted_at, readable=readable)
+            clearance_payload(
+                c, last_resubmitted_at=obj.last_resubmitted_at, readable=readable,
+                versions=versions,
+            )
             for c in self._ordered_clearances(obj)
         ]
 

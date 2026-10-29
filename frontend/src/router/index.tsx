@@ -20,6 +20,7 @@ import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConfer
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
 import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
 import MyReviewsPage        from "@/features/review/MyReviewsPage";
+import OfficeConsolePage    from "@/features/review/OfficeConsolePage";
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import AuditLogPage         from "@/features/audit/AuditLogPage";
 import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
@@ -77,6 +78,8 @@ export const router = createBrowserRouter([
                 element: <ReviewAccessRoute />,
                 children: [
                   { path: "review",          element: <MyReviewsPage />,       handle: { crumb: "My Reviews" } },
+                  // A coordinator's console (IR-623). The server refuses anyone else.
+                  { path: "review/office",   element: <OfficeConsolePage />,   handle: { crumb: "Office console" } },
                 ],
               },
               { path: "review/:id/evaluate", loader: ({ params }) => redirect(`/records/${params.id}?section=review`) },

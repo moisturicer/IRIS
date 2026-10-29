@@ -1,0 +1,42 @@
+# Repo-local semgrep rules for the CI security gate (IR-614).
+#
+# Why this file exists: the registry's own rule for this case,
+# python.django.security.injection.sql.sql-injection-using-db-cursor-execute,
+# is rated WARNING, and bandit's B608 MEDIUM -- so request data reaching raw
+# SQL would only be *reported*, and IR-614's own example (`cursor.execute(f"...")`
+# turning the PR red) would pass. This rule is the same idea at ERROR.
+#
+# It is a taint rule on purpose: it fires only when something read from the
+# request reaches raw SQL, so SQL built from module constants (for example
+# apps/ai/keyword_index.py's table names) is not a finding.
+rules:
+  - id: iris-request-data-in-raw-sql
+    mode: taint
+    severity: ERROR
+    languages: [python]
+    message: >-
+      Request data reaches raw SQL. Pass it as a query parameter
+      (cursor.execute(sql, [value])) or use the ORM.
+    metadata:
+      cwe: "CWE-89: SQL Injection"
+      ticket: IR-614
+    pattern-sources:
+      - pattern: request.$ATTR
+      - pattern: request.$ATTR[...]
+      - pattern: request.$ATTR.get(...)
+    pattern-sinks:
+      # Only the SQL string itself: parameters passed separately are safe.
+      - patterns:
+          - pattern-inside: $CURSOR.execute($SQL, ...)
+          - focus-metavariable: $SQL
+      - patterns:
+          - pattern-inside: $CURSOR.executemany($SQL, ...)
+          - focus-metavariable: $SQL
+      - patterns:
+          - pattern-inside: $MODEL.objects.raw($SQL, ...)
+          - focus-metavariable: $SQL
+      - patterns:
+          - pattern-inside: RawSQL($SQL, ...)
+          - focus-metavariable: $SQL
+    pattern-sanitizers:
+      - pattern: int(...)

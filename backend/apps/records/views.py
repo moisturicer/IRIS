@@ -88,7 +88,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
-        if self.action == "metadata_suggestions":
+        if self.action in ("metadata_suggestions", "related_research"):
             # The Publish dialog's prefill is the manuscript's own text, offered
             # to the person publishing it (IR-406; IR-374 spec Appendix D:
             # "the owner through visible_to(), with a 404 otherwise").
@@ -472,6 +472,29 @@ class RecordViewSet(viewsets.ModelViewSet):
         return Response(
             {"results": [record_card(m.record, m.score) for m in matches]}
         )
+
+    @action(detail=True, methods=["get"], url_path="related-research")
+    def related_research(self, request, pk=None):
+        """
+        GET /records/<id>/related-research/ -- the Novelty check (IR-312).
+
+        Published work close to this Proposal, shown to its owner as "Related
+        published research" (ADR-029 §2, amendment item 9), recomputed on
+        every request. **Owner-only**, through `get_queryset()`: anyone else
+        gets the same 404 as a missing record (IR-153). A record that is not a
+        Proposal, or has no vector yet, answers `checked: false`.
+        """
+        from apps.ai.presentation import record_card
+        from apps.ai.similarity import related_published_research
+
+        matches = related_published_research(self.get_object(), request.user)
+        # `checked` is False when no comparison ran -- not a Proposal, or not
+        # indexed yet -- so "nothing close" is never shown for an unchecked one.
+        return Response({
+            "checked": matches is not None,
+            "results": [record_card(m.record, m.score) for m in matches or []],
+            "threshold": settings.AI_NOVELTY_MIN_SIMILARITY,
+        })
 
     @action(detail=True, methods=["get"])
     def tracker(self, request, pk=None):
@@ -904,14 +927,28 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         return Response({"years": list(years)})
 
-    @action(detail=False, methods=["get", "put"], url_path="interests")
+    @action(detail=False, methods=["get", "put", "delete"], url_path="interests")
     def interests(self, request):
-        """The signed-in reader's optional Classification and PSCED Areas."""
-        from .discovery import get_interests, put_interests
+        """The signed-in reader's optional Classification and PSCED Areas.
+        DELETE is "Reset my interests": Areas and Not interested both go (IR-576)."""
+        from .discovery import get_interests, put_interests, reset_interests
 
         if request.method == "PUT":
             return put_interests(request.user, request.data)
+        if request.method == "DELETE":
+            return reset_interests(request.user)
         return get_interests(request.user)
+
+    @action(detail=True, methods=["post", "delete"], url_path="not-interested")
+    def not_interested(self, request, pk=None):
+        """POST /records/<id>/not-interested/ hides it from the reader's For you;
+        DELETE is Undo (IR-576). Only a Record the reader can read is dismissed,
+        and undoing names nothing, so it answers 204 either way."""
+        from .discovery import dismiss, undo_dismissal
+
+        if request.method == "DELETE":
+            return undo_dismissal(request.user, pk)
+        return dismiss(request.user, self.get_object())
 
     @action(detail=False, methods=["get"], url_path="for-you")
     def for_you(self, request):

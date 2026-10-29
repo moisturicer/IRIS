@@ -117,6 +117,11 @@ export default function DiscoverPage() {
   const [interestLoadFailed, setInterestLoadFailed] = useState(false);
   const [interestSaving, setInterestSaving] = useState(false);
   const [interestError, setInterestError] = useState("");
+  const [resetConfirming, setResetConfirming] = useState(false);
+  const [resetting, setResetting] = useState(false);
+  /** What the reader's last Not interested, Undo or reset did; Undo only for the last dismissal. */
+  const [feedback, setFeedback] = useState<{ text: string; undo?: ForYouItem } | null>(null);
+  const [feedbackError, setFeedbackError] = useState("");
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -269,6 +274,10 @@ export default function DiscoverPage() {
   // (or a retry) starts a new one, and anything older is dropped, Load more
   // included, so results from two queries can never mix.
   const generation = useRef(0);
+  /** Dismissals not yet confirmed by the server, each resolving to whether it was
+   *  stored. A page requested meanwhile may still carry the Record (IR-576). */
+  const pendingDismissals = useRef(new Map<number, Promise<boolean>>());
+  const withoutHidden = (rows: ForYouItem[]) => rows.filter((r) => !pendingDismissals.current.has(r.id));
   const restoreScrollTo = useRef<number | null>(null);
   /** Where the reader is, set only once this query's results are on screen:
    *  until then there is nothing of this query to return to. */
@@ -296,7 +305,7 @@ export default function DiscoverPage() {
         if (current !== generation.current) return;
         if (feed === "for_you") {
           const response = data as Awaited<ReturnType<typeof recordsApi.forYou>>["data"];
-          setFeedRecords(response.results ?? []);
+          setFeedRecords(withoutHidden(response.results ?? []));
           setNextCursor(response.next_cursor);
           setTotalCount(response.count ?? response.results.length);
           if (response.mode === "latest") {
@@ -347,7 +356,7 @@ export default function DiscoverPage() {
           const response = data as Awaited<ReturnType<typeof recordsApi.forYou>>["data"];
           setFeedRecords((prev) => {
             const seen = new Set(prev.map((r) => r.id));
-            return [...prev, ...(response.results ?? []).filter((r) => !seen.has(r.id))];
+            return [...prev, ...withoutHidden(response.results ?? []).filter((r) => !seen.has(r.id))];
           });
           setNextCursor(response.next_cursor);
           setTotalCount(response.count);
@@ -433,6 +442,68 @@ export default function DiscoverPage() {
   const shownRecords: (RecordListItem & { reason?: ForYouItem["reason"] })[] = feed === "for_you" ? feedRecords : records;
   const shownRemaining = feed === "for_you" ? (nextCursor ? Math.max(1, (totalCount ?? 0) - feedRecords.length) : 0) : remaining;
 
+  /* ── Not interested, Undo and reset (IR-576) ─────────────────────────── */
+  const report = (text: string, undo?: ForYouItem) => {
+    setFeedbackError("");
+    setFeedback({ text, undo });
+  };
+  const adjustCount = (by: number) => setTotalCount((n) => (n === null ? n : n + by));
+
+  // Removed at once; the server keeps the reader's next pages valid without it.
+  const notInterested = (record: ForYouItem) => {
+    const index = feedRecords.findIndex((r) => r.id === record.id);
+    if (index < 0) return;
+    const shownIn = generation.current;
+    setFeedRecords((prev) => prev.filter((r) => r.id !== record.id));
+    adjustCount(-1);
+    report(`“${record.title}” won’t be recommended to you again.`, record);
+    const stored = recordsApi.notInterested(record.id).then(() => true, () => {
+      // Put it back only into the list it left; a reloaded feed already has the truth.
+      if (shownIn === generation.current) {
+        setFeedRecords((prev) => prev.some((r) => r.id === record.id)
+          ? prev
+          : [...prev.slice(0, index), record, ...prev.slice(index)]);
+        adjustCount(1);
+      }
+      setFeedback((current) => (current?.undo?.id === record.id ? null : current));
+      setFeedbackError("That recommendation couldn’t be hidden. Please try again.");
+      return false;
+    }).finally(() => pendingDismissals.current.delete(record.id));
+    pendingDismissals.current.set(record.id, stored);
+  };
+
+  // Undo restores it under a fresh feed, so the list is reloaded rather than patched.
+  // It waits for the dismissal itself, or a fast Undo could land before it.
+  const undoNotInterested = async (record: ForYouItem) => {
+    setFeedbackError("");
+    if (!(await (pendingDismissals.current.get(record.id) ?? true))) return;
+    try {
+      await recordsApi.undoNotInterested(record.id);
+      report(`“${record.title}” is back in For you.`);
+      setAttempt((n) => n + 1);
+    } catch {
+      setFeedbackError("Undo didn’t go through. Please try again.");
+    }
+  };
+
+  const resetInterests = async () => {
+    setResetting(true);
+    setInterestError("");
+    try {
+      const { data } = await recordsApi.resetInterests();
+      setInterests(data);
+      setInterestSelection({ classification_ids: [], psced_ids: [] });
+      setInterestOpen(false);
+      setResetConfirming(false);
+      report("Your interests were reset. Your saved papers and folders are unchanged.");
+      if (feed === "for_you") setAttempt((n) => n + 1);
+    } catch {
+      setInterestError("Your interests couldn’t be reset. Please try again.");
+    } finally {
+      setResetting(false);
+    }
+  };
+
   const saveInterests = async () => {
     setInterestSaving(true);
     setInterestError("");
@@ -460,6 +531,8 @@ export default function DiscoverPage() {
               title={value === "trending" ? "Most viewed research" : undefined}
               onClick={() => {
                 setFeedNotice("");
+                setFeedback(null);
+                setFeedbackError("");
                 updateQuery((current) => ({ ...current, feed: value, q: value === "for_you" ? "" : current.q }));
                 if (value === "for_you") setSearchInput("");
               }}
@@ -502,6 +575,18 @@ export default function DiscoverPage() {
         )}
       </div>
       {feedNotice && <p role="status" className="mt-3 text-small text-stone-700">{feedNotice}</p>}
+      {feed === "for_you" && feedback && (
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-small text-stone-700">
+          <p role="status">{feedback.text}</p>
+          {feedback.undo && (
+            <button type="button" onClick={() => void undoNotInterested(feedback.undo!)}
+              className={cn("font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
+              Undo
+            </button>
+          )}
+        </div>
+      )}
+      {feed === "for_you" && feedbackError && <p role="alert" className="mt-3 text-small text-brand">{feedbackError}</p>}
       {refFailed && (
         <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 text-small text-stone-700">
           Some filters couldn&apos;t load, so their lists may be incomplete.
@@ -571,6 +656,7 @@ export default function DiscoverPage() {
                 expanded={columns === 1}
                 searchHighlight={activeQuery}
                 onCite={() => setCiteRecord(record)}
+                onNotInterested={feed === "for_you" ? () => notInterested(record as ForYouItem) : undefined}
               />
             ))}
           </div>
@@ -615,7 +701,7 @@ export default function DiscoverPage() {
         />
       </div>
 
-      <Modal open={interestOpen} onClose={() => setInterestOpen(false)} title="Choose Areas for your recommendations" sheet
+      <Modal open={interestOpen} onClose={() => { setInterestOpen(false); setResetConfirming(false); }} title="Choose Areas for your recommendations" sheet
         footer={<div className="flex items-center justify-between gap-3">
           <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setInterestSelection({ classification_ids: [], psced_ids: [] })}>Clear Areas</button>
           <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={interestSaving || interestLoading || interestLoadFailed} onClick={() => void saveInterests()}>{interestLoading ? "Loading…" : interestSaving ? "Saving…" : "Save Areas"}</button>
@@ -626,6 +712,17 @@ export default function DiscoverPage() {
           {interestError && <p role="alert" className="text-small text-brand">{interestError}</p>}
           <InterestChoices title="Research classifications" options={interestOptions.classifications} selected={interestSelection.classification_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, classification_ids: ids }))} />
           <InterestChoices title="PSCED areas" options={interestOptions.psced} selected={interestSelection.psced_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, psced_ids: ids }))} />
+          <div className="border-t border-stone-200 pt-4">
+            <p className="text-small text-stone-600">Resetting clears your Areas and everything you marked Not interested. Your saved papers and folders stay.</p>
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              {resetConfirming ? <>
+                <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={resetting} onClick={() => void resetInterests()}>{resetting ? "Resetting…" : "Reset"}</button>
+                <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} disabled={resetting} onClick={() => setResetConfirming(false)}>Keep my interests</button>
+              </> : (
+                <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setResetConfirming(true)}>Reset my interests</button>
+              )}
+            </div>
+          </div>
         </div>
       </Modal>
       <PaperCiteModal record={citeRecord} isOpen={Boolean(citeRecord)} onClose={() => setCiteRecord(null)} />

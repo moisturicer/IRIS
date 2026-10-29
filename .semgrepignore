@@ -1,0 +1,18 @@
+# What semgrep does not scan in the CI security gate (IR-614).
+#
+# This file exists to *replace* semgrep's built-in ignore list, which also
+# skips every `test/` and `tests/` directory -- 277 tracked files here, silently
+# and for every rule. Tests stay in scope: a real secret or an injection
+# pattern in a test file is still one. Only generated, vendored or installed
+# code is left out below, none of which is ours to fix.
+
+:include .gitignore
+
+.git/
+node_modules/
+build/
+dist/
+vendor/
+.venv/
+venv/
+*.min.js
