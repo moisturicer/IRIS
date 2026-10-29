@@ -40,13 +40,15 @@ export const reviewsApi = {
    * One tab of My Reviews (IR-268), with every tab's count. Each tab is a
    * server-side question, so the counts stay honest and Done can page.
    */
-  mine: ({ tab, outcome, office, cursor }: MyReviewsQuery) =>
+  mine: ({ tab, outcome, office, cursor, sort, overdue }: MyReviewsQuery) =>
     apiClient.get<MyReviewsPage>("/reviews/mine/", {
       params: {
         tab,
         ...(outcome ? { outcome } : {}),
         ...(office ? { office } : {}),
         ...(cursor ? { cursor } : {}),
+        ...(sort ? { sort } : {}),
+        ...(overdue ? { overdue: "1" } : {}),
       },
     }),
   /** Request a one-time PIN emailed to the current user's account email. */

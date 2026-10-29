@@ -37,6 +37,7 @@ function row(overrides: Partial<MyReviewsRow> = {}): MyReviewsRow {
     submitted_by: null, waiting_since: "2026-10-01T00:00:00Z", waiting_days: 2,
     waiting_on: null, outcome: null, outcome_label: null, decided_at: null,
     can_claim: false, can_assign: false,
+    due_at: null, original_due_at: null, is_overdue: false, clock_paused: false, overdue_days: null,
     ...overrides,
   };
 }
@@ -107,7 +108,7 @@ describe("MyReviewsPage", () => {
     expect(screen.getByText("ITSO · You")).toBeInTheDocument();
     expect(screen.getByText("ITSO · Unassigned")).toBeInTheDocument();
     expect(screen.getByText("Routed by Prof. Santos · “Potential IP concern”", { exact: false })).toBeInTheDocument();
-    expect(mine).toHaveBeenCalledWith({ tab: "to_review", outcome: null, office: null, cursor: null });
+    expect(mine).toHaveBeenCalledWith({ tab: "to_review", outcome: null, office: null, cursor: null, sort: "due", overdue: false });
     await expectNoBlockingA11yViolations(container);
   });
 
@@ -195,7 +196,7 @@ describe("MyReviewsPage", () => {
     expect(await screen.findByText("Cleared", { selector: "span" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Finding recorded" }));
     await waitFor(() =>
-      expect(mine).toHaveBeenLastCalledWith({ tab: "done", outcome: "finding", office: null, cursor: null }),
+      expect(mine).toHaveBeenLastCalledWith({ tab: "done", outcome: "finding", office: null, cursor: null, sort: null, overdue: false }),
     );
     expect(screen.getByLabelText("Location")).toHaveValue("/review?tab=done&outcome=finding");
     expect(screen.getByRole("button", { name: "Finding recorded" })).toHaveAttribute("aria-pressed", "true");
@@ -203,7 +204,7 @@ describe("MyReviewsPage", () => {
     mine.mockResolvedValueOnce(page([row({ key: "seat:10", record: 11, title: "Older paper", outcome: "finding", outcome_label: "Finding recorded" })]));
     await userEvent.click(await screen.findByRole("button", { name: "Show more" }));
     expect(await screen.findByRole("link", { name: "Older paper" })).toBeInTheDocument();
-    expect(mine).toHaveBeenLastCalledWith({ tab: "done", outcome: "finding", office: null, cursor: "cursor-2" });
+    expect(mine).toHaveBeenLastCalledWith({ tab: "done", outcome: "finding", office: null, cursor: "cursor-2", sort: null, overdue: false });
   });
 
   it("gives a coordinator, and only a coordinator, a view of their whole office", async () => {
@@ -219,7 +220,7 @@ describe("MyReviewsPage", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "All of ITSO" }));
     await waitFor(() =>
-      expect(mine).toHaveBeenLastCalledWith({ tab: "to_review", outcome: null, office: "itso", cursor: null }),
+      expect(mine).toHaveBeenLastCalledWith({ tab: "to_review", outcome: null, office: "itso", cursor: null, sort: "due", overdue: false }),
     );
     expect(await screen.findByText("ITSO · Ben Cruz")).toBeInTheDocument();
     expect(screen.getByLabelText("Location")).toHaveValue("/review?office=itso");
@@ -228,7 +229,7 @@ describe("MyReviewsPage", () => {
   it("translates an old Review Queue bookmark once", async () => {
     show("/review?status=declined");
     await waitFor(() => expect(screen.getByLabelText("Location")).toHaveValue("/review?tab=done"));
-    expect(mine).toHaveBeenCalledWith({ tab: "done", outcome: null, office: null, cursor: null });
+    expect(mine).toHaveBeenCalledWith({ tab: "done", outcome: null, office: null, cursor: null, sort: null, overdue: false });
   });
 
   it("says what arrives in an empty tab", async () => {
@@ -236,5 +237,100 @@ describe("MyReviewsPage", () => {
     show();
     expect(await screen.findByText("Nothing to review")).toBeInTheDocument();
     expect(screen.getByText(/Records routed to ITSO appear here until someone claims them/)).toBeInTheDocument();
+  });
+});
+
+describe("MyReviewsPage due dates (IR-622)", () => {
+  // Friday 7 November 2025, 23:59 in Manila.
+  const DUE = "2025-11-07T15:59:00+00:00";
+  const LATE = row({
+    key: "seat:2", record: 9, title: "Flood Early Warning Network",
+    due_at: DUE, is_overdue: true, overdue_days: 2,
+  });
+  const ON_TIME = row({ due_at: DUE });
+
+  it("shows each row's due date, and says in words when one is overdue", async () => {
+    mine.mockResolvedValue(page([LATE, ON_TIME]));
+    const { container } = show();
+
+    const late = await screen.findByRole("article", { name: "Flood Early Warning Network" });
+    expect(within(late).getByText("2 working days overdue")).toBeInTheDocument();
+    expect(within(late).getByText("Due Fri 7 Nov")).toBeInTheDocument();
+
+    const onTime = screen.getByRole("article", { name: "Smart Campus Energy Monitor" });
+    expect(within(onTime).getByText("Due Fri 7 Nov")).toBeInTheDocument();
+    expect(within(onTime).queryByText(/overdue/i)).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("says a paused clock is paused, and shows no due date where there is none", async () => {
+    mine.mockResolvedValue(page([
+      row({ due_at: DUE, clock_paused: true }),
+      row({ key: "pool:3", kind: "pool", record: 8, title: "No Clock Record", seat: null, can_claim: true }),
+    ]));
+    show();
+
+    const paused = await screen.findByRole("article", { name: "Smart Campus Energy Monitor" });
+    expect(within(paused).getByText("Due Fri 7 Nov · clock paused")).toBeInTheDocument();
+    expect(within(screen.getByRole("article", { name: "No Clock Record" })).queryByText(/^Due /))
+      .not.toBeInTheDocument();
+  });
+
+  it("asks for soonest due by default, and keeps a changed sort and filter in the URL", async () => {
+    show();
+    const sort = await screen.findByRole("group", { name: "Sort" });
+    expect(within(sort).getByRole("button", { name: "Soonest due" })).toHaveAttribute("aria-pressed", "true");
+
+    await userEvent.click(within(sort).getByRole("button", { name: "Longest waiting" }));
+    await userEvent.click(screen.getByRole("button", { name: "Overdue only" }));
+
+    await waitFor(() =>
+      expect(mine).toHaveBeenLastCalledWith({ tab: "to_review", outcome: null, office: null, cursor: null, sort: "waiting", overdue: true }),
+    );
+    expect(screen.getByLabelText("Location")).toHaveValue("/review?sort=waiting&overdue=1");
+    expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("comes back to the sort and filter it left, from the URL", async () => {
+    show("/review?tab=in_review&sort=waiting&overdue=1");
+
+    const sort = await screen.findByRole("group", { name: "Sort" });
+    expect(within(sort).getByRole("button", { name: "Longest waiting" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Overdue only" })).toHaveAttribute("aria-pressed", "true");
+    expect(mine).toHaveBeenCalledWith({ tab: "in_review", outcome: null, office: null, cursor: null, sort: "waiting", overdue: true });
+  });
+
+  it("offers no sort or overdue filter on Done, which is newest first and never overdue", async () => {
+    show("/review?tab=done");
+    await screen.findByRole("group", { name: "Filter by outcome" });
+    expect(screen.queryByRole("group", { name: "Sort" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Overdue only" })).not.toBeInTheDocument();
+  });
+
+  it("says when nothing is overdue, rather than that there is nothing to review", async () => {
+    mine.mockResolvedValue(page([]));
+    show("/review?overdue=1");
+    expect(await screen.findByText("Nothing overdue")).toBeInTheDocument();
+  });
+
+  /*
+   * jsdom loads no stylesheet, so rendering at 360, 768 and 1280 px would
+   * render one tree three times (see entryHeadings.test.tsx). What would hide
+   * a long title or push the deadline off a phone is a clamp or a no-wrap, so
+   * that is what is asserted; the rendered check at the three widths is a
+   * browser check, recorded on the PR.
+   */
+  it("never clips a long title or keeps the deadline from wrapping", async () => {
+    const title = "A Longitudinal Mixed-Methods Evaluation of Community-Based Flood Early Warning Networks Across Six Coastal Barangays of Metro Cebu";
+    mine.mockResolvedValue(page([{ ...LATE, title }]));
+    show();
+
+    const link = await screen.findByRole("link", { name: title });
+    expect(link).toHaveTextContent(title);
+    const unwrapped = (el: Element | null) =>
+      !!el?.closest(".truncate, .whitespace-nowrap, [class*='line-clamp']");
+    expect(unwrapped(link)).toBe(false);
+    expect(unwrapped(screen.getByText("2 working days overdue"))).toBe(false);
+    expect(unwrapped(screen.getByText("Due Fri 7 Nov"))).toBe(false);
   });
 });

@@ -65,7 +65,7 @@ class ReviewViewSet(viewsets.GenericViewSet):
 
 class MyReviewsView(APIView):
     """
-    GET /reviews/mine/?tab=&outcome=&office=&cursor=  -- My Reviews (IR-268)
+    GET /reviews/mine/?tab=&outcome=&office=&cursor=&sort=&overdue=  -- My Reviews (IR-268, IR-622)
 
     A reviewer's own seats plus their office's pool, one tab at a time, with
     every tab's count (ADR-032 §9 and its 2026-10-08 Amendment). `office` is a
@@ -87,6 +87,8 @@ class MyReviewsView(APIView):
                 outcome=params.get("outcome"),
                 office=params.get("office"),
                 cursor=params.get("cursor"),
+                sort=params.get("sort"),
+                overdue=params.get("overdue"),
             )
         except my_reviews.MyReviewsRefused as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)

@@ -178,13 +178,15 @@ My Reviews                                       [Search title, author…]
 
 [ To review (4) ]  [ In review (2) ]  [ Done ]
 
+(Soonest due) (Longest waiting)   (Overdue only)
+
  AI-Based Medical Imaging            THESIS
  Routed by Prof. Santos · "Potential IP concern" · 2 days
- ITSO · Unassigned                                  [Claim review]
+ ITSO · Unassigned · [2 working days overdue] Due Fri 7 Nov   [Claim review]
 
  Smart Campus Energy Monitor         PROPOSAL
  Submitted by Juan Dela Cruz · 1 day
- Adviser · You                                      [Open review]
+ Adviser · You · Due Tue 11 Nov                     [Open review]
 ```
 
 | Tab | Rows |
@@ -199,6 +201,8 @@ My Reviews                                       [Search title, author…]
 - Coordinators get an **Office** filter listing every seat in their office, with who holds it.
 - The empty states say what arrives there, not "no data". For example: *"Records routed to ITSO appear here until someone claims them."*
 - The filter lives in the URL, as it does today.
+- **Due dates (IR-622, ADR-043).** Each row with a running clock shows *Due Fri 7 Nov*, read in Manila, and *· clock paused* while its own revision or document request stops the clock. Overdue is said in words: *2 working days overdue*, or just *Overdue* before a working day has been missed. The badge's colour only repeats that text. The server decides both; the browser computes no date.
+- **To review and In review** sort soonest due first by default (undated rows last), or by *Longest waiting*, and offer *Overdue only*. Both live in the URL (`?sort=waiting&overdue=1`). Done has neither: it is newest first, and a finished seat is never overdue. *Nothing overdue* is the empty state under the filter.
 
 ---
 

@@ -50,7 +50,21 @@ export interface MyReviewsRow {
   decided_at:       string | null;
   can_claim:        boolean;
   can_assign:       boolean;
+  /**
+   * The assignment's clock (ADR-043, IR-619): null when its office has no
+   * turnaround configured, and on a Done decision with no seat behind it.
+   */
+  due_at:           string | null;
+  original_due_at:  string | null;
+  /** The server's verdict; a paused or closed assignment is never overdue. */
+  is_overdue:       boolean;
+  clock_paused:     boolean;
+  /** Manila working days late, holidays excluded (IR-622); null unless overdue. */
+  overdue_days:     number | null;
 }
+
+/** The current tabs' orders (IR-622). Done is always newest first. */
+export type MyReviewsSort = "due" | "waiting";
 
 export interface MyReviewsPage {
   rows:   MyReviewsRow[];
@@ -65,4 +79,7 @@ export interface MyReviewsQuery {
   outcome?: ReviewOutcome | null;
   office?:  string | null;
   cursor?:  string | null;
+  /** To review and In review only; the server refuses both on Done. */
+  sort?:    MyReviewsSort | null;
+  overdue?: boolean;
 }
