@@ -103,6 +103,13 @@ class InactivityExpiryTests(SessionTestBase):
         self.assertEqual(response.status_code, 401)
         self.assertEqual(response.data["code"], "session_idle")
 
+    def test_coming_back_after_31_minutes_does_not_excuse_the_absence(self):
+        # The request says "the user just clicked", and they did -- after 31
+        # minutes away. The absence is what counts, not the click that ends it.
+        self.sign_in()
+        self.clock.advance(minutes=31)
+        self.assertEqual(self.get_me(idle_seconds=0).status_code, 401)
+
     def test_a_session_idle_for_29_minutes_is_not(self):
         self.sign_in()
         self.clock.advance(minutes=29)

@@ -16,6 +16,12 @@ extends nothing, while a second tab the user *is* using keeps the session
 alive. A request with no header -- a script, the AI stream's bare ``fetch`` --
 counts as activity when it arrives.
 
+A session is idle when more than the timeout has passed since that stored
+moment, judged before the request in hand is applied (see `touch`). A page
+that sends no requests while the user reads it would otherwise look idle, so
+the interface sends a heartbeat every few minutes while there is input to
+report.
+
 The client can lie about its own idleness. That is acceptable: the rule
 protects an unattended screen from a passer-by, not the server from the user.
 
@@ -96,18 +102,23 @@ def idle_seconds(request) -> int:
 def touch(sid, request) -> None:
     """Record this request's activity on session ``sid``, or refuse it as idle.
 
-    Raises `SessionIdle` when the session is ended, unknown, or has been idle
-    past the timeout once this request's own activity is taken into account.
+    Raises `SessionIdle` when the session is ended, unknown, or was idle past
+    the timeout *before* this request arrived. The judgement uses the stored
+    activity only: a user who walks away for 31 minutes and then clicks has
+    still been away for 31 minutes, and their click must not excuse it. The
+    interface's heartbeat (frontend/src/lib/activity.ts) is what keeps the
+    stored figure current while someone works on a page that sends nothing.
     """
     at = now()
     session = UserSession.objects.filter(id=sid).only("last_activity_at", "ended_at").first()
     if session is None or session.ended_at is not None:
         raise SessionIdle()
 
-    activity = max(session.last_activity_at, at - timedelta(seconds=idle_seconds(request)))
-    if at - activity > idle_timeout():
+    if at - session.last_activity_at > idle_timeout():
         end_session(sid)
         raise SessionIdle()
+
+    activity = at - timedelta(seconds=idle_seconds(request))
 
     if activity - session.last_activity_at >= WRITE_EVERY:
         # Monotonic under concurrency: a slower request carrying an older

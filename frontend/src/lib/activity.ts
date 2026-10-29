@@ -19,9 +19,11 @@ export const IDLE_HEADER = "X-IRIS-Idle-Seconds";
 export const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
 
 const INPUT_EVENTS = ["pointerdown", "keydown", "wheel", "touchstart"] as const;
+export const HEARTBEAT_MS = 5 * 60 * 1000;
 const CHECK_EVERY_MS = 30_000;
 
 let lastInteraction = Date.now();
+let lastReported = Date.now();
 
 function markActive(): void {
   lastInteraction = Date.now();
@@ -40,6 +42,24 @@ export function trackActivity(target: Window = window): () => void {
   };
 }
 
+/** The interceptor calls this as each request leaves, carrying the idle header. */
+export function markReported(): void {
+  lastReported = Date.now();
+}
+
+/**
+ * Call `ping` every `HEARTBEAT_MS` while there is input the server has not
+ * heard about. The server judges idleness from the last activity a request
+ * reported, so someone reading a page that sends nothing would otherwise be
+ * signed out mid-read.
+ */
+export function startHeartbeat(ping: () => void): () => void {
+  const timer = setInterval(() => {
+    if (lastInteraction > lastReported) ping();
+  }, HEARTBEAT_MS);
+  return () => clearInterval(timer);
+}
+
 /** Call `onIdle` once, when the user has been idle for the timeout. */
 export function startIdleWatch(onIdle: () => void): () => void {
   const timer = setInterval(() => {
@@ -54,4 +74,5 @@ export function startIdleWatch(onIdle: () => void): () => void {
 /** Test seam: the next test starts as if the page just loaded. */
 export function __resetActivity(): void {
   lastInteraction = Date.now();
+  lastReported = lastInteraction;
 }

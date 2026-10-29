@@ -1,5 +1,5 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
-import { IDLE_HEADER, idleSeconds } from "@/lib/activity";
+import { IDLE_HEADER, idleSeconds, markReported } from "@/lib/activity";
 import { API_BASE } from "@/lib/constants";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
 import { refreshOnce, type RefreshedTokens } from "@/lib/tokenRefresh";
@@ -18,6 +18,7 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // How long the user has been idle, so a poll cannot keep the session alive
   // (IR-166, NFR-S2). See lib/activity.ts.
   if (config.headers) config.headers[IDLE_HEADER] = String(idleSeconds());
+  markReported();
   return config;
 });
 

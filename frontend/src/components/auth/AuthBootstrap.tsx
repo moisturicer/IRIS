@@ -1,7 +1,8 @@
 import { useEffect } from "react";
 import { useAuthStore } from "@/store/auth.store";
 import { Spinner } from "@/components/ui/Spinner";
-import { startIdleWatch, trackActivity } from "@/lib/activity";
+import { authApi } from "@/api/auth";
+import { startHeartbeat, startIdleWatch, trackActivity } from "@/lib/activity";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
 
 /**
@@ -27,10 +28,15 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (!isAuthenticated) return;
-    return startIdleWatch(() => {
+    const unwatch = startIdleWatch(() => {
       useAuthStore.getState().logout();
       redirectToLoginSessionExpired();
     });
+    // The server judges idleness from the activity requests have reported, so
+    // reading a page that sends nothing still has to be heard. A 401 here is
+    // handled by the client's interceptor like any other.
+    const stopHeartbeat = startHeartbeat(() => { void authApi.me().catch(() => {}); });
+    return () => { unwatch(); stopHeartbeat(); };
   }, [isAuthenticated]);
 
   if (!authReady) {

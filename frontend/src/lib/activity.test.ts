@@ -8,10 +8,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  HEARTBEAT_MS,
   IDLE_HEADER,
   IDLE_TIMEOUT_MS,
   __resetActivity,
   idleSeconds,
+  markReported,
+  startHeartbeat,
   startIdleWatch,
   trackActivity,
 } from "./activity";
@@ -70,6 +73,47 @@ describe("the header", () => {
 
   it("agrees with the server's 30-minute default", () => {
     expect(IDLE_TIMEOUT_MS).toBe(30 * 60 * 1000);
+  });
+});
+
+describe("startHeartbeat", () => {
+  // The server judges idleness from the activity it last heard about, so a
+  // user working on a page that sends nothing must still be heard from.
+  it("reports input the server has not heard about", () => {
+    const ping = vi.fn();
+    const stop = trackActivity(window);
+    const beat = startHeartbeat(ping);
+    vi.advanceTimersByTime(60_000);
+    window.dispatchEvent(new Event("wheel"));
+    vi.advanceTimersByTime(HEARTBEAT_MS);
+    expect(ping).toHaveBeenCalledTimes(1);
+    beat();
+    stop();
+  });
+
+  it("sends nothing when nobody has touched the page", () => {
+    const ping = vi.fn();
+    const beat = startHeartbeat(ping);
+    vi.advanceTimersByTime(HEARTBEAT_MS * 6);
+    expect(ping).not.toHaveBeenCalled();
+    beat();
+  });
+
+  it("sends nothing when a request already carried the input", () => {
+    const ping = vi.fn();
+    const stop = trackActivity(window);
+    const beat = startHeartbeat(ping);
+    window.dispatchEvent(new Event("keydown"));
+    vi.advanceTimersByTime(1_000);
+    markReported(); // the interceptor does this on every request
+    vi.advanceTimersByTime(HEARTBEAT_MS);
+    expect(ping).not.toHaveBeenCalled();
+    beat();
+    stop();
+  });
+
+  it("beats well inside the timeout", () => {
+    expect(HEARTBEAT_MS * 4).toBeLessThan(IDLE_TIMEOUT_MS);
   });
 });
 
