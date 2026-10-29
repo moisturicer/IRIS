@@ -296,7 +296,7 @@ jobs:
       # expired allowlist entry fails on its own. Tools are pinned so a new
       # release cannot change what the gate means.
       - name: Install the audit gate
-        run: pip install pip-audit==2.10.1 pyyaml==6.0.2 pytest==8.3.5
+        run: pip install pip-audit==2.10.1 bandit==1.9.4 semgrep==1.180.0 pyyaml==6.0.2 pytest==8.3.5
 
       - name: Audit gate self-test
         run: python -m pytest security/tests -q -p no:cacheprovider
@@ -317,10 +317,30 @@ jobs:
           node -e 'if (!JSON.parse(require("fs").readFileSync("../npm-audit.json")).vulnerabilities) process.exit(1)' \
             || { echo "npm audit produced no report"; exit 1; }
 
-      - name: Dependency audit gate (fails on high/critical)
+      # IR-614: static analysis of our own code. Both write every finding to
+      # JSON and the same gate decides, so there is one allowlist, not three.
+      # bandit's only exclusion (assert in test files) is in security/bandit.yml
+      # with its reason; --exit-zero because the gate, not bandit, decides --
+      # a bandit crash still fails the step.
+      - name: SAST (bandit)
+        run: bandit -c security/bandit.yml -r backend ai -f json -o bandit.json -q --exit-zero
+
+      # Registry rulesets plus security/semgrep.yml, which raises request data
+      # reaching raw SQL to ERROR (the registry rates it WARNING). Run from the
+      # repo root with a relative --config so the local rule's id is the
+      # stable `security.iris-request-data-in-raw-sql`. Without --error,
+      # semgrep exits 0 on findings and non-zero only when the scan broke.
+      - name: SAST (semgrep)
+        run: |
+          semgrep scan --metrics=off --json -o semgrep.json \
+            --config p/django --config p/python --config p/typescript \
+            --config p/react --config p/secrets --config security/semgrep.yml .
+
+      - name: Security gate (fails on high/critical)
         run: |
           python -m security.audit_gate --allowlist security/allowlist.yml \
-            --pip-audit pip-audit.json --npm-audit npm-audit.json
+            --pip-audit pip-audit.json --npm-audit npm-audit.json \
+            --bandit bandit.json --semgrep semgrep.json
 
       - name: Keep the audit reports
         if: always()
@@ -330,4 +350,15 @@ jobs:
           path: |
             pip-audit.json
             npm-audit.json
+          if-no-files-found: ignore
+
+      # Medium and low findings do not fail the job; this is where they are read.
+      - name: Keep the SAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast
+          path: |
+            bandit.json
+            semgrep.json
           if-no-files-found: ignore

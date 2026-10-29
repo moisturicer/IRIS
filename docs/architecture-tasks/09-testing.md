@@ -335,7 +335,7 @@ Three CI steps and two repository settings, running on every push.
 - GitHub secret scanning and push protection enabled
 
 ## Out of Scope
-SAST tooling (Bandit, Semgrep) — disproportionate at this budget, and noisy on a Django codebase without tuning. Container image scanning. Licence scanning. Penetration testing. These are Phase 2 if IRIS becomes a commercial product with paying institutional customers.
+SAST tooling (Bandit, Semgrep) — disproportionate at this budget, and noisy on a Django codebase without tuning. **Superseded 2026-10-29 by IR-614 (parent IR-611, systematic security testing):** bandit and semgrep now run in the `security` job through the same gate and allowlist, failing on high only; see [`../testing/TEST_PLAN.md`](../testing/TEST_PLAN.md) §Security gate. The noise concern is handled by gating on high and reporting the rest as an artifact. Container image scanning. Licence scanning. Penetration testing. These are Phase 2 if IRIS becomes a commercial product with paying institutional customers.
 
 ## Technical Approach
 Fail the build on **high and critical only**. Failing on every advisory produces noise that gets ignored within a week, which is worse than no scanning at all.

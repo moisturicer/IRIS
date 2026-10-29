@@ -12,8 +12,12 @@ Moderate and low findings are printed but never fail the job.
 Why a script and not the tools' own flags: ``npm audit --audit-level=high``
 has no allowlist at all, and ``pip-audit`` reports no severity — its
 ``--ignore-vuln`` ignores an id forever, with no reason, owner or expiry. One
-exception file with expiry for both, and later for bandit/semgrep (IR-614), is
-the point of the ticket.
+exception file with expiry for both is the point of the ticket.
+
+bandit and semgrep reports go through the same gate (IR-614). Their findings
+are named ``<tool>:<rule>:<path>`` -- one rule in one file -- and a file either
+tool could not scan blocks like an unaudited dependency does. bandit HIGH and
+semgrep ERROR are high; MEDIUM and WARNING are moderate.
 
 pip-audit severity comes from OSV (``api.osv.dev``). A finding whose severity
 cannot be determined counts as **high**: an outage at OSV must fail the gate,
@@ -22,7 +26,8 @@ not quietly pass it.
 Usage (repo root)::
 
     python -m security.audit_gate --allowlist security/allowlist.yml \\
-        --pip-audit pip-audit.json --npm-audit npm-audit.json
+        --pip-audit pip-audit.json --npm-audit npm-audit.json \\
+        --bandit bandit.json --semgrep semgrep.json
 """
 from __future__ import annotations
 
@@ -161,6 +166,70 @@ def findings_from_npm_audit(
     return list(by_id.values())
 
 
+def _sast_id(tool: str, rule: str, path: str) -> str:
+    """``<tool>:<rule>:<path>``: one rule in one file (IR-614).
+
+    No line number, so an entry survives the code above it moving; no bare
+    rule, so one entry can never silence a rule across the whole repo.
+    """
+    path = path.replace("\\", "/").removeprefix("./")
+    return f"{tool}:{rule}:{path}"
+
+
+BANDIT_SEVERITY = {"HIGH": "high", "MEDIUM": "moderate", "LOW": "low"}
+# Semgrep error messages can run to a stack trace; the full text is in the artifact.
+MAX_MESSAGE = 200
+
+
+def findings_from_bandit(report: dict) -> list[Finding]:
+    findings = []
+    for e in report.get("errors", []):
+        # bandit could not parse it, so nothing says it is safe (IR-633).
+        fid = _sast_id("bandit", "error", e.get("filename") or "<run>")
+        findings.append(Finding(id=fid, ids=(fid,), package=str(e.get("reason")), severity="high"))
+    for r in report["results"]:
+        fid = _sast_id("bandit", r["test_id"], r["filename"])
+        findings.append(Finding(
+            id=fid,
+            ids=(fid,),
+            package=f"{r['filename']}:{r['line_number']} {r['issue_text']}",
+            severity=BANDIT_SEVERITY.get(r["issue_severity"], "high"),
+        ))
+    return findings
+
+
+# Semgrep writes ERROR/WARNING/INFO; newer rules may say HIGH/MEDIUM/LOW.
+SEMGREP_SEVERITY = {
+    "CRITICAL": "critical", "ERROR": "high", "HIGH": "high",
+    "WARNING": "moderate", "MEDIUM": "moderate", "INFO": "low", "LOW": "low",
+}
+
+
+def findings_from_semgrep(report: dict) -> list[Finding]:
+    findings = []
+    for e in report.get("errors", []):
+        # A rule timing out on one file is a `warn` and is only reported; an
+        # `error` means a file went unscanned, which blocks (IR-633's rule).
+        level = "error" if e.get("level") == "error" else "warn"
+        fid = _sast_id("semgrep", level, e.get("path") or "<run>")
+        message = " ".join(f"{e.get('type')}: {e.get('message')}".split())  # one line
+        findings.append(Finding(
+            id=fid,
+            ids=(fid,),
+            package=message[:MAX_MESSAGE],
+            severity="high" if level == "error" else "low",
+        ))
+    for r in report["results"]:
+        fid = _sast_id("semgrep", r["check_id"], r["path"])
+        findings.append(Finding(
+            id=fid,
+            ids=(fid,),
+            package=f"{r['path']}:{r['start']['line']}",
+            severity=SEMGREP_SEVERITY.get(r["extra"]["severity"].upper(), "high"),
+        ))
+    return findings
+
+
 def osv_record(vid: str) -> dict | None:
     """OSV's record for ``vid``, or None when it cannot be had.
 
@@ -215,10 +284,12 @@ def main(argv: Sequence[str] | None = None, osv: Callable[[str], dict | None] = 
     parser.add_argument("--allowlist", type=Path, required=True)
     parser.add_argument("--pip-audit", type=Path, action="append", default=None)
     parser.add_argument("--npm-audit", type=Path, action="append", default=None)
+    parser.add_argument("--bandit", type=Path, action="append", default=None)
+    parser.add_argument("--semgrep", type=Path, action="append", default=None)
     args = parser.parse_args(argv)
-    if not args.pip_audit and not args.npm_audit:
+    if not (args.pip_audit or args.npm_audit or args.bandit or args.semgrep):
         # Nothing audited is not "nothing found" (IR-633).
-        parser.error("give at least one --pip-audit or --npm-audit report")
+        parser.error("give at least one --pip-audit, --npm-audit, --bandit or --semgrep report")
 
     try:
         allowlist = load_allowlist(args.allowlist, date.today())
@@ -231,6 +302,15 @@ def main(argv: Sequence[str] | None = None, osv: Callable[[str], dict | None] = 
         findings += findings_from_pip_audit(json.loads(path.read_text(encoding="utf-8")), severity_lookup(osv))
     for path in args.npm_audit or []:
         findings += findings_from_npm_audit(json.loads(path.read_text(encoding="utf-8")), alias_lookup(osv))
+    for tool, parse in (("bandit", findings_from_bandit), ("semgrep", findings_from_semgrep)):
+        for path in getattr(args, tool) or []:
+            # A crashed scan leaves an empty or partial file; that is not
+            # "nothing found", so anything unreadable fails here (IR-614).
+            try:
+                findings += parse(json.loads(path.read_text(encoding="utf-8")))
+            except (ValueError, KeyError, TypeError, AttributeError) as exc:
+                print(f"FAIL {tool}: {path} is not a usable {tool} report ({exc!r})")
+                return 1
 
     result = evaluate(findings, allowlist)
     for f in result.reported:
