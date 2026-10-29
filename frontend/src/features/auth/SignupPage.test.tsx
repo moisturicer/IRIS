@@ -495,6 +495,20 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("shows every reason the server refused a password, not just the first (IR-647)", async () => {
+    const user = userEvent.setup();
+    refuse({ password: ["This password is too common.", "This password is entirely numeric."] });
+    renderSignup();
+    await optionsLoaded();
+    await submitStudent(user);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText("Password")).toHaveAccessibleDescription(
+        "This password is too common. This password is entirely numeric.",
+      ),
+    );
+  });
+
   it("puts errors named the server's way on the field they mean", async () => {
     const user = userEvent.setup();
     refuse({ confirm_password: ["Passwords do not match."] });

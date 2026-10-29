@@ -1,3 +1,5 @@
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from core.enums import RequestStatus, RoleName
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
@@ -134,8 +136,21 @@ class MeSerializer(UserSerializer):
         return {"status": latest.status, "requested_role": latest.requested_role.name}
 
 
+def enforce_password_policy(password, user, field):
+    """Refuse ``password`` unless it passes `AUTH_PASSWORD_VALIDATORS` (IR-647).
+
+    The settings are the one definition of the policy; this is how the API
+    applies it. Every validator's message is reported on ``field`` together,
+    so the person can fix them all in one try.
+    """
+    try:
+        validate_password(password, user)
+    except DjangoValidationError as exc:
+        raise serializers.ValidationError({field: list(exc.messages)})
+
+
 class RegisterSerializer(serializers.ModelSerializer):
-    password         = serializers.CharField(write_only=True, min_length=8)
+    password         = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
     consent_given    = serializers.BooleanField(write_only=True)
 
@@ -167,6 +182,15 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if data["password"] != data.pop("confirm_password"):
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+
+        # An unsaved user, so validators that compare against the person's own
+        # name or email have something to compare with.
+        candidate = User(
+            email=data.get("email", ""),
+            first_name=data.get("first_name", ""),
+            last_name=data.get("last_name", ""),
+        )
+        enforce_password_policy(data["password"], candidate, "password")
 
         role_name = data.get("role_name")
         if role_name == RoleName.STUDENT and not data.get("course_id"):
@@ -210,13 +234,17 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField()
-    new_password = serializers.CharField(min_length=8)
+    new_password = serializers.CharField()
 
     def validate_old_password(self, value):
         user = self.context["request"].user
         if not user.check_password(value):
             raise serializers.ValidationError("Old password is incorrect.")
         return value
+
+    def validate(self, attrs):
+        enforce_password_policy(attrs["new_password"], self.context["request"].user, "new_password")
+        return attrs
 
 
 class CollegeSerializer(serializers.ModelSerializer):

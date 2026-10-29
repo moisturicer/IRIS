@@ -309,10 +309,15 @@ function SecurityTab() {
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: unknown) {
-      const res = (err as { response?: { data?: { detail?: string; old_password?: string[] } } })?.response;
+      const res = (err as {
+        response?: { data?: { detail?: string; old_password?: string[]; new_password?: string[] } };
+      })?.response;
       setError(
         res?.data?.detail ??
           res?.data?.old_password?.[0] ??
+          // The configured policy can refuse one password for several reasons;
+          // say all of them (IR-647).
+          res?.data?.new_password?.join(" ") ??
           "Failed to change password. Please check your current password.",
       );
     } finally {

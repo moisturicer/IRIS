@@ -64,6 +64,9 @@ const UNREACHABLE: FormAlert = {
 
 const firstMessage = (val: unknown) => (Array.isArray(val) ? String(val[0]) : String(val));
 
+/** Every message on a field, so a password refused for two reasons says both (IR-647). */
+const allMessages = (val: unknown) => (Array.isArray(val) ? val.map(String).join(" ") : String(val));
+
 /** The consent box's own error, shown on it when a submit arrives without it (IR-540). */
 const CONSENT_REQUIRED = "Agree to the data notice to register.";
 
@@ -240,7 +243,7 @@ export default function SignupPage() {
       const elsewhere: string[] = [];
       for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
         if (key === "consent_given") setConsentError(firstMessage(val));
-        else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = firstMessage(val);
+        else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = allMessages(val);
         else elsewhere.push(firstMessage(val));
       }
       setErrors((prev) => ({ ...prev, ...onFields }));
