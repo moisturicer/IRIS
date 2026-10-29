@@ -392,6 +392,8 @@ class ResubmissionTests(AuditTestBase):
         metadata = self.one(record, AuditEvent.RESUBMITTED)["metadata"]
         self.assertEqual(metadata["policy"], "restart_all")
         self.assertEqual(metadata["reset_parties"], [Party.IERC, Party.ITSO])
+        # ITSO had cleared, so it reviews again (ADR-032 §5, IR-632 amendment).
+        self.assertEqual(metadata["rereview_parties"], [Party.ITSO, Party.IERC])
         self.assertEqual(metadata["preserved_parties"], [])
         self.assertEqual(self.events(record, AuditEvent.CLEARANCE_PRESERVED), [])
 
@@ -698,6 +700,61 @@ class MetricsFromTheExportTests(AuditTestBase):
     describes. The workflow tables are read only afterwards, to check them.
     """
 
+    def clocks(self, rows):
+        """
+        Per-party turnaround as AUDIT_EXPORT.md writes it: a clock starts when a
+        party is handed work and stops when its assignment closes. Returns
+        `(party, duration)` in the order the clocks stopped.
+        """
+        started, clocks = {}, []
+        for row in rows:
+            at, m = parse_datetime(row["created_at"]), row["metadata"]
+            if row["event_type"] == AuditEvent.SUBMITTED:
+                started[m["to_party"]] = at
+            elif row["event_type"] == AuditEvent.ROUTED and m["opened"]:
+                started[m["to_party"]] = at
+            elif row["event_type"] == AuditEvent.RESUBMITTED:
+                for party in m["rereview_parties"]:
+                    started.setdefault(party, at)
+            elif row["event_type"] == AuditEvent.ASSIGNMENT_CLOSED:
+                clocks.append((m["party"], at - started.pop(m["party"])))
+        self.assertEqual(started, {}, "every clock that started stopped")
+        return clocks
+
+    @override_settings(WORKFLOW_TABLE=RESTART_ALL)
+    def test_a_reopened_office_gets_a_second_clock_under_restart_all(self):
+        # IR-632: ITSO cleared, IERC asked; the new version reopens ITSO, whose
+        # second turn is timed from RESUBMITTED to its second close.
+        record = self.make_record(abstract_file=_pdf(b"%PDF-1.7 v1"))
+        self.submit_via_api(record)
+        adviser_seat = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.adviser)
+        self.open_seat(adviser_seat, self.adviser)
+        self.accepted_to(record, Party.ITSO, Party.IERC)
+        self.claimed_and_opened(record, Party.ITSO, self.itso)
+        self.cleared(record, self.itso)
+        self.claimed_and_opened(record, Party.IERC, self.ierc)
+        self.asked(record, self.ierc)
+        self.edit_title(record)
+        self.submitted(record)
+        self.cleared(record, self.itso)
+        self.cleared(record, self.ierc)
+        self.claimed_and_opened(record, Party.RDCO, self.rdco)
+        self.decided(record, self.rdco, "publish")
+        self.assertEqual(record.pipeline_status, PipelineStatus.PUBLISHED)
+
+        clocks = self.clocks(self.events(record))
+        itso = [duration for party, duration in clocks if party == Party.ITSO]
+        self.assertEqual(len(itso), 2, "ITSO's first turn and its reopened one")
+        ierc = [duration for party, duration in clocks if party == Party.IERC]
+        self.assertEqual(len(ierc), 1, "IERC asked, so its one clock kept running")
+
+        # The second clock runs from the new version to ITSO's second close.
+        resubmitted_at = parse_datetime(self.one(record, AuditEvent.RESUBMITTED)["created_at"])
+        assignment = RecordAssignment.objects.get(record=record, party=Party.ITSO)
+        self.assertLess(
+            abs((resubmitted_at + itso[1] - assignment.closed_at).total_seconds()), 1.0,
+        )
+
     def test_turnaround_and_preserved_clearances_are_computable_from_the_rows(self):
         record = self.make_record(abstract_file=_pdf(b"%PDF-1.7 v1"))
         self.submit_via_api(record)
@@ -715,21 +772,10 @@ class MetricsFromTheExportTests(AuditTestBase):
         self.decided(record, self.rdco, "publish")
         self.assertEqual(record.pipeline_status, PipelineStatus.PUBLISHED)
 
-        rows = self.events(record)
-
-        # Per-party turnaround: a clock starts when a party is handed work and
-        # stops when its assignment closes.
-        started, turnaround = {}, {}
-        for row in rows:
-            at, m = parse_datetime(row["created_at"]), row["metadata"]
-            if row["event_type"] == AuditEvent.SUBMITTED:
-                started[m["to_party"]] = at
-            elif row["event_type"] == AuditEvent.ROUTED and m["opened"]:
-                started[m["to_party"]] = at
-            elif row["event_type"] == AuditEvent.ASSIGNMENT_CLOSED:
-                turnaround[m["party"]] = at - started.pop(m["party"])
+        clocks = self.clocks(self.events(record))
+        turnaround = dict(clocks)
+        self.assertEqual(len(clocks), len(turnaround), "one clock per party")
         self.assertEqual(set(turnaround), {Party.ADVISER, Party.ITSO, Party.IERC, Party.RDCO})
-        self.assertEqual(started, {}, "every clock that started stopped")
 
         # The author's share of IERC's clock: from its request to the new version.
         asked_at = parse_datetime(self.one(record, AuditEvent.RESUBMISSION_REQUESTED)["created_at"])

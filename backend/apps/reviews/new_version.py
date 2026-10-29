@@ -1,6 +1,6 @@
 """
 The owner answers the open revision requests with a new version (ADR-032 §5
-and its 2026-10-08 Amendments; IR-273).
+and its 2026-10-08 and 2026-10-29 Amendments; IR-273, IR-632).
 
 **This is ADR-003's contribution on the new model.** One act, by an owner of
 a record on the new model with at least one revision request open, that has
@@ -12,12 +12,17 @@ changed since the newest request:
 2. resolves every open request as `resubmitted` (ADR-021 §11);
 3. resets clearances by the resubmission policy (ADR-004, IR-137):
    `CLEARANCE_AWARE`, the default, resets only the requesting parties'; the
-   comparison arm `RESTART_ALL` resets every one. **Nothing else differs
-   between the two arms**, so seats and assignments below do not read it;
-4. returns the requesting parties' finished seats to `in_review`. Their
-   reviewers review the new version. Every other party's seats, and the
-   Adviser's and RDCO's, are untouched, so if RDCO asked only RDCO looks
-   again, and if the Adviser asked only the Adviser does;
+   comparison arm `RESTART_ALL` resets every one. **The arms differ only in
+   which offices reset and review again**, so seats and assignments below
+   follow the reset rather than reading the policy;
+4. returns the finished seats of every party that reviews again to
+   `in_review`: the requesting parties, and under `RESTART_ALL` every reset
+   office that had completed, whose assignment reopens with the same seats
+   (IR-632). Their reviewers review the new version, in parallel. Under
+   `CLEARANCE_AWARE` every other party's seats, and the Adviser's and RDCO's,
+   are untouched, so if RDCO asked only RDCO looks again, and if the Adviser
+   asked only the Adviser does. An office still reviewing keeps its seats
+   under both policies: it has nothing to redo;
 5. records the resubmission on the record (IR-139), so
    `clearance_state.is_preserved` tells a surviving clearance from a reset
    one.
@@ -60,7 +65,7 @@ from core.enums import (
 from core.permissions import is_record_owner
 
 from . import revisions, routing
-from .models import RecordClearance, ResubmissionRequest, ReviewerSeat
+from .models import RecordAssignment, RecordClearance, ResubmissionRequest, ReviewerSeat
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +117,31 @@ def _reset_offices(record, parties) -> list[str]:
     return list(rows.values_list("office", flat=True))
 
 
+def _reopened_assignments(record, parties, reset) -> list:
+    """
+    The completed assignments of the reset offices that did not ask: under
+    `RESTART_ALL` they review the new version too (ADR-032 §5, IR-632
+    amendment). Each office's latest assignment, and only when it completed:
+    one still active has nothing to redo, and a withdrawn one was not
+    reviewing. Under `CLEARANCE_AWARE` the reset offices are the requesting
+    parties, so this is empty without reading the policy.
+    """
+    reopened = []
+    for office in reset:
+        if office in parties:
+            continue
+        latest = RecordAssignment.objects.filter(record=record, party=office).order_by("-pk").first()
+        if latest is not None and latest.state == AssignmentState.COMPLETED:
+            reopened.append(latest)
+    return reopened
+
+
+def _rereview(parties, reopened) -> list[str]:
+    """Every party that reviews the new version, in the tracker's order."""
+    again = set(parties) | {str(a.party) for a in reopened}
+    return [p for p in revisions.ASKING_PARTIES if p in again]
+
+
 def _kept_offices(record, reset) -> list[str]:
     """The offices whose `cleared` clearance a version resetting `reset` keeps."""
     return list(
@@ -128,7 +158,8 @@ def new_version_hint(record, user) -> Optional[dict]:
     re-checks all of it.
 
     - `number`: the version it would be;
-    - `rereview`: the parties that asked, who review it;
+    - `rereview`: the parties that review it: those that asked, and under
+      `RESTART_ALL` the completed offices it reopens;
     - `kept`: the offices whose `cleared` clearance it keeps;
     - `blocked`: why it cannot be submitted yet.
     """
@@ -139,11 +170,12 @@ def new_version_hint(record, user) -> Optional[dict]:
         return None
     parties = _parties(requests)
     reset = set(_reset_offices(record, parties))
+    rereview = _rereview(parties, _reopened_assignments(record, parties, reset))
     latest = latest_version(record)
     kept = _kept_offices(record, reset)
     return {
         "number": (latest.number if latest else 0) + 1,
-        "rereview": [_label(p) for p in parties],
+        "rereview": [_label(p) for p in rereview],
         "kept": [_label(o) for o in kept],
         "blocked": unchanged_reason(record, requests),
     }
@@ -178,6 +210,8 @@ def submit_new_version(record, actor):
 
     parties = _parties(requests)
     reset = _reset_offices(record, parties)
+    reopened = _reopened_assignments(record, parties, reset)
+    rereview = _rereview(parties, reopened)
     # Read before the reset: the offices whose `cleared` clearance this version
     # keeps -- ADR-003's contribution, counted per office (IR-144).
     preserved = _kept_offices(record, reset)
@@ -201,15 +235,29 @@ def submit_new_version(record, actor):
     RecordClearance.objects.filter(record=record, office__in=reset).update(
         **lifecycle.clearance_reset_fields()
     )
-    # The requesting parties' seats on the assignments still reviewing.
+    # A reopened office keeps its seats, so its same reviewers look again
+    # (ADR-032 §5, IR-632 amendment).
+    RecordAssignment.objects.filter(pk__in=[a.pk for a in reopened]).update(
+        state=AssignmentState.ACTIVE, closed_by=None, closed_at=None,
+    )
+    # The seats of every party reviewing again, on the assignments now active.
     requesting_seats = ReviewerSeat.objects.filter(
-        assignment__record=record, assignment__party__in=parties,
+        assignment__record=record, assignment__party__in=rereview,
         assignment__state=AssignmentState.ACTIVE,
     )
     requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
+    from .deadlines import start_clock
+
+    for assignment in RecordAssignment.objects.select_for_update().filter(
+        record=record, party__in=parties, state=AssignmentState.ACTIVE,
+    ):
+        start_clock(assignment, now)
+        assignment.save(update_fields=[
+            "due_at", "original_due_at", "clock_started_at", "document_pause_started_at",
+        ])
     audit.resubmitted(
         record, actor, version=version, policy=lifecycle.resubmission_policy().value,
-        requests=[r.pk for r in requests], rereview_parties=parties,
+        requests=[r.pk for r in requests], rereview_parties=rereview,
         reset_parties=reset, preserved_parties=preserved,
     )
 
@@ -217,7 +265,7 @@ def submit_new_version(record, actor):
     # (IR-137, ADR-004's documentation requirement).
     logger.info(
         "record %s: v%s submitted under %s policy; %s review again",
-        record.pk, version.number, lifecycle.resubmission_policy().value, ", ".join(parties),
+        record.pk, version.number, lifecycle.resubmission_policy().value, ", ".join(rereview),
     )
 
     reviewers = list({

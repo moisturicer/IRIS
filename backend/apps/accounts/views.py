@@ -14,6 +14,7 @@ from .serializers import (
     RoleRequestSerializer, SystemSettingSerializer,
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
+from .sessions import end_session, start_session
 
 
 class RegisterView(generics.CreateAPIView):
@@ -55,7 +56,8 @@ class LoginView(APIView):
         if user.is_locked:
             return Response({"detail": "Account is locked."}, status=status.HTTP_403_FORBIDDEN)
 
-        refresh = RefreshToken.for_user(user)
+        # A session the inactivity rule can end, its id inside both tokens (IR-166).
+        refresh = start_session(user)
         create_audit_event("LOGIN", user, metadata={"email": user.email})
         return Response({
             "access":  str(refresh.access_token),
@@ -70,6 +72,11 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        # Ended through the access token in hand, which is the one this request
+        # was authenticated with; the refresh token in the body may be stale.
+        sid = request.auth.get("sid") if request.auth else None
+        if sid:
+            end_session(sid)
         try:
             token = RefreshToken(request.data["refresh"])
             token.blacklist()
@@ -112,6 +119,9 @@ class UserListView(generics.ListAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     queryset           = User.objects.select_related("role").order_by("-date_joined")
+    # The default SearchFilter matches nothing until a view names its fields,
+    # so the Users page's search box listed everyone (IR-478).
+    search_fields      = ["email", "first_name", "last_name"]
 
 
 class AdviserListView(generics.ListAPIView):

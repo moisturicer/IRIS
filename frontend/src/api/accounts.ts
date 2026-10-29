@@ -39,6 +39,10 @@ export const accountsApi = {
   changeRole: (id: number, role: number) =>
     apiClient.patch(`/users/${id}/role/`, { role }),
 
+  /** Grant or remove office-coordinator status (ADR-032 §4). RDCO only; refused for anyone without an office role. */
+  setCoordinator: (id: number, isCoordinator: boolean) =>
+    apiClient.patch<User>(`/users/${id}/coordinator/`, { is_office_coordinator: isCoordinator }),
+
   /** Lock or unlock a user account */
   setLocked:  (id: number, locked: boolean) =>
     apiClient.patch(`/users/${id}/lock/`, { is_locked: locked }),

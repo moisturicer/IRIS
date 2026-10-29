@@ -22,6 +22,7 @@ already held).
 """
 
 from django.contrib.auth import get_user_model
+from django.utils.dateparse import parse_datetime
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -31,6 +32,7 @@ from apps.records.models import Record
 
 from . import seats
 from .models import RecordAssignment, ReviewerSeat
+from .deadlines import deadline_payload, extend
 
 
 def _not_found():
@@ -53,6 +55,31 @@ def _visible_seat(pk, user):
         .select_related("assignment__record", "reviewer")
         .first()
     )
+
+
+class ExtendAssignmentView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        assignment = _visible_assignment(pk, request.user)
+        if assignment is None:
+            return _not_found()
+        refusal = _coordinator_refusal(request.user, assignment.party)
+        if refusal is not None:
+            return refusal
+        raw = request.data.get("due_at")
+        try:
+            due_at = parse_datetime(raw) if isinstance(raw, str) else None
+        except ValueError:
+            due_at = None
+        try:
+            assignment = extend(assignment, request.user, due_at=due_at,
+                                reason=request.data.get("reason"))
+        except seats.SeatRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except seats.SeatError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"assignment": assignment.pk, **deadline_payload(assignment, request.user)})
 
 
 def _reviewer_from(request):
@@ -82,7 +109,7 @@ def _coordinator_refusal(user, party):
     return None
 
 
-def _run(act, *, created=False):
+def _run(act, *, user=None, created=False):
     """Run a seat act and answer with the seat it returns, or its refusal."""
     try:
         seat = act()
@@ -92,7 +119,7 @@ def _run(act, *, created=False):
         return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
     seat = ReviewerSeat.objects.select_related("assignment", "reviewer").get(pk=seat.pk)
     return Response(
-        seats.seat_payload(seat),
+        seats.seat_payload(seat, user),
         status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
     )
 
@@ -104,7 +131,7 @@ class ClaimView(APIView):
         assignment = _visible_assignment(pk, request.user)
         if assignment is None:
             return _not_found()
-        return _run(lambda: seats.claim(assignment, request.user), created=True)
+        return _run(lambda: seats.claim(assignment, request.user), user=request.user, created=True)
 
 
 class AssignView(APIView):
@@ -139,7 +166,7 @@ class AssignView(APIView):
         reviewer, refused = _reviewer_from(request)
         if refused:
             return refused
-        return _run(lambda: seats.assign(assignment, request.user, reviewer), created=True)
+        return _run(lambda: seats.assign(assignment, request.user, reviewer), user=request.user, created=True)
 
 
 class AddReviewerView(APIView):
@@ -169,7 +196,7 @@ class AddReviewerView(APIView):
         reviewer, refused = _reviewer_from(request)
         if refused:
             return refused
-        return _run(lambda: seats.add_reviewer(assignment, request.user, reviewer), created=True)
+        return _run(lambda: seats.add_reviewer(assignment, request.user, reviewer), user=request.user, created=True)
 
 
 class OpenReviewView(APIView):
@@ -179,7 +206,7 @@ class OpenReviewView(APIView):
         seat = _visible_seat(pk, request.user)
         if seat is None:
             return _not_found()
-        return _run(lambda: seats.open_review(seat, request.user))
+        return _run(lambda: seats.open_review(seat, request.user), user=request.user)
 
 
 class ReassignView(APIView):
@@ -195,7 +222,7 @@ class ReassignView(APIView):
         reviewer, refused = _reviewer_from(request)
         if refused:
             return refused
-        return _run(lambda: seats.reassign(seat, request.user, reviewer), created=True)
+        return _run(lambda: seats.reassign(seat, request.user, reviewer), user=request.user, created=True)
 
 
 class WithdrawView(APIView):
@@ -205,4 +232,4 @@ class WithdrawView(APIView):
         seat = _visible_seat(pk, request.user)
         if seat is None:
             return _not_found()
-        return _run(lambda: seats.withdraw(seat, request.user))
+        return _run(lambda: seats.withdraw(seat, request.user), user=request.user)

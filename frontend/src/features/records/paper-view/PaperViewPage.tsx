@@ -52,6 +52,9 @@ import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
 import { ReadingHeader } from "./ReadingHeader";
+import { SubmissionStatus } from "./SubmissionStatus";
+import { useFragmentFocus } from "./useFragmentFocus";
+import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
@@ -321,6 +324,8 @@ export default function PaperViewPage() {
   const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
   /** Bumped when a document request changes, so the tracker reloads. */
   const [trackerVersion, setTrackerVersion] = useState(0);
+  // A My Library link names the request it answers as `#fragment` (IR-625).
+  useFragmentFocus(location.hash, record != null);
 
   // A citation links here with `?page=` (IR-284), so acting on it lands on
   // the page that supports the claim rather than the paper's first. The
@@ -983,11 +988,14 @@ export default function PaperViewPage() {
               <>
                 {/* Action required (spec §4.10): what is waiting on the
                     owner comes first. */}
+                {record.submitter_status && <SubmissionStatus status={record.submitter_status} />}
                 {/* Revision requests are answered through Submit new version. */}
                 {userIsOwner && record.revision.open.length > 0 && (
                   <section
+                    id={WAITING_TARGET.revision}
+                    tabIndex={-1}
                     aria-labelledby="revision-requested-heading"
-                    className="rounded-2xl border border-brand-200 bg-brand-50 p-4"
+                    className="rounded-2xl border border-brand-200 bg-brand-50 p-4 scroll-mt-20 focus:outline-none"
                   >
                     <h2
                       id="revision-requested-heading"
@@ -1071,6 +1079,7 @@ export default function PaperViewPage() {
 
                 {userIsOwner && (
                   <ActionRequiredPanel
+                    id={WAITING_TARGET.document}
                     recordId={record.id}
                     onChanged={handleDocumentRequestChanged}
                   />

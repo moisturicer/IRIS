@@ -279,6 +279,25 @@ class DocumentRequest(models.Model):
         ordering = ["record", "created_at", "pk"]
         indexes  = [models.Index(fields=["record", "state"])]
 
+    def save(self, *args, **kwargs):
+        # Request and clock move together, including fulfillment and a
+        # rejected upload reopening a request. Bulk workflow withdrawals
+        # close assignments too, so they do not leave a running clock.
+        from django.db import transaction
+        from apps.records.models import Record
+        from apps.reviews.deadlines import sync_document_pause
+        from apps.reviews.models import RecordAssignment
+
+        with transaction.atomic():
+            Record.objects.select_for_update().get(pk=self.record_id)
+            assignment = (
+                RecordAssignment.objects.select_for_update().get(pk=self.assignment_id)
+                if self.assignment_id else None
+            )
+            super().save(*args, **kwargs)
+            if assignment is not None:
+                sync_document_pause(assignment, now=timezone.now())
+
     def __str__(self):
         return f"Record {self.record_id} | {self.party} | {self.state}"
 

@@ -23,7 +23,7 @@ from django.test import TestCase
 
 from apps.accounts.models import User
 from apps.documents.models import RecordUpload, UploadSlot
-from apps.reviews.models import RecordClearance
+from apps.reviews.models import RecordAssignment, RecordClearance, Turnaround
 from apps.reviews.new_version import submit_new_version
 from apps.reviews.tracker import workflow_state
 from core.enums import ClearanceStatus, Office, PipelineStatus
@@ -31,6 +31,7 @@ from core.enums import ClearanceStatus, Office, PipelineStatus
 from .management.commands.seed_demo import (
     ADMIN_EMAIL,
     AT_RDCO_TITLE,
+    COORDINATOR_ACCOUNTS,
     FLAGSHIP_TITLE,
     NEW_MODEL_TITLE,
     PASSWORD,
@@ -82,6 +83,22 @@ class SeedDemoGuardTests(TestCase):
         self.assertTrue(User.objects.filter(email=ADMIN_EMAIL).exists())
 
 
+class SeedDemoDeadlineTests(TestCase):
+    def test_demo_values_are_explicit_preserve_configuration_and_date_new_assignments(self):
+        Turnaround.objects.create(party="itso", working_days=9)
+        output = StringIO()
+        call_command("seed_demo", force=True, stdout=output)
+        self.assertEqual(Turnaround.objects.get(party="itso").working_days, 9)
+        self.assertEqual(set(Turnaround.objects.exclude(party="itso").values_list("working_days", flat=True)), {5})
+        self.assertIn("demonstration only", output.getvalue())
+        self.assertTrue(RecordAssignment.objects.filter(state="active").exists())
+        self.assertFalse(RecordAssignment.objects.filter(state="active", due_at__isnull=True).exists())
+
+    def test_accounts_only_does_not_configure_office_policy(self):
+        seed(accounts_only=True)
+        self.assertFalse(Turnaround.objects.exists())
+
+
 class SeedDemoAccountTests(TestCase):
 
     def test_it_seeds_all_seven_accounts(self):
@@ -126,6 +143,49 @@ class SeedDemoAccountTests(TestCase):
     def test_accounts_only_seeds_no_records(self):
         seed(accounts_only=True)
         self.assertFalse(Record.objects.exists())
+
+
+class SeedDemoCoordinatorTests(TestCase):
+    """One coordinator per office beside a plain member (IR-478).
+
+    The demo shows that `itso@cit.edu` can only claim from ITSO's pool while
+    `itso.coordinator@cit.edu` can assign it (ADR-032 §4). That needs both
+    kinds of account, and needs the plain one to stay plain.
+    """
+
+    def test_each_office_has_a_coordinator_login(self):
+        seed(accounts_only=True)
+        self.assertEqual(
+            {email for email, *_ in COORDINATOR_ACCOUNTS},
+            {"itso.coordinator@cit.edu", "ierc.coordinator@cit.edu",
+             "ktto.coordinator@cit.edu", "rdco.coordinator@cit.edu"},
+        )
+        for email, _first, _last, role_name in COORDINATOR_ACCOUNTS:
+            user = User.objects.get(email=email)
+            self.assertTrue(user.is_office_coordinator, f"{email} is not a coordinator")
+            self.assertEqual(user.role.name, role_name)
+            self.assertTrue(user.check_password(PASSWORD), f"{email} does not accept the demo password")
+
+    def test_the_plain_office_logins_are_members_only(self):
+        seed(accounts_only=True)
+        for email, _first, _last, _role in ROLE_ACCOUNTS:
+            self.assertFalse(
+                User.objects.get(email=email).is_office_coordinator,
+                f"{email} must stay an ordinary member",
+            )
+
+    def test_running_again_restores_both_kinds(self):
+        """A rehearsal that granted or removed the flag on the Users page is undone, like a changed password."""
+        seed(accounts_only=True)
+        User.objects.filter(email="itso@cit.edu").update(is_office_coordinator=True)
+        User.objects.filter(email="itso.coordinator@cit.edu").update(is_office_coordinator=False)
+        count = User.objects.count()
+
+        seed(accounts_only=True)
+
+        self.assertEqual(User.objects.count(), count)
+        self.assertFalse(User.objects.get(email="itso@cit.edu").is_office_coordinator)
+        self.assertTrue(User.objects.get(email="itso.coordinator@cit.edu").is_office_coordinator)
 
 
 class SeedDemoRecordTests(TestCase):

@@ -22,6 +22,9 @@ export interface User {
   is_superuser:   boolean;
   is_verified:    boolean;
   is_locked:      boolean;
+  is_active:      boolean;
+  /** Granted by RDCO on the Users page (ADR-032 §4, IR-478). Read-only here. */
+  is_office_coordinator: boolean;
   /** RA 10173 consent, recorded at registration (FR-M6-06). Read-only. */
   consent_given:  boolean;
   date_joined:    string;
@@ -118,5 +121,7 @@ export interface UserListItem {
   role_name:  string;
   is_active:  boolean;
   is_locked:  boolean;
+  /** May assign, reassign and withdraw reviewers in their office (ADR-032 §4). */
+  is_office_coordinator: boolean;
   date_joined: string;
 }

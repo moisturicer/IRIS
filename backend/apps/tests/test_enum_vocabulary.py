@@ -108,6 +108,12 @@ ALLOWED = {
     # awaiting backfill, not a person's request awaiting a decision. Two
     # concepts, one string; pointing this file at core.enums would be wrong.
     "ai/models/embedding_space.py",
+    # (IR-561) A submission identity's transport response is pending while
+    # its original answer is still running. This is not RequestStatus.PENDING
+    # (a workflow request awaiting a decision); importing that enum would
+    # couple chat retries to institutional workflow. This module contains
+    # no workflow states, only claim/replay handling for one chat request.
+    "ai/submissions.py",
     # (IR-406) Declares its own `SuggestionState` for the Publish dialog's
     # prefill (pending/ready/failed/unsupported, IR-374 spec §4.5): the
     # manuscript *extraction's* status restated for one client -- the same
