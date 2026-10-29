@@ -940,3 +940,64 @@ describe("each answer stays with the conversation that asked (IR-562)", () => {
     expect(screen.queryByText(/gauges predicted flooding a day ahead/)).toBeNull();
   });
 });
+
+
+describe("back to the answer from a citation (IR-578)", () => {
+  const passage: Citation = {
+    marker: 1, chunk_id: 11, record_id: 7, record_title: "Flood Prediction", page: 4,
+    text: "gauges predicted flooding a day ahead", context_path: ["Flood Prediction"], regions: [],
+  };
+
+  function turn(id: number, question: string, text: string, citations: Citation[]) {
+    return {
+      id, question, resolved_question: null, answer: text, message: null, state: "generative" as const,
+      degraded: false, widened: false, partial: false, created_at: "2026-10-20T00:00:00.000Z", citations,
+    };
+  }
+
+  beforeEach(() => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" })] });
+    get.mockResolvedValue({
+      data: detail({
+        id: 9,
+        title: "Flooding",
+        turns: [
+          turn(3, "What predicts flooding?", "Gauges predict it [1].", [passage]),
+          turn(4, "Who funded it?", "No paper says who funded it.", []),
+        ],
+      }),
+    });
+  });
+
+  function renderAt(route: string) {
+    renderScreen(
+      <Routes>
+        <Route path="/ai/conversations/:conversationId" element={<RAGChatPage />} />
+      </Routes>,
+      { route },
+    );
+  }
+
+  it("opens at the answer returned to, selected, with its sources", async () => {
+    const scrolled: Element[] = [];
+    Element.prototype.scrollIntoView = vi.fn(function (this: Element) { scrolled.push(this); });
+
+    renderAt("/ai/conversations/9?turn=3");
+
+    const select = await screen.findByRole("button", { name: "1 source for this answer" });
+    await waitFor(() => expect(select).toHaveAttribute("aria-pressed", "true"));
+    const sources = screen.getByRole("complementary", { name: "Referenced passages" });
+    expect(within(sources).getByText(/gauges predicted flooding a day ahead/)).toBeTruthy();
+    expect(within(sources).getByText(/What predicts flooding\?/)).toBeTruthy();
+    // The transcript opens at that answer, not at its newest one.
+    expect(scrolled.some((el) => /Gauges predict it/.test(el.textContent ?? ""))).toBe(true);
+    expect(scrolled.some((el) => /No paper says who funded it/.test(el.textContent ?? ""))).toBe(false);
+  });
+
+  it("links every citation to its conversation and answer, by id", async () => {
+    renderAt("/ai/conversations/9");
+
+    const chip = await screen.findByRole("link", { name: "Open Flood Prediction at page 4" });
+    expect(chip).toHaveAttribute("href", "/records/7?page=4&conversation=9&turn=3&cite=1");
+  });
+});

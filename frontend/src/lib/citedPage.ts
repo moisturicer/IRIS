@@ -17,7 +17,7 @@
  * citation's job is to say which page and which chunk, not to shape a URL to
  * the file at all.
  */
-import { createContext } from "react";
+import { createContext, useContext } from "react";
 import type { ChatCitation, Citation } from "@/types/ai";
 
 /**
@@ -33,11 +33,20 @@ export function hasCitationQuote(citation: ChatCitation): citation is Citation {
   return "text" in citation;
 }
 
+/**
+ * A positive whole number read off the address, or null: a page, or the id
+ * of a Conversation, Turn or citation marker (IR-578). Anything typed into
+ * the address bar that is not one is ignored rather than passed on.
+ */
+export function addressNumber(raw: string | null): number | null {
+  if (raw === null || raw.trim() === "") return null;
+  const value = Number(raw);
+  return Number.isInteger(value) && value > 0 ? value : null;
+}
+
 /** The page a citation asked for, or null when it named none we can use. */
 export function citedPage(raw: string | null): number | null {
-  if (raw === null || raw.trim() === "") return null;
-  const page = Number(raw);
-  return Number.isInteger(page) && page > 0 ? page : null;
+  return addressNumber(raw);
 }
 
 /**
@@ -47,10 +56,22 @@ export function citedPage(raw: string | null): number | null {
  * no page, rather than guessing one: landing confidently on the wrong page is
  * worse than landing on the first.
  */
-export function citationHref(citation: Pick<Citation, "record_id" | "page">): string {
-  return citation.page != null
-    ? `/records/${citation.record_id}?page=${citation.page}`
-    : `/records/${citation.record_id}`;
+export function citationHref(
+  citation: Pick<Citation, "record_id" | "page"> & { marker?: number },
+  { origin = null, answer = null }: { origin?: CitationOrigin | null; answer?: AnswerTurn | null } = {},
+): string {
+  const params = new URLSearchParams();
+  if (citation.page != null) params.set("page", String(citation.page));
+  // Ids only (IR-578): the question and the quote never go in an address.
+  if (answer) {
+    params.set("conversation", String(answer.conversationId));
+    params.set("turn", String(answer.turnId));
+    if (citation.marker) params.set("cite", String(citation.marker));
+    if (origin === "paper-chat") params.set("from", "paper");
+  }
+  if (origin === "overview") params.set("context", "page");
+  const query = params.toString();
+  return `/records/${citation.record_id}${query ? `?${query}` : ""}`;
 }
 
 /**
@@ -92,23 +113,52 @@ export interface CitationNavigationState {
   citation: ChatCitation;
   /**
    * Where the citation was followed from, when that matters to the screen
-   * it lands on (IR-355). Absent everywhere but Paper Chat.
+   * it lands on (IR-355). Absent everywhere but Paper Chat and the Overview.
    */
   origin?: CitationOrigin;
+  /** The answer it was followed from (IR-578). */
+  answer?: AnswerTurn;
+  /**
+   * The page load that wrote this state (IR-578). A reload keeps router
+   * state, so state from another load is stale: the paper view re-resolves
+   * the citation from the address, or highlights nothing.
+   */
+  load?: string;
 }
 
 /**
- * A transcript whose citations the paper view treats differently (IR-355).
- * Only Paper Chat today: a citation followed from it keeps its conversation
- * open on the paper it lands on.
+ * A surface whose citations the paper view treats differently. Paper Chat
+ * keeps its conversation open on the paper a citation lands on (IR-355); the
+ * Overview cites whole pages, which land as page context (IR-578).
  */
-export type CitationOrigin = "paper-chat";
+export type CitationOrigin = "paper-chat" | "overview";
+
+/** One answer in one of the reader's own Conversations (IR-578). */
+export interface AnswerTurn {
+  conversationId: number;
+  turnId: number;
+}
+
+/** A request to show that answer again; `key` makes a repeat a request again. */
+export type AnswerReturn = AnswerTurn & { key: number };
+
+/** This page load. Router state from another one is not trusted. */
+const PAGE_LOAD = crypto.randomUUID();
 
 export function citationNavigationState(
   citation: ChatCitation,
   origin?: CitationOrigin | null,
+  answer?: AnswerTurn | null,
 ): CitationNavigationState {
-  return origin ? { citation, origin } : { citation };
+  // Stamped wherever a reload would otherwise keep an unchecked highlight:
+  // an answer's citation, or an Overview page.
+  const stamped = answer != null || origin === "overview";
+  return {
+    citation,
+    ...(origin ? { origin } : {}),
+    ...(answer ? { answer } : {}),
+    ...(stamped ? { load: PAGE_LOAD } : {}),
+  };
 }
 
 /**
@@ -126,4 +176,90 @@ export const CitationOriginContext = createContext<CitationOrigin | null>(null);
  */
 export function followedFromPaperChat(state: unknown): boolean {
   return (state as CitationNavigationState | null)?.origin === "paper-chat";
+}
+
+/**
+ * The Conversation the citations below belong to, and the answer, set by
+ * the transcript and by each answer in it (IR-578). Either `null` and a
+ * citation carries no way back to its answer.
+ */
+export const CitationConversationContext = createContext<number | null>(null);
+export const CitationTurnContext = createContext<number | null>(null);
+
+/**
+ * Where a citation rendered here links to, and the router state it carries.
+ * The one place a citation link is built, so every surface carries its
+ * origin and its answer the same way.
+ */
+export function useCitationLink(
+  citation: ChatCitation | (Pick<Citation, "record_id" | "page"> & Partial<Pick<Citation, "record_title">>),
+  /** False where the marker is not one of the answer's citations: no `cite` to re-read. */
+  { resolvable = true }: { resolvable?: boolean } = {},
+) {
+  const origin = useContext(CitationOriginContext);
+  const conversationId = useContext(CitationConversationContext);
+  const turnId = useContext(CitationTurnContext);
+  const answer = conversationId != null && turnId != null ? { conversationId, turnId } : null;
+  return {
+    to: citationHref(
+      resolvable ? citation : { record_id: citation.record_id, page: citation.page },
+      { origin, answer },
+    ),
+    state: isChatCitation(citation) ? citationNavigationState(citation, origin, answer) : undefined,
+    /** An Overview page, which the paper lands as page context. */
+    pageContext: origin === "overview",
+  };
+}
+
+function isChatCitation(citation: object): citation is ChatCitation {
+  return "marker" in citation;
+}
+
+/**
+ * The answer a paper was opened from, read off its address (IR-578). `null`
+ * unless it names a Conversation and a Turn; `marker` is null when the link
+ * named no citation to re-resolve (a comparison's page link).
+ */
+export interface AnswerReference extends AnswerTurn {
+  marker: number | null;
+  from: "ask" | "paper-chat";
+}
+
+export function answerReference(params: URLSearchParams): AnswerReference | null {
+  const conversationId = addressNumber(params.get("conversation"));
+  const turnId = addressNumber(params.get("turn"));
+  if (conversationId == null || turnId == null) return null;
+  return {
+    conversationId,
+    turnId,
+    marker: addressNumber(params.get("cite")),
+    from: params.get("from") === "paper" ? "paper-chat" : "ask",
+  };
+}
+
+/**
+ * The citation this navigation carried, when it can be trusted as it is:
+ * written by this page load for the answer the address names. Anything else
+ * -- a reload, a restored tab -- is re-resolved from the address.
+ */
+export function trustedCitation(state: unknown, reference: AnswerReference | null): ChatCitation | null {
+  const carried = state as CitationNavigationState | null;
+  if (!carried?.citation) return null;
+  const thisLoad = carried.load === PAGE_LOAD;
+  if (!reference) {
+    // An Overview page cannot be re-read from its address, so a stale one
+    // highlights nothing; a plain link's state is used as it always was.
+    return carried.origin === "overview" && !thisLoad ? null : carried.citation;
+  }
+  const answer = carried.answer;
+  return thisLoad &&
+    answer?.conversationId === reference.conversationId &&
+    answer.turnId === reference.turnId
+    ? carried.citation
+    : null;
+}
+
+/** Whether the address says this is the Overview's page context (IR-578). */
+export function landedAsPageContext(params: URLSearchParams, state: unknown): boolean {
+  return params.get("context") === "page" || (state as CitationNavigationState | null)?.origin === "overview";
 }

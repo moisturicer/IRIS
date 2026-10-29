@@ -1,9 +1,8 @@
-import { useContext } from "react";
 import { Link } from "react-router-dom";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { ChatCitation, Citation } from "@/types/ai";
-import { CitationOriginContext, citationHref, citationNavigationState, openCitationLabel } from "@/lib/citedPage";
+import { openCitationLabel, useCitationLink } from "@/lib/citedPage";
 
 /**
  * The pieces every surface that shows a Passage needs (IR-284).
@@ -89,11 +88,11 @@ export function OpenPassageLink({
   title?: string;
   className?: string;
 }) {
-  const origin = useContext(CitationOriginContext);
+  const { to, state } = useCitationLink(citation);
   return (
     <Link
-      to={citationHref(citation)}
-      state={"marker" in citation ? citationNavigationState(citation, origin) : undefined}
+      to={to}
+      state={state}
       className={
         "inline-flex items-center gap-1.5 text-xs font-semibold text-brand " +
         "hover:underline " +
