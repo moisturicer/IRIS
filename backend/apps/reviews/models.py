@@ -286,6 +286,13 @@ class ReviewerSeat(models.Model):
         "reviews.Review", on_delete=models.RESTRICT,
         null=True, blank=True, related_name="closed_seats",
     )
+    #: The seat a coordinator's *Reassign* moved this one from, and why
+    #: (IR-623). Blank on every seat that was not reassigned.
+    reassigned_from = models.ForeignKey(
+        "self", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="reassigned_to",
+    )
+    reason      = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["assignment", "assigned_at", "pk"]

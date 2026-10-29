@@ -238,7 +238,10 @@ class CoordinatorTests(SeatTestBase):
 
     def test_a_coordinator_reassigns_a_seat(self):
         seat = self.seat(self.pool, self.itso, state=SeatState.IN_REVIEW)
-        response = self.post(reassign_url(seat), self.itso_coordinator, {"reviewer": self.itso2.pk})
+        response = self.post(
+            reassign_url(seat), self.itso_coordinator,
+            {"reviewer": self.itso2.pk, "reason": "  On leave until December.  "},
+        )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         seat.refresh_from_db()
@@ -246,11 +249,30 @@ class CoordinatorTests(SeatTestBase):
         self.assertEqual(
             self.live_seats(self.pool), {(self.itso2.pk, SeatState.ASSIGNED, SeatSource.ASSIGNED)},
         )
+        # IR-623: the new seat keeps why it was moved, and from whom.
+        new_seat = ReviewerSeat.objects.get(pk=response.data["id"])
+        self.assertEqual(
+            (new_seat.reason, new_seat.reassigned_from_id),
+            ("On leave until December.", seat.pk),
+        )
+
+    def test_a_reassignment_needs_a_reason(self):
+        seat = self.seat(self.pool, self.itso, state=SeatState.IN_REVIEW)
+        for body in ({"reviewer": self.itso2.pk}, {"reviewer": self.itso2.pk, "reason": "   "}):
+            response = self.post(reassign_url(seat), self.itso_coordinator, body)
+            self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        seat.refresh_from_db()
+        self.assertEqual(seat.state, SeatState.IN_REVIEW)
+        self.assertEqual(
+            self.live_seats(self.pool), {(self.itso.pk, SeatState.IN_REVIEW, SeatSource.CLAIMED)},
+        )
 
     def test_a_non_coordinator_cannot_reassign_or_withdraw(self):
         seat = self.seat(self.pool, self.itso)
         self.assertEqual(
-            self.post(reassign_url(seat), self.itso2, {"reviewer": self.itso2.pk}).status_code,
+            self.post(
+                reassign_url(seat), self.itso2, {"reviewer": self.itso2.pk, "reason": "Workload"},
+            ).status_code,
             status.HTTP_403_FORBIDDEN,
         )
         self.assertEqual(self.post(withdraw_url(seat), self.itso2).status_code, status.HTTP_403_FORBIDDEN)

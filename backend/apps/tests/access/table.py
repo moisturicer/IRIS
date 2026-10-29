@@ -343,6 +343,14 @@ REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
             data={"due_at": "2099-12-31T23:59:00+08:00", "reason": "Committee unavailable"},
         ),
     }),
+    # IR-623: the coordinator console names no object, so nothing is hidden:
+    # every signed-in caller but ITSO's coordinator is refused outright.
+    "reviews-office": Entry({
+        "GET": _case(
+            row(ANON, DENY, DENY, DENY, DENY, DENY, OK, DENY, DENY),
+            query={"office": "itso"},
+        ),
+    }),
 }
 
 # IR-616: every remaining app is declared; there is no pending exemption.
