@@ -12,6 +12,7 @@ Design rules:
 import logging
 
 from django.conf import settings
+from django.db import transaction
 from core.enums import Party, RecordTypeName, RoleName
 from core.utils import send_email_async
 from .models import Notification, NotificationType
@@ -535,6 +536,26 @@ def notify_document_rejected(document_request, item, *, rejected_by):
             )
     except Exception:
         _log_failure("notify_document_rejected", request=document_request)
+
+
+def notify_deadline(record, recipient, *, type_name, message):
+    """
+    One in-app deadline reminder or escalation (ADR-043 §7). No email: §7
+    keeps deadlines in-app. Returns whether it was written; the savepoint
+    lets the scheduled batch carry on inside its transaction (IR-300).
+    """
+    try:
+        with transaction.atomic():
+            Notification.objects.create(
+                recipient=recipient,
+                record=record,
+                notif_type=NotificationType.objects.get_or_create(name=type_name)[0],
+                message=message,
+            )
+        return True
+    except Exception:
+        _log_failure("notify_deadline", record=record)
+        return False
 
 
 def notify_role_request(user, requested_role):

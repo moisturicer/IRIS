@@ -1,6 +1,7 @@
 from pathlib import Path
 from datetime import timedelta
 
+from celery.schedules import crontab
 from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
@@ -285,6 +286,16 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.generate_paper_brief": {"queue": "embedding"},
     # IR-466: its own concurrency-1 worker, apart from reader work.
     "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
+}
+
+# ADR-043 §8 (IR-620): the `celery-beat` service's only entry. Hourly, on
+# `default`; the task asks the database what is owed, so the schedule of
+# reminders lives in data and a missed tick is caught up by the next one.
+CELERY_BEAT_SCHEDULE = {
+    "deadline-notifications": {
+        "task": "apps.reviews.tasks.send_deadline_notifications",
+        "schedule": crontab(minute=0),
+    },
 }
 
 # ---- Static / Media -----------------------------------------------------
