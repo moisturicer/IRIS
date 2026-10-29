@@ -72,6 +72,7 @@ function payload(overrides: Partial<RecordTracker>): RecordTracker {
     routing_recorded_from: "2026-09-19T12:00:00Z",
     reviews: [],
     versions: [],
+    review_comments: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],
