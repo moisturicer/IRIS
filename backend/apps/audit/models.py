@@ -94,11 +94,17 @@ class AuditEvent(models.Model):
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)
+    # DO_NOTHING with no database constraint (IR-166): deleting a User or a
+    # Record must not touch its audit rows, which are insert-only at the
+    # database. The row keeps the deleted subject's id; `select_related` reads
+    # it as None. SET_NULL would have needed an UPDATE the trigger allowed, and
+    # that exception let anyone strip attribution from the whole log.
     user       = models.ForeignKey(
-        "accounts.User", on_delete=models.SET_NULL, null=True, related_name="audit_events"
+        "accounts.User", on_delete=models.DO_NOTHING, db_constraint=False, null=True,
+        related_name="audit_events"
     )
     record     = models.ForeignKey(
-        "records.Record", on_delete=models.SET_NULL, null=True, blank=True,
+        "records.Record", on_delete=models.DO_NOTHING, db_constraint=False, null=True, blank=True,
         related_name="audit_events"
     )
     # Store extra details without polluting the schema with more columns
