@@ -1,4 +1,5 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
+import { IDLE_HEADER, idleSeconds } from "@/lib/activity";
 import { API_BASE } from "@/lib/constants";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
 import { refreshOnce, type RefreshedTokens } from "@/lib/tokenRefresh";
@@ -14,6 +15,9 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  // How long the user has been idle, so a poll cannot keep the session alive
+  // (IR-166, NFR-S2). See lib/activity.ts.
+  if (config.headers) config.headers[IDLE_HEADER] = String(idleSeconds());
   return config;
 });
 
@@ -25,7 +29,13 @@ apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
  * itself would try to refresh, recursively.
  */
 async function requestNewTokens(refresh: string): Promise<RefreshedTokens> {
-  const { data } = await axios.post(`${API_BASE}/auth/token/refresh/`, { refresh });
+  // The idle header here too: this refresh is usually caused by a poll's 401,
+  // and counting it as activity would hand the poll the session back.
+  const { data } = await axios.post(
+    `${API_BASE}/auth/token/refresh/`,
+    { refresh },
+    { headers: { [IDLE_HEADER]: String(idleSeconds()) } },
+  );
   return { access: data.access, refresh: data.refresh };
 }
 

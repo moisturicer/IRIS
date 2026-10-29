@@ -162,7 +162,8 @@ AUTH_PASSWORD_VALIDATORS = [
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # simplejwt's, plus the 30-minute inactivity rule (IR-166).
+        "apps.accounts.authentication.IdleAwareJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -200,7 +201,14 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
+    # Refuses a refresh for a session idle past the limit below (IR-166).
+    "TOKEN_REFRESH_SERIALIZER": "apps.accounts.authentication.IdleAwareTokenRefreshSerializer",
 }
+
+# NFR-S2: a session ends after this long with no user activity, independent of
+# the token lifetimes above (IR-166, apps/accounts/sessions.py). The interface
+# signs itself out on the same figure: frontend/src/lib/activity.ts.
+SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30, cast=int)
 
 # ---- CORS ---------------------------------------------------------------
 
