@@ -12,7 +12,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { act, renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { AIAnswer, AIStatus, Citation, ConversationDetail, ConversationSummary, LatestAskRun } from "@/types/ai";
 
 import RAGChatPage from "./RAGChatPage";
@@ -708,5 +708,235 @@ describe("Ask IRIS on a phone (IR-570)", () => {
 
     expect(screen.getByRole("complementary", { name: "Chat history" })).toBeInTheDocument();
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+});
+
+describe("each answer stays with the conversation that asked (IR-562)", () => {
+  const passage: Citation = {
+    marker: 1, chunk_id: 11, record_id: 7, record_title: "Flood Prediction", page: 4,
+    text: "gauges predicted flooding a day ahead", context_path: ["Flood Prediction"], regions: [],
+  };
+
+  /** Two conversations, 9 "Flooding" and 7 "Bridges", each opened by its address. */
+  async function renderTwo() {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" }), summary({ id: 7, title: "Bridges" })] });
+    get.mockImplementation(async (id: number) => ({
+      data: detail({ id, title: id === 9 ? "Flooding" : "Bridges" }),
+    }));
+    renderScreen(
+      <Routes>
+        <Route path="/ai/conversations/:conversationId" element={<><RAGChatPage /><Address /></>} />
+      </Routes>,
+      { route: "/ai/conversations/9" },
+    );
+    await waitFor(() => expect(get).toHaveBeenCalledWith(9));
+    await screen.findByRole("link", { name: /^Bridges/ });
+  }
+
+  const address = () => screen.getByLabelText("address").textContent;
+  const composer = () => screen.getByRole("textbox", { name: /ask a follow-up/i }) as HTMLTextAreaElement;
+  const sourcesPanel = () => screen.getByRole("complementary", { name: "Referenced passages" });
+
+  /** A stream that says it is thinking, then waits for the returned release before its answer. */
+  function delayedAnswer(overrides: Partial<AIAnswer> = {}) {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    askStream.mockImplementationOnce(async function* () {
+      yield { event: "activity", data: { state: "thinking" } };
+      await gate;
+      yield { event: "done", data: answer(overrides) };
+    });
+    return () => act(async () => { release(); await gate; });
+  }
+
+  async function ask(question: string) {
+    await userEvent.type(composer(), question);
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+  }
+
+  async function openConversation(title: string, id: number) {
+    get.mockClear();
+    await userEvent.click(screen.getByRole("link", { name: new RegExp(`^${title}`) }));
+    await waitFor(() => expect(address()).toBe(`/ai/conversations/${id}`));
+    await waitFor(() => expect(get).toHaveBeenCalledWith(id));
+  }
+
+  it("keeps an answer still arriving out of the conversation the reader moved to", async () => {
+    await renderTwo();
+    const release = delayedAnswer({ answer: "Rain gauges predict it." });
+
+    await ask("What predicts flooding?");
+    expect(await screen.findByText("Thinking…")).toBeTruthy();
+    await openConversation("Bridges", 7);
+    await release();
+
+    expect(screen.queryByText("What predicts flooding?")).toBeNull();
+    expect(screen.queryByText("Rain gauges predict it.")).toBeNull();
+    // Moving away is not Stop: the answer is still received in full, so the
+    // server stores all of it rather than a fragment cut off by a disconnect.
+    const signal = askStream.mock.calls[0][2] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+  });
+
+  it("shows the answer in the conversation that asked, when the reader comes back", async () => {
+    await renderTwo();
+    const release = delayedAnswer({ answer: "Rain gauges predict it." });
+
+    await ask("What predicts flooding?");
+    expect(await screen.findByText("Thinking…")).toBeTruthy();
+    await openConversation("Bridges", 7);
+    await openConversation("Flooding", 9);
+
+    // Still answering: the question and its live line are where they were.
+    expect(await screen.findByText("What predicts flooding?")).toBeTruthy();
+    expect(screen.getByText("Thinking…")).toBeTruthy();
+
+    await release();
+
+    expect(await screen.findByText("Rain gauges predict it.")).toBeTruthy();
+    expect(screen.getAllByText("What predicts flooding?")).toHaveLength(1);
+  });
+
+  it("shows the live line only in the conversation that is answering, and frees the others", async () => {
+    await renderTwo();
+    delayedAnswer();
+
+    await ask("What predicts flooding?");
+    expect(await screen.findByText("Thinking…")).toBeTruthy();
+    expect(composer().disabled).toBe(true);
+
+    await openConversation("Bridges", 7);
+
+    expect(screen.queryByText("Thinking…")).toBeNull();
+    expect(screen.queryByRole("button", { name: /stop answering/i })).toBeNull();
+    expect(composer().disabled).toBe(false);
+  });
+
+  it("keeps each conversation's unsent draft to itself", async () => {
+    await renderTwo();
+
+    await userEvent.type(composer(), "Draft about flooding");
+    await openConversation("Bridges", 7);
+
+    expect(composer().value).toBe("");
+    await userEvent.type(composer(), "Draft about bridges");
+
+    await openConversation("Flooding", 9);
+    expect(composer().value).toBe("Draft about flooding");
+
+    await openConversation("Bridges", 7);
+    expect(composer().value).toBe("Draft about bridges");
+  });
+
+  it("never shows an older answer's sources beside a newer answer that cited nothing", async () => {
+    await renderTwo();
+    askStream
+      .mockImplementationOnce(() => doneStreamOf({ answer: "Gauges predict it [1].", citations: [passage] }))
+      .mockImplementationOnce(() => doneStreamOf({ answer: "No paper says who funded it.", citations: [] }));
+
+    await ask("What predicts flooding?");
+    await screen.findByText(/Gauges predict it/);
+    expect(within(sourcesPanel()).getByText(/gauges predicted flooding a day ahead/)).toBeTruthy();
+    expect(within(sourcesPanel()).getByText(/What predicts flooding\?/)).toBeTruthy();
+
+    await ask("Who funded it?");
+    await screen.findByText("No paper says who funded it.");
+
+    expect(within(sourcesPanel()).queryByText(/gauges predicted flooding a day ahead/)).toBeNull();
+    expect(within(sourcesPanel()).getByText(/Who funded it\?/)).toBeTruthy();
+    expect(within(sourcesPanel()).getByText(/cited no passages/i)).toBeTruthy();
+  });
+
+  it("shows the sources of the answer the reader selects, and names it", async () => {
+    await renderTwo();
+    askStream
+      .mockImplementationOnce(() => doneStreamOf({ answer: "Gauges predict it [1].", citations: [passage] }))
+      .mockImplementationOnce(() => doneStreamOf({ answer: "No paper says who funded it.", citations: [] }));
+    await ask("What predicts flooding?");
+    await screen.findByText(/Gauges predict it/);
+    await ask("Who funded it?");
+    await screen.findByText("No paper says who funded it.");
+
+    const select = screen.getByRole("button", { name: "1 source for this answer" });
+    expect(select).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(select);
+
+    expect(select).toHaveAttribute("aria-pressed", "true");
+    expect(within(sourcesPanel()).getByText(/gauges predicted flooding a day ahead/)).toBeTruthy();
+    expect(within(sourcesPanel()).getByText(/What predicts flooding\?/)).toBeTruthy();
+  });
+
+  it("puts a cited answer's sources with its own conversation after a switch mid-answer", async () => {
+    await renderTwo();
+    const release = delayedAnswer({ answer: "Gauges predict it [1].", citations: [passage] });
+
+    await ask("What predicts flooding?");
+    expect(await screen.findByText("Thinking…")).toBeTruthy();
+    await openConversation("Bridges", 7);
+    await release();
+
+    expect(screen.queryByText(/gauges predicted flooding a day ahead/)).toBeNull();
+
+    // The server stored the whole answer, because following it never stopped.
+    get.mockImplementation(async (id: number) => ({
+      data: detail({
+        id, title: id === 9 ? "Flooding" : "Bridges",
+        turns: id === 9 ? [{
+          id: 90, question: "What predicts flooding?", resolved_question: null,
+          answer: "Gauges predict it [1].", message: null, state: "generative",
+          degraded: false, widened: false, created_at: "2026-10-16", citations: [passage],
+        }] : [],
+      }),
+    }));
+    await openConversation("Flooding", 9);
+    await userEvent.click(await screen.findByRole("button", { name: "1 source for this answer" }));
+
+    expect(within(sourcesPanel()).getByText(/gauges predicted flooding a day ahead/)).toBeTruthy();
+    expect(within(sourcesPanel()).getByText(/What predicts flooding\?/)).toBeTruthy();
+  });
+
+  it("keeps an answer that lands while its conversation is loading, rather than an older copy", async () => {
+    await renderTwo();
+    const release = delayedAnswer({ answer: "Rain gauges predict it." });
+    await ask("What predicts flooding?");
+    expect(await screen.findByText("Thinking…")).toBeTruthy();
+    await openConversation("Bridges", 7);
+
+    // Coming back, the load is answered with a copy taken before the answer existed.
+    let deliver: () => void = () => {};
+    get.mockImplementationOnce(() => new Promise((resolve) => {
+      deliver = () => resolve({ data: detail({ id: 9, title: "Flooding" }) });
+    }));
+    await userEvent.click(screen.getByRole("link", { name: /^Flooding/ }));
+    await waitFor(() => expect(get).toHaveBeenCalledWith(9));
+    await release();
+    await act(async () => deliver());
+
+    expect(await screen.findByText("Rain gauges predict it.")).toBeTruthy();
+    expect(screen.getByText("What predicts flooding?")).toBeTruthy();
+  });
+
+  it("keeps a handed-off draft when the conversation's address is reloaded", async () => {
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    renderScreen(
+      <Routes>
+        <Route path="/ai/conversations/:conversationId" element={<RAGChatPage />} />
+      </Routes>,
+      { route: "/ai/conversations/9", state: { draft: "What predicts flooding?" } },
+    );
+
+    await waitFor(() => expect(composer().value).toBe("What predicts flooding?"));
+    expect(askStream).not.toHaveBeenCalled();
+  });
+
+  it("does not carry one conversation's sources into another", async () => {
+    await renderTwo();
+    askStream.mockImplementationOnce(() => doneStreamOf({ answer: "Gauges predict it [1].", citations: [passage] }));
+    await ask("What predicts flooding?");
+    await screen.findByText(/Gauges predict it/);
+
+    await openConversation("Bridges", 7);
+
+    expect(screen.queryByText(/gauges predicted flooding a day ahead/)).toBeNull();
   });
 });

@@ -17,6 +17,7 @@ import type { Region, SemanticSearchResult } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
+import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
@@ -1122,6 +1123,12 @@ export default function PaperViewPage() {
                     currentIpType={record.ip_type}
                     onSaved={(updated) => setRecord(updated)}
                   />
+                )}
+
+                {/* The Novelty check (IR-312): the owner's own Proposal only,
+                    per ADR-029's 2026-09-26 amendment, item 9. */}
+                {userIsOwner && record.record_type_name === "Proposal" && (
+                  <RelatedPublishedResearch recordId={record.id} />
                 )}
 
                 <SimilarPapers recordId={record.id} />

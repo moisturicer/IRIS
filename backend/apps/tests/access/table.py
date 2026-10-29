@@ -1,4 +1,4 @@
-"""
+﻿"""
 The declared expected-access table (IR-615).
 
 Keyed by app, then URL name, then HTTP method. Every route
@@ -50,12 +50,12 @@ SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE)
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY)
 
-#: ADR-022 §Amendment 4 point 4, recorded 2026-09-24: `authorize_record_documents`
+#: ADR-022 Â§Amendment 4 point 4, recorded 2026-09-24: `authorize_record_documents`
 #: answers 403 even to a caller who cannot see the Record, because the Record id
 #: is the caller's own parameter. The documents app's upload and listing routes
 #: only; every other route follows the 404 convention.
 DOCUMENTS_EXCEPTION = (
-    "ADR-022 §Amendment 4 point 4: authorize_record_documents answers 403 to a caller "
+    "ADR-022 Â§Amendment 4 point 4: authorize_record_documents answers 403 to a caller "
     "who cannot see the Record, whose id they supplied (IR-153)"
 )
 
@@ -108,6 +108,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-interests": Entry({
         "GET": _case(SIGNED_IN),
         "PUT": _case(SIGNED_IN, data={}),
+        "DELETE": _case(SIGNED_IN),
+    }),
+    # IR-576: dismiss only a readable Record; Undo deletes only one's own
+    # feedback and returns the same empty success for hidden or missing ids.
+    "record-not-interested": Entry({
+        "POST": _case(READS_RECORD, kwargs=RECORD, data={}),
+        "DELETE": _case(SIGNED_IN, kwargs=RECORD),
     }),
     "record-mine": Entry({"GET": _case(SIGNED_IN)}),
 
@@ -130,6 +137,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
         ),
     }),
     "record-similar": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
+    # ADR-029: novelty results belong only to the Proposal's owner.
+    "record-related-research": Entry({
+        "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
+    }),
     "record-tracker": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     "record-increment-access": Entry({"POST": _case(READS_RECORD, kwargs=RECORD, data={})}),
     # The manuscript's own text, for the person publishing it (IR-406).
@@ -140,7 +151,7 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # before lookup, so a non-office caller's 403 is the same for a missing id.
     "record-tags": Entry({"PATCH": _case(OFFICE_ONLY, kwargs=RECORD, data={"is_ip": True})}),
 
-    # -- document requests (ADR-022 §5, §Amendment 5) --------------------
+    # -- document requests (ADR-022 Â§5, Â§Amendment 5) --------------------
     # Read by participation, never by role: the owner, and anyone who can
     # staff a party that took part -- the Adviser, ITSO's whole pool. RDCO
     # took no part in `record`, so sees it but not its requests.
@@ -305,7 +316,7 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
         ),
     }),
 
-    # -- deciding a document request (ADR-022 §Amendment 4) -------------
+    # -- deciding a document request (ADR-022 Â§Amendment 4) -------------
     # 404 off a visible Record; 403 to a visible reader who is not the
     # requesting party; the party, not the person: ITSO's whole pool.
     "document-request-detail": Entry({
@@ -323,7 +334,7 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
 }
 
 REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
-    # ADR-043 §6: only this office's coordinator, with the same hidden-id
+    # ADR-043 Â§6: only this office's coordinator, with the same hidden-id
     # convention as seats. The document request supplies its assignment id.
     "assignment-extend": Entry({
         "POST": _case(

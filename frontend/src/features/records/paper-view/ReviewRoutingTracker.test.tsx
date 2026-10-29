@@ -53,6 +53,9 @@ function row(
     in_pool: false,
     changes_requested: false,
     seats: null,
+    carryover: null, carryover_version: null, carryover_label: null,
+    due_at: null, original_due_at: null, is_overdue: false, clock_paused: false,
+    can_extend: false, extensions: [],
     ...extra,
   };
 }
