@@ -1,3 +1,6 @@
+import re
+from datetime import date
+
 import pyexcel
 from django.contrib.postgres.search import SearchVector
 from core.enums import RecordTypeName
@@ -57,19 +60,19 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
       Is IP, For Commercialization, Community Extension, Authors
 
     Rules:
-    - Title is the only required column.
     - Processing stops when the first cell of a row equals "END OF RECORDS".
     - Completely blank rows are silently skipped.
-    - Rows missing a Title are logged as errors and skipped.
     - Authors should be comma-separated (e.g. "Juan Dela Cruz, Maria Santos").
     - Boolean columns accept: TRUE / FALSE / YES / NO / 1 / 0 (case-insensitive).
-    - Record Type defaults to "Project" when blank or unrecognised.
-    - Year columns accept integers; non-integer values are stored as None.
+
+    This only reads the sheet. Whether a row's values can be accepted --
+    Title present, years, names -- is `check_import_row`'s (IR-638), which
+    reports every problem in a row rather than the first.
 
     Returns
     -------
-    rows   : list of dicts ready for bulk Record creation
-    errors : human-readable strings describing skipped rows
+    rows   : one dict per data row, cells as text, with its sheet ``row_num``
+    errors : human-readable strings for a file that could not be read
     """
     import os
 
@@ -107,14 +110,6 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     def parse_bool(val: str | None) -> bool:
         return str(val).strip().upper() in ("TRUE", "YES", "1", "Y") if val else False
 
-    def parse_year(val: str | None) -> int | None:
-        if val is None:
-            return None
-        try:
-            return int(float(val))
-        except (ValueError, TypeError):
-            return None
-
     # --- Parse data rows ----------------------------------------------------
     records: list[dict] = []
     errors:  list[str]  = []
@@ -129,21 +124,16 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
         if all(cell is None or str(cell).strip() == "" for cell in row):
             continue
 
-        title = get_col(row, "title")
-        if not title:
-            errors.append(f"Row {row_num}: skipped — Title is required.")
-            continue
-
         authors_raw = get_col(row, "authors") or ""
         authors = [a.strip() for a in authors_raw.split(",") if a.strip()]
 
         records.append({
             "row_num":               row_num,
-            "title":                 title,
+            "title":                 get_col(row, "title"),
             "abstract":              get_col(row, "abstract") or "",
-            "year_accomplished":     parse_year(get_col(row, "year accomplished")),
-            "year_completed":        parse_year(get_col(row, "year completed")),
-            "record_type_name":      get_col(row, "record type") or RecordTypeName.PROJECT,
+            "year_accomplished":     get_col(row, "year accomplished"),
+            "year_completed":        get_col(row, "year completed"),
+            "record_type_name":      get_col(row, "record type"),
             "classification_name":   get_col(row, "classification"),
             "psced_name":            get_col(row, "psced classification"),
             "is_ip":                 parse_bool(get_col(row, "is ip")),
@@ -153,6 +143,103 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
         })
 
     return records, errors
+
+
+#: The earliest year an imported record may carry (IR-638); the latest is next year.
+EARLIEST_IMPORT_YEAR = 1900
+
+
+class ImportChoices:
+    """
+    The names an import row may use, each looked up once per file, ignoring
+    case (IR-638). Loaded at the start of an import, not per row.
+    """
+
+    def __init__(self):
+        from .models import Classification, PSCEDClassification, RecordType
+
+        self.record_types = {t.name.lower(): t for t in RecordType.objects.all()}
+        self.classifications = {c.name.lower(): c for c in Classification.objects.all()}
+        self.psced = {p.name.lower(): p for p in PSCEDClassification.objects.all()}
+
+
+#: A year cell as a spreadsheet gives it: a whole number, or one written as a
+#: float (``2021.0``). Not ``float()``, which would also read "2_024" or "2.024e3".
+_YEAR_CELL = re.compile(r"\d+(\.0+)?")
+
+
+def _accepted_names(names: dict) -> str:
+    """The names a column accepts, for an error message."""
+    return ", ".join(sorted((choice.name for choice in names.values()), key=str.lower)) or "(none)"
+
+
+def check_import_row(row: dict, choices: ImportChoices) -> tuple[dict, list[str]]:
+    """
+    A parsed row's values as the Record will hold them, and every reason the
+    row cannot be imported (IR-638).
+
+    The import publishes with no review, so a value the system cannot accept
+    skips the row and says why, under the same rule as a missing Title:
+    - Title is required.
+    - A year is blank, or a whole number from 1900 to next year, and Year
+      Completed is not earlier than Year Accomplished.
+    - Record Type, Classification and PSCED Classification must match an
+      existing name, ignoring case. A blank Classification or PSCED stays
+      blank; a blank Record Type is Project.
+
+    Each problem names its column and the value given, and a name lists the
+    accepted ones. The row is imported only when the list is empty.
+    """
+    problems: list[str] = []
+    latest = date.today().year + 1
+
+    if not row["title"]:
+        problems.append("Title is required")
+
+    def year(column: str, raw: str | None) -> int | None:
+        if raw is None:
+            return None
+        value = int(float(raw)) if _YEAR_CELL.fullmatch(raw) else None
+        if value is None or not EARLIEST_IMPORT_YEAR <= value <= latest:
+            problems.append(f'{column} "{raw}" is not a year from {EARLIEST_IMPORT_YEAR} to {latest}')
+            return None
+        return value
+
+    accomplished = year("Year Accomplished", row["year_accomplished"])
+    completed = year("Year Completed", row["year_completed"])
+    if accomplished is not None and completed is not None and completed < accomplished:
+        problems.append(f'Year Completed "{completed}" is earlier than Year Accomplished "{accomplished}"')
+
+    def look_up(column: str, raw: str | None, names: dict):
+        if raw is None:
+            return None
+        found = names.get(raw.lower())
+        if found is None:
+            problems.append(f'{column} "{raw}" is not one of: {_accepted_names(names)}')
+        return found
+
+    if row["record_type_name"] is None:
+        # Blank keeps the documented default, which a database may lack.
+        record_type = choices.record_types.get(RecordTypeName.PROJECT.lower())
+        if record_type is None:
+            problems.append(f'Record Type is blank and its default "{RecordTypeName.PROJECT}" does not exist')
+    else:
+        record_type = look_up("Record Type", row["record_type_name"], choices.record_types)
+    classification = look_up("Classification", row["classification_name"], choices.classifications)
+    psced = look_up("PSCED Classification", row["psced_name"], choices.psced)
+
+    return {
+        "title":                 row["title"],
+        "abstract":              row["abstract"],
+        "year_accomplished":     accomplished,
+        "year_completed":        completed,
+        "record_type":           record_type,
+        "classification":        classification,
+        "psced":                 psced,
+        "is_ip":                 row["is_ip"],
+        "for_commercialization": row["for_commercialization"],
+        "community_extension":   row["community_extension"],
+    }, problems
 
 
 def queue_manuscript_extraction(record: Record) -> None:
