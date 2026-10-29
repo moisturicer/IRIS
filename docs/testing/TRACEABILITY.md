@@ -36,6 +36,10 @@
 
 **Status:** implemented and focused tests verified; CI rerun and independent human approval remain outstanding. Deterministic provider tests establish call counts, not production vendor performance.
 
+## IR-636 analytics retains its office-only gate (NFR-S4)
+
+The manually bound `reviews-analytics` URL now passes its declared `IsAuthenticated`/`IsStaff` permission classes into `as_view`, rather than falling back to `IsReviewer`. `apps/reviews/test_analytics_access.py` asserts Adviser, Student and role-less superuser 403, anonymous 401 and all four office roles reaching the declared 501 stub. The IR-616 defect marker is removed without relaxing access. This does not implement analytics. Database execution is pending CI because local Docker's engine is unavailable; no pass is claimed.
+
 ## IR-616 authorization coverage across every app (NFR-S4)
 
 **Design:** IR-611 slice 4, ADR-009, ADR-019's private Conversations and ADR-022's hidden-object convention. This extends IR-615 without changing application authorization.
