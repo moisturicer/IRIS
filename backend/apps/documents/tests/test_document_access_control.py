@@ -31,7 +31,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import User
-from apps.documents.models import RecordUpload, UploadSlot
+from apps.documents.models import RecordFile, RecordUpload, UploadSlot
 from apps.records.models import Record, RecordOwner, RecordType
 
 def _repo_root():
@@ -116,8 +116,8 @@ class PublicMediaRouteRemovedTests(SimpleTestCase):
         )
 
 
-class DocumentDownloadPermissionTests(APITestCase):
-    """The authenticated download path must let owners through and turn others away."""
+class _TempMediaAPITestCase(APITestCase):
+    """Stored files land in a throwaway MEDIA_ROOT, removed with the class."""
 
     @classmethod
     def setUpClass(cls):
@@ -141,6 +141,10 @@ class DocumentDownloadPermissionTests(APITestCase):
     def make_user(cls, email, **extra):
         extra.setdefault("is_verified", True)
         return User.objects.create_user(email=email, password="TestPass123!", **extra)
+
+
+class DocumentDownloadPermissionTests(_TempMediaAPITestCase):
+    """The authenticated download path must let owners through and turn others away."""
 
     def setUp(self):
         self.owner = self.make_user("owner@cit.edu")
@@ -171,12 +175,18 @@ class DocumentDownloadPermissionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_non_owner_is_refused(self):
-        """A verified account with no claim on the record is still a stranger to it."""
+        """
+        A verified account with no claim on the record is still a stranger to it.
+
+        Changed deliberately by IR-627: this asserted a 403, which predates
+        ADR-022 §Amendment 4. A 403 here, beside a 404 for a missing id, told a
+        stranger which upload ids exist on records they cannot see.
+        """
         self.client.force_authenticate(user=self.stranger)
         response = self.client.get(self.url)
         self.assertEqual(
             response.status_code,
-            status.HTTP_403_FORBIDDEN,
+            status.HTTP_404_NOT_FOUND,
             "a non-owner could download another user's upload",
         )
 
@@ -187,3 +197,89 @@ class DocumentDownloadPermissionTests(APITestCase):
             (status.HTTP_401_UNAUTHORIZED, status.HTTP_403_FORBIDDEN),
             "the download endpoint answered an unauthenticated caller",
         )
+
+
+class ObjectIdRouteExistenceOracleTests(_TempMediaAPITestCase):
+    """
+    IR-627. Three routes take an upload or file id rather than a Record id. A
+    caller who cannot see the Record must get the same 404 as for a missing id
+    (ADR-022 §Amendment 4); one who can see it but may not touch its documents,
+    such as the assigned Adviser, still gets a 403.
+    """
+
+    def setUp(self):
+        self.owner = self.make_user("owner@cit.edu")
+        self.stranger = self.make_user("stranger@cit.edu")
+        self.adviser = self.make_user("adviser@cit.edu")
+
+        record_type = RecordType.objects.first()
+        self.assertIsNotNone(record_type, "no seeded RecordType -- migrations incomplete")
+        self.record = Record.objects.create(
+            title="A Draft Nobody Else Should Know About",
+            record_type=record_type,
+            added_by=self.owner,
+            adviser=self.adviser,
+        )
+        RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
+
+        slot = UploadSlot.objects.create(name="Manuscript", record_type=record_type)
+        # Version 2, so the owner-side delete rule would not be what refuses.
+        self.upload = RecordUpload.objects.create(
+            record=self.record,
+            slot=slot,
+            file=SimpleUploadedFile("thesis.pdf", b"%PDF-1.4 secret", content_type="application/pdf"),
+            uploaded_by=self.owner,
+            version=2,
+        )
+        self.record_file = RecordFile.objects.create(
+            record=self.record,
+            file=SimpleUploadedFile("memo.pdf", b"%PDF-1.4 memo", content_type="application/pdf"),
+            filename="memo.pdf",
+            uploaded_by=self.owner,
+        )
+        missing_upload = RecordUpload.objects.order_by("-pk").first().pk + 1000
+        missing_file = RecordFile.objects.order_by("-pk").first().pk + 1000
+
+        # (method, url for the real object, url for an id that does not exist)
+        self.routes = {
+            "upload-download": (
+                "get",
+                f"/api/v1/documents/uploads/{self.upload.pk}/download/",
+                f"/api/v1/documents/uploads/{missing_upload}/download/",
+            ),
+            "upload-delete": (
+                "delete",
+                f"/api/v1/documents/uploads/{self.upload.pk}/",
+                f"/api/v1/documents/uploads/{missing_upload}/",
+            ),
+            "file-download": (
+                "get",
+                f"/api/v1/documents/files/{self.record_file.pk}/download/",
+                f"/api/v1/documents/files/{missing_file}/download/",
+            ),
+        }
+
+    def _call(self, user, method, url):
+        self.client.force_authenticate(user=user)
+        return getattr(self.client, method)(url)
+
+    def test_hidden_object_is_indistinguishable_from_a_missing_id(self):
+        for name, (method, url, missing_url) in self.routes.items():
+            with self.subTest(route=name):
+                hidden = self._call(self.stranger, method, url)
+                missing = self._call(self.stranger, method, missing_url)
+                self.assertEqual(missing.status_code, status.HTTP_404_NOT_FOUND)
+                self.assertEqual(hidden.status_code, status.HTTP_404_NOT_FOUND)
+                self.assertEqual(hidden.content, missing.content)
+
+    def test_visible_record_without_document_access_is_still_403(self):
+        """The Adviser can see the record, so a 404 would hide nothing."""
+        for name, (method, url, _) in self.routes.items():
+            with self.subTest(route=name):
+                response = self._call(self.adviser, method, url)
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_hidden_upload_is_not_deleted(self):
+        method, url, _ = self.routes["upload-delete"]
+        self._call(self.stranger, method, url)
+        self.assertTrue(RecordUpload.objects.filter(pk=self.upload.pk).exists())
