@@ -334,7 +334,25 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     }),
 }
 
+REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
+    # ADR-043 §6: only this office's coordinator, with the same hidden-id
+    # convention as seats. The document request supplies its assignment id.
+    "assignment-extend": Entry({
+        "POST": _case(
+            row(ANON, HIDE, DENY, DENY, DENY, DENY, OK, DENY, HIDE),
+            kwargs={"pk": Ref("document_request", "assignment_id")},
+            data={"due_at": "2099-12-31T23:59:00+08:00", "reason": "Committee unavailable"},
+        ),
+    }),
+}
+
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "records": RECORDS,
     "documents": DOCUMENTS_APP,
 }
+
+# IR-619 adds one route while IR-616 still owns the rest of reviews. Partial
+# declarations are fired and validated like full ones, but do not claim that
+# the app's remaining routes have been audited.
+PARTIAL: dict[str, dict[str, Entry | Shadowed]] = {"reviews": REVIEW_DEADLINES}
+DECLARED = {**TABLE, **PARTIAL}

@@ -1318,6 +1318,16 @@ found source/metadata/history and recovery-evidence gaps; fixes and regressions 
 no outstanding findings. Full final-commit CI status is recorded in the PR. No model-quality,
 paid-capacity or production-readiness claim.
 
+## IR-619 — assignment deadlines and extensions
+
+**Authority.** [ADR-043 §§1–6](../adr/043-review-turnaround-reminders-and-escalation.md), accepted. The ticket's reference to Proposed is stale; implementation follows the accepted ADR.
+
+**Implemented.** Admin-maintained Turnaround and Holiday tables; assignment clocks fixed at opening, counting working days in Manila and due at 23:59; no backfill for existing assignments. Own overlapping document requests share a pause and record system Extensions on resumption. New Versions restart only the requesting parties' clocks. Reassignment and nomination into an active assignment preserve its date. The office's coordinators alone may extend later with a reason; Adviser manual extension is refused. Every Extension and its mandatory audit event commit together. Tracker, seats, My Reviews and assignment capabilities project deadlines and retain earlier-round history. The extension route is declared in IR-615's generic matrix (`apps/tests/access/table.py::REVIEW_DEADLINES`, a partial `reviews` declaration that leaves the app pending for IR-616), and its configured-success cases in `apps/tests/test_authorization_matrix.py::ASSIGNMENT_EXTENSION_ACCESS`. Details: [deadline contract](ASSIGNMENT_DEADLINES.md).
+
+**Evidence (2026-10-29).** Rebased on main after IR-166 and IR-632; `audit/0006` merges IR-166's `0005_auditevent_insert_only` with this branch's `0005_alter_auditevent_event_type`, and a redundant local import in `submit_new_version` that shadowed IR-632's module-level `RecordAssignment` was removed. Against PostgreSQL, `pytest apps/reviews apps/audit apps/documents apps/records/test_seed_demo.py apps/tests` ran **948 tests: 934 passed, 14 skipped (container lacks the repo root), 0 failed**; `makemigrations --check` reported no changes; scoped flake8 passed. On a `pg_dump` copy of the development database, reviews/0017 and audit/0005–0006 were unapplied and reapplied: all **28** existing assignments stayed undated and the Turnaround and Holiday tables stayed empty. No frontend files belong to IR-619. No CI pass or human approval is claimed here; CI status is recorded in the PR.
+
+The new integration and migration tests are `test_deadlines.py`, `test_deadline_migration.py` and `AssignmentExtensionMatrixTests`. They cover pauses, date preservation, fresh rereview clocks, coordinator authority, audit rollback, history and deadline-independent acts. The older cutover fixture helper now temporarily removes only the retired-party constraint, instead of rewinding away later columns; its expected outcomes remain unchanged. Two independent static reviews found issues in test drivers, historical-schema fixtures and extension-history projection; those findings were addressed. Reminders and escalation remain sibling tickets.
+
 ## IR-598 — conversation set, scorer and controlled-pilot documents
 
 Authority: ADR-042 and general-tools specification §9–§11 (scenarios A01–A15).

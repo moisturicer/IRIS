@@ -188,6 +188,11 @@ class Command(BaseCommand):
         users = self._seed_accounts()
 
         if not options["accounts_only"]:
+            from apps.reviews.models import Turnaround
+
+            for party in ("adviser", "itso", "ierc", "ktto", "rdco"):
+                Turnaround.objects.get_or_create(party=party, defaults={"working_days": 5})
+            self.stdout.write("Demo turnaround: 5 working days per unconfigured party (demonstration only).")
             self._seed_classifications()
             self._seed_catalogue(users)
             self._seed_workflow(users)

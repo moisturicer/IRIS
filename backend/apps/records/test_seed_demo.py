@@ -23,7 +23,7 @@ from django.test import TestCase
 
 from apps.accounts.models import User
 from apps.documents.models import RecordUpload, UploadSlot
-from apps.reviews.models import RecordClearance
+from apps.reviews.models import RecordAssignment, RecordClearance, Turnaround
 from apps.reviews.new_version import submit_new_version
 from apps.reviews.tracker import workflow_state
 from core.enums import ClearanceStatus, Office, PipelineStatus
@@ -81,6 +81,22 @@ class SeedDemoGuardTests(TestCase):
     def test_force_overrides_the_refusal(self):
         seed(force=True)
         self.assertTrue(User.objects.filter(email=ADMIN_EMAIL).exists())
+
+
+class SeedDemoDeadlineTests(TestCase):
+    def test_demo_values_are_explicit_preserve_configuration_and_date_new_assignments(self):
+        Turnaround.objects.create(party="itso", working_days=9)
+        output = StringIO()
+        call_command("seed_demo", force=True, stdout=output)
+        self.assertEqual(Turnaround.objects.get(party="itso").working_days, 9)
+        self.assertEqual(set(Turnaround.objects.exclude(party="itso").values_list("working_days", flat=True)), {5})
+        self.assertIn("demonstration only", output.getvalue())
+        self.assertTrue(RecordAssignment.objects.filter(state="active").exists())
+        self.assertFalse(RecordAssignment.objects.filter(state="active", due_at__isnull=True).exists())
+
+    def test_accounts_only_does_not_configure_office_policy(self):
+        seed(accounts_only=True)
+        self.assertFalse(Turnaround.objects.exists())
 
 
 class SeedDemoAccountTests(TestCase):

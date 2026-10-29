@@ -37,7 +37,7 @@ from apps.tests.access.cells import (
 )
 from apps.tests.access.routes import enumerate_routes, name_collisions
 from apps.tests.access.runner import observe
-from apps.tests.access.table import PENDING, TABLE, Entry, Shadowed
+from apps.tests.access.table import DECLARED, PARTIAL, PENDING, TABLE, Entry, Shadowed
 from apps.tests.access.world import ROLES, build_world
 
 
@@ -82,7 +82,7 @@ class RouteDeclarationTests(SimpleTestCase):
         """A stale row, or a method added to a declared route, fails too."""
         routes = _routes_by_key()
         problems = []
-        for app, entries in TABLE.items():
+        for app, entries in DECLARED.items():
             for name, entry in entries.items():
                 route = routes.get((app, name))
                 if route is None:
@@ -97,7 +97,7 @@ class RouteDeclarationTests(SimpleTestCase):
     def test_a_shadowed_route_really_is_unreachable(self):
         """`Shadowed` is a claim about the URLconf; check it rather than trust it."""
         routes = _routes_by_key()
-        for app, entries in TABLE.items():
+        for app, entries in DECLARED.items():
             for name, entry in entries.items():
                 if not isinstance(entry, Shadowed):
                     continue
@@ -110,10 +110,12 @@ class RouteDeclarationTests(SimpleTestCase):
         apps_with_routes = {route.app for route in enumerate_routes()}
         self.assertEqual(set(PENDING) - apps_with_routes, set())
         self.assertEqual(set(PENDING) & set(TABLE), set(), "an app is either declared or pending")
+        self.assertEqual(set(PARTIAL) - set(PENDING), set(), "partial coverage retains its pending marker")
+        self.assertEqual(set(PARTIAL) & set(TABLE), set(), "complete apps have no partial declarations")
 
     def test_known_defects_cite_a_filed_issue(self):
         """A `KnownDefect` names a real ticket, never a placeholder."""
-        for app, entries in TABLE.items():
+        for app, entries in DECLARED.items():
             for name, entry in entries.items():
                 if not isinstance(entry, Entry):
                     continue
@@ -166,7 +168,7 @@ class AccessMatrixTests(APITestCase):
     def run_app(self, app):
         routes = _routes_by_key()
         failures = []
-        for name, entry in TABLE[app].items():
+        for name, entry in DECLARED[app].items():
             if isinstance(entry, Shadowed):
                 continue
             route = routes[(app, name)]
@@ -190,6 +192,9 @@ class AccessMatrixTests(APITestCase):
 
     def test_documents_routes(self):
         self.run_app("documents")
+
+    def test_review_deadline_routes(self):
+        self.run_app("reviews")
 
     def test_every_role_is_who_the_table_says(self):
         """The columns mean what `table.py` says, or every row means nothing."""
