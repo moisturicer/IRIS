@@ -45,7 +45,9 @@ from core.enums import (
 )
 from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
 
-from .clearance_state import clearance_payload, is_preserved, record_versions, resubmission_payload
+from .clearance_state import (
+    carryover_fields, clearance_payload, is_preserved, record_versions, resubmission_payload,
+)
 from .decisions import withdrawn_by_label
 from .models import (
     RecordAssignment, RecordClearance, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
@@ -464,13 +466,17 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
     return rows
 
 
+#: A party row's carryover keys for a party that holds no clearance.
+_NO_CARRYOVER = {
+    "preserved": False, "carryover": None, "carryover_version": None, "carryover_label": None,
+}
+
+
 def _party_rows(
     record, *, reviews: list, clearances: list, staff: bool, disclose_requests: bool,
-    disclose_seats: bool = False, user=None, versions=None,
+    versions: list, disclose_seats: bool = False, user=None,
 ) -> list[dict]:
     from .deadlines import deadline_payload
-    if versions is None:
-        versions = record_versions(record)
     assignments: dict[str, RecordAssignment] = {}
     for a in (
         RecordAssignment.objects.filter(record=record)
@@ -513,15 +519,6 @@ def _party_rows(
             # Retired (ADR-032 §13): shown only as history, never as a step.
             continue
         clearance = clearance_by_office.get(party) if party in _CLEARING_OFFICES else None
-        # What the latest version kept or reset, as the clearance payload
-        # states it (IR-624). Outcomes, not review content: never `readable`.
-        carried = (
-            clearance_payload(
-                clearance, last_resubmitted_at=record.last_resubmitted_at,
-                readable=False, versions=versions,
-            )
-            if clearance is not None else None
-        )
 
         if assignment is None and party == Party.RDCO and new_model:
             # ADR-032 §10 (amended 2026-10-08, IR-269): RDCO enters only by
@@ -623,13 +620,15 @@ def _party_rows(
                 if state is TrackerPartyState.WITHDRAWN
                 and assignment.closed_by_decision_id is not None else None
             ),
-            "preserved": carried["preserved"] if carried else False,
-            # Preserved from an earlier version, or reset by the latest, with
-            # the version each applies to (IR-624). None for a party that
-            # holds no clearance, or whose clearance the version left alone.
-            "carryover": carried["carryover"] if carried else None,
-            "carryover_version": carried["carryover_version"] if carried else None,
-            "carryover_label": carried["carryover_label"] if carried else None,
+            # Preserved from an earlier version, or reset by a revision, as the
+            # clearance payload states it (IR-624). An outcome, not review
+            # content. None for a party that holds no clearance.
+            **(
+                carryover_fields(
+                    clearance, last_resubmitted_at=record.last_resubmitted_at, versions=versions,
+                )
+                if clearance is not None else _NO_CARRYOVER
+            ),
         })
     return rows
 

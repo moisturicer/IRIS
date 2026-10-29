@@ -15,7 +15,6 @@ from datetime import datetime, timedelta, timezone as tz
 from apps.reviews.clearance_state import (
     CLEARANCE_OFFICES,
     carryover,
-    carryover_version,
     declining_office,
     is_preserved,
 )
@@ -75,31 +74,52 @@ class IsPreservedTests:
 
 
 class CarryoverTests:
-    """Preserved *or reset* across the latest version (IR-624). The client
-    renders whichever the server names and infers neither."""
+    """Preserved *or reset*, with the version each applies to (IR-624). The
+    client renders whichever the server names and infers neither."""
 
-    def _carryover(self, status, *, created=T0, updated=T0, resubmitted=LATER):
+    # v1 went in before any clearance; v2 and v3 are revisions.
+    V1, V2, V3 = T0 - timedelta(days=1), LATER, LATER_STILL + timedelta(days=1)
+    VERSIONS = [(1, V1, "submission"), (2, V2, "revision"), (3, V3, "revision")]
+
+    def _carryover(self, status, *, created=T0, updated=T0, resubmitted=LATER, versions=None):
         return carryover(
-            status=status, clearance_created_at=created,
-            clearance_updated_at=updated, last_resubmitted_at=resubmitted,
+            status=status, clearance_created_at=created, clearance_updated_at=updated,
+            last_resubmitted_at=resubmitted,
+            versions=self.VERSIONS[:2] if versions is None else versions,
         )
 
-    def test_a_clearance_that_survived_the_version_is_preserved(self):
-        assert self._carryover("cleared") == "preserved"
+    def test_a_clearance_that_survived_the_version_names_the_version_it_was_cleared_on(self):
+        """Cleared on v1, kept through v2."""
+        assert self._carryover("cleared") == ("preserved", 1)
+        assert self._carryover("cleared").label == "Cleared on v1, preserved"
 
-    def test_a_clearance_the_version_set_back_to_pending_is_reset(self):
-        """IERC asked for the revision; `submit_new_version` reset its row,
-        writing `updated_at` at or after the resubmission."""
-        assert self._carryover("pending", updated=LATER) == "reset"
-        assert self._carryover("pending", updated=LATER_STILL) == "reset"
+    def test_a_clearance_the_version_set_back_to_pending_is_reset_by_it(self):
+        """IERC asked; `submit_new_version` wrote v2, then reset IERC's row."""
+        reset = self._carryover("pending", updated=LATER + timedelta(seconds=1))
+        assert reset == ("reset", 2)
+        assert reset.label == "Reset by v2"
+
+    def test_a_reset_survives_a_later_version_it_did_not_touch(self):
+        """IERC reset by v2 and still pending when another party's revision
+        makes v3: IERC still waits on its review of the resubmission, so it is
+        still reset -- by v2, which is what set it back."""
+        reset = self._carryover(
+            "pending", updated=LATER + timedelta(seconds=1),
+            resubmitted=self.V3, versions=self.VERSIONS,
+        )
+        assert reset == ("reset", 2)
+
+    def test_restart_all_resets_an_office_that_had_not_concluded(self):
+        """RESTART_ALL rewrites every row, pending ones included: that office's
+        review restarts on the new version, which is what reset means."""
+        assert self._carryover("pending", updated=LATER + timedelta(seconds=1)) == ("reset", 2)
 
     def test_an_office_still_undecided_and_untouched_is_neither(self):
-        """Pending since before the version and not reset by it: it never
-        concluded, so there was nothing to keep or reset."""
+        """Pending since before the version and not reset by it."""
         assert self._carryover("pending", updated=T0) is None
 
     def test_an_office_first_routed_after_the_version_is_not_reset(self):
-        """A row created after the resubmission was never set back."""
+        """A row created after the version was never set back."""
         assert self._carryover("pending", created=LATER_STILL, updated=LATER_STILL) is None
 
     def test_an_office_that_reviewed_the_new_version_is_neither(self):
@@ -108,32 +128,18 @@ class CarryoverTests:
         assert self._carryover("not_cleared", updated=LATER_STILL) is None
 
     def test_nothing_carries_over_on_a_record_never_resubmitted(self):
-        assert self._carryover("cleared", resubmitted=None) is None
-        assert self._carryover("pending", updated=LATER, resubmitted=None) is None
-
-
-class CarryoverVersionTests:
-    """The version each carryover applies to (IR-416, IR-624)."""
-
-    VERSIONS = [(1, T0 - timedelta(days=1)), (2, T0 + timedelta(days=1)), (3, LATER_STILL)]
-
-    def test_a_preserved_clearance_names_the_version_it_was_cleared_on(self):
-        """Cleared after v2 went in and before v3: cleared on v2."""
-        assert carryover_version(
-            "preserved", clearance_updated_at=T0 + timedelta(days=2), versions=self.VERSIONS,
-        ) == 2
-
-    def test_a_reset_clearance_names_the_version_awaiting_review(self):
-        assert carryover_version("reset", clearance_updated_at=LATER, versions=self.VERSIONS) == 3
+        assert self._carryover("cleared", resubmitted=None, versions=self.VERSIONS[:1]) is None
+        assert self._carryover("pending", resubmitted=None, versions=self.VERSIONS[:1]) is None
 
     def test_no_version_is_invented(self):
-        """Versions began with IR-416; a clearance older than every version
-        names none rather than an invented v1."""
-        assert carryover_version(
-            "preserved", clearance_updated_at=T0 - timedelta(days=2), versions=self.VERSIONS,
-        ) is None
-        assert carryover_version("reset", clearance_updated_at=LATER, versions=[]) is None
-        assert carryover_version(None, clearance_updated_at=LATER, versions=self.VERSIONS) is None
+        """Versions began with IR-416. A resubmission the retired pipeline
+        recorded with no version still carries over, naming none."""
+        kept = self._carryover("cleared", versions=[])
+        assert kept == ("preserved", None)
+        assert kept.label == "Cleared earlier, preserved"
+        reset = self._carryover("pending", updated=LATER, versions=[])
+        assert reset == ("reset", None)
+        assert reset.label == "Reset by the new version"
 
 
 class DecliningOfficeTests:

@@ -19,8 +19,8 @@ not serve — an invented stage order would be worse than an absent one.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, Iterable, Optional, Sequence
-from core.enums import ClearanceStatus, Office
+from typing import Any, Iterable, NamedTuple, Optional, Sequence
+from core.enums import ClearanceStatus, Office, VersionCause
 
 #: Offices that hold an individual clearance. Mirrors
 #: `RecordClearance.OFFICE_CHOICES`; the sequential stages (adviser, RDCO) do
@@ -51,9 +51,28 @@ def is_preserved(
     return clearance_updated_at < last_resubmitted_at
 
 
-#: What the latest version did to an office's clearance (IR-624).
+#: What a revision did to an office's clearance (IR-624).
 PRESERVED = "preserved"
 RESET = "reset"
+
+#: `(number, created_at, cause)` for one of a record's versions.
+VersionStamp = tuple[int, datetime, str]
+
+
+class Carryover(NamedTuple):
+    """What a revision did to one clearance, and the version it applies to."""
+
+    state: str
+    #: Preserved: the version the office cleared. Reset: the version that set
+    #: it back, whose review it awaits. None before versions were recorded.
+    version: Optional[int]
+
+    @property
+    def label(self) -> str:
+        """In words, so the client maps no state to English."""
+        if self.state == PRESERVED:
+            return f"Cleared on v{self.version}, preserved" if self.version else "Cleared earlier, preserved"
+        return f"Reset by v{self.version}" if self.version else "Reset by the new version"
 
 
 def carryover(
@@ -62,63 +81,72 @@ def carryover(
     clearance_created_at: Optional[datetime],
     clearance_updated_at: Optional[datetime],
     last_resubmitted_at: Optional[datetime],
-) -> Optional[str]:
-    """`preserved`, `reset`, or None: what the latest version did to this clearance.
+    versions: Sequence[VersionStamp],
+) -> Optional[Carryover]:
+    """Preserved, reset, or None: what a revision did to this clearance.
 
-    The other half of `is_preserved`, so the Review section can show both
-    sides of the contribution without the client inferring either (IR-624).
+    The other half of `is_preserved`, so the Review section shows both sides
+    of the contribution without the client inferring either (IR-624).
+    `versions` is `record_versions(record)`, oldest first.
 
-    A clearance is reset when the version set it back to `pending`: the row
-    existed before the resubmission and was rewritten at or after it
-    (`lifecycle.clearance_reset_fields` stamps `updated_at`). A row still
-    pending from before, or first created after, was never set back. Once the
-    office reviews the new version it is neither: that is ordinary review.
+    **Reset** is a `pending` row a revision set back. Only a reset writes
+    `pending` to an existing row (`lifecycle.clearance_reset_fields` stamps
+    `updated_at`), and `submit_new_version` writes the version just before
+    it, so the version is the newest revision written after the row was
+    created and no later than its last update. That survives a later revision
+    that did not touch the row: the office still awaits its review. A row
+    pending since creation, or created after, was never set back; one the
+    office has since reviewed is ordinary review. A resubmission the retired
+    pipeline made without a version is read from `last_resubmitted_at`.
+
+    **Preserved** is `is_preserved`, naming the version current when the
+    office cleared.
     """
     if is_preserved(
         status=status,
         clearance_updated_at=clearance_updated_at,
         last_resubmitted_at=last_resubmitted_at,
     ):
-        return PRESERVED
+        before = [n for n, at, _ in versions if at <= clearance_updated_at]
+        return Carryover(PRESERVED, before[-1] if before else None)
     if (
-        status == ClearanceStatus.PENDING
-        and last_resubmitted_at is not None
-        and clearance_created_at is not None
-        and clearance_updated_at is not None
+        status != ClearanceStatus.PENDING
+        or clearance_created_at is None or clearance_updated_at is None
+    ):
+        return None
+    reset_by = [
+        n for n, at, cause in versions
+        if cause == VersionCause.REVISION and clearance_created_at < at <= clearance_updated_at
+    ]
+    if reset_by:
+        return Carryover(RESET, reset_by[-1])
+    if (
+        last_resubmitted_at is not None
         and clearance_created_at < last_resubmitted_at <= clearance_updated_at
     ):
-        return RESET
+        return Carryover(RESET, None)
     return None
 
 
-def carryover_version(
-    state: Optional[str],
-    *,
-    clearance_updated_at: Optional[datetime],
-    versions: Sequence[tuple[int, datetime]],
-) -> Optional[int]:
-    """
-    The version a carryover applies to: for `preserved`, the version the
-    office cleared (the newest one in before it did); for `reset`, the newest
-    version, which the office now reviews. `versions` is `(number, created_at)`,
-    oldest first. None rather than an invented v1 for a clearance older than
-    every version (IR-416).
-    """
-    if state == RESET:
-        return versions[-1][0] if versions else None
-    if state == PRESERVED and clearance_updated_at is not None:
-        before = [number for number, at in versions if at <= clearance_updated_at]
-        return before[-1] if before else None
-    return None
-
-
-def carryover_label(state: Optional[str], version: Optional[int]) -> Optional[str]:
-    """The carryover in words, so the client maps no state to English."""
-    if state == PRESERVED:
-        return f"Cleared on v{version}, preserved" if version else "Cleared earlier, preserved"
-    if state == RESET:
-        return f"Reset by v{version}" if version else "Reset by the new version"
-    return None
+def carryover_fields(
+    clearance, *, last_resubmitted_at: Optional[datetime], versions: Sequence[VersionStamp],
+) -> dict[str, Any]:
+    """The carryover keys a clearance and a tracker party row both carry."""
+    carried = carryover(
+        status=clearance.status,
+        clearance_created_at=clearance.created_at,
+        clearance_updated_at=clearance.updated_at,
+        last_resubmitted_at=last_resubmitted_at,
+        versions=versions,
+    )
+    return {
+        "preserved": bool(carried and carried.state == PRESERVED),
+        # Both sides of the contribution, with the version each applies to,
+        # so no client infers either (IR-624).
+        "carryover": carried.state if carried else None,
+        "carryover_version": carried.version if carried else None,
+        "carryover_label": carried.label if carried else None,
+    }
 
 
 def declining_office(latest_decline_stage: Optional[str]) -> Optional[str]:
@@ -132,14 +160,14 @@ def declining_office(latest_decline_stage: Optional[str]) -> Optional[str]:
     return None
 
 
-def record_versions(record) -> list[tuple[int, datetime]]:
-    """`(number, created_at)` for each of `record`'s versions, oldest first."""
-    return list(record.versions.order_by("number").values_list("number", "created_at"))
+def record_versions(record) -> list[VersionStamp]:
+    """Each of `record`'s versions as a `VersionStamp`, oldest first."""
+    return list(record.versions.order_by("number").values_list("number", "created_at", "cause"))
 
 
 def clearance_payload(
     clearance, *, last_resubmitted_at: Optional[datetime], readable: bool,
-    versions: Optional[Sequence[tuple[int, datetime]]] = None,
+    versions: Sequence[VersionStamp],
 ) -> dict[str, Any]:
     """
     One office's clearance, as the API states it.
@@ -147,24 +175,10 @@ def clearance_payload(
     `readable` is `core.permissions.may_read_review` for the viewer, and is
     required so no caller can forget it: the comment and who signed are review
     content, `None` -- not disclosed -- to anyone else; the outcome is not
-    (IR-479). What the latest version kept or reset is an outcome too.
+    (IR-479). What a revision kept or reset is an outcome too.
 
-    `versions` is `record_versions(record)`, passed by a caller serializing
-    several clearances so it is read once; read here when omitted.
+    `versions` is `record_versions(record)`, read once by the caller.
     """
-    state = carryover(
-        status=clearance.status,
-        clearance_created_at=clearance.created_at,
-        clearance_updated_at=clearance.updated_at,
-        last_resubmitted_at=last_resubmitted_at,
-    )
-    version = None
-    if state is not None:
-        if versions is None:
-            versions = record_versions(clearance.record)
-        version = carryover_version(
-            state, clearance_updated_at=clearance.updated_at, versions=versions,
-        )
     return {
         "office": clearance.office,
         "office_label": clearance.get_office_display(),
@@ -176,12 +190,9 @@ def clearance_payload(
             if readable and clearance.reviewed_by else None
         ),
         "updated_at": clearance.updated_at.isoformat(),
-        "preserved": state == PRESERVED,
-        # Both sides of the contribution, with the version each applies to,
-        # so no client infers either (IR-624).
-        "carryover": state,
-        "carryover_version": version,
-        "carryover_label": carryover_label(state, version),
+        **carryover_fields(
+            clearance, last_resubmitted_at=last_resubmitted_at, versions=versions,
+        ),
     }
 
 

@@ -49,7 +49,7 @@ Two mutations were applied and then reverted, to prove the matrix fails:
 
 **Design:** Jira IR-624, building on IR-139's server-only `preserved`, IR-412's timeline and IR-619's `deadline_payload`.
 
-- **Field:** `carryover` (`preserved` | `reset` | null), `carryover_version` and the server-worded `carryover_label` ("Cleared on v1, preserved", "Reset by v2") on each clearance in Record detail and the tracker, and on each tracker party row. The rule is `clearance_state.carryover`: reset means `pending`, created before the last resubmission and rewritten at or after it. The client infers neither state.
+- **Field:** `carryover` (`preserved` | `reset` | null), `carryover_version` and the server-worded `carryover_label` ("Cleared on v1, preserved", "Reset by v2") on each clearance in Record detail and the tracker, and on each tracker party row. The rule is `clearance_state.carryover`: reset means `pending` and rewritten by a revision version written after the row was created, so it survives a later revision that left the row alone. Preserved names the version the office cleared. The client infers neither state.
 - **Visibility:** carryover is an outcome, so every tracker reader gets it. Seats, and so reviewer names, stay `null` to a viewer who may not read the review (IR-479).
 - **Frontend:** `ReviewStatus` sits above the timeline: one turn line ("Waiting on IERC: 1 of 2 seats done"), then each asked party's state, outcome, carryover label, seats and due date. Overdue, paused and extended dates are stated in words.
 - **Scope:** only ITSO, IERC and KTTO hold clearances. When the Adviser or RDCO asks for changes, its seats show "in review" again; no reset label is drawn for it.
