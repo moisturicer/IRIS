@@ -66,7 +66,7 @@ def test_another_readers_conversation_is_hidden_before_answering(route, client_f
     assert responses[0].content == responses[1].content
 
 
-def test_reopened_transcript_drops_a_turn_whose_source_is_now_hidden(embedder, space, client_for):
+def test_reopened_transcript_drops_citations_whose_source_is_now_hidden(embedder, space, client_for):
     reader = make_user("matrix-history-reader@cit.edu")
     public = make_record(title="Revocable matrix paper", text=FLOOD_TEXT, embedder=embedder, space=space)
     client = client_for(reader)
@@ -81,12 +81,14 @@ def test_reopened_transcript_drops_a_turn_whose_source_is_now_hidden(embedder, s
     Record.objects.filter(pk=public.pk).update(pipeline_status=PipelineStatus.DRAFT)
     reopened = client.get(url)
     assert reopened.status_code == 200
-    assert reopened.json()["turns"] == []
+    # ADR-019 re-resolves citation pointers; the reader retains their question/answer.
+    assert len(reopened.json()["turns"]) == 1
+    assert reopened.json()["turns"][0]["citations"] == []
     assert public.title not in json.dumps(reopened.json())
 
 
 @pytest.mark.parametrize("after", [0, 1])
-@pytest.mark.parametrize("protocol", ["legacy", "public-1"])
+@pytest.mark.parametrize("protocol", [None, "public-1"])
 def test_queued_replay_rechecks_citations_cards_and_candidates(after, protocol, client_for):
     from datetime import timedelta
     from django.utils import timezone
@@ -106,8 +108,10 @@ def test_queued_replay_rechecks_citations_cards_and_candidates(after, protocol, 
         {"record_id": r.pk, "title": r.title} for r in [public, hidden]]})
     AskRunEvent.objects.create(run=run, sequence=4, name="done", data={"turn_id": turn.pk, "sources": [
         {"id": r.pk, "title": r.title} for r in [public, hidden]]})
-    response = client_for(reader).get(reverse("ai-ask-run-stream", args=[run.pk]),
-                                      {"after": after, "protocol": protocol})
+    query = {"after": after}
+    if protocol is not None:
+        query["protocol"] = protocol
+    response = client_for(reader).get(reverse("ai-ask-run-stream", args=[run.pk]), query)
     assert response.status_code == 200
     body = payload(response)
     wire = json.dumps(body)

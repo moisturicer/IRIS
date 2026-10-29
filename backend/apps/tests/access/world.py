@@ -278,4 +278,8 @@ def build_world() -> World:
         title="Matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
         posted_by=users["rdco"], opportunity_type="internal_call", posting_office="RDCO",
     )
+    o["adviser_opportunity"] = Opportunity.objects.create(
+        title="Adviser's matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
+        posted_by=users["adviser"], opportunity_type="internal_call", posting_office="Adviser",
+    )
     return world

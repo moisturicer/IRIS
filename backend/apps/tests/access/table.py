@@ -367,7 +367,7 @@ ACCOUNTS = {
     "user-detail": Entry({m: _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")},
                                  **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                           for m in ("GET", "PUT", "PATCH")}),
-    "user-change-role": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"role": "Adviser"})}),
+    "user-change-role": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"role_name": "Adviser"})}),
     "user-coordinator": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"is_office_coordinator": True})}),
     "user-lock": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={})}),
     "user-locked": Entry({"GET": _case(RDCO_ONLY)}),
@@ -446,10 +446,13 @@ NOTIFICATIONS = {
 }
 OPPORTUNITIES = {
     "opportunity-list": Entry({"GET": _case(SIGNED_IN), "POST": _case(POSTER, data={"title": "Call"})}),
-    "opportunity-detail": Entry({m: _case(SIGNED_IN if m == "GET" else POSTER,
-                                        kwargs={"pk": Ref("opportunity")},
-                                        **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {}))
-                                 for m in ("GET", "PUT", "PATCH", "DELETE")}),
+    # IR-121: an Adviser edits only their own call; RDCO moderates either.
+    "opportunity-detail": Entry({m: [
+        _case(SIGNED_IN if m == "GET" else RDCO_ONLY, kwargs={"pk": Ref("opportunity")},
+              **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
+        _case(SIGNED_IN if m == "GET" else POSTER, kwargs={"pk": Ref("adviser_opportunity")},
+              **({"data": {"title": "Updated"}} if m in ("PUT", "PATCH") else {})),
+    ] for m in ("GET", "PUT", "PATCH", "DELETE")}),
     "opportunity-calendar": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")})}),
     "api-root": Shadowed(by="opportunity-list", why="The empty-prefix list matches before the router root."),
 }
