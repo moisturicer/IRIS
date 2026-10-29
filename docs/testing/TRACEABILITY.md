@@ -189,7 +189,41 @@ services (`reviews.routing`, `seats`, `office_review`, `decisions`, `revisions`,
 an audit failure can never abort the workflow transaction (the IR-216 guarantee). Migration
 `audit/0004` adds the types and widens `event_type` to 40 characters. Keys and the metric
 recipes: [`../evaluation/AUDIT_EXPORT.md`](../evaluation/AUDIT_EXPORT.md). Display, filters and
-CSV export are IR-529.
+CSV export are implemented by IR-529 (below).
+
+### IR-529 audit viewer and CSV export
+
+The RDCO Audit Log declares every backend type in grouped filters and shows actor,
+timestamp (including time), Record link, and labelled metadata. Record, actor, event
+and inclusive date filters share one validated API query with the CSV export.
+`GET /api/v1/audit/export/` exports all matching rows in insertion order, with the
+17 fixed columns mapped in `AUDIT_EXPORT.md`; no write route is introduced.
+Deleted subjects retain their IDs; absent metadata and missing events are explicit.
+Actor roles are current lookup values, not invented historical snapshots.
+
+**Tests:** `apps/audit/tests/test_csv_export.py` covers RDCO-only access (including
+other roles with `is_staff`), filter parity, all rows beyond pagination, CSV escaping
+and formula protection, retained deleted IDs, invalid filters, empty exports,
+read-only methods, and 7,200-second turnaround plus one preserved clearance computed
+solely from CSV. `frontend/src/features/audit/AuditLogPage.test.tsx` checks every
+backend type against the selectable options, labelled details, actor and Record,
+filter/export parity, error feedback, and automated accessibility.
+
+**Deliberate test correction:** IR-166's route-inventory assertion equated no detail
+endpoint with exactly one collection route. IR-529 adds a read-only CSV collection.
+The test now exercises GET/PUT/PATCH/DELETE on a specific event URL and requires 404;
+both collection routes separately reject writes. The immutability guarantee remains.
+
+**Executed evidence (2026-10-30):** the Docker PostgreSQL run of `apps/audit`
+passed all 56 tests using a separate `DB_NAME=ir529_verification` test namespace
+(the pre-existing default test schema had a duplicate-column migration error).
+The four Audit Log page tests passed, including axe checks. With locked frontend
+dependencies installed, the full frontend suite passed 1,282 tests in 103 files;
+`tsc --noEmit`, changed-file ESLint, the production build, audit flake8 and
+`manage.py check` passed (existing Axes configuration warning). Full backend and
+PR CI results are recorded in the linked IR-529 pull request.
+The export is also declared `RDCO_ONLY` in the endpoint authorization matrix;
+its route declaration and every role are checked by `apps/tests/test_access_matrix.py`.
 
 **Recorded deviation from the card:** its "Clocks" rule starts a clock at `RESUBMITTED` for
 `reset_parties`. A party that asked never stopped its clock, so none restarts for it. The

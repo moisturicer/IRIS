@@ -465,7 +465,10 @@ OPPORTUNITIES = {
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "records": RECORDS, "documents": DOCUMENTS_APP, "accounts": ACCOUNTS,
     "reviews": REVIEWS, "ai": AI, "notifications": NOTIFICATIONS,
-    "audit": {"audit-list": Entry({"GET": _case(RDCO_ONLY)})},
+    "audit": {
+        "audit-list": Entry({"GET": _case(RDCO_ONLY)}),
+        "audit-export": Entry({"GET": _case(RDCO_ONLY)}),
+    },
     "opportunities": OPPORTUNITIES,
 }
 DECLARED = TABLE
