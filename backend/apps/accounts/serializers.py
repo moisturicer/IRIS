@@ -21,7 +21,7 @@ class UserSerializer(serializers.ModelSerializer):
             "id", "email", "first_name", "middle_initial", "last_name",
             "role", "role_name",
             "is_staff", "is_superuser",
-            "is_verified", "is_locked", "consent_given", "date_joined",
+            "is_verified", "is_locked", "is_active", "consent_given", "date_joined",
             "is_office_coordinator",
             "college_name", "department_name", "course_name",
         ]
@@ -38,7 +38,7 @@ class UserSerializer(serializers.ModelSerializer):
         # is an administrator's, through `PATCH /users/<id>/coordinator/`.
         read_only_fields = [
             "email", "role", "is_staff", "is_superuser",
-            "is_verified", "is_locked", "consent_given", "date_joined",
+            "is_verified", "is_locked", "is_active", "consent_given", "date_joined",
             "is_office_coordinator",
         ]
 

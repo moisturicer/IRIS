@@ -119,6 +119,9 @@ class UserListView(generics.ListAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     queryset           = User.objects.select_related("role").order_by("-date_joined")
+    # The default SearchFilter matches nothing until a view names its fields,
+    # so the Users page's search box listed everyone (IR-478).
+    search_fields      = ["email", "first_name", "last_name"]
 
 
 class AdviserListView(generics.ListAPIView):

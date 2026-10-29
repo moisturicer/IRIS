@@ -1,12 +1,13 @@
 /**
- * User management page -- staff/admin only.
+ * User management page -- RDCO only.
  * Lists all users with role, active status, and quick actions:
  *   - Lock / unlock account
  *   - Change role (via modal)
+ *   - Make or remove an office coordinator (IR-478, ADR-032 §4)
  * TODO: add "Create user" button.
  * TODO: add bulk import from CSV.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { accountsApi }  from "@/api/accounts";
 import { PageHeader }   from "@/components/layout/PageHeader";
 import { DataTable }    from "@/components/shared/DataTable";
@@ -16,12 +17,19 @@ import { Input }        from "@/components/ui/Input";
 import { Button }       from "@/components/ui/Button";
 import { Badge }        from "@/components/ui/Badge";
 import { Modal }        from "@/components/ui/Modal";
+import { ALL_ROLES, STAFF_ROLES } from "@/lib/constants";
 import { useUIStore }   from "@/store/ui.store";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { UserListItem } from "@/types/auth";
 
+/** The four office roles: the only ones the server lets coordinate. */
+function isOfficeMember(user: UserListItem): boolean {
+  return (STAFF_ROLES as readonly string[]).includes(user.role_name);
+}
+
 export default function UserListPage() {
   const addToast = useUIStore((s) => s.addToast);
+  const roleSelectId = useId();
 
   const [users, setUsers]     = useState<UserListItem[]>([]);
   const [total, setTotal]     = useState(0);
@@ -34,6 +42,11 @@ export default function UserListPage() {
   // Role change modal
   const [roleTarget, setRoleTarget] = useState<UserListItem | null>(null);
   const [newRole, setNewRole]       = useState("");
+  // Coordinator grant/removal confirm. Not an in-place toggle: an authority
+  // grant must not be one misclick away.
+  const [coordTarget, setCoordTarget]         = useState<UserListItem | null>(null);
+  const [coordConfirming, setCoordConfirming] = useState(false);
+  const [coordError, setCoordError]           = useState<string | null>(null);
 
   const load = (p = page) => {
     setLoading(true);
@@ -77,6 +90,43 @@ export default function UserListPage() {
     }
   };
 
+  const openCoordinator = (target: UserListItem) => {
+    setCoordError(null);
+    setCoordTarget(target);
+  };
+
+  const closeCoordinator = () => {
+    setCoordTarget(null);
+    setCoordError(null);
+  };
+
+  // The row changes only from the server's answer, so a refusal leaves it as
+  // it was and keeps the dialog open with the reason.
+  const handleCoordinator = async () => {
+    if (!coordTarget) return;
+    const granting = !coordTarget.is_office_coordinator;
+    setCoordConfirming(true);
+    setCoordError(null);
+    try {
+      const { data } = await accountsApi.setCoordinator(coordTarget.id, granting);
+      setUsers((rows) => rows.map((row) =>
+        row.id === data.id ? { ...row, is_office_coordinator: data.is_office_coordinator } : row,
+      ));
+      addToast({
+        type: "success",
+        message: `${coordTarget.email} ${granting ? "is now a coordinator" : "is no longer a coordinator"}.`,
+      });
+      setCoordTarget(null);
+    } catch (err) {
+      setCoordError(
+        (err as { response?: { data?: { detail?: string } } }).response?.data?.detail
+          ?? "The change could not be saved. Try again.",
+      );
+    } finally {
+      setCoordConfirming(false);
+    }
+  };
+
   const columns: ColumnDef<UserListItem, unknown>[] = [
     {
       header: "Email",
@@ -97,7 +147,14 @@ export default function UserListPage() {
     {
       header: "Role",
       accessorKey: "role_name",
-      cell: ({ getValue }) => <RoleBadge role={getValue<string>()} />,
+      cell: ({ row }) => (
+        <div className="flex flex-wrap items-center gap-1.5">
+          <RoleBadge role={row.original.role_name} />
+          {isOfficeMember(row.original) && row.original.is_office_coordinator && (
+            <Badge>Coordinator</Badge>
+          )}
+        </div>
+      ),
     },
     {
       header: "Status",
@@ -120,6 +177,11 @@ export default function UserListPage() {
           >
             Change role
           </Button>
+          {isOfficeMember(row.original) && (
+            <Button variant="ghost" size="sm" onClick={() => openCoordinator(row.original)}>
+              {row.original.is_office_coordinator ? "Remove coordinator" : "Make coordinator"}
+            </Button>
+          )}
           <Button
             variant={row.original.is_locked ? "secondary" : "danger"}
             size="sm"
@@ -132,12 +194,15 @@ export default function UserListPage() {
     },
   ];
 
+  const coordAction = coordTarget?.is_office_coordinator ? "Remove coordinator" : "Make coordinator";
+
   return (
     <div>
-      <PageHeader title="Users" description="Manage user accounts and roles." />
+      <PageHeader title="Users" description="Manage user accounts, roles and office coordinators." />
 
       <div className="flex gap-3 mb-4">
         <Input
+          aria-label="Search users"
           placeholder="Search email or name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
@@ -175,6 +240,22 @@ export default function UserListPage() {
         onCancel={() => setLockTarget(null)}
       />
 
+      {/* Coordinator grant/removal confirm (ADR-032 §4) */}
+      <ConfirmDialog
+        open={!!coordTarget}
+        title={`${coordAction}?`}
+        message={
+          coordTarget?.is_office_coordinator
+            ? `${coordTarget.email} will no longer assign reviewers in ${coordTarget.role_name}; their existing assignments stay.`
+            : `${coordTarget?.email} can assign, reassign and withdraw reviewers in ${coordTarget?.role_name}.`
+        }
+        confirmLabel={coordAction}
+        confirming={coordConfirming}
+        error={coordError}
+        onConfirm={handleCoordinator}
+        onCancel={closeCoordinator}
+      />
+
       {/* Role change modal */}
       <Modal
         open={!!roleTarget}
@@ -185,15 +266,24 @@ export default function UserListPage() {
           <p className="text-[14px] text-gray-600">
             Changing role for <strong>{roleTarget?.email}</strong>.
           </p>
+          {/* `User.assign_role` drops the grant on every role change, even to
+              the same role, because it was for the office the old role staffed. */}
+          {roleTarget?.is_office_coordinator && (
+            <p className="text-[14px] text-stone-700 border-l-2 border-brand pl-3">
+              {roleTarget.email} coordinates {roleTarget.role_name}. Saving a role
+              removes their coordinator status, even if you keep {roleTarget.role_name}.
+            </p>
+          )}
           <div>
-            <label className="text-[14px] font-medium text-gray-700 block mb-1">New Role</label>
+            <label htmlFor={roleSelectId} className="text-[14px] font-medium text-gray-700 block mb-1">New role</label>
             <select
+              id={roleSelectId}
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[14px] outline-none
                 focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12]"
             >
-              {["Student","Adviser","KTTO","RDCO","ITSO","IERC"].map((r) => (
+              {ALL_ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>
