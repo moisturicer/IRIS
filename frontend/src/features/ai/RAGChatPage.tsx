@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { conversationPath, useConsumeHandoff } from "@/lib/askHandoff";
+import { CitationConversationContext, CitationTurnContext, addressNumber } from "@/lib/citedPage";
 import { aiApi } from "@/api/ai";
 import { useUIStore } from "@/store/ui.store";
 import type { ChatMessage } from "@/types/chat";
@@ -149,6 +150,14 @@ export default function RAGChatPage() {
 
   const { open, show, showUnavailable, isOnScreen, setDraftFor } = client;
 
+  // Back from a citation (IR-578): `?turn=` names the answer to come back
+  // to. Once it is on screen it is selected, its sources shown, and the
+  // transcript opens at it.
+  const returnTurn = addressNumber(searchParams.get("turn"));
+  const returnedTo = returnTurn == null
+    ? undefined
+    : messages.find((m) => m.role === "assistant" && m.turnId === returnTurn);
+
   /** Shows `conversation` and makes its address the current one. */
   const goTo = useCallback(
     (conversation: ConversationDetail, replace = false, nextDraft: string | null = null) => {
@@ -256,6 +265,16 @@ export default function RAGChatPage() {
     setSourcesOpen(false);
   }, [activeId]);
 
+  // After the reset above, so the answer returned to keeps its sources open.
+  const { select } = client;
+  useEffect(() => {
+    if (!returnedTo) return;
+    select(returnedTo.id);
+    if (returnedTo.citations?.length && !panelsAsDrawers) setSourcesOpen(true);
+    // Once per answer returned to: selecting another afterwards is the reader's.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returnedTo?.id]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -320,6 +339,8 @@ export default function RAGChatPage() {
   return (
     // `dvh`, not `vh`: the page is the height of what a phone shows, so the
     // composer stays above the software keyboard rather than under it (IR-570).
+    // Every citation here names its conversation, the way back (IR-578).
+    <CitationConversationContext.Provider value={activeId}>
     <div ref={observePage} className="relative flex flex-col h-dvh bg-canvas overflow-hidden">
       <div
         className="flex flex-1 min-h-0 min-w-0 relative"
@@ -422,6 +443,7 @@ export default function RAGChatPage() {
               onRetry={handleRetry}
               onStop={() => void client.stop()}
               selectedId={selected?.id ?? null}
+              anchorTurn={returnTurn}
               onSelectSources={(message) => {
                 client.select(message.id);
                 if (panelsAsDrawers) togglePanel("sources");
@@ -441,6 +463,7 @@ export default function RAGChatPage() {
         </div>
 
         {!panelsAsDrawers && (
+          <CitationTurnContext.Provider value={selected?.turnId ?? null}>
           <SourceContextPanel
             open={sourcesOpen}
             citations={citations}
@@ -448,6 +471,7 @@ export default function RAGChatPage() {
             question={selected?.question ?? null}
             onClose={() => setSourcesOpen(false)}
           />
+          </CitationTurnContext.Provider>
         )}
       </div>
 
@@ -483,9 +507,12 @@ export default function RAGChatPage() {
           onClose={() => setDrawer(null)}
           returnTo={drawerOpener.current}
         >
-          <SourcePassages citations={citations} sources={sources} answered={selected !== null} />
+          <CitationTurnContext.Provider value={selected?.turnId ?? null}>
+            <SourcePassages citations={citations} sources={sources} answered={selected !== null} />
+          </CitationTurnContext.Provider>
         </ChatDrawer>
       )}
     </div>
+    </CitationConversationContext.Provider>
   );
 }

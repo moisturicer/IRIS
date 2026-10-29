@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { ChatMessage } from "@/types/chat";
+import { CitationTurnContext } from "@/lib/citedPage";
 import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
@@ -92,7 +93,10 @@ export function ChatMessageBubble({
   const cited = message.citations?.length ?? 0;
 
   return (
+    // Its citations name this answer, the way back to it (IR-578).
+    <CitationTurnContext.Provider value={message.turnId ?? null}>
     <div
+      data-turn={isUser ? undefined : message.turnId}
       className={cn(
         "group flex animate-fade-in-up motion-reduce:animate-none",
         compact ? "gap-2.5" : "gap-3",
@@ -180,5 +184,6 @@ export function ChatMessageBubble({
         )}
       </div>
     </div>
+    </CitationTurnContext.Provider>
   );
 }

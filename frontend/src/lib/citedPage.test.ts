@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { citationNavigationState, citedPage, followedFromPaperChat } from "./citedPage";
+import {
+  answerReference,
+  citationHref,
+  citationNavigationState,
+  citedPage,
+  followedFromPaperChat,
+  trustedCitation,
+} from "./citedPage";
 import type { Citation, ReplayedCitation } from "@/types/ai";
 
 describe("the page a citation asked for", () => {
@@ -83,5 +90,76 @@ describe("marking a citation followed from Paper Chat", () => {
     expect(followedFromPaperChat(null)).toBe(false);
     expect(followedFromPaperChat(undefined)).toBe(false);
     expect(followedFromPaperChat({ from: "/discover" })).toBe(false);
+  });
+});
+
+describe("the way back to an answer (IR-578)", () => {
+  const answer = { conversationId: 12, turnId: 88 };
+
+  it("names the conversation, the turn and the citation, by id only", () => {
+    const href = citationHref(liveCitation, { answer });
+
+    expect(href).toBe("/records/7?page=12&conversation=12&turn=88&cite=1");
+    // Never the question or the quote: an address is shared, logged and kept.
+    expect(href).not.toContain("twelve");
+  });
+
+  it("says when the citation came from Paper Chat", () => {
+    expect(citationHref(liveCitation, { origin: "paper-chat", answer })).toBe(
+      "/records/7?page=12&conversation=12&turn=88&cite=1&from=paper",
+    );
+  });
+
+  it("links an Overview page as page context, with no answer to return to", () => {
+    expect(citationHref(liveCitation, { origin: "overview" })).toBe("/records/7?page=12&context=page");
+  });
+
+  it("keeps the plain link where there is no answer", () => {
+    expect(citationHref(liveCitation)).toBe("/records/7?page=12");
+    expect(citationHref({ record_id: 7, page: null })).toBe("/records/7");
+  });
+
+  it("reads the reference back off the address, and nothing that is not one", () => {
+    const read = (query: string) => answerReference(new URLSearchParams(query));
+
+    expect(read("page=12&conversation=12&turn=88&cite=1&from=paper")).toEqual({
+      conversationId: 12, turnId: 88, marker: 1, from: "paper-chat",
+    });
+    expect(read("conversation=12&turn=88")).toEqual({
+      conversationId: 12, turnId: 88, marker: null, from: "ask",
+    });
+    expect(read("page=12")).toBeNull();
+    expect(read("conversation=12")).toBeNull();
+    expect(read("conversation=twelve&turn=88")).toBeNull();
+  });
+
+  it("trusts a citation this page load carried for the answer the address names", () => {
+    const reference = answerReference(new URLSearchParams("conversation=12&turn=88&cite=1"));
+    const state = citationNavigationState(liveCitation, null, answer);
+
+    expect(trustedCitation(state, reference)).toBe(liveCitation);
+  });
+
+  it("does not trust a citation from another page load, as after a reload", () => {
+    const reference = answerReference(new URLSearchParams("conversation=12&turn=88&cite=1"));
+    const stale = { citation: liveCitation, answer, load: "an earlier load" };
+
+    expect(trustedCitation(stale, reference)).toBeNull();
+  });
+
+  it("does not trust a citation carried for a different answer", () => {
+    const reference = answerReference(new URLSearchParams("conversation=12&turn=89&cite=1"));
+
+    expect(trustedCitation(citationNavigationState(liveCitation, null, answer), reference)).toBeNull();
+  });
+
+  it("uses a carried citation as before when the address names no answer", () => {
+    expect(trustedCitation({ citation: liveCitation }, null)).toBe(liveCitation);
+    expect(trustedCitation(null, null)).toBeNull();
+  });
+
+  it("trusts an Overview page only from this page load", () => {
+    expect(trustedCitation(citationNavigationState(liveCitation, "overview"), null)).toBe(liveCitation);
+    expect(trustedCitation({ citation: liveCitation, origin: "overview", load: "earlier" }, null)).toBeNull();
   });
 });

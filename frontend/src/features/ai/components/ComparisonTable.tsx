@@ -1,7 +1,7 @@
-import { useContext, useId } from "react";
+import { useId } from "react";
 import { Link } from "react-router-dom";
 import type { AnswerComparison, Citation, ComparisonCell, ComparisonCitation } from "@/types/ai";
-import { CitationOriginContext, citationHref, citationNavigationState, openCitationLabel } from "@/lib/citedPage";
+import { openCitationLabel, useCitationLink } from "@/lib/citedPage";
 
 const COVERAGE_LABELS = {
   read_fully: "Read in full",
@@ -34,14 +34,16 @@ function PageCitation({ source, record }: {
   source: ComparisonCitation;
   record: AnswerComparison["records"][number];
 }) {
-  const origin = useContext(CitationOriginContext);
   const citation: Citation = {
     ...source, marker: source.marker ?? 0, record_id: record.record_id,
     record_title: record.title, text: source.quote, context_path: [], regions: [],
   };
   const label = openCitationLabel(citation);
+  // A comparison's markers are not the answer's citation markers, so the
+  // link names its answer but no citation to re-read (IR-578).
+  const { to, state } = useCitationLink(citation, { resolvable: false });
   return (
-    <Link to={citationHref(citation)} state={citationNavigationState(citation, origin)}
+    <Link to={to} state={state}
       aria-label={label} title={label}
       className="inline-flex rounded px-1.5 py-0.5 text-xs font-medium text-brand bg-brand/10 hover:bg-brand/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40">
       {source.page === null ? "Source" : `p. ${source.page}`}

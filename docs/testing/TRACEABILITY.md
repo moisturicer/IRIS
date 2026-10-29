@@ -1390,6 +1390,56 @@ Five failed before the change, and the live-line, sources-carry and reload-draft
 - Not checked: a browser run. The dev corpus has no indexed records, so no answer carries citations there.
 
 
+## IR-578: Back to the answer after following a citation, even after a reload
+
+**Requirement.** IR-552 user stories 17–20. A reader follows a citation into the Manuscript, checks it, and returns to the same answer. This holds after a reload and across Records. It changes IR-434's page-citation links (a linked follow-up; IR-434 is not reopened).
+
+**Design basis.** No ADR covers it. It follows the IR-578 acceptance criteria and reuses ADR-019's owned Conversation model and the IR-299 re-resolution rule. No backend code changes: the owner-scoped `GET /ai/conversations/<id>/` already re-resolves every stored citation against the reader (`apps/ai/conversations.py`, `_resolve_citation`).
+
+**Implementation.**
+- A citation link names its answer by ids only (`lib/citedPage.ts`, `citationHref`, `useCitationLink`): `/records/<id>?page=N&conversation=C&turn=T&cite=M`, plus `from=paper` from Paper Chat. The question and the quote never go in an address.
+  - `CitationConversationContext` (set by the Ask IRIS page and Paper Chat) and `CitationTurnContext` (set by each answer bubble and the sources panel) supply the ids, so every citation link (chip, passage link, comparison page link) builds them the same way.
+- Router state is trusted only when this page load wrote it for the answer the address names (`trustedCitation`). A browser reload keeps router state, so a stamp from another load is treated as stale.
+- Otherwise the paper view re-reads the citation through the reader's own Conversation (`paper-view/useCitationReference.ts`):
+  - **passage**: the page and regions as they read now win over the address's page.
+  - **changed** (re-chunked): it highlights nothing and says so. It lands on the page the citation was stored with, which the note offers as where the passage was when the answer was written, not as the passage.
+  - **missing** (no longer in the answer) and **elsewhere** (a citation into another Record): each highlights nothing and says which.
+  - **gone** (someone else's or a deleted Conversation, which reads like a missing one): it highlights nothing and offers no Back to answer.
+  - A Record the reader lost is a 404 page before any of this, and the backend drops that citation anyway.
+- The reader waits for the re-read before it lands. It lands once per navigation, so landing on the address's page would not move again to the page the re-read gives.
+- **Back to answer** is in the shared reading header (`ReadingHeader`, `onBackToAnswer`).
+  - From Ask IRIS it goes to `/ai/conversations/C?turn=T`. The page selects that answer, opens its sources, and opens the transcript at it (`ChatMessageList`, `anchorTurn`).
+  - From Paper Chat it opens the panel on that Conversation, about the paper it belongs to, and scrolls the transcript to the Turn (`PaperChatPanel`, `returnTo`). Arriving after a reload still pins nothing (IR-355); the button is the way back.
+- Overview citations are page context. The chip's name ends ", page context", the link carries `context=page`, and the paper marks only regions on the stated page, with a note saying so. An Overview page cannot be re-read from its address, so after a reload its kept router state is dropped: the page lands as page context with nothing marked, and the note does not claim a mark. Passage citations keep every region, so a passage over two pages stays highlighted on both.
+- A comparison's page links name their answer but no `cite`: a comparison's markers are not the answer's citation markers, so re-reading one could highlight the wrong passage.
+- A citation landing still overrides the reader's kept place: there is no persisted reading position, and `useReadingPosition`'s in-memory place yields to every new landing (IR-354). No test targets this separately.
+- "Restores the scroll position" is met by opening the transcript at the answer (its top), not by restoring the exact pixel offset the reader left.
+
+**Tests.**
+- `lib/citedPage.test.ts` › "the way back to an answer (IR-578)", 10 tests: ids-only links, `from=paper`, `context=page`, plain links unchanged, address parsing, router state trusted only from this load and for this answer, and an Overview page trusted only from this load.
+- `PaperViewPage.test.tsx` › "back to the answer after following a citation (IR-578)", 12 tests:
+  - Re-read after a reload: the page reads 14, not the address's 12, with both regions of a two-page passage.
+  - It lands only once the re-read is in.
+  - Reload-kept router state is not trusted.
+  - A citation followed in this load needs no fetch.
+  - Re-chunked, no-longer-cited, other-Record and not-the-reader's cases each degrade with their own note, and only the last offers no Back to answer.
+  - Back to answer reaches the Ask IRIS address.
+  - A paper reached without an answer offers none.
+  - Overview page context marks only its page, and after a reload marks nothing and says only that it is page context.
+- `ComparisonTable.test.tsx`, 1 test: a page chip links back to its answer with no `cite`.
+- `PaperViewPage.test.tsx` › IR-355 block, 2 tests: Paper Chat citations carry their conversation and answer, and Back to answer after a reload on the other paper reopens X's conversation, pinned.
+- `RAGChatPage.test.tsx` › "back to the answer from a citation (IR-578)", 2 tests: `?turn=` selects that answer, shows its sources and scrolls to it, and every citation link names its conversation and Turn.
+- **Changed deliberately:** `PaperAiOverview.test.tsx` expected `/records/7?page=12`. An Overview link now carries `&context=page` and its name says page context.
+- Six tests were checked red with their fix removed: reload trust, re-resolution, page-context filtering, the Ask IRIS anchor, the Paper Chat return and the wait before landing.
+- **HTTP citation resolution** is the backend's existing suite, unchanged by this ticket: `apps/ai/tests/test_conversations_http.py` covers dropped invisible citations, tombstoned chunks degrading to a record-level link, and someone else's conversation as a 404. `test_citation_regions_http.py` covers a replayed turn re-resolving regions. They were not re-run locally (no backend change); CI runs them. Two cases this now depends on have no explicit backend test, and are a follow-up for `apps/ai`'s owner: a degraded pointer keeps `page` and carries no `regions`, and a chunk in a superseded (inactive) ChunkSet degrades the same way as a tombstoned one.
+
+**Evidence, 2026-10-30.**
+- `npm test`: **1305 passed, 0 failed** (after `npm ci`, as `main`'s dependencies had moved).
+- `tsc --noEmit` is clean, `npm run lint` has 0 errors (its warnings are all on `main` already), and `npm run build` passes.
+- A two-axis review (standards and spec) followed. It added the elsewhere case, the reload rule for Overview pages, the honest page-context and re-chunked notes, the comparison link without `cite`, one parser named for what it reads (`addressNumber`), one `AnswerReturn` type, one page-context signal, and an accessible-tree assertion in place of an attribute query.
+- Not checked: a browser run. The dev corpus has no indexed records, so no answer carries citations there.
+
+
 ## IR-597 — Controller recovery, budgets and source safety
 
 Authority: ADR-042 and general-tools specification sections 7/10, scenarios A11, A12 and A15.
