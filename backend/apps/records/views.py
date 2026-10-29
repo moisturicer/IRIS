@@ -179,7 +179,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         from .versions import details_editable
 
         record = self.get_object()
-        self.get_queryset().select_for_update(of=("self",)).get(pk=record.pk)
+        Record.objects.select_for_update().get(pk=record.pk)
         record = self.get_object()
         if not details_editable(record):
             return Response(
@@ -296,7 +296,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         Revised work uses the dedicated resubmission action.
         """
         record = self.get_object()  # enforces IsRecordOwner object permission
-        self.get_queryset().select_for_update(of=("self",)).get(pk=record.pk)
+        Record.objects.select_for_update().get(pk=record.pk)
         record = self.get_object()
 
         if record.pipeline_status != PipelineStatus.DRAFT:
