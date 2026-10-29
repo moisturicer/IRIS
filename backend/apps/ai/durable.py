@@ -176,7 +176,7 @@ def public_routing(routing: dict) -> dict:
 # ---- submission -------------------------------------------------------------
 
 
-def submit(prepared, user, data, *, max_sources: int):
+def submit(prepared, user, data, *, max_sources: int, submission=None):
     """Create the run and its `run_queued` event; dispatch once committed.
 
     ``None`` while an earlier run in the same Conversation is unfinished: a
@@ -215,7 +215,11 @@ def submit(prepared, user, data, *, max_sources: int):
     with transaction.atomic():
         # The Conversation, then its runs: the order finishing a run takes.
         Conversation.objects.select_for_update().filter(pk=prepared.conversation.pk).first()
-        return _queue(user, prepared.conversation.pk, request)
+        run = _queue(user, prepared.conversation.pk, request)
+        if run is not None and submission is not None:
+            submission.run = run
+            submission.save(update_fields=["run"])
+        return run
 
 
 def retry(run_id, user):
@@ -726,7 +730,7 @@ def _payload(event: AskRunEvent, user, *, public=False):
     elif event.name in ("candidates_selected", "candidates_updated"):
         data = _visible_candidates(user, data)
     elif event.name == "done":
-        data = _done(event, user, public=public)
+        data = done_for_reader(event, user, public=public)
         if data is None:
             # The Turn is gone; the run is still over, and must say so.
             return "run_failed", {
@@ -757,7 +761,7 @@ def _visible_candidates(user, data: dict) -> dict:
     ]}
 
 
-def _done(event: AskRunEvent, user, *, public=False):
+def done_for_reader(event: AskRunEvent, user, *, public=False):
     """The final answer as it reads now: rebuilt from the Turn, never replayed."""
     from apps.ai.conversations import turn_for_reader
 

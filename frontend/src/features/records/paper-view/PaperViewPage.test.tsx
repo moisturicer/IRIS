@@ -1338,6 +1338,11 @@ describe("following a citation to another paper (IR-355)", () => {
     vi.mocked(aiApi.conversations.findForRecord).mockImplementation(
       ((id: number) => Promise.resolve(conversations[id])) as never,
     );
+    // The atomic first-send POST returns the same default as the GET (IR-561),
+    // including when the panel remains pinned to X on Y's page.
+    vi.mocked(aiApi.conversations.create).mockImplementation(
+      ((body: { record: number }) => Promise.resolve({ data: conversations[body.record] })) as never,
+    );
     vi.mocked(aiApi.askStream).mockReset();
     vi.mocked(aiApi.askStream).mockImplementation((async function* () {
       yield {
@@ -1358,6 +1363,9 @@ describe("following a citation to another paper (IR-355)", () => {
     vi.mocked(recordsApi.detail).mockImplementation((() => Promise.resolve({ data: shownRecord })) as never);
     const { aiApi } = await import("@/api/ai");
     vi.mocked(aiApi.conversations.findForRecord).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(aiApi.conversations.create).mockImplementation(
+      (() => Promise.resolve({ data: { id: 50, turns: [] } })) as never,
+    );
   });
 
   async function conversationsOpened(): Promise<number[]> {

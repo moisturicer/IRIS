@@ -41,6 +41,7 @@ class ChatQuestion:
     context_revision: Optional[int] = None
     #: The engine pinned for this run; `None` takes the root's (IR-593).
     engine: Optional[str] = None
+    submission_id: Optional[int] = None
 
 
 class ChatOrchestrator:
@@ -75,7 +76,9 @@ class ChatOrchestrator:
     @property
     def metadata(self):
         metadata = self._routing.metadata
-        return {**metadata, "turn_id": self._turn_id} if metadata and self._turn_id else metadata
+        if self._turn_id and (metadata or self._asked.submission_id is not None):
+            return {**metadata, "turn_id": self._turn_id}
+        return metadata
 
     def answer(self, user):
         with admission_scope.workload("chat"), admission_scope.run(self._run):
@@ -175,6 +178,7 @@ class ChatOrchestrator:
             guard=self._record_guard(answer),
             context=self._outcome.context if self._outcome is not None else None,
             expected_revision=asked.context_revision,
+            submission_id=asked.submission_id,
         )
         self._turn_id = turn.pk
         return turn

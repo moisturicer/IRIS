@@ -15,7 +15,7 @@ describe("starting a conversation (IR-548)", () => {
 
     const { data } = await aiApi.conversations.create({ record: 5 });
 
-    expect(post).toHaveBeenCalledWith("/ai/conversations/", { record: 5 });
+    expect(post).toHaveBeenCalledWith("/ai/conversations/", { record: 5 }, { headers: { "X-IRIS-Protocol": "public-1" } });
     expect(data).toEqual({ ...created, turns: [], latest_run: null });
   });
 
@@ -26,7 +26,7 @@ describe("finding a Record's conversation (IR-569)", () => {
     get.mockResolvedValue({ data: [] });
 
     expect(await aiApi.conversations.findForRecord(5)).toBeNull();
-    expect(get).toHaveBeenCalledWith("/ai/conversations/", { params: { record: 5 } });
+    expect(get).toHaveBeenCalledWith("/ai/conversations/", { params: { record: 5, default: true } });
     expect(post).not.toHaveBeenCalled();
   });
 
@@ -48,7 +48,7 @@ describe("the public reader protocol (IR-596)", () => {
     aiApi.ask("Original question", { conversationId: 42, widen: true });
     expect(post).toHaveBeenCalledWith(
       "/ai/ask/",
-      { question: "Original question", top_k: 5, conversation_id: 42, widen: true },
+      { question: "Original question", top_k: 5, conversation_id: 42, widen: true, request_id: expect.any(String) },
       { headers: PROTOCOL },
     );
   });
@@ -63,7 +63,7 @@ describe("the public reader protocol (IR-596)", () => {
     }
     expect(fetchMock.mock.calls[0][1].headers).toMatchObject(PROTOCOL);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      question: "Original question", top_k: 5, conversation_id: 42, widen: false,
+      question: "Original question", top_k: 5, conversation_id: 42, widen: false, request_id: expect.any(String),
     });
   });
 

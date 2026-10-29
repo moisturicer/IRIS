@@ -33,6 +33,7 @@ export interface StreamingState {
 }
 
 interface AskStreamOptions {
+  requestId?: string;
   comparisonRecordIds?: number[];
   conversationId?: number;
   topK?:           number;

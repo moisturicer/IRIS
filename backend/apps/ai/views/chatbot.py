@@ -32,6 +32,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.ai import public as public_protocol
+from apps.ai import submissions
 from apps.ai.conversation_state import current_revision
 from apps.ai.history import recent_window
 from apps.ai.answers.events import (
@@ -287,24 +288,45 @@ class ChatQueryView(APIView):
 
     def post(self, request):
         public_mode = public_protocol.requested(request)
-        prepared, error = prepare_ask(request.data, request.user)
+        prepared, error = prepare_ask(request.data, request.user, resolve=False)
         if error is not None:
             return error
+        submission, created, error = submissions.claim(
+            request.data, prepared, max_sources=_parse_top_k(request.data.get("top_k")))
+        if error is not None:
+            return error
+        if not created:
+            if submission.run_id:
+                from apps.ai import durable
 
-        orchestrator = ChatOrchestrator(
-            prepared, max_sources=_parse_top_k(request.data.get("top_k"))
-        )
-        answer = orchestrator.answer(request.user)
-        if public_mode:
-            return Response(public_body(prepared, orchestrator, answer))
-        return Response(done_body(prepared, orchestrator, answer))
+                event = submission.run.events.filter(name="done").last()
+                if event is not None:
+                    body = durable.done_for_reader(event, request.user, public=public_mode)
+                    if body is not None:
+                        return Response(body)
+                return submissions.pending(submission)
+            if submission.turn_id:
+                return Response(submissions.replay(submission, request.user, public=public_mode))
+            return submissions.pending(submission)
+        try:
+            prepared, error = prepare_ask(request.data, request.user)
+            if error is not None:
+                return error
+            prepared = submissions.bind(prepared, submission)
+            orchestrator = ChatOrchestrator(
+                prepared, max_sources=_parse_top_k(request.data.get("top_k"))
+            )
+            answer = orchestrator.answer(request.user)
+            return Response((public_body if public_mode else done_body)(prepared, orchestrator, answer))
+        finally:
+            submissions.finish(submission)
 
 
 def done_body(prepared, orchestrator, answer) -> dict:
     """The final answer's wire body, one shape for `/ask/` and `done`."""
     mode = answer_mode(answer.state)
     return {
-        **answer_body(mode, answer.text, preserve_no_results=bool(orchestrator.metadata)),
+        **answer_body(mode, answer.text, preserve_no_results=any(key != "turn_id" for key in orchestrator.metadata)),
         **orchestrator.metadata,
         "conversation_id": (
             None if prepared.conversation is None else prepared.conversation.pk
@@ -433,9 +455,20 @@ class ChatStreamView(APIView):
 
         public_mode = public_protocol.requested(request)
         queued = durable.requested(request.data)
-        prepared, error = prepare_ask(request.data, request.user, resolve=not queued)
+        prepared, error = prepare_ask(request.data, request.user, resolve=False)
         if error is not None:
             return error
+        submission, created, error = submissions.claim(
+            request.data, prepared, max_sources=_parse_top_k(request.data.get("top_k")))
+        if error is not None:
+            return error
+        if not created:
+            if submission.run_id:
+                return EventStreamResponse(durable.follow(submission.run_id, request.user, public=public_mode))
+            if submission.turn_id:
+                body = submissions.replay(submission, request.user, public=public_mode)
+                return EventStreamResponse(iter([_sse("done", body)]))
+            return submissions.pending(submission)
         if queued:
             # Answered by a worker; this response only follows its journal,
             # so a disconnect unsubscribes and nothing else (IR-544).
@@ -443,8 +476,13 @@ class ChatStreamView(APIView):
                 run = durable.submit(
                     prepared, request.user, request.data,
                     max_sources=_parse_top_k(request.data.get("top_k")),
+                    submission=submission,
                 )
             except durable.Busy as busy:
+                # Nothing was admitted or sent. The same identity may safely
+                # try queue admission again once capacity is available.
+                if submission is not None:
+                    submission.delete()
                 # Refused before anything was queued (IR-545): an explicit
                 # busy status, not a run that would wait past its deadline.
                 return Response(
@@ -454,15 +492,26 @@ class ChatStreamView(APIView):
                     headers={"Retry-After": "5"},
                 )
             if run is None:
+                if submission is not None:
+                    submission.delete()
                 return Response(
                     {"detail": "IRIS is still answering your previous question in this conversation."},
                     status=status.HTTP_409_CONFLICT,
                 )
             return EventStreamResponse(durable.follow(run.pk, request.user, public=public_mode))
 
-        orchestrator = ChatOrchestrator(
-            prepared, max_sources=_parse_top_k(request.data.get("top_k"))
-        )
+        try:
+            prepared, error = prepare_ask(request.data, request.user)
+            if error is not None:
+                submissions.finish(submission)
+                return error
+            prepared = submissions.bind(prepared, submission)
+            orchestrator = ChatOrchestrator(
+                prepared, max_sources=_parse_top_k(request.data.get("top_k"))
+            )
+        except Exception:
+            submissions.finish(submission)
+            raise
 
         def event_source():
             # The orchestrator records the Turn before `Done` reaches here,
@@ -470,18 +519,21 @@ class ChatStreamView(APIView):
             # Closed explicitly, so a run never waits on garbage collection.
             events = orchestrator.answer_stream(request.user)
             projector = public_protocol.StreamProjector()
-            with closing(events):
-                for event in events:
-                    if isinstance(event, Done):
-                        body = (public_body if public_mode else done_body)(
-                            prepared, orchestrator, event.answer)
-                    else:
-                        body = event_payload(event)
-                    if not public_mode:
-                        yield _sse(event.name, body)
-                        continue
-                    for name, data in projector.feed(event.name, body):
-                        yield _sse(name, data)
+            try:
+                with closing(events):
+                    for event in events:
+                        if isinstance(event, Done):
+                            body = (public_body if public_mode else done_body)(
+                                prepared, orchestrator, event.answer)
+                        else:
+                            body = event_payload(event)
+                        if not public_mode:
+                            yield _sse(event.name, body)
+                            continue
+                        for name, data in projector.feed(event.name, body):
+                            yield _sse(name, data)
+            finally:
+                submissions.finish(submission)
 
         return EventStreamResponse(event_source())
 
