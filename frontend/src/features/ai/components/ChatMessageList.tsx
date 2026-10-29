@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/types/chat";
-import type { StreamingState } from "../hooks/useAskStream";
+import type { StreamingState } from "../conversation/answerStream";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AssistantMessageSkeleton } from "./AssistantMessageSkeleton";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
@@ -26,6 +26,10 @@ interface ChatMessageListProps {
   onRetry?:           (message: ChatMessage) => void;
   /** Cancel the queued run in flight (IR-548). */
   onStop?:            () => void;
+  /** The answer whose sources are showing (IR-562). */
+  selectedId?:        string | null;
+  /** Show the sources of `message` rather than another answer's. */
+  onSelectSources?:   (message: ChatMessage) => void;
 }
 
 export function ChatMessageList({
@@ -37,6 +41,8 @@ export function ChatMessageList({
   indexedRecords = null,
   onRetry,
   onStop,
+  selectedId = null,
+  onSelectSources,
 }: ChatMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -87,7 +93,14 @@ export function ChatMessageList({
       {/* One shared column with ChatInput below it -- see CHAT_COLUMN. */}
       <div className={`${CHAT_COLUMN} space-y-6`}>
         {messages.map((m) => (
-          <ChatMessageBubble key={m.id} message={m} retryDisabled={isLoading} onRetry={onRetry} />
+          <ChatMessageBubble
+            key={m.id}
+            message={m}
+            retryDisabled={isLoading}
+            onRetry={onRetry}
+            sourcesSelected={m.id === selectedId}
+            onSelectSources={onSelectSources}
+          />
         ))}
         {isLoading && (streaming ? <StreamingMessageBubble state={streaming} onStop={onStop} /> : <AssistantMessageSkeleton />)}
         <div ref={bottomRef} />
