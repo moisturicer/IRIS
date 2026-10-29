@@ -234,15 +234,20 @@ def add_reviewer(assignment, holder, reviewer) -> ReviewerSeat:
     return seat
 
 
-def _member_options(assignment) -> dict:
-    """Every active member of `assignment`'s office, marked `seated` when they hold a live seat."""
+def office_members(party):
+    """Every active member of the office `party`, by name."""
     from django.contrib.auth import get_user_model
 
-    roles = [role for role, party in OFFICE_PARTY_BY_ROLE.items() if str(party) == str(assignment.party)]
-    seated = set(_live_seats(assignment).values_list("reviewer_id", flat=True))
-    members = get_user_model().objects.filter(
+    roles = [role for role, office in OFFICE_PARTY_BY_ROLE.items() if str(office) == str(party)]
+    return get_user_model().objects.filter(
         is_active=True, role__name__in=roles,
     ).order_by("last_name", "first_name", "pk")
+
+
+def _member_options(assignment) -> dict:
+    """Every active member of `assignment`'s office, marked `seated` when they hold a live seat."""
+    seated = set(_live_seats(assignment).values_list("reviewer_id", flat=True))
+    members = office_members(assignment.party)
     return {
         "assignment": assignment.pk,
         "party": str(assignment.party),
@@ -347,18 +352,27 @@ def withdraw(seat, coordinator) -> ReviewerSeat:
 
 
 @transaction.atomic
-def reassign(seat, coordinator, reviewer) -> ReviewerSeat:
-    """A coordinator moves an unfinished seat to another member. Returns the new seat."""
+def reassign(seat, coordinator, reviewer, *, reason) -> ReviewerSeat:
+    """
+    A coordinator moves an unfinished seat to another member. Returns the new
+    seat, which keeps the reason and the seat it replaced (IR-623): the
+    reviewer who lost it reads why on the Review timeline.
+    """
     assignment = _locked(seat.assignment)
     seat = ReviewerSeat.objects.select_for_update().get(pk=seat.pk)
     require_coordinator(coordinator, seat.assignment.party)
     _require_active(assignment)
     _require_open(seat)
+    if not isinstance(reason, str) or not reason.strip():
+        raise SeatError("Give a reason for the reassignment.")
     if seat.reviewer_id == reviewer.pk:
         raise SeatError(f"{_name(reviewer)} already holds this seat.")
     seat.state = SeatState.WITHDRAWN
     seat.save(update_fields=["state"])
     new_seat = _seat(assignment, reviewer, source=SeatSource.ASSIGNED, by=coordinator)
+    new_seat.reassigned_from = seat
+    new_seat.reason = reason.strip()
+    new_seat.save(update_fields=["reassigned_from", "reason"])
     audit.seat_moved(AuditEvent.SEAT_REASSIGNED, new_seat, coordinator, previous=seat)
     return new_seat
 

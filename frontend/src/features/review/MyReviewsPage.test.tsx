@@ -225,6 +225,18 @@ describe("MyReviewsPage", () => {
     expect(screen.getByLabelText("Location")).toHaveValue("/review?office=itso");
   });
 
+  it("links a coordinator, and only a coordinator, to their office's console (IR-623)", async () => {
+    show();
+    await screen.findByRole("tablist", { name: "My Reviews" });
+    expect(screen.queryByRole("link", { name: "ITSO console" })).not.toBeInTheDocument();
+  });
+
+  it("puts the console link where a coordinator lands", async () => {
+    signIn(true);
+    show();
+    expect(await screen.findByRole("link", { name: "ITSO console" })).toHaveAttribute("href", "/review/office");
+  });
+
   it("translates an old Review Queue bookmark once", async () => {
     show("/review?status=declined");
     await waitFor(() => expect(screen.getByLabelText("Location")).toHaveValue("/review?tab=done"));

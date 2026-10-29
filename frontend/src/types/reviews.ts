@@ -66,3 +66,45 @@ export interface MyReviewsQuery {
   office?:  string | null;
   cursor?:  string | null;
 }
+
+/**
+ * One row of the coordinator console (`GET /reviews/office/`, IR-623): an
+ * unfinished seat, or (`kind: "pool"`) an assignment nobody holds yet. The
+ * due date and overdue state are the server's (ADR-043); nothing is worked
+ * out here.
+ */
+export interface OfficeConsoleRow {
+  key:              string;
+  kind:             "seat" | "pool";
+  record:           number;
+  title:            string;
+  assignment:       number;
+  seat:             number | null;
+  reviewer:         number | null;
+  reviewer_name:    string | null;
+  seat_state:       "assigned" | "in_review" | null;
+  seat_state_label: string | null;
+  /** When the office received the record: its clock's start. */
+  opened_at:        string;
+  due_at:           string | null;
+  original_due_at:  string | null;
+  is_overdue:       boolean;
+  /** Waiting on a requested document or on the author: the clock stands still. */
+  clock_paused:     boolean;
+  can_extend:       boolean;
+}
+
+/** One member's load in the console: every member, idle ones too. */
+export interface OfficeLoad {
+  reviewer: number;
+  name:     string;
+  open:     number;
+  overdue:  number;
+}
+
+export interface OfficeConsole {
+  office:       string;
+  office_label: string;
+  rows:         OfficeConsoleRow[];
+  load:         OfficeLoad[];
+}

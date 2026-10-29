@@ -355,6 +355,14 @@ REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
             data={"due_at": "2099-12-31T23:59:00+08:00", "reason": "Committee unavailable"},
         ),
     }),
+    # IR-623: the coordinator console names no object, so nothing is hidden:
+    # every signed-in caller but ITSO's coordinator is refused outright.
+    "reviews-office": Entry({
+        "GET": _case(
+            row(ANON, DENY, DENY, DENY, DENY, DENY, OK, DENY, DENY),
+            query={"office": "itso"},
+        ),
+    }),
 }
 
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
@@ -362,7 +370,7 @@ TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "documents": DOCUMENTS_APP,
 }
 
-# IR-619 adds one route while IR-616 still owns the rest of reviews. Partial
+# IR-619 and IR-623 add routes while IR-616 still owns the rest of reviews. Partial
 # declarations are fired and validated like full ones, but do not claim that
 # the app's remaining routes have been audited.
 PARTIAL: dict[str, dict[str, Entry | Shadowed]] = {"reviews": REVIEW_DEADLINES}

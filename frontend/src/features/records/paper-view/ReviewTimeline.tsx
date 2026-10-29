@@ -16,6 +16,8 @@ const KIND_ICON: Record<TimelineKind, string> = {
   revision_resolved: "fa-paper-plane",
   document_request: "fa-file-circle-plus",
   version: "fa-code-commit",
+  reassignment: "fa-people-arrows",
+  extension: "fa-calendar-plus",
 };
 
 /**

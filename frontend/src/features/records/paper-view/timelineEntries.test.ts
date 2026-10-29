@@ -288,6 +288,61 @@ describe("timelineEntries", () => {
     expect(entries[2].details).toEqual(["Revision · no manuscript"]);
   });
 
+  it("shows a coordinator's reassignment with who moved it and why (IR-623)", () => {
+    const entries = timelineEntries(
+      tracker({
+        reassignments: [{
+          seat: 9, party: "itso", label: "ITSO", from_name: "Maria Reyes", to_name: "Juan Santos",
+          by_name: "Cora Dinator", reason: "Maria is on leave.", at: "2026-09-06T08:00:00Z",
+        }],
+      }),
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: "reassignment",
+      act: "Reassigned from Maria Reyes to Juan Santos",
+      actor: "Cora Dinator",
+      party: "ITSO",
+      note: "Maria is on leave.",
+      at: "2026-09-06T08:00:00Z",
+    });
+  });
+
+  it("shows each due-date extension, by hand or by a document pause, in time order", () => {
+    const entries = timelineEntries(
+      tracker({
+        reviews: [review({ created_at: "2026-09-09T08:00:00Z" })],
+        assignment_deadline_history: [{
+          assignment: 3, party: "itso", label: "ITSO",
+          extensions: [
+            {
+              id: 1, previous_due_at: "2026-09-10T15:59:00Z", due_at: "2026-09-14T15:59:00Z",
+              reason: "Committee meets Monday.", system: false, actor: 4, actor_name: "Cora Dinator",
+              created_at: "2026-09-08T08:00:00Z",
+            },
+            {
+              id: 2, previous_due_at: "2026-09-14T15:59:00Z", due_at: "2026-09-16T15:59:00Z",
+              reason: "Document request pause: 2 working days.", system: true, actor: null,
+              actor_name: null, created_at: "2026-09-10T08:00:00Z",
+            },
+          ],
+        }],
+      }),
+    );
+
+    expect(entries.map((e) => [e.kind, e.act, e.actor, e.party])).toEqual([
+      ["extension", "Extended the due date", "Cora Dinator", "ITSO"],
+      ["review", "Approved", "Mara Santos", "ITSO"],
+      ["extension", "Due date moved for a document request", null, "ITSO"],
+    ]);
+    expect(entries[0].note).toBe("Committee meets Monday.");
+    expect(entries[0].details).toHaveLength(1);
+    expect(entries[0].details[0]).toMatch(/^Due .+, was .+$/);
+    // The system's own wording is a fact, not something anyone wrote.
+    expect(entries[2].note).toBeNull();
+  });
+
   it("tags no review written before versions, rather than invent v1", () => {
     const entries = timelineEntries(tracker({ reviews: [review({ version: null })], versions: null }));
 

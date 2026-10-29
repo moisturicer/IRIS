@@ -1,8 +1,9 @@
 from django.urls import path
-from .views import MyReviewsView, ReviewViewSet, RecordAuthPinViewSet
+from .views import MyReviewsView, OfficeConsoleView, ReviewViewSet, RecordAuthPinViewSet
 
 urlpatterns = [
     path("mine/",         MyReviewsView.as_view(),                     name="reviews-mine"),
+    path("office/",       OfficeConsoleView.as_view(),                 name="reviews-office"),
     path("submit/",        ReviewViewSet.as_view({"post": "submit"}),    name="reviews-submit"),
     path("resubmit/",      ReviewViewSet.as_view({"post": "resubmit"}),  name="reviews-resubmit"),
     path("analytics/",     ReviewViewSet.as_view({"get": "analytics"}),  name="reviews-analytics"),  # TODO M07 FR-M7-01

@@ -692,10 +692,36 @@ def _deadline_history(record, user, *, readable):
     from .deadlines import deadline_payload
 
     return [
-        {"assignment": a.pk, "party": a.party, "state": a.state,
+        {"assignment": a.pk, "party": a.party, "label": party_label(a.party, staff_viewer=False),
+         "state": a.state,
          "opened_at": _iso(a.opened_at), "clock_started_at": _iso(a.clock_started_at),
          **deadline_payload(a, user, readable=readable)}
-        for a in record.assignments.order_by("opened_at", "pk").prefetch_related("extensions")
+        for a in record.assignments.order_by("opened_at", "pk").prefetch_related("extensions__actor")
+    ]
+
+
+def _reassignments(record, *, staff: bool, readable: bool) -> list[dict]:
+    """
+    Every seat a coordinator reassigned (IR-623), oldest first. Who lost it,
+    who got it, who moved it and why are review content: `None` to a viewer
+    who may not read the review (IR-479). That one happened, for which
+    party, and when, is not.
+    """
+    return [
+        {
+            "seat": s.pk,
+            "party": s.assignment.party,
+            "label": party_label(s.assignment.party, staff_viewer=staff),
+            "from_name": _name(s.reassigned_from.reviewer) if readable else None,
+            "to_name": _name(s.reviewer) if readable else None,
+            "by_name": _name(s.assigned_by) if readable else None,
+            "reason": s.reason if readable else None,
+            "at": _iso(s.assigned_at),
+        }
+        for s in ReviewerSeat.objects.filter(
+            assignment__record=record, reassigned_from__isnull=False,
+        ).select_related("assignment", "reviewer", "assigned_by", "reassigned_from__reviewer")
+        .order_by("assigned_at", "pk")
     ]
 
 
@@ -753,6 +779,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
         # Review material, so `None` to a viewer who may not read the review.
         "versions": versions_payload(record) if readable else None,
         "resubmissions": _resubmissions(record, staff=staff, readable=readable),
+        "reassignments": _reassignments(record, staff=staff, readable=readable),
         "document_requests": (
             serialize_requests(record, user, requests_for(record)) if disclose_requests else None
         ),

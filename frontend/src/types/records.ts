@@ -614,6 +614,43 @@ export interface TrackerResubmission {
   resolved_by:  string | null;
 }
 
+/**
+ * A seat a coordinator moved to another member (IR-623). The names and the
+ * reason are null to a viewer who may not read the review (IR-479).
+ */
+export interface TrackerReassignment {
+  seat:      number;
+  party:     Party;
+  label:     string;
+  from_name: string | null;
+  to_name:   string | null;
+  by_name:   string | null;
+  reason:    string | null;
+  at:        string | null;
+}
+
+/** One movement of an assignment's due date (ADR-043 §6): by a coordinator, or by a document pause. */
+export interface DeadlineExtension {
+  id:              number;
+  previous_due_at: string;
+  due_at:          string;
+  /** Null, as `actor` is, to a viewer who may not read the review. */
+  reason:          string | null;
+  /** Moved by IRIS itself, for a document-request pause; no person did it. */
+  system:          boolean;
+  actor:           number | null;
+  actor_name:      string | null;
+  created_at:      string;
+}
+
+/** An assignment's due-date history on the tracker. Only what the timeline reads is typed. */
+export interface TrackerDeadlineHistory {
+  assignment: number;
+  party:      Party;
+  label:      string;
+  extensions: DeadlineExtension[];
+}
+
 export interface RecordTracker {
   record_id:             number;
   record_type:           string | null;
@@ -636,6 +673,10 @@ export interface RecordTracker {
   document_requests:     DocumentRequest[] | null;
   clearances:            RecordClearance[];
   resubmission:          RecordResubmission;
+  /** Coordinators' reassignments (IR-623). Optional: a fixture may leave it out. */
+  reassignments?:               TrackerReassignment[];
+  /** Every assignment's due date and its extensions (ADR-043, IR-619). */
+  assignment_deadline_history?: TrackerDeadlineHistory[];
 }
 
 export interface RecordFormData {
