@@ -43,6 +43,21 @@ class DiscoveryInterests(models.Model):
     revision = models.PositiveBigIntegerField(default=0)
 
 
+class DiscoveryDismissal(models.Model):
+    """A reader's "Not interested" in one Record, private to them (IR-576)."""
+
+    user = models.ForeignKey(
+        "accounts.User", on_delete=models.CASCADE, related_name="discovery_dismissals"
+    )
+    record = models.ForeignKey("Record", on_delete=models.CASCADE, related_name="+")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "record"], name="unique_discovery_dismissal"),
+        ]
+
+
 class DiscoveryFeedSnapshot(models.Model):
     """Frozen ordering for one reader; Record access is checked again on every page."""
 

@@ -120,6 +120,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-interests": Entry({
         "GET": _case(SIGNED_IN),
         "PUT": _case(SIGNED_IN, data={}),
+        "DELETE": _case(SIGNED_IN),
+    }),
+    # IR-576: dismiss only a readable Record; Undo deletes only one's own
+    # feedback and returns the same empty success for hidden or missing ids.
+    "record-not-interested": Entry({
+        "POST": _case(READS_RECORD, kwargs=RECORD, data={}),
+        "DELETE": _case(SIGNED_IN, kwargs=RECORD),
     }),
     "record-mine": Entry({"GET": _case(SIGNED_IN)}),
 

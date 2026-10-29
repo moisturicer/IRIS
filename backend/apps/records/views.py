@@ -927,14 +927,28 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         return Response({"years": list(years)})
 
-    @action(detail=False, methods=["get", "put"], url_path="interests")
+    @action(detail=False, methods=["get", "put", "delete"], url_path="interests")
     def interests(self, request):
-        """The signed-in reader's optional Classification and PSCED Areas."""
-        from .discovery import get_interests, put_interests
+        """The signed-in reader's optional Classification and PSCED Areas.
+        DELETE is "Reset my interests": Areas and Not interested both go (IR-576)."""
+        from .discovery import get_interests, put_interests, reset_interests
 
         if request.method == "PUT":
             return put_interests(request.user, request.data)
+        if request.method == "DELETE":
+            return reset_interests(request.user)
         return get_interests(request.user)
+
+    @action(detail=True, methods=["post", "delete"], url_path="not-interested")
+    def not_interested(self, request, pk=None):
+        """POST /records/<id>/not-interested/ hides it from the reader's For you;
+        DELETE is Undo (IR-576). Only a Record the reader can read is dismissed,
+        and undoing names nothing, so it answers 204 either way."""
+        from .discovery import dismiss, undo_dismissal
+
+        if request.method == "DELETE":
+            return undo_dismissal(request.user, pk)
+        return dismiss(request.user, self.get_object())
 
     @action(detail=False, methods=["get"], url_path="for-you")
     def for_you(self, request):

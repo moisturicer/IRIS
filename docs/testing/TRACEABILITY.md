@@ -8,6 +8,20 @@
 
 ---
 
+## IR-576 "Not interested" with Undo, and a reset for my interests
+
+**Design:** no ADR covers personal discovery. The behaviour follows the IR-557 spec text (user stories 6 and 7, metadata recipe step 1), building on IR-567's For you feed. Jira is not a requirements authority, so this gap is recorded here: an ADR for discovery feedback is still owed.
+
+- **Not interested:** `POST /records/<id>/not-interested/` stores one `DiscoveryDismissal` per reader and Record (migration `records/0019`). It goes through `get_object()`, so a Record the reader cannot read is a 404, the same as a missing one. A repeat answers 200 and adds nothing.
+- **Removed at once:** `_catalogue()` in `apps/records/discovery.py` leaves the reader's dismissals out, both when a snapshot is built and on every page. A page already frozen in a snapshot drops the Record and its cursor still works. A dismissal deliberately does not bump the interest revision: it removes one item and reorders nothing, so IR-557's "preference changes invalidate the snapshot" is applied to Undo and reset, not to dismissal.
+- **Undo:** `DELETE /records/<id>/not-interested/` removes the dismissal and bumps the interest revision. It does not look the Record up: it deletes only the requester's own row, so it confirms nothing about the Record, and Undo still works after the Record became unreadable. Every old cursor goes stale (409), so the Record comes back under a fresh snapshot rather than an old one. It answers 204 whether or not there was a dismissal.
+- **Reset my interests:** `DELETE /records/interests/` clears the chosen Areas and every dismissal, deletes the reader's snapshots and bumps the revision.
+- **Saves are separate:** saves, folders and stars stay in this browser's library (`lib/recordLibrary.ts`). Dismissing never writes there, and removing a paper from a folder never dismisses it. Feedback is stored per account on the server, so two accounts on one browser never share it.
+- **Interface:** For you cards only get a "Not interested" button. Discover then says the paper won't be recommended again and offers Undo for the latest dismissal; a failed dismissal puts the card back with an alert. Undo waits for the dismissal request to finish, and a page loaded while it is in flight leaves the card out, so a fast Undo or Load more cannot undo the removal. The Areas dialog has "Reset my interests" behind a confirmation that says saved papers and folders stay.
+
+**Tests:** `apps/records/test_discovery_feed.py` covers removal mid-pagination without a stale cursor, Undo under a fresh snapshot, the 404 for an unreadable Record, reset clearing Areas and feedback and staling cursors, and feedback private to each account. `DiscoverPage.test.tsx` "Not interested, Undo and reset (IR-576)" covers removal and Undo, a failed dismissal, no control on Latest, folders and stars untouched by a dismissal, removing from a folder not dismissing, and reset with confirmation and on failure.
+
+**Status:** IMPLEMENTED, tested. Not reviewed by a person yet. Saved Records do not yet feed For you; that is IR-575, which waits on ADR-044.
 ## IR-561 Paper Chat default reuse and idempotent sends
 
 **Design:** [ADR-019 implementation note](../adr/019-persisted-unified-conversation-history.md), implementing IR-552 story 13 while preserving IR-569's deferred creation.
