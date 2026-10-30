@@ -1337,9 +1337,9 @@ IR-589 records [ADR-042](../adr/042-general-tools-conversation-contract.md) as *
 
 **Evidence, 2026-10-15, local against a pgvector Postgres:** `test_catalogue_facets.py` **5 passed**; the Discover test files **45 passed**. Full runs: `npm test` **1090 passed, 4 failed**, and `pytest` **3799 passed, 5 failed**; none of the failures is in a file this change touches. Three of the frontend failures (`Sidebar.test.tsx`) fail identically on `main` without this change, and the fourth (`PaperAiOverview` polling) is a timing test that has failed on `main` before. Four backend failures are known (the IR-202 chunker flake, two `test_complete_authority` subtests and the proxy-audit hash pin). The fifth is `test_enum_vocabulary`, which `main` fails too: IR-347 made `open` and `missing` governed while IR-549's code uses them for other concepts. Lint 0 errors; build green. Scroll restoration is not exercised under jsdom, which has no layout.
 
-## IR-566: Saved Records and reading status follow the reader's account (ADR only, not built)
+## IR-566: Saved Records and reading status follow the reader's account (design accepted, not built)
 
-**Status.** Design proposed, not implemented. [ADR-044](../adr/044-account-backed-research-library.md) is **Proposed**. IR-566 is not labelled ready-for-agent until the ADR is accepted by a named person and its open questions are answered: Likes, reading history, and Calls & Conferences saves. No code, migration or test exists for it yet, so no requirement here is met.
+**Status.** Design accepted, not implemented. [ADR-044](../adr/044-account-backed-research-library.md) was **Accepted** on 2026-10-30 by Lee Jasmin Adolfo, with its product decisions answered: Likes are retired, reading history stays browser-only and is cleared on sign-out, and Calls & Conferences saves are out of scope. No code, migration or test exists for it yet, so no requirement here is met.
 
 ## IR-570: Ask IRIS on a phone: a full-width answer, with history and sources in drawers
 
