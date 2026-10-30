@@ -59,7 +59,7 @@ import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
-import { ReviewSection } from "./ReviewSection";
+import { ReviewWorkspace } from "./ReviewWorkspace";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
@@ -1206,7 +1206,7 @@ export default function PaperViewPage() {
             )}
 
             {section === "review" && (
-              <ReviewSection
+              <ReviewWorkspace
                 record={record}
                 can={can}
                 reader={sections.includes("paper") ? reader() : null}
