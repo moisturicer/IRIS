@@ -134,7 +134,7 @@ class ChangePasswordView(APIView):
             serializer.is_valid(raise_exception=True)
             set_password_and_invalidate(user, serializer.validated_data["new_password"], timezone.now())
         return Response({"detail": "Password changed. Sign in again with your new password.",
-                         "code": "password_changed"})
+                         "code": SessionEndReason.PASSWORD_CHANGED})
 
 
 class MeView(generics.RetrieveUpdateAPIView):

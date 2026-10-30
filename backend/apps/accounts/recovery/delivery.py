@@ -28,6 +28,7 @@ import smtplib
 from datetime import timedelta
 from datetime import timezone as dt_timezone
 
+from core.enums import RecoveryAuditOutcome
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.db import transaction
@@ -90,7 +91,7 @@ def deliver_recovery_intent(intent_id) -> None:
             return
         if intent.attempts >= settings.RECOVERY_MAIL_MAX_ATTEMPTS:
             _finish(intent, Status.FAILED, at)
-            audit.record(AuditEvent.RECOVERY_EMAIL_FAILED, purpose=intent.purpose, outcome="failed",
+            audit.record(AuditEvent.RECOVERY_EMAIL_FAILED, purpose=intent.purpose, outcome=RecoveryAuditOutcome.FAILED,
                          reason="attempts_exhausted", correlation_id=intent.correlation_id,
                          attempt=intent.attempts)
             logger.error("recovery mail for intent %s exhausted its attempts", intent_id)
@@ -135,7 +136,7 @@ def _issue(intent, at) -> None:
         _finish(intent, Status.EXPIRED, intent.expires_at)
         return
     if user is None or user.email != address or not is_eligible(user) or not _purpose_applies(user, intent.purpose):
-        audit.record(AuditEvent.RECOVERY_SUPPRESSED, purpose=intent.purpose, outcome="suppressed",
+        audit.record(AuditEvent.RECOVERY_SUPPRESSED, purpose=intent.purpose, outcome=RecoveryAuditOutcome.SUPPRESSED,
                      reason="not_eligible", correlation_id=intent.correlation_id)
         _finish(intent, Status.INELIGIBLE, at)
         return
@@ -221,7 +222,7 @@ def _record_sent(intent_id, attempt) -> None:
         if intent.status != Status.ISSUED or intent.attempts != attempt:
             return
         _finish(intent, Status.SENT, at)
-        audit.record(AuditEvent.RECOVERY_EMAIL_SENT, purpose=intent.purpose, outcome="sent",
+        audit.record(AuditEvent.RECOVERY_EMAIL_SENT, purpose=intent.purpose, outcome=RecoveryAuditOutcome.SENT,
                      correlation_id=intent.correlation_id, attempt=attempt)
 
 
@@ -238,9 +239,9 @@ def _record_failure(intent_id, attempt, *, permanent) -> None:
             intent.save(update_fields=["next_attempt_at", "lease_until"])
             transaction.on_commit(lambda: service.enqueue(intent_id, countdown=delay))
             return
-        reason = "rejected" if permanent else "attempts_exhausted"
+        reason = RecoveryAuditOutcome.REJECTED if permanent else "attempts_exhausted"
         _finish(intent, Status.FAILED, at)
-        audit.record(AuditEvent.RECOVERY_EMAIL_FAILED, purpose=intent.purpose, outcome="failed",
+        audit.record(AuditEvent.RECOVERY_EMAIL_FAILED, purpose=intent.purpose, outcome=RecoveryAuditOutcome.FAILED,
                      reason=reason, correlation_id=intent.correlation_id, attempt=attempt)
     # The internal alert ADR-045 §6 asks for: aggregate-safe, no payload.
     logger.error("recovery mail for intent %s failed for good (%s)", intent_id, reason)

@@ -9,6 +9,7 @@ timing and its side effects the same for every address.
 import logging
 from datetime import timedelta
 
+from core.enums import RecoveryAuditOutcome
 from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
@@ -54,7 +55,7 @@ def admit_request(purpose: str, address: str) -> None:
     with transaction.atomic():
         if limits.admit(f"rcpt:{recipient}", limits.recipient_windows(), at) is not None:
             audit.record(AuditEvent.RECOVERY_SUPPRESSED, purpose=purpose,
-                         outcome="suppressed", reason="recipient_limit")
+                         outcome=RecoveryAuditOutcome.SUPPRESSED, reason="recipient_limit")
             return
 
         generation = None
@@ -80,7 +81,7 @@ def admit_request(purpose: str, address: str) -> None:
             created_at=at, next_attempt_at=at,
             expires_at=at + timedelta(seconds=settings.RECOVERY_INTENT_TTL_SECONDS),
         )
-        audit.record(AuditEvent.RECOVERY_REQUESTED, purpose=purpose, outcome="admitted",
+        audit.record(AuditEvent.RECOVERY_REQUESTED, purpose=purpose, outcome=RecoveryAuditOutcome.ADMITTED,
                      correlation_id=intent.correlation_id)
         transaction.on_commit(lambda: enqueue(intent.pk))
 
@@ -157,7 +158,7 @@ def _consume_reset(raw_token, new_password, confirm_password):
         at = clock.now()
         if user is None or token is None or not usable(token, user, purpose, at):
             audit.record(AuditEvent.RECOVERY_TOKEN_REJECTED, purpose=purpose,
-                         outcome="rejected", reason="invalid_link")
+                         outcome=RecoveryAuditOutcome.REJECTED, reason="invalid_link")
             return InvalidLink
 
         errors = password_errors(user, new_password, confirm_password)
@@ -168,7 +169,7 @@ def _consume_reset(raw_token, new_password, confirm_password):
         token.save(update_fields=["consumed_at"])
         set_password_and_invalidate(user, new_password, at)
         correlation_id = token.intent.correlation_id if token.intent_id else None
-        audit.record(AuditEvent.PASSWORD_RESET_COMPLETED, purpose=purpose, outcome="completed",
+        audit.record(AuditEvent.PASSWORD_RESET_COMPLETED, purpose=purpose, outcome=RecoveryAuditOutcome.COMPLETED,
                      correlation_id=correlation_id, user=user)
         user_id = user.pk
         transaction.on_commit(lambda: notify_password_changed(user_id))

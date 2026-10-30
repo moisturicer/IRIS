@@ -1737,3 +1737,11 @@ Both final agent review axes reported no remaining blocking finding. Browser
 visual/zoom checks remain unverified because automatic approval review blocked
 launching Chrome. Agent review is not human approval; no production deployment
 or final requirement sign-off is claimed.
+
+CI run `41041230876` exposed three integration-guard failures alongside
+4,735 passing backend tests: the new public routes lacked access-matrix rows,
+and recovery literals collided with governed workflow vocabulary. The repair
+declares both routes public under ADR-045 and centralizes the distinct recovery
+enums in `core.enums`, preserving stored/wire values. Guard assertions were not
+changed. The focused route/vocabulary checks passed **10 tests and 2 subtests**;
+static checks passed. Final full-suite results are recorded on the PR.

@@ -390,6 +390,12 @@ ACCOUNTS = {
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # ADR-045: both recovery endpoints are anonymous and ignore incidental
+    # credentials. Confirmation checks the link, not the caller's role.
+    "password-reset-request": Entry({"POST": _case(PUBLIC, data={"email": "unknown@cit.edu"})}),
+    "password-reset-confirm": Entry({"POST": _case(PUBLIC, data={
+        "token": "x" * 43, "new_password": "Recovery-test-42", "confirm_password": "Recovery-test-42",
+    })}),
     "user-list": Entry({"GET": _case(RDCO_ONLY)}),
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
