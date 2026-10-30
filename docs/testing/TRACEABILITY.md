@@ -1745,3 +1745,14 @@ Axes now receives Django's underlying request and reads the supplied username cr
 `eval_scenarios --workers` writes measured/not_measured results, distinguishes provider/worker/browser evidence and blocks enablement on failures or missing exercises. `evaluation/tests/test_scenarios.py` verifies that skipped/absent checks never pass and diagnostics never enter the report. See the IR-608 PR for executed results and remaining browser measurements.
 
 IR-608 CI security follow-up: scenario JUnit XML uses `defusedxml`; `test_xml_entities_are_rejected_as_unmeasured` verifies entity expansion and external entities cannot enter measured evidence.
+
+## IR-609 — comparable campaigns and the evaluation report
+
+Authority: IR-609 under IR-605, ADR-042 and the general-tools evaluation contract. Additive to the IR-598 scorer, which is reused unchanged.
+
+- Preflight (`evaluation/campaign_report.py`): stale or missing lock, draft labels (counted), incomplete manifests, duplicate run/case/Conversation ids, unequal corpus/model/data-policy/limits, wrong engine or protocol per arm, two arms on one implementation, fewer than three repetitions (counted). Tests: `test_campaign_report.py` preflight section.
+- Smoke and spend: per-operation physical spend, unreported usage at reservation and never zero, cold/warm apart, price basis, cap coverage. Tests: spend and smoke sections, hand-worked figures.
+- Report: per-repetition scores with own denominators, family `INCONCLUSIVE`/`unreviewed`, breach and unreviewed-family blocking, unmeasured arms and IR-608 scenarios, examples, exclusions, approvals, proxy-corpus statement; counted reports refuse a lowered family minimum. Tests: report section and `test_campaign_command.py`.
+- Held-out gate: `eval_replay_conversations --held-out` needs `locked_at` and frozen thresholds (now written into every lock), and recorded approvals for real providers. Tests: `test_campaign_command.py`.
+
+**Executed evidence (2026-10-30, Windows, local Postgres):** `python -m pytest apps/ai/evaluation/tests/test_campaign_report.py apps/ai/evaluation/tests/test_campaign_command.py`: 52 passed. `flake8` on the touched modules: clean. `python manage.py eval_campaign --smoke <fixture smoke run> --case-cost-usd 0.1 --campaign-cost-usd 2 --planned-cases 20` ran from the CLI and reported `not ready` (fake providers, one turn with missing usage), as expected. The full backend suite's failures were compared file by file against a clean `origin/main` worktree: none is added by this change. Pre-existing failures come from the local `.env` (inference profiles), `core.autocrlf` (proxy audit digest) and an uncommitted engine switch in the author's checkout. No campaign was run and no quality claim is made.

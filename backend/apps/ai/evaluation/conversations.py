@@ -15,6 +15,8 @@ from collections import Counter
 from datetime import datetime
 from typing import Any, Mapping
 
+from .conversation_scoring import TARGETS
+
 SCHEMA_VERSION = 1
 FAMILIES = tuple(f"A{i:02d}" for i in range(1, 16))
 SPLITS = ("development", "held_out")
@@ -52,7 +54,8 @@ def lock_record(data: Mapping[str, Any]) -> dict[str, Any]:
     digests = split_digests(data)
     return {"set_id": data.get("set_id"), "development": digests["development"],
             "held_out": digests["held_out"], "corpus": _digest(data.get("corpus")),
-            "rubric_version": data.get("rubric_version", RUBRIC_VERSION)}
+            "rubric_version": data.get("rubric_version", RUBRIC_VERSION),
+            "thresholds": dict(TARGETS)}
 
 
 LOCK_KEYS = ("set_id", "development", "held_out", "corpus", "rubric_version")

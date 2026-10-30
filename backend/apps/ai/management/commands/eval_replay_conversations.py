@@ -16,6 +16,8 @@ from rest_framework.test import APIClient
 from apps.ai.admission.limits import ENFORCE, mode, read_limits
 from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.controller import versions
+from apps.ai.evaluation.campaign_report import (CampaignRefused, require_frozen_for_held_out,
+                                                require_paid_held_out)
 from apps.ai.evaluation.conversations import check_lock, split_digests, validate_set
 from apps.ai.evaluation.replay import CampaignAttempts, ResearchDiagnostics, collect_run
 from apps.ai.evaluation.runfile import eval_token, file_digest, load_json, write_run
@@ -50,6 +52,10 @@ class Command(BaseCommand):
         parser.add_argument("--smoke", action="store_true",
                             help="Require exactly one development case and fake providers.")
         parser.add_argument("--approval-id", help="Recorded paid campaign approval ID.")
+        parser.add_argument("--held-out", action="store_true",
+                            help="Open held-out cases; needs a frozen lock (IR-609).")
+        parser.add_argument("--approvals", help="Recorded approvals; required for paid "
+                            "held-out collection.")
         parser.add_argument("--data-policy", default="deterministic-fake-local")
         parser.add_argument("--case-attempts", type=int, default=10)
         parser.add_argument("--case-cost-usd", type=float)
@@ -61,23 +67,34 @@ class Command(BaseCommand):
         report = validate_set(data, min_conversations=0)
         if report["errors"]:
             raise CommandError("invalid set: " + "; ".join(report["errors"]))
-        mismatches = check_lock(data, load_json(options["lock"]))
+        lock = load_json(options["lock"])
+        mismatches = check_lock(data, lock)
         if mismatches:
             raise CommandError("set lock mismatch: " + ", ".join(mismatches))
+        split = "held_out" if options["held_out"] else "development"
+        if options["held_out"]:
+            try:
+                require_frozen_for_held_out(data, lock)
+                if options["providers"] == "real":
+                    require_paid_held_out(load_json(options["approvals"])
+                                          if options["approvals"] else None)
+            except CampaignRefused as exc:
+                raise CommandError(str(exc)) from None
         selected = []
         by_id = {case["id"]: case for case in data["conversations"]}
         for case_id in options["case"]:
             case = by_id.get(case_id)
-            if case is None or case["split"] != "development":
-                raise CommandError(f"{case_id}: select a development case")
+            if case is None or case["split"] != split:
+                raise CommandError(f"{case_id}: select a {split.replace('_', '-')} case")
             if case_id in [item["id"] for item in selected]:
                 raise CommandError(f"{case_id}: duplicate case")
             selected.append(case)
         if options["case_attempts"] < 1 or (options["case_cost_usd"] is not None and
                                               options["case_cost_usd"] <= 0):
             raise CommandError("case caps must be positive")
-        if options["smoke"] and (len(selected) != 1 or options["providers"] != "fake"):
-            raise CommandError("--smoke requires one case and fake providers")
+        if options["smoke"] and (len(selected) != 1 or options["providers"] != "fake"
+                                 or options["held_out"]):
+            raise CommandError("--smoke requires one development case and fake providers")
         engine = versions.NEW_RUN_ENGINE
         arm = options["arm"] or ("controller" if engine == versions.CONTROLLER_ENGINE
                                  else "current")
@@ -181,7 +198,7 @@ class Command(BaseCommand):
                               model_profiles=safe_profiles,
                               partition_method=data.get("partition_method"),
                               retrieval=retrieval, pricing=pricing,
-                              arm=arm, engine_version=engine,
+                              arm=arm, engine_version=engine, split=split,
                               diagnostics=ResearchDiagnostics())
         run["manifest"]["set_sha256"] = corpus["set_sha256"]
         path = write_run(options["out"], f"IR-606-replay-{run['run_id']}", run)
