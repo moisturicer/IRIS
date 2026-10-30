@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 import pytest
 from django.core.handlers.asgi import ASGIHandler
 from django.urls import reverse
-from rest_framework_simplejwt.tokens import AccessToken
+from apps.accounts.sessions import start_session
 
 from apps.ai.answers.citations import NO_SOURCES, GroundedAnswer
 from apps.ai.answers.events import AgentStep, Done, RetrievalStarted
@@ -89,7 +89,7 @@ def slow_research(monkeypatch):
 
 
 def test_concurrent_research_streams_stream_and_do_not_block_other_requests(slow_research):
-    token = str(AccessToken.for_user(make_user("asgi@cit.edu"))).encode()
+    token = str(start_session(make_user("asgi@cit.edu")).access_token).encode()
 
     async def scenario():
         handler = ASGIHandler()
@@ -116,7 +116,7 @@ def test_concurrent_research_streams_stream_and_do_not_block_other_requests(slow
 
 
 def test_a_reader_leaving_closes_the_run_on_its_own_thread(monkeypatch):
-    token = str(AccessToken.for_user(make_user("leave@cit.edu"))).encode()
+    token = str(start_session(make_user("leave@cit.edu")).access_token).encode()
     closed, release = threading.Event(), threading.Event()
 
     class Orchestrator:
