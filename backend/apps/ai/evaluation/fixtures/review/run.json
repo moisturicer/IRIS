@@ -1,0 +1,371 @@
+{
+  "schema_version": 1,
+  "run_id": "fixture-run",
+  "arm": "controller",
+  "providers": "fake",
+  "capacity_fit": false,
+  "manifest": {
+    "run_id": "fixture-run",
+    "timestamp_utc": "2026-10-30T00:00:00+00:00",
+    "set_id": "ir607-review-fixture",
+    "set_digests": {
+      "development": "046f0c83e26cdc51b6fb89e1f3275cf7a16ac94bc9de2dff8d649ed50be5a6e0",
+      "held_out": "1abc0ac78d0ae8bdc912d95d5b5b89937e2b8eb23ac926ee725ec5f06b1e3baa"
+    },
+    "corpus_snapshot_digest": "fixture",
+    "model_ids": {
+      "answer": "scripted"
+    },
+    "data_policy": "deterministic-fake-local",
+    "limits": {
+      "case_attempts": 2
+    },
+    "rubric_version": 1,
+    "campaign_approval_id": null
+  },
+  "conversations": [
+    {
+      "id": "R01",
+      "family": "A01",
+      "split": "development",
+      "conversation_id": 100,
+      "status": "complete",
+      "cache": "cold",
+      "latency_ms": 10,
+      "cost": 0.0,
+      "physical_attempts": 0,
+      "cost_final": true,
+      "turns": [
+        {
+          "number": 1,
+          "question": "Question for R01",
+          "outcome": "answered",
+          "public_answer": {
+            "answer": "Answer for R01 [1].",
+            "citations": [
+              {
+                "record_id": 100,
+                "page": 2,
+                "quote": "a quoted line"
+              }
+            ],
+            "sources": [
+              {
+                "id": 100
+              }
+            ]
+          },
+          "citation_record_ids": [
+            100
+          ],
+          "source_ids": [
+            100
+          ],
+          "saved_turn": null,
+          "reopened_transcript": null,
+          "latency_ms": 10,
+          "physical_attempts": [],
+          "usage_status": "missing",
+          "diagnostics": {
+            "stage": "answered"
+          }
+        }
+      ],
+      "reopened_transcript": []
+    },
+    {
+      "id": "R02",
+      "family": "A01",
+      "split": "development",
+      "conversation_id": 101,
+      "status": "complete",
+      "cache": "cold",
+      "latency_ms": 10,
+      "cost": 0.0,
+      "physical_attempts": 0,
+      "cost_final": true,
+      "turns": [
+        {
+          "number": 1,
+          "question": "Question for R02",
+          "outcome": "answered",
+          "public_answer": {
+            "answer": "Answer for R02 [1].",
+            "citations": [
+              {
+                "record_id": 101,
+                "page": 2,
+                "quote": "a quoted line"
+              }
+            ],
+            "sources": [
+              {
+                "id": 101
+              }
+            ]
+          },
+          "citation_record_ids": [
+            101
+          ],
+          "source_ids": [
+            101
+          ],
+          "saved_turn": null,
+          "reopened_transcript": null,
+          "latency_ms": 10,
+          "physical_attempts": [],
+          "usage_status": "missing",
+          "diagnostics": {
+            "stage": "answered"
+          }
+        }
+      ],
+      "reopened_transcript": []
+    },
+    {
+      "id": "R03",
+      "family": "A10",
+      "split": "development",
+      "conversation_id": 102,
+      "status": "complete",
+      "cache": "cold",
+      "latency_ms": 10,
+      "cost": 0.0,
+      "physical_attempts": 0,
+      "cost_final": true,
+      "turns": [
+        {
+          "number": 1,
+          "question": "Question for R03",
+          "outcome": "answered",
+          "public_answer": {
+            "answer": "Answer for R03 [1].",
+            "citations": [
+              {
+                "record_id": 102,
+                "page": 2,
+                "quote": "a quoted line"
+              }
+            ],
+            "sources": [
+              {
+                "id": 102
+              }
+            ]
+          },
+          "citation_record_ids": [
+            102
+          ],
+          "source_ids": [
+            102
+          ],
+          "saved_turn": null,
+          "reopened_transcript": null,
+          "latency_ms": 10,
+          "physical_attempts": [],
+          "usage_status": "missing",
+          "diagnostics": {
+            "stage": "answered"
+          }
+        }
+      ],
+      "reopened_transcript": []
+    },
+    {
+      "id": "R04",
+      "family": "A02",
+      "split": "development",
+      "conversation_id": 103,
+      "status": "complete",
+      "cache": "cold",
+      "latency_ms": 10,
+      "cost": 0.0,
+      "physical_attempts": 0,
+      "cost_final": true,
+      "turns": [
+        {
+          "number": 1,
+          "question": "Question for R04",
+          "outcome": "answered",
+          "public_answer": {
+            "answer": "Answer for R04 [1].",
+            "citations": [
+              {
+                "record_id": 103,
+                "page": 2,
+                "quote": "a quoted line"
+              }
+            ],
+            "sources": [
+              {
+                "id": 103
+              }
+            ]
+          },
+          "citation_record_ids": [
+            103
+          ],
+          "source_ids": [
+            103
+          ],
+          "saved_turn": null,
+          "reopened_transcript": null,
+          "latency_ms": 10,
+          "physical_attempts": [],
+          "usage_status": "missing",
+          "diagnostics": {
+            "stage": "answered"
+          }
+        }
+      ],
+      "reopened_transcript": []
+    },
+    {
+      "id": "R05",
+      "family": "A09",
+      "split": "development",
+      "conversation_id": 104,
+      "status": "complete",
+      "cache": "cold",
+      "latency_ms": 10,
+      "cost": 0.0,
+      "physical_attempts": 0,
+      "cost_final": true,
+      "turns": [
+        {
+          "number": 1,
+          "question": "Question for R05",
+          "outcome": "answered",
+          "public_answer": {
+            "answer": "Answer for R05 [1].",
+            "citations": [
+              {
+                "record_id": 104,
+                "page": 2,
+                "quote": "a quoted line"
+              }
+            ],
+            "sources": [
+              {
+                "id": 104
+              }
+            ]
+          },
+          "citation_record_ids": [
+            104
+          ],
+          "source_ids": [
+            104
+          ],
+          "saved_turn": null,
+          "reopened_transcript": null,
+          "latency_ms": 10,
+          "physical_attempts": [],
+          "usage_status": "missing",
+          "diagnostics": {
+            "stage": "candidates_then_no_results"
+          }
+        }
+      ],
+      "reopened_transcript": []
+    },
+    {
+      "id": "R06",
+      "family": "A09",
+      "split": "development",
+      "conversation_id": 105,
+      "status": "complete",
+      "cache": "cold",
+      "latency_ms": 10,
+      "cost": 0.0,
+      "physical_attempts": 0,
+      "cost_final": true,
+      "turns": [
+        {
+          "number": 1,
+          "question": "Question for R06",
+          "outcome": "answered",
+          "public_answer": {
+            "answer": "Answer for R06 [1].",
+            "citations": [
+              {
+                "record_id": 105,
+                "page": 2,
+                "quote": "a quoted line"
+              }
+            ],
+            "sources": [
+              {
+                "id": 105
+              }
+            ]
+          },
+          "citation_record_ids": [
+            105
+          ],
+          "source_ids": [
+            105
+          ],
+          "saved_turn": null,
+          "reopened_transcript": null,
+          "latency_ms": 10,
+          "physical_attempts": [],
+          "usage_status": "missing",
+          "diagnostics": {
+            "stage": "answered"
+          }
+        }
+      ],
+      "reopened_transcript": []
+    },
+    {
+      "id": "R07",
+      "family": "A09",
+      "split": "development",
+      "conversation_id": 106,
+      "status": "complete",
+      "cache": "cold",
+      "latency_ms": 10,
+      "cost": 0.0,
+      "physical_attempts": 0,
+      "cost_final": true,
+      "turns": [
+        {
+          "number": 1,
+          "question": "Question for R07",
+          "outcome": "answered",
+          "public_answer": {
+            "answer": "Answer for R07 [1].",
+            "citations": [
+              {
+                "record_id": 106,
+                "page": 2,
+                "quote": "a quoted line"
+              }
+            ],
+            "sources": [
+              {
+                "id": 106
+              }
+            ]
+          },
+          "citation_record_ids": [
+            106
+          ],
+          "source_ids": [
+            106
+          ],
+          "saved_turn": null,
+          "reopened_transcript": null,
+          "latency_ms": 10,
+          "physical_attempts": [],
+          "usage_status": "missing",
+          "diagnostics": {
+            "stage": "provider_failure"
+          }
+        }
+      ],
+      "reopened_transcript": []
+    }
+  ]
+}

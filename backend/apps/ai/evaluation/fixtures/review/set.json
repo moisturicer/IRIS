@@ -1,0 +1,178 @@
+{
+  "schema_version": 1,
+  "set_id": "ir607-review-fixture",
+  "label_status": "human_reviewed",
+  "labelled_by": [
+    "Fixture Labeller"
+  ],
+  "corpus": {
+    "snapshot_id": "fixture",
+    "paper_set_sha256": "fixture"
+  },
+  "notes": "Development fixture for IR-607. 'Fixture Labeller' is not a person; nothing scored from it is counted.",
+  "conversations": [
+    {
+      "id": "R01",
+      "family": "A01",
+      "split": "development",
+      "topic": "topic R01",
+      "papers": [
+        "Paper One"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Question for R01",
+          "intended_task": "answer",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": null
+        }
+      ]
+    },
+    {
+      "id": "R02",
+      "family": "A01",
+      "split": "development",
+      "topic": "topic R02",
+      "papers": [
+        "Paper Two"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Question for R02",
+          "intended_task": "answer",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": null
+        }
+      ]
+    },
+    {
+      "id": "R03",
+      "family": "A10",
+      "split": "development",
+      "topic": "topic R03",
+      "papers": [
+        "Paper Three"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Question for R03",
+          "intended_task": "answer",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": null
+        }
+      ]
+    },
+    {
+      "id": "R04",
+      "family": "A02",
+      "split": "development",
+      "topic": "topic R04",
+      "papers": [
+        "Paper Four"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Question for R04",
+          "intended_task": "answer",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": null
+        }
+      ]
+    },
+    {
+      "id": "R05",
+      "family": "A09",
+      "split": "development",
+      "topic": "topic R05",
+      "papers": [
+        "Paper Five"
+      ],
+      "supported_unambiguous": false,
+      "turns": [
+        {
+          "user": "Question for R05",
+          "intended_task": "answer",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": null
+        }
+      ],
+      "a09_case": "no_match"
+    },
+    {
+      "id": "R06",
+      "family": "A09",
+      "split": "development",
+      "topic": "topic R06",
+      "papers": [
+        "Paper Six"
+      ],
+      "supported_unambiguous": false,
+      "turns": [
+        {
+          "user": "Question for R06",
+          "intended_task": "answer",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": null
+        }
+      ],
+      "a09_case": "missing_field"
+    },
+    {
+      "id": "R07",
+      "family": "A09",
+      "split": "development",
+      "topic": "topic R07",
+      "papers": [
+        "Paper Seven"
+      ],
+      "supported_unambiguous": false,
+      "turns": [
+        {
+          "user": "Question for R07",
+          "intended_task": "answer",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": null
+        }
+      ],
+      "a09_case": "outage"
+    },
+    {
+      "id": "H01",
+      "family": "A01",
+      "split": "held_out",
+      "topic": "topic H01",
+      "papers": [
+        "Held Paper"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Question for H01",
+          "intended_task": "answer",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": null
+        }
+      ]
+    }
+  ]
+}

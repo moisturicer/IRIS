@@ -17,7 +17,7 @@ from apps.ai.admission.limits import ENFORCE, mode, read_limits
 from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.controller import versions
 from apps.ai.evaluation.conversations import check_lock, split_digests, validate_set
-from apps.ai.evaluation.replay import CampaignAttempts, collect_run
+from apps.ai.evaluation.replay import CampaignAttempts, ResearchDiagnostics, collect_run
 from apps.ai.evaluation.runfile import eval_token, file_digest, load_json, write_run
 from apps.ai.inference.profiles import profile_for
 from apps.ai.inference.tasks import InferenceTask
@@ -181,7 +181,8 @@ class Command(BaseCommand):
                               model_profiles=safe_profiles,
                               partition_method=data.get("partition_method"),
                               retrieval=retrieval, pricing=pricing,
-                              arm=arm, engine_version=engine)
+                              arm=arm, engine_version=engine,
+                              diagnostics=ResearchDiagnostics())
         run["manifest"]["set_sha256"] = corpus["set_sha256"]
         path = write_run(options["out"], f"IR-606-replay-{run['run_id']}", run)
         self.stdout.write(f"wrote {path} ({len(run['conversations'])} conversations)")

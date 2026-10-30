@@ -25,6 +25,43 @@ ASK_STREAM = "/api/v1/ai/ask/stream/"
 SCHEMA_VERSION = 1
 STOP_OUTCOMES = frozenset({"timeout", "cancellation", "cap_stop", "failure", "empty"})
 
+#: Private diagnostic stages (IR-607); never a human verdict.
+NOT_TRACED = "not_traced"
+HANDOFF = "candidates_then_no_results"
+NO_CANDIDATES = "no_candidates"
+PROVIDER_FAILURE = "provider_failure"
+ANSWERED = "answered"
+OTHER = "other"
+_CANDIDATE = frozenset({"ok", "partial", "ambiguous"})
+#: General tools whose ok status means papers were found.
+_PAPER_TOOLS = frozenset({"search_research", "resolve_papers"})
+#: Stop reasons after which an unavailable answer means a model was down.
+_OUTAGE_STOPS = frozenset({"ready", "no_progress", "planner_unavailable"})
+
+
+def research_stage(runs: list[dict]) -> dict:
+    """Where a turn's research ended, from its private run rows alone."""
+    if not runs:
+        return {"stage": NOT_TRACED}
+    steps = [s for r in runs for s in r["steps"]]
+    candidates = sum(s["kind"] == "tool" and s["tool"] in _PAPER_TOOLS
+                     and s["status"] in _CANDIDATE for s in steps)
+    tool_outage = any(s["kind"] == "tool" and s["status"] == "unavailable" for s in steps)
+    final = runs[-1]
+    if final["status"] in ("generated", "partial"):
+        stage = ANSWERED
+    elif final["status"] == "no_sources":
+        stage = HANDOFF if candidates else PROVIDER_FAILURE if tool_outage else NO_CANDIDATES
+    elif final["status"] == "failed" or (final["status"] == "unavailable"
+                                         and final["stop_reason"] in _OUTAGE_STOPS):
+        stage = PROVIDER_FAILURE
+    else:
+        stage = OTHER
+    return {"stage": stage, "candidate_steps": candidates,
+            "research_runs": [{k: r[k] for k in ("id", "status", "stop_reason")} | {
+                "steps": [{k: s[k] for k in ("kind", "tool", "status")} for s in r["steps"]]}
+                for r in runs]}
+
 
 def _body(response) -> dict:
     try:
@@ -65,7 +102,7 @@ def _ids(rows: list[dict], key: str) -> list[int]:
 
 
 def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None = None,
-                 clock=time.monotonic) -> dict:
+                 diagnostics=None, clock=time.monotonic) -> dict:
     """A fresh saved Conversation, then ordered turns and a final public reopen."""
     limits = limits or {}
     created = reader.post(CONVERSATIONS, {"title": f"Evaluation {case['id']}"})
@@ -78,6 +115,7 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
     total_cost = 0.0
     start = clock()
     previous_turns: set[int] = set()
+    traced: set[str] = set()
     for number, source in enumerate(case["turns"], 1):
         if ((limits.get("case_attempts") is not None and
              total_attempts + limits.get("turn_max_attempts", 1) > limits["case_attempts"]) or
@@ -120,6 +158,11 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
         saved = added[-1] if added else None
         citations = (answer or {}).get("citations") or []
         sources = (answer or {}).get("sources") or []
+        runs = []
+        if diagnostics is not None:
+            runs = [r for r in diagnostics.for_conversation(conversation_id)
+                    if r["id"] not in traced]
+            traced.update(r["id"] for r in runs)
         recorded.append({
             "number": number, "question": source["user"], "outcome": outcome,
             "public_answer": answer, "citation_record_ids": _ids(citations, "record_id"),
@@ -128,6 +171,8 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
             "physical_attempts": physical, "cost_final": not unsettled,
             "usage_status": ("reported" if physical and all(p["usage_reported"] for p in physical)
                              else "missing"),
+            "diagnostics": (research_stage(runs) if diagnostics is not None
+                            else {"stage": NOT_TRACED}),
         })
         if outcome in STOP_OUTCOMES:
             break
@@ -151,7 +196,7 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
                 cache: str, attempts=None, approval_id=None, model_profiles=None,
                 partition_method=None, retrieval=None, pricing=None,
                 arm="controller", engine_version=CONTROLLER_ENGINE,
-                clock=time.monotonic) -> dict:
+                diagnostics=None, clock=time.monotonic) -> dict:
     """One scorer-readable run; only supplied, approved manifest fields enter it."""
     run_id = str(uuid.uuid4())
     rows = []
@@ -159,7 +204,8 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
         if case["split"] != "development":
             raise ValueError("collection is restricted to the development split")
         try:
-            row = collect_case(reader, case, attempts=attempts, limits=limits, clock=clock)
+            row = collect_case(reader, case, attempts=attempts, limits=limits,
+                               diagnostics=diagnostics, clock=clock)
         except (TimeoutError, httpx.TimeoutException, KeyboardInterrupt) as exc:
             row = _unfinished(case, "cancellation" if isinstance(exc, KeyboardInterrupt) else "timeout")
         except (OSError, ConnectionError, httpx.TransportError, ValueError):
@@ -216,6 +262,19 @@ def git_commit() -> str:
     from .runfile import git_commit as current_commit
 
     return current_commit()
+
+
+class ResearchDiagnostics:
+    """Private research-run rows for one evaluation Conversation (IR-512 telemetry)."""
+
+    def for_conversation(self, conversation_id) -> list[dict]:
+        from apps.ai.models.research import ResearchRun
+
+        runs = ResearchRun.objects.filter(conversation_id=conversation_id).order_by(
+            "created_at", "id").prefetch_related("steps")
+        return [{"id": str(r.pk), "status": r.status, "stop_reason": r.stop_reason,
+                 "steps": [{"kind": s.kind, "tool": s.tool, "status": s.status}
+                           for s in r.steps.all()]} for r in runs]
 
 
 class CampaignAttempts:

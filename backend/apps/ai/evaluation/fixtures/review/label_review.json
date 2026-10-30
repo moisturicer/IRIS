@@ -1,0 +1,87 @@
+{
+  "set_id": "ir607-review-fixture",
+  "reviewer": "Fixture Labeller",
+  "fixture": true,
+  "corpus": {
+    "snapshot_id": "fixture",
+    "paper_set_sha256": "fixture"
+  },
+  "set_digests": {
+    "development": "046f0c83e26cdc51b6fb89e1f3275cf7a16ac94bc9de2dff8d649ed50be5a6e0",
+    "held_out": "1abc0ac78d0ae8bdc912d95d5b5b89937e2b8eb23ac926ee725ec5f06b1e3baa"
+  },
+  "conversations": {
+    "R01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "R02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "R03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "R04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "R05": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "R06": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "R07": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    }
+  }
+}
