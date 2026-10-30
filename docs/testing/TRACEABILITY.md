@@ -1694,3 +1694,13 @@ Verification on 2026-10-30: local frontend full suite **105 files / 1,323 tests 
 [PR #348](https://github.com/moisturicer/IRIS/pull/348), implementation commit `0757adc`: [clean CI run 40990153412](https://github.com/moisturicer/IRIS/actions/runs/40990153412) passed **Backend, Frontend, Security and Docker Compose**. Backend: **4,556 passed, 1 expected xfail, 415 subtests passed**; the authorization matrix executed **40 tests**. Frontend: **106 files / 1,335 tests passed**, plus lint/build. Migration consistency and backend static checks passed. Agent review against `b2c5187`: Standards **0 hard violations, 1 nonblocking duplicated-renderer concern**; Spec **0 findings**. Human approval and merge remain outstanding.
 
 The interrupted broad local run included `No active EmbeddingSpace is configured` errors in its reused test database; it did not establish a code regression. The clean CI database executed the full backend suite successfully. Task-owned test databases and temporary source copies may be removed after verification; no live metadata corrections were executed.
+
+## IR-608 — ADR-042 safety and recovery evidence
+
+- A11: `evaluation/tests/test_scenario_http.py` uses the authenticated IR-606 collector, private records and between-turn revocation. Public history withholds prose derived from a revoked cited Record. Foreign Conversation access remains 404.
+- A09: the collector exercises candidate-only search, empty search, rejected tool arguments and answer failure after authorized evidence; private observations remain distinct from safe public output.
+- A12: `test_durable_processes.py` launches independent interpreters over real shared Postgres for cancel, crash/redelivery, stale attempts and revision races; HTTP reconnect and state tests run separately. Scripted providers establish correctness, not throughput or broker behavior.
+- A13: public HTTP projection suites are separate from the named manual browser exercise in `docs/evaluation/general-tools/scenarios.md`. Browser surfaces without evidence remain not_measured.
+- A15: `test_controller_security_http.py` exercises malicious paper instructions and disabled public research without widening the tool registry or Paper Chat scope.
+
+`eval_scenarios --workers` writes measured/not_measured results, distinguishes provider/worker/browser evidence and blocks enablement on failures or missing exercises. `evaluation/tests/test_scenarios.py` verifies that skipped/absent checks never pass and diagnostics never enter the report. See the IR-608 PR for executed results and remaining browser measurements.

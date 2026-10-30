@@ -65,7 +65,7 @@ def _ids(rows: list[dict], key: str) -> list[int]:
 
 
 def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None = None,
-                 clock=time.monotonic) -> dict:
+                 clock=time.monotonic, before_turn=None, observe=None) -> dict:
     """A fresh saved Conversation, then ordered turns and a final public reopen."""
     limits = limits or {}
     created = reader.post(CONVERSATIONS, {"title": f"Evaluation {case['id']}"})
@@ -89,9 +89,12 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
                              "reopened_transcript": None, "latency_ms": 0,
                              "physical_attempts": [], "usage_status": "missing"})
             break
+        if before_turn:
+            before_turn(number, conversation_id)
         cursor = attempts.snapshot() if attempts else None
         turn_start = clock()
         answer = None
+        events = []
         try:
             response = reader.post(ASK_STREAM, {"question": source["user"],
                                                 "conversation_id": conversation_id,
@@ -118,11 +121,13 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
         added = [turn for turn in transcript if turn.get("id") not in previous_turns]
         previous_turns.update(turn["id"] for turn in added)
         saved = added[-1] if added else None
+        if observe:
+            observe(number, conversation_id, events, transcript)
         citations = (answer or {}).get("citations") or []
         sources = (answer or {}).get("sources") or []
         recorded.append({
             "number": number, "question": source["user"], "outcome": outcome,
-            "public_answer": answer, "citation_record_ids": _ids(citations, "record_id"),
+            "public_answer": answer, "public_events": events, "citation_record_ids": _ids(citations, "record_id"),
             "source_ids": _ids(sources, "id"), "saved_turn": saved,
             "reopened_transcript": transcript, "latency_ms": elapsed,
             "physical_attempts": physical, "cost_final": not unsettled,
