@@ -1,5 +1,20 @@
 # Requirements Traceability
 
+## IR-538 · Announced email verification in the shared entry frame
+
+`EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains
+mounted while loading and announces the result together with its reason; success
+explains that RDCO approval follows. `ButtonLink` shares the button's variants and
+size steps while preserving link navigation. Decorative status marks are hidden
+from assistive technology, and the page leaves all three palette allowlists.
+
+**Verification (2026-10-30):** `EmailVerifyPage.test.tsx`, `Button.test.tsx` and
+`palette.test.ts`: 33 passed, including axe in loading, success and failure and
+link destinations. Full-suite and browser geometry/contrast evidence is recorded
+on the IR-538 PR. The initial full local suite was stopped during host memory
+pressure after unrelated tests exceeded their timeouts; that attempt is not a
+passing suite result.
+
 ## IR-368 · Actionable API rate-limit messages
 
 `lib/errorDetail.ts` formats HTTP 429 as "Too many requests" with an upward-rounded
