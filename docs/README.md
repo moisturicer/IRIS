@@ -39,6 +39,7 @@ A requirement is not satisfied because code exists for it. It is satisfied when 
 | [`rag_third_party_services_architecture.md`](rag_third_party_services_architecture.md) | Provider survey and the prerequisites behind [ADR-015](adr/015-voyage-embedding-and-reranking.md) |
 | [`document_requirements_architecture.md`](document_requirements_architecture.md) | Target three-layer department-template / office-checklist model for FR-M2-01 |
 | [`workflow_routing_architecture.md`](workflow_routing_architecture.md) | **The settled MVP workflow, and how the code gets there.** It records the current code's conflicts with the settled model (each with file and line), then maps each symbol to its replacement. It also holds the data model, state mapping, migration plan, tracker payload, frontend plan, test migration plan and the Jira breakdown (IR-255). Implementation companion to [ADR-021](adr/021-reviewer-directed-routing.md) and [ADR-022](adr/022-explicit-document-requests.md) |
+| [`review_workspace_roadmap.md`](review_workspace_roadmap.md) | **Proposed.** The GitHub pull-request model mapped onto Versions of a paper: readiness, comparing Versions, anchored threads, review submissions, resolution, and the order to build them |
 
 ### Decisions
 | Document | Owns |

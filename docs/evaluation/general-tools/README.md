@@ -49,3 +49,7 @@ The [development replay command](replay.md) collects a selected case through the
 ## IR-608 safety and recovery
 
 The [scenario runner and browser exercise](scenarios.md) collect access/failure contract results and independent Postgres worker correctness evidence separately. Missing browser or worker exercises remain `not_measured`; no deterministic result counts as quality, throughput or production approval.
+
+## IR-609 campaigns and report
+
+[Smoke, repeated arm runs, the held-out gate and the evaluation report](campaign.md). The report scores each repetition with the unchanged scorer, keeps completion, support, safety and cost apart, lists what was not measured, and blocks on any breach, unreviewed family or missing safety evidence. No campaign has run.
