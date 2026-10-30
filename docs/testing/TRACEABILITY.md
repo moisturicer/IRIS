@@ -1,5 +1,19 @@
 # Requirements Traceability
 
+## IR-339 · Soft-delete closure terminology
+
+`workflow_routing_architecture.md` §6 now distinguishes `pending_delete` from
+finished review outcomes: a soft delete withdraws active assignments and open
+requests, retaining completed history. The neighbouring state lists already
+distinguish `completed` from `withdrawn`. ADR-021 and ADR-022 contain no contrary
+soft-delete closure decision. The historical, applied IR-257 backfill remains
+unchanged and is explicitly distinguished from the live closure rule.
+
+**Verification (2026-10-30):** compared §5–§6 and §8.2 with
+`records.lifecycle.apply()` and `reviews.withdrawal.withdraw_review()`; searched
+the documentation for `pending_delete`, soft-delete, `completed` and `withdrawn`.
+No application behavior, migrations, permissions or visibility changed.
+
 ## IR-368 · Actionable API rate-limit messages
 
 `lib/errorDetail.ts` formats HTTP 429 as "Too many requests" with an upward-rounded
