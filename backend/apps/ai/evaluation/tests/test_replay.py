@@ -7,6 +7,7 @@ from django.urls import reverse
 
 from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.controller.versions import CONTROLLER_ENGINE
+from apps.ai.controller.budget import FAKE_TEST_PROFILE
 from apps.ai.evaluation.replay import collect_case, collect_run
 from apps.ai.models import Conversation
 from apps.ai.providers.fakes import ScriptedLLM, ScriptedReranker, ScriptedToolCallingLLM
@@ -30,6 +31,8 @@ class Reader:
 
 
 def test_repeating_a_case_creates_fresh_ordered_conversations(client_for, embedder, settings):
+    for name, value in FAKE_TEST_PROFILE.items():
+        setattr(settings, name, value)
     settings.AI_DURABLE_ASK = False
     settings.AI_RESEARCH_LANE = "off"
     user = make_user("ir606-reader@cit.edu")
