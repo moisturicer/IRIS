@@ -32,7 +32,6 @@ const NOT_YET_CONVERTED: readonly string[] = [
   "src/features/download/DownloadTokenPage.tsx",
   "src/features/requests/AccessRequestsPage.tsx",
   // IR-364 -- sign-up, account and error screens
-  "src/features/auth/EmailVerifyPage.tsx",
   "src/features/errors/ForbiddenPage.tsx",
   "src/features/settings/SettingsPage.tsx",
   // IR-365 -- the Ask IRIS hub and chat page
@@ -65,7 +64,6 @@ const GREY_NOT_YET_CONVERTED: readonly string[] = [
   "src/features/requests/AccessRequestsPage.tsx",
   // IR-364 -- sign-up, account and error screens
   "src/components/auth/AuthBootstrap.tsx",
-  "src/features/auth/EmailVerifyPage.tsx",
   "src/features/errors/ForbiddenPage.tsx",
   // Shared pieces no subtask names yet
   "src/components/compliance/DpaConsentModal.tsx",
@@ -77,12 +75,10 @@ const GREY_NOT_YET_CONVERTED: readonly string[] = [
 ];
 
 /**
- * IR-558: files with a see-through white background left on purpose. The
- * email-verify screen's decorative circles are IR-533/IR-538's to redraw.
+ * IR-558: files with a see-through white background left on purpose. Empty
+ * since IR-538 redrew the email-verify screen without its decorative circles.
  */
-const SEE_THROUGH_ALLOWED: readonly string[] = [
-  "src/features/auth/EmailVerifyPage.tsx",
-];
+const SEE_THROUGH_ALLOWED: readonly string[] = [];
 
 const THIS_FILE = "src/test/palette.test.ts";
 
