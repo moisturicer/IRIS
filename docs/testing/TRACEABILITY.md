@@ -1642,3 +1642,26 @@ human decision. IR-642 and IR-643 have been reassessed and are ready for
 implementation. No recovery implementation or automated coverage is claimed.
 Existing behavior is a baseline, not evidence that the accepted guarantees
 already exist. PR #334 passed all four CI checks before merge.
+
+## IR-214 — institutional policy review drafts (2026-10-30)
+
+**PROPOSED; documentation only.** Lee confirmed the drafting direction through
+the IR-214 grilling interview. [The review package](../policy/README.md)
+contains pilot Terms and Privacy Policy drafts, confirmed decisions, code
+evidence and seven proposed development tasks. This is approval to prepare
+drafts, not institutional policy approval. CIT-U ownership/authority, the Terms
+approver and the DPO's decisions remain to be confirmed. IR-214 retains its
+`not-ready` marker for policy publication and implementation.
+
+The interim registration notice from IR-540 remains. No `/terms` or `/privacy`
+route, versioned acceptance record, purpose-specific consent lifecycle,
+existing-user gate, backend enforcement or retention expiry is implemented by
+this documentation. Historical signup booleans do not establish acceptance of
+replacement documents. Conversation data includes questions, answers and
+reasoning, with no general automatic expiry; the approved retention schedule
+must precede any promise of a duration.
+
+**Validation scope.** Code cross-checks, local Markdown links and whitespace
+integrity only; no application tests, lint/build, migrations, deployment or
+institutional sign-off are claimed. PR checks and review evidence belong on
+the documentation PR; future behavior tests are specified in the task list.
