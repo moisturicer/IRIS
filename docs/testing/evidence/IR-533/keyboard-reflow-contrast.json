@@ -1,0 +1,487 @@
+[
+  {
+    "state": "login",
+    "width": 320,
+    "overflow": false,
+    "titleTop": 264.5,
+    "targets": [],
+    "violations": [],
+    "stops": [
+      {
+        "name": "Email Address",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 403.5,
+        "bottom": 451.5
+      },
+      {
+        "name": "Password",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 508.25,
+        "bottom": 556.25
+      },
+      {
+        "name": "Show password",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 498.5,
+        "bottom": 542.5
+      },
+      {
+        "name": "Forgot password?",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 584,
+        "bottom": 628
+      },
+      {
+        "name": "Sign In",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 648,
+        "bottom": 700
+      },
+      {
+        "name": "Sign up",
+        "tag": "A",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 720,
+        "bottom": 764
+      }
+    ],
+    "colors": [
+      {
+        "name": "Sign In",
+        "interaction": "rest",
+        "styles": {
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(107, 15, 18)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign In",
+        "interaction": "hover",
+        "styles": {
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(139, 19, 22)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign In",
+        "interaction": "disabled",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgb(245, 245, 244)",
+          "opacity": "1"
+        }
+      }
+    ]
+  },
+  {
+    "state": "signup-error",
+    "width": 320,
+    "overflow": false,
+    "titleTop": 145,
+    "targets": [],
+    "violations": [],
+    "stops": [
+      {
+        "name": "Student",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 284,
+        "bottom": 300
+      },
+      {
+        "name": "First Name",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 369,
+        "bottom": 417
+      },
+      {
+        "name": "Last Name",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 485.5,
+        "bottom": 533.5
+      },
+      {
+        "name": "M.I.",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 1px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 602,
+        "bottom": 650
+      },
+      {
+        "name": "CIT-U Email",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 695,
+        "bottom": 743
+      },
+      {
+        "name": "College",
+        "tag": "SELECT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 811.5,
+        "bottom": 859.5
+      },
+      {
+        "name": "Password",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 425.5,
+        "bottom": 473.5
+      },
+      {
+        "name": "Show password",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 427.5,
+        "bottom": 471.5
+      },
+      {
+        "name": "Confirm Password",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 0px, rgb(107, 15, 18) 0px 0px 0px 2px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 542,
+        "bottom": 590
+      },
+      {
+        "name": "Show confirmed password",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 544,
+        "bottom": 588
+      },
+      {
+        "name": "I have read the data notice and agree to IRIS using my details as it describes.",
+        "tag": "INPUT",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 639.5,
+        "bottom": 655.5
+      },
+      {
+        "name": "Read the data notice",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "rgb(255, 255, 255) 0px 0px 0px 2px, rgb(107, 15, 18) 0px 0px 0px 4px, rgba(0, 0, 0, 0) 0px 0px 0px 0px",
+        "visible": true,
+        "top": 711.5,
+        "bottom": 755.5
+      },
+      {
+        "name": "Register",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 674.5,
+        "bottom": 726.5
+      },
+      {
+        "name": "Sign in",
+        "tag": "A",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 783.5,
+        "bottom": 827.5
+      }
+    ],
+    "colors": [
+      {
+        "name": "Register",
+        "interaction": "rest",
+        "styles": {
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(107, 15, 18)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Register",
+        "interaction": "hover",
+        "styles": {
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(139, 19, 22)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Register",
+        "interaction": "disabled",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgb(245, 245, 244)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign in",
+        "interaction": "rest",
+        "styles": {
+          "foreground": "rgb(107, 15, 18)",
+          "background": "rgba(0, 0, 0, 0)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign in",
+        "interaction": "hover",
+        "styles": {
+          "foreground": "rgb(107, 15, 18)",
+          "background": "rgba(0, 0, 0, 0)",
+          "opacity": "1"
+        }
+      }
+    ]
+  },
+  {
+    "state": "verify-success",
+    "width": 320,
+    "overflow": false,
+    "titleTop": 413.5,
+    "targets": [],
+    "violations": [],
+    "stops": [
+      {
+        "name": "Sign in",
+        "tag": "A",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 611.5,
+        "bottom": 663.5
+      }
+    ],
+    "colors": [
+      {
+        "name": "Sign in",
+        "interaction": "rest",
+        "styles": {
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(107, 15, 18)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign in",
+        "interaction": "hover",
+        "styles": {
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(139, 19, 22)",
+          "opacity": "1"
+        }
+      }
+    ]
+  },
+  {
+    "state": "verify-failure",
+    "width": 320,
+    "overflow": false,
+    "titleTop": 428.5,
+    "targets": [],
+    "violations": [],
+    "stops": [
+      {
+        "name": "Register again",
+        "tag": "A",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 530.5,
+        "bottom": 582.5
+      },
+      {
+        "name": "Sign in",
+        "tag": "A",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 594.5,
+        "bottom": 648.5
+      }
+    ],
+    "colors": [
+      {
+        "name": "Register again",
+        "interaction": "rest",
+        "styles": {
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(107, 15, 18)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Register again",
+        "interaction": "hover",
+        "styles": {
+          "foreground": "rgb(255, 255, 255)",
+          "background": "rgb(139, 19, 22)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign in",
+        "interaction": "rest",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgba(0, 0, 0, 0)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign in",
+        "interaction": "hover",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgb(250, 250, 249)",
+          "opacity": "1"
+        }
+      }
+    ]
+  },
+  {
+    "state": "pending",
+    "width": 320,
+    "overflow": false,
+    "titleTop": 236,
+    "targets": [],
+    "violations": [],
+    "stops": [
+      {
+        "name": "Sign out",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 683,
+        "bottom": 737
+      }
+    ],
+    "colors": [
+      {
+        "name": "Sign out",
+        "interaction": "rest",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgba(0, 0, 0, 0)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign out",
+        "interaction": "hover",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgb(250, 250, 249)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign out",
+        "interaction": "disabled",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgb(245, 245, 244)",
+          "opacity": "1"
+        }
+      }
+    ]
+  },
+  {
+    "state": "declined",
+    "width": 320,
+    "overflow": false,
+    "titleTop": 240,
+    "targets": [],
+    "violations": [],
+    "stops": [
+      {
+        "name": "Sign out",
+        "tag": "BUTTON",
+        "outline": "2px",
+        "shadow": "none",
+        "visible": true,
+        "top": 711,
+        "bottom": 765
+      }
+    ],
+    "colors": [
+      {
+        "name": "Sign out",
+        "interaction": "rest",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgba(0, 0, 0, 0)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign out",
+        "interaction": "hover",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgb(250, 250, 249)",
+          "opacity": "1"
+        }
+      },
+      {
+        "name": "Sign out",
+        "interaction": "disabled",
+        "styles": {
+          "foreground": "rgb(68, 64, 60)",
+          "background": "rgb(245, 245, 244)",
+          "opacity": "1"
+        }
+      }
+    ]
+  },
+  {
+    "state": "lock-focus-restore",
+    "active": {
+      "id": "",
+      "tag": "BUTTON",
+      "text": "Sign In"
+    }
+  }
+]

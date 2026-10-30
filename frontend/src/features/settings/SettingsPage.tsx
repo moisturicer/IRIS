@@ -401,7 +401,10 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
         </p>
       </Panel>
 
-      <Panel title="What you agreed to" caption="The full notice, as shown at registration.">
+      <Panel
+        title="Current disclosure notice"
+        caption="This is the current notice for research disclosures. Your account consent record does not confirm that you accepted this revised notice or its external AI processing terms."
+      >
         <div className="space-y-5 max-h-[420px] overflow-y-auto scrollbar-thin pr-1">
           {DPA_SECTIONS.map((section) => (
             <div key={section.title}>

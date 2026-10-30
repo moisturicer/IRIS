@@ -76,6 +76,7 @@ export function LibraryRecordTable({
         <i
           className={cn(
             "fa-star text-[14px] transition-colors",
+            // eslint-disable-next-line no-restricted-syntax -- IR-207 permits decorative state icons: aria-pressed and filled/outline shapes also express this state.
             isOn ? "fas text-gold" : "far text-stone-300 hover:text-gold",
           )} aria-hidden />
       </button>

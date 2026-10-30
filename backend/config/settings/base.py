@@ -989,6 +989,11 @@ AI_EMBEDDING_TOKEN_CEILING = config(
 AI_OVERVIEW_TOKEN_CEILING = config(
     "AI_OVERVIEW_TOKEN_CEILING", default=100_000, cast=int
 )
+# A `generating` overview claim older than this is re-queued on the next read
+# (IR-650): its task was lost. Longer than the task's retries. 0 disables.
+AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS = config(
+    "AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS", default=900, cast=int
+)
 # Full-paper briefs remain off pending acceptance of their proposed ADR.
 # Generation additionally requires enforced shared provider admission.
 AI_PAPER_BRIEFS_ENABLED = config("AI_PAPER_BRIEFS_ENABLED", default=False, cast=bool)

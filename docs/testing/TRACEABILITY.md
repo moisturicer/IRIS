@@ -1,5 +1,22 @@
 # Requirements Traceability
 
+## IR-123 · Disclosure notice describes external AI processing (FR-M6-02)
+
+The shared notice describes manuscript extraction, external Voyage AI embedding
+and reranking, and configured language-model answers and whole-paper summaries.
+The consent label names external AI processing; the expanded terms show pending
+CIT-U DPO / legal review. Modal clipboard output is derived from the displayed
+sections instead of maintaining separate wording.
+Settings identifies the text as the current notice, rather than as historical
+terms accepted at registration (`SettingsPage.test.tsx`).
+
+**Evidence:** `components/compliance/DpaConsent.test.tsx` renders the submission
+notice and exercises Copy content in the modal. The old notice fails both
+regression cases. Final command results are recorded in the PR.
+**Partial:** institutional approval, the withdrawal decision and consent
+re-collection remain outstanding. Existing consent stamps are not renewed.
+See [the processing inventory and review checklist](../compliance/IR-123-processing-review.md).
+
 ## IR-538 · Announced email verification in the shared entry frame
 
 `EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains
@@ -1694,6 +1711,18 @@ Verification on 2026-10-30: local frontend full suite **105 files / 1,323 tests 
 [PR #348](https://github.com/moisturicer/IRIS/pull/348), implementation commit `0757adc`: [clean CI run 40990153412](https://github.com/moisturicer/IRIS/actions/runs/40990153412) passed **Backend, Frontend, Security and Docker Compose**. Backend: **4,556 passed, 1 expected xfail, 415 subtests passed**; the authorization matrix executed **40 tests**. Frontend: **106 files / 1,335 tests passed**, plus lint/build. Migration consistency and backend static checks passed. Agent review against `b2c5187`: Standards **0 hard violations, 1 nonblocking duplicated-renderer concern**; Spec **0 findings**. Human approval and merge remain outstanding.
 
 The interrupted broad local run included `No active EmbeddingSpace is configured` errors in its reused test database; it did not establish a code regression. The clean CI database executed the full backend suite successfully. Task-owned test databases and temporary source copies may be removed after verification; no live metadata corrections were executed.
+
+### IR-533 / IR-538 / IR-207 / IR-555 — entry-flow accessibility and truthful lock reporting
+
+**Requirements:** NFR-A1 (WCAG 2.1 AA), NFR-U3 (readable, consistent entry controls), NFR-S6 (account protection). The project lead confirmed the four-screen scope, remaining lock dialog, removal of unsupported statistics, and automated plus manual review evidence on 2026-10-30. The 44×44 and disabled-text contrast criteria are stricter product requirements, not blanket AA rules. The authority for entry accessibility remains `docs/ui-ux/12-accessibility.md`; IR-533 and its children identify the implementation work.
+
+Verification now uses `AuthLayout` and the shared `ButtonLink`, announces its result and failure reason in one polite status region, and explains RDCO review after email verification. No inline verification brand panel or invented quotation remains. Registration's confirmation also adopts `ButtonLink`. `entryTokens.test.ts` covers verification. Full-width buttons keep disabled text readable; entry navigation, consent labels and alert dismiss controls meet the 44×44 target. The gold text/fill lint guard runs across production TypeScript sources, preserves gold borders/rings, and documents the decorative library-star exception.
+
+Axes now receives Django's underlying request and reads the supplied username credential, so its middleware can report the actual lock. Its JSON 429 names `too_many_attempts` and computes `unlock_at` from axes' stored failure windows, including attempts that extend the lock and the ASGI callback. A valid password on a manually locked account gets 403 `locked_by_admin` without a promised unlock time. The frontend prioritizes these codes, retains the older plain-text fallback without a timer, and keeps the existing tab-local counter for its own lock. The dialog uses shared focus containment/Escape/return behavior and an explicit sign-in return target because that control is disabled while the dialog opens. The configured server cool-off remains unchanged.
+
+**Executed evidence:** 191 entry/primitives/guard tests; 2 added dialog keyboard/axe tests; the final three-file sign-in/signup/dialog regression pass had 71 tests. All 64 accounts REST tests passed on isolated PostgreSQL, including six timed/manual/ASGI lock tests and the existing current-user role-request seam. Backend static checks, frontend lint (six existing warnings), TypeScript and production build passed. Deliberate `text-gold hover:bg-gold-dark` reintroduction made lint fail, then was removed. Browser audit: 36 combinations across 360/768/1280/1745px, no reported WCAG A/AA violation, horizontal overflow or measured target below 44×44; minimum computed text-pair contrast 4.59:1. See [the evidence, screenshots, incomplete contrast results and human-review checklist](evidence/IR-533/README.md). Automated checks do not certify full conformance.
+
+**Review gate:** actual screen-reader and browser-zoom verification and named human approval remain required. IR-203 and IR-209 remain open until the consolidated work is approved and merged. No Done status or full WCAG conformance is claimed here.
 
 ## IR-608 — ADR-042 safety and recovery evidence
 

@@ -7,6 +7,7 @@ Invalidated by a re-chunk or a ``PROMPT_VERSION`` bump. Runs as the
 from __future__ import annotations
 
 import logging
+from datetime import timedelta
 
 from django.conf import settings
 from django.db import transaction
@@ -62,6 +63,14 @@ def _too_large(chunk_set: ChunkSet) -> bool:
         total=Sum("token_count")
     )["total"]
     return (total or 0) > ceiling
+
+
+def _claim_expired(stored: RecordOverview) -> bool:
+    """A claim whose task was lost never reports back; reclaim it (IR-650)."""
+    timeout = getattr(settings, "AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS", 0)
+    if not timeout:
+        return False
+    return timezone.now() - stored.updated_at > timedelta(seconds=timeout)
 
 
 def overview_for(record: Record, *, retry: bool = False) -> dict:
@@ -137,7 +146,7 @@ def _claim_generation(
         )
         if is_current and stored.state == "ready":
             return {"state": "ready", "overview": _wire(stored), "cached": True}
-        if is_current and stored.state == "generating":
+        if is_current and stored.state == "generating" and not _claim_expired(stored):
             return {"state": "generating", "overview": None}
         if is_current and stored.state == "unavailable" and not retry_unavailable:
             return {"state": "unavailable", "overview": None}
