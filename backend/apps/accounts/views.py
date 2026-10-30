@@ -2,7 +2,7 @@ from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from core.enums import RequestStatus, RoleName
+from core.enums import RequestStatus, RoleName, SessionEndReason
 from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import IsAdmin
 from core.pagination import LargeResultsPagination
@@ -76,7 +76,7 @@ class LogoutView(APIView):
         # was authenticated with; the refresh token in the body may be stale.
         sid = request.auth.get("sid") if request.auth else None
         if sid:
-            end_session(sid)
+            end_session(sid, SessionEndReason.LOGOUT)
         try:
             token = RefreshToken(request.data["refresh"])
             token.blacklist()
@@ -249,7 +249,6 @@ class LockUserView(APIView):
             return Response({"detail": "is_locked is required."}, status=400)
         user.is_locked = bool(is_locked)
         user.save(update_fields=["is_locked"])
-        action     = "locked" if user.is_locked else "unlocked"
         event_type = "ACCOUNT_LOCKED" if user.is_locked else "ACCOUNT_UNLOCKED"
 
         create_audit_event(
@@ -257,7 +256,8 @@ class LockUserView(APIView):
             metadata={"target_user": user.email},
         )
 
-        return Response({"detail": f"Account {action}.", "is_locked": user.is_locked})
+        detail     = "Account locked." if user.is_locked else "Account unlocked."
+        return Response({"detail": detail, "is_locked": user.is_locked})
 
 
 class LockedUsersView(generics.ListAPIView):

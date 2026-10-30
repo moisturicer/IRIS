@@ -296,6 +296,7 @@ class Command(BaseCommand):
 
             record = Record.objects.create(
                 title=title,
+                origin=Record.Origin.SYNTHETIC,
                 abstract=ABSTRACT.format(topic=classification_name.lower()),
                 classification=Classification.objects.filter(name=classification_name).first(),
                 record_type=RecordType.objects.get_or_create(name=type_name)[0],
@@ -349,6 +350,7 @@ class Command(BaseCommand):
 
         record = Record.objects.create(
             title=full_title,
+            origin=Record.Origin.SYNTHETIC,
             abstract=(
                 "Seeded by manage.py seed_demo to demonstrate this pipeline "
                 "state. Not a real disclosure."
@@ -517,9 +519,12 @@ class Command(BaseCommand):
             return
 
         owner = users[RoleName.STUDENT]
-        # A new version requires a document uploaded since the request.
+        # A new version requires a document uploaded since the request. The
+        # lookup is for the type-level slot: another record's ad-hoc "Other"
+        # slot can carry the same name and type (IR-348).
         slot, _ = UploadSlot.objects.get_or_create(
-            name="Revised ethics consent form", record_type=record.record_type
+            name="Revised ethics consent form", record_type=record.record_type,
+            record=None,
         )
         RecordUpload.objects.create(
             record=record, slot=slot, file="documents/demo-revised-consent.pdf",

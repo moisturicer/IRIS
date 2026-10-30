@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import timedelta
+import re
 
 from celery.schedules import crontab
 from corsheaders.defaults import default_headers
@@ -162,6 +163,17 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # ---- REST Framework -----------------------------------------------------
 
+def throttle_rate(name, default):
+    """Read a positive DRF rate, rejecting typos before serving requests."""
+    value = config(name, default=default)
+    if not re.fullmatch(r"[1-9][0-9]*/(s|sec|second|m|min|minute|h|hour|d|day)", value):
+        raise ImproperlyConfigured(
+            f"{name} must be a positive rate such as '100/day' or '60/hour'; "
+            "see backend/.env.example."
+        )
+    return value
+
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         # simplejwt's, plus the 30-minute inactivity rule (IR-166).
@@ -182,9 +194,9 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/day",
-        "user": "1000/day",
-        "ai_query": "60/hour",
+        "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
+        "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
+        "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
         "ai_overview": "600/hour",

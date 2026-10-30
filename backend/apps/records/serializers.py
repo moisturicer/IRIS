@@ -56,7 +56,7 @@ class RecordListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Record
         fields = [
-            "id", "title", "abstract", "year_accomplished", "classification_name",
+            "id", "title", "abstract", "year_accomplished", "origin", "publication_year", "classification_name",
             "record_type_name", "pipeline_status", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "access_count", "file_count", "has_manuscript", "created_at", "authors", "ai_hook",
@@ -474,7 +474,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         model  = Record
         fields = [
             "id", "title", "abstract", "abstract_file",
-            "year_accomplished", "year_completed",
+            "year_accomplished", "year_completed", "origin", "publication_year",
             "classification", "psced", "record_type",
             "classification_name", "record_type_name", "file_count", "has_manuscript", "ai_hook",
             "adviser", "adviser_name", "added_by", "is_ip", "ip_type",
@@ -518,7 +518,7 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         model  = Record
         fields = [
             "id",
-            "title", "year_accomplished", "year_completed", "abstract",
+            "title", "year_accomplished", "year_completed", "abstract", "origin", "publication_year",
             "classification", "psced", "record_type", "adviser",
             "is_ip", "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",

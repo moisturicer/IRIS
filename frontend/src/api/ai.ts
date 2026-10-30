@@ -1,3 +1,4 @@
+import { errorDetail } from "@/lib/errorDetail";
 import { apiClient, refreshSession } from "./client";
 import { IDLE_HEADER, idleSeconds, markReported } from "@/lib/activity";
 import { API_BASE } from "@/lib/constants";
@@ -105,14 +106,17 @@ async function* openStream(url: string, init: RequestInit): AsyncGenerator<SSEEv
   }
 
   if (!response.ok) {
-    let detail = "IRIS could not answer right now.";
+    let data: unknown;
     try {
-      const errorBody = await response.json();
-      detail = errorBody.detail ?? detail;
+      data = await response.json();
     } catch {
       /* a non-JSON error body -- the generic message stands */
     }
-    throw new Error(detail);
+    const failure = { response: {
+      status: response.status, data,
+      headers: { "retry-after": response.headers.get("Retry-After") },
+    } };
+    throw Object.assign(new Error(errorDetail(failure, "IRIS could not answer right now.")), failure);
   }
 
   yield* readSSE(response);

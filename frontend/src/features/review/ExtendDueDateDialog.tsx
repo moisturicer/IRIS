@@ -3,7 +3,7 @@ import { useId, useState, type FormEvent } from "react";
 import { seatsApi } from "@/api/reviews";
 import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
-import { errorDetail } from "@/features/document-requests/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { formatDate } from "@/lib/utils";
 
 interface ExtendDueDateDialogProps {

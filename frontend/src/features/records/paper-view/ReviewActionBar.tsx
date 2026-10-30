@@ -4,7 +4,7 @@ import { createPortal } from "react-dom";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { errorDetail } from "@/features/document-requests/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import type { Capability } from "@/features/records/capabilities";
 import { cn } from "@/lib/utils";
 import type { RecordDetail } from "@/types/records";

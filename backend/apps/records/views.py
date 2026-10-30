@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
@@ -518,6 +518,60 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews.tracker import tracker_payload
 
         return Response(tracker_payload(self.get_object(), request.user))
+
+    def _comment_response(self, act, success=status.HTTP_200_OK):
+        """
+        Run a review-discussion act and answer with its result (IR-419,
+        ADR-032 §7). 404 for a record or a discussion the caller may not see,
+        403 for one they read but may not act in, 400 for what cannot be done.
+        The 404 is `get_object()`'s own for a missing record, word for word: a
+        caller who sees the record must not learn it has a discussion (IR-153).
+        """
+        from apps.reviews import comments
+
+        try:
+            return Response(act(comments), status=success)
+        except comments.CommentNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except comments.CommentRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except comments.CommentError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["get", "post"], url_path="review-comments")
+    def review_comments(self, request, pk=None):
+        """
+        GET  /records/<id>/review-comments/ -- the review discussion, oldest first.
+        POST /records/<id>/review-comments/ `{"body": str, "reply_to"?: id}`
+
+        Read under `may_read_review`; written by the record's participants, on
+        a submitted record (`apps.reviews.comments`). A new comment answers 201.
+        """
+        record = self.get_object()
+        if request.method == "GET":
+            return self._comment_response(lambda c: c.readable_comments(record, request.user))
+        return self._comment_response(
+            lambda c: c.comment_payload(c.post_comment(
+                record, request.user,
+                body=request.data.get("body"), reply_to=request.data.get("reply_to"),
+            ), request.user),
+            success=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        detail=True, methods=["patch"],
+        url_path=r"review-comments/(?P<comment_id>[0-9]+)", url_name="review-comment",
+    )
+    def review_comment(self, request, pk=None, comment_id=None):
+        """
+        PATCH /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+
+        Its author edits a comment; a changed body stamps `edited_at`.
+        """
+        record = self.get_object()
+        return self._comment_response(lambda c: c.comment_payload(c.edit_comment(
+            record, request.user, int(comment_id), body=request.data.get("body"),
+        ), request.user))
 
     @action(detail=True, methods=["get"], url_path="metadata-suggestions")
     def metadata_suggestions(self, request, pk=None):
@@ -1040,8 +1094,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         Accepts a multipart upload with key "file" (.xls or .xlsx).
         Creates published records from each valid row and returns a plaintext log.
         Legacy imports bypass the review pipeline — staff is the implicit reviewer.
+
+        Rows are independent, and a row is saved whole or not at all: its
+        Record, primary owner and authors share one savepoint, so a failed
+        write leaves nothing of it behind (IR-637).
         """
-        from .models import Author
+        from django.db import transaction
+
+        from .models import Author, RecordOwner
         from .models import RecordType, Classification, PSCEDClassification
 
         file = request.FILES.get("file")
@@ -1081,33 +1141,36 @@ class RecordViewSet(viewsets.ModelViewSet):
                     if row["psced_name"] else None
                 )
 
-                record = Record.objects.create(
-                    title                = row["title"],
-                    abstract             = row["abstract"],
-                    year_accomplished    = row["year_accomplished"],
-                    year_completed       = row["year_completed"],
-                    record_type          = record_type,
-                    classification       = classification,
-                    psced                = psced,
-                    is_ip                = row["is_ip"],
-                    for_commercialization= row["for_commercialization"],
-                    community_extension  = row["community_extension"],
-                    added_by             = request.user,
-                    pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
-                )
-
-                from .models import RecordOwner
-                RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
-
-                for author_name in row["authors"]:
-                    Author.objects.create(record=record, name=author_name)
-
-                log_lines.append(f"✓  Created: {record.title[:70]}")
-                created += 1
-
+                with transaction.atomic():
+                    record = Record.objects.create(
+                        title                = row["title"],
+                        origin               = row["origin"],
+                        publication_year     = row["publication_year"],
+                        abstract             = row["abstract"],
+                        year_accomplished    = row["year_accomplished"],
+                        year_completed       = row["year_completed"],
+                        record_type          = record_type,
+                        classification       = classification,
+                        psced                = psced,
+                        is_ip                = row["is_ip"],
+                        for_commercialization= row["for_commercialization"],
+                        community_extension  = row["community_extension"],
+                        added_by             = request.user,
+                        pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
+                    )
+                    RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
+                    for author_name in row["authors"]:
+                        Author.objects.create(record=record, name=author_name)
             except Exception as exc:
-                log_lines.append(f"✗  Failed:  {row['title'][:70]} — {exc}")
+                # One line, whatever the database said: its full text can run
+                # to several lines and name the schema.
+                reason = (str(exc).splitlines() or [type(exc).__name__])[0]
+                log_lines.append(f"✗  Row {row['row_num']}: not saved — {row['title'][:70]} — {reason}")
                 failed += 1
+                continue
+
+            log_lines.append(f"✓  Row {row['row_num']}: created — {record.title[:70]}")
+            created += 1
 
         log_lines.append(f"\n{'─' * 50}")
         log_lines.append(f"Done — {created} record(s) created, {failed} skipped.")
@@ -1149,8 +1212,10 @@ class RecordViewSet(viewsets.ModelViewSet):
             "For Commercialization",
             "Community Extension",
             "Authors",
+            "Origin",
+            "Publication Year",
         ]
-        WIDTHS = [55, 65, 18, 16, 22, 28, 36, 10, 22, 22, 45]
+        WIDTHS = [55, 65, 18, 16, 22, 28, 36, 10, 22, 22, 45, 24, 20]
 
         # ---- Header row styling --------------------------------------------
         header_font  = Font(bold=True, color="FFFFFF", size=11)
@@ -1184,6 +1249,8 @@ class RecordViewSet(viewsets.ModelViewSet):
             "FALSE",
             "FALSE",
             "Juan Dela Cruz, Maria Santos",
+            "unknown",
+            None,
         ])
 
         # ---- Notes row (light grey) ----------------------------------------
@@ -1201,6 +1268,8 @@ class RecordViewSet(viewsets.ModelViewSet):
             "TRUE or FALSE",
             "TRUE or FALSE",
             "Comma-separated names",
+            "unknown / institutional / imported_reference / synthetic",
+            "Optional; separate from completion year",
         ]
         ws.append(note_row)
         note_row_idx = ws.max_row

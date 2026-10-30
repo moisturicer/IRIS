@@ -375,6 +375,12 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         if delete_act is not None:
             offered.append(delete_act)
 
+    # `review-comments/`: the record's participants, once it is submitted
+    # (ADR-032 §7, IR-419). A pool member reads the discussion but is not
+    # offered a place in it.
+    if record.pipeline_status != PipelineStatus.DRAFT and is_record_participant(user, record):
+        offered.append("comment_review")
+
     # Both role-gated endpoints refuse anyone who is not office staff
     # (`IsStaff`) before any other check, so the offers do too.
     office_staff = is_office_staff(user)

@@ -150,9 +150,9 @@ def record_card(record: Record, score: float) -> dict:
         "id": record.id,
         "title": record.title,
         "abstract": (record.abstract or "").strip(),
-        "authors": ", ".join(a.name for a in record.authors.all())
-        or "Institutional Author",
-        "year": record.year_accomplished,
+        "authors": ", ".join(a.name.strip() for a in record.authors.all() if a.name.strip()),
+        "origin": record.origin,
+        "year": record.publication_year,
         "classification": (
             record.classification.name if record.classification_id else None
         ),
