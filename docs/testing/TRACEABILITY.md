@@ -1,5 +1,22 @@
 # Requirements Traceability
 
+## IR-371 · Configurable API request budgets
+
+The anonymous, authenticated and Ask IRIS query rates come from
+`API_THROTTLE_ANON`, `API_THROTTLE_USER` and `API_THROTTLE_AI_QUERY`.
+Unset values retain `100/day`, `1000/day` and `60/hour`, regardless of DEBUG.
+Invalid or nonpositive values refuse settings startup and name the key.
+Only the development example opts into higher values; production configuration
+and the separate overview budget are unchanged. The development guide includes
+a verified cache-inspection dry run and narrowly scoped local reset instructions.
+
+**Evidence:** `backend/apps/tests/test_throttle_configuration.py` imports fresh
+settings without reading local env files: original defaults in both DEBUG modes,
+independent overrides for all three rates, and startup rejection of malformed
+values for every key. This file and `test_settings_validation.py` pass; Django
+system checks pass with the existing axes deprecation warning. Full-suite and
+CI evidence is recorded on the PR. No live cache entries were deleted.
+
 ## IR-417 · Proposal continuation and lineage
 
 **Design:** [ADR-032 §6 and §12](../adr/032-adviser-first-review-and-office-reviewer-pools.md).
