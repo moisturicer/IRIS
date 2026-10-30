@@ -49,7 +49,7 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-30 (project lead, IR-419): §7, §10, §12 and Security Impact.** The review discussion is read under `may_read_review` and written by participants only. §12's "404 on the review timeline" is the discussion endpoint's 404 plus `null` in the tracker. See the *Amendment* note under §10.
 
-**Proposed amendment, 2026-10-31 (IR-689, spec IR-420): §7 and §8. Awaiting Lee Jasmin Adolfo; not accepted.** Comments exist on published papers only, never on Discoverable Proposals. Only a comment's writer edits or deletes it; RDCO or a system administrator may remove any comment with a reason; readers report comments to RDCO. Decided by Hermoine Zozobrado in a design session on 2026-10-31 and transcribed by an agent. See the *Amendment* notes under §7 and §8; the original text is kept.
+**Amended 2026-10-31 (project lead, IR-689, spec IR-420): §7 and §8.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. Comments exist on published papers only, never on Discoverable Proposals. Only a comment's writer edits or deletes it; RDCO or a system administrator may remove any comment with a reason; readers report comments to RDCO. Decided by Hermoine Zozobrado in a design session on 2026-10-31 and transcribed by an agent. See the *Amendment* notes under §7 and §8; the original text is kept.
 
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
@@ -355,7 +355,7 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 - **The timeline is derived** from the rows that already exist plus `ReviewComment`, the same way the tracker is (ADR-021 §14). Nothing is duplicated into an event table.
 - **Public comments are moderated by hiding, not by deleting.** Owners and system administrators can hide a comment.
 
-**Amendment, 2026-10-31 (Proposed, IR-689; spec IR-420): the public thread is "Comments", and who may remove a comment changes.** Not accepted until Lee Jasmin Adolfo accepts it. It replaces the public-discussion column above where they differ; the review discussion is unchanged.
+**Amendment, 2026-10-31 (project lead, IR-689; spec IR-420): the public thread is "Comments", and who may remove a comment changes.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. It replaces the public-discussion column above where they differ; the review discussion is unchanged.
 
 - **Name.** The interface calls the public thread **Comments** ("Comments (n)"). `CONTEXT.md` defines Comment, Comment report and Review discussion.
 - **Where.** Published papers only. Discoverable Proposals never get comments (see the §8 amendment). A paper that stops being public takes its comments with it; nothing is deleted.
@@ -395,7 +395,7 @@ EXT  Record  + proposal_visibility ∈ private | discoverable   (default private
 
 **ADR-029's consent is this setting.** Marking a Proposal Discoverable is the explicit, separate consent ADR-029 §3 required. It is never inferred from `dpa_accepted`. It also covers ADR-029's collaboration matching, so there is one opt-in, not two.
 
-**Amendment, 2026-10-31 (Proposed, IR-689; spec IR-420): no comments on Proposals.** Not accepted until Lee Jasmin Adolfo accepts it. "Public discussion (§7) is open on the summary" above is withdrawn: a Discoverable Proposal's summary never carries Comments, now or later. Comments exist on published papers only (§7 amendment).
+**Amendment, 2026-10-31 (project lead, IR-689; spec IR-420): no comments on Proposals.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. "Public discussion (§7) is open on the summary" above is withdrawn: a Discoverable Proposal's summary never carries Comments, now or later. Comments exist on published papers only (§7 amendment).
 
 ### 9. Review queues: **To review · In review · Done**
 
