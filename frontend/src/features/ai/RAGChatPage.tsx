@@ -1,3 +1,4 @@
+import { errorDetail } from "@/lib/errorDetail";
 /**
  * FR-M3-01 — Conversational RAG chatbot UI (SDD Module 3).
  *
@@ -127,10 +128,10 @@ export default function RAGChatPage() {
       if (onScreen && message.citations?.length) setSourcesOpen(true);
       refreshList();
     },
-    onFailed: () => {
+    onFailed: (_conversationId, error) => {
       addToast({
         type:    "error",
-        message: "IRIS could not answer right now. Check that the AI service is available.",
+        message: errorDetail(error, "IRIS could not answer right now. Check that the AI service is available."),
       });
     },
   });
@@ -210,11 +211,11 @@ export default function RAGChatPage() {
           : await aiApi.conversations.create();
         if (cancelled) return;
         goTo(data, true);
-      } catch {
+      } catch (error) {
         if (!cancelled) {
           addToast({
             type:    "error",
-            message: "Could not load your conversations. Check that the AI service is available.",
+            message: errorDetail(error, "Could not load your conversations. Check that the AI service is available."),
           });
         }
       }
@@ -244,10 +245,10 @@ export default function RAGChatPage() {
         routedDraft.current = null;
         if (draft && isOnScreen(routeId)) setDraftFor(routeId, draft);
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         addToast({
           type:    "error",
-          message: "Could not load this conversation. Check that the AI service is available.",
+          message: errorDetail(error, "Could not load this conversation. Check that the AI service is available."),
         });
       });
   }, [routeId, isOnScreen, open, setDraftFor, showUnavailable, addToast]);
@@ -331,8 +332,8 @@ export default function RAGChatPage() {
   const handleRetry = async (message: ChatMessage) => {
     try {
       await client.retry(message);
-    } catch {
-      addToast({ type: "error", message: "IRIS could not retry that question right now." });
+    } catch (error) {
+      addToast({ type: "error", message: errorDetail(error, "IRIS could not retry that question right now.") });
     }
   };
 

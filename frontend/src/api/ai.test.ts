@@ -171,4 +171,16 @@ describe("a stream's session (IR-634)", () => {
     await expect(drain(aiApi.askStream("Question"))).rejects.toThrow("IRIS could not answer right now.");
     expect(refreshSession).not.toHaveBeenCalled();
   });
+
+  it.each([
+    ["{}", { "Retry-After": "841" }, "Too many requests — try again in about 15 minutes."],
+    [JSON.stringify({ detail: "Request was throttled. Expected available in 30 seconds." }), {}, "Too many requests — try again in about 30 seconds."],
+    ["upstream busy", {}, "Too many requests — try again later."],
+  ])("preserves a stream's rate-limit response for its caller", async (body, headers, message) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status: 429, headers })));
+    await expect(drain(aiApi.askStream("Question"))).rejects.toMatchObject({
+      message, response: { status: 429 },
+    });
+    expect(refreshSession).not.toHaveBeenCalled();
+  });
 });

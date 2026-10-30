@@ -16,6 +16,8 @@ import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/re
 import type { AIAnswer, AIStatus, Citation, ConversationDetail, ConversationSummary, LatestAskRun } from "@/types/ai";
 
 import RAGChatPage from "./RAGChatPage";
+import { ToastContainer } from "@/components/ui/Toast";
+import { useUIStore } from "@/store/ui.store";
 
 const LEGACY_STORAGE_KEY = "iris_rag_conversations";
 
@@ -92,6 +94,18 @@ beforeEach(() => {
 });
 
 describe("persisted conversations", () => {
+  it("announces a throttled question with the server's wait", async () => {
+    useUIStore.setState({ toasts: [] });
+    list.mockResolvedValue({ data: [summary()] });
+    askStream.mockImplementation(async function* () {
+      yield await Promise.reject({ response: { status: 429, headers: { "retry-after": "841" } } });
+    });
+    renderScreen(<><RAGChatPage /><ToastContainer /></>);
+    await userEvent.type(await screen.findByRole("textbox", { name: /ask a follow-up/i }), "What predicts flooding?");
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests — try again in about 15 minutes.");
+  });
+
   it("continues the most recent conversation rather than starting a new one", async () => {
     list.mockResolvedValue({ data: [summary({ id: 9, title: "Prior chat" })] });
     get.mockResolvedValue({

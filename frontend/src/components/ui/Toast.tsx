@@ -37,6 +37,7 @@ export function ToastContainer() {
         return (
           <div
             key={t.id}
+            role={t.type === "error" ? "alert" : undefined}
             className={`pointer-events-auto flex items-start gap-3 w-80 rounded-xl px-4 py-3 shadow-lg
               text-[14px] ${kind.tone}`}
           >

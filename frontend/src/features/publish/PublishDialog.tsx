@@ -33,6 +33,7 @@ import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { rolesFor } from "@/lib/access";
+import { errorDetail } from "@/lib/errorDetail";
 import { tabbableWithin } from "@/lib/focusTrap";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
@@ -132,7 +133,7 @@ export function PublishDialog() {
 
 type Phase =
   | { kind: "loading" }
-  | { kind: "loadError" }
+  | { kind: "loadError"; message: string }
   | { kind: "notFound" }
   | { kind: "notDraft"; recordId: number }
   | { kind: "form" }
@@ -180,6 +181,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   // Which reference lists failed. Details still opens; a failed list's field is
   // left out of the save so a resumed draft's value is not erased.
   const [listsFailed, setListsFailed] = useState({ advisers: false, classification: false, psced: false });
+  const [listError, setListError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   const [step, setStep] = useState<PublishStep>(1);
@@ -232,7 +234,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       if (cancelled) return;
       // Without the types nothing can start; the other three only degrade step 2.
       if (types.status === "rejected") {
-        setPhase({ kind: "loadError" });
+        setPhase({ kind: "loadError", message: errorDetail(types.reason, "We couldn't open Publish just now.") });
         return;
       }
       const loaded: Lists = {
@@ -247,6 +249,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         classification: classifications.status === "rejected",
         psced: psceds.status === "rejected",
       });
+      const listFailure = [advisers, classifications, psceds].find((result) => result.status === "rejected");
+      setListError(listFailure ? errorDetail(listFailure.reason, "We couldn't load the adviser and classification lists. Close this and try again.") : null);
 
       if (startTarget === "new") {
         setPhase({ kind: "form" });
@@ -279,7 +283,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       } catch (err) {
         if (cancelled) return;
         const status = (err as { response?: { status?: number } })?.response?.status;
-        setPhase(status === 404 ? { kind: "notFound" } : { kind: "loadError" });
+        setPhase(status === 404 ? { kind: "notFound" } : { kind: "loadError", message: errorDetail(err, "We couldn't open Publish just now.") });
       }
     })();
 
@@ -623,7 +627,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
       {phase.kind === "loadError" && (
         <Notice
-          message="We couldn't open Publish just now."
+          message={phase.message}
           action={
             <button type="button" onClick={() => setAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
               Try again
@@ -719,6 +723,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
                   psceds={lists.psceds}
                   selfId={selfId}
                   loadError={listsFailed.advisers || listsFailed.classification || listsFailed.psced}
+                  loadErrorMessage={listError}
                   moreOpen={moreOpen}
                   onMoreOpenChange={setMoreOpen}
                   fieldNotes={prefillNotes}
@@ -827,7 +832,7 @@ function StepIndicator({ current }: { current: PublishStep }) {
 
 function Notice({ message, action }: { message: string; action: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-section py-section">
+    <div role="alert" className="flex flex-col items-start gap-section py-section">
       <p className="text-body text-stone-800">{message}</p>
       {action}
     </div>

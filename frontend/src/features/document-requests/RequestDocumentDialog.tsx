@@ -3,7 +3,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { recordsApi } from "@/api/records";
 import type { DocumentRequestItemInput, DocumentRequestSlot, Party } from "@/types/records";
 
-import { errorDetail } from "./errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 
 interface RequestDocumentDialogProps {
   recordId: number;
@@ -34,7 +34,7 @@ export function RequestDocumentDialog({
   const ids = useId();
   const titleId = `${ids}-title`;
   const [slots, setSlots] = useState<DocumentRequestSlot[] | null>(null);
-  const [slotsFailed, setSlotsFailed] = useState(false);
+  const [slotsFailed, setSlotsFailed] = useState<string | null>(null);
   const [chosen, setChosen] = useState<Set<number>>(new Set());
   const [other, setOther] = useState("");
   const [message, setMessage] = useState("");
@@ -49,8 +49,8 @@ export function RequestDocumentDialog({
       .then(({ data }) => {
         if (!cancelled) setSlots(data);
       })
-      .catch(() => {
-        if (!cancelled) setSlotsFailed(true);
+      .catch((error: unknown) => {
+        if (!cancelled) setSlotsFailed(errorDetail(error, "Could not load this record type's documents. Name what you need under Other."));
       });
     return () => {
       cancelled = true;
@@ -150,7 +150,7 @@ export function RequestDocumentDialog({
             <legend className="text-xs font-semibold text-stone-700 mb-1.5">Documents</legend>
             {slotsFailed ? (
               <p className="text-xs text-stone-600">
-                Could not load this record type's documents. Name what you need under Other.
+                {slotsFailed}
               </p>
             ) : slots === null ? (
               <div aria-hidden className="space-y-2">

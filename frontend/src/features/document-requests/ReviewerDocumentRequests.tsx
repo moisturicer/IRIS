@@ -8,7 +8,7 @@ import type {
   RecordDetail,
 } from "@/types/records";
 
-import { errorDetail } from "./errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip } from "./itemStatus";
 import { RequestDocumentDialog } from "./RequestDocumentDialog";
 
