@@ -327,7 +327,9 @@ python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (
 python scripts/setup_env.py         # REQUIRED first (IR-154): creates the repo-root .env Compose
                                    # interpolates DB_NAME/DB_USER/DB_PASSWORD from, deriving it from
                                    # backend/.env so it matches an existing postgres_data volume.
-                                   # Idempotent; never overwrites. Without it Compose stops by name
+                                   # Idempotent; never overwrites, except to add
+                                   # ADR-045's missing recovery secrets to backend/.env (IR-642).
+                                   # Without it Compose stops by name
 docker compose up --build          # ai-gateway needs ./ai/.env (gitignored, absent in CI) or Compose stops.
                                    # Given one it now boots (IR-156); it is still undeployable per ADR-014's
                                    # auth/CORS/public-port preconditions. Nothing on the indexing path calls

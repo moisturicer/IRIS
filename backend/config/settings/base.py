@@ -6,7 +6,7 @@ from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
-from .validation import missing_required, non_blank
+from .validation import missing_required, non_blank, recovery_problems
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -235,6 +235,7 @@ CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds")
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_TIMEOUT = 30  # Bounded below the recovery worker's 120-second sending lease.
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
@@ -295,6 +296,15 @@ CELERY_BEAT_SCHEDULE = {
     "deadline-notifications": {
         "task": "apps.reviews.tasks.send_deadline_notifications",
         "schedule": crontab(minute=0),
+    },
+    # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
+    # re-enqueues recovery mail whose broker message was lost, schedules due
+    # retries, expires stale intents and purges terminal records. Its interval
+    # is RECOVERY_DISPATCH_INTERVAL_SECONDS, read where that setting is
+    # defined further down.
+    "recovery-dispatch": {
+        "task": "apps.accounts.recovery.tasks.dispatch_recovery_intents",
+        "schedule": 30.0,
     },
 }
 
@@ -1105,6 +1115,64 @@ AI_CHUNK_EXCLUDE_SECTIONS = config(
     ),
     cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
 )
+
+# ---- Account recovery (ADR-045 §8, IR-642) --------------------------------
+#
+# The accepted defaults. Changing one is a security review and an updated test,
+# not a tuning knob. Every limit must be a positive whole number and both
+# secrets must be set, or Django refuses to start: a missing limit or key must
+# never quietly switch a protection off. Links are built on FRONTEND_URL only,
+# never on the request's Host.
+RECOVERY_RESET_TTL_SECONDS        = config("RECOVERY_RESET_TTL_SECONDS", default=1800, cast=int)
+RECOVERY_VERIFICATION_TTL_SECONDS = config("RECOVERY_VERIFICATION_TTL_SECONDS", default=86400, cast=int)
+RECOVERY_COOLDOWN_SECONDS         = config("RECOVERY_COOLDOWN_SECONDS", default=60, cast=int)
+RECOVERY_REQUEST_IP_10M           = config("RECOVERY_REQUEST_IP_10M", default=10, cast=int)
+RECOVERY_REQUEST_IP_DAY           = config("RECOVERY_REQUEST_IP_DAY", default=50, cast=int)
+RECOVERY_CONFIRM_IP_10M           = config("RECOVERY_CONFIRM_IP_10M", default=30, cast=int)
+RECOVERY_RECIPIENT_HOUR           = config("RECOVERY_RECIPIENT_HOUR", default=5, cast=int)
+RECOVERY_RECIPIENT_DAY            = config("RECOVERY_RECIPIENT_DAY", default=10, cast=int)
+RECOVERY_DISPATCH_INTERVAL_SECONDS = config("RECOVERY_DISPATCH_INTERVAL_SECONDS", default=30, cast=int)
+RECOVERY_INTENT_TTL_SECONDS       = config("RECOVERY_INTENT_TTL_SECONDS", default=600, cast=int)
+RECOVERY_MAIL_MAX_ATTEMPTS        = config("RECOVERY_MAIL_MAX_ATTEMPTS", default=4, cast=int)
+RECOVERY_RECORD_RETENTION_DAYS    = config("RECOVERY_RECORD_RETENTION_DAYS", default=7, cast=int)
+#: Delays before retries 1-3 of a transient SMTP failure. Fixed by ADR-045 §6.
+RECOVERY_MAIL_RETRY_DELAYS        = (30, 120, 300)
+
+#: Keys recipient and address identifiers in the limit counters. Separate from
+#: SECRET_KEY, so rotating one does not silently reset or expose the other.
+RECOVERY_COUNTER_HMAC_KEY = config("RECOVERY_COUNTER_HMAC_KEY", default="")
+#: Fernet keys, comma-separated. The first encrypts; every one decrypts, so a
+#: rotation keeps the old key listed until its pending intents have expired.
+RECOVERY_MAIL_ENCRYPTION_KEY = config("RECOVERY_MAIL_ENCRYPTION_KEY", default="", cast=csv_list)
+#: Addresses of the reverse proxy whose X-Forwarded-For is believed. Empty
+#: means none: the limits then count the connecting address, which a client
+#: cannot forge, rather than a header it can.
+RECOVERY_TRUSTED_PROXIES = config("RECOVERY_TRUSTED_PROXIES", default="", cast=csv_list)
+
+_recovery_problems = recovery_problems(
+    limits={
+        name: globals()[name]
+        for name in (
+            "RECOVERY_RESET_TTL_SECONDS", "RECOVERY_VERIFICATION_TTL_SECONDS",
+            "RECOVERY_COOLDOWN_SECONDS", "RECOVERY_REQUEST_IP_10M",
+            "RECOVERY_REQUEST_IP_DAY", "RECOVERY_CONFIRM_IP_10M",
+            "RECOVERY_RECIPIENT_HOUR", "RECOVERY_RECIPIENT_DAY",
+            "RECOVERY_DISPATCH_INTERVAL_SECONDS", "RECOVERY_INTENT_TTL_SECONDS",
+            "RECOVERY_MAIL_MAX_ATTEMPTS", "RECOVERY_RECORD_RETENTION_DAYS",
+        )
+    },
+    counter_hmac_key=RECOVERY_COUNTER_HMAC_KEY,
+    mail_encryption_keys=RECOVERY_MAIL_ENCRYPTION_KEY,
+    secret_key=SECRET_KEY,
+    retry_delays=RECOVERY_MAIL_RETRY_DELAYS,
+)
+if _recovery_problems:
+    raise ImproperlyConfigured(
+        "Account recovery is not configured (ADR-045 §8):\n  - "
+        + "\n  - ".join(_recovery_problems)
+    )
+del _recovery_problems
+CELERY_BEAT_SCHEDULE["recovery-dispatch"]["schedule"] = float(RECOVERY_DISPATCH_INTERVAL_SECONDS)
 
 # ---- Axes (brute force protection) --------------------------------------
 

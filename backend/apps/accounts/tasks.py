@@ -1,6 +1,7 @@
 from celery import shared_task
 from django.core.mail import send_mail
 from django.conf import settings
+from .recovery.tasks import deliver_recovery_intent_task, dispatch_recovery_intents  # noqa: F401
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=30)

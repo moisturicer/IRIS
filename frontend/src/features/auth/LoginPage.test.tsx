@@ -425,42 +425,38 @@ describe("what a failed sign-in says", () => {
 });
 
 /**
- * "Forgot password?" (IR-536). It was a toast-only dead end; IRIS has no
- * self-service reset, so it now says so, in place, and says who resets one.
+ * "Forgot password?" (IR-536, then IR-642). IR-536 replaced a toast-only dead
+ * end with a disclosure naming RDCO, because there was no self-service reset.
+ * ADR-045 adds one, so the control is now a link to it; RDCO stays in the
+ * recovery email and the confirmation as support guidance.
  */
 describe("forgot password", () => {
   afterEach(() => {
     useUIStore.setState({ toasts: [] });
   });
 
-  it("is a disclosure that answers in place, without a toast", async () => {
+  it("is a link to the self-service reset, reachable by keyboard", async () => {
     const user = userEvent.setup();
-    renderScreen(<LoginPage />, { route: "/login" });
+    renderScreen(
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/password/forgot" element={<p>forgot screen</p>} />
+      </Routes>,
+      { route: "/login" },
+    );
 
-    const trigger = screen.getByRole("button", { name: "Forgot password?" });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    const link = screen.getByRole("link", { name: "Forgot password?" });
+    expect(link).toHaveAttribute("href", "/password/forgot");
     expect(screen.queryByText(/no self-service password reset/i)).not.toBeInTheDocument();
 
-    trigger.focus();
+    link.focus();
     await user.keyboard("{Enter}");
-
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    const answer = screen.getByRole("region", { name: "Forgot password?" });
-    expect(answer).toHaveTextContent(/no self-service password reset/i);
-    expect(answer).toHaveTextContent("RDCO");
-    expect(trigger).toHaveAttribute("aria-controls", answer.id);
+    expect(screen.getByText("forgot screen")).toBeInTheDocument();
     expect(useUIStore.getState().toasts).toHaveLength(0);
-
-    await user.keyboard("{Enter}");
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("has no serious or critical accessibility violations when open", async () => {
-    const user = userEvent.setup();
+  it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(<LoginPage />, { route: "/login" });
-
-    await user.click(screen.getByRole("button", { name: "Forgot password?" }));
-
     await expectNoBlockingA11yViolations(container);
   });
 });

@@ -201,6 +201,10 @@ class SessionLifecycleTests(SessionTestBase):
         self.refresh = str(RefreshToken.for_user(self.user))
         self.assertEqual(self.refresh_tokens().status_code, 401)
 
-    def test_an_access_token_with_no_session_still_authenticates(self):
-        # Its own 30-minute lifetime already bounds it.
-        self.assertEqual(self.get_me(access=str(AccessToken.for_user(self.user))).status_code, 200)
+    def test_an_access_token_with_no_session_is_refused(self):
+        # IR-166 accepted one, because its 30-minute lifetime bounded it.
+        # ADR-045 §4 (IR-642) reverses that on purpose: a token with no `sid`
+        # carries no credential version either, so nothing a password reset
+        # does could stop it, and those 30 minutes are exactly the window a
+        # reset exists to close.
+        self.assertEqual(self.get_me(access=str(AccessToken.for_user(self.user))).status_code, 401)

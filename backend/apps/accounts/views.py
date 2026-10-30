@@ -1,3 +1,5 @@
+from django.db import transaction
+from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,6 +16,7 @@ from .serializers import (
     RoleRequestSerializer, SystemSettingSerializer,
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
+from .credentials import set_password_and_invalidate
 from .sessions import end_session, start_session
 
 
@@ -56,8 +59,17 @@ class LoginView(APIView):
         if user.is_locked:
             return Response({"detail": "Account is locked."}, status=status.HTTP_403_FORBIDDEN)
 
-        # A session the inactivity rule can end, its id inside both tokens (IR-166).
-        refresh = start_session(user)
+        # A session the inactivity rule can end, its id inside both tokens (IR-166),
+        # minted under the account's row lock (ADR-045 §4). A reset holds the
+        # same lock, so this either finishes before it -- and the reset ends
+        # this session -- or runs after it and sees the password hash this
+        # request did not check, and refuses. It can never pair the old
+        # password with the new credential version.
+        with transaction.atomic():
+            locked = User.objects.select_for_update().get(pk=user.pk)
+            if locked.password != user.password:
+                return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
+            refresh = start_session(locked)
         create_audit_event("LOGIN", user, metadata={"email": user.email})
         return Response({
             "access":  str(refresh.access_token),
@@ -102,9 +114,13 @@ class ChangePasswordView(APIView):
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        request.user.set_password(serializer.validated_data["new_password"])
-        request.user.save()
-        return Response({"detail": "Password changed."})
+        # The same invalidation as a reset (ADR-045 §4): every session ends,
+        # this one included, and so does any outstanding reset link.
+        with transaction.atomic():
+            user = User.objects.select_for_update().get(pk=request.user.pk)
+            set_password_and_invalidate(user, serializer.validated_data["new_password"], timezone.now())
+        return Response({"detail": "Password changed. Sign in again with your new password.",
+                         "code": "password_changed"})
 
 
 class MeView(generics.RetrieveUpdateAPIView):

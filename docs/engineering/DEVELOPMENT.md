@@ -213,7 +213,8 @@ Compose needs its own file because `${DB_PASSWORD}` in a compose file is interpo
 **`docker compose up` fails by name without the root `.env`** — every reference is written `${DB_NAME:?set DB_NAME in the repo-root .env}`, which is the intended behaviour, not a bug to work around:
 
 ```bash
-python scripts/setup_env.py   # creates both, never overwrites either
+python scripts/setup_env.py   # creates both; never overwrites, except to add
+                              # missing recovery secrets to backend/.env (IR-642)
 ```
 
 It derives the repo-root `.env` from your existing `backend/.env` when you have

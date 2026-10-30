@@ -102,6 +102,19 @@ export interface ChangePasswordPayload {
   new_password: string;
 }
 
+/** ADR-045 §2: the fixed bodies the recovery endpoints answer with. */
+export interface RecoveryAcknowledgement {
+  code: string;
+  detail: string;
+  retry_after?: number;
+}
+
+export interface PasswordResetConfirmPayload {
+  token: string;
+  new_password: string;
+  confirm_password: string;
+}
+
 export interface RoleRequest {
   id:             number;
   user:           number;

@@ -56,6 +56,11 @@ export default function LoginPage() {
     const fromState = (location.state as { from?: unknown } | null)?.from;
     return safeRedirectPath(fromState) ?? safeRedirectPath(searchParams.get("next"));
   });
+  // IR-642: Settings sends a person here after changing their password,
+  // which ends every session. Read once, like `redirectTo`.
+  const [passwordChanged] = useState(
+    () => (location.state as { reason?: string } | null)?.reason === "password_changed",
+  );
   const sessionExpiredFromState =
     (location.state as { reason?: string } | null)?.reason === "session_expired";
   const [sessionAlert, setSessionAlert] = useState(
@@ -182,6 +187,12 @@ export default function LoginPage() {
         />
       }
     >
+
+      {passwordChanged && (
+        <AuthAlert variant="warning" title="Password changed">
+          You were signed out on every device. Sign in again with your new password.
+        </AuthAlert>
+      )}
 
       {sessionAlert && (
         <AuthAlert
