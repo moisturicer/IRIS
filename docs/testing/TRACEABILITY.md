@@ -15,6 +15,15 @@ on the IR-538 PR. The initial full local suite was stopped during host memory
 pressure after unrelated tests exceeded their timeouts; that attempt is not a
 passing suite result.
 
+**Browser evidence (headless Chrome, 2026-10-30):** success and failure at
+320, 360, 768, 1280 and 1745 px, with an 800 px viewport height: no horizontal
+overflow; the result ends at or above 530 px. Navigation targets are 52–54 px
+tall. Primary contrast is 12.34:1 at rest and 9.53:1 hovered; outline contrast is
+10.27:1 at rest and 9.84:1 hovered. At 360 px, Tab reaches the first action with
+a visible 2 px maroon outline. There is exactly one h1 at every tested width.
+Screenshots and computed geometry were captured locally; the IR-538 PR records
+the check and CI results.
+
 ## IR-368 · Actionable API rate-limit messages
 
 `lib/errorDetail.ts` formats HTTP 429 as "Too many requests" with an upward-rounded
