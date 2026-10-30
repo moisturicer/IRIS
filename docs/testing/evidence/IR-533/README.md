@@ -6,6 +6,12 @@ pending/declined access and the lock dialog. WCAG 2.1 AA remains the baseline.
 The project's 44×44 targets and 4.5:1 disabled-text requirement also apply.
 Unsupported statistics stay removed; restoring one requires a verifiable source.
 
+IR-538 and IR-555 are merged independently in [PR #350](https://github.com/moisturicer/IRIS/pull/350)
+and [PR #351](https://github.com/moisturicer/IRIS/pull/351). The completion PR
+builds on them: gold lint enforcement, disabled contrast, target sizes,
+registration's shared button-link, dialog description/IDs, and cumulative
+verification evidence. Their existing request/lock/focus behavior is preserved.
+
 ## Executed checks
 
 - Entry-page/primitives/palette suite: **13 files, 191 tests passed**.

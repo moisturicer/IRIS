@@ -25,7 +25,6 @@ interface LoginFormProps {
   submitRef?: Ref<HTMLButtonElement>;
   showCredentialsError?: boolean;
   onIdentifierChange?: (identifier: string) => void;
-  submitRef?: Ref<HTMLButtonElement>;
 }
 
 export function LoginForm({
