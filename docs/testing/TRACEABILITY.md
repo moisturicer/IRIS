@@ -1642,3 +1642,26 @@ human decision. IR-642 and IR-643 have been reassessed and are ready for
 implementation. No recovery implementation or automated coverage is claimed.
 Existing behavior is a baseline, not evidence that the accepted guarantees
 already exist. PR #334 passed all four CI checks before merge.
+
+## IR-563 — Truthful research metadata
+
+[ADR-046](../adr/046-declared-research-origin-and-publication-metadata.md) records the user-approved contract. Origin is explicitly declared and never grants access. Existing records migrate to unknown without author or publication-year inference. Missing-author labels replace institutional and submitting-owner substitutions; reference/synthetic badges and neutral catalogue wording prevent false institutional claims. Publication year is separate from completion and added dates. Authorized editors/importers declare metadata; the bounded administrative correction path is documented in [RESEARCH_METADATA.md](../engineering/RESEARCH_METADATA.md).
+
+| Requirement | Verification boundary |
+|---|---|
+| Declared origin and separate publication year round-trip; invalid origin rejected | `records/test_research_metadata.py` write/list serializers |
+| Origin does not widen editing permissions | `records/test_research_metadata.py` authenticated HTTP PATCH |
+| Explicit spreadsheet metadata survives import; invalid origin is reported | `records/test_excel_import.py` real XLSX through HTTP |
+| Existing rows preserve authors, owners, completion and workflow | `records/test_research_metadata_migration.py` historical populated schema |
+| Administrative correction is authorized, atomic, evidence-backed and audited; dry-run writes nothing | `records/test_correct_research_metadata.py` management command |
+| Ask IRIS carries real authors, declared origin and publication year | `ai/tests/test_ask_http.py` answer HTTP response |
+| Honest missing-author state, origin badges, verified reference and date distinctions | Discover, SourceContextPanel, PaperViewPage and EditDetailsDialog rendered-page tests |
+| Authorless citations and no completion/creation-year publication fallback | `discover/researchMetadata.test.ts` public citation formatter |
+
+The verified external fixture is [Attention Is All You Need](https://arxiv.org/abs/1706.03762), checked against arXiv on 2026-10-30: all eight authors and original publication year 2017. The test deliberately uses a different completion year. An existing source-card assertion was deliberately corrected: its fixture records no authors, so a nonempty invented byline is no longer required.
+
+Verification on 2026-10-30: local frontend full suite **105 files / 1,323 tests passed**; TypeScript passed. The first frontend full run caught the new audit event missing from the frontend filter; that mapping was added and the full run repeated successfully. A copy of the populated local database was migrated across records 0020 → 0021: **20 records, 14 author rows, 20 ownership rows**, with identical before/after hashes of every pre-existing column. All origins became unknown and publication years remained null. Backend focused checks passed 31 tests; the corrected historical migration fixture passed separately. Initial backend attempts interrupted by PostgreSQL recovery are not counted as verification. The broad local backend run reported failures and was stopped after clean CI completed; it is not a passing full-suite claim.
+
+[PR #348](https://github.com/moisturicer/IRIS/pull/348), implementation commit `0757adc`: [clean CI run 40990153412](https://github.com/moisturicer/IRIS/actions/runs/40990153412) passed **Backend, Frontend, Security and Docker Compose**. Backend: **4,556 passed, 1 expected xfail, 415 subtests passed**; the authorization matrix executed **40 tests**. Frontend: **106 files / 1,335 tests passed**, plus lint/build. Migration consistency and backend static checks passed. Agent review against `b2c5187`: Standards **0 hard violations, 1 nonblocking duplicated-renderer concern**; Spec **0 findings**. Human approval and merge remain outstanding.
+
+The interrupted broad local run included `No active EmbeddingSpace is configured` errors in its reused test database; it did not establish a code regression. The clean CI database executed the full backend suite successfully. Task-owned test databases and temporary source copies may be removed after verification; no live metadata corrections were executed.

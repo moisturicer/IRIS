@@ -1144,6 +1144,8 @@ class RecordViewSet(viewsets.ModelViewSet):
                 with transaction.atomic():
                     record = Record.objects.create(
                         title                = row["title"],
+                        origin               = row["origin"],
+                        publication_year     = row["publication_year"],
                         abstract             = row["abstract"],
                         year_accomplished    = row["year_accomplished"],
                         year_completed       = row["year_completed"],
@@ -1210,8 +1212,10 @@ class RecordViewSet(viewsets.ModelViewSet):
             "For Commercialization",
             "Community Extension",
             "Authors",
+            "Origin",
+            "Publication Year",
         ]
-        WIDTHS = [55, 65, 18, 16, 22, 28, 36, 10, 22, 22, 45]
+        WIDTHS = [55, 65, 18, 16, 22, 28, 36, 10, 22, 22, 45, 24, 20]
 
         # ---- Header row styling --------------------------------------------
         header_font  = Font(bold=True, color="FFFFFF", size=11)
@@ -1245,6 +1249,8 @@ class RecordViewSet(viewsets.ModelViewSet):
             "FALSE",
             "FALSE",
             "Juan Dela Cruz, Maria Santos",
+            "unknown",
+            None,
         ])
 
         # ---- Notes row (light grey) ----------------------------------------
@@ -1262,6 +1268,8 @@ class RecordViewSet(viewsets.ModelViewSet):
             "TRUE or FALSE",
             "TRUE or FALSE",
             "Comma-separated names",
+            "unknown / institutional / imported_reference / synthetic",
+            "Optional; separate from completion year",
         ]
         ws.append(note_row)
         note_row_idx = ws.max_row

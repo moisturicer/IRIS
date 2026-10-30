@@ -1,5 +1,7 @@
 import type { PipelineStatus } from "@/lib/constants";
 
+export type ResearchOrigin = "unknown" | "institutional" | "imported_reference" | "synthetic";
+
 export type IpType = "patent" | "copyright" | "trade_secret" | "utility_model" | "";
 
 export const IP_TYPE_LABELS: Record<Exclude<IpType, "">, string> = {
@@ -24,6 +26,8 @@ export interface Author {
 }
 
 export interface RecordListItem {
+  origin?: ResearchOrigin;
+  publication_year?: number | null;
   id:                    number;
   title:                 string;
   abstract:              string;
@@ -765,6 +769,8 @@ export interface RecordTracker {
 }
 
 export interface RecordFormData {
+  origin?: ResearchOrigin;
+  publication_year?: number | null;
   keywords?:             string[];
   owner_emails?:         string[];
   title:                 string;

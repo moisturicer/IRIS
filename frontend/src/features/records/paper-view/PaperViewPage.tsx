@@ -4,6 +4,7 @@ import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
 import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
@@ -639,13 +640,7 @@ export default function PaperViewPage() {
 
   const editOpen = searchParams.get("edit") === "details" && can.has("edit_details") && !arriving;
 
-  const primaryOwner = record.owners.find((o) => o.is_primary) ?? record.owners[0];
-  const authorNames =
-    record.authors.length > 0
-      ? record.authors.map((a) => a.name)
-      : primaryOwner?.full_name
-        ? [primaryOwner.full_name]
-        : [];
+  const authorNames = record.authors.map((a) => a.name.trim()).filter(Boolean);
 
   // A citation carries the exact chunk it points at as router `state`
   // (IR-335), so the reader draws its highlight with no second fetch. A
@@ -932,7 +927,7 @@ export default function PaperViewPage() {
               {/* Byline: authors, then adviser, college and year (spec §4.6).
                   No adviser line when the record names none (IR-472). */}
               <div className="space-y-2">
-                {authorNames.length > 0 && (
+                {authorNames.length > 0 ? (
                   <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
                     {authorNames.map((name) => (
                       <li
@@ -946,11 +941,13 @@ export default function PaperViewPage() {
                       </li>
                     ))}
                   </ul>
-                )}
+                ) : <p className="text-sm text-stone-500 italic">Authors not recorded</p>}
+                <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
                   {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
-                  <span>Cebu Institute of Technology – University</span>
-                  {record.year_accomplished && <span>{record.year_accomplished}</span>}
+                  {record.origin === "institutional" && <span>Cebu Institute of Technology – University</span>}
+                  {record.publication_year && <span>Published {record.publication_year}</span>}
+                  {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
                 </div>
               </div>
 

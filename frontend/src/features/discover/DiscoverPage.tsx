@@ -693,7 +693,7 @@ export default function DiscoverPage() {
 
         <div className="mt-4 flex flex-wrap items-baseline gap-x-4 gap-y-0.5">
           <h1 className="font-display font-semibold text-title sm:text-display text-stone-900">Discover</h1>
-          <p className="text-body text-stone-600">Published theses, research and projects from across CIT-U.</p>
+          <p className="text-body text-stone-600">Research, projects and reference papers in IRIS.</p>
         </div>
 
         <DiscoverTabs

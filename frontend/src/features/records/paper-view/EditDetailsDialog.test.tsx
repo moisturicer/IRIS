@@ -204,6 +204,18 @@ describe("Edit details while a revision is asked for", () => {
     }
   });
 
+  it("lets an authorized editor declare origin and publication year separately", async () => {
+    const user = userEvent.setup();
+    renderRevising();
+    const dialog = await screen.findByRole("dialog", { name: "Edit details" });
+    await within(dialog).findByRole("textbox", { name: /Title/ });
+    await user.selectOptions(within(dialog).getByRole("combobox", { name: "Research origin" }), "imported_reference");
+    await user.type(within(dialog).getByRole("spinbutton", { name: "Publication year" }), "2017");
+    await user.click(within(dialog).getByRole("button", { name: "Save details" }));
+    await waitFor(() => expect(recordsApi.update).toHaveBeenCalledTimes(1));
+    expect(vi.mocked(recordsApi.update).mock.calls[0][1]).toMatchObject({ origin: "imported_reference", publication_year: 2017 });
+  });
+
   it("saves a legacy record that has no Adviser recorded", async () => {
     // Found in the browser check: the hidden Adviser was still validated, so
     // Save sent nothing and said nothing.
