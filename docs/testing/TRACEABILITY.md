@@ -1,5 +1,22 @@
 # Requirements Traceability
 
+## IR-123 · Disclosure notice describes external AI processing (FR-M6-02)
+
+The shared notice describes manuscript extraction, external Voyage AI embedding
+and reranking, and configured language-model answers and whole-paper summaries.
+The consent label names external AI processing; the expanded terms show pending
+CIT-U DPO / legal review. Modal clipboard output is derived from the displayed
+sections instead of maintaining separate wording.
+Settings identifies the text as the current notice, rather than as historical
+terms accepted at registration (`SettingsPage.test.tsx`).
+
+**Evidence:** `components/compliance/DpaConsent.test.tsx` renders the submission
+notice and exercises Copy content in the modal. The old notice fails both
+regression cases. Final command results are recorded in the PR.
+**Partial:** institutional approval, the withdrawal decision and consent
+re-collection remain outstanding. Existing consent stamps are not renewed.
+See [the processing inventory and review checklist](../compliance/IR-123-processing-review.md).
+
 ## IR-538 · Announced email verification in the shared entry frame
 
 `EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains
@@ -1637,6 +1654,16 @@ Authority: ADR-042 and general-tools specification §9–§11 (scenarios A01–A
 
 Authority: IR-606 and ADR-042's authenticated public reader boundary. `apps/ai/evaluation/replay.py` collects each development case into a fresh Conversation through `/conversations/` and `/ask/stream/`, then reads `/conversations/<id>/` after every attempted turn. It records public answer, citation/source IDs, saved Turn, reopened transcript, outcome, latency and explicit usage status. The `eval_replay_conversations` command validates the split lock, limits launch to selected development cases, supports a one-case deterministic smoke launch, and requires approval plus admission enforcement for real providers. Its manifest captures set, code, engine, protocol, prompt, corpus, permission, model, budget, cache and physical-attempt provenance without credentials or provider artifacts. `test_replay.py` exercises the authenticated API seam with deterministic providers; `test_replay_contract.py` covers order, isolation, cap stop and incomplete attempts; `test_replay_command.py` covers the scorer-readable smoke file and held-out rejection. A local run and its limits are recorded in the IR-606 implementation report; no paid or institutional collection is claimed.
 
+## IR-607 — review conversations and score supported task completion
+
+Authority: IR-607 under IR-605, ADR-042, and the general-tools evaluation contract's review rubric. Additive to IR-598's set and scorer contract.
+
+**Built.** The lock now pins the corpus snapshot and rubric version as well as each split, records `locked_at`, and refuses to be written while A09 lacks distinct `missing_field`, `no_match` and `outage` cases (`a09_case`). `check_label_review` gates a named person's label review against the current set and corpus. `eval_review_packets` writes one reviewer's packet: rendered answers and citations checked through `Record.objects.visible_to`, a turn citing an unreadable record withheld whole, and no diagnostics, usage or other verdicts. `score_reviews` keeps two independent reviews and an adjudication in `review_audit`. It refuses a disagreement without an adjudication, an adjudication that is unfinished, made by one of the two reviewers or lacking two reviews, one person reviewing twice, any non-human reviewer, and claims without explicit support judgments. It drops `not_reviewed` records from every denominator. `--score` reports `counted` with reasons and, with `--counted`, refuses draft labels, a missing or fixture label review, no packets, fake providers, a run on another corpus, single-reviewed conversations and reviews with no stated `reviewer_kind`. It always refuses evidence outside a reviewer's packet and a label review changed after locking. It scores held-out reviews only from runs stamped after the lock with the locked rubric, and `eval_review_packets` will not package held-out output before then. The collector records a private per-turn stage from `ResearchRun` rows; the scorer reports stage counts beside verdicts.
+
+**Not built, not measured.** No person has reviewed a label or a conversation. The draft set's A09 cases are untagged and its lock is stale under the new rules, so it can be neither locked nor counted. No real-provider run exists. Diagnostic stages exist only for the controller engine; the legacy engine writes no `ResearchRun`, so it reports `not_traced`.
+
+**Evidence (2026-10-30).** New tests: `test_replay_diagnostics.py` (4, real Postgres, controller at the HTTP boundary: hand-off, no candidate and provider failure told apart; reader view identical with tracing on or off), `test_research_stage.py` (5, pure: recovery, model outage, budget stops, non-paper tools), `test_label_review.py` (7), `test_review_resolution.py` (9), `test_review_campaign.py` (10, committed fixtures at the run-file boundary, numbers counted by hand), `test_review_packets.py` (6, real Postgres, a private draft withheld from another reader and shown to its owner, held-out freeze). The stage classifier is only as precise as `ResearchStep` rows, which record a status per step but no item count. `python -m pytest apps/ai/evaluation`: the new tests and the IR-598/IR-606 tests pass; the known Windows-only `test_the_proxy_audit_pins_the_proxy_set_it_audited` fails as before. The CLI was run on the fixtures for `--validate --label-review --write-lock`, `--score` (uncounted, reasons printed) and `--score --counted` (refused).
+
 
 ## IR-620 — deadline reminders from an hourly beat task
 
@@ -1711,3 +1738,37 @@ A successful password change ends every other tracked session with reason `passw
 Compatibility: before this change, `OutstandingToken.token` was stored before `sid` was added to the issued token. New sign-ins store the complete payload. During a password change, older stored payloads without a session identity are not individually blacklisted because the current device cannot be identified safely from them; every issued refresh still carries its session identity and the shared session rule refuses ended sessions. Account locking blacklists all outstanding tokens, including these older records.
 
 Local focused verification on 2026-10-30: backend session invalidation, existing session, password-policy and enum-vocabulary suites passed. TypeScript passed; focused frontend suites passed **46 tests**. Both security regressions were observed before the fixes: a locked no-sid access token returned 200, and another device's access token returned 200 after a password change. The strengthened password-changed-elsewhere UI assertion also failed before the message changed. Full-suite, migration-copy and CI evidence are recorded in the PR when complete. Human review and approval remain required.
+### IR-533 / IR-538 / IR-207 / IR-555 — entry-flow accessibility and truthful lock reporting
+
+**Requirements:** NFR-A1 (WCAG 2.1 AA), NFR-U3 (readable, consistent entry controls), NFR-S6 (account protection). The project lead confirmed the four-screen scope, remaining lock dialog, removal of unsupported statistics, and automated plus manual review evidence on 2026-10-30. The 44×44 and disabled-text contrast criteria are stricter product requirements, not blanket AA rules. The authority for entry accessibility remains `docs/ui-ux/12-accessibility.md`; IR-533 and its children identify the implementation work.
+
+Verification now uses `AuthLayout` and the shared `ButtonLink`, announces its result and failure reason in one polite status region, and explains RDCO review after email verification. No inline verification brand panel or invented quotation remains. Registration's confirmation also adopts `ButtonLink`. `entryTokens.test.ts` covers verification. Full-width buttons keep disabled text readable; entry navigation, consent labels and alert dismiss controls meet the 44×44 target. The gold text/fill lint guard runs across production TypeScript sources, preserves gold borders/rings, and documents the decorative library-star exception.
+
+Axes now receives Django's underlying request and reads the supplied username credential, so its middleware can report the actual lock. Its JSON 429 names `too_many_attempts` and computes `unlock_at` from axes' stored failure windows, including attempts that extend the lock and the ASGI callback. A valid password on a manually locked account gets 403 `locked_by_admin` without a promised unlock time. The frontend prioritizes these codes, retains the older plain-text fallback without a timer, and keeps the existing tab-local counter for its own lock. The dialog uses shared focus containment/Escape/return behavior and an explicit sign-in return target because that control is disabled while the dialog opens. The configured server cool-off remains unchanged.
+
+**Executed evidence:** 191 entry/primitives/guard tests; 2 added dialog keyboard/axe tests; the final three-file sign-in/signup/dialog regression pass had 71 tests. All 64 accounts REST tests passed on isolated PostgreSQL, including six timed/manual/ASGI lock tests and the existing current-user role-request seam. Backend static checks, frontend lint (six existing warnings), TypeScript and production build passed. Deliberate `text-gold hover:bg-gold-dark` reintroduction made lint fail, then was removed. Browser audit: 36 combinations across 360/768/1280/1745px, no reported WCAG A/AA violation, horizontal overflow or measured target below 44×44; minimum computed text-pair contrast 4.59:1. See [the evidence, screenshots, incomplete contrast results and human-review checklist](evidence/IR-533/README.md). Automated checks do not certify full conformance.
+
+**Review gate:** actual screen-reader and browser-zoom verification and named human approval remain required. IR-203 and IR-209 remain open until the consolidated work is approved and merged. No Done status or full WCAG conformance is claimed here.
+
+## IR-608 — ADR-042 safety and recovery evidence
+
+- A11: `evaluation/tests/test_scenario_http.py` uses the authenticated IR-606 collector, private records and between-turn revocation. Public history withholds prose derived from a revoked cited Record. Foreign Conversation access remains 404.
+- A09: the collector exercises candidate-only search, empty search, rejected tool arguments and answer failure after authorized evidence; private observations remain distinct from safe public output.
+- A12: `test_durable_processes.py` launches independent interpreters over real shared Postgres for cancel, crash/redelivery, stale attempts and revision races; HTTP reconnect and state tests run separately. Scripted providers establish correctness, not throughput or broker behavior.
+- A13: public HTTP projection suites are separate from the named manual browser exercise in `docs/evaluation/general-tools/scenarios.md`. Browser surfaces without evidence remain not_measured.
+- A15: `test_controller_security_http.py` exercises malicious paper instructions and disabled public research without widening the tool registry or Paper Chat scope.
+
+`eval_scenarios --workers` writes measured/not_measured results, distinguishes provider/worker/browser evidence and blocks enablement on failures or missing exercises. `evaluation/tests/test_scenarios.py` verifies that skipped/absent checks never pass and diagnostics never enter the report. See the IR-608 PR for executed results and remaining browser measurements.
+
+IR-608 CI security follow-up: scenario JUnit XML uses `defusedxml`; `test_xml_entities_are_rejected_as_unmeasured` verifies entity expansion and external entities cannot enter measured evidence.
+
+## IR-609 — comparable campaigns and the evaluation report
+
+Authority: IR-609 under IR-605, ADR-042 and the general-tools evaluation contract. Additive to the IR-598 scorer, which is reused unchanged.
+
+- Preflight (`evaluation/campaign_report.py`): stale or missing lock, draft labels (counted), incomplete manifests, duplicate run/case/Conversation ids, unequal corpus/model/data-policy/limits, wrong engine or protocol per arm, two arms on one implementation, fewer than three repetitions (counted). Tests: `test_campaign_report.py` preflight section.
+- Smoke and spend: per-operation physical spend, unreported usage at reservation and never zero, cold/warm apart, price basis, cap coverage. Tests: spend and smoke sections, hand-worked figures.
+- Report: per-repetition scores with own denominators, family `INCONCLUSIVE`/`unreviewed`, breach and unreviewed-family blocking, unmeasured arms and IR-608 scenarios, examples, exclusions, approvals, proxy-corpus statement; counted reports refuse a lowered family minimum. Tests: report section and `test_campaign_command.py`.
+- Held-out gate: `eval_replay_conversations --held-out` needs `locked_at` and frozen thresholds (now written into every lock), and recorded approvals for real providers. Tests: `test_campaign_command.py`.
+
+**Executed evidence (2026-10-30, Windows, local Postgres):** `python -m pytest apps/ai/evaluation/tests/test_campaign_report.py apps/ai/evaluation/tests/test_campaign_command.py`: 52 passed. `flake8` on the touched modules: clean. `python manage.py eval_campaign --smoke <fixture smoke run> --case-cost-usd 0.1 --campaign-cost-usd 2 --planned-cases 20` ran from the CLI and reported `not ready` (fake providers, one turn with missing usage), as expected. The full backend suite's failures were compared file by file against a clean `origin/main` worktree: none is added by this change. Pre-existing failures come from the local `.env` (inference profiles), `core.autocrlf` (proxy audit digest) and an uncommitted engine switch in the author's checkout. No campaign was run and no quality claim is made.

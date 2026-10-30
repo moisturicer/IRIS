@@ -444,6 +444,14 @@ def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
             body["comparison"] = comparison
     if public:
         for turn, body in zip(turns, bodies):
+            if any(c.record_id not in visible_titles for c in turn.citations.all()):
+                # Removing the citation alone still exposes prose derived from it.
+                body.update(answer=None, message="The answer sources are no longer readable.",
+                            reasoning=None, state="unavailable", degraded=True,
+                            question="", resolved_question=None)
+                body.pop("comparison", None)
+                body.pop("listing", None)
+                continue
             # A degraded historical pointer proves access, not the version
             # that supported the analysis. Never revive its derived summary.
             current = all(c.chunk_id in live_chunks for c in turn.citations.all())

@@ -12,13 +12,19 @@ from __future__ import annotations
 import hashlib
 import json
 from collections import Counter
+from datetime import datetime
 from typing import Any, Mapping
+
+from .conversation_scoring import TARGETS
 
 SCHEMA_VERSION = 1
 FAMILIES = tuple(f"A{i:02d}" for i in range(1, 16))
 SPLITS = ("development", "held_out")
 LABEL_STATUSES = ("draft_unreviewed", "human_reviewed")
 DEFAULT_MIN_CONVERSATIONS = 100
+RUBRIC_VERSION = 1
+#: A09's three outcomes must stay distinct before a lock is written (IR-607).
+A09_CASES = ("missing_field", "no_match", "outage")
 TURN_FIELDS = ("user", "intended_task", "expected_pair", "required_evidence",
                "clarification_necessary", "acceptable_uncertainty")
 CONVERSATION_FIELDS = ("id", "family", "split", "topic", "papers",
@@ -44,17 +50,69 @@ def split_digests(data: Mapping[str, Any]) -> dict[str, str]:
     return out
 
 
-def lock_record(data: Mapping[str, Any]) -> dict[str, str]:
+def lock_record(data: Mapping[str, Any]) -> dict[str, Any]:
     digests = split_digests(data)
     return {"set_id": data.get("set_id"), "development": digests["development"],
-            "held_out": digests["held_out"]}
+            "held_out": digests["held_out"], "corpus": _digest(data.get("corpus")),
+            "rubric_version": data.get("rubric_version", RUBRIC_VERSION),
+            "thresholds": dict(TARGETS)}
+
+
+LOCK_KEYS = ("set_id", "development", "held_out", "corpus", "rubric_version")
 
 
 def check_lock(data: Mapping[str, Any], lock: Mapping[str, Any]) -> list[str]:
-    """Names of the lock entries the current set no longer matches."""
+    """Names of the lock entries the current set no longer matches.
+
+    A lock written before IR-607 pinned no corpus or rubric, so it is stale.
+    """
     current = lock_record(data)
-    return [key for key in ("set_id", "development", "held_out")
-            if current[key] != lock.get(key)]
+    return [key for key in LOCK_KEYS if current[key] != lock.get(key)]
+
+
+def postdates_lock(stamp: Any, lock: Mapping[str, Any]) -> bool:
+    """Was output stamped after the lock froze its prompts and rubric?"""
+    try:
+        froze = datetime.fromisoformat(lock["locked_at"])
+        made = datetime.fromisoformat(stamp)
+        return froze.tzinfo is not None and made.tzinfo is not None and made >= froze
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+LABEL_CHECKS =("category_names", "exact_counts", "paper_page_facts", "supported_unambiguous")
+LABEL_REVIEWED = ("confirmed", "corrected")
+
+
+def check_label_review(data: Mapping[str, Any], review: Mapping[str, Any]) -> list[str]:
+    """Problems that stop a named label review from covering this set version."""
+    problems = []
+    reviewer = str(review.get("reviewer") or "").strip()
+    if not reviewer:
+        problems.append("label review needs a named reviewer")
+    elif reviewer not in data.get("labelled_by", ()):
+        problems.append(f"label reviewer {reviewer!r} is not in the set's labelled_by")
+    if review.get("set_id") != data.get("set_id"):
+        problems.append("label review is for another set_id")
+    if review.get("set_digests") != split_digests(data):
+        problems.append("label review digests do not match this set version")
+    if _digest(review.get("corpus")) != _digest(data.get("corpus")):
+        problems.append("label review was made against another corpus snapshot")
+    entries = review.get("conversations") or {}
+    for c in data.get("conversations", ()):
+        cid = c.get("id")
+        entry = entries.get(cid)
+        if entry is None:
+            problems.append(f"{cid}: not in the label review")
+            continue
+        if entry.get("status") not in LABEL_REVIEWED:
+            problems.append(f"{cid}: label status {entry.get('status')!r}, not reviewed")
+            continue
+        checks = entry.get("checks") or {}
+        for name in LABEL_CHECKS:
+            if checks.get(name) not in (True, "not_applicable"):
+                problems.append(f"{cid}: {name} not confirmed")
+    return problems
 
 
 def _check_turns(conv: Mapping[str, Any], errors: list[str]) -> None:
@@ -168,7 +226,12 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
         if c.get("family") in FAMILIES and c.get("split") in SPLITS:
             counts[c["split"]][c["family"]] += 1
         _check_turns(c, errors)
+        if "a09_case" in c and c["a09_case"] not in A09_CASES:
+            errors.append(f"{c.get('id')}: a09_case {c['a09_case']!r} is not one of {A09_CASES}")
 
+    a09 = [c for c in conversations if c.get("family") == "A09"]
+    absent = [case for case in A09_CASES if case not in {c.get("a09_case") for c in a09}]
+    lock_blockers = ([f"A09 lacks distinct {', '.join(absent)} cases"] if a09 and absent else [])
     leaks, shared = _leakage(conversations, allowed)
     for leak in leaks:
         errors.append(f"leakage: {leak['kind']} {leak['value']!r} in both splits")
@@ -184,7 +247,7 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
         "supported_unambiguous": sum(bool(c.get("supported_unambiguous")) for c in conversations),
         "leakage": leaks, "allowed_shared": shared,
         "coverage_gaps": gaps, "held_out_coverage_gaps": held_gaps,
-        "digests": split_digests(data), "errors": errors,
+        "digests": split_digests(data), "errors": errors, "lock_blockers": lock_blockers,
         "warnings": [{"kind": "topic_overlap", **o} for o in _topic_overlaps(conversations)],
         "ready": not errors and not gaps,
         "ok": not errors,
