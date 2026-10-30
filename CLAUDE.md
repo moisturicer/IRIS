@@ -294,6 +294,15 @@ python manage.py eval_conversations --set <set.json> --validate [--lock <lock.js
                                    # an adjudication stay in review_audit. Verified 2026-10-30 on
                                    # apps/ai/evaluation/fixtures/review/ (uncounted; --counted refused).
                                    # Guide: docs/evaluation/general-tools/review.md
+python manage.py eval_campaign --report --set <s.json> --lock <lock.json> --runs controller=<r1.json> [--runs ...] --reviews <reviews.json> [--approvals a.json --scenarios ir608.json --counted]
+                                   # IR-609: report a campaign of repeated arm runs (>=3 per arm
+                                   # when counted). Free: no DB, no vendor. Refuses stale locks,
+                                   # incomplete manifests, reused Conversations and unequal arms;
+                                   # blocks on breaches, unreviewed families or unmeasured IR-608
+                                   # scenarios. --smoke <run.json> --case-cost-usd X
+                                   # --campaign-cost-usd Y --planned-cases N measures a development
+                                   # smoke's spend against proposed caps. Writes .json + .md. Test-only so
+                                   # far: no campaign has run. Guide: docs/evaluation/general-tools/campaign.md
 python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewer-name NAME --out <packets.json>
                                    # one reviewer's packet (IR-607): rendered answers and citations
                                    # checked by Record.visible_to(reviewer); a turn citing an

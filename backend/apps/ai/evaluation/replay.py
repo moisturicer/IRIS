@@ -202,13 +202,13 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
                 cache: str, attempts=None, approval_id=None, model_profiles=None,
                 partition_method=None, retrieval=None, pricing=None,
                 arm="controller", engine_version=CONTROLLER_ENGINE,
-                diagnostics=None, clock=time.monotonic) -> dict:
+                diagnostics=None, clock=time.monotonic, split="development") -> dict:
     """One scorer-readable run; only supplied, approved manifest fields enter it."""
     run_id = str(uuid.uuid4())
     rows = []
     for case in cases:
-        if case["split"] != "development":
-            raise ValueError("collection is restricted to the development split")
+        if case["split"] != split:
+            raise ValueError(f"this collection is restricted to the {split} split")
         try:
             row = collect_case(reader, case, attempts=attempts, limits=limits,
                                diagnostics=diagnostics, clock=clock)
