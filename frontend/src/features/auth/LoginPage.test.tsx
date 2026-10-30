@@ -430,6 +430,25 @@ describe("what a failed sign-in says", () => {
    * only to a time the server gave it.
    */
   describe("the locked dialog", () => {
+    it("moves focus inside, traps Tab, and returns focus when Escape closes it", async () => {
+      // jsdom has no layout; report a visible rect for the browser focus trap.
+      vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
+      failSignInWith(serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" }));
+      renderScreen(<LoginPage />, { route: "/login" });
+      const user = await signIn();
+      await screen.findByRole("dialog", { name: "Account Locked" });
+
+      const close = screen.getByRole("button", { name: "Close" });
+      expect(close).toHaveFocus();
+      await user.tab();
+      expect(close).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(close).toHaveFocus();
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign In" })).toHaveFocus();
+    });
+
     it("counts down to the server's unlock_at for an axes lockout", async () => {
       const unlockAt = new Date(Date.now() + 90_000).toISOString();
       failSignInWith(

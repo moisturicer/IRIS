@@ -37,3 +37,7 @@ Fixture validation and local fake runs are free and authorized by IR-589. Paid m
 - [`rollout-runbook.md`](rollout-runbook.md): cohort reading, rollback, monitoring and the separate approvals. It records one conflict with the ticket wording for a human to settle.
 
 Nothing in this section is a quality result. No arm was run and no person has reviewed anything.
+
+## IR-606 development replay
+
+The [development replay command](replay.md) collects a selected case through the authenticated public reader protocol, saves its Conversation and reopened Turns, and writes a versioned scorer-readable run file. It records incomplete attempts and explicit missing usage. The local smoke mode uses a deterministic-provider server; it does not run a paid campaign or score draft labels.

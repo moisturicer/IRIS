@@ -33,6 +33,8 @@ const CLIENT_LOCKOUT_MS = 15 * 60 * 1000;
 type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
 
 export default function LoginPage() {
+  // The submitting button may lose focus when Formik disables it, before the
+  // lock reply arrives. Keep its actual element as the dialog's return target.
   const signInRef = useRef<HTMLButtonElement>(null);
   const navigate       = useNavigate();
   const location       = useLocation();

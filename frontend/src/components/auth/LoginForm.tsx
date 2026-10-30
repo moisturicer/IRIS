@@ -22,6 +22,7 @@ interface LoginFormProps {
     helpers: FormikHelpers<LoginFormValues>
   ) => Promise<void>;
   disabled?: boolean;
+  submitRef?: Ref<HTMLButtonElement>;
   showCredentialsError?: boolean;
   onIdentifierChange?: (identifier: string) => void;
   submitRef?: Ref<HTMLButtonElement>;

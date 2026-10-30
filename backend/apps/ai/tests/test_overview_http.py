@@ -193,6 +193,76 @@ class UnavailableIsNeverCachedTests:
         assert retry.json()["state"] == "generating"
         assert len(queued) == 1
 
+class LostClaimsAreRecoveredTests:
+    """IR-650: a task lost before it reports back must not strand the claim."""
+
+    def _claim(self, record, age_seconds):
+        from datetime import timedelta
+
+        from django.utils import timezone
+
+        chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+        RecordOverview.objects.create(
+            record=record, state="generating",
+            content_hash=chunk_set.content_hash, prompt_version=PROMPT_VERSION,
+        )
+        RecordOverview.objects.filter(record=record).update(
+            updated_at=timezone.now() - timedelta(seconds=age_seconds)
+        )
+
+    def _read(self, embedder, space, client_for, monkeypatch, age_seconds):
+        reader = make_user("reader@cit.edu")
+        record = make_record(
+            title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space
+        )
+        self._claim(record, age_seconds)
+        queued = []
+        monkeypatch.setattr(
+            "apps.ai.tasks.generate_record_overview.delay",
+            lambda *args: queued.append(args),
+        )
+        with TestCase.captureOnCommitCallbacks(execute=True):
+            response = _overview(client_for(reader), record.pk)
+        return record, response, queued
+
+    def test_a_stale_generating_claim_is_requeued(
+        self, embedder, space, client_for, monkeypatch, settings
+    ):
+        settings.AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS = 900
+        record, response, queued = self._read(
+            embedder, space, client_for, monkeypatch, age_seconds=901
+        )
+
+        assert response.json()["state"] == "generating"
+        assert len(queued) == 1
+        refreshed = RecordOverview.objects.get(record=record)
+        assert refreshed.state == "generating"
+        from django.utils import timezone
+
+        assert (timezone.now() - refreshed.updated_at).total_seconds() < 60
+
+    def test_a_fresh_generating_claim_is_left_alone(
+        self, embedder, space, client_for, monkeypatch, settings
+    ):
+        settings.AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS = 900
+        _, response, queued = self._read(
+            embedder, space, client_for, monkeypatch, age_seconds=60
+        )
+
+        assert response.json()["state"] == "generating"
+        assert queued == []
+
+    def test_zero_disables_the_timeout(
+        self, embedder, space, client_for, monkeypatch, settings
+    ):
+        settings.AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS = 0
+        _, _, queued = self._read(
+            embedder, space, client_for, monkeypatch, age_seconds=10_000
+        )
+
+        assert queued == []
+
+
 class SummaryRunsAsItsOwnInferenceTaskTests:
     """IR-380: the overview stops borrowing the answer path's model.
 
