@@ -15,6 +15,7 @@ from .serializers import (
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
 from .sessions import end_session, start_session
+from .lockout import LOCKED_BY_ADMIN
 
 
 class RegisterView(generics.CreateAPIView):
@@ -47,14 +48,23 @@ class LoginView(APIView):
         from django.contrib.auth import authenticate
         email    = request.data.get("email")
         password = request.data.get("password")
-        user = authenticate(request, username=email, password=password)
+        # The Django request, not DRF's wrapper: axes marks a lockout by setting
+        # `axes_locked_out` on the request it is given, and its middleware reads
+        # it from the Django one. Through the wrapper the mark was lost, so a
+        # locked account was told "Invalid credentials." even with the right
+        # password, and no 429 was ever sent (IR-555).
+        user = authenticate(request._request, username=email, password=password)
         if not user:
             create_audit_event("FAILED_LOGIN", None, metadata={"email": email})
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
         if not user.is_verified:
             return Response({"detail": "Email not verified."}, status=status.HTTP_403_FORBIDDEN)
         if user.is_locked:
-            return Response({"detail": "Account is locked."}, status=status.HTTP_403_FORBIDDEN)
+            # RDCO's lock: it lifts only when RDCO unlocks, so no `unlock_at` (IR-555).
+            return Response(
+                {"detail": "Account is locked.", "code": LOCKED_BY_ADMIN},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # A session the inactivity rule can end, its id inside both tokens (IR-166).
         refresh = start_session(user)

@@ -1110,10 +1110,17 @@ AI_CHUNK_EXCLUDE_SECTIONS = config(
 
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)
 AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+# The key axes reads the username from. It defaults to the user model's
+# USERNAME_FIELD (`email`), but LoginView authenticates with `username=`, so
+# axes found none and recorded every failure against no user at all (IR-555).
+AXES_USERNAME_FORM_FIELD = "username"
 AXES_RESET_ON_SUCCESS = True
 AXES_COOLOFF_TIME = timedelta(
     minutes=config("AXES_COOLOFF_TIME_MINUTES", default=10, cast=int)
 )
+# A JSON 429 naming the lock and when axes will admit the next attempt, so the
+# sign-in screen counts down to the server's time rather than its own (IR-555).
+AXES_LOCKOUT_CALLABLE = "apps.accounts.lockout.lockout_response"
 
 # ---- Internationalisation -----------------------------------------------
 
