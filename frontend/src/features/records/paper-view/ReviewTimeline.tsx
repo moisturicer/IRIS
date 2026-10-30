@@ -4,7 +4,7 @@ import { recordsApi } from "@/api/records";
 import { Button } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { errorDetail } from "@/features/document-requests/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { cn, formatDate } from "@/lib/utils";
 import type { RecordTracker, ReviewComment } from "@/types/records";
 
