@@ -1756,3 +1756,10 @@ Authority: IR-609 under IR-605, ADR-042 and the general-tools evaluation contrac
 - Held-out gate: `eval_replay_conversations --held-out` needs `locked_at` and frozen thresholds (now written into every lock), and recorded approvals for real providers. Tests: `test_campaign_command.py`.
 
 **Executed evidence (2026-10-30, Windows, local Postgres):** `python -m pytest apps/ai/evaluation/tests/test_campaign_report.py apps/ai/evaluation/tests/test_campaign_command.py`: 52 passed. `flake8` on the touched modules: clean. `python manage.py eval_campaign --smoke <fixture smoke run> --case-cost-usd 0.1 --campaign-cost-usd 2 --planned-cases 20` ran from the CLI and reported `not ready` (fake providers, one turn with missing usage), as expected. The full backend suite's failures were compared file by file against a clean `origin/main` worktree: none is added by this change. Pre-existing failures come from the local `.env` (inference profiles), `core.autocrlf` (proxy audit digest) and an uncommitted engine switch in the author's checkout. No campaign was run and no quality claim is made.
+
+
+## IR-679 — Review workspace contract (proposed)
+
+**Design basis.** Proposed 2026-10-30 amendment to ADR-032 §7/§10 and screen spec 16 §4, indexed in the ADR README. Covers Conversation/Readiness, three regions, width clamps and container breakpoints, capability-driven actions, and review privacy. Existing accepted workflow rules remain in force; ADR-047 is separate.
+
+**Verification.** Documentation checked against IR-679 and IR-678 acceptance criteria and the committed prototype; relative links checked and `git diff --check` passed. No runtime behavior or requirements implementation is claimed. Named project-lead acceptance remains pending and must be recorded in ADR-032 before workspace implementation merges.

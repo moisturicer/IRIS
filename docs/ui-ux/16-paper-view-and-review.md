@@ -82,6 +82,24 @@ Choosing an older version swaps the manuscript and shows a banner: *"You are vie
 
 ## 4 · Review mode
 
+**Amendment proposed, 2026-10-30 (IR-679): Phase 1 review workspace.** Acceptance is pending the project lead's named review in [ADR-032 §7 and §10](../adr/032-adviser-first-review-and-office-reviewer-pools.md). Until accepted and implemented, the two-column description below remains the current behavior. On acceptance the following replaces the Review mode regions, party status placement and action-bar placement; existing acts and dialogs remain.
+
+| Region | Phase 1 content |
+|---|---|
+| Paper, remaining width (50% by default) | Whole Manuscript, using the existing Paper reader |
+| Review pane, 30% by default | Conversation: existing timeline, Readiness panel, then record comment box. Footer: viewer's verdict in words and one filled primary action. Changes and Threads tabs are absent. |
+| Details sidebar, 20% by default | Reviewers by party, then Researchers, Adviser, Classification, Flagged by the authors, Keywords, Version, Due dates, Documents and Participants |
+
+Reviewers replaces the separate status strip in Review mode. People show an icon and state in words; an unclaimed Pool shows the office and that nobody has claimed it. **Request review** and **Add a colleague** remain separate controls backed by the existing dialogs and endpoints. Allowed targets and controls come from the server's routing and capability flags. Every person opens a profile card with only information the viewer may already read; Escape or an outside click closes it and returns focus.
+
+**Readiness** leads with the server's verdict in words and lists each fact with its server-authored label, who/which party and since when where available, and an allowed link to what clears it. Real blockers use maroon; information uses an outline; neither relies on colour alone. Its contract and invariants live in ADR-032 §10: `ready` exactly when a Decision would be accepted for the same state, every `decision.blocked` reason represented, and `null` when `may_read_review` refuses the viewer. Review-only sidebar content is withheld under the same predicate. The browser derives no verdict or blocker wording.
+
+**Resizing and narrow workspaces.** Breakpoints measure the workspace container. Clamp the review pane to 320px–half that width; clamp the sidebar to 220–420px and at least 40px narrower than the pane; cap the pane so the paper retains 480px. Below 1200px, Details becomes a tab in the review pane. Below 900px, the pane becomes a drawer over the paper with **Back to paper**, and resize edges are hidden. Edges are keyboard-focusable separators with their current width, arrow keys move 24px, and double click restores that column's default. One browser-storage key remembers widths, with safe defaults if storage is unavailable. Use maroon/stone/white/ink, Garamond headings, hairlines, and 36px pointer/44px touch controls.
+
+Read mode, Ask IRIS's entry point and the author's existing view stay unchanged. The [prototype](prototypes/review-workspace.html) also illustrates later phases, which are excluded here: Changes, Threads, review submissions, resolution, suggested wording and notification subscriptions. ADR-047's proposed routing change is separate and is not implemented by this amendment.
+
+**Existing layout, retained until the amendment is accepted and implemented:**
+
 ```
 ┌──────────────────────────────┬──────────────────────────────────────┐
 │                              │ Adviser ✓ · ITSO ● · IERC ● ·        │
