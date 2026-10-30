@@ -34,6 +34,45 @@ Read this first — several obvious commands fail for reasons that are already u
 - Python 3.11+ and Node 18+ if running outside containers
 - PostgreSQL 15+ and Redis if running services natively
 
+### API rate limits during development (IR-371)
+
+Every API call counts, including Paper View reloads and polling. Unset
+`API_THROTTLE_ANON`, `API_THROTTLE_USER` and `API_THROTTLE_AI_QUERY` retain
+`100/day`, `1000/day` and `60/hour`. `backend/.env.example` explicitly opts
+into local values of `10000/day`, `100000/day` and `6000/hour`; copy those
+keys into your local `backend/.env` and restart backend processes to use them.
+`DEBUG` never raises a limit. Each rate must be a positive integer followed by
+`/second`, `/minute`, `/hour` or `/day` (short forms s/sec, m/min, h and d
+also work). Invalid values stop startup and name the offending key.
+The separate AI overview budget is unchanged.
+
+A 429 recovers after its `Retry-After` window. **Production must wait out
+that window.** Locally, after changing a limit, old counters can still lock
+an account out. Open `docker compose exec backend python manage.py shell`
+and paste the following to inspect only DRF's `throttle_*` keys in Django's
+configured cache database (Compose uses Redis database 1, not Celery's 0):
+
+```python
+from django.conf import settings
+from redis import Redis
+
+if not settings.DEBUG:
+    raise RuntimeError("Local development only; production must wait out the window.")
+client = Redis.from_url(settings.CACHES["default"]["LOCATION"])
+pattern = f"{settings.CACHES['default'].get('KEY_PREFIX', '')}:*:throttle_*"
+keys = list(client.scan_iter(match=pattern))
+dry_run = True
+print(f"{len(keys)} throttle keys in the configured cache database")
+print("Dry run: nothing deleted" if dry_run else client.delete(*keys) if keys else 0)
+```
+
+To clear the local lockout, rerun with `dry_run = False`. This resets request
+budgets for **all local accounts**, including the throttled one, without
+flushing unrelated cache entries or Celery jobs. For a single authenticated
+account, narrow the pattern to `iris:*:throttle_user_42` (replace `42` with
+the numeric user id, and `iris` if you customized the prefix). Anonymous
+budgets are keyed by IP.
+
 ---
 
 ## 3 · Repository layout
