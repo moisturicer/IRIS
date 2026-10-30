@@ -215,3 +215,17 @@ _Avoid_: Collection, list, tag.
 **Reading history**:
 The papers recently opened in this browser. It is not part of the [[Library]], never leaves the browser, and is cleared on sign-out.
 _Avoid_: Recently viewed, activity, reading log.
+
+### Downloads
+
+**Download**:
+Saving a copy of a published paper's [[Manuscript]] to take out of IRIS. Distinct from reading it inside IRIS, which stays open to every reader who can see the paper.
+_Avoid_: Export, access, view.
+
+**Download request**:
+A reader asking RDCO to [[Download]] one published paper, always with a note saying why. RDCO alone approves or declines it, and a decline always carries a note. A reader holds at most one pending request per paper; a declined or expired one may be made again. The paper's owners, its Adviser, office staff and its assigned reviewers download without one.
+_Avoid_: Access request (the old page's name), download link.
+
+**Download grant**:
+What an approved [[Download request]] gives its reader: they may download that paper while signed in, as often as they like, until the grant expires or RDCO revokes it with a note. It is never a link, and nothing emailed works on its own.
+_Avoid_: Download link, token, download permission.
