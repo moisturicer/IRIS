@@ -653,6 +653,12 @@ describe("filtering", () => {
 });
 
 describe("states", () => {
+  it("announces a rate limit while loading filters", async () => {
+    vi.mocked(recordsApi.facets).mockRejectedValueOnce({ response: { status: 429, headers: { "retry-after": "61" } } });
+    renderDiscover();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests — try again in about 2 minutes.");
+  });
+
   it("says nothing has been published yet, and offers an author Publish", async () => {
     listed = [];
     const { container } = renderDiscover();

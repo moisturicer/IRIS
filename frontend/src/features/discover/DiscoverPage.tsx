@@ -115,7 +115,7 @@ export default function DiscoverPage() {
   const [interestSelection, setInterestSelection] = useState<{ classification_ids: number[]; psced_ids: number[] }>({ classification_ids: [], psced_ids: [] });
   const [interestOpen, setInterestOpen] = useState(false);
   const [interestLoading, setInterestLoading] = useState(true);
-  const [interestLoadFailed, setInterestLoadFailed] = useState(false);
+  const [interestLoadFailed, setInterestLoadFailed] = useState<string | null>(null);
   const [interestSaving, setInterestSaving] = useState(false);
   const [interestError, setInterestError] = useState("");
   const [resetConfirming, setResetConfirming] = useState(false);
@@ -162,7 +162,7 @@ export default function DiscoverPage() {
   const [recordTypes, setRecordTypes] = useState<FilterOption[]>([]);
   const [years, setYears] = useState<string[]>([]);
   const [refLoading, setRefLoading] = useState(true);
-  const [refFailed, setRefFailed] = useState(false);
+  const [refFailed, setRefFailed] = useState<string | null>(null);
   const [refAttempt, setRefAttempt] = useState(0);
 
   const [citeRecord, setCiteRecord] = useState<RecordListItem | null>(null);
@@ -191,7 +191,7 @@ export default function DiscoverPage() {
   useEffect(() => {
     let cancelled = false;
     setRefLoading(true);
-    setRefFailed(false);
+    setRefFailed(null);
 
     Promise.allSettled([
       recordsApi.classifications(),
@@ -203,7 +203,8 @@ export default function DiscoverPage() {
     ])
       .then(([classRes, collegeRes, typeRes, facetRes]) => {
         if (cancelled) return;
-        setRefFailed([classRes, collegeRes, typeRes, facetRes].some((r) => r.status === "rejected"));
+        const failure = [classRes, collegeRes, typeRes, facetRes].find((r) => r.status === "rejected");
+        setRefFailed(failure ? errorDetail(failure.reason, "Some filters couldn't load, so their lists may be incomplete.") : null);
         if (classRes.status === "fulfilled") {
           setClassifications(
             (classRes.value.data.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
@@ -251,7 +252,7 @@ export default function DiscoverPage() {
           psced: psced.data.results ?? [],
         });
       })
-      .catch(() => { if (!cancelled) setInterestLoadFailed(true); })
+      .catch((error: unknown) => { if (!cancelled) setInterestLoadFailed(errorDetail(error, "Areas couldn’t load. You can still browse Latest; try setting them again later.")); })
       .finally(() => { if (!cancelled) setInterestLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -590,7 +591,7 @@ export default function DiscoverPage() {
       {feed === "for_you" && feedbackError && <p role="alert" className="mt-3 text-small text-brand">{feedbackError}</p>}
       {refFailed && (
         <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 text-small text-stone-700">
-          Some filters couldn&apos;t load, so their lists may be incomplete.
+          {refFailed}
           <button type="button" onClick={() => setRefAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
             Retry filters
           </button>
@@ -705,11 +706,11 @@ export default function DiscoverPage() {
       <Modal open={interestOpen} onClose={() => { setInterestOpen(false); setResetConfirming(false); }} title="Choose Areas for your recommendations" sheet
         footer={<div className="flex items-center justify-between gap-3">
           <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setInterestSelection({ classification_ids: [], psced_ids: [] })}>Clear Areas</button>
-          <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={interestSaving || interestLoading || interestLoadFailed} onClick={() => void saveInterests()}>{interestLoading ? "Loading…" : interestSaving ? "Saving…" : "Save Areas"}</button>
+          <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={interestSaving || interestLoading || Boolean(interestLoadFailed)} onClick={() => void saveInterests()}>{interestLoading ? "Loading…" : interestSaving ? "Saving…" : "Save Areas"}</button>
         </div>}>
         <div className="space-y-5 p-5">
           <p className="text-small text-stone-600">Choose any Areas you’d like to see more often. Leave this blank to browse the latest research.</p>
-          {interestLoadFailed && <p role="alert" className="text-small text-brand">Areas couldn’t load. You can still browse Latest; try setting them again later.</p>}
+          {interestLoadFailed && <p role="alert" className="text-small text-brand">{interestLoadFailed}</p>}
           {interestError && <p role="alert" className="text-small text-brand">{interestError}</p>}
           <InterestChoices title="Research classifications" options={interestOptions.classifications} selected={interestSelection.classification_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, classification_ids: ids }))} />
           <InterestChoices title="PSCED areas" options={interestOptions.psced} selected={interestSelection.psced_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, psced_ids: ids }))} />
