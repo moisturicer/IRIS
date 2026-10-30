@@ -1,5 +1,25 @@
 # Requirements Traceability
 
+## IR-368 · Actionable API rate-limit messages
+
+`lib/errorDetail.ts` formats HTTP 429 as "Too many requests" with an upward-rounded
+wait from Retry-After, then DRF's detail, then "try again later". Other server
+details are preserved and callers retain their existing fallback wording.
+The fetch stream preserves status, retry header and detail just like Axios.
+Ask IRIS, Paper Chat, Discover, Publish (the current Add Record flow), My Reviews
+and the review/document-request dialogs use this shared formatter. Publish keeps
+its field-error handling. The former Evaluation screen has been replaced by
+My Reviews and the record review dialogs; no retired screen is recreated.
+Error toasts have alert semantics and Paper Chat's transcript is a polite log.
+
+**Evidence:** `lib/errorDetail.test.ts` covers retry-header precedence, detail-only
+waits, seconds/minutes/hours, missing/malformed waits, non-429 details and existing
+fallbacks. `api/ai.test.ts` checks real fetch Responses including non-JSON 429s;
+`RAGChatPage.test.tsx` and `PaperChatDock.test.tsx` render throttling through the
+accessible alert/log. The focused chat/API/Publish run passes (110 tests before
+the final additional Paper Chat/API cases); TypeScript passes. Full-suite,
+lint/build and final CI evidence is recorded on the PR.
+
 ## IR-417 · Proposal continuation and lineage
 
 **Design:** [ADR-032 §6 and §12](../adr/032-adviser-first-review-and-office-reviewer-pools.md).

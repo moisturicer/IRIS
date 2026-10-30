@@ -1,3 +1,4 @@
+import { errorDetail } from "@/lib/errorDetail";
 /**
  * The Publish dialog's pure rules (IR-408), kept out of the component so each
  * is stated once and tested as a table.
@@ -123,7 +124,8 @@ export function describeFailure(err: unknown, fallback: string): ApiFailure {
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
       const text = Array.isArray(value) ? value.filter((v) => typeof v === "string").join(" ") : value;
       if (typeof text !== "string" || !text) continue;
-      if (key === "detail" || key === "non_field_errors") message = text;
+      if (key === "non_field_errors") message = text;
+      else if (key === "detail") continue;
       else fields[key] = text;
     }
   } else if (typeof data === "string" && (response.status ?? 0) < 500) {
@@ -133,5 +135,5 @@ export function describeFailure(err: unknown, fallback: string): ApiFailure {
     if (text && !text.startsWith("<") && text.length < 300) message = text;
   }
 
-  return { message, fields, network: false };
+  return { message: errorDetail(err, message), fields, network: false };
 }

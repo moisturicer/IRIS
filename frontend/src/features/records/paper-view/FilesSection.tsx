@@ -34,7 +34,7 @@ import { cn, downloadBlob, formatDate } from "@/lib/utils";
 import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
-import { errorDetail } from "@/features/document-requests/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip, itemStatus } from "@/features/document-requests/itemStatus";
 import { ReviewerDocumentRequests } from "@/features/document-requests/ReviewerDocumentRequests";
 

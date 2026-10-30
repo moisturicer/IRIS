@@ -3,7 +3,7 @@ import { useId, useState, type FormEvent } from "react";
 import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
-import { errorDetail } from "@/features/document-requests/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import type { RecordDetail } from "@/types/records";
 
 import { clearRevisionDraft, readRevisionDraft, writeRevisionDraft } from "./revisionDraft";
