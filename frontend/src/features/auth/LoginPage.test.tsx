@@ -422,6 +422,103 @@ describe("what a failed sign-in says", () => {
 
     await expectNoBlockingA11yViolations(container);
   });
+
+  /**
+   * Which lock it is, and when it lifts (IR-555). The dialog used to say "try
+   * again in 15:00" for every lock. axes lifts after its own cool-off, and
+   * RDCO's manual lock never lifts on its own, so the dialog now counts down
+   * only to a time the server gave it.
+   */
+  describe("the locked dialog", () => {
+    it("moves focus inside, traps Tab, and returns focus when Escape closes it", async () => {
+      // jsdom has no layout; report a visible rect for the browser focus trap.
+      vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
+      failSignInWith(serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" }));
+      renderScreen(<LoginPage />, { route: "/login" });
+      const user = await signIn();
+      await screen.findByRole("dialog", { name: "Account Locked" });
+
+      const close = screen.getByRole("button", { name: "Close" });
+      expect(close).toHaveFocus();
+      await user.tab();
+      expect(close).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(close).toHaveFocus();
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign In" })).toHaveFocus();
+    });
+
+    it("counts down to the server's unlock_at for an axes lockout", async () => {
+      const unlockAt = new Date(Date.now() + 90_000).toISOString();
+      failSignInWith(
+        serverReplied(429, {
+          detail: "Account locked: too many failed sign-in attempts.",
+          code: "too_many_attempts",
+          unlock_at: unlockAt,
+        }),
+      );
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/try again in 1:(29|30)/i);
+    });
+
+    it("names RDCO and shows no countdown for an account RDCO locked", async () => {
+      failSignInWith(serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" }));
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/RDCO/);
+      expect(dialog).not.toHaveTextContent(/try again in|\d+:\d\d/i);
+    });
+
+    it("shows no countdown for the plain-text 429 an older server sends", async () => {
+      failSignInWith(serverReplied(429, "Account locked: too many login attempts."));
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/too many failed sign-in attempts/i);
+      expect(dialog).not.toHaveTextContent(/\d+:\d\d/);
+    });
+
+    it("keeps the browser's own 15-minute countdown for its own lock", async () => {
+      failSignInWith(
+        serverReplied(401, { detail: "Invalid credentials." }),
+        serverReplied(401, { detail: "Invalid credentials." }),
+        serverReplied(401, { detail: "Invalid credentials." }),
+      );
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      const user = await signIn();
+      await screen.findByRole("alert");
+      await user.click(screen.getByRole("button", { name: "Sign In" }));
+      await screen.findByText(/2 of 3/);
+      await user.click(screen.getByRole("button", { name: "Sign In" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/try again in (15:00|14:59)/i);
+    });
+
+    it.each([
+      ["an axes lockout", serverReplied(429, { code: "too_many_attempts", detail: "Locked.", unlock_at: new Date(Date.now() + 60_000).toISOString() })],
+      ["an RDCO lock", serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" })],
+    ])("has no serious or critical accessibility violations for %s", async (_label, error) => {
+      failSignInWith(error);
+      const { container } = renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+      await screen.findByRole("dialog", { name: "Account Locked" });
+
+      await expectNoBlockingA11yViolations(container);
+    });
+  });
 });
 
 /**
