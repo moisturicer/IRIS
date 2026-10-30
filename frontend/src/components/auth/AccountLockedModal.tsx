@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
-import type { AccountLock } from "@/features/auth/loginFailure";
-import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
+import type { AccountLock } from "@/features/auth/loginFailure";
 
 function formatCountdown(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -18,6 +18,7 @@ interface AccountLockedModalProps {
   onClose: () => void;
   /** Which lock it is. It holds no duration of its own (IR-555). */
   lock: AccountLock | null;
+  /** The sign-in control is disabled while this opens; preserve its identity. */
   returnTo?: HTMLElement | null;
 }
 
@@ -29,7 +30,9 @@ interface AccountLockedModalProps {
  */
 export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLockedModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
-  useDialogFocus(open, panelRef, onClose, returnTo);
+  const titleId = useId();
+  const descriptionId = useId();
+  useDialogFocus(open && lock !== null, panelRef, onClose, returnTo);
   const endAt = lock?.by === "attempts" ? lock.unlockAt : null;
   const [remaining, setRemaining] = useState(() => (endAt === null ? 0 : secondsUntil(endAt)));
 
@@ -53,10 +56,11 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
       <div
         ref={panelRef}
         tabIndex={-1}
-        className="relative bg-white rounded-xl shadow-xl w-full max-w-[380px] px-8 py-8 text-center"
+        className="relative max-h-screen overflow-y-auto bg-white rounded-xl shadow-xl w-full max-w-sm px-8 py-8 text-center"
         role="dialog"
         aria-modal="true"
-        aria-labelledby="lockout-title"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
       >
         <div className="mx-auto w-14 h-14 rounded-full bg-brand-50 flex items-center justify-center mb-5">
           <svg className="w-7 h-7 text-brand" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} aria-hidden>
@@ -68,10 +72,10 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
           </svg>
         </div>
 
-        <h2 id="lockout-title" className="text-[20px] font-bold text-stone-900">
+        <h2 id={titleId} className="text-title font-bold text-stone-900">
           Account Locked
         </h2>
-        <p className="mt-3 text-[15px] text-stone-600 leading-relaxed">
+        <p id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed">
           {lock.by === "admin" ? (
             <>
               RDCO has locked this account, and it stays locked until they unlock it, so trying
@@ -92,9 +96,9 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
 
         <Button
           type="button"
-          onClick={onClose}
           variant="secondary"
           size="full"
+          onClick={onClose}
           className="mt-8"
         >
           Close

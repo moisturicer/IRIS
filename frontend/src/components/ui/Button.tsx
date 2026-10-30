@@ -55,9 +55,15 @@ const SIZE_CLASSES: Record<Size, string> = {
 
 /** The one place a button's look is assembled, for `Button` and `ButtonLink` alike. */
 function buttonClasses(variant: Variant, size: Size, className: string): string {
+  // Entry controls keep readable disabled text (IR-533), rather than fading
+  // the entire control below the project's 4.5:1 threshold.
+  const variantClasses = size === "full"
+    ? VARIANT_CLASSES[variant].replace("disabled:opacity-50", "")
+    : VARIANT_CLASSES[variant];
   return `inline-flex items-center gap-2 rounded-lg font-medium transition-colors
           cursor-pointer disabled:cursor-not-allowed
-          ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`;
+          ${variantClasses} ${SIZE_CLASSES[size]}
+          ${size === "full" ? "disabled:bg-stone-100 disabled:text-stone-700" : ""} ${className}`;
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(

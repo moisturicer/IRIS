@@ -1,0 +1,1069 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRIS Review Workspace</title>
+<meta name="description" content="Clickable prototype of the IRIS review workspace: the paper, a pull-request style review pane, and a details sidebar of reviewers, researchers and classification. Synthetic data.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root {
+  --maroon: #6B0F12; --maroon-light: #8B1316; --maroon-dark: #4A0A0C;
+  --wash: #fdf2f2; --thread: #f9b8b9;
+  --endpaper: #fafaf9; --white: #ffffff; --bar: #f5f5f4; --desk: #e7e5e4; --rule: #d6d3d1;
+  --faint: #78716c; --quiet: #57534e; --body: #44403c; --ink: #1c1917;
+  --serif: "EB Garamond", Georgia, Cambria, serif;
+  --sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --r-thumb: .375rem; --r-control: .75rem; --r-card: 1.25rem;
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --lift: 0 4px 12px 0 rgb(0 0 0 / .08);
+  --recess: inset 0 1px 3px rgb(41 37 36 / .28), inset 0 0 0 1px rgb(41 37 36 / .07);
+  --ctl: 36px;
+}
+@media (pointer: coarse) { :root { --ctl: 44px; } }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { display: flex; flex-direction: column; overflow: hidden; font: 400 15px/24px var(--sans); color: var(--body); background: var(--endpaper); -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+::selection { background: var(--thread); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--maroon); outline-offset: 2px; border-radius: 4px; }
+* { scrollbar-width: thin; scrollbar-color: var(--rule) transparent; }
+button, input, textarea, select { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; text-align: inherit; }
+button:disabled { cursor: not-allowed; }
+h1, h2, h3, h4, p { margin: 0; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+svg.i { width: 16px; height: 16px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; vertical-align: -3px; }
+
+/* ---------- Prototype controls (not part of the design) ---------- */
+.proto { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; padding: 6px 16px; background: var(--ink); color: #d6d3d1; font-size: 12px; line-height: 18px; }
+.proto strong { color: #fff; font-weight: 600; }
+.proto .seg { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 2px; border-radius: var(--r-control); background: #292524; }
+.proto .seg button { padding: 2px 9px; border-radius: var(--r-thumb); color: #d6d3d1; font-weight: 500; }
+.proto .seg button[aria-pressed="true"] { background: #fff; color: var(--ink); }
+.proto .seg button:disabled { color: #57534e; }
+.proto .note { margin-left: auto; color: #a8a29e; }
+@media (max-width: 760px) { .proto .note { display: none; } }
+
+/* ---------- Record bar ---------- */
+.bar { flex: none; display: flex; align-items: center; gap: 12px; height: 56px; padding: 0 20px; background: var(--bar); border-bottom: 1px solid var(--desk); }
+.back { display: inline-flex; align-items: center; gap: 6px; height: var(--ctl); padding: 0 10px 0 6px; border-radius: var(--r-control); font: 600 13px/20px var(--sans); color: var(--body); text-decoration: none; }
+.back:hover { background: var(--desk); color: var(--ink); }
+.vr { width: 1px; height: 24px; background: var(--rule); flex: none; }
+.bar-title { min-width: 0; flex: 1; font: 600 20px/28px var(--serif); color: var(--ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.track { display: flex; padding: 2px; border-radius: var(--r-control); background: var(--desk); box-shadow: var(--recess); flex: none; }
+.track span { padding: 0 12px; font: 600 13px/calc(var(--ctl) - 4px) var(--sans); color: var(--quiet); border-radius: var(--r-thumb); }
+.track span[aria-current] { background: var(--maroon); color: #fff; }
+@media (max-width: 639px) { .bar { padding: 0 8px; gap: 6px; } .vr, .bar-title { display: none; } .track { margin-left: auto; } .track span { padding: 0 9px; } }
+
+/* ---------- Workspace: paper 50 · review 25 · details 25 ---------- */
+.work-wrap { flex: 1; min-height: 0; display: flex; container: work / inline-size; }
+.work { flex: 1; min-width: 0; position: relative; display: grid; grid-template-columns: minmax(0, 1fr) var(--mid-w, 30%) var(--side-w, 20%); }
+/* Drag the left edge of the review pane or the details sidebar; arrow keys nudge, a double click restores. */
+.grip { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; touch-action: none; }
+.grip::after { content: ""; position: absolute; left: 3px; top: 0; bottom: 0; width: 2px; background: transparent; transition: background-color .15s; }
+.grip:hover::after, .grip:focus-visible::after, .grip.dragging::after { background: var(--maroon); }
+.grip:focus-visible { outline: none; }
+body.resizing { cursor: col-resize; user-select: none; }
+body.resizing iframe, body.resizing .pages { pointer-events: none; }
+.reader { min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--desk); }
+.reader-tools { flex: none; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 16px; background: var(--bar); border-bottom: 1px solid var(--desk); }
+.reader-tools .grow { flex: 1; }
+.reader-tools .hint { font-size: 13px; color: var(--faint); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40ch; }
+.pages { flex: 1; min-height: 0; overflow-y: auto; padding: 24px 20px 96px; display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.page { position: relative; width: min(100%, 700px); flex: none; background: var(--white); box-shadow: 0 1px 2px rgb(41 37 36 / .12), 0 8px 24px rgb(41 37 36 / .06); padding: 52px 56px 50px; scroll-margin-top: 16px; }
+.page .running { position: absolute; top: 18px; left: 56px; right: 56px; font-size: 11px; color: var(--faint); display: flex; justify-content: space-between; }
+.page .pno { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center; font-size: 11px; color: var(--faint); }
+.page h2 { font: 600 19px/26px var(--serif); color: var(--ink); margin-bottom: 12px; }
+.page p { font: 400 15px/1.75 Georgia, Cambria, serif; color: #292524; margin: 0 0 14px; text-align: justify; hyphens: auto; }
+.page.flash { animation: pageflash 1.4s var(--ease); }
+@keyframes pageflash { 0% { box-shadow: 0 0 0 3px var(--thread); } 100% { box-shadow: 0 1px 2px rgb(41 37 36 / .12), 0 8px 24px rgb(41 37 36 / .06); } }
+mark.hl { background: var(--wash); color: inherit; box-shadow: inset 0 -2px 0 var(--thread); cursor: pointer; border-radius: 2px; transition: background-color .15s; }
+mark.hl:hover, mark.hl.focus { background: var(--thread); }
+mark.hl.pending { background: transparent; box-shadow: inset 0 -2px 0 var(--maroon); cursor: default; }
+.pin { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--maroon); color: #fff; font: 600 11px/1 var(--sans); vertical-align: 2px; margin-left: 2px; }
+.pin.done { background: var(--ink); }
+.pin.quiet { background: var(--white); color: var(--maroon); box-shadow: inset 0 0 0 1px var(--thread); }
+.reader-foot { display: none; }
+
+/* ---------- Review pane (middle) ---------- */
+.pane { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; background: var(--endpaper); border-left: 1px solid var(--rule); }
+.pane-head { flex: none; padding: 12px 16px 0; background: var(--bar); border-bottom: 1px solid var(--desk); }
+.who-line { display: flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; font-size: 12.5px; line-height: 18px; color: var(--quiet); }
+.who-line b { color: var(--ink); font-weight: 600; }
+.pane-title { font: 600 20px/28px var(--serif); color: var(--ink); margin-top: 4px; display: flex; align-items: center; gap: 8px; }
+.pane-title .grow { flex: 1; }
+.pane-head .close-pane { display: none; }
+.tabs { display: flex; margin: 6px -8px 0; overflow-x: auto; scrollbar-width: none; }
+.tab { position: relative; display: inline-flex; align-items: center; gap: 6px; height: 42px; padding: 0 8px; font: 600 13px/20px var(--sans); color: var(--quiet); white-space: nowrap; }
+.tab:hover { color: var(--ink); }
+.tab[aria-selected="true"] { color: var(--ink); }
+.tab[aria-selected="true"]::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: -1px; height: 2px; background: var(--ink); border-radius: 2px; }
+.tab .count { min-width: 18px; padding: 0 5px; border-radius: 999px; background: var(--desk); color: var(--quiet); font-size: 11px; line-height: 18px; text-align: center; }
+.tab.details-tab { display: none; }
+.pane-body { flex: 1; min-height: 0; overflow-y: auto; }
+.pane-body > section { padding: 16px; }
+
+/* ---------- Details sidebar (right) ---------- */
+.meta { position: relative; min-width: 0; min-height: 0; overflow-y: auto; background: var(--endpaper); border-left: 1px solid var(--rule); padding: 4px 18px 32px; }
+.m-sec { padding: 14px 0; border-bottom: 1px solid var(--desk); }
+.m-sec:last-child { border-bottom: 0; }
+.m-h { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.m-h h3 { flex: 1; font: 600 12.5px/18px var(--sans); color: var(--quiet); }
+.gear { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--r-thumb); color: var(--faint); }
+.gear:hover:not(:disabled) { background: var(--desk); color: var(--maroon); }
+.gear:disabled { opacity: .35; }
+.m-empty { font-size: 13px; color: var(--faint); }
+.m-text { font-size: 13px; line-height: 20px; color: var(--body); margin-top: 4px; }
+.party-h { display: flex; align-items: center; gap: 6px; margin: 12px 0 2px; font: 600 12px/18px var(--sans); color: var(--ink); }
+.m-sec .party-h:first-of-type { margin-top: 0; }
+.party-h .q { font-weight: 400; color: var(--faint); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.party-h .pst { font-weight: 500; color: var(--quiet); }
+.person { display: flex; align-items: center; gap: 8px; width: calc(100% + 12px); min-height: 32px; padding: 3px 6px; margin: 0 -6px; border-radius: var(--r-thumb); font-size: 13px; line-height: 18px; color: var(--ink); }
+button.person:hover { background: var(--bar); }
+.person .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.person .sub { color: var(--faint); font-size: 12px; }
+.av { width: 24px; height: 24px; border-radius: 50%; background: var(--maroon); color: #fff; display: inline-grid; place-items: center; font: 600 10px/1 var(--sans); flex: none; letter-spacing: .02em; }
+.av.staff { background: var(--ink); color: #fff; }
+.av.pool { background: var(--white); color: var(--faint); border: 1px dashed var(--rule); }
+.av.pool svg.i { width: 13px; height: 13px; vertical-align: 0; }
+.st { display: inline-grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; flex: none; }
+.st svg.i { width: 11px; height: 11px; stroke-width: 2.4; vertical-align: 0; }
+.st.ok { background: var(--ink); color: #fff; }
+.st.on { color: var(--maroon); box-shadow: inset 0 0 0 1.5px var(--thread); background: var(--wash); }
+.st.flag { background: var(--maroon); color: #fff; }
+.st.wait { color: var(--faint); box-shadow: inset 0 0 0 1.5px var(--rule); }
+.st.gone { color: var(--faint); }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.tag { display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px; border-radius: 999px; font: 600 12px/20px var(--sans); color: var(--body); box-shadow: inset 0 0 0 1px var(--rule); }
+.tag.on { background: var(--wash); color: var(--maroon); box-shadow: inset 0 0 0 1px var(--thread); }
+.tag svg.i { width: 12px; height: 12px; stroke-width: 2.2; vertical-align: 0; }
+.kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; line-height: 19px; margin: 0; }
+.kv dt { color: var(--faint); }
+.kv dd { margin: 0; color: var(--ink); text-align: right; }
+.avatars { display: flex; flex-wrap: wrap; gap: 4px; }
+.m-act { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 0; font: 600 13px/20px var(--sans); color: var(--body); }
+.m-act:hover { color: var(--maroon); }
+
+/* ---------- Responsive ---------- */
+@container work (max-width: 1199px) {
+  .work { grid-template-columns: minmax(0, 1fr) var(--mid-w, 40%); }
+  .work > .meta { display: none; }
+  .meta.as-tab { border: 0; padding: 0 16px 24px; overflow: visible; }
+  .tab.details-tab { display: inline-flex; }
+}
+@container work (max-width: 899px) {
+  .work { grid-template-columns: minmax(0, 1fr); }
+  .pane { position: absolute; top: 0; right: 0; bottom: 0; width: min(440px, 100%); z-index: 40; transform: translateX(100%); visibility: hidden; transition: transform .32s var(--ease), visibility 0s .32s; box-shadow: -12px 0 32px rgb(41 37 36 / .12); }
+  .pane.open { transform: none; visibility: visible; transition: transform .32s var(--ease); }
+  .pane-head .close-pane { display: inline-flex; }
+  .grip { display: none; }
+  .scrim { position: absolute; inset: 0; background: rgb(41 37 36 / .28); z-index: 35; }
+  .reader-foot { display: flex; position: absolute; left: 0; right: 0; bottom: 0; z-index: 20; align-items: center; gap: 10px; padding: 10px 16px; background: var(--bar); border-top: 1px solid var(--rule); }
+  .reader-foot .ft { flex: 1; min-width: 0; font-size: 13px; line-height: 18px; color: var(--quiet); }
+  .reader-foot .ft b { display: block; color: var(--ink); font-size: 14px; }
+}
+@container work (max-width: 599px) {
+  .pane { width: 100%; box-shadow: none; }
+  .page { padding: 40px 22px 44px; } .page .running { left: 22px; right: 22px; }
+  .pages { padding: 16px 8px 120px; }
+  .reader-tools .hint { display: none; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---------- Controls ---------- */
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: var(--ctl); padding: 0 13px; border-radius: var(--r-control); font: 600 13px/20px var(--sans); color: var(--body); box-shadow: inset 0 0 0 1px var(--rule); transition: color .15s, box-shadow .15s, background-color .15s; white-space: nowrap; }
+.btn svg.i { vertical-align: 0; }
+.btn:hover:not(:disabled) { color: var(--maroon); box-shadow: inset 0 0 0 1px rgb(107 15 18 / .4); }
+.btn.on { background: var(--wash); color: var(--maroon); box-shadow: inset 0 0 0 1px var(--thread); }
+.btn.primary { background: var(--maroon); color: #fff; box-shadow: var(--lift); }
+.btn.primary:hover:not(:disabled) { background: var(--maroon-light); color: #fff; }
+.btn.ghost { box-shadow: none; color: var(--faint); padding: 0 9px; }
+.btn.ghost:hover:not(:disabled) { background: var(--desk); color: var(--ink); box-shadow: none; }
+.btn.sm { min-height: 30px; padding: 0 10px; font-size: 12px; }
+.btn.pill { border-radius: 999px; min-height: 44px; padding: 0 18px; font-size: 14px; }
+.btn.block { width: 100%; }
+.btn:disabled { opacity: .55; }
+.seg2 { display: inline-flex; padding: 2px; border-radius: var(--r-control); background: var(--desk); box-shadow: var(--recess); }
+.seg2 button { height: calc(var(--ctl) - 4px); padding: 0 11px; border-radius: var(--r-thumb); font: 600 13px/20px var(--sans); color: var(--quiet); }
+.seg2 button[aria-pressed="true"] { background: var(--white); color: var(--ink); box-shadow: 0 1px 2px rgb(0 0 0 / .08); }
+.seg2 button:disabled { opacity: .5; }
+.field { width: 100%; border: 0; border-radius: var(--r-control); background: var(--white); box-shadow: inset 0 0 0 1px var(--rule); padding: 9px 12px; font-size: 14px; line-height: 22px; color: var(--ink); resize: vertical; caret-color: var(--maroon); }
+.field:focus { outline: none; box-shadow: inset 0 0 0 1px var(--maroon), 0 0 0 3px var(--wash); }
+.field::placeholder { color: var(--faint); }
+select.field { height: var(--ctl); padding: 0 30px 0 10px; appearance: none; font-size: 13px; font-weight: 600; background: var(--white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%2357534e' stroke-width='1.6' stroke-linecap='round'%3E%3Cpath d='m3 4.5 3 3 3-3'/%3E%3C/svg%3E") no-repeat right 10px center; }
+.label { display: block; font: 600 12px/16px var(--sans); color: var(--quiet); margin-bottom: 6px; }
+.small { font-size: 13px; line-height: 20px; }
+.faint { color: var(--faint); }
+.ink { color: var(--ink); }
+.linkish { color: var(--maroon); font-weight: 600; text-decoration: underline; text-decoration-color: var(--thread); text-underline-offset: 3px; }
+.linkish:hover { text-decoration-color: var(--maroon); }
+.chip { display: inline-flex; align-items: center; gap: 5px; padding: 1px 9px; border-radius: 999px; font: 600 12px/20px var(--sans); white-space: nowrap; }
+.chip svg.i { width: 12px; height: 12px; stroke-width: 2; vertical-align: 0; }
+.t-quiet { color: var(--body); box-shadow: inset 0 0 0 1px var(--rule); }
+.t-active { background: var(--wash); color: var(--maroon); box-shadow: inset 0 0 0 1px var(--thread); }
+.t-attn { background: var(--maroon); color: #fff; }
+.t-settled { background: var(--ink); color: #fff; }
+
+/* ---------- Conversation ---------- */
+.tl { position: relative; padding-left: 32px; }
+.tl::before { content: ""; position: absolute; left: 12px; top: 8px; bottom: 8px; width: 1px; background: var(--rule); }
+.ev { position: relative; padding: 4px 0 14px; }
+.ev-icon { position: absolute; left: -32px; top: 3px; width: 25px; height: 25px; border-radius: 50%; display: grid; place-items: center; background: var(--endpaper); color: var(--quiet); box-shadow: inset 0 0 0 1px var(--rule); }
+.ev-icon.maroon { background: var(--maroon); color: #fff; box-shadow: none; }
+.ev-icon.ink { background: var(--ink); color: #fff; box-shadow: none; }
+.ev-icon svg.i { width: 13px; height: 13px; vertical-align: 0; }
+.ev-line { font-size: 13px; line-height: 20px; color: var(--quiet); padding-top: 5px; }
+.ev-line b { font-weight: 600; color: var(--ink); }
+.ev-box { margin-top: 8px; background: var(--white); border: 1px solid var(--desk); border-radius: var(--r-control); overflow: hidden; }
+.ev-box-h { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: var(--bar); border-bottom: 1px solid var(--desk); font-size: 12px; color: var(--quiet); }
+.ev-box-b { padding: 9px 12px; font-size: 13px; line-height: 20px; color: var(--body); }
+.ev-box-b + .ev-box-b { border-top: 1px solid var(--desk); }
+.ev-box-b .q { color: var(--faint); font-size: 12px; margin-bottom: 2px; }
+.vrule { display: flex; align-items: center; gap: 10px; margin: 6px 0 16px -32px; font: 600 12px/18px var(--sans); color: var(--quiet); }
+.vrule::after { content: ""; flex: 1; height: 1px; background: var(--rule); }
+.vrule .vchip { padding: 1px 9px; border-radius: 999px; background: var(--ink); color: #fff; }
+.letter { padding: 12px; }
+.letter h4 { font: 600 16px/22px var(--serif); color: var(--ink); }
+.letter ol { margin: 8px 0 0; padding-left: 18px; }
+.letter li { margin-bottom: 8px; font-size: 13px; line-height: 20px; }
+.letter li .lq { display: block; color: var(--faint); font-size: 12px; }
+.letter .resp { font-weight: 600; color: var(--ink); }
+.stand { border: 1px solid var(--rule); border-radius: var(--r-control); background: var(--white); overflow: hidden; scroll-margin-top: 12px; }
+.verdict { display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; }
+.verdict.ready { background: var(--ink); color: #fff; }
+.verdict.blocked { background: var(--maroon); color: #fff; }
+.verdict.waiting { background: var(--wash); color: var(--maroon); border-bottom: 1px solid var(--thread); }
+.verdict.done { background: var(--bar); color: var(--ink); border-bottom: 1px solid var(--desk); }
+.verdict .vt { font-weight: 600; font-size: 14px; line-height: 20px; }
+.verdict .vs { font-size: 13px; line-height: 19px; opacity: .9; }
+.verdict svg.i { width: 18px; height: 18px; margin-top: 1px; vertical-align: 0; }
+.stand ul { list-style: none; margin: 0; padding: 0 14px; }
+.stand li { display: grid; grid-template-columns: 22px 1fr; gap: 1px 8px; padding: 9px 0; border-top: 1px solid var(--desk); font-size: 13px; line-height: 19px; }
+.stand li:first-child { border-top: 0; }
+.mk { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; }
+.mk.ok { background: var(--ink); color: #fff; }
+.mk.block { background: var(--maroon); color: #fff; }
+.mk.look { background: var(--wash); color: var(--maroon); box-shadow: inset 0 0 0 1px var(--thread); }
+.mk.info { color: var(--quiet); box-shadow: inset 0 0 0 1px var(--rule); }
+.mk svg.i { width: 12px; height: 12px; stroke-width: 2.2; vertical-align: 0; }
+.stand .rt { color: var(--ink); font-weight: 500; }
+.stand .rs { grid-column: 2; color: var(--faint); }
+
+/* ---------- Changes ---------- */
+.cmp-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.cmp-note { font-size: 12px; color: var(--faint); margin: 6px 0 2px; }
+.ch-sec { padding: 14px 0; border-top: 1px solid var(--desk); }
+.ch-head { display: flex; align-items: center; gap: 8px; }
+.ch-head h4 { font: 600 16px/22px var(--serif); color: var(--ink); flex: 1; min-width: 0; }
+.ch-head .pg { font-size: 12px; color: var(--faint); }
+.ch-sec.same .ch-head h4 { color: var(--faint); }
+.ch-body { margin-top: 8px; }
+.ch-para { font-size: 13.5px; line-height: 1.7; color: var(--body); margin: 0 0 8px; }
+ins { text-decoration: none; background: var(--wash); color: var(--ink); box-shadow: inset 0 -2px 0 var(--thread); border-radius: 2px; padding: 0 1px; }
+del { color: var(--faint); text-decoration: line-through; background: var(--bar); border-radius: 2px; padding: 0 1px; }
+.newtag { display: inline-flex; align-items: center; gap: 5px; font: 600 11px/16px var(--sans); color: var(--maroon); margin-bottom: 2px; }
+.check { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 9px; border-radius: var(--r-control); font: 600 12px/16px var(--sans); color: var(--quiet); box-shadow: inset 0 0 0 1px var(--rule); }
+.check .box { width: 14px; height: 14px; border-radius: 4px; box-shadow: inset 0 0 0 1.5px var(--rule); display: grid; place-items: center; background: var(--white); }
+.check .box svg { width: 10px; height: 10px; stroke-width: 2.6; opacity: 0; vertical-align: 0; }
+.check[aria-pressed="true"] { background: var(--bar); color: var(--ink); }
+.check[aria-pressed="true"] .box { background: var(--ink); box-shadow: none; color: #fff; }
+.check[aria-pressed="true"] .box svg { opacity: 1; }
+.ch-link { display: flex; gap: 8px; align-items: flex-start; width: 100%; margin-top: 6px; padding: 8px 10px; border-radius: var(--r-control); background: var(--white); box-shadow: inset 0 0 0 1px var(--desk); font-size: 12.5px; line-height: 18px; color: var(--quiet); }
+.ch-link:hover { box-shadow: inset 0 0 0 1px var(--rule), var(--lift); }
+.ch-link b { color: var(--ink); font-weight: 600; }
+
+/* ---------- Threads ---------- */
+.filters { display: flex; gap: 6px; flex-wrap: wrap; }
+.filters button { height: 28px; padding: 0 10px; border-radius: 999px; font: 600 12px/16px var(--sans); color: var(--quiet); box-shadow: inset 0 0 0 1px var(--rule); }
+.filters button[aria-pressed="true"] { background: var(--wash); color: var(--maroon); box-shadow: inset 0 0 0 1px var(--thread); }
+.thread { padding: 14px 0; border-top: 1px solid var(--desk); scroll-margin-top: 12px; }
+.thread.flash { animation: flash 1.4s var(--ease); }
+@keyframes flash { 0% { background: var(--wash); } 100% { background: transparent; } }
+.th-top { display: flex; align-items: center; gap: 6px; font-size: 12px; line-height: 16px; color: var(--faint); margin-bottom: 6px; flex-wrap: wrap; }
+.th-top .where { color: var(--quiet); font-weight: 600; }
+.th-top .grow { flex: 1; }
+.party { display: inline-flex; align-items: center; padding: 0 7px; border-radius: 999px; font: 600 11px/18px var(--sans); color: var(--quiet); box-shadow: inset 0 0 0 1px var(--rule); }
+.party.me { color: var(--maroon); box-shadow: inset 0 0 0 1px var(--thread); background: var(--wash); }
+.th-quote { display: block; width: 100%; font-size: 13px; line-height: 20px; color: var(--quiet); padding: 1px 0 1px 10px; border-left: 1px solid var(--rule); margin-bottom: 8px; }
+button.th-quote:hover { color: var(--ink); border-left-color: var(--maroon); }
+.th-quote.gone { text-decoration: line-through; text-decoration-color: var(--rule); }
+.th-body { font-size: 13px; line-height: 20px; color: var(--ink); }
+.th-who { font-weight: 600; }
+button.th-who:hover { color: var(--maroon); }
+.reply { margin-top: 8px; padding-left: 12px; border-left: 1px solid var(--desk); font-size: 13px; line-height: 20px; }
+.reply .rh { font-size: 12px; color: var(--faint); margin-bottom: 1px; }
+.reply .rh b { color: var(--ink); font-weight: 600; font-size: 13px; }
+.suggest { margin-top: 8px; border-radius: var(--r-control); overflow: hidden; box-shadow: inset 0 0 0 1px var(--desk); font-size: 13px; line-height: 20px; background: var(--white); }
+.suggest .sh { padding: 5px 10px; background: var(--bar); color: var(--quiet); font-weight: 600; font-size: 12px; display: flex; gap: 6px; align-items: center; }
+.suggest .sb { padding: 7px 10px; }
+.th-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.empty { padding: 14px 0 4px; font-size: 13px; color: var(--faint); }
+.composer { margin: 0 -16px 12px; padding: 14px 16px; background: var(--white); border-bottom: 1px solid var(--desk); animation: arrive .32s var(--ease); }
+@keyframes arrive { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.composer .ctx { font-size: 12px; color: var(--faint); margin-bottom: 6px; display: flex; gap: 6px; align-items: center; }
+.composer .ctx b { color: var(--quiet); }
+.row { display: flex; gap: 8px; align-items: center; justify-content: flex-end; flex-wrap: wrap; margin-top: 10px; }
+.row .grow { flex: 1; }
+
+/* ---------- Dock ---------- */
+.dock { flex: none; display: flex; align-items: center; gap: 10px; padding: 10px 16px; background: var(--bar); border-top: 1px solid var(--rule); }
+.dock .dt { flex: 1; min-width: 0; font-size: 12.5px; line-height: 18px; color: var(--quiet); }
+.dock .dt b { display: block; color: var(--ink); font-weight: 600; font-size: 14px; line-height: 20px; }
+.dock .dt button { display: block; text-align: left; }
+
+/* ---------- Profile card ---------- */
+.profile { position: fixed; z-index: 70; width: 300px; background: var(--white); border-radius: var(--r-card); box-shadow: 0 0 0 1px var(--desk), 0 16px 40px rgb(41 37 36 / .16); padding: 16px; animation: arrive .25s var(--ease); }
+.profile .top { display: flex; gap: 12px; align-items: center; }
+.profile .av { width: 44px; height: 44px; font-size: 15px; }
+.profile .nm { font: 600 18px/22px var(--serif); color: var(--ink); }
+.profile .rl { font-size: 12.5px; color: var(--quiet); }
+.profile .kv { margin-top: 12px; }
+.profile .kv dd { text-align: left; }
+.profile .bio { margin-top: 10px; font-size: 13px; line-height: 20px; color: var(--body); }
+.profile .ft { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--desk); font-size: 12px; color: var(--faint); }
+
+/* ---------- Dialog ---------- */
+dialog { border: 0; padding: 0; border-radius: var(--r-card); width: min(580px, calc(100vw - 24px)); max-height: calc(100vh - 32px); background: var(--white); color: var(--body); box-shadow: 0 24px 64px rgb(41 37 36 / .22); }
+dialog[open] { animation: dlg .32s var(--ease); }
+@keyframes dlg { from { opacity: 0; transform: translateY(12px) scale(.98); } to { opacity: 1; transform: none; } }
+dialog::backdrop { background: rgb(41 37 36 / .32); }
+.dlg-h { padding: 22px 24px 4px; }
+.dlg-h h2 { font: 600 22px/28px var(--serif); color: var(--ink); }
+.dlg-h p { margin-top: 4px; font-size: 14px; color: var(--quiet); }
+.dlg-b { padding: 14px 24px; }
+.dlg-f { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; padding: 14px 24px 20px; border-top: 1px solid var(--desk); background: var(--endpaper); }
+.opts { display: flex; flex-direction: column; gap: 6px; margin: 14px 0 4px; }
+.opt { display: grid; grid-template-columns: 20px 1fr; gap: 2px 10px; padding: 10px 12px; border-radius: var(--r-control); box-shadow: inset 0 0 0 1px var(--desk); cursor: pointer; }
+.opt:hover:not(.off) { box-shadow: inset 0 0 0 1px var(--rule); }
+.opt.sel { background: var(--wash); box-shadow: inset 0 0 0 1px var(--thread); }
+.opt.off { cursor: not-allowed; background: var(--endpaper); }
+.opt input { margin: 3px 0 0; accent-color: var(--maroon); width: 16px; height: 16px; }
+.opt .on { font-weight: 600; color: var(--ink); font-size: 14px; line-height: 22px; }
+.opt.off .on, .opt.off .od { color: var(--faint); }
+.opt .od { grid-column: 2; font-size: 13px; line-height: 20px; color: var(--quiet); }
+.opt.danger .on { color: var(--maroon-dark); }
+.office-pick { border-radius: var(--r-control); box-shadow: inset 0 0 0 1px var(--desk); margin-bottom: 8px; overflow: hidden; }
+.office-pick.sel { box-shadow: inset 0 0 0 1px var(--thread); }
+.office-pick > label { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; flex-wrap: wrap; }
+.office-pick.sel > label { background: var(--wash); }
+.office-pick input { accent-color: var(--maroon); width: 16px; height: 16px; margin: 0; }
+.office-pick .on { font-weight: 600; color: var(--ink); font-size: 14px; }
+.office-pick .whom { padding: 10px 12px 12px 38px; border-top: 1px solid var(--desk); display: grid; gap: 8px; }
+.whom .members { display: flex; flex-wrap: wrap; gap: 6px; }
+.member { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px 3px 3px; border-radius: 999px; font-size: 13px; font-weight: 500; color: var(--body); box-shadow: inset 0 0 0 1px var(--rule); background: var(--white); }
+.member .av { width: 22px; height: 22px; font-size: 9px; background: var(--faint); }
+.member[aria-pressed="true"] { background: var(--wash); color: var(--maroon); box-shadow: inset 0 0 0 1px var(--thread); }
+.member[aria-pressed="true"] .av { background: var(--maroon); }
+.member:disabled { opacity: .5; }
+.err { color: var(--maroon); font-size: 13px; margin-top: 8px; display: flex; gap: 6px; align-items: center; }
+.warn { display: flex; gap: 8px; align-items: flex-start; padding: 10px 12px; border-radius: var(--r-control); background: var(--bar); box-shadow: inset 0 0 0 1px var(--rule); font-size: 13px; line-height: 19px; color: var(--body); margin-top: 10px; }
+.drop { display: flex; align-items: center; gap: 12px; padding: 14px; border-radius: var(--r-control); box-shadow: inset 0 0 0 1px var(--rule); background: var(--endpaper); width: 100%; }
+.drop .file-ic { width: 34px; height: 42px; border-radius: 4px; background: var(--white); box-shadow: inset 0 0 0 1px var(--rule); display: grid; place-items: center; color: var(--maroon); font: 600 10px/1 var(--sans); }
+.toast { position: fixed; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; z-index: 80; display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 14px; font-weight: 500; box-shadow: var(--lift); transition: opacity .3s var(--ease), transform .3s var(--ease); pointer-events: none; max-width: calc(100vw - 32px); }
+.toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div class="proto" role="region" aria-label="Prototype controls">
+  <strong>Prototype</strong>
+  <span>Stage</span><span class="seg" id="stageSeg"></span>
+  <span>Viewing as</span><span class="seg" id="roleSeg"></span>
+  <span class="note">Synthetic data · nothing is saved</span>
+</div>
+<header class="bar">
+  <a class="back" href="#" onclick="return false"><svg class="i" viewBox="0 0 16 16"><path d="M10 3 5 8l5 5"/></svg>Back</a>
+  <span class="vr" aria-hidden="true"></span>
+  <span class="bar-title">Flood-Risk Mapping of Barangay Drainage Networks Using Low-Cost Ultrasonic Sensors</span>
+  <nav class="track" aria-label="Record sections"><span>Overview</span><span>Paper</span><span aria-current="page">Review</span><span>Files</span></nav>
+</header>
+<div class="work-wrap"><div class="work" id="work"></div></div>
+<div id="pop"></div>
+<dialog id="dlg"></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script>
+/* ================= Icons ================= */
+const I = {
+  check: '<path d="m3.5 8.5 3 3 6-7"/>', x: '<path d="m4 4 8 8M12 4l-8 8"/>',
+  dot: '<circle cx="8" cy="8" r="2.5" fill="currentColor" stroke="none"/>',
+  clock: '<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3l2 1.5"/>', pause: '<path d="M6 4.5v7M10 4.5v7"/>',
+  msg: '<path d="M3 4.5A1.5 1.5 0 0 1 4.5 3h7A1.5 1.5 0 0 1 13 4.5v5A1.5 1.5 0 0 1 11.5 11H7l-3 2.5V11A1 1 0 0 1 3 10Z"/>',
+  file: '<path d="M4.5 2.5h4.5l3 3v8h-7.5Z"/><path d="M9 2.5v3h3"/>', up: '<path d="M8 12V4M4.5 7.5 8 4l3.5 3.5"/>',
+  route: '<circle cx="4" cy="4" r="1.5"/><circle cx="12" cy="12" r="1.5"/><path d="M5.5 4H9a2.5 2.5 0 0 1 0 5H7a2.5 2.5 0 0 0 0 5h3.5"/>',
+  eye: '<path d="M1.8 8S4 3.8 8 3.8 14.2 8 14.2 8 12 12.2 8 12.2 1.8 8 1.8 8Z"/><circle cx="8" cy="8" r="2"/>',
+  arrow: '<path d="M3 8h10M9 4l4 4-4 4"/>', undo: '<path d="M5 6.5H10a3 3 0 0 1 0 6H7"/><path d="M7 4 4.5 6.5 7 9"/>',
+  pen: '<path d="M10.5 3 13 5.5 6 12.5H3.5V10Z"/>', alert: '<path d="M8 2.5 14 13H2Z"/><path d="M8 6.5v3M8 11.2v.1"/>',
+  diff: '<path d="M4 3v6M1 6h6M9 11h6"/>', list: '<path d="M5.5 4.5h8M5.5 8h8M5.5 11.5h8"/><path d="M2.5 4.5h.1M2.5 8h.1M2.5 11.5h.1"/>',
+  users: '<circle cx="6" cy="5.5" r="2.2"/><path d="M2 13c.5-2.4 2-3.6 4-3.6s3.5 1.2 4 3.6"/><path d="M10.5 3.6a2 2 0 0 1 0 3.8M12 9.6c1 .5 1.7 1.6 2 3.4"/>',
+  plus: '<path d="M8 3.5v9M3.5 8h9"/>', minus: '<path d="M4 8h8"/>',
+  hand: '<path d="M5 8.5V4a1 1 0 0 1 2 0v3.5M7 7V3a1 1 0 0 1 2 0v4M9 7V4a1 1 0 0 1 2 0v5c0 2.5-1.5 4.5-4 4.5S3.5 12 3 10.5L2.4 8.8a1 1 0 0 1 1.8-.8L5 9"/>',
+  panel: '<rect x="2.5" y="3" width="11" height="10" rx="1.5"/><path d="M9.5 3v10"/>', flag: '<path d="M4 13.5V3M4 3.5h7l-1.5 2.5L11 8.5H4"/>',
+  sparkle: '<path d="M8 2.5v3M8 10.5v3M2.5 8h3M10.5 8h3"/>',
+  gear: '<circle cx="8" cy="8" r="2"/><path d="M8 1.8v1.6M8 12.6v1.6M1.8 8h1.6M12.6 8h1.6M3.6 3.6l1.1 1.1M11.3 11.3l1.1 1.1M3.6 12.4l1.1-1.1M11.3 4.7l1.1-1.1"/>',
+  bell: '<path d="M4 11V7.5a4 4 0 0 1 8 0V11l1 1.5H3Z"/><path d="M6.8 14h2.4"/>', bellOff: '<path d="M4 11V7.5a4 4 0 0 1 6.6-3M12 7.5V11l1 1.5H5.5M6.8 14h2.4M2.5 2.5l11 11"/>',
+  link: '<path d="M7 9a2.5 2.5 0 0 0 3.5 0l2-2A2.5 2.5 0 0 0 9 3.5l-.7.7M9 7a2.5 2.5 0 0 0-3.5 0l-2 2A2.5 2.5 0 0 0 7 12.5l.7-.7"/>',
+  bolt: '<path d="M9 1.8 3.5 9H8l-1 5.2L12.5 7H8Z"/>',
+};
+const ic = (n, c = '') => `<svg class="i ${c}" viewBox="0 0 16 16" aria-hidden="true">${I[n]}</svg>`;
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const lead = s => (s.match(/^.*?[.?!](?=\s|$)/) || [s])[0];
+const initials = n => n.replace(/^(Prof|Dr|Engr|Atty|Ms|Mr)\.\s+/, '').split(/\s+/).filter(w => /^[A-Z]/.test(w)).map(w => w[0]).slice(0, 2).join('');
+
+/* ================= People (synthetic) ================= */
+const PEOPLE = {
+  'Maria Lopez': { role: 'Researcher · lead author', unit: 'BS Computer Engineering, 4th year', college: 'Engineering and Architecture', bio: 'Builds embedded sensing systems. This is her undergraduate thesis.', records: 'This thesis, and the Proposal it grew from' },
+  'Ken Villanueva': { role: 'Researcher · co-author', unit: 'BS Computer Engineering, 4th year', college: 'Engineering and Architecture', bio: 'Wrote the LoRa gateway firmware and the risk-map pipeline.', records: 'This thesis' },
+  'Prof. R. Santos': { role: 'Adviser', unit: 'Department of Computer Engineering', college: 'Engineering and Architecture', bio: 'Embedded systems and environmental IoT.' },
+  'Engr. L. Tan': { role: 'ITSO · IP specialist', unit: 'Innovation and Technology Support Office', bio: 'Patent searches and invention disclosures for engineering work.' },
+  'Atty. J. Ramos': { role: 'ITSO · legal counsel', unit: 'Innovation and Technology Support Office', bio: 'Licensing and IP agreements.' },
+  'Engr. P. Uy': { role: 'ITSO · technology officer', unit: 'Innovation and Technology Support Office', bio: 'Prior-art review for hardware.' },
+  'Dr. A. Cruz': { role: 'IERC · chair', unit: 'Institutional Ethics Review Committee', bio: 'Research ethics for studies involving people and communities.' },
+  'Dr. M. Lim': { role: 'IERC · member', unit: 'Institutional Ethics Review Committee', bio: 'Data privacy in field research.' },
+  'Prof. C. Go': { role: 'IERC · member', unit: 'Institutional Ethics Review Committee', bio: 'Community-engaged research.' },
+  'Ms. D. Yap': { role: 'KTTO · technology transfer officer', unit: 'Knowledge and Technology Transfer Office', bio: 'Licensing campus technology to LGUs and industry.' },
+  'Mr. R. Sy': { role: 'KTTO · industry liaison', unit: 'Knowledge and Technology Transfer Office', bio: 'Partnerships with local government units.' },
+  'Dr. E. Navarro': { role: 'RDCO · director', unit: 'Research, Development and Coordination Office', bio: 'Decides on research records; may ask any office to review first.' },
+  'Ms. G. Ong': { role: 'RDCO · research coordinator', unit: 'Research, Development and Coordination Office', bio: 'Coordinates office reviews.' },
+};
+const AUTHOR = 'Maria Lopez', AUTHORS = ['Maria Lopez', 'Ken Villanueva'], ADVISER = 'Prof. R. Santos';
+const PARTY = {
+  adviser: { name: 'Adviser', q: 'first review', me: ADVISER, members: [ADVISER] },
+  rdco: { name: 'RDCO', q: 'decides', me: 'Dr. E. Navarro', members: ['Dr. E. Navarro', 'Ms. G. Ong'] },
+  itso: { name: 'ITSO', q: 'intellectual property', me: 'Engr. L. Tan', members: ['Engr. L. Tan', 'Atty. J. Ramos', 'Engr. P. Uy'] },
+  ierc: { name: 'IERC', q: 'research ethics', me: 'Dr. A. Cruz', members: ['Dr. A. Cruz', 'Dr. M. Lim', 'Prof. C. Go'] },
+  ktto: { name: 'KTTO', q: 'commercialisation', me: 'Ms. D. Yap', members: ['Ms. D. Yap', 'Mr. R. Sy'] },
+};
+const SPECIALISTS = ['itso', 'ierc', 'ktto'];
+// Proposed routing (would supersede ADR-032 §3): the Adviser sends to RDCO only,
+// and only the offices, RDCO included, request other offices.
+const ROUTE_TARGETS = { adviser: ['rdco'], rdco: ['itso', 'ierc', 'ktto'], itso: ['ierc', 'ktto'], ierc: ['itso', 'ktto'], ktto: ['itso', 'ierc'] };
+
+/* ================= The paper ================= */
+const SECTIONS = [
+  { id: 's1', name: '1 Introduction', page: 1, paras: [
+    'Seasonal flooding in low-lying barangays is driven less by rainfall totals than by how quickly drainage channels fill and back up. Local disaster offices still rely on manual staff-gauge readings taken twice a day, which miss the short peaks that cause most street flooding.',
+    'This study asks whether a network of low-cost ultrasonic sensors can report water levels in drainage channels often and accurately enough to map flood risk at the street level.'] },
+  { id: 's2', name: '2 Related work', page: 3, paras: [
+    'Ultrasonic ranging is widely used for river-level monitoring because the sensor never touches the water. [-Previous studies have shown ultrasonic sensors to be unreliable in humid conditions [7]. -]Field deployments in Southeast Asia report stable readings when the transducer is shielded from direct rain [4], [5].'] },
+  { id: 's3', name: '3.1 Sensor deployment', page: 6, paras: [
+    'We deployed [-sensors in selected barangays-][+18 sensors across six barangays of Mandaue City, chosen because each had at least three recorded street-flooding incidents in 2023 and a drainage outfall reachable for maintenance+]. Each unit was mounted 1.2 m above the channel bed on a galvanised bracket of our own design and reported every five minutes over LoRa.'] },
+  { id: 's4', name: '3.2 Calibration', page: 7, paras: [
+    'Readings were calibrated against manual measurements taken by barangay staff.',
+    '[+Calibration used 412 paired readings collected over 21 days, each taken within two minutes of a sensor report. A linear correction per unit reduced the mean absolute error from 6.8 cm to 2.4 cm; units whose correction slope fell outside 0.95–1.05 were re-mounted and recalibrated.+]'] },
+  { id: 's5', name: '4 Results', page: 9, paras: [
+    'Over the 60-day deployment the network delivered 97.2% of scheduled reports. Water levels estimated by the sensors achieved [-an accuracy of 94%-][+an RMSE of 3.1 cm against staff-gauge readings+], and the five-minute series captured 23 peak events that the twice-daily manual readings missed entirely.'] },
+  { id: 's6', name: '5 Discussion', page: 11, paras: [
+    'Street-level risk maps built from the sensor series identified four drainage segments that back up within 20 minutes of heavy rain, two of which were not on the city’s existing flood-prone list. The bracket and enclosure cost under ₱1,900 per unit, which makes a city-wide network affordable to a local government.',
+    '[+Limitations. The deployment ran during the dry-to-wet transition and did not include a typhoon event. Sensor fouling by debris during sustained heavy rain was not observed and is left to a wet-season deployment.+]'] },
+  { id: 's7', name: '6 Conclusion', page: 12, paras: [
+    'Low-cost ultrasonic sensors can report drainage water levels often and accurately enough to support street-level flood-risk mapping, at a fraction of the cost of commercial river gauges.'] },
+];
+const segs = t => { const o = []; const re = /\[-([\s\S]*?)-\]|\[\+([\s\S]*?)\+\]/g; let i = 0, m; while ((m = re.exec(t))) { if (m.index > i) o.push(['eq', t.slice(i, m.index)]); o.push(m[1] != null ? ['del', m[1]] : ['ins', m[2]]); i = re.lastIndex; } if (i < t.length) o.push(['eq', t.slice(i)]); return o; };
+const textOf = (t, v) => segs(t).filter(([k]) => k === 'eq' || (v === 3 ? k === 'ins' : k === 'del')).map(s => s[1]).join('');
+const changed = s => s.paras.some(p => /\[[-+]/.test(p));
+const secOf = id => SECTIONS.find(s => s.id === id);
+
+/* ================= Stages ================= */
+const STAGES = {
+  v2: { label: 'v2 · revision requested', roles: ['adviser', 'author'] },
+  v3: { label: 'v3 · back with Adviser', roles: ['adviser', 'author'] },
+  offices: { label: 'v3 · with RDCO and offices', roles: ['adviser', 'rdco', 'itso', 'ierc', 'ktto', 'author'] },
+};
+const ROLE_LABEL = { adviser: 'Adviser', rdco: 'RDCO', itso: 'ITSO', ierc: 'IERC', ktto: 'KTTO', author: 'Author' };
+function adviserThreads(answered, resolved) {
+  const A = s => answered ? s : null;
+  return [
+    { id: 't1', party: 'adviser', by: ADVISER, v: 2, sec: 's3', page: 6, quote: 'sensors in selected barangays', body: 'Which barangays, and why these? State the sampling rationale so a reader can judge how far the results generalise.', answer: A({ state: 'addressed', text: 'Named the six barangays and the selection rule.', where: '§3.1, p.6' }), outdated: answered ? 'changed' : null, resolved },
+    { id: 't2', party: 'adviser', by: ADVISER, v: 2, sec: 's4', page: 7, quote: 'Readings were calibrated against manual measurements', body: 'How many manual measurements, over how long, and what error remained after calibration?', answer: A({ state: 'addressed', text: 'Added the calibration protocol and the error before and after.', where: '§3.2, p.7' }), resolved },
+    { id: 't3', party: 'adviser', by: ADVISER, v: 2, sec: 's5', page: 9, quote: 'an accuracy of 94%', body: '94% of what? For a water level, report an error in centimetres.', suggestion: 'an RMSE of 3.1 cm against staff-gauge readings', answer: A({ state: 'addressed', text: 'Accepted your wording.', where: '§4, p.9', accepted: true }), outdated: answered ? 'changed' : null, resolved },
+    { id: 't4', party: 'adviser', by: ADVISER, v: 2, sec: 's6', page: 11, quote: 'two of which were not on the city’s existing flood-prone list', body: 'Discuss sensor fouling during sustained heavy rain. Debris is the usual failure mode for channel-mounted sensors.', answer: A({ state: 'declined', text: 'No heavy-rain event occurred during the deployment. Added it to the limitations as future work.', where: '§5, p.11' }), resolved },
+    { id: 't5', party: 'adviser', by: ADVISER, v: 2, sec: 's2', page: 3, quote: 'Previous studies have shown ultrasonic sensors to be unreliable in humid conditions [7].', body: 'Reference [7] is a blog post. Replace it with a peer-reviewed source or remove the claim.', answer: A({ state: 'addressed', text: 'Removed the claim; the paragraph cites only [4] and [5].', where: '§2, p.3' }), outdated: answered ? 'removed' : null, resolved },
+  ];
+}
+
+/* ================= State ================= */
+const S = {};
+const emptyParty = () => ({ state: 'none', seats: [] });
+function setStage(stage, role, fresh) {
+  Object.assign(S, {
+    stage, role: role && STAGES[stage].roles.includes(role) ? role : STAGES[stage].roles[0],
+    tab: 'conversation', readerV: stage === 'v2' ? 2 : 3, filter: 'open', viewed: new Set(),
+    pending: { adviser: [], rdco: [], itso: [], ierc: [], ktto: [] }, selection: null, composing: null, focus: null,
+    events: [], answerDraft: {}, v3file: null, decision: null, paneOpen: false, docUploaded: false, watching: true,
+    revision: { adviser: stage === 'v2' }, fresh: !!fresh,
+  });
+  S.threads = adviserThreads(stage !== 'v2', stage === 'offices');
+  const advDone = stage === 'offices';
+  S.parties = { adviser: { state: advDone ? 'done' : 'review', seats: [{ who: ADVISER, st: advDone ? 'done' : 'reviewing', verdict: 'accepted' }] }, rdco: emptyParty(), itso: emptyParty(), ierc: emptyParty(), ktto: emptyParty() };
+  if (!advDone) return;
+  if (fresh) { Object.assign(S.parties.rdco, { state: 'pool', routedBy: ADVISER, from: 'adviser', at: 'just now', reason: S.sendReason || 'Ready for RDCO.', due: 'Fri 14 Nov' }); return; }
+  S.threads.push(
+    { id: 't6', party: 'itso', by: 'Engr. L. Tan', v: 3, sec: 's3', page: 6, quote: 'a galvanised bracket of our own design', body: 'Your team designed this bracket? Then keep its drawings out of the published paper until ITSO advises on a disclosure. Who made each part of the design?', answer: null, resolved: false },
+    { id: 't7', party: 'ierc', by: 'Dr. A. Cruz', v: 3, sec: 's4', page: 7, quote: 'manual measurements taken by barangay staff', body: 'Were the staff told their readings would be used in research? I’ve asked for their signed consent forms.', answer: null, resolved: false });
+  Object.assign(S.parties.rdco, { state: 'review', routedBy: ADVISER, from: 'adviser', at: 'Oct 30', reason: 'Ready for RDCO. Possible IP in the bracket (§3.1); calibration used barangay staff (§3.2).', due: 'Fri 14 Nov', seats: [{ who: 'Dr. E. Navarro', st: 'reviewing' }] });
+  Object.assign(S.parties.itso, { state: 'review', routedBy: 'Dr. E. Navarro', from: 'rdco', at: 'Oct 30', reason: 'Possible patentable sensor bracket (§3.1).', due: 'Thu 13 Nov', seats: [{ who: 'Engr. L. Tan', st: 'reviewing' }] });
+  Object.assign(S.parties.ierc, { state: 'review', routedBy: 'Dr. E. Navarro', from: 'rdco', at: 'Oct 30', reason: 'Calibration used readings collected by barangay staff (§3.2).', due: 'Fri 14 Nov', paused: true, docReq: 'Signed consent forms from barangay staff', seats: [{ who: 'Dr. A. Cruz', st: 'reviewing' }] });
+  Object.assign(S.parties.ktto, { state: 'pool', routedBy: 'Engr. L. Tan', from: 'itso', at: 'Oct 31', reason: 'The bracket and enclosure may be licensable to local governments (§5).', due: 'Tue 18 Nov' });
+}
+// The prototype acts as the office's usual member, or as whoever that office seated instead.
+const me = () => { if (S.role === 'author') return AUTHOR; const def = PARTY[S.role].me; const seats = S.parties?.[S.role]?.seats || []; return seats.length && !seats.some(x => x.who === def) ? seats[0].who : def; };
+const andList = xs => new Intl.ListFormat('en', { type: 'conjunction' }).format(xs);
+const isOffice = r => r !== 'author' && r !== 'adviser';
+function mySeat() { if (S.role === 'author') return null; return S.parties[S.role].seats.find(s => s.who === me()) || null; }
+const canReview = () => { if (S.decision) return false; const s = mySeat(); return !!s && s.st === 'reviewing'; };
+const anyRevisionOpen = () => Object.values(S.revision).some(Boolean);
+const activeOffices = () => SPECIALISTS.filter(k => ['pool', 'review'].includes(S.parties[k].state));
+const canRequest = () => !!ROUTE_TARGETS[S.role] && canReview() && !(S.role === 'adviser' && (S.stage !== 'v3' || S.revision.adviser));
+
+/* ================= Where it stands ================= */
+function standing() {
+  const it = []; const T = S.threads; const P = S.parties;
+  const mineOpen = T.filter(t => !t.resolved && t.party === S.role && !t.answer);
+  const mineAnswered = T.filter(t => !t.resolved && t.party === S.role && t.answer);
+  if (S.role === 'author') return authorStanding();
+  if (S.decision) return { kind: 'done', title: S.decision, sub: 'Recorded. Every open piece of work on the record is closed, with its history kept.', items: [] };
+  if (S.role === 'adviser') {
+    if (S.stage === 'offices') { ['rdco', ...SPECIALISTS].forEach(k => P[k].state !== 'none' && it.push(partyItem(k)));
+      return { kind: 'done', title: 'Your part is done', sub: 'You accepted v3 and sent it to RDCO. You can still comment.', items: it }; }
+    if (S.revision.adviser) it.push({ mk: 'block', icon: 'x', t: 'Your revision request on v2 is open', s: `It closes when ${AUTHOR} submits v3, or when you withdraw it.`, act: ['Withdraw request', 'withdraw'] });
+    else it.push({ mk: 'ok', icon: 'check', t: 'Your revision request was answered by v3', s: 'Submitted Oct 28, with an answer to each point.' });
+    if (mineAnswered.length) it.push({ mk: 'look', icon: 'eye', t: `${mineAnswered.length} of your threads have an answer to check`, s: 'Shown, not enforced: open threads never stop a Decision.', act: ['Show them', 'threads'] });
+    it.push(S.revision.adviser ? { mk: 'info', icon: 'pause', t: 'Due date paused', s: 'Your clock stopped while the record waits on its author.' } : { mk: 'info', icon: 'clock', t: 'Due Tue 4 Nov', s: '3 working days left.' });
+    return S.revision.adviser ? { kind: 'blocked', title: 'You can’t decide yet', sub: 'One thing stops a Decision.', items: it } : { kind: 'ready', title: 'Ready for your Decision', sub: 'Accept & publish, or send it to RDCO.', items: it };
+  }
+  if (S.role === 'rdco') {
+    const p = P.rdco;
+    if (p.state === 'none') return { kind: 'done', title: 'Not sent to RDCO', sub: 'The Adviser sends a record to RDCO when they accept it.', items: [] };
+    it.push({ mk: 'info', icon: 'route', t: `Sent by ${p.routedBy}, ${p.at}`, s: `“${p.reason}”` });
+    SPECIALISTS.forEach(k => P[k].state !== 'none' && it.push(partyItem(k)));
+    if (!SPECIALISTS.some(k => P[k].state !== 'none')) it.push({ mk: 'info', icon: 'users', t: 'No office asked yet', s: 'Request ITSO, IERC or KTTO under Reviewers, or decide now.' });
+    if (p.state === 'pool') return { kind: 'waiting', title: 'In RDCO’s pool', sub: 'Claim it to review and decide.', items: it };
+    const still = activeOffices().map(k => PARTY[k].name);
+    return { kind: 'ready', title: 'RDCO can decide at any time', sub: still.length ? `${still.join(', ')} still reviewing. A Decision now closes their reviews; their notes stay in the history.` : 'No office review is open.', items: it };
+  }
+  const p = P[S.role]; const n = PARTY[S.role].name;
+  if (p.state === 'none') return { kind: 'done', title: `Not requested from ${n}`, sub: 'RDCO or another office can ask this office to review.', items: [] };
+  if (p.state === 'closed') return { kind: 'done', title: 'Closed by RDCO’s Decision', sub: 'Your notes stay in the record’s history.', items: [] };
+  it.push({ mk: 'info', icon: 'route', t: `Requested by ${p.routedBy} (${PARTY[p.from].name}), ${p.at}`, s: `“${p.reason}”` });
+  if (p.state === 'pool') { it.push({ mk: 'info', icon: 'clock', t: `Due ${p.due}`, s: 'The office’s date: the pool has one too.' }); return { kind: 'waiting', title: `Unclaimed in ${n}’s pool`, sub: 'Claim it, or a coordinator assigns someone.', items: it }; }
+  if (p.state === 'cleared' || p.state === 'finding') return { kind: 'done', title: p.state === 'cleared' ? `${n} cleared it` : `${n} recorded a finding`, sub: p.state === 'finding' ? 'The finding goes to RDCO, which decides.' : 'Your office’s question is settled for v3.', items: it };
+  const seat = mySeat();
+  if (!seat) { it.push({ mk: 'info', icon: 'users', t: `Reviewed by ${p.seats.map(s => s.who).join(', ')}`, s: 'A seat holder can add you.' }); return { kind: 'waiting', title: `With ${n}`, sub: 'Someone else in your office is reviewing it.', items: it }; }
+  if (seat.st === 'assigned') return { kind: 'waiting', title: 'You were asked to review', sub: 'Open the review to start.', items: it };
+  if (p.docReq && !S.docUploaded) it.push({ mk: 'look', icon: 'file', t: 'Your document request is open', s: `${p.docReq}. Your clock is paused until it arrives.` });
+  if (mineOpen.length) it.push({ mk: 'look', icon: 'msg', t: `${mineOpen.length} of your threads have no answer yet`, s: 'They don’t stop you clearing or recording a finding.', act: ['Show them', 'threads'] });
+  const others = p.seats.filter(s => s.who !== me() && s.st !== 'done');
+  if (others.length) it.push({ mk: 'info', icon: 'users', t: `${others.map(s => s.who).join(', ')} also reviewing`, s: `${n} finishes when every seat is done.` });
+  it.push({ mk: 'info', icon: p.paused && !S.docUploaded ? 'pause' : 'clock', t: `Due ${p.due}${p.paused && !S.docUploaded ? ' · paused' : ''}`, s: 'RDCO may decide before then, which would close this review.' });
+  if (S.revision[S.role]) return { kind: 'blocked', title: 'Waiting on the author', sub: 'You asked for a revision.', items: it };
+  return { kind: 'ready', title: 'Ready to clear or record a finding', sub: p.docReq && !S.docUploaded ? 'You can answer now, or wait for the document.' : 'Nothing stops your office’s answer.', items: it };
+}
+function partyItem(k) {
+  const p = S.parties[k]; const n = PARTY[k].name;
+  const map = { pool: ['look', 'dot', 'unclaimed'], review: ['look', 'dot', `reviewing · ${p.seats.filter(s => s.st !== 'done').map(s => s.who).join(', ')}`], cleared: ['ok', 'check', 'cleared'], finding: ['block', 'flag', 'finding recorded'], done: ['ok', 'check', 'done'], closed: ['info', 'minus', 'closed by Decision'], decided: ['ok', 'check', 'decided'] };
+  const [mk, icon, w] = map[p.state] || ['info', 'minus', p.state];
+  return { mk, icon, t: `${n} · ${w}`, s: p.state === 'finding' ? `“${p.findingText}”` : `${PARTY[k].q}${p.due ? ` · due ${p.due}` : ''}${p.paused && !S.docUploaded ? ', paused' : ''}` };
+}
+function authorStanding() {
+  const it = [];
+  if (S.decision) return { kind: 'done', title: S.decision, sub: 'Your record’s review is finished.', items: [] };
+  if (S.stage === 'v2') { const n = S.threads.filter(t => S.answerDraft[t.id]?.state).length;
+    it.push({ mk: n === S.threads.length ? 'ok' : 'block', icon: n === S.threads.length ? 'check' : 'msg', t: `${n} of ${S.threads.length} points answered`, s: 'Your answers become the response letter.', act: ['Answer them', 'threads'] });
+    return { kind: 'waiting', title: 'Waiting on you', sub: `${ADVISER} asked for a revision on v2, Oct 20.`, items: it }; }
+  if (S.stage === 'v3') return { kind: 'done', title: `With ${ADVISER}`, sub: 'Nothing is waiting on you.', items: [] };
+  ['rdco', ...SPECIALISTS].forEach(k => S.parties[k].state !== 'none' && it.push(partyItem(k)));
+  if (S.parties.ierc.docReq && !S.docUploaded && S.parties.ierc.state === 'review') { it.unshift({ mk: 'block', icon: 'file', t: 'IERC asked for a document', s: 'Signed consent forms from barangay staff.', act: ['Upload it', 'upload'] });
+    return { kind: 'waiting', title: 'One thing is waiting on you', sub: 'IERC’s clock is paused until you upload it.', items: it }; }
+  return { kind: 'done', title: 'With RDCO and the offices', sub: 'Nothing is waiting on you.', items: it };
+}
+
+/* ================= Render ================= */
+const work = document.getElementById('work');
+function render(opts = {}) {
+  renderProto(); closePop();
+  const keep = { p: work.querySelector('.pages')?.scrollTop || 0, b: opts.resetPane ? 0 : (work.querySelector('.pane-body')?.scrollTop || 0), m: work.querySelector('.work > .meta')?.scrollTop || 0 };
+  work.innerHTML = readerHtml() + (S.paneOpen ? '<div class="scrim" data-act="close-pane"></div>' : '') + paneHtml() + `<aside class="meta" aria-label="Details"><div class="grip" data-grip="side" role="separator" aria-orientation="vertical" aria-label="Resize the details sidebar" tabindex="0"></div>${detailsHtml()}</aside>`;
+  work.querySelector('.pages').scrollTop = keep.p; work.querySelector('.pane-body').scrollTop = keep.b; work.querySelector('.work > .meta').scrollTop = keep.m;
+  if (S.focus) { const el = work.querySelector(`[data-thread="${S.focus}"]`); if (el) { el.classList.add('flash'); el.scrollIntoView({ block: 'nearest' }); } S.focus = null; }
+  if (S.composing) work.querySelector('#compose-text')?.focus();
+  applyWidths(false);
+}
+function renderProto() {
+  document.getElementById('stageSeg').innerHTML = Object.entries(STAGES).map(([k, v]) => `<button data-stage="${k}" aria-pressed="${S.stage === k}">${v.label}</button>`).join('');
+  document.getElementById('roleSeg').innerHTML = Object.keys(ROLE_LABEL).map(r => `<button data-role="${r}" aria-pressed="${S.role === r}" ${STAGES[S.stage].roles.includes(r) ? '' : 'disabled title="Not involved at this stage"'}>${ROLE_LABEL[r]}</button>`).join('');
+}
+
+/* ---------- Paper (left, 50%) ---------- */
+function readerHtml() {
+  const v = S.readerV; const live = S.threads.filter(t => !t.resolved && t.v <= v);
+  const pend = S.role !== 'author' ? S.pending[S.role] : [];
+  const pages = SECTIONS.map(s => {
+    const html = s.paras.map(p => {
+      const t = textOf(p, v); if (!t.trim()) return '';
+      let out = esc(t);
+      live.filter(th => th.sec === s.id && t.includes(th.quote)).forEach(th => { out = out.replace(esc(th.quote), `<mark class="hl" data-goto="${th.id}" title="Thread ${th.id.slice(1)} · ${PARTY[th.party].name}">${esc(th.quote)}</mark><span class="pin">${th.id.slice(1)}</span>`); });
+      pend.filter(pc => pc.sec === s.id && t.includes(pc.quote)).forEach(pc => { out = out.replace(esc(pc.quote), `<mark class="hl pending">${esc(pc.quote)}</mark><span class="pin quiet">D${pend.indexOf(pc) + 1}</span>`); });
+      return `<p data-sec="${s.id}" data-page="${s.page}">${out}</p>`;
+    }).join('');
+    return `<article class="page" id="page-${s.id}" aria-label="Page ${s.page}"><div class="running"><span>Lopez & Villanueva</span><span>v${v}</span></div><h2>${esc(s.name)}</h2>${html}<div class="pno">${s.page}</div></article>`;
+  }).join('');
+  const R = standing();
+  return `<section class="reader" aria-label="Paper">
+    <div class="reader-tools">
+      <span class="seg2" role="group" aria-label="Version"><button disabled title="v1’s text was not kept">v1</button><button data-readv="2" aria-pressed="${v === 2}">v2</button><button data-readv="3" aria-pressed="${v === 3}" ${S.stage === 'v2' ? 'disabled' : ''}>v3</button></span>
+      ${canReview() ? `<span class="hint" id="selHint">${S.selection ? `Selected: “${esc(S.selection.quote.slice(0, 36))}…”` : 'Select a passage to comment on it.'}</span>` : ''}
+      <span class="grow"></span>
+      ${canReview() ? `<button class="btn ${S.selection ? 'on' : ''}" data-act="comment" ${S.selection ? '' : 'disabled'} title="Comment on the selection (C)">${ic('msg')}Comment</button>` : ''}
+      <button class="btn ghost" aria-label="Zoom out">${ic('minus')}</button><span class="small faint">140%</span><button class="btn ghost" aria-label="Zoom in">${ic('plus')}</button>
+    </div>
+    <div class="pages">${pages}</div>
+    <div class="reader-foot"><span class="ft"><b>${esc(R.title)}</b>${esc(dockSub())}</span><button class="btn pill" data-act="open-pane">${ic('panel')}Review</button></div>
+  </section>`;
+}
+
+/* ---------- Review pane (middle, 25%) ---------- */
+function paneHtml() {
+  const open = S.threads.filter(t => !t.resolved).length;
+  const T = [{ id: 'conversation', label: 'Conversation', icon: 'list' }, { id: 'changes', label: 'Changes', icon: 'diff', count: S.stage === 'v2' ? '' : SECTIONS.filter(changed).length }, { id: 'threads', label: 'Threads', icon: 'msg', count: open }, { id: 'details', label: 'Details', icon: 'users', cls: 'details-tab' }];
+  const identity = S.role === 'author' ? `<b>${AUTHOR}</b> · author` : `<b>${esc(me())}</b> · ${isOffice(S.role) ? PARTY[S.role].name : 'Adviser'}`;
+  const body = S.tab === 'conversation' ? conversation() : S.tab === 'changes' ? changes() : S.tab === 'threads' ? threadsTab() : `<div class="meta as-tab">${detailsHtml()}</div>`;
+  return `<section class="pane ${S.paneOpen ? 'open' : ''}" aria-label="Review">
+    <div class="grip" data-grip="mid" role="separator" aria-orientation="vertical" aria-label="Resize the review pane" tabindex="0"></div>
+    <div class="pane-head">
+      <div class="who-line">${headChip()}<span>${identity}</span></div>
+      <div class="pane-title">Review<span class="grow"></span><button class="btn ghost close-pane" data-act="close-pane">${ic('x')}Back to paper</button></div>
+      <div class="tabs" role="tablist" aria-label="Review views">${T.map(t => `<button class="tab ${t.cls || ''}" role="tab" aria-selected="${S.tab === t.id}" data-tab="${t.id}">${ic(t.icon)}${t.label}${t.count ? `<span class="count">${t.count}</span>` : ''}</button>`).join('')}</div>
+    </div>
+    <div class="pane-body">${body}</div>
+    <div class="dock">${dock()}</div>
+  </section>`;
+}
+function headChip() {
+  if (S.decision) return `<span class="chip t-settled">${ic('check')}${S.decision.split(' ·')[0]}</span>`;
+  if (anyRevisionOpen()) return `<span class="chip t-attn">${ic('pause')}Revision requested</span>`;
+  if (S.stage !== 'offices') return `<span class="chip t-active">${ic('dot')}With Adviser</span>`;
+  const a = ['rdco', ...SPECIALISTS].filter(k => ['pool', 'review'].includes(S.parties[k].state)).map(k => PARTY[k].name);
+  return `<span class="chip t-active">${ic('dot')}With ${a.join(', ') || 'RDCO'}</span>`;
+}
+function conversation() {
+  const ev = (tone, icon, line, when, extra = '') => `<div class="ev"><div class="ev-icon ${tone}">${ic(icon)}</div><div class="ev-line">${line} <span class="faint">· ${when}</span></div>${extra}</div>`;
+  const box = rows => `<div class="ev-box">${rows.map(r => `<div class="ev-box-b">${r}</div>`).join('')}</div>`;
+  let h = `<div class="tl">
+    <div class="vrule"><span class="vchip">v1</span>Sep 15</div>
+    ${ev('ink', 'up', `<b>${AUTHOR}</b> submitted the thesis`, 'Sep 15')}
+    ${ev('maroon', 'undo', `<b>${ADVISER}</b> asked for a revision`, 'Sep 20')}
+    <div class="vrule"><span class="vchip">v2</span>Oct 6</div>
+    ${ev('ink', 'up', `<b>${AUTHOR}</b> submitted v2`, 'Oct 6')}
+    ${ev('maroon', 'undo', `<b>${ADVISER}</b> reviewed v2 and asked for a revision`, 'Oct 20', `<div class="ev-box"><div class="ev-box-h">${ic('msg')} Review on v2 · 5 comments</div><div class="ev-box-b">Much stronger. The methods still need the sampling and calibration detail, and the results need an error a reader can use.</div>${adviserThreads(false, false).map(t => `<div class="ev-box-b"><div class="q">${esc(secOf(t.sec).name)} · p.${t.page}</div>${esc(lead(t.body))}</div>`).join('')}</div>`)}`;
+  if (S.stage !== 'v2') h += `<div class="vrule"><span class="vchip">v3</span>Oct 28</div>${ev('ink', 'up', `<b>${AUTHOR}</b> submitted v3 with a response to reviewers`, 'Oct 28', `<div class="ev-box">${letter(adviserThreads(true, false))}</div>`)}`;
+  if (S.stage === 'offices') {
+    h += ev('ink', 'route', `<b>${ADVISER}</b> accepted v3 and sent it to <b>RDCO</b>`, S.fresh ? 'just now' : 'Oct 30', box([esc(S.parties.rdco.reason)]));
+    if (!S.fresh) h += `${ev('', 'hand', `<b>Dr. E. Navarro</b> claimed it for RDCO`, 'Oct 30')}
+      ${ev('ink', 'route', `<b>Dr. E. Navarro</b> (RDCO) asked <b>ITSO</b> and <b>IERC</b> to review`, 'Oct 30', box(['Possible patentable sensor bracket (§3.1); calibration used readings collected by barangay staff (§3.2).']))}
+      ${ev('', 'hand', `<b>Engr. L. Tan</b> claimed it for ITSO`, 'Oct 30')}
+      ${ev('ink', 'route', `<b>Engr. L. Tan</b> (ITSO) asked <b>KTTO</b> to review`, 'Oct 31', box(['The bracket and enclosure may be licensable to local governments (§5). Left to KTTO’s pool.']))}
+      ${ev('', 'file', `<b>Dr. A. Cruz</b> (IERC) requested a document: signed consent forms`, 'Oct 31')}`;
+  }
+  h += S.events.map(e => ev(e.tone, e.icon, e.line, 'just now', e.box || '')).join('') + '</div>';
+  const R = standing();
+  h += `<div class="stand" id="stand">
+    <div class="verdict ${R.kind}" role="status">${ic(R.kind === 'blocked' ? 'x' : R.kind === 'waiting' ? 'alert' : R.kind === 'ready' && S.role === 'rdco' ? 'bolt' : 'check')}<div><div class="vt">${esc(R.title)}</div><div class="vs">${esc(R.sub)}</div></div></div>
+    ${R.items.length ? `<ul>${R.items.map(i => `<li><span class="mk ${i.mk}">${ic(i.icon)}</span><span class="rt">${esc(i.t)}</span><span class="rs">${esc(i.s)}${i.act ? ` <button class="linkish" data-act="${i.act[1]}">${i.act[0]}</button>` : ''}</span></li>`).join('')}</ul>` : ''}
+  </div>
+  <div style="margin-top:14px"><label class="label" for="gen">Comment on the whole record</label>
+    <textarea id="gen" class="field" rows="2" placeholder="For anything that isn’t about one passage"></textarea>
+    <div class="row" style="margin-top:8px"><span class="small faint grow">Seen by the author and every reviewer.</span><button class="btn" data-act="general">Comment</button></div></div>`;
+  return `<section>${h}</section>`;
+}
+function letter(list) {
+  return `<div class="letter"><h4>Response to reviewers</h4><p class="small faint">Assembled from ${AUTHOR}’s answer to each point.</p><ol>${list.map(t => `<li><span class="lq">${esc(secOf(t.sec).name)} · “${esc(lead(t.body))}”</span>${t.answer ? `<span class="resp">${t.answer.state === 'declined' ? 'Declined' : 'Addressed'}${t.answer.where ? ` in ${esc(t.answer.where)}` : ''}.</span> ${esc(t.answer.text || '')}` : '<span class="faint">Not answered.</span>'}</li>`).join('')}</ol></div>`;
+}
+function changes() {
+  if (S.stage === 'v2') return `<section><p class="empty">v2 is the latest version. Changes appear once v3 is submitted. v1’s text was not kept, so v1 and v2 can’t be compared.</p></section>`;
+  const firstLook = S.stage === 'offices' && isOffice(S.role);
+  const cs = SECTIONS.filter(changed);
+  return `<section>
+    <div class="cmp-tools"><select class="field" style="width:auto" aria-label="Earlier version"><option>v2${S.role === 'adviser' ? ' · your last review' : ''}</option><option disabled>v1 · text not kept</option></select>${ic('arrow')}<select class="field" style="width:auto" aria-label="Later version"><option>v3 · current</option></select></div>
+    <p class="cmp-note">${firstLook ? `${PARTY[S.role].name} first saw this record at v3. This is what changed in the Adviser’s last round.` : `${cs.length} of ${SECTIONS.length} sections changed · ${cs.filter(s => S.viewed.has(s.id)).length} viewed`}</p>
+    ${SECTIONS.map(s => { const c = changed(s); const v = S.viewed.has(s.id); const th = S.threads.filter(t => t.sec === s.id && t.party === 'adviser');
+      return `<div class="ch-sec ${c ? '' : 'same'}"><div class="ch-head"><h4>${esc(s.name)}</h4><span class="pg">p.${s.page}</span>${c ? `<button class="check" aria-pressed="${v}" data-viewed="${s.id}"><span class="box">${ic('check')}</span>Viewed</button>` : `<span class="small faint">Unchanged</span>`}</div>
+        ${c && !v ? `<div class="ch-body">${s.paras.filter(p => /\[[-+]/.test(p)).map(p => { const sg = segs(p); const isNew = sg.length === 1 && sg[0][0] === 'ins';
+          return `${isNew ? `<span class="newtag">${ic('sparkle')}New paragraph</span>` : ''}<p class="ch-para">${sg.map(([k, t]) => k === 'eq' ? esc(t) : k === 'del' ? `<del><span class="sr">Removed: </span>${esc(t)}</del>` : `<ins><span class="sr">Added: </span>${esc(t)}</ins>`).join('')}</p>`; }).join('')}
+          <button class="btn sm" data-show="${s.id}">${ic('eye')}Show in paper</button>
+          ${th.map(t => `<button class="ch-link" data-goto="${t.id}"><span class="pin ${t.resolved ? 'done' : ''}">${t.id.slice(1)}</span><span><b>${esc(t.by)}</b> on v2: “${esc(lead(t.body))}” — ${t.answer ? (t.answer.state === 'declined' ? 'declined, with a reason' : 'addressed') : 'no answer'}${t.resolved ? ', resolved' : ''}</span></button>`).join('')}</div>`
+        : c ? `<p class="small faint" style="margin-top:4px">Marked viewed. It reopens if a later version changes it.</p>` : ''}</div>`; }).join('')}
+  </section>`;
+}
+function threadsTab() {
+  const T = S.threads; const author = S.role === 'author';
+  if (author && S.stage === 'v2') return authorAnswers();
+  const groups = { open: T.filter(t => !t.resolved), mine: T.filter(t => author ? !t.resolved : t.party === S.role), resolved: T.filter(t => t.resolved), all: T };
+  const names = { open: 'Open', mine: author ? 'For you' : 'Yours', resolved: 'Resolved', all: 'All' };
+  const pend = author ? [] : S.pending[S.role];
+  return `<section>${S.composing ? composer() : ''}
+    <div class="filters" role="group" aria-label="Filter threads">${Object.keys(names).map(k => `<button aria-pressed="${S.filter === k}" data-filter="${k}">${names[k]} ${groups[k].length}</button>`).join('')}</div>
+    ${pend.length ? `<div class="th-top" style="margin-top:14px"><span class="where">Your drafts</span><span class="grow"></span>Only you see these until you finish</div>${pend.map((p, i) => `<article class="thread"><div class="th-top"><span class="pin quiet">D${i + 1}</span><span class="where">${esc(secOf(p.sec).name)} · p.${p.page}</span><span class="grow"></span><span class="chip t-quiet">${ic('pen')}Draft</span></div><div class="th-quote">“${esc(p.quote)}”</div><div class="th-body">${esc(p.body)}</div><div class="th-actions"><button class="btn ghost sm" data-discard="${i}">Discard</button></div></article>`).join('')}` : ''}
+    ${groups[S.filter].length ? groups[S.filter].map(threadItem).join('') : `<p class="empty">${S.filter === 'resolved' ? 'Resolved threads stay here, in the record’s history.' : canReview() ? 'Select a passage in the paper to start one.' : 'No threads here.'}</p>`}
+  </section>`;
+}
+function threadItem(t) {
+  const a = t.answer; const mine = t.party === S.role; const author = S.role === 'author';
+  const chip = t.resolved ? `<span class="chip t-settled">${ic('check')}Resolved</span>` : !a ? `<span class="chip t-quiet">No answer</span>` : a.state === 'declined' ? `<span class="chip t-active">${ic('x')}Declined</span>` : `<span class="chip t-active">${ic('check')}Addressed</span>`;
+  return `<article class="thread" data-thread="${t.id}">
+    <div class="th-top"><span class="pin ${t.resolved ? 'done' : ''}">${t.id.slice(1)}</span><span class="party ${mine ? 'me' : ''}">${PARTY[t.party].name}</span><span class="where">${esc(secOf(t.sec).name)} · p.${t.page}</span><span class="grow"></span>${chip}</div>
+    <button class="th-quote ${t.outdated === 'removed' ? 'gone' : ''}" data-see="${t.id}">“${esc(t.quote)}”${t.outdated ? ` <span class="faint">(v${t.v}, ${t.outdated} in v3)</span>` : ''}</button>
+    <div class="th-body"><button class="th-who" data-person="${esc(t.by)}">${mine ? 'You' : esc(t.by)}</button> <span class="faint small">· v${t.v}</span><br>${esc(t.body)}</div>
+    ${t.suggestion ? `<div class="suggest"><div class="sh">${ic('pen')}Suggested wording${a?.accepted ? ' · accepted' : ''}</div><div class="sb"><del>${esc(t.quote)}</del> <ins>${esc(t.suggestion)}</ins></div></div>` : ''}
+    ${a ? `<div class="reply"><div class="rh"><b>${AUTHOR}</b> · ${a.state === 'declined' ? 'declined' : 'marked addressed'}${a.where ? ` in ${esc(a.where)}` : ''}</div>${esc(a.text)}</div>` : ''}
+    ${(t.replies || []).map(r => `<div class="reply"><div class="rh"><b>${esc(r.by)}</b> · just now</div>${esc(r.body)}</div>`).join('')}
+    ${S.decision ? '' : `<div class="th-actions">${t.resolved ? (mine ? `<button class="btn sm" data-reopen="${t.id}">${ic('undo')}Reopen</button>` : '') : `${mine && a ? `<button class="btn sm" data-resolve="${t.id}">${ic('check')}Resolve</button>` : ''}${author && !a ? `<button class="btn sm" data-addr="${t.id}">${ic('check')}Mark addressed</button>` : ''}<button class="btn ghost sm" data-reply="${t.id}">Reply</button>`}</div>`}
+  </article>`;
+}
+function composer() {
+  const c = S.composing;
+  if (c.reply) return `<div class="composer"><div class="ctx">${ic('msg')}Reply to thread <b>${c.reply.slice(1)}</b></div><textarea class="field" rows="3" id="compose-text" placeholder="Posted now, not held with your review"></textarea><div class="row"><button class="btn ghost" data-act="cancel">Cancel</button><button class="btn primary" data-act="post-reply">Reply</button></div></div>`;
+  return `<div class="composer"><div class="ctx">${ic('msg')}Comment on <b>${esc(secOf(c.sec).name)} · p.${c.page}</b></div><div class="th-quote">“${esc(c.quote)}”</div>
+    <label class="sr" for="compose-text">Comment</label><textarea class="field" rows="3" id="compose-text" placeholder="What should the author look at here?"></textarea>
+    ${c.suggest ? `<label class="label" for="compose-sug" style="margin-top:10px">Suggested wording</label><textarea class="field" rows="2" id="compose-sug">${esc(c.quote)}</textarea>` : ''}
+    <div class="row"><button class="btn ghost sm" data-act="toggle-suggest">${ic('pen')}${c.suggest ? 'No wording' : 'Suggest wording'}</button><span class="grow"></span><button class="btn ghost" data-act="cancel">Cancel</button><button class="btn primary" data-act="add-pending">Add to review</button></div>
+    <p class="small faint" style="margin-top:8px">Held as a draft until you finish your review.</p></div>`;
+}
+function authorAnswers() {
+  return `<section><p class="small" style="margin-bottom:8px">${ADVISER} raised five points on v2. Mark each <b class="ink">addressed</b> and say where, or <b class="ink">decline</b> it with a reason.</p>
+    ${S.threads.map(t => { const d = S.answerDraft[t.id] || {};
+      return `<article class="thread" data-thread="${t.id}"><div class="th-top"><span class="pin">${t.id.slice(1)}</span><span class="where">${esc(secOf(t.sec).name)} · p.${t.page}</span><span class="grow"></span>${d.state ? `<span class="chip ${d.state === 'declined' ? 't-quiet' : 't-settled'}">${ic(d.state === 'declined' ? 'x' : 'check')}${d.state === 'declined' ? 'Declined' : 'Addressed'}</span>` : `<span class="chip t-active">${ic('dot')}Needs your answer</span>`}</div>
+        <button class="th-quote" data-see="${t.id}">“${esc(t.quote)}”</button><div class="th-body"><b>${ADVISER}</b><br>${esc(t.body)}</div>
+        ${t.suggestion ? `<div class="suggest"><div class="sh">${ic('pen')}Suggested wording</div><div class="sb"><del>${esc(t.quote)}</del> <ins>${esc(t.suggestion)}</ins></div></div>` : ''}
+        <div class="th-actions"><span class="seg2" role="group" aria-label="Your answer"><button aria-pressed="${d.state === 'addressed'}" data-ans="${t.id}" data-state="addressed">${t.suggestion ? 'Accept wording' : 'Addressed'}</button><button aria-pressed="${d.state === 'declined'}" data-ans="${t.id}" data-state="declined">Decline</button></span></div>
+        ${d.state ? `<div style="display:grid;gap:8px;margin-top:10px"><div><label class="label" for="at-${t.id}">${d.state === 'declined' ? 'Reason (required)' : 'What you changed'}</label><textarea id="at-${t.id}" class="field" rows="2" data-ans-text="${t.id}">${esc(d.text || '')}</textarea></div>${d.state === 'addressed' ? `<div><label class="label" for="aw-${t.id}">Where in v3</label><input id="aw-${t.id}" class="field" data-ans-where="${t.id}" value="${esc(d.where || '')}" placeholder="§3.1, p.6"></div>` : ''}</div>` : ''}</article>`; }).join('')}</section>`;
+}
+
+/* ---------- Details (right, 25%): reviewers and the record's facts ---------- */
+const partyOfPerson = n => Object.keys(PARTY).find(k => PARTY[k].members.includes(n)) || 'author';
+function personRow(name, status, sub) {
+  const st = { reviewing: ['on', 'dot', 'reviewing'], assigned: ['wait', 'clock', 'asked, not opened'], done: ['ok', 'check', 'done'], cleared: ['ok', 'check', 'cleared'], finding: ['flag', 'flag', 'finding recorded'], accepted: ['ok', 'check', 'accepted'], decided: ['ok', 'check', 'decided'], withdrawn: ['gone', 'minus', 'closed by Decision'] }[status];
+  return `<button class="person" data-person="${esc(name)}"><span class="av ${partyOfPerson(name) === 'author' ? '' : 'staff'}">${initials(name)}</span><span class="nm">${esc(name)}${sub ? ` <span class="sub">${esc(sub)}</span>` : ''}</span>${st ? `<span class="st ${st[0]}" title="${st[2]}" aria-label="${st[2]}">${ic(st[1])}</span>` : ''}</button>`;
+}
+function detailsHtml() {
+  const P = S.parties; const involved = ['adviser', 'rdco', ...SPECIALISTS].filter(k => P[k].state !== 'none');
+  const word = { pool: 'unclaimed', review: 'reviewing', cleared: 'cleared', finding: 'finding', done: 'done', closed: 'closed', decided: 'decided' };
+  const reviewers = involved.map(k => { const p = P[k];
+    return `<div class="party-h">${PARTY[k].name}<span class="q">· ${PARTY[k].q}</span><span class="pst">${word[p.state] || ''}</span></div>
+      ${p.seats.length ? p.seats.map(s => personRow(s.who, s.st === 'done' && s.verdict ? s.verdict : s.st)).join('') : `<div class="person"><span class="av pool">${ic('users')}</span><span class="nm faint">Anyone in ${PARTY[k].name}</span><span class="st wait" title="unclaimed" aria-label="unclaimed">${ic('clock')}</span></div>`}`; }).join('');
+  const rt = ROUTE_TARGETS[S.role] || [];
+  const v = S.stage === 'v2' ? 2 : 3;
+  const dues = S.stage === 'offices' ? ['rdco', ...SPECIALISTS].filter(k => P[k].due && ['pool', 'review'].includes(P[k].state)).map(k => `<dt>${PARTY[k].name}</dt><dd>${P[k].due}${P[k].paused && !S.docUploaded ? ' · paused' : ''}</dd>`).join('') : `<dt>Adviser</dt><dd>${S.revision.adviser ? 'paused' : 'Tue 4 Nov'}</dd>`;
+  return `
+  <section class="m-sec" aria-labelledby="m-rev"><div class="m-h"><h3 id="m-rev">Reviewers</h3><button class="gear" data-act="route" ${canRequest() ? '' : 'disabled'} aria-label="Request review" title="${canRequest() ? `Request review from ${rt.map(k => PARTY[k].name).join(', ')}` : S.role === 'author' ? 'Reviewers choose who reviews' : 'Hold an open review to request others'}">${ic('gear')}</button></div>
+    ${reviewers || '<p class="m-empty">No reviews yet</p>'}
+    ${canRequest() ? `<p class="m-text" style="margin-top:8px"><button class="linkish" data-act="route">Request review</button> <span class="faint">from ${rt.map(k => PARTY[k].name).join(', ')}</span></p>` : ''}
+    ${isOffice(S.role) && canReview() ? `<p class="m-text"><button class="linkish" data-act="add-reviewer">Add a colleague</button> <span class="faint">from ${PARTY[S.role].name}</span></p>` : ''}
+  </section>
+  <section class="m-sec"><div class="m-h"><h3>Researchers</h3></div>${AUTHORS.map(a => personRow(a, '', a === AUTHOR ? 'lead' : '')).join('')}</section>
+  <section class="m-sec"><div class="m-h"><h3>Adviser</h3></div>${personRow(ADVISER, '')}</section>
+  <section class="m-sec"><div class="m-h"><h3>Classification</h3></div>
+    <div class="tags"><span class="tag">Thesis</span><span class="tag">Engineering & Technology</span><span class="tag">Environmental monitoring</span></div>
+    <dl class="kv" style="margin-top:10px"><dt>PSCED</dt><dd>Engineering and engineering trades</dd><dt>College</dt><dd>Engineering and Architecture</dd><dt>Program</dt><dd>BS Computer Engineering</dd></dl></section>
+  <section class="m-sec"><div class="m-h"><h3>Flagged by the authors</h3></div>
+    <div class="tags"><span class="tag on">${ic('check')}Possible IP</span><span class="tag on">${ic('check')}Human participants</span><span class="tag">Commercial potential</span></div></section>
+  <section class="m-sec"><div class="m-h"><h3>Keywords</h3></div><div class="tags"><span class="tag">flood risk</span><span class="tag">ultrasonic sensing</span><span class="tag">LoRa</span><span class="tag">urban drainage</span></div></section>
+  <section class="m-sec"><div class="m-h"><h3>Version</h3></div>
+    <dl class="kv"><dt>Current</dt><dd>v${v} · ${v === 2 ? 'Oct 6' : 'Oct 28'}</dd><dt>First submitted</dt><dd>Sep 15</dd><dt>History</dt><dd>${v} versions · v1 text not kept</dd></dl></section>
+  <section class="m-sec"><div class="m-h"><h3>Due dates</h3></div><dl class="kv">${dues || '<dt>None running</dt><dd></dd>'}</dl></section>
+  <section class="m-sec"><div class="m-h"><h3>Documents</h3></div>
+    <p class="m-text">${ic('file')} Manuscript v${v} · PDF</p>
+    ${S.stage === 'offices' ? `<p class="m-text">${ic('file')} Consent forms · ${S.docUploaded ? 'uploaded' : '<span class="faint">requested by IERC</span>'}</p>` : ''}</section>
+  <section class="m-sec"><div class="m-h"><h3>Notifications</h3></div>
+    <button class="btn block" data-act="watch">${ic(S.watching ? 'bellOff' : 'bell')}${S.watching ? 'Stop watching' : 'Watch'}</button>
+    <p class="m-text faint" style="margin-top:6px">${S.watching ? (S.role === 'author' ? 'You’re told because you own this record.' : canReview() ? 'You’re told because you hold a review seat.' : 'You’re told because you take part in this review.') : 'You’re told only when you’re mentioned.'}</p></section>
+  <section class="m-sec"><div class="m-h"><h3>${participants().length} participants</h3></div><div class="avatars">${participants().map(n => `<button class="av ${partyOfPerson(n) === 'author' ? '' : 'staff'}" data-person="${esc(n)}" title="${esc(n)}" aria-label="${esc(n)}">${initials(n)}</button>`).join('')}</div></section>
+  <section class="m-sec"><button class="m-act" data-act="copy">${ic('link')}Copy link to this review</button></section>`;
+}
+function participants() { const set = new Set([...AUTHORS, ADVISER]); Object.values(S.parties).forEach(p => p.seats.forEach(s => set.add(s.who))); return [...set]; }
+
+/* ---------- Dock ---------- */
+function dockSub() {
+  const R = standing(); if (S.role === 'author') return S.stage === 'v2' ? `${S.threads.filter(t => S.answerDraft[t.id]?.state).length} of ${S.threads.length} answered` : R.sub;
+  const n = S.pending[S.role].length; return canReview() ? (n ? `${n} draft comment${n > 1 ? 's' : ''}, not sent` : 'No draft comments') : R.sub;
+}
+function dock() {
+  const R = standing(); const line = `<span class="dt"><button class="linkish" style="text-decoration:none;color:var(--ink)" data-act="stand"><b>${esc(R.title)}</b></button>${esc(dockSub())}</span>`;
+  if (S.role === 'author') { if (S.stage === 'v2') return line + `<button class="btn primary pill" data-act="prepare">Prepare v3</button>`;
+    if (S.stage === 'offices' && S.parties.ierc.docReq && !S.docUploaded && S.parties.ierc.state === 'review' && !S.decision) return line + `<button class="btn primary pill" data-act="upload">${ic('up')}Upload</button>`; return line; }
+  const p = S.parties[S.role];
+  if (!S.decision && p.state === 'pool') return line + `<button class="btn primary pill" data-act="claim">${ic('hand')}Claim review</button>`;
+  if (!S.decision && mySeat()?.st === 'assigned') return line + `<button class="btn primary pill" data-act="open-seat">Open review</button>`;
+  if (canReview()) return line + `<button class="btn primary pill" data-act="finish">${S.role === 'rdco' ? 'Decide…' : 'Finish review'}</button>`;
+  return line;
+}
+
+/* ================= Profile card ================= */
+const pop = document.getElementById('pop');
+function closePop() { pop.innerHTML = ''; }
+function openProfile(name, anchor) {
+  const d = PEOPLE[name] || { role: '', unit: '' }; const k = partyOfPerson(name);
+  const seat = k !== 'author' && S.parties[k].seats.find(s => s.who === name);
+  const r = anchor.getBoundingClientRect(); const w = 300;
+  const left = r.left - w - 12 > 12 ? r.left - w - 12 : Math.min(r.left, innerWidth - w - 12);
+  const top = Math.max(12, Math.min(r.top - 8, innerHeight - 320));
+  const seatWord = seat ? ({ reviewing: 'reviewing', assigned: 'asked, not opened yet', done: seat.verdict || 'done', withdrawn: 'closed by Decision' }[seat.st]) : '';
+  pop.innerHTML = `<div class="profile" role="dialog" aria-label="${esc(name)}" style="left:${Math.max(12, left)}px;top:${top}px">
+    <div class="top"><span class="av ${k === 'author' ? '' : 'staff'}">${initials(name)}</span><div><div class="nm">${esc(name)}</div><div class="rl">${esc(d.role)}</div></div></div>
+    <dl class="kv"><dt>${k === 'author' || k === 'adviser' ? 'Unit' : 'Office'}</dt><dd>${esc(d.unit)}</dd>${d.college ? `<dt>College</dt><dd>${esc(d.college)}</dd>` : ''}${seat ? `<dt>On this record</dt><dd>${seatWord}${k !== 'adviser' ? ` for ${PARTY[k].name}` : ''}</dd>` : ''}${d.records ? `<dt>In IRIS</dt><dd>${esc(d.records)}</dd>` : ''}</dl>
+    ${d.bio ? `<p class="bio">${esc(d.bio)}</p>` : ''}
+    <div class="ft">Synthetic profile for the prototype.</div></div>`;
+}
+
+/* ================= Dialogs ================= */
+const dlg = document.getElementById('dlg');
+function verdictOptions() {
+  const own = S.revision[S.role]; const why = 'Unavailable while your revision request is open.';
+  if (S.role === 'adviser') return [
+    { v: 'comment', n: 'Comment only', d: 'Send your drafts and a summary. Your review stays open.' },
+    { v: 'revise', n: 'Request revision', d: own ? 'You already have one open.' : `${AUTHOR} revises and submits the next version.`, off: own, need: true },
+    { v: 'send', n: 'Accept & send to RDCO', d: own ? why : 'Accept, and ask RDCO to review. RDCO decides, and asks the offices it needs.', off: own },
+    { v: 'publish', n: 'Accept & publish', d: own ? why : 'Publishes the thesis to Discover. No office reviews it.', off: own },
+    { v: 'reject', n: 'Reject', d: own ? why : 'Archives the thesis. The authors must submit a new record.', off: own, danger: true, need: true },
+  ];
+  if (S.role === 'rdco') { const still = activeOffices().map(k => PARTY[k].name); const note = still.length ? ` Closes ${still.join(', ')}’s open review${still.length > 1 ? 's' : ''}.` : '';
+    const warn = still.length > 0 || Object.keys(S.revision).some(k => k !== 'rdco' && S.revision[k]);
+    return [
+    { v: 'comment', n: 'Comment only', d: 'Send your drafts and a summary.' },
+    { v: 'revise', n: 'Request revision', d: 'The author revises. RDCO, and any office that asked, review the next version.', need: true },
+    { v: 'publish', n: 'Accept & publish', d: `Publishes to Discover.${note}`, warn },
+    { v: 'unlisted', n: 'Accept, keep unlisted', d: `Accepted, but kept out of Discover and Ask IRIS, for example ahead of a patent filing.${note}`, warn },
+    { v: 'reject', n: 'Reject', d: `Archives the thesis.${note}`, danger: true, need: true, warn },
+  ]; }
+  const n = PARTY[S.role].name;
+  return [
+    { v: 'comment', n: 'Comment only', d: 'Send your drafts and a summary. Your seat stays open.' },
+    { v: 'clear', n: `Clear for ${n}`, d: own ? 'Withdraw your revision request first.' : `${n}’s question (${PARTY[S.role].q}) is settled for v3.`, off: own },
+    { v: 'finding', n: 'Record a finding', d: 'A reasoned concern. It goes to RDCO, which decides.', off: own, need: true },
+    { v: 'revise', n: 'Request revision', d: own ? 'You already have one open.' : 'The author revises. Only your office reviews the next version again.', off: own, need: true },
+  ];
+}
+function openFinish() {
+  const pend = S.pending[S.role]; const opts = verdictOptions(); const rdco = S.role === 'rdco'; const still = activeOffices();
+  dlg.innerHTML = `<form method="dialog" id="f">
+    <div class="dlg-h"><h2>${rdco ? 'RDCO’s Decision' : 'Finish your review'}</h2><p>${rdco ? (still.length ? `${still.map(k => PARTY[k].name).join(', ')} ${still.length > 1 ? 'are' : 'is'} still reviewing. RDCO doesn’t have to wait.` : 'No office review is open.') : pend.length ? `${pend.length} draft comment${pend.length > 1 ? 's' : ''} will be sent with it.` : 'No draft comments. You can still send a summary.'}</p></div>
+    <div class="dlg-b"><label class="label" for="summary">Summary</label><textarea id="summary" class="field" rows="3" placeholder="What the author and the other reviewers read first"></textarea>
+      <div class="opts" role="radiogroup" aria-label="Verdict">${opts.map((o, i) => `<label class="opt ${o.off ? 'off' : ''} ${o.danger ? 'danger' : ''} ${i === 0 ? 'sel' : ''}"><input type="radio" name="verdict" value="${o.v}" data-need="${o.need ? 1 : ''}" data-warn="${o.warn ? 1 : ''}" ${o.off ? 'disabled' : ''} ${i === 0 ? 'checked' : ''}><span class="on">${o.n}</span><span class="od">${o.d}</span></label>`).join('')}</div>
+      <div class="warn" id="warn" hidden>${ic('alert')}<span>This is RDCO’s executive Decision. ${still.length ? `${andList(still.map(k => PARTY[k].name))}’s open review${still.length > 1 ? 's close' : ' closes'}, marked “closed by RDCO’s Decision”; their comments and findings stay in the history.` : ''}${Object.keys(S.revision).some(k => k !== 'rdco' && S.revision[k]) ? ' Open revision requests are withdrawn.' : ''}</span></div>
+      <p class="err" id="ferr" hidden></p></div>
+    <div class="dlg-f"><button class="btn pill" value="cancel">Keep reviewing</button><button class="btn primary pill" id="send" value="send">Send review</button></div></form>`;
+  dlg.showModal();
+  const f = dlg.querySelector('#f');
+  const labels = { comment: 'Send review', revise: 'Request revision', send: 'Accept & send to RDCO', publish: 'Accept & publish', unlisted: 'Accept, keep unlisted', reject: 'Reject thesis', clear: `Clear for ${PARTY[S.role]?.name}`, finding: 'Record finding' };
+  f.addEventListener('change', () => { f.querySelectorAll('.opt').forEach(o => o.classList.toggle('sel', o.querySelector('input').checked)); f.querySelector('#warn').hidden = !f.querySelector(`input[value="${f.verdict.value}"]`).dataset.warn; f.querySelector('#send').textContent = labels[f.verdict.value]; });
+  f.addEventListener('submit', e => {
+    if (e.submitter?.value !== 'send') return;
+    const v = f.verdict.value; const sum = f.summary.value.trim();
+    if (f.querySelector(`input[value="${v}"]`).dataset.need && !sum) { e.preventDefault(); const er = f.querySelector('#ferr'); er.hidden = false; er.innerHTML = `${ic('alert')}Write the reason in the summary first.`; f.summary.focus(); return; }
+    applyVerdict(v, sum);
+  });
+}
+function applyVerdict(v, sum) {
+  const pend = S.pending[S.role]; const who = S.role === 'adviser' ? 'You' : `You (${PARTY[S.role].name})`;
+  const rows = [...(sum ? [esc(sum)] : []), ...pend.map(p => `<div class="q">p.${p.page} · “${esc(p.quote)}”</div>${esc(p.body)}`)];
+  const box = rows.length ? `<div class="ev-box">${rows.map(r => `<div class="ev-box-b">${r}</div>`).join('')}</div>` : '';
+  pend.forEach(p => S.threads.push({ id: 't' + (S.threads.length + 1), party: S.role, by: me(), v: 3, sec: p.sec, page: p.page, quote: p.quote, body: p.body, suggestion: p.suggestion, answer: null, resolved: false }));
+  S.pending[S.role] = [];
+  if (S.role === 'adviser' && v === 'send') { S.sendReason = sum || 'Ready for RDCO.'; setStage('offices', 'rdco', true); toast('Accepted and sent to RDCO. Now viewing as RDCO.'); render({ resetPane: true }); return; }
+  const say = { comment: ['', 'msg', 'commented'], revise: ['maroon', 'undo', 'asked for a revision'], publish: ['ink', 'check', 'accepted and published'], unlisted: ['ink', 'check', 'accepted and kept it unlisted'], reject: ['maroon', 'x', 'rejected the thesis'], clear: ['ink', 'check', `cleared it for ${PARTY[S.role]?.name}`], finding: ['maroon', 'flag', 'recorded a finding'] }[v];
+  S.events.push({ tone: say[0], icon: say[1], line: `<b>${who}</b> ${say[2]}`, box });
+  let msg = v === 'comment' ? 'Review sent. One notification, not one per comment.' : '';
+  if (v === 'revise') { S.revision[S.role] = true; msg = 'Revision requested. Your clock is paused.'; }
+  if (['publish', 'unlisted', 'reject'].includes(v)) {
+    S.decision = { publish: 'Accepted and published', unlisted: 'Accepted · Unlisted', reject: 'Rejected · Archived' }[v]; msg = S.decision;
+    const p = S.parties[S.role]; p.state = S.role === 'rdco' ? 'decided' : 'done'; const s = mySeat(); if (s) { s.st = 'done'; s.verdict = 'decided'; }
+    const closed = activeOffices();
+    closed.forEach(k => { S.parties[k].state = 'closed'; S.parties[k].seats.forEach(x => { if (x.st !== 'done') x.st = 'withdrawn'; }); });
+    Object.keys(S.revision).forEach(k => S.revision[k] = false);
+    if (closed.length) { S.events.push({ tone: '', icon: 'minus', line: `${andList(closed.map(k => `<b>${PARTY[k].name}</b>`))}’s review closed by RDCO’s Decision` }); msg += `. ${andList(closed.map(k => PARTY[k].name))} closed.`; }
+  }
+  if (SPECIALISTS.includes(S.role) && (v === 'clear' || v === 'finding')) {
+    const p = S.parties[S.role]; const seat = mySeat(); seat.st = 'done'; seat.verdict = v === 'clear' ? 'cleared' : 'finding';
+    if (p.seats.every(s => s.st === 'done')) { p.state = p.seats.some(s => s.verdict === 'finding') ? 'finding' : 'cleared'; if (v === 'finding') p.findingText = sum; msg = `${PARTY[S.role].name} ${p.state === 'cleared' ? 'cleared it' : 'recorded a finding'}. RDCO is told.`;
+      if (!activeOffices().length) S.events.push({ tone: 'ink', icon: 'check', line: 'Every office review is finished. <b>RDCO</b> is told' }); }
+    else msg = `Your part is done. ${PARTY[S.role].name} finishes when ${p.seats.filter(s => s.st !== 'done').map(s => s.who).join(', ')} is done too.`;
+  }
+  toast(msg); S.tab = 'conversation'; render({ resetPane: true });
+  setTimeout(() => work.querySelector('#stand')?.scrollIntoView({ block: 'nearest' }), 30);
+}
+function openRoute() {
+  const role = S.role; const targets = ROUTE_TARGETS[role]; const adviser = role === 'adviser';
+  dlg.innerHTML = `<form method="dialog" id="f">
+    <div class="dlg-h"><h2>Request review</h2><p>${adviser ? 'Send the record to RDCO. This accepts v3 at your stage; RDCO decides, and asks the offices it needs.' : 'Ask another office, as a whole or specific officers in it. Your own review carries on.'}</p></div>
+    <div class="dlg-b">${targets.map(k => { const p = S.parties[k]; const holds = ['pool', 'review'].includes(p.state); const seated = p.seats.filter(s => s.st !== 'withdrawn').map(s => s.who);
+      return `<div class="office-pick" data-office="${k}"><label><input type="checkbox" name="to" value="${k}"><span class="on">${PARTY[k].name}</span><span class="faint small">· ${PARTY[k].q}</span><span style="flex:1"></span><span class="small faint">${holds ? 'already reviewing' : ['cleared', 'finding'].includes(p.state) ? 'finished v3' : ''}</span></label>
+        <div class="whom" hidden><span class="small">${holds ? `Add specific officers to ${PARTY[k].name}’s review:` : `Who in ${PARTY[k].name}? Pick nobody to leave it to the office.`}</span>
+          <div class="members">${PARTY[k].members.map(m => `<button type="button" class="member" aria-pressed="false" data-m="${esc(m)}" ${seated.includes(m) ? 'disabled title="Already reviewing"' : ''}><span class="av">${initials(m)}</span>${esc(m)}</button>`).join('')}</div>
+          <span class="small faint" data-whomnote>${holds ? 'Pick at least one.' : `Nobody picked: it goes to ${PARTY[k].name}’s pool, and anyone there can claim it.`}</span></div></div>`; }).join('')}
+      <label class="label" for="why" style="margin-top:12px">Why? (required)</label>
+      <textarea id="why" class="field" rows="2" placeholder="What should they look at? Point to the section."></textarea>
+      <p class="err" id="ferr" hidden></p></div>
+    <div class="dlg-f"><button class="btn pill" value="cancel">Cancel</button><button class="btn primary pill" value="send">${adviser ? 'Accept & send to RDCO' : 'Send request'}</button></div></form>`;
+  dlg.showModal();
+  const f = dlg.querySelector('#f');
+  if (adviser) { f.querySelector('input[name=to]').checked = true; f.querySelector('.office-pick').classList.add('sel'); f.querySelector('.whom').hidden = false; }
+  f.addEventListener('change', e => { if (e.target.name !== 'to') return; const bx = e.target.closest('.office-pick'); bx.classList.toggle('sel', e.target.checked); bx.querySelector('.whom').hidden = !e.target.checked; });
+  f.addEventListener('click', e => { const b = e.target.closest('.member'); if (!b) return; b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') !== 'true');
+    const bx = b.closest('.office-pick'); const k = bx.dataset.office; const picked = [...bx.querySelectorAll('.member[aria-pressed=true]')].map(x => x.dataset.m); const holds = ['pool', 'review'].includes(S.parties[k].state);
+    bx.querySelector('[data-whomnote]').textContent = picked.length ? `${picked.join(', ')} ${picked.length > 1 ? 'are' : 'is'} asked directly and told now.` : holds ? 'Pick at least one.' : `Nobody picked: it goes to ${PARTY[k].name}’s pool, and anyone there can claim it.`; });
+  f.addEventListener('submit', e => {
+    if (e.submitter?.value !== 'send') return;
+    const er = f.querySelector('#ferr'); const fail = m => { e.preventDefault(); er.hidden = false; er.innerHTML = ic('alert') + m; };
+    const chosen = [...f.querySelectorAll('input[name=to]:checked')].map(x => ({ k: x.value, people: [...x.closest('.office-pick').querySelectorAll('.member[aria-pressed=true]')].map(b => b.dataset.m) }));
+    const why = f.why.value.trim();
+    if (!chosen.length) return fail('Choose at least one office.');
+    const bad = chosen.find(c => ['pool', 'review'].includes(S.parties[c.k].state) && !c.people.length);
+    if (bad) return fail(`${PARTY[bad.k].name} already has this record. Pick the officers to add.`);
+    if (!why) { f.why.focus(); return fail('Give a reason, so the office knows why it was asked.'); }
+    if (adviser) { S.sendReason = why; const nominees = chosen[0].people; setStage('offices', 'rdco', true); if (nominees.length) Object.assign(S.parties.rdco, { state: 'review', seats: nominees.map(w => ({ who: w, st: 'assigned' })) }); toast('Accepted and sent to RDCO. Now viewing as RDCO.'); render({ resetPane: true }); return; }
+    chosen.forEach(({ k, people }) => { const p = S.parties[k]; const holds = ['pool', 'review'].includes(p.state);
+      if (!holds) Object.assign(p, { state: people.length ? 'review' : 'pool', routedBy: me(), from: role, at: 'just now', reason: why, due: 'Mon 17 Nov', paused: false, docReq: null, seats: people.map(w => ({ who: w, st: 'assigned' })) });
+      else { people.forEach(w => p.seats.push({ who: w, st: 'assigned' })); if (p.state === 'pool') p.state = 'review'; } });
+    S.events.push({ tone: 'ink', icon: 'route', line: `<b>You (${PARTY[role].name})</b> asked ${chosen.map(c => `<b>${PARTY[c.k].name}</b>${c.people.length ? ` (${c.people.map(esc).join(', ')})` : ''}`).join(' and ')} to review`, box: `<div class="ev-box"><div class="ev-box-b">${esc(why)}</div></div>` });
+    toast(`Requested ${chosen.map(c => c.people.length ? c.people.join(', ') : PARTY[c.k].name).join(' and ')}.`); render();
+  });
+}
+function openAddReviewer() {
+  const p = S.parties[S.role]; const free = PARTY[S.role].members.filter(m => !p.seats.some(s => s.who === m));
+  dlg.innerHTML = `<form method="dialog" id="f"><div class="dlg-h"><h2>Add a colleague from ${PARTY[S.role].name}</h2><p>They review beside you. ${PARTY[S.role].name} finishes when every seat is done.</p></div>
+    <div class="dlg-b"><label class="label" for="who">Colleague</label><select id="who" class="field">${free.map(m => `<option>${m}</option>`).join('')}</select></div>
+    <div class="dlg-f"><button class="btn pill" value="cancel">Cancel</button><button class="btn primary pill" value="send" ${free.length ? '' : 'disabled'}>Add</button></div></form>`;
+  dlg.showModal();
+  dlg.querySelector('#f').addEventListener('submit', e => { if (e.submitter?.value !== 'send') return; const w = dlg.querySelector('#who').value; p.seats.push({ who: w, st: 'assigned' }); S.events.push({ tone: '', icon: 'plus', line: `<b>You</b> added <b>${esc(w)}</b> to ${PARTY[S.role].name}’s review` }); toast(`${w} added.`); render(); });
+}
+function openPrepare() {
+  const missing = S.threads.filter(t => { const d = S.answerDraft[t.id]; return !d?.state || (d.state === 'declined' && !d.text?.trim()); });
+  const list = S.threads.map(t => ({ ...t, answer: S.answerDraft[t.id]?.state ? S.answerDraft[t.id] : null }));
+  dlg.innerHTML = `<form method="dialog" id="f"><div class="dlg-h"><h2>Submit v3</h2><p>${ADVISER} reviews v3 next.</p></div>
+    <div class="dlg-b"><span class="label">Revised manuscript</span><button type="button" class="drop" id="pick"><span class="file-ic">PDF</span><span>${S.v3file ? `<b class="ink">${esc(S.v3file)}</b>` : `<b class="ink">Choose the revised PDF</b><br><span class="small faint">Or submit details only.</span>`}</span></button>
+      <div class="ev-box" style="margin-top:14px">${letter(list)}</div>${missing.length ? `<p class="err">${ic('alert')}${missing.length} point${missing.length > 1 ? 's' : ''} still need an answer, or a reason for declining.</p>` : ''}</div>
+    <div class="dlg-f"><button class="btn pill" value="cancel">Keep revising</button><button class="btn primary pill" value="send" ${missing.length ? 'disabled' : ''}>Submit v3</button></div></form>`;
+  dlg.showModal();
+  dlg.querySelector('#pick').onclick = () => { S.v3file = 'lopez-villanueva-thesis-v3.pdf'; dlg.close(); openPrepare(); };
+  dlg.querySelector('#f').addEventListener('submit', e => { if (e.submitter?.value !== 'send') return; const ans = S.answerDraft; setStage('v3', 'author'); S.threads = S.threads.map(t => ans[t.id]?.state ? { ...t, answer: { ...ans[t.id] } } : t); toast(`v3 submitted. ${ADVISER} has it now.`); render({ resetPane: true }); });
+}
+
+/* ================= Events ================= */
+let tt; function toast(m) { const t = document.getElementById('toast'); t.textContent = m; t.classList.add('show'); clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2800); }
+const narrow = () => work.getBoundingClientRect().width < 900;
+document.getElementById('stageSeg').onclick = e => { const b = e.target.closest('button'); if (b) { setStage(b.dataset.stage, S.role); render({ resetPane: true }); } };
+// Switching who is looking keeps the record as it is: the same review, seen from another seat.
+document.getElementById('roleSeg').onclick = e => { const b = e.target.closest('button'); if (!b || b.disabled) return; S.role = b.dataset.role; S.tab = 'conversation'; S.selection = null; S.composing = null; S.filter = 'open'; render({ resetPane: true }); };
+function showInPaper(secId, threadId) {
+  if (narrow()) S.paneOpen = false; render();
+  const pg = work.querySelector('#page-' + secId); if (!pg) return;
+  pg.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  const m = threadId && work.querySelector(`mark[data-goto="${threadId}"]`); if (m) m.classList.add('focus'); else { pg.classList.remove('flash'); void pg.offsetWidth; pg.classList.add('flash'); }
+}
+function goThread(id) { S.tab = 'threads'; const t = S.threads.find(x => x.id === id); S.filter = t?.resolved ? 'resolved' : 'open'; S.focus = id; if (narrow()) S.paneOpen = true; render(); }
+document.addEventListener('click', e => { if (pop.innerHTML && !e.target.closest('.profile') && !e.target.closest('[data-person]')) closePop(); });
+work.addEventListener('click', e => {
+  const b = e.target.closest('button, mark, .scrim'); if (!b) return; const d = b.dataset;
+  if (d.person) { const same = pop.querySelector('.profile')?.getAttribute('aria-label') === d.person; closePop(); if (!same) openProfile(d.person, b); return; }
+  if (d.tab) { S.tab = d.tab; render({ resetPane: true }); return; }
+  if (d.readv) { S.readerV = +d.readv; render(); return; }
+  if (d.goto) { goThread(d.goto); return; }
+  if (d.show) { showInPaper(d.show); return; }
+  if (d.see) { const t = S.threads.find(x => x.id === d.see); if (t.outdated && S.stage !== 'v2') { S.tab = 'changes'; render({ resetPane: true }); } else showInPaper(t.sec, t.id); return; }
+  if (d.viewed) { S.viewed.has(d.viewed) ? S.viewed.delete(d.viewed) : S.viewed.add(d.viewed); render(); return; }
+  if (d.filter) { S.filter = d.filter; render(); return; }
+  if (d.resolve) { S.threads.find(t => t.id === d.resolve).resolved = true; toast('Thread resolved'); render(); return; }
+  if (d.reopen) { S.threads.find(t => t.id === d.reopen).resolved = false; render(); return; }
+  if (d.addr) { S.threads.find(t => t.id === d.addr).answer = { state: 'addressed', text: 'Will be reflected in the next version.', where: '' }; render(); return; }
+  if (d.reply) { S.composing = { reply: d.reply }; S.tab = 'threads'; render(); return; }
+  if (d.discard !== undefined) { S.pending[S.role].splice(+d.discard, 1); render(); return; }
+  if (d.ans) { S.answerDraft[d.ans] = { ...(S.answerDraft[d.ans] || {}), state: d.state, accepted: d.state === 'addressed' && !!S.threads.find(t => t.id === d.ans).suggestion }; render(); work.querySelector('#at-' + d.ans)?.focus(); return; }
+  switch (d.act) {
+    case 'open-pane': S.paneOpen = true; render(); return;
+    case 'close-pane': S.paneOpen = false; render(); return;
+    case 'comment': if (S.selection) { S.composing = { ...S.selection }; S.tab = 'threads'; if (narrow()) S.paneOpen = true; render({ resetPane: true }); } return;
+    case 'toggle-suggest': { const v = work.querySelector('#compose-text').value; S.composing.suggest = !S.composing.suggest; render(); work.querySelector('#compose-text').value = v; return; }
+    case 'cancel': S.composing = null; render(); return;
+    case 'add-pending': { const body = work.querySelector('#compose-text').value.trim(); if (!body) return work.querySelector('#compose-text').focus(); const sug = work.querySelector('#compose-sug')?.value.trim();
+      S.pending[S.role].push({ ...S.composing, body, suggestion: sug && sug !== S.composing.quote ? sug : null }); S.composing = null; S.selection = null; getSelection().removeAllRanges(); toast('Added to your review'); render(); return; }
+    case 'post-reply': { const body = work.querySelector('#compose-text').value.trim(); if (!body) return; const t = S.threads.find(x => x.id === S.composing.reply); (t.replies ||= []).push({ by: S.role === 'author' ? AUTHOR : me(), body }); S.focus = t.id; S.composing = null; render(); return; }
+    case 'finish': openFinish(); return;
+    case 'prepare': openPrepare(); return;
+    case 'route': if (canRequest()) openRoute(); return;
+    case 'add-reviewer': openAddReviewer(); return;
+    case 'claim': { const p = S.parties[S.role]; p.seats.push({ who: me(), st: 'reviewing' }); p.state = 'review'; S.events.push({ tone: '', icon: 'hand', line: `<b>You</b> claimed it for ${PARTY[S.role].name}` }); toast('Claimed. It’s in your In review list.'); render(); return; }
+    case 'open-seat': mySeat().st = 'reviewing'; if (S.parties[S.role].state === 'pool') S.parties[S.role].state = 'review'; render(); return;
+    case 'withdraw': S.revision[S.role] = false; toast('Revision request withdrawn.'); render(); return;
+    case 'threads': S.tab = 'threads'; S.filter = S.role === 'author' ? 'open' : 'mine'; render({ resetPane: true }); return;
+    case 'stand': S.tab = 'conversation'; if (narrow()) S.paneOpen = true; render(); setTimeout(() => work.querySelector('#stand')?.scrollIntoView({ block: 'nearest' }), 20); return;
+    case 'upload': S.docUploaded = true; S.parties.ierc.paused = false; S.events.push({ tone: '', icon: 'file', line: `<b>${AUTHOR}</b> uploaded the signed consent forms` }); toast('Uploaded. IERC’s clock restarts.'); render(); return;
+    case 'general': { const v = work.querySelector('#gen').value.trim(); if (!v) return; S.events.push({ tone: '', icon: 'msg', line: `<b>You</b> commented`, box: `<div class="ev-box"><div class="ev-box-b">${esc(v)}</div></div>` }); render(); return; }
+    case 'watch': S.watching = !S.watching; render(); return;
+    case 'copy': toast('Link copied'); return;
+  }
+});
+work.addEventListener('input', e => { const t = e.target; if (t.dataset.ansText) S.answerDraft[t.dataset.ansText].text = t.value; if (t.dataset.ansWhere) S.answerDraft[t.dataset.ansWhere].where = t.value; });
+work.addEventListener('focusout', e => { if (e.target.dataset.ansText !== undefined || e.target.dataset.ansWhere !== undefined) setTimeout(() => { const a = document.activeElement; if (!a?.dataset?.ansText && !a?.dataset?.ansWhere) render(); }, 0); });
+document.addEventListener('selectionchange', () => {
+  if (!canReview()) return;
+  const sel = getSelection(); const q = sel?.toString().trim();
+  const p = sel?.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement)?.closest('.page p');
+  const next = q && q.length > 3 && p ? { sec: p.dataset.sec, page: +p.dataset.page, quote: q.replace(/\s+/g, ' ') } : null;
+  if (JSON.stringify(next) === JSON.stringify(S.selection)) return; S.selection = next;
+  const btn = work.querySelector('[data-act="comment"]'); const hint = work.querySelector('#selHint');
+  if (btn) { btn.disabled = !next; btn.classList.toggle('on', !!next); }
+  if (hint) hint.textContent = next ? `Selected: “${next.quote.slice(0, 36)}${next.quote.length > 36 ? '…' : ''}” · press C` : 'Select a passage to comment on it.';
+});
+document.addEventListener('keydown', e => {
+  if (e.key.toLowerCase() === 'c' && S.selection && !/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName) && !e.metaKey && !e.ctrlKey && !dlg.open) { e.preventDefault(); S.composing = { ...S.selection }; S.tab = 'threads'; if (narrow()) S.paneOpen = true; render({ resetPane: true }); }
+  if (e.key === 'Escape' && !dlg.open) { if (pop.innerHTML) closePop(); else if (S.paneOpen) { S.paneOpen = false; render(); } }
+});
+// Details is a tab only while the sidebar is folded away; widen the window and it goes back to the sidebar.
+addEventListener('resize', () => { closePop(); if (S.tab === 'details' && work.getBoundingClientRect().width >= 1200) { S.tab = 'conversation'; render({ resetPane: true }); } });
+
+/* ================= Column widths =================
+   The paper keeps at least 480 px. The review pane takes 320 px up to half the workspace;
+   the details sidebar 220 px up to 420 px, and always at least 40 px slimmer than the review pane. */
+const root = document.documentElement;
+const W = { mid: null, side: null };
+const DEFAULT = { mid: .30, side: .20 };
+function workW() { return work.getBoundingClientRect().width; }
+function threeCols() { return workW() >= 1200; }
+function clampWidths(mid, side) {
+  const w = workW(); const three = threeCols();
+  mid = Math.max(320, Math.min(mid, w / 2));
+  if (three) { side = Math.max(220, Math.min(side, 420, mid - 40)); mid = Math.min(mid, w - 480 - side); }
+  else mid = Math.min(mid, w - 480);
+  return { mid: Math.round(Math.max(320, mid)), side: Math.round(side) };
+}
+function applyWidths(save) {
+  const w = workW(); const c = clampWidths(W.mid ?? w * DEFAULT.mid, W.side ?? w * DEFAULT.side);
+  root.style.setProperty('--mid-w', c.mid + 'px'); root.style.setProperty('--side-w', c.side + 'px');
+  work.querySelectorAll('.grip').forEach(g => { const k = g.dataset.grip; g.setAttribute('aria-valuenow', c[k]); g.setAttribute('aria-valuemin', k === 'mid' ? 320 : 220); });
+  if (save) try { localStorage.setItem('iris-review-cols', JSON.stringify(W)); } catch {}
+}
+try { Object.assign(W, JSON.parse(localStorage.getItem('iris-review-cols') || '{}')); } catch {}
+function current(k) { return parseFloat(getComputedStyle(root).getPropertyValue(k === 'mid' ? '--mid-w' : '--side-w')); }
+work.addEventListener('pointerdown', e => {
+  const g = e.target.closest('.grip'); if (!g) return; e.preventDefault();
+  const k = g.dataset.grip; const startX = e.clientX; const mid0 = current('mid'); const side0 = current('side');
+  g.classList.add('dragging'); document.body.classList.add('resizing'); g.setPointerCapture(e.pointerId);
+  const move = ev => { const dx = startX - ev.clientX;
+    // Dragging the review pane's edge widens it into the paper; the sidebar keeps its width.
+    if (k === 'mid') { W.mid = mid0 + dx; W.side = side0; } else { W.side = side0 + dx; W.mid = mid0; }
+    const c = clampWidths(W.mid, W.side); W.mid = c.mid; W.side = c.side; applyWidths(false); };
+  const up = () => { g.classList.remove('dragging'); document.body.classList.remove('resizing'); g.removeEventListener('pointermove', move); g.removeEventListener('pointerup', up); applyWidths(true); };
+  g.addEventListener('pointermove', move); g.addEventListener('pointerup', up);
+});
+work.addEventListener('dblclick', e => { const g = e.target.closest('.grip'); if (!g) return; W[g.dataset.grip] = null; applyWidths(true); });
+work.addEventListener('keydown', e => {
+  const g = e.target.closest('.grip'); if (!g || !['ArrowLeft', 'ArrowRight'].includes(e.key)) return; e.preventDefault();
+  const k = g.dataset.grip; W.mid = current('mid'); W.side = current('side'); W[k] += e.key === 'ArrowLeft' ? 24 : -24; applyWidths(true);
+});
+addEventListener('resize', () => applyWidths(false));
+
+setStage('offices', 'rdco'); render();
+</script>
+</body>
+</html>

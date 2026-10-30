@@ -88,6 +88,12 @@ def main():
 
     attempt = durable.claim(run_id)
     assert attempt is not None, "probe requires an unfinished run"
+    if mode == "revision":
+        emit(ready=str(attempt.pk))
+        assert sys.stdin.readline().strip() == "continue"
+        record(attempt)
+        emit(recorded=True)
+        return
     if mode == "crash":
         durable.append(attempt, "text_delta", {"text": "unfinished"})
         emit(claimed=str(attempt.pk))

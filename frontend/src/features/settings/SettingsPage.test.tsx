@@ -94,3 +94,19 @@ describe("changing your password", () => {
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 });
+
+it("distinguishes the current disclosure notice from historical account consent (IR-123)", async () => {
+  const user = userEvent.setup();
+  useAuthStore.setState({
+    user: { ...useAuthStore.getState().user!, consent_given: true, date_joined: "2026-09-01T00:00:00Z" },
+  });
+  renderScreen(<SettingsPage />, { route: "/settings" });
+
+  await user.click(screen.getByRole("button", { name: "Data privacy & consent" }));
+
+  expect(screen.getByText("Consent on record")).toBeVisible();
+  expect(screen.getByRole("heading", { name: "Current disclosure notice" })).toBeVisible();
+  expect(screen.getByText(/does not confirm.*accepted this revised notice/i)).toBeVisible();
+  expect(screen.queryByText("What you agreed to")).not.toBeInTheDocument();
+  expect(screen.getByText(/external AI providers outside CIT-U/i)).toBeVisible();
+});

@@ -281,7 +281,35 @@ python manage.py eval_conversations --set <set.json> --validate [--lock <lock.js
                                    # family), 36 supported and unambiguous, zero leakage, `valid`,
                                    # lock written and re-checked. Labels are AI-drafted
                                    # (`draft_unreviewed`, `labelled_by` empty), so no score on it
-                                   # counts until a named person reviews it. No arm has been run
+                                   # counts until a named person reviews it. No arm has been run.
+                                   # IR-607: the lock also pins corpus and rubric_version (older
+                                   # locks read stale); --write-lock refuses while A09 lacks
+                                   # distinct a09_case missing_field/no_match/outage cases;
+                                   # --label-review checks a named person's label review.
+                                   # --score adds --packets (refuses evidence outside a reviewer's
+                                   # packet) and --counted (refuses draft labels, a missing or
+                                   # fixture label review, no packets, fake providers, another
+                                   # corpus, single-reviewed conversations); every score
+                                   # file states counted and not_counted_reasons. Two reviews plus
+                                   # an adjudication stay in review_audit. Verified 2026-10-30 on
+                                   # apps/ai/evaluation/fixtures/review/ (uncounted; --counted refused).
+                                   # Guide: docs/evaluation/general-tools/review.md
+python manage.py eval_campaign --report --set <s.json> --lock <lock.json> --runs controller=<r1.json> [--runs ...] --reviews <reviews.json> [--approvals a.json --scenarios ir608.json --counted]
+                                   # IR-609: report a campaign of repeated arm runs (>=3 per arm
+                                   # when counted). Free: no DB, no vendor. Refuses stale locks,
+                                   # incomplete manifests, reused Conversations and unequal arms;
+                                   # blocks on breaches, unreviewed families or unmeasured IR-608
+                                   # scenarios. --smoke <run.json> --case-cost-usd X
+                                   # --campaign-cost-usd Y --planned-cases N measures a development
+                                   # smoke's spend against proposed caps. Writes .json + .md. Test-only so
+                                   # far: no campaign has run. Guide: docs/evaluation/general-tools/campaign.md
+python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewer-name NAME --out <packets.json>
+                                   # one reviewer's packet (IR-607): rendered answers and citations
+                                   # checked by Record.visible_to(reviewer); a turn citing an
+                                   # unreadable record is withheld whole; no diagnostics or usage.
+                                   # Held-out output needs --lock and a run newer than it.
+                                   # Test-only so far (test_review_packets.py, test Postgres);
+                                   # not yet run against the dev database
 python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (IR-133/IR-394)
                                    # The retrieval eval harness. --dry-run costs nothing and calls no
                                    # vendor: it checks that every label resolves against this database,
