@@ -86,7 +86,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     #: `cv` claim, and authentication refuses one that does not match. A
     #: password change or reset increments it, which is what ends every
     #: sign-in on every device at once. Change it only through
-    #: `apps.accounts.credentials.invalidate_credentials`.
+    #: `apps.accounts.credentials.set_password_and_invalidate`.
     credential_version = models.PositiveIntegerField(default=0)
 
     objects = UserManager()

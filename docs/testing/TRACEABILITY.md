@@ -1696,7 +1696,7 @@ Verification on 2026-10-30: local frontend full suite **105 files / 1,323 tests 
 The interrupted broad local run included `No active EmbeddingSpace is configured` errors in its reused test database; it did not establish a code regression. The clean CI database executed the full backend suite successfully. Task-owned test databases and temporary source copies may be removed after verification; no live metadata corrections were executed.
 
 
-## IR-642 ? Forgotten-password recovery
+## IR-642 - Forgotten-password recovery
 
 [ADR-045](../adr/045-account-recovery-contract.md) is the accepted contract.
 The public request/confirmation endpoints, reset screens and durable encrypted
@@ -1719,7 +1719,11 @@ backend snapshot: **149 passed, 1 repository-layout skip**, plus the subsequent
 stale-profile regression demonstrated failing old-password login and then passed
 with the fix. The historical IR-645 migration fixture was deliberately corrected
 to use historical User when rewound before the new credential-version column;
-its assertions were retained. Full backend verification is pending.
+its assertions were retained. Existing ASGI/replay fixtures now mint current
+session credentials instead of legacy sid-less tokens; their assertions were
+retained. Full-suite CI evidence is linked from [PR #356](https://github.com/moisturicer/IRIS/pull/356).
+Interrupted local full runs (missing seed data, temporary-directory ownership,
+and recreation of the shared backend container) are not passing evidence.
 
 An actual production backend image built successfully, including collectstatic
 with build-only configuration. A populated local database copy migrated through
