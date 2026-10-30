@@ -16,6 +16,7 @@ const ENTRY_FRAME = [
   "src/components/auth/AuthBrandPanel.tsx",
   "src/components/auth/AuthLayout.tsx",
   "src/features/auth/DataNotice.tsx",
+  "src/features/auth/EmailVerifyPage.tsx",
   "src/features/auth/LoginPage.tsx",
   "src/features/auth/PendingApprovalPage.tsx",
   "src/features/auth/SignupPage.tsx",

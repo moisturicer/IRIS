@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormikHelpers } from "formik";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
@@ -33,6 +33,7 @@ const CLIENT_LOCKOUT_MS = 15 * 60 * 1000;
 type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
 
 export default function LoginPage() {
+  const signInRef = useRef<HTMLButtonElement>(null);
   const navigate       = useNavigate();
   const location       = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -196,6 +197,7 @@ export default function LoginPage() {
           open={lockoutOpen}
           onClose={closeLockout}
           lock={lock}
+          returnTo={signInRef.current}
         />
       }
     >
@@ -252,6 +254,7 @@ export default function LoginPage() {
       )}
 
       <LoginForm
+        submitRef={signInRef}
         onSubmit={handleLogin}
         disabled={lockoutOpen}
         showCredentialsError={showFieldError}
@@ -260,7 +263,7 @@ export default function LoginPage() {
 
       <p className="mt-5 text-center text-sm text-stone-600">
         No account?{" "}
-        <Link to="/signup" className="text-brand font-semibold hover:underline">
+        <Link to="/signup" className="inline-flex min-h-11 min-w-11 items-center justify-center text-brand font-semibold hover:underline">
           Sign up
         </Link>
       </p>

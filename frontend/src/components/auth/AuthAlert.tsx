@@ -35,7 +35,7 @@ export function AuthAlert({ variant, title, children, onDismiss }: AuthAlertProp
         <button
           type="button"
           onClick={onDismiss}
-          className="absolute top-3 right-3 text-brand/70 hover:text-brand text-[20px] leading-none"
+          className="absolute top-1 right-1 flex min-h-11 min-w-11 items-center justify-center text-brand hover:text-brand-light text-title leading-none"
           aria-label="Dismiss"
         >
           ×

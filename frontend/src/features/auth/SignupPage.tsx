@@ -4,7 +4,7 @@ import { authApi } from "@/api/auth";
 import { accountsApi } from "@/api/accounts";
 import { AuthAlert } from "@/components/auth/AuthAlert";
 import { AuthLayout } from "@/components/auth/AuthLayout";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, ButtonLink, Input, Select } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { DataNotice } from "./DataNotice";
 
@@ -306,15 +306,13 @@ export default function SignupPage() {
         <p className="mt-section text-small text-stone-600">
           If that address is wrong, register again with the right one.
         </p>
-        <Link
+        <ButtonLink
           to="/login"
-          // Drawn as the primary action, since it is the only one left. Button
-          // cannot render as a link yet (IR-538 adds that); until then this
-          // copies its `primary` + `full` look, in type-role sizes.
-          className={`mt-section-lg flex min-h-11 w-full items-center justify-center rounded-lg bg-brand px-5 py-3.5 text-heading font-medium text-white transition-colors hover:bg-brand-light ${FOCUS_RING}`}
+          size="full"
+          className="mt-section-lg"
         >
           Go to sign in
-        </Link>
+        </ButtonLink>
       </AuthLayout>
     );
   }
@@ -471,7 +469,7 @@ export default function SignupPage() {
               aria-describedby={consentError ? consentErrorId : undefined}
               className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
             />
-            <label htmlFor="signup-consent" className="cursor-pointer text-small text-stone-600">
+            <label htmlFor="signup-consent" className="flex min-h-11 items-center cursor-pointer text-small text-stone-600">
               I have read the data notice and agree to IRIS using my details as it describes.
             </label>
           </div>
@@ -530,7 +528,7 @@ export default function SignupPage() {
       <div className="mt-section-lg border-t border-stone-200 pt-section">
         <p className="text-center text-sm text-stone-600">
           Already have an account?{" "}
-          <Link to="/login" className="font-semibold text-brand hover:underline">
+          <Link to="/login" className="inline-flex min-h-11 min-w-11 items-center justify-center font-semibold text-brand hover:underline">
             Sign in
           </Link>
         </p>

@@ -43,6 +43,8 @@ The `sr-only: 0` result is the structural one. It means the 768–1279 px icon r
 
 **Gold as a button fill is the same failure, inverted.** White text on gold is **2.76 : 1** — it fails AA and even the 3 : 1 large-text floor, so the rule above extends to fills: gold never sits behind text of any size. The brand maroon is the primary-action colour, at **12.34 : 1** resting and **9.53 : 1** on `brand-light` hover. The login submit adopted the shared button primitive in IR-204; the signup and email-verify actions are still hand-rolled gold and are tracked in IR-205.
 
+**Entry completion (IR-533, IR-538, IR-207).** Verification now adopts the same frame and maroon button-link primitive as the other entry screens. Registration's confirmation also uses that primitive. Full-width actions keep opaque stone text on a stone background when disabled, rather than fading below the project's 4.5:1 requirement. Entry links, consent labels and dismiss actions have at least 44×44 targets. Frontend lint rejects gold text/fill utilities in literals and template segments; borders and rings remain legal, and an explicitly documented decorative state icon may retain gold when its state is conveyed independently of color. Unsupported statistics may return only with a verifiable source. See [the recorded checks and outstanding human verification](../testing/evidence/IR-533/README.md).
+
 The brand colour passing at AAA is a real asset: primary actions, links and active states are already well above the threshold. The contrast problem is entirely in the greys.
 
 ### B. Icons announce as noise — 1.1.1
