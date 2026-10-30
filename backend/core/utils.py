@@ -1,13 +1,6 @@
-import random
-import string
 import zipfile
 import os
 from io import BytesIO
-
-
-def generate_pin(length: int = 6) -> str:
-    """Generate a random alphanumeric PIN for record access."""
-    return "".join(random.choices(string.ascii_uppercase + string.digits, k=length))
 
 
 def build_zip(files: list) -> BytesIO:

@@ -53,7 +53,15 @@ My Library and Paper View offer the action from server-computed availability. Th
 **Tests:** `apps/reviews/test_analytics.py` — exact figures from fixture event logs (median, nearest-rank p90, record-type cells, revisions and reassignment not restarting a clock, restart-all's second clock, unmeasured turns never zero, Manila week boundaries, the date range, revision cycles per scope, open and overdue now) and, against PostgreSQL, the endpoint's office scope, RDCO's narrowing, the 403 for another office, malformed filters, no reviewer identifiers in the payload, and the empty-log state. `apps/reviews/test_analytics_access.py` now expects 200 for the offices. `frontend/src/features/review/ReviewAnalyticsPage.test.tsx` (data start date, too-few cells, elapsed-not-effort, office filter for RDCO only, load failure, axe); `lib/access.test.ts`.
 
 
+## IR-473 the document-access PIN ceremony is removed (NFR-S4)
+
+Verifying a PIN unlocked nothing: no permission, download or view read it. `POST /reviews/pin/generate/` and `/pin/verify/` are gone (404), and so are `RecordAuthPinViewSet`, the `RecordAuthPin` model (`reviews/0020` drops the table), `core.utils.generate_pin`, both access-matrix rows and `reviewsApi.generatePin`/`verifyPin`. **The audit types `PIN_GENERATED` and `PIN_VERIFIED` are kept as `AuditEvent` choices**, and kept in `frontend/src/types/audit.ts`, so rows written before the removal still display. Nothing writes them any more.
+
+**Tests:** `apps/reviews/test_pin_removed.py` covers three things. Both routes 404 and neither URL name reverses. Rows of both PIN audit types display their labels. `reviews/0020` applies over a table that still holds PIN rows, both unused and used. This file replaces IR-635's `test_pin_visibility.py`, below, whose endpoint no longer exists.
+
 ## IR-635 PIN generation respects Record visibility (NFR-S4)
+
+**Superseded by IR-473**, above: the endpoint is removed. Kept as history.
 
 `RecordAuthPinViewSet.generate` resolves through `visible_to(request.user)` before creating a PIN or emailing a title. Hidden and missing Records return the same 404. `apps/reviews/test_pin_visibility.py` asserts both the refusal and absence of PIN/email side effects, plus the owner's positive path. The IR-616 PIN defect markers are removed without changing expected access. Database execution is pending CI because local Docker's engine is unavailable; no pass is claimed.
 
