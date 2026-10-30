@@ -42,6 +42,10 @@ Nothing in this section is a quality result. No arm was run and no person has re
 
 The [development replay command](replay.md) collects a selected case through the authenticated public reader protocol, saves its Conversation and reopened Turns, and writes a versioned scorer-readable run file. It records incomplete attempts and explicit missing usage. The local smoke mode uses a deterministic-provider server; it does not run a paid campaign or score draft labels.
 
+## IR-607 review and counted scoring
+
+[Label review, reviewer packets, double review with adjudication, and counted scoring](review.md). The draft set is not yet reviewed, its A09 cases are untagged, and its lock predates corpus and rubric pinning, so it cannot be locked or counted yet.
+
 ## IR-608 safety and recovery
 
 The [scenario runner and browser exercise](scenarios.md) collect access/failure contract results and independent Postgres worker correctness evidence separately. Missing browser or worker exercises remain `not_measured`; no deterministic result counts as quality, throughput or production approval.

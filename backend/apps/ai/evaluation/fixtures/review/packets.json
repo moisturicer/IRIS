@@ -1,0 +1,152 @@
+[
+  {
+    "run_id": "fixture-run",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer A",
+    "rubric_version": 1,
+    "packets": [
+      {
+        "conversation": "R01",
+        "authorized_record_ids": [
+          100
+        ]
+      },
+      {
+        "conversation": "R02",
+        "authorized_record_ids": [
+          101
+        ]
+      },
+      {
+        "conversation": "R03",
+        "authorized_record_ids": [
+          102
+        ]
+      },
+      {
+        "conversation": "R04",
+        "authorized_record_ids": [
+          103
+        ]
+      },
+      {
+        "conversation": "R05",
+        "authorized_record_ids": [
+          104
+        ]
+      },
+      {
+        "conversation": "R06",
+        "authorized_record_ids": [
+          105
+        ]
+      },
+      {
+        "conversation": "R07",
+        "authorized_record_ids": [
+          106
+        ]
+      }
+    ]
+  },
+  {
+    "run_id": "fixture-run",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer B",
+    "rubric_version": 1,
+    "packets": [
+      {
+        "conversation": "R01",
+        "authorized_record_ids": [
+          100
+        ]
+      },
+      {
+        "conversation": "R02",
+        "authorized_record_ids": [
+          101
+        ]
+      },
+      {
+        "conversation": "R03",
+        "authorized_record_ids": [
+          102
+        ]
+      },
+      {
+        "conversation": "R04",
+        "authorized_record_ids": [
+          103
+        ]
+      },
+      {
+        "conversation": "R05",
+        "authorized_record_ids": [
+          104
+        ]
+      },
+      {
+        "conversation": "R06",
+        "authorized_record_ids": [
+          105
+        ]
+      },
+      {
+        "conversation": "R07",
+        "authorized_record_ids": [
+          106
+        ]
+      }
+    ]
+  },
+  {
+    "run_id": "fixture-run",
+    "arm": "controller",
+    "reviewer": "Fixture Adjudicator",
+    "rubric_version": 1,
+    "packets": [
+      {
+        "conversation": "R01",
+        "authorized_record_ids": [
+          100
+        ]
+      },
+      {
+        "conversation": "R02",
+        "authorized_record_ids": [
+          101
+        ]
+      },
+      {
+        "conversation": "R03",
+        "authorized_record_ids": [
+          102
+        ]
+      },
+      {
+        "conversation": "R04",
+        "authorized_record_ids": [
+          103
+        ]
+      },
+      {
+        "conversation": "R05",
+        "authorized_record_ids": [
+          104
+        ]
+      },
+      {
+        "conversation": "R06",
+        "authorized_record_ids": [
+          105
+        ]
+      },
+      {
+        "conversation": "R07",
+        "authorized_record_ids": [
+          106
+        ]
+      }
+    ]
+  }
+]
