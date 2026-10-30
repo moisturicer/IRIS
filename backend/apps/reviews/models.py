@@ -427,18 +427,43 @@ class ResubmissionRequest(models.Model):
         return f"Record {self.record_id} | {self.party} | {self.state}"
 
 
-class RecordAuthPin(models.Model):
+class ReviewComment(models.Model):
     """
-    A one-time PIN emailed to a user to grant temporary access to a protected record.
-    PINs expire 24 hours after generation and can only be used once.
+    One message in a record's review discussion (ADR-032 §7, IR-419).
+
+    Private to the review: read under `may_read_review`, written by the
+    record's participants, and never shown in public discussion, which is a
+    separate model. Shown in the review timeline, which is derived from rows
+    like this one rather than copied into an event table.
     """
-    record     = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="auth_pins")
-    user       = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="auth_pins")
-    email      = models.EmailField()
-    pin        = models.CharField(max_length=6)
-    is_used    = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(null=True, blank=True)
+
+    record     = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="review_comments"
+    )
+    #: `SET_NULL`: the discussion outlives an account that is removed.
+    author     = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="review_comments",
+    )
+    body       = models.TextField()
+    #: The record's latest Version when the comment was written. Null on a
+    #: record with no version yet: no "v1" is invented (spec §4.11).
+    version    = models.ForeignKey(
+        "records.RecordVersion", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="review_comments",
+    )
+    #: The comment this one answers. Always a top-level comment on the same
+    #: record: a reply to a reply joins its thread (`apps.reviews.comments`).
+    reply_to   = models.ForeignKey(
+        "self", on_delete=models.CASCADE, null=True, blank=True, related_name="replies",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    #: Stamped by an edit that changed the body; null until then.
+    edited_at  = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["record", "created_at", "pk"]
+        indexes  = [models.Index(fields=["record", "created_at"])]
 
     def __str__(self):
-        return f"Pin for record {self.record_id} user {self.user_id}"
+        return f"Record {self.record_id} | comment {self.pk} by {self.author_id}"

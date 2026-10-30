@@ -48,7 +48,7 @@ TURN_FIELDS = DONE_FIELDS + ("id", "question", "created_at")
 
 _CITATION = ("marker", "chunk_id", "record_id", "record_title", "page", "text", "context_path",
              "regions")
-_SOURCE_CARD = ("id", "title", "abstract", "authors", "year", "classification", "score")
+_SOURCE_CARD = ("id", "title", "abstract", "authors", "origin", "year", "classification", "score")
 _RECORD = ("record_id", "title")
 _CANDIDATE = ("record_id", "title", "state", "quote", "restricted")
 _CANDIDATE_SOURCE = ("field", "page", "chunk_id")

@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { ResearchCard } from "@/components/shared/ResearchCard";
+import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import type { ForYouItem, RecordListItem } from "@/types/records";
@@ -13,6 +14,7 @@ import {
   highlightMatch,
   ipTypeLabel,
   isStarred,
+  indexedOnLabel,
   recordYearLabel,
   toggleStarred,
 } from "./discoverUtils";
@@ -65,8 +67,10 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
           </span>}
         </span>
       }
-      meta={recordYearLabel(record)}
-      byline={highlightMatch(formatAuthorList(record.authors), searchHighlight)}
+      meta={record.publication_year ? `Published ${recordYearLabel(record)}` : indexedOnLabel(record)}
+      byline={formatAuthorList(record.authors) === "Authors not recorded"
+        ? <span className="italic text-stone-500">Authors not recorded</span>
+        : highlightMatch(formatAuthorList(record.authors), searchHighlight)}
       summary={abstract ? highlightMatch(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
       summaryClassName={expanded ? "xl:line-clamp-5" : undefined}
       splitFooter={expanded}
@@ -86,6 +90,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
       footerClassName="rounded-b-xl border-stone-200 bg-white"
       footer={
         <>
+          <ResearchOriginBadge origin={record.origin} />
           <span className="inline-flex items-center gap-1.5 text-stone-700" title="Times this record has been opened">
             <i className="fas fa-eye text-[12px] text-brand" aria-hidden />
             {record.access_count} {record.access_count === 1 ? "view" : "views"}

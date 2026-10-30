@@ -16,13 +16,13 @@ export function formatAuthorList(
   authors: (Author | string)[] | undefined,
   max = 4,
 ): string {
-  if (!authors || authors.length === 0) return "Institutional Author";
+  if (!authors || authors.length === 0) return "Authors not recorded";
 
   const names = authors
     .map((a) => (typeof a === "string" ? a : a?.name))
     .filter((n): n is string => Boolean(n && n.trim()));
 
-  if (names.length === 0) return "Institutional Author";
+  if (names.length === 0) return "Authors not recorded";
   if (names.length <= max) return names.join(", ");
   return `${names.slice(0, max).join(", ")} +${names.length - max} more`;
 }
@@ -72,21 +72,19 @@ export function highlightMatch(
  * Date / year parsing
  * ──────────────────────────────────────────────────────────────────────────*/
 
-/** Best-effort publication year: the declared year, else the year it was indexed. */
+/** Publication metadata only; completion and added dates are separate facts. */
 export function recordYear(record: RecordListItem): number | null {
-  if (record.year_accomplished) return record.year_accomplished;
-  const created = parseISO(record.created_at);
-  return isValid(created) ? created.getFullYear() : null;
+  return record.publication_year ?? null;
 }
 
 export function recordYearLabel(record: RecordListItem): string {
   return recordYear(record)?.toString() ?? "—";
 }
 
-/** "Indexed Mar 4, 2026" — used in the card footer. */
+/** Added to IRIS, distinct from publication and completion dates. */
 export function indexedOnLabel(record: RecordListItem): string {
   const created = parseISO(record.created_at);
-  return isValid(created) ? `Indexed ${format(created, "MMM d, yyyy")}` : "Recently indexed";
+  return isValid(created) ? `Added ${format(created, "MMM d, yyyy")}` : "Added date not recorded";
 }
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -225,43 +223,44 @@ function toApaName(fullName: string): string {
 }
 
 function bibtexKey(record: RecordListItem): string {
-  const first = authorNames(record)[0] ?? "citu";
-  const surname = first.trim().split(/\s+/).pop() ?? "citu";
-  return `${surname.toLowerCase().replace(/[^a-z]/g, "")}${recordYear(record) ?? ""}`;
+  const first = authorNames(record)[0] ?? `record${record.id}`;
+  const surname = first.trim().split(/\s+/).pop() ?? "record";
+  return `${surname.toLowerCase().replace(/[^a-z0-9]/g, "")}${recordYear(record) ?? ""}`;
 }
 
 /** Build a citation string for a record in the requested style. */
 export function buildCitation(record: RecordListItem, style: CitationStyle): string {
   const names = authorNames(record);
-  const year = recordYear(record) ?? "n.d.";
+  const year = String(recordYear(record) ?? "n.d.");
   const title = record.title.trim();
+  const institution = record.origin === "institutional" ? ` ${INSTITUTION}.` : "";
 
   if (style === "APA") {
     const authors =
       names.length === 0
-        ? INSTITUTION
+        ? ""
         : names.length === 1
           ? toApaName(names[0])
           : `${names.slice(0, -1).map(toApaName).join(", ")}, & ${toApaName(names[names.length - 1])}`;
-    return `${authors} (${year}). ${title}. ${INSTITUTION}.`;
+    return authors ? `${authors} (${year}). ${title}.${institution}` : `${title}. (${year}).${institution}`;
   }
 
   if (style === "MLA") {
     const authors =
       names.length === 0
-        ? INSTITUTION
+        ? ""
         : names.length === 1
           ? names[0]
           : `${names[0]}, et al.`;
-    return `${authors}. "${title}." ${INSTITUTION}, ${year}.`;
+    return `${authors ? `${authors}. ` : ""}"${title}."${institution} ${year}${year.endsWith(".") ? "" : "."}`;
   }
 
   return [
     `@misc{${bibtexKey(record)},`,
     `  title        = {${title}},`,
-    `  author       = {${names.length > 0 ? names.join(" and ") : INSTITUTION}},`,
+    ...(names.length > 0 ? [`  author       = {${names.join(" and ")}},`] : []),
     `  year         = {${year}},`,
-    `  institution  = {${INSTITUTION}},`,
+    ...(record.origin === "institutional" ? [`  institution  = {${INSTITUTION}},`] : []),
     `  note         = {IRIS record ${record.id}}`,
     `}`,
   ].join("\n");

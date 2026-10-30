@@ -542,3 +542,66 @@ describe("forgot password", () => {
     await expectNoBlockingA11yViolations(container);
   });
 });
+
+/**
+ * Why the session ended (IR-645).
+ *
+ * The server's refusal names a reason (`code`), and `lib/authSession.ts`
+ * carries it across the full page load as `?code=`. Each reason has its own
+ * message: someone who signed out in another tab must not be told they were
+ * away too long. A missing or unknown code keeps the inactivity message, which
+ * is what every sign-out said before.
+ */
+describe("why the session ended", () => {
+  const cases = [
+    { code: "session_idle", title: "Session Expired", text: /30 minutes of inactivity/ },
+    { code: "session_ended", title: "Signed Out", text: /signed out of this session/ },
+    { code: "account_locked", title: "Account Locked", text: /your account was locked/ },
+    {
+      code: "session_ended_password_changed",
+      title: "Password Changed",
+      text: /your password was changed/,
+    },
+  ];
+
+  it.each(cases)("says why for $code", async ({ code, title, text }) => {
+    const { container } = renderScreen(<LoginPage />, {
+      route: `/login?reason=session_expired&code=${code}`,
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(title);
+    expect(alert).toHaveTextContent(text);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("gives every code a message of its own", () => {
+    const shown = cases.map(({ code }) => {
+      const { unmount } = renderScreen(<LoginPage />, {
+        route: `/login?reason=session_expired&code=${code}`,
+      });
+      const text = screen.getByRole("alert").textContent;
+      unmount();
+      return text;
+    });
+    expect(new Set(shown).size).toBe(cases.length);
+  });
+
+  it.each([
+    { label: "no code", route: "/login?reason=session_expired" },
+    { label: "an unknown code", route: "/login?reason=session_expired&code=token_not_valid" },
+  ])("keeps the inactivity message for $label", ({ route }) => {
+    renderScreen(<LoginPage />, { route });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/30 minutes of inactivity/);
+  });
+
+  it("clears the reason from the address when dismissed", async () => {
+    const user = userEvent.setup();
+    renderScreen(<LoginPage />, { route: "/login?reason=session_expired&code=session_ended" });
+
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+});

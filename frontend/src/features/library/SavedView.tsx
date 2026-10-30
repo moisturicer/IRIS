@@ -118,7 +118,7 @@ export function SavedView({
       : records;
     const sorted = [...matched];
     if (sort === "title") sorted.sort((a, b) => a.title.localeCompare(b.title));
-    else if (sort === "year") sorted.sort((a, b) => (b.year_accomplished ?? 0) - (a.year_accomplished ?? 0));
+    else if (sort === "year") sorted.sort((a, b) => (b.publication_year ?? 0) - (a.publication_year ?? 0));
     else sorted.sort((a, b) => (order.get(a.id) ?? 0) - (order.get(b.id) ?? 0));
     return sorted;
   }, [records, viewIds, query, sort]);

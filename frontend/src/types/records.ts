@@ -1,5 +1,7 @@
 import type { PipelineStatus } from "@/lib/constants";
 
+export type ResearchOrigin = "unknown" | "institutional" | "imported_reference" | "synthetic";
+
 export type IpType = "patent" | "copyright" | "trade_secret" | "utility_model" | "";
 
 export const IP_TYPE_LABELS: Record<Exclude<IpType, "">, string> = {
@@ -24,6 +26,8 @@ export interface Author {
 }
 
 export interface RecordListItem {
+  origin?: ResearchOrigin;
+  publication_year?: number | null;
   id:                    number;
   title:                 string;
   abstract:              string;
@@ -553,6 +557,27 @@ export interface TrackerReview {
   version:          number | null;
 }
 
+/**
+ * One message in a record's review discussion (ADR-032 §7, IR-419). Private
+ * to the review; public discussion is a separate model.
+ */
+export interface ReviewComment {
+  id:          number;
+  author:      number | null;
+  author_name: string | null;
+  /** Plain text, verbatim. Never render as markup. */
+  body:        string;
+  /** The version it was made against; null on a record with no version yet. */
+  version:     number | null;
+  /** The top-level comment this one answers. Threads are one level deep. */
+  reply_to:    number | null;
+  created_at:  string;
+  /** Set once an edit changed the body. */
+  edited_at:   string | null;
+  /** The server's answer: Edit is offered only where this is true. */
+  can_edit:    boolean;
+}
+
 export interface TrackerHolder {
   party:     Party;
   label:     string;
@@ -730,6 +755,8 @@ export interface RecordTracker {
   reviews:               TrackerReview[] | null;
   /** Each a timeline entry of its own (IR-416). Null as `reviews` is. */
   versions:              RecordVersion[] | null;
+  /** The review discussion, oldest first (IR-419). Null as `reviews` is. */
+  review_comments:       ReviewComment[] | null;
   resubmissions:         TrackerResubmission[];
   /** Null when the viewer may not read them (IR-349) -- not "there are none". */
   document_requests:     DocumentRequest[] | null;
@@ -742,6 +769,8 @@ export interface RecordTracker {
 }
 
 export interface RecordFormData {
+  origin?: ResearchOrigin;
+  publication_year?: number | null;
   keywords?:             string[];
   owner_emails?:         string[];
   title:                 string;

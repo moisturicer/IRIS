@@ -26,6 +26,7 @@ class AuditEvent(models.Model):
     ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
     SESSION_REVOKE   = "SESSION_REVOKE"
     QUESTION_INJECTION = "QUESTION_INJECTION"
+    RESEARCH_METADATA_CORRECTED = "RESEARCH_METADATA_CORRECTED"
 
     # Workflow events (IR-144): one type per act, written by the workflow
     # services inside the act's own transaction (`apps.audit.workflow`). Their
@@ -71,6 +72,7 @@ class AuditEvent(models.Model):
         (ACCOUNT_UNLOCKED, "Account Unlocked"),
         (SESSION_REVOKE,   "Session Revoked"),
         (QUESTION_INJECTION, "Reader Question Injection Flagged"),
+        (RESEARCH_METADATA_CORRECTED, "Research Metadata Corrected"),
         (SUBMITTED,                  "Submitted"),
         (ROUTED,                     "Routed"),
         (ASSIGNMENT_CLOSED,          "Assignment Closed"),

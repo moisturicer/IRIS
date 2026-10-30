@@ -51,21 +51,57 @@ export function clearLockout(identifier: string): void {
 }
 
 /**
+ * What the login screen says for each reason the server gives for refusing a
+ * session (IR-645, `apps/accounts/sessions.py`). Inactivity is the default:
+ * it is what a refusal with no reason, or one this list does not know, said
+ * before reasons existed.
+ */
+export const SESSION_END_MESSAGES = {
+  session_idle: {
+    title: "Session Expired",
+    text: "Your session timed out after 30 minutes of inactivity. Please sign in again.",
+  },
+  session_ended: {
+    title: "Signed Out",
+    text: "You signed out of this session, perhaps in another tab. Please sign in again.",
+  },
+  account_locked: {
+    title: "Account Locked",
+    text: "You were signed out because your account was locked. Contact an administrator to unlock it.",
+  },
+  session_ended_password_changed: {
+    title: "Password Changed",
+    text: "You were signed out because your password was changed. Please sign in with your new password.",
+  },
+} as const;
+
+export type SessionEndCode = keyof typeof SESSION_END_MESSAGES;
+
+export function isSessionEndCode(code: unknown): code is SessionEndCode {
+  return typeof code === "string" && Object.prototype.hasOwnProperty.call(SESSION_END_MESSAGES, code);
+}
+
+export function sessionEndMessage(code: unknown) {
+  return SESSION_END_MESSAGES[isSessionEndCode(code) ? code : "session_idle"];
+}
+
+/**
  * NFR-S2 — send user to login with session-expired banner.
  *
  * This is a full page load, not a router navigation, so nothing in memory
  * survives it and the page the user was on has to travel in the URL. `?next=`
  * is validated on arrival by `safeRedirectPath`, the same check the router
  * state goes through (IR-236) — the login screen does not trust this value
- * just because we wrote it.
+ * just because we wrote it. `?code=` is why the server refused the session
+ * (IR-645); only a code the login screen knows is passed on.
  */
-export function redirectToLoginSessionExpired(): void {
+export function redirectToLoginSessionExpired(code?: unknown): void {
   if (window.location.pathname === "/login") return;
 
+  const params = new URLSearchParams({ reason: "session_expired" });
+  if (isSessionEndCode(code)) params.set("code", code);
   const next = safeRedirectPath(wholePath(window.location));
-  const query = next
-    ? `?reason=session_expired&next=${encodeURIComponent(next)}`
-    : "?reason=session_expired";
+  if (next) params.set("next", next);
 
-  window.location.href = `/login${query}`;
+  window.location.href = `/login?${params}`;
 }
