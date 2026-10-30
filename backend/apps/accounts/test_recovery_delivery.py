@@ -13,7 +13,6 @@ import smtplib
 import os
 import subprocess
 import sys
-from datetime import timedelta
 from unittest.mock import patch
 
 from django.core import mail
@@ -224,7 +223,7 @@ class SendTests(RecoveryTestCase):
                 self.deliver()
             except KeyboardInterrupt:
                 pass  # the worker process died mid-send
-        with patch("apps.accounts.recovery.service.enqueue") as enqueue:
+        with patch("apps.accounts.recovery.service.enqueue"):
             self.assertEqual(dispatch_recovery_intents(), 0, "still leased")
             self.clock.advance(seconds=121)
             self.assertEqual(dispatch_recovery_intents(), 1)

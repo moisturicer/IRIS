@@ -1665,3 +1665,42 @@ Verification on 2026-10-30: local frontend full suite **105 files / 1,323 tests 
 [PR #348](https://github.com/moisturicer/IRIS/pull/348), implementation commit `0757adc`: [clean CI run 40990153412](https://github.com/moisturicer/IRIS/actions/runs/40990153412) passed **Backend, Frontend, Security and Docker Compose**. Backend: **4,556 passed, 1 expected xfail, 415 subtests passed**; the authorization matrix executed **40 tests**. Frontend: **106 files / 1,335 tests passed**, plus lint/build. Migration consistency and backend static checks passed. Agent review against `b2c5187`: Standards **0 hard violations, 1 nonblocking duplicated-renderer concern**; Spec **0 findings**. Human approval and merge remain outstanding.
 
 The interrupted broad local run included `No active EmbeddingSpace is configured` errors in its reused test database; it did not establish a code regression. The clean CI database executed the full backend suite successfully. Task-owned test databases and temporary source copies may be removed after verification; no live metadata corrections were executed.
+
+
+## IR-642 ? Forgotten-password recovery
+
+[ADR-045](../adr/045-account-recovery-contract.md) is the accepted contract.
+The public request/confirmation endpoints, reset screens and durable encrypted
+mail intents implement its password-recovery journey. Reset preserves email
+verification, role decisions and restrictions. Verification resend remains IR-643.
+
+| Guarantee | Automated boundary |
+|---|---|
+| Generic anonymous request, account eligibility, exact validation/envelopes and limits | `accounts/test_password_recovery.py` HTTP and actual mail outbox |
+| Single use, exact expiry including lock waits, password policy, cross-purpose rejection and rollback | Same HTTP suite; real PostgreSQL transactions for concurrent consumers, issuance and counters |
+| Commit-before-mail, broker recovery, retries, duplicate workers, bounded leases, stale outcomes and retention | `accounts/test_recovery_delivery.py` worker/dispatcher plus a fresh Celery process |
+| Access/refresh/Django-session invalidation, login/refresh races and stale profile writes | `accounts/test_credential_invalidation.py`; existing session tests |
+| Accessible request/reset states, fragment stripping, deliberate submit, cooldown and fixed sign-in return | ForgotPasswordPage, ResetPasswordPage, LoginPage and SettingsPage rendered-screen tests |
+| New recovery events remain filterable | `features/audit/AuditLogPage.test.tsx` complete event-choice check |
+| Required keys and production origin/SMTP configuration | `apps/tests/test_settings_validation.py`; actual production image build |
+
+Local verification on 2026-10-30: frontend full suite **109 files / 1,393 tests
+passed**, TypeScript and lint/build passed (lint has existing warnings). Focused
+backend snapshot: **149 passed, 1 repository-layout skip**, plus the subsequent
+stale-profile regression demonstrated failing old-password login and then passed
+with the fix. The historical IR-645 migration fixture was deliberately corrected
+to use historical User when rewound before the new credential-version column;
+its assertions were retained. Full backend verification is pending.
+
+An actual production backend image built successfully, including collectstatic
+with build-only configuration. A populated local database copy migrated through
+accounts 0014 and audit 0009: **15 users, 20 records, 179 audit events, 14
+outstanding and 7 blacklisted credentials**. Before/after hashes of every
+pre-existing column in those tables matched; every existing user started with
+credential version zero. The copy predated UserSession, whose creation also ran.
+The live database was not migrated by this check.
+
+Both final agent review axes reported no remaining blocking finding. Browser
+visual/zoom checks remain unverified because automatic approval review blocked
+launching Chrome. Agent review is not human approval; no production deployment
+or final requirement sign-off is claimed.

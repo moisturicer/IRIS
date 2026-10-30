@@ -102,6 +102,11 @@ class User(AbstractBaseUser, PermissionsMixin):
             using = kwargs.get("using") or self._state.db or "default"
             with transaction.atomic(using=using):
                 previous = type(self).objects.using(using).select_for_update().get(pk=self.pk)
+                if fields is None and self.credential_version != previous.credential_version:
+                    # An already-authorized profile/admin write may finish
+                    # after reset, but cannot restore its earlier credentials.
+                    self.password = previous.password
+                    self.credential_version = previous.credential_version
                 result = super().save(*args, **kwargs)
                 if previous.email != self.email:
                     RecoveryToken.objects.using(using).filter(

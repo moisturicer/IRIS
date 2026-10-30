@@ -39,6 +39,23 @@ def emailed_reset_token(client, email):
 
 
 class CredentialTests(APITestCase):
+    def test_a_profile_request_started_before_reset_cannot_restore_old_credentials(self):
+        from apps.accounts.serializers import MeSerializer
+        original_update = MeSerializer.update
+        credentials = self.sign_in()
+
+        def finish_after_reset(serializer, instance, validated_data):
+            self.reset()
+            return original_update(serializer, instance, validated_data)
+
+        with patch.object(MeSerializer, "update", finish_after_reset):
+            response = APIClient().patch(ME, {"first_name": "Changed"}, format="json",
+                                         HTTP_AUTHORIZATION=f"Bearer {credentials['access']}")
+        self.assertEqual(response.status_code, 200, response.content)
+        old_login = APIClient().post(LOGIN, {"email": "reader@cit.edu", "password": OLD}, format="json")
+        self.assertEqual(old_login.status_code, 401)
+        self.assertEqual(self.me(self.sign_in(NEW)["access"]).status_code, 200)
+
     def test_reset_invalidates_django_auth_sessions_too(self):
         from django.test import Client
         self.user.is_staff = True
