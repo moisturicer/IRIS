@@ -26,7 +26,7 @@ from apps.documents.models import RecordUpload, UploadSlot
 from apps.reviews.models import RecordAssignment, RecordClearance, Turnaround
 from apps.reviews.new_version import submit_new_version
 from apps.reviews.tracker import workflow_state
-from core.enums import ClearanceStatus, Office, PipelineStatus
+from core.enums import ClearanceStatus, Office, PipelineStatus, RecordTypeName
 
 from .management.commands.seed_demo import (
     ADMIN_EMAIL,
@@ -40,7 +40,7 @@ from .management.commands.seed_demo import (
     ROLE_ACCOUNTS,
     _PREFIX,
 )
-from .models import Record
+from .models import Record, RecordType
 
 # PBKDF2 is deliberately slow, and `seed_demo` hashes a password for every
 # account on every run while these classes reseed per test. This module used to
@@ -349,7 +349,8 @@ class SeedDemoRecordTests(TestCase):
         # Resubmission requires a document uploaded since the decline (IR-139).
         # That refusal is part of the demo; here it is simply satisfied.
         slot, _ = UploadSlot.objects.get_or_create(
-            name="Revised ethics consent form", record_type=record.record_type
+            name="Revised ethics consent form", record_type=record.record_type,
+            record=None,
         )
         RecordUpload.objects.create(
             record=record, slot=slot, file="documents/demo-revision.pdf",
@@ -406,3 +407,50 @@ class SeedDemoRecordTests(TestCase):
             c.office: c.status
             for c in RecordClearance.objects.filter(record=record)
         }
+
+
+class SeedDemoAdhocSlotTests(TestCase):
+    """IR-348: an ad-hoc slot of the same name and type is another record's.
+
+    IR-262's ad-hoc slots carry their record's type, so a lookup by name and
+    type alone can match one. The seed must use only the type-level slot.
+    """
+
+    SLOT_NAME = "Revised ethics consent form"
+
+    def setUp(self):
+        seed(accounts_only=True)
+        owner = User.objects.get(email=ROLE_ACCOUNTS[0][0])
+        record_type = RecordType.objects.get_or_create(name=RecordTypeName.PROJECT)[0]
+        self.other = Record.objects.create(
+            title="Someone else's project", record_type=record_type, added_by=owner,
+        )
+        self.adhoc = UploadSlot.objects.create(
+            name=self.SLOT_NAME, record_type=record_type, record=self.other,
+        )
+
+    def test_the_demo_upload_never_lands_on_another_records_slot(self):
+        seed()
+
+        self.assertFalse(self.adhoc.uploads.exists())
+        upload = RecordUpload.objects.get(record__title=RESUBMITTED_TITLE)
+        self.assertIsNone(upload.slot.record_id)
+        self.assertEqual(upload.slot.name, self.SLOT_NAME)
+
+    def test_it_completes_beside_a_type_level_slot_of_the_same_name(self):
+        UploadSlot.objects.create(
+            name=self.SLOT_NAME, record_type=self.adhoc.record_type,
+        )
+
+        seed()
+
+        self.assertTrue(Record.objects.filter(title=RESUBMITTED_TITLE).exists())
+        self.assertFalse(self.adhoc.uploads.exists())
+
+    def test_a_second_run_creates_no_duplicate_slot(self):
+        seed()
+        seed()
+
+        self.assertEqual(
+            UploadSlot.objects.filter(name=self.SLOT_NAME, record=None).count(), 1,
+        )
