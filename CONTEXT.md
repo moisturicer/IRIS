@@ -229,3 +229,13 @@ _Avoid_: Access request (the old page's name), download link.
 **Download grant**:
 What an approved [[Download request]] gives its reader: they may download that paper while signed in, as often as they like, until the grant expires or RDCO revokes it with a note. It is never a link, and nothing emailed works on its own.
 _Avoid_: Download link, token, download permission.
+
+### Discover
+
+**View**:
+One account's first opening of a published paper. A paper's views are the number of distinct accounts that have opened it since it was published: opening it again never adds one, and its owners never count. Which accounts viewed a paper is used only to count them and is never shown.
+_Avoid_: Access (the audit log's word for one opening), hit, read, reader count.
+
+**Trending**:
+Published papers ordered by the [[View]]s they gained in the last 30 days, then by all-time views, then newest first. Distinct from Most Viewed, which orders by all-time views alone.
+_Avoid_: Popular, hot, most viewed.
