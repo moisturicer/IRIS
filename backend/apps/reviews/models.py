@@ -425,7 +425,6 @@ class ResubmissionRequest(models.Model):
 
     def __str__(self):
         return f"Record {self.record_id} | {self.party} | {self.state}"
-<<<<<<< HEAD
 
 
 class ReviewComment(models.Model):
@@ -468,4 +467,3 @@ class ReviewComment(models.Model):
 
     def __str__(self):
         return f"Record {self.record_id} | comment {self.pk} by {self.author_id}"
-
