@@ -1722,6 +1722,22 @@ Verification on 2026-10-30: local frontend full suite **105 files / 1,323 tests 
 
 The interrupted broad local run included `No active EmbeddingSpace is configured` errors in its reused test database; it did not establish a code regression. The clean CI database executed the full backend suite successfully. Task-owned test databases and temporary source copies may be removed after verification; no live metadata corrections were executed.
 
+## IR-646 and IR-648 — Account locks and password changes end sessions
+
+Locking an account ends all its open tracked sessions with reason `locked` and blacklists its outstanding refresh tokens. Unlocking never revives those sessions. Both JWT authentication and refresh apply the same active-and-unlocked account rule, including direct database locks, deactivation, and access tokens without `sid`.
+
+A successful password change ends every other tracked session with reason `password_changed`, preserving the request's session and its refresh token. Without `sid`, every tracked session ends. A rejected change does not end sessions or emit an audit event. `PASSWORD_CHANGED` records the actor with empty metadata; its choice-only migration is `audit/0009_password_changed` and the frontend audit filter includes it.
+
+| Guarantee | Public verification boundary |
+| --- | --- |
+| Lock, unlock, direct lock, deactivation, no-sid access, session list and unchanged lock audit events | `accounts/test_session_invalidation.py::LockingEndsSessionsTests`: real sign-in, authenticated HTTP request, refresh, administrative API and audit API |
+| Current device survives; other device ends; new/old passwords; rejected change; no sid; rotation; older stored JWT payloads | `accounts/test_session_invalidation.py::PasswordChangeEndsOtherSessionsTests`: password API, request, refresh, sign-in and audit API |
+| Distinct account-locked and password-changed-elsewhere sign-out messages, with axe checks | `features/auth/LoginPage.test.tsx`: rendered login alert queried by accessible role |
+| New audit event is available in the audit filter | `features/audit/AuditLogPage.test.tsx`: rendered filter options compared with the backend vocabulary |
+
+Compatibility: before this change, `OutstandingToken.token` was stored before `sid` was added to the issued token. New sign-ins store the complete payload. During a password change, older stored payloads without a session identity are not individually blacklisted because the current device cannot be identified safely from them; every issued refresh still carries its session identity and the shared session rule refuses ended sessions. Account locking blacklists all outstanding tokens, including these older records.
+
+Local focused verification on 2026-10-30: backend session invalidation, existing session, password-policy and enum-vocabulary suites passed. TypeScript passed; focused frontend suites passed **46 tests**. Both security regressions were observed before the fixes: a locked no-sid access token returned 200, and another device's access token returned 200 after a password change. The strengthened password-changed-elsewhere UI assertion also failed before the message changed. Full-suite, migration-copy and CI evidence are recorded in the PR when complete. Human review and approval remain required.
 ### IR-533 / IR-538 / IR-207 / IR-555 — entry-flow accessibility and truthful lock reporting
 
 **Requirements:** NFR-A1 (WCAG 2.1 AA), NFR-U3 (readable, consistent entry controls), NFR-S6 (account protection). The project lead confirmed the four-screen scope, remaining lock dialog, removal of unsupported statistics, and automated plus manual review evidence on 2026-10-30. The 44×44 and disabled-text contrast criteria are stricter product requirements, not blanket AA rules. The authority for entry accessibility remains `docs/ui-ux/12-accessibility.md`; IR-533 and its children identify the implementation work.
