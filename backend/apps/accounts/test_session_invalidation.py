@@ -3,6 +3,7 @@
 from concurrent.futures import ThreadPoolExecutor
 from time import monotonic, sleep
 
+from django.core.cache import cache
 from django.db import connection, transaction
 from rest_framework.test import APIClient, APITransactionTestCase
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
@@ -15,6 +16,10 @@ from apps.accounts.test_sessions import LOGIN, PASSWORD, REFRESH, SessionTestBas
 class AccountSessionTestBase(SessionTestBase):
     def setUp(self):
         super().setUp()
+        # Login budgets live in the cache, outside APITestCase's DB rollback.
+        # Each scenario owns its budget and must leave it empty for the next.
+        cache.clear()
+        self.addCleanup(cache.clear)
         self.admin = User.objects.create_user(
             email="session-admin@cit.edu", password=PASSWORD, is_verified=True,
             role=Role.objects.get(name="RDCO"),
@@ -182,7 +187,10 @@ class PasswordChangeEndsOtherSessionsTests(AccountSessionTestBase):
 
 
 class ConcurrentPasswordChangeTests(APITransactionTestCase):
-    serialized_rollback = True
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
 
     def test_an_old_password_login_cannot_create_a_session_after_password_change(self):
         user = User.objects.create_user(
