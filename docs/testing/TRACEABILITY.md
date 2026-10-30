@@ -1723,3 +1723,15 @@ Axes now receives Django's underlying request and reads the supplied username cr
 **Executed evidence:** 191 entry/primitives/guard tests; 2 added dialog keyboard/axe tests; the final three-file sign-in/signup/dialog regression pass had 71 tests. All 64 accounts REST tests passed on isolated PostgreSQL, including six timed/manual/ASGI lock tests and the existing current-user role-request seam. Backend static checks, frontend lint (six existing warnings), TypeScript and production build passed. Deliberate `text-gold hover:bg-gold-dark` reintroduction made lint fail, then was removed. Browser audit: 36 combinations across 360/768/1280/1745px, no reported WCAG A/AA violation, horizontal overflow or measured target below 44×44; minimum computed text-pair contrast 4.59:1. See [the evidence, screenshots, incomplete contrast results and human-review checklist](evidence/IR-533/README.md). Automated checks do not certify full conformance.
 
 **Review gate:** actual screen-reader and browser-zoom verification and named human approval remain required. IR-203 and IR-209 remain open until the consolidated work is approved and merged. No Done status or full WCAG conformance is claimed here.
+
+## IR-608 — ADR-042 safety and recovery evidence
+
+- A11: `evaluation/tests/test_scenario_http.py` uses the authenticated IR-606 collector, private records and between-turn revocation. Public history withholds prose derived from a revoked cited Record. Foreign Conversation access remains 404.
+- A09: the collector exercises candidate-only search, empty search, rejected tool arguments and answer failure after authorized evidence; private observations remain distinct from safe public output.
+- A12: `test_durable_processes.py` launches independent interpreters over real shared Postgres for cancel, crash/redelivery, stale attempts and revision races; HTTP reconnect and state tests run separately. Scripted providers establish correctness, not throughput or broker behavior.
+- A13: public HTTP projection suites are separate from the named manual browser exercise in `docs/evaluation/general-tools/scenarios.md`. Browser surfaces without evidence remain not_measured.
+- A15: `test_controller_security_http.py` exercises malicious paper instructions and disabled public research without widening the tool registry or Paper Chat scope.
+
+`eval_scenarios --workers` writes measured/not_measured results, distinguishes provider/worker/browser evidence and blocks enablement on failures or missing exercises. `evaluation/tests/test_scenarios.py` verifies that skipped/absent checks never pass and diagnostics never enter the report. See the IR-608 PR for executed results and remaining browser measurements.
+
+IR-608 CI security follow-up: scenario JUnit XML uses `defusedxml`; `test_xml_entities_are_rejected_as_unmeasured` verifies entity expansion and external entities cannot enter measured evidence.

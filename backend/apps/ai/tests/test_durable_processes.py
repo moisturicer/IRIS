@@ -196,3 +196,25 @@ def test_real_controller_crash_retains_shared_spend_and_rebuilds_evidence(run, b
     assert run.turn.state == "unavailable"
     assert run.events.filter(name="done").count() == 1
     assert not run.turn.reasoning_summary
+
+
+def test_concurrent_independent_workers_do_not_overwrite_conversation_revision(run):
+    other = AskRun.objects.create(
+        user=run.user, conversation=run.conversation, request=dict(run.request),
+        deadline_at=run.deadline_at,
+    )
+    with _probe("revision", run) as first, _probe("revision", other) as second:
+        _ready(first)
+        _ready(second)
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(lambda worker: _result(worker, resume=True), (first, second)))
+    assert all(row["recorded"] for row in results)
+    state = ConversationState.objects.get(conversation=run.conversation)
+    assert state.revision == 2 and state.basis == ConversationState.CONFLICT
+    assert state.presented == []
+    assert sorted(Turn.objects.filter(conversation=run.conversation)
+                  .values_list("context_revision", flat=True)) == [1, 2]
+    for item in (run, other):
+        item.refresh_from_db()
+        assert item.turn_id is not None
+        assert item.events.filter(name="done").count() == 1
