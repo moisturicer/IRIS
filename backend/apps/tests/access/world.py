@@ -29,7 +29,7 @@ from apps.records.download_tokens import make_download_token
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
 from apps.records.models import DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
-from apps.reviews.models import ReviewerSeat
+from apps.reviews.models import ReviewComment, ReviewerSeat
 from apps.reviews.routing import accept_and_route, enter_at_adviser
 from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName
 
@@ -203,6 +203,10 @@ def build_world() -> World:
     o["document_request_item"] = document_request.items.get()
 
     o["version"] = record.versions.get(number=1)
+    # The owner's, so only the owner may edit it (IR-419).
+    o["review_comment"] = ReviewComment.objects.create(
+        record=record, author=owner, body="Is the endorsement enough?", version=o["version"],
+    )
 
     # -- a record still at its Adviser's step, with the review opened ----
     # The acts that happen there (accept & route, decide) are fired on this

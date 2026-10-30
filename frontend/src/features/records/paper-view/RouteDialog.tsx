@@ -3,7 +3,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { recordsApi } from "@/api/records";
 import { Button, Modal, Skeleton } from "@/components/ui";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
-import { errorDetail } from "@/features/document-requests/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import type { Party, RouteOptions, RouteRequest } from "@/types/records";
 
 interface RouteDialogProps {

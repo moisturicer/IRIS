@@ -8,11 +8,13 @@ claim with the account's `credential_version`, so a password reset or change
 refuses every token minted before it, from the very next request.
 """
 
+from django.db import transaction
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
 
 from . import sessions
 from .models import User
@@ -60,16 +62,21 @@ class IdleAwareTokenRefreshSerializer(TokenRefreshSerializer):
 
     def validate(self, attrs):
         try:
-            token = RefreshToken(attrs["refresh"])
+            token = UntypedToken(attrs["refresh"])
         except TokenError:
-            # Malformed or expired: the parent's validation says so.
             return super().validate(attrs)
-        if not token.get("sid"):
+        if token.get(api_settings.TOKEN_TYPE_CLAIM) != RefreshToken.token_type:
+            return super().validate(attrs)
+        sid = token.get("sid")
+        if not sid:
             raise InvalidToken("This sign-in predates session tracking. Sign in again.")
-        user = User.objects.filter(pk=token.get("user_id")).only("credential_version").first()
-        if user is None or not current(token, user):
-            raise CredentialsChanged()
-        # Validated first, so a rotated or blacklisted token records no activity.
-        data = super().validate(attrs)
-        sessions.touch(token["sid"], self.context["request"])
-        return data
+        # Reset and refresh both lock the account before issuing credentials.
+        with transaction.atomic():
+            user = User.objects.select_for_update().filter(pk=token.get("user_id")).first()
+            if user is None or not current(token, user):
+                raise CredentialsChanged()
+            sessions.refuse_if_ended(sid)
+            data = super().validate(attrs)
+            sessions.touch(sid, self.context["request"])
+            return data
+

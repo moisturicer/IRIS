@@ -2,7 +2,7 @@ import { apiClient } from "./client";
 import type {
   RecordListItem, RecordDetail, RecordFormData, MyResearchItem,
   Classification, PSCEDClassification, RecordType,
-  DownloadRequest, DeleteRequest, RecordTracker,
+  DownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
   DiscoverInterests, ForYouPage, MetadataSuggestions,
@@ -47,6 +47,15 @@ export const recordsApi = {
    * not a RecordListItem.
    */
   tracker:        (id: number) => apiClient.get<RecordTracker>(`/records/${id}/tracker/`),
+  /**
+   * A participant comments in the review discussion, or replies to a comment
+   * (ADR-032 §7, IR-419). The timeline reads it back from the tracker.
+   */
+  postReviewComment: (id: number, body: { body: string; reply_to?: number }) =>
+    apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
+  /** Its author edits a comment; a changed body is marked edited. */
+  editReviewComment: (id: number, commentId: number, body: { body: string }) =>
+    apiClient.patch<ReviewComment>(`/records/${id}/review-comments/${commentId}/`, body),
 
   /** Document requests on a record, oldest first (ADR-022 §5, IR-262). */
   documentRequests: (id: number) =>

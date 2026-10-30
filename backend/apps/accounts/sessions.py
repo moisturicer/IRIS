@@ -27,6 +27,11 @@ protects an unattended screen from a passer-by, not the server from the user.
 
 Once a session is found idle it is ended for good; fresh activity does not
 revive it. The refresh token's 7-day lifetime remains the absolute limit.
+
+An ended session records why (IR-645), and its refusal says so: a user who
+signed out in another tab is not told they were away too long. A session
+ended before the reason was recorded has none, and reads as idle -- the
+message it had before.
 """
 
 from datetime import timedelta
@@ -35,6 +40,8 @@ from django.conf import settings
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from core.enums import SessionEndReason
 
 from .models import UserSession
 
@@ -56,22 +63,35 @@ def idle_timeout() -> timedelta:
     return timedelta(minutes=settings.SESSION_IDLE_TIMEOUT_MINUTES)
 
 
-class SessionIdle(AuthenticationFailed):
-    """401 with ``code: session_idle``, so the interface can say why.
+class SessionEnded(AuthenticationFailed):
+    """401 naming why the session ended, so the interface can say so.
 
     An `AuthenticationFailed`, not a bare `APIException`: DRF keeps a 401 only
     for those (with a ``WWW-Authenticate`` header) and turns anything else
     raised during authentication into a 403.
     """
-    default_detail = "You were signed out after a period of inactivity."
-    default_code = "session_idle"
 
-    def __init__(self):
-        minutes = settings.SESSION_IDLE_TIMEOUT_MINUTES
-        super().__init__({
-            "detail": f"You were signed out after {minutes} minutes of inactivity.",
-            "code": self.default_code,
-        })
+    def __init__(self, reason=None):
+        code, detail = _REFUSALS.get(reason) or _idle_refusal()
+        super().__init__({"detail": detail, "code": code})
+
+
+def _idle_refusal():
+    minutes = settings.SESSION_IDLE_TIMEOUT_MINUTES
+    return "session_idle", f"You were signed out after {minutes} minutes of inactivity."
+
+
+#: The 401 ``code`` and message for each reason. Idle, null and an unknown
+#: session fall through to `_idle_refusal`, so the wire format they had before
+#: IR-645 is unchanged.
+_REFUSALS = {
+    SessionEndReason.LOGOUT: ("session_ended", "This session was signed out."),
+    SessionEndReason.LOCKED: ("account_locked", "You were signed out because your account was locked."),
+    SessionEndReason.PASSWORD_CHANGED: (
+        "session_ended_password_changed",
+        "You were signed out because your password was changed.",
+    ),
+}
 
 
 def start_session(user) -> RefreshToken:
@@ -86,8 +106,22 @@ def start_session(user) -> RefreshToken:
     return refresh
 
 
-def end_session(sid) -> None:
-    UserSession.objects.filter(id=sid, ended_at__isnull=True).update(ended_at=now())
+def end_session(sid, reason: SessionEndReason) -> None:
+    """End session ``sid`` for ``reason``. The first ending stands."""
+    UserSession.objects.filter(id=sid, ended_at__isnull=True).update(ended_at=now(), ended_reason=reason)
+
+
+def refuse_if_ended(sid) -> None:
+    """Raise `SessionEnded` when session ``sid`` is ended or unknown; write nothing.
+
+    Refresh asks this before validating the token: a logout blacklists the
+    refresh token too, and that refusal alone would not say the session ended.
+    """
+    session = UserSession.objects.filter(id=sid).only("ended_at", "ended_reason").first()
+    if session is None:
+        raise SessionEnded()
+    if session.ended_at is not None:
+        raise SessionEnded(session.ended_reason)
 
 
 def idle_seconds(request) -> int:
@@ -105,7 +139,7 @@ def idle_seconds(request) -> int:
 def touch(sid, request) -> None:
     """Record this request's activity on session ``sid``, or refuse it as idle.
 
-    Raises `SessionIdle` when the session is ended, unknown, or was idle past
+    Raises `SessionEnded` when the session is ended, unknown, or was idle past
     the timeout *before* this request arrived. The judgement uses the stored
     activity only: a user who walks away for 31 minutes and then clicks has
     still been away for 31 minutes, and their click must not excuse it. The
@@ -113,13 +147,15 @@ def touch(sid, request) -> None:
     stored figure current while someone works on a page that sends nothing.
     """
     at = now()
-    session = UserSession.objects.filter(id=sid).only("last_activity_at", "ended_at").first()
-    if session is None or session.ended_at is not None:
-        raise SessionIdle()
+    session = UserSession.objects.filter(id=sid).only("last_activity_at", "ended_at", "ended_reason").first()
+    if session is None:
+        raise SessionEnded()
+    if session.ended_at is not None:
+        raise SessionEnded(session.ended_reason)
 
     if at - session.last_activity_at > idle_timeout():
-        end_session(sid)
-        raise SessionIdle()
+        end_session(sid, SessionEndReason.IDLE)
+        raise SessionEnded(SessionEndReason.IDLE)
 
     activity = at - timedelta(seconds=idle_seconds(request))
 

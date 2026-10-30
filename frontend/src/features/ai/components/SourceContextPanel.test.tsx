@@ -52,6 +52,11 @@ function renderPanel(props: Partial<React.ComponentProps<typeof SourceContextPan
 }
 
 describe("the referenced passages panel", () => {
+  it("labels missing authors and declared reference origin", () => {
+    renderPanel({ sources: [{ ...card, authors: "", origin: "imported_reference" }] });
+    expect(screen.getByText("Authors not recorded")).toHaveClass("italic", "text-stone-500");
+    expect(screen.getByText("Imported reference")).toBeInTheDocument();
+  });
   it("shows the quoted passage and the page it sits on", () => {
     renderPanel();
 

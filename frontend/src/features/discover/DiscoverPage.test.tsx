@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { importedReference } from "@/test/fixtures/importedReference";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { recordsApi } from "@/api/records";
 import { useAuthStore } from "@/store/auth.store";
@@ -384,6 +385,26 @@ describe("browsing", () => {
     expect(await screen.findByRole("dialog")).toBeInTheDocument();
   });
 
+  it("states missing authors and external origin without claiming institutional authorship", async () => {
+    listed = [listItem({ title: "An imported reference", authors: [], origin: "imported_reference", publication_year: null })];
+    localStorage.setItem("iris.discover.columns", "2");
+    renderDiscover();
+    const card = await screen.findByRole("article", { name: "An imported reference" });
+    expect(within(card).getByText("Authors not recorded")).toHaveClass("italic", "text-stone-500");
+    expect(within(card).getByText("Imported reference")).toBeInTheDocument();
+    expect(within(card).queryByText("Institutional Author")).not.toBeInTheDocument();
+  });
+
+  it("shows verified imported author metadata and publication year", async () => {
+    listed = [listItem({ ...importedReference, year_accomplished: 2020 })];
+    localStorage.setItem("iris.discover.columns", "2");
+    renderDiscover();
+    const card = await screen.findByRole("article", { name: importedReference.title });
+    expect(within(card).getByText(/Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit/)).toBeInTheDocument();
+    expect(within(card).getByText("Published 2017")).toBeInTheDocument();
+    expect(within(card).getByText("Imported reference")).toBeInTheDocument();
+  });
+
   it("loads more results, saying honestly how many remain", async () => {
     listed = [publishedThesis];
     total = 3;
@@ -653,6 +674,12 @@ describe("filtering", () => {
 });
 
 describe("states", () => {
+  it("announces a rate limit while loading filters", async () => {
+    vi.mocked(recordsApi.facets).mockRejectedValueOnce({ response: { status: 429, headers: { "retry-after": "61" } } });
+    renderDiscover();
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests — try again in about 2 minutes.");
+  });
+
   it("says nothing has been published yet, and offers an author Publish", async () => {
     listed = [];
     const { container } = renderDiscover();

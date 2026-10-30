@@ -141,6 +141,14 @@ function openNew() {
   return renderScreen(<PublishDialog />, { route: "/?publish=new" });
 }
 
+it.each(["draft", "types"])("announces a rate limit while loading Publish %s", async (source) => {
+  const failure = { response: { status: 429, headers: { "retry-after": "61" } } };
+  if (source === "draft") vi.mocked(recordsApi.detail).mockRejectedValueOnce(failure);
+  else vi.mocked(recordsApi.recordTypes).mockRejectedValueOnce(failure);
+  renderScreen(<PublishDialog />, { route: "/?publish=42" });
+  expect(await screen.findByRole("alert")).toHaveTextContent("Too many requests — try again in about 2 minutes.");
+});
+
 it("opens a continuation in Publish, requires its manuscript, and keeps copied details editable", async () => {
   vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({
     ...COMPLETE, abstract_file: null,

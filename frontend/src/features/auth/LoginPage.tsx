@@ -15,6 +15,7 @@ import {
   isAccountLocked,
   LOGIN_FAILURE_LIMIT,
   resetLoginAttempts,
+  sessionEndMessage,
   setLockoutUntil,
 } from "@/lib/authSession";
 import { getRoleDashboardPath } from "@/lib/roleDashboard";
@@ -63,6 +64,8 @@ export default function LoginPage() {
   );
   const sessionExpiredFromState =
     (location.state as { reason?: string } | null)?.reason === "session_expired";
+  // Why the server ended the session (IR-645); inactivity when it did not say.
+  const sessionEnd = sessionEndMessage(searchParams.get("code"));
   const [sessionAlert, setSessionAlert] = useState(
     () => searchParams.get("reason") === "session_expired" || sessionExpiredFromState
   );
@@ -89,8 +92,9 @@ export default function LoginPage() {
 
   const dismissSessionAlert = () => {
     setSessionAlert(false);
-    if (searchParams.get("reason")) {
+    if (searchParams.get("reason") || searchParams.get("code")) {
       searchParams.delete("reason");
+      searchParams.delete("code");
       setSearchParams(searchParams, { replace: true });
     }
     if ((location.state as { reason?: string } | null)?.reason === "session_expired") {
@@ -197,10 +201,10 @@ export default function LoginPage() {
       {sessionAlert && (
         <AuthAlert
           variant="session"
-          title="Session Expired"
+          title={sessionEnd.title}
           onDismiss={dismissSessionAlert}
         >
-          Your session timed out after 30 minutes of inactivity. Please sign in again.
+          {sessionEnd.text}
         </AuthAlert>
       )}
 

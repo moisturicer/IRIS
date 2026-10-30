@@ -5,6 +5,7 @@ export const AUDIT_EVENT_GROUPS = {
     ACCOUNT_LOCKED: "Account Locked", ACCOUNT_UNLOCKED: "Account Unlocked", SESSION_REVOKE: "Session Revoked",
   },
   Files: { ACCESS: "Record Access", UPLOAD: "File Upload", DOWNLOAD: "File Download", DELETE: "File Delete", RENAME: "File Rename" },
+  Research: { RESEARCH_METADATA_CORRECTED: "Research Metadata Corrected" },
   Workflow: {
     SUBMITTED: "Submitted", ROUTED: "Routed", ASSIGNMENT_CLOSED: "Assignment Closed",
     ASSIGNMENT_EXTENDED: "Assignment Deadline Extended", DECISION_RECORDED: "Decision Recorded",

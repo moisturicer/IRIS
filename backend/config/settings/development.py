@@ -31,14 +31,5 @@ CORS_ALLOWED_ORIGINS = list(
 EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 DEFAULT_FROM_EMAIL = "iris@localhost"
 
-# A page load here makes 15-30 API calls, so base.py's 1000/day was spent in
-# about forty loads of local clicking, and every call then answered 429.
-# `ai_query` is left alone: it bounds paid model calls, not page loads.
-REST_FRAMEWORK = {  # noqa: F405
-    **REST_FRAMEWORK,  # noqa: F405
-    "DEFAULT_THROTTLE_RATES": {
-        **REST_FRAMEWORK["DEFAULT_THROTTLE_RATES"],  # noqa: F405
-        "anon": "1000/hour",
-        "user": "5000/hour",
-    },
-}
+# Request budgets come from the same explicit environment keys as production.
+# See backend/.env.example for opt-in local values (IR-371).

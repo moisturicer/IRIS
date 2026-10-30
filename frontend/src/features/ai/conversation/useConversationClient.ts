@@ -56,7 +56,7 @@ export interface ConversationClientEvents {
   /** An answer arrived for `conversationId`; `onScreen` when the reader is looking at it. */
   onAnswered?: (conversationId: number, message: ChatMessage, onScreen: boolean) => void;
   /** Nothing streamed at all: the question could not be answered. */
-  onFailed?:   (conversationId: number) => void;
+  onFailed?:   (conversationId: number, error: unknown) => void;
 }
 
 /**
@@ -158,7 +158,7 @@ export function useConversationClient(events: ConversationClientEvents = {}) {
         }));
         eventsRef.current.onAnswered?.(conversationId, message, activeRef.current === conversationId);
       } catch (err) {
-        if (!(err instanceof StreamDetached) && current()) eventsRef.current.onFailed?.(conversationId);
+        if (!(err instanceof StreamDetached) && current()) eventsRef.current.onFailed?.(conversationId, err);
       } finally {
         if (current() && mounted.current) {
           flights.current.delete(conversationId);

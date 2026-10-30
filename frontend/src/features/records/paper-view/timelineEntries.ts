@@ -11,11 +11,14 @@
  *
  * Each version is an entry of its own ("v2 submitted"), and each review is
  * tagged with the version it was made against (IR-416). Nothing else is
- * tagged: a version is never worked out from a timestamp. Review comments
- * join when their backend lands (IR-419).
+ * tagged: a version is never worked out from a timestamp.
+ *
+ * Review comments (IR-419) are entries too, each tagged with the version it
+ * was made against. A reply is not an entry of its own: it sits under the
+ * comment it answers, as on a pull request, and threads are one level deep.
  */
 import { formatDate, joinLabels } from "@/lib/utils";
-import type { RecordTracker, TrackerResubmission } from "@/types/records";
+import type { RecordTracker, ReviewComment, TrackerResubmission } from "@/types/records";
 
 export type TimelineKind =
   | "routing"
@@ -25,7 +28,8 @@ export type TimelineKind =
   | "document_request"
   | "version"
   | "reassignment"
-  | "extension";
+  | "extension"
+  | "comment";
 
 export interface TimelineEntry {
   key: string;
@@ -50,6 +54,8 @@ export interface TimelineEntry {
    * is shown rather than an invented "v1" (spec §4.11).
    */
   version: number | null;
+  /** A comment entry's own: the comment, and its replies, oldest first. */
+  comment?: { root: ReviewComment; replies: ReviewComment[] };
 }
 
 export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
@@ -221,6 +227,34 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
         version: null,
       });
     }
+  }
+
+  // Null as `reviews` is, to a viewer who may not read the review (IR-479).
+  const comments = tracker.review_comments ?? [];
+  const roots = new Set(comments.filter((c) => c.reply_to === null).map((c) => c.id));
+  const replies = new Map<number, ReviewComment[]>();
+  for (const c of comments) {
+    if (c.reply_to !== null && roots.has(c.reply_to)) {
+      replies.set(c.reply_to, [...(replies.get(c.reply_to) ?? []), c]);
+    }
+  }
+  for (const c of comments) {
+    // A reply whose comment is not here stands alone, rather than be lost.
+    if (c.reply_to !== null && roots.has(c.reply_to)) continue;
+    entries.push({
+      key: `comment-${c.id}`,
+      kind: "comment",
+      at: c.created_at,
+      actor: c.author_name,
+      party: null,
+      act: c.reply_to === null ? "Commented" : "Replied",
+      status: null,
+      note: c.body,
+      details: [],
+      version: c.version,
+      // Replies keep the server's order, which is oldest first.
+      comment: { root: c, replies: replies.get(c.id) ?? [] },
+    });
   }
 
   // Oldest first. An entry with no time sorts before every dated one; ties
