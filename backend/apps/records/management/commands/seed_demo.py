@@ -296,6 +296,7 @@ class Command(BaseCommand):
 
             record = Record.objects.create(
                 title=title,
+                origin=Record.Origin.SYNTHETIC,
                 abstract=ABSTRACT.format(topic=classification_name.lower()),
                 classification=Classification.objects.filter(name=classification_name).first(),
                 record_type=RecordType.objects.get_or_create(name=type_name)[0],
@@ -349,6 +350,7 @@ class Command(BaseCommand):
 
         record = Record.objects.create(
             title=full_title,
+            origin=Record.Origin.SYNTHETIC,
             abstract=(
                 "Seeded by manage.py seed_demo to demonstrate this pipeline "
                 "state. Not a real disclosure."

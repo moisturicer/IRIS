@@ -1593,3 +1593,22 @@ human decision. IR-642 and IR-643 have been reassessed and are ready for
 implementation. No recovery implementation or automated coverage is claimed.
 Existing behavior is a baseline, not evidence that the accepted guarantees
 already exist. PR #334 passed all four CI checks before merge.
+
+## IR-563 — Truthful research metadata
+
+[ADR-046](../adr/046-declared-research-origin-and-publication-metadata.md) records the user-approved contract. Origin is explicitly declared and never grants access. Existing records migrate to unknown without author or publication-year inference. Missing-author labels replace institutional and submitting-owner substitutions; reference/synthetic badges and neutral catalogue wording prevent false institutional claims. Publication year is separate from completion and added dates. Authorized editors/importers declare metadata; the bounded administrative correction path is documented in [RESEARCH_METADATA.md](../engineering/RESEARCH_METADATA.md).
+
+| Requirement | Verification boundary |
+|---|---|
+| Declared origin and separate publication year round-trip; invalid origin rejected | `records/test_research_metadata.py` write/list serializers |
+| Origin does not widen editing permissions | `records/test_research_metadata.py` authenticated HTTP PATCH |
+| Explicit spreadsheet metadata survives import; invalid origin is reported | `records/test_excel_import.py` real XLSX through HTTP |
+| Existing rows preserve authors, owners, completion and workflow | `records/test_research_metadata_migration.py` historical populated schema |
+| Administrative correction is authorized, atomic, evidence-backed and audited; dry-run writes nothing | `records/test_correct_research_metadata.py` management command |
+| Ask IRIS carries real authors, declared origin and publication year | `ai/tests/test_ask_http.py` answer HTTP response |
+| Honest missing-author state, origin badges, verified reference and date distinctions | Discover, SourceContextPanel, PaperViewPage and EditDetailsDialog rendered-page tests |
+| Authorless citations and no completion/creation-year publication fallback | `discover/researchMetadata.test.ts` public citation formatter |
+
+The verified external fixture is [Attention Is All You Need](https://arxiv.org/abs/1706.03762), checked against arXiv on 2026-10-30: all eight authors and original publication year 2017. The test deliberately uses a different completion year. An existing source-card assertion was deliberately corrected: its fixture records no authors, so a nonempty invented byline is no longer required.
+
+Verification on 2026-10-30: frontend full suite **105 files / 1,323 tests passed**; TypeScript passed. The first frontend full run caught the new audit event missing from the frontend filter; that mapping was added and the full run repeated successfully. A copy of the populated local database was migrated across records 0020 → 0021: **20 records, 14 author rows, 20 ownership rows**, with identical before/after hashes of every pre-existing column. All origins became unknown and publication years remained null. Backend focused checks passed 31 tests; the historical migration test fixture was corrected separately. Final backend suite and review evidence will be appended after completion. Initial backend attempts interrupted by PostgreSQL recovery are not counted as verification.

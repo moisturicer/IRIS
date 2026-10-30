@@ -46,6 +46,30 @@ def workbook(*rows):
 
 
 class ExcelImportTests(APITestCase):
+    def test_declared_external_origin_and_publication_year_survive_import(self):
+        wb = openpyxl.Workbook()
+        wb.active.append(["Title", "Authors", "Origin", "Publication Year", "Year Accomplished"])
+        # Verified 2026-10-30 against https://arxiv.org/abs/1706.03762.
+        authors = ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar", "Jakob Uszkoreit", "Llion Jones", "Aidan N. Gomez", "Lukasz Kaiser", "Illia Polosukhin"]
+        wb.active.append(["Attention Is All You Need", ", ".join(authors), "imported_reference", 2017, 2020])
+        buffer = BytesIO()
+        wb.save(buffer)
+        response = self.post(buffer.getvalue())
+        self.assertEqual(response.status_code, 200)
+        record = Record.objects.get(title="Attention Is All You Need")
+        self.assertEqual((record.origin, record.publication_year, record.year_accomplished), ("imported_reference", 2017, 2020))
+        self.assertEqual(list(record.authors.order_by("pk").values_list("name", flat=True)), authors)
+
+    def test_invalid_origin_is_reported_and_never_reclassified(self):
+        wb = openpyxl.Workbook()
+        wb.active.append(["Title", "Origin"])
+        wb.active.append(["Bad provenance", "guessed"])
+        buffer = BytesIO()
+        wb.save(buffer)
+        response = self.post(buffer.getvalue())
+        self.assertEqual(response.data["created"], 0)
+        self.assertIn("Origin", response.data["log"])
+
     def setUp(self):
         self.rdco = make_user("import_rdco@cit.edu", "RDCO")
         self.client.force_authenticate(self.rdco)

@@ -33,6 +33,7 @@
  */
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { importedReference } from "@/test/fixtures/importedReference";
 import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -2229,6 +2230,30 @@ describe("the Overview's header (IR-569)", () => {
     expect(within(authors).getByText("R. Dela Cruz")).toBeInTheDocument();
     expect(screen.getAllByText("Thesis/Research").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Applied Research").length).toBeGreaterThan(0);
+  });
+
+  it("never credits the submitting owner as an unrecorded author", async () => {
+    shownRecord = { ...record, authors: [], origin: "imported_reference", owners: [
+      { id: 1, user: 99, email: "loader@cit.edu", full_name: "Corpus Loader", is_primary: true },
+    ] };
+    renderPaperView();
+    await waitForRecord(record.title);
+    expect(screen.getByText("Authors not recorded")).toHaveClass("italic", "text-stone-500");
+    expect(screen.queryByRole("list", { name: "Authors" })).not.toBeInTheDocument();
+    expect(screen.getByText("Imported reference")).toBeInTheDocument();
+  });
+
+  it("shows a verified external reference without attributing it to CIT-U", async () => {
+    shownRecord = { ...record, ...importedReference, year_accomplished: 2020 };
+    renderPaperView();
+    await waitForRecord(importedReference.title);
+    const authors = screen.getByRole("list", { name: "Authors" });
+    expect(within(authors).getAllByRole("listitem")).toHaveLength(8);
+    expect(within(authors).getByText("Ashish Vaswani")).toBeInTheDocument();
+    expect(screen.getByText("Published 2017")).toBeInTheDocument();
+    expect(screen.getByText("Completed 2020")).toBeInTheDocument();
+    expect(screen.getByText("Imported reference")).toBeInTheDocument();
+    expect(screen.queryByText("Cebu Institute of Technology – University")).not.toBeInTheDocument();
   });
 
   it("holds governance and documents in Record details, beside the page", async () => {

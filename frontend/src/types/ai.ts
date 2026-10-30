@@ -166,6 +166,7 @@ export type Citation = Omit<Passage, "score"> & { marker: number };
 
 /** A Record card: whose work a Passage came from, for the card the UI renders. */
 export interface SemanticSearchResult {
+  origin?: import("./records").ResearchOrigin;
   id:             number;
   title:          string;
   abstract:       string;

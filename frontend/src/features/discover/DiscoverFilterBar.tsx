@@ -148,7 +148,7 @@ export function DiscoverFilterBar({
         />
         <DiscoverFilterDropdown
           {...shared}
-          name="Year"
+          name="Year (completed)"
           options={options.years}
           selected={filters.year}
           onChange={(v) => set("year", v)}

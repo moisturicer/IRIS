@@ -61,6 +61,8 @@ export function stateFromDraft(
       title: record.title ?? "",
       abstract: record.abstract ?? "",
       year: record.year_accomplished ?? blank.year,
+      origin: record.origin ?? "unknown",
+      publication_year: record.publication_year ?? null,
       adviser: (record.adviser ?? undefined) as number,
       authors: (record.authors ?? []).map((a) => a.name).filter(Boolean),
       keywords: (record.keywords ?? []).join(", "),
