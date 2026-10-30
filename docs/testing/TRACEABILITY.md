@@ -1,5 +1,20 @@
 # Requirements Traceability
 
+## IR-123 · Disclosure notice describes external AI processing (FR-M6-02)
+
+The shared notice describes manuscript extraction, external Voyage AI embedding
+and reranking, and configured language-model answers and whole-paper summaries.
+The consent label names external AI processing; the expanded terms show pending
+CIT-U DPO / legal review. Modal clipboard output is derived from the displayed
+sections instead of maintaining separate wording.
+
+**Evidence:** `components/compliance/DpaConsent.test.tsx` renders the submission
+notice and exercises Copy content in the modal. The old notice fails both
+regression cases. Final command results are recorded in the PR.
+**Partial:** institutional approval, the withdrawal decision and consent
+re-collection remain outstanding. Existing consent stamps are not renewed.
+See [the processing inventory and review checklist](../compliance/IR-123-processing-review.md).
+
 ## IR-538 · Announced email verification in the shared entry frame
 
 `EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains
