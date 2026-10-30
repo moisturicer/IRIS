@@ -194,6 +194,20 @@ _Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision r
 A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
 _Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).
 
+**Review discussion**:
+The private conversation on a submitted Record between its owners and everyone who has held a [[Seat]] on it, shown in its review timeline. Never mixed with [[Comment]]s.
+_Avoid_: Comments (the public thread), notes, chat.
+
+### Comments
+
+**Comment**:
+A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or a system administrator may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
+_Avoid_: Public discussion (the ADR's name for the thread), post, review comment.
+
+**Comment report**:
+A reader telling RDCO that a [[Comment]] needs attention, with a reason. Only RDCO sees reports; the Comment's writer never learns one was made.
+_Avoid_: Flag, complaint.
+
 ### Library
 
 **Library**:
