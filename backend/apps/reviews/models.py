@@ -425,6 +425,7 @@ class ResubmissionRequest(models.Model):
 
     def __str__(self):
         return f"Record {self.record_id} | {self.party} | {self.state}"
+<<<<<<< HEAD
 
 
 class ReviewComment(models.Model):
@@ -468,19 +469,3 @@ class ReviewComment(models.Model):
     def __str__(self):
         return f"Record {self.record_id} | comment {self.pk} by {self.author_id}"
 
-
-class RecordAuthPin(models.Model):
-    """
-    A one-time PIN emailed to a user to grant temporary access to a protected record.
-    PINs expire 24 hours after generation and can only be used once.
-    """
-    record     = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="auth_pins")
-    user       = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="auth_pins")
-    email      = models.EmailField()
-    pin        = models.CharField(max_length=6)
-    is_used    = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(null=True, blank=True)
-
-    def __str__(self):
-        return f"Pin for record {self.record_id} user {self.user_id}"

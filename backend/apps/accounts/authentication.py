@@ -8,7 +8,8 @@ and every refresh pass through it.
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.settings import api_settings
+from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
 
 from . import sessions
 
@@ -42,13 +43,23 @@ class IdleAwareTokenRefreshSerializer(TokenRefreshSerializer):
 
     def validate(self, attrs):
         try:
-            sid = RefreshToken(attrs["refresh"]).get("sid")
+            # Signature and expiry checked, the blacklist not: `RefreshToken()`
+            # would refuse a logged-out token here, before its session could
+            # say why (IR-645). The parent's validation still checks both.
+            token = UntypedToken(attrs["refresh"])
         except TokenError:
             # Malformed or expired: the parent's validation says so.
             return super().validate(attrs)
+        if token.get(api_settings.TOKEN_TYPE_CLAIM) != RefreshToken.token_type:
+            return super().validate(attrs)
+        sid = token.get("sid")
         if not sid:
             raise InvalidToken("This sign-in predates session tracking. Sign in again.")
-        # Validated first, so a rotated or blacklisted token records no activity.
+        # An ended session is refused by its reason before the token is judged:
+        # logout blacklists the refresh token too, and "token not valid" would
+        # not say the session ended (IR-645).
+        sessions.refuse_if_ended(sid)
+        # Validated next, so a rotated or blacklisted token records no activity.
         data = super().validate(attrs)
         sessions.touch(sid, self.context["request"])
         return data

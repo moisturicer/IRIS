@@ -421,9 +421,6 @@ REVIEWS = {
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
     "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
-    "pin-generate": Entry({"POST": _case(READS_RECORD, data={"record_id": Ref("record")}, objects=("record",))}),
-
-    "pin-verify": Entry({"POST": _case(SIGNED_IN, data={"record_id": Ref("record"), "pin": "invalid"})}),
     "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=ASSIGNMENT, data={})}),
     "assignment-assign": Entry({m: _case(COORDINATOR, kwargs=ASSIGNMENT,
                                        **({} if m == "GET" else {"data": {"reviewer": Ref("reviewer_target")}}))
