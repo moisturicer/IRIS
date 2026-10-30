@@ -165,3 +165,25 @@ _Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision r
 **Version**:
 A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
 _Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).
+
+### Library
+
+**Library**:
+A reader's private collection of [[Saved Record]]s. It belongs to the reader's account, and nobody else can see it.
+_Avoid_: Repository, catalogue (that is Discover), collection, bookshelf.
+
+**Saved Record**:
+A Record a reader has kept in their [[Library]]. A reader saves a Record at most once, and saving tells no one else anything.
+_Avoid_: Like, star, favourite, bookmark.
+
+**Reading status**:
+Where a reader is with a [[Saved Record]]: Want to read, Reading or Completed. A Saved Record has at most one; giving a Record a status saves it, and unsaving it clears the status.
+_Avoid_: Status folder, shelf, progress.
+
+**Folder**:
+A named group a reader makes for their own [[Saved Record]]s. A Reading status is not a Folder, even where the interface shows them side by side.
+_Avoid_: Collection, list, tag.
+
+**Reading history**:
+The papers recently opened in this browser. It is not part of the [[Library]], never leaves the browser, and is cleared on sign-out.
+_Avoid_: Recently viewed, activity, reading log.
