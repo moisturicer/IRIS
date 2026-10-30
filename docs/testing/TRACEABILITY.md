@@ -1756,3 +1756,14 @@ Authority: IR-609 under IR-605, ADR-042 and the general-tools evaluation contrac
 - Held-out gate: `eval_replay_conversations --held-out` needs `locked_at` and frozen thresholds (now written into every lock), and recorded approvals for real providers. Tests: `test_campaign_command.py`.
 
 **Executed evidence (2026-10-30, Windows, local Postgres):** `python -m pytest apps/ai/evaluation/tests/test_campaign_report.py apps/ai/evaluation/tests/test_campaign_command.py`: 52 passed. `flake8` on the touched modules: clean. `python manage.py eval_campaign --smoke <fixture smoke run> --case-cost-usd 0.1 --campaign-cost-usd 2 --planned-cases 20` ran from the CLI and reported `not ready` (fake providers, one turn with missing usage), as expected. The full backend suite's failures were compared file by file against a clean `origin/main` worktree: none is added by this change. Pre-existing failures come from the local `.env` (inference profiles), `core.autocrlf` (proxy audit digest) and an uncommitted engine switch in the author's checkout. No campaign was run and no quality claim is made.
+
+
+## IR-680 — Review workspace composition boundary
+
+**Basis and scope.** IR-678/IR-680, ADR-032 §10 and Paper View spec 16 §4. Current `main` already composed the reader, status/timeline and action bar in `ReviewSection`; this pure refactor moves that boundary to `ReviewWorkspace`. PaperViewPage still owns the record fetch, reader, section selection and existing callbacks, passing the viewer's server-derived capabilities. ReviewTimeline keeps its existing tracker read. The Overview-only routing tracker stays in Overview. No workflow, permission or visible layout changes; the proposed three-column workspace remains IR-681.
+
+**Executed evidence (2026-10-30).** Frontend `npm test -- --maxWorkers=2`: **110 files, 1402 tests passed**, with existing tests unchanged, including PaperViewPage, ReviewActionBar, ReviewStatus, ReviewTimeline and ReviewRoutingTracker. The initial targeted run passed 172 tests but failed to spawn its last Windows forks worker (`spawn UNKNOWN`); the complete two-worker rerun passed without that error. `npm run build` passed TypeScript and Vite production build. `npm run lint` passed with zero errors and six existing warnings. `git diff --check` passed. No new behavior was introduced, so no new test suite was added for the rename.
+
+**Visual comparison.** [Before/after evidence](evidence/IR-680/README.md) for an Adviser and ITSO reviewer in Review mode: both pairs have identical PNG SHA-256 hashes and the same record/manuscript/tracker requests. Real app and PDF reader, synthetic API fixtures, 1600×1000 viewport. This establishes the requested wide-layout regression comparison, not every workflow state.
+
+**Review.** Independent Standards and Spec reviews against baseline `c6b6c1e` found no defects. Human approval and merge remain pending under the Definition of Done.
