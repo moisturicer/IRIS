@@ -19,9 +19,14 @@ import {
 } from "@/lib/authSession";
 import { getRoleDashboardPath } from "@/lib/roleDashboard";
 import { safeRedirectPath } from "@/lib/redirectTarget";
-import { classifyLoginFailure, type LoginFailure } from "./loginFailure";
+import { classifyLoginFailure, type AccountLock, type LoginFailure } from "./loginFailure";
 
-const LOCKOUT_MS = 15 * 60 * 1000;
+/**
+ * How long the browser's own lock lasts, after `LOGIN_FAILURE_LIMIT` rejected
+ * credentials in this tab (NFR-S6). It is this lock's only: a server lock's
+ * time comes from the server, and replaces this one when both apply (IR-555).
+ */
+const CLIENT_LOCKOUT_MS = 15 * 60 * 1000;
 
 /** Every failure but a lock, which opens its own dialog instead. */
 type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
@@ -34,7 +39,7 @@ export default function LoginPage() {
   const [loginAlert, setLoginAlert]     = useState<LoginAlert | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutOpen, setLockoutOpen]   = useState(false);
-  const [lockoutUntil, setLockoutUntilState] = useState<number | undefined>();
+  const [lock, setLock]                 = useState<AccountLock | null>(null);
   const [lockoutIdentifier, setLockoutIdentifier] = useState("");
   const [identifier, setIdentifier] = useState("");
   /**
@@ -76,7 +81,7 @@ export default function LoginPage() {
     const until = getLockoutUntil(identifier);
     if (until) {
       setLockoutIdentifier(identifier);
-      setLockoutUntilState(until);
+      setLock({ by: "attempts", unlockAt: until });
       setLockoutOpen(true);
     }
     setFailedAttempts(getLoginAttempts(identifier));
@@ -96,17 +101,25 @@ export default function LoginPage() {
     }
   };
 
-  const openLockout = (forIdentifier: string, untilMs: number) => {
-    setLockoutUntil(forIdentifier, untilMs);
+  const openLockout = (forIdentifier: string, next: AccountLock) => {
+    // Only a lock with a known end is remembered, so the dialog can reopen on
+    // it in this tab; RDCO's lock and a lock with no time are asked of the
+    // server again on the next attempt.
+    if (next.by === "attempts" && next.unlockAt !== null) {
+      setLockoutUntil(forIdentifier, next.unlockAt);
+    }
     setLockoutIdentifier(forIdentifier);
-    setLockoutUntilState(untilMs);
+    setLock(next);
     setLockoutOpen(true);
     setLoginAlert(null);
   };
 
   const closeLockout = () => {
     setLockoutOpen(false);
-    if (lockoutIdentifier && lockoutUntil && lockoutUntil <= Date.now()) {
+    if (
+      lockoutIdentifier && lock?.by === "attempts" && lock.unlockAt !== null &&
+      lock.unlockAt <= Date.now()
+    ) {
       clearLockout(lockoutIdentifier);
     }
   };
@@ -120,7 +133,7 @@ export default function LoginPage() {
     const loginId = data.identifier.trim();
 
     if (isAccountLocked(loginId)) {
-      openLockout(loginId, getLockoutUntil(loginId)!);
+      openLockout(loginId, { by: "attempts", unlockAt: getLockoutUntil(loginId)! });
       setSubmitting(false);
       return;
     }
@@ -138,7 +151,7 @@ export default function LoginPage() {
       const failure = classifyLoginFailure(err);
 
       if (failure.kind === "locked") {
-        openLockout(loginId, Date.now() + LOCKOUT_MS);
+        openLockout(loginId, failure.lock);
         return;
       }
 
@@ -154,7 +167,7 @@ export default function LoginPage() {
       setFailedAttempts(attempts);
 
       if (attempts >= LOGIN_FAILURE_LIMIT) {
-        openLockout(loginId, Date.now() + LOCKOUT_MS);
+        openLockout(loginId, { by: "attempts", unlockAt: Date.now() + CLIENT_LOCKOUT_MS });
         return;
       }
 
@@ -178,7 +191,7 @@ export default function LoginPage() {
         <AccountLockedModal
           open={lockoutOpen}
           onClose={closeLockout}
-          unlockAt={lockoutUntil}
+          lock={lock}
         />
       }
     >

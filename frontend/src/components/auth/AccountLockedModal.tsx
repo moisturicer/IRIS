@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
-
-const LOCKOUT_SECONDS = 15 * 60; // FR-M1-01 / SRS: 15-minute lockout
+import type { AccountLock } from "@/features/auth/loginFailure";
 
 function formatCountdown(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -8,23 +7,31 @@ function formatCountdown(totalSeconds: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+function secondsUntil(endAt: number): number {
+  return Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+}
+
 interface AccountLockedModalProps {
   open: boolean;
   onClose: () => void;
-  /** Unix ms when lockout ends; defaults to now + 15 min */
-  unlockAt?: number;
+  /** Which lock it is. It holds no duration of its own (IR-555). */
+  lock: AccountLock | null;
 }
 
-export function AccountLockedModal({ open, onClose, unlockAt }: AccountLockedModalProps) {
-  const endAt = unlockAt ?? Date.now() + LOCKOUT_SECONDS * 1000;
-  const [remaining, setRemaining] = useState(() =>
-    Math.max(0, Math.ceil((endAt - Date.now()) / 1000))
-  );
+/**
+ * Says which lock refused the sign-in, and when it lifts only when someone
+ * actually knows (IR-555): a countdown to the server's `unlock_at`, or the
+ * browser's own lock's time, and no time at all for RDCO's lock, which lifts
+ * only when RDCO unlocks it.
+ */
+export function AccountLockedModal({ open, onClose, lock }: AccountLockedModalProps) {
+  const endAt = lock?.by === "attempts" ? lock.unlockAt : null;
+  const [remaining, setRemaining] = useState(() => (endAt === null ? 0 : secondsUntil(endAt)));
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || endAt === null) return;
     const tick = () => {
-      const secs = Math.max(0, Math.ceil((endAt - Date.now()) / 1000));
+      const secs = secondsUntil(endAt);
       setRemaining(secs);
       if (secs <= 0) onClose();
     };
@@ -33,7 +40,7 @@ export function AccountLockedModal({ open, onClose, unlockAt }: AccountLockedMod
     return () => globalThis.clearInterval(id);
   }, [open, endAt, onClose]);
 
-  if (!open) return null;
+  if (!open || !lock) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -58,8 +65,22 @@ export function AccountLockedModal({ open, onClose, unlockAt }: AccountLockedMod
           Account Locked
         </h2>
         <p className="mt-3 text-[15px] text-stone-600 leading-relaxed">
-          Too many failed login attempts. Please try again in{" "}
-          <span className="font-bold text-brand tabular-nums">{formatCountdown(remaining)}</span>
+          {lock.by === "admin" ? (
+            <>
+              RDCO has locked this account, and it stays locked until they unlock it, so trying
+              again won&apos;t help. Contact RDCO or your department administrator.
+            </>
+          ) : endAt === null ? (
+            <>
+              Too many failed sign-in attempts, so sign-in is paused for this account. Try again
+              later, or contact RDCO or your department administrator if it stays locked.
+            </>
+          ) : (
+            <>
+              Too many failed sign-in attempts. Please try again in{" "}
+              <span className="font-bold text-brand tabular-nums">{formatCountdown(remaining)}</span>
+            </>
+          )}
         </p>
 
         <button

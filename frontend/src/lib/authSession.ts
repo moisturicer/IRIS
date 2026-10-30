@@ -1,6 +1,6 @@
 import { safeRedirectPath, wholePath } from "@/lib/redirectTarget";
 
-/** SRS FR-M1-01: lock account after 3 consecutive failed logins */
+/** The browser's own lock (NFR-S6): this many rejected credentials in a tab lock it. */
 export const LOGIN_FAILURE_LIMIT = 3;
 
 const ATTEMPT_KEY_PREFIX = "iris_login_attempts:";
