@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormikHelpers } from "formik";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
@@ -33,6 +33,9 @@ const CLIENT_LOCKOUT_MS = 15 * 60 * 1000;
 type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
 
 export default function LoginPage() {
+  // The submitting button may lose focus when Formik disables it, before the
+  // lock reply arrives. Keep its actual element as the dialog's return target.
+  const signInRef = useRef<HTMLButtonElement>(null);
   const navigate       = useNavigate();
   const location       = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -196,6 +199,7 @@ export default function LoginPage() {
           open={lockoutOpen}
           onClose={closeLockout}
           lock={lock}
+          returnTo={signInRef.current}
         />
       }
     >
@@ -252,6 +256,7 @@ export default function LoginPage() {
       )}
 
       <LoginForm
+        submitRef={signInRef}
         onSubmit={handleLogin}
         disabled={lockoutOpen}
         showCredentialsError={showFieldError}

@@ -1,5 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AccountLock } from "@/features/auth/loginFailure";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
+import { Button } from "@/components/ui/Button";
 
 function formatCountdown(totalSeconds: number): string {
   const m = Math.floor(totalSeconds / 60);
@@ -16,6 +18,7 @@ interface AccountLockedModalProps {
   onClose: () => void;
   /** Which lock it is. It holds no duration of its own (IR-555). */
   lock: AccountLock | null;
+  returnTo?: HTMLElement | null;
 }
 
 /**
@@ -24,7 +27,9 @@ interface AccountLockedModalProps {
  * browser's own lock's time, and no time at all for RDCO's lock, which lifts
  * only when RDCO unlocks it.
  */
-export function AccountLockedModal({ open, onClose, lock }: AccountLockedModalProps) {
+export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLockedModalProps) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useDialogFocus(open, panelRef, onClose, returnTo);
   const endAt = lock?.by === "attempts" ? lock.unlockAt : null;
   const [remaining, setRemaining] = useState(() => (endAt === null ? 0 : secondsUntil(endAt)));
 
@@ -46,6 +51,8 @@ export function AccountLockedModal({ open, onClose, lock }: AccountLockedModalPr
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40" aria-hidden onClick={onClose} />
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className="relative bg-white rounded-xl shadow-xl w-full max-w-[380px] px-8 py-8 text-center"
         role="dialog"
         aria-modal="true"
@@ -83,14 +90,15 @@ export function AccountLockedModal({ open, onClose, lock }: AccountLockedModalPr
           )}
         </p>
 
-        <button
+        <Button
           type="button"
           onClick={onClose}
-          className="mt-8 w-full py-3 rounded-lg text-[15px] font-semibold text-stone-700
-            bg-stone-100 hover:bg-stone-200 transition-colors"
+          variant="secondary"
+          size="full"
+          className="mt-8"
         >
           Close
-        </button>
+        </Button>
       </div>
     </div>
   );
