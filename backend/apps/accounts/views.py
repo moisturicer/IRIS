@@ -16,7 +16,9 @@ from .serializers import (
     RoleRequestSerializer, SystemSettingSerializer,
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
-from .sessions import end_all_sessions, end_session, start_session
+from .sessions import (
+    end_all_sessions, end_session, start_session, require_eligible_account, refuse_if_ended,
+)
 from .lockout import LOCKED_BY_ADMIN
 
 
@@ -46,6 +48,7 @@ class RegisterView(generics.CreateAPIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @transaction.atomic
     def post(self, request):
         from django.contrib.auth import authenticate
         email    = request.data.get("email")
@@ -56,6 +59,14 @@ class LoginView(APIView):
         # locked account was told "Invalid credentials." even with the right
         # password, and no 429 was ever sent (IR-555).
         user = authenticate(request._request, username=email, password=password)
+        if user:
+            # A password change or account lock may have committed since
+            # authenticate read the credentials. Serialize that check and
+            # token issuance with those actions on the account row.
+            verified_hash = user.password
+            user = User.objects.select_for_update().get(pk=user.pk)
+            if user.password != verified_hash or not user.is_active:
+                user = None
         if not user:
             create_audit_event("FAILED_LOGIN", None, metadata={"email": email})
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
@@ -113,11 +124,15 @@ class ChangePasswordView(APIView):
 
     @transaction.atomic
     def post(self, request):
+        request.user = User.objects.select_for_update().get(pk=request.user.pk)
+        require_eligible_account(request.user)
+        sid = request.auth.get("sid") if request.auth else None
+        if sid:
+            refuse_if_ended(sid)
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         request.user.set_password(serializer.validated_data["new_password"])
         request.user.save(update_fields=["password"])
-        sid = request.auth.get("sid") if request.auth else None
         end_all_sessions(request.user, SessionEndReason.PASSWORD_CHANGED, except_sid=sid)
         create_audit_event(AuditEvent.PASSWORD_CHANGED, request.user)
         return Response({"detail": "Password changed."})
@@ -260,7 +275,7 @@ class LockUserView(APIView):
 
     @transaction.atomic
     def patch(self, request, pk):
-        user      = User.objects.get(pk=pk)
+        user      = User.objects.select_for_update().get(pk=pk)
         is_locked = request.data.get("is_locked")
         if is_locked is None:
             return Response({"detail": "is_locked is required."}, status=400)

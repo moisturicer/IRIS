@@ -1,5 +1,10 @@
 """Account security changes enforced through real sign-in, request and refresh."""
 
+from concurrent.futures import ThreadPoolExecutor
+from time import monotonic, sleep
+
+from django.db import connection, transaction
+from rest_framework.test import APIClient, APITransactionTestCase
 from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 
@@ -174,3 +179,55 @@ class PasswordChangeEndsOtherSessionsTests(AccountSessionTestBase):
         self.assertEqual(self.get_me().status_code, 200)
         self.assertEqual(self.refresh_tokens().status_code, 200)
         self.assert_refused(*other, "session_ended_password_changed")
+
+
+class ConcurrentPasswordChangeTests(APITransactionTestCase):
+    serialized_rollback = True
+
+    def test_an_old_password_login_cannot_create_a_session_after_password_change(self):
+        user = User.objects.create_user(
+            email="concurrent-session@cit.edu", password=PASSWORD, is_verified=True,
+        )
+        credentials = {"email": user.email, "password": PASSWORD}
+        response = self.client.post(LOGIN, credentials, format="json")
+        self.assertEqual(response.status_code, 200, response.content)
+        access = response.data["access"]
+
+        def sign_in_on_another_connection():
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET application_name = 'ir644_login_race'")
+                    cursor.execute("SET lock_timeout = '15s'")
+                return APIClient().post(LOGIN, credentials, format="json")
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with transaction.atomic():
+                # Hold the account while another HTTP login validates the old
+                # password and reaches its next account write/row lock. The
+                # lock observation coordinates the race; all outcomes are HTTP.
+                User.objects.select_for_update().get(pk=user.pk)
+                pending = pool.submit(sign_in_on_another_connection)
+                deadline = monotonic() + 10
+                waiting = False
+                while monotonic() < deadline and not pending.done():
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pg_stat_clear_snapshot()")
+                        cursor.execute(
+                            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+                            "WHERE application_name = 'ir644_login_race' AND wait_event_type = 'Lock')"
+                        )
+                        waiting = cursor.fetchone()[0]
+                    if waiting:
+                        break
+                    sleep(0.02)
+                self.assertTrue(waiting, "Concurrent login did not reach the held account")
+                response = self.client.post(
+                    "/api/v1/auth/password/change/",
+                    {"old_password": PASSWORD, "new_password": NEW_PASSWORD}, format="json",
+                    HTTP_AUTHORIZATION=f"Bearer {access}",
+                )
+                self.assertEqual(response.status_code, 200, response.content)
+            response = pending.result(timeout=10)
+        self.assertEqual(response.status_code, 401, response.content)
