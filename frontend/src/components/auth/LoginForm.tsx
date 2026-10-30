@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useId, useState, type Ref } from "react";
 import { Link } from "react-router-dom";
 import { Formik, Form, Field, type FormikHelpers, type FieldProps } from "formik";
 import * as Yup from "yup";
@@ -23,6 +23,7 @@ interface LoginFormProps {
     helpers: FormikHelpers<LoginFormValues>
   ) => Promise<void>;
   disabled?: boolean;
+  submitRef?: Ref<HTMLButtonElement>;
   showCredentialsError?: boolean;
   onIdentifierChange?: (identifier: string) => void;
 }
@@ -32,6 +33,7 @@ export function LoginForm({
   disabled = false,
   showCredentialsError = false,
   onIdentifierChange,
+  submitRef,
 }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -123,7 +125,7 @@ export function LoginForm({
           {/* `size="full"` carries the full width and the larger step. Passing
               those as a className instead would collide with the primitive's
               own sizing -- clsx keeps both and stylesheet order decides. */}
-          <Button type="submit" variant="primary" size="full" loading={isSubmitting} disabled={disabled}>
+          <Button ref={submitRef} type="submit" variant="primary" size="full" loading={isSubmitting} disabled={disabled}>
             {isSubmitting ? "Signing in…" : "Sign In"}
           </Button>
         </Form>
