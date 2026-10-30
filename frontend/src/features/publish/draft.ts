@@ -1,3 +1,4 @@
+import { errorDetail } from "@/lib/errorDetail";
 /**
  * The Publish dialog's pure rules (IR-408), kept out of the component so each
  * is stated once and tested as a table.
@@ -61,8 +62,12 @@ export function stateFromDraft(
       title: record.title ?? "",
       abstract: record.abstract ?? "",
       year: record.year_accomplished ?? blank.year,
+      origin: record.origin ?? "unknown",
+      publication_year: record.publication_year ?? null,
       adviser: (record.adviser ?? undefined) as number,
       authors: (record.authors ?? []).map((a) => a.name).filter(Boolean),
+      keywords: (record.keywords ?? []).join(", "),
+      owner_emails: record.owners?.map((owner) => owner.email).join(", "),
       classification: byName(lists.classifications, record.classification),
       psced: byName(lists.psceds, record.psced),
       is_ip: Boolean(record.is_ip),
@@ -96,25 +101,41 @@ export interface ApiFailure {
 }
 
 const NETWORK_MESSAGE = "We couldn't reach IRIS. Check your connection and try again.";
+const SERVER_MESSAGE = "IRIS isn't responding right now. Try again in a few minutes.";
+const TOO_LARGE_MESSAGE = "This is too large for the server to accept.";
+
+/**
+ * What to say when the body has nothing readable (IR-610): a proxy's empty 5xx
+ * or HTML error page means the server failed, not whatever the caller was sending.
+ */
+function statusMessage(status: number | undefined, fallback: string): string {
+  if (status === 413) return TOO_LARGE_MESSAGE;
+  if (status != null && status >= 500) return SERVER_MESSAGE;
+  return fallback;
+}
 
 export function describeFailure(err: unknown, fallback: string): ApiFailure {
-  const response = (err as { response?: { data?: unknown } })?.response;
+  const response = (err as { response?: { status?: number; data?: unknown } })?.response;
   if (!response) return { message: NETWORK_MESSAGE, fields: {}, network: true };
 
   const data = response.data;
   const fields: Record<string, string> = {};
-  let message = fallback;
+  let message = statusMessage(response.status, fallback);
 
   if (data && typeof data === "object" && !Array.isArray(data)) {
     for (const [key, value] of Object.entries(data as Record<string, unknown>)) {
       const text = Array.isArray(value) ? value.filter((v) => typeof v === "string").join(" ") : value;
       if (typeof text !== "string" || !text) continue;
-      if (key === "detail" || key === "non_field_errors") message = text;
+      if (key === "non_field_errors") message = text;
+      else if (key === "detail") continue;
       else fields[key] = text;
     }
-  } else if (typeof data === "string" && data.length < 300) {
-    message = data;
+  } else if (typeof data === "string" && (response.status ?? 0) < 500) {
+    // A blank body or an error page is not a message, and a 5xx's text is the
+    // proxy's (IR-610), so only a short plain reply from IRIS itself is shown.
+    const text = data.trim();
+    if (text && !text.startsWith("<") && text.length < 300) message = text;
   }
 
-  return { message, fields, network: false };
+  return { message: errorDetail(err, message), fields, network: false };
 }

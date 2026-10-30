@@ -10,28 +10,19 @@ import { TONES } from "@/components/ui/statusTones";
 import { cn, formatDate } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
-import { groupResearch, type ResearchSection } from "./researchSections";
+import { waitingHref } from "@/features/records/waitingOnYou";
+import { ContinueProposal } from "@/features/records/ContinueProposal";
 
-/** What the owner owes, in the server's terms (`workflow_state`). */
-const NEXT_STEP: Partial<Record<MyResearchItem["workflow_state"], { text: string; section: string }>> = {
-  awaiting_resubmission: { text: "Revise the paper and submit a new version.", section: "review" },
-  awaiting_document:     { text: "Upload the document a reviewer asked for.", section: "files" },
-};
+import { groupResearch, type ResearchSection } from "./researchSections";
 
 const CHIP = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold";
 
 /**
- * Where the review stands, office by office: who is reviewing now and who
- * has cleared it. A clearance kept through a resubmission says so; that is
- * clearance-aware resubmission (ADR-003), shown where the owner works. Only
- * the three clearing offices get a chip: the Adviser and RDCO are named by
- * the section heading.
+ * Which offices have cleared it. A clearance kept through a resubmission
+ * says so; that is clearance-aware resubmission (ADR-003), shown where the
+ * owner works. Who is reviewing now is the server's status line.
  */
-const OFFICES: ReadonlySet<string> = new Set(["itso", "ierc", "ktto"]);
-
-function ReviewChips({ item }: { item: MyResearchItem }) {
-  const reviewing = item.holders.filter((h) => OFFICES.has(h.party));
-  if (reviewing.length === 0 && item.cleared_offices.length === 0) return null;
+function ClearedChips({ item }: { item: MyResearchItem }) {
   // Spans, not a list: the card's status slot is a phrasing context.
   return (
     <>
@@ -41,27 +32,35 @@ function ReviewChips({ item }: { item: MyResearchItem }) {
           {office.label} cleared{office.preserved && <span className="font-normal"> · kept</span>}
         </span>
       ))}
-      {reviewing.map((holder) => (
-        <span key={holder.party} className={cn(CHIP, TONES.active)}>
-          <i className="fas fa-hourglass-half" aria-hidden />
-          {holder.label} reviewing
-        </span>
-      ))}
     </>
   );
 }
 
 function ResearchItem({ item }: { item: MyResearchItem }) {
-  const next = NEXT_STEP[item.workflow_state];
   const byline = [
     item.authors.map((author) => author.name).join(", "),
     item.adviser_name && `Adviser: ${item.adviser_name}`,
   ].filter(Boolean).join(" · ");
 
+  // One link per open request, straight to the act on Paper View (IR-625).
+  const waiting = item.submitter_status.waiting_on_you;
   const action = item.pipeline_status === "draft"
     ? <Link to={`/?publish=${item.id}`} className={cn(PILL_SECONDARY, FOCUS_RING)}>Continue</Link>
-    : next
-      ? <Link to={`/records/${item.id}?section=${next.section}`} className={cn(PILL_PRIMARY, FOCUS_RING)}>Respond</Link>
+    : waiting.length > 0
+      ? (
+        <>
+          {waiting.map((request, i) => (
+            <Link
+              key={`${request.kind}-${request.party}`}
+              to={waitingHref(item.id, request)}
+              className={cn(i === 0 ? PILL_PRIMARY : PILL_SECONDARY, FOCUS_RING)}
+            >
+              {request.action_label}{" "}
+              <span className="sr-only">({request.label})</span>
+            </Link>
+          ))}
+        </>
+      )
       : undefined;
 
   return (
@@ -76,12 +75,11 @@ function ResearchItem({ item }: { item: MyResearchItem }) {
         byline={byline || undefined}
         status={
           <>
-            <StatusBadge state={item.workflow_state} label={item.workflow_state_label} />
-            <ReviewChips item={item} />
+            <StatusBadge state={item.workflow_state} label={item.submitter_status.line} />
+            <ClearedChips item={item} />
           </>
         }
-        nextStep={next?.text}
-        actions={action}
+        actions={item.can_continue ? <ContinueProposal recordId={item.id} /> : action}
       />
     </li>
   );

@@ -11,11 +11,14 @@
  *
  * Each version is an entry of its own ("v2 submitted"), and each review is
  * tagged with the version it was made against (IR-416). Nothing else is
- * tagged: a version is never worked out from a timestamp. Review comments
- * join when their backend lands (IR-419).
+ * tagged: a version is never worked out from a timestamp.
+ *
+ * Review comments (IR-419) are entries too, each tagged with the version it
+ * was made against. A reply is not an entry of its own: it sits under the
+ * comment it answers, as on a pull request, and threads are one level deep.
  */
-import { joinLabels } from "@/lib/utils";
-import type { RecordTracker, TrackerResubmission } from "@/types/records";
+import { formatDate, joinLabels } from "@/lib/utils";
+import type { RecordTracker, ReviewComment, TrackerResubmission } from "@/types/records";
 
 export type TimelineKind =
   | "routing"
@@ -23,7 +26,10 @@ export type TimelineKind =
   | "revision"
   | "revision_resolved"
   | "document_request"
-  | "version";
+  | "version"
+  | "reassignment"
+  | "extension"
+  | "comment";
 
 export interface TimelineEntry {
   key: string;
@@ -48,6 +54,8 @@ export interface TimelineEntry {
    * is shown rather than an invented "v1" (spec §4.11).
    */
   version: number | null;
+  /** A comment entry's own: the comment, and its replies, oldest first. */
+  comment?: { root: ReviewComment; replies: ReviewComment[] };
 }
 
 export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
@@ -182,6 +190,70 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       note: null,
       details: [v.manuscript_url ? v.cause_label : `${v.cause_label} · no manuscript`],
       version: null,
+    });
+  }
+
+  // A coordinator moved a seat (IR-623). The names are null to a viewer who
+  // may not read the review, and the act still says what happened.
+  for (const r of tracker.reassignments ?? []) {
+    entries.push({
+      key: `reassignment-${r.seat}`,
+      kind: "reassignment",
+      at: r.at,
+      actor: r.by_name,
+      party: r.label,
+      act: r.from_name && r.to_name ? `Reassigned from ${r.from_name} to ${r.to_name}` : "Reassigned a reviewer",
+      status: null,
+      note: r.reason || null,
+      details: [],
+      version: null,
+    });
+  }
+
+  // A due date moved (ADR-043 §6): by a coordinator, with their reason, or by
+  // IRIS for a document-request pause, whose wording is a fact, not a note.
+  for (const h of tracker.assignment_deadline_history ?? []) {
+    for (const e of h.extensions) {
+      entries.push({
+        key: `extension-${e.id}`,
+        kind: "extension",
+        at: e.created_at,
+        actor: e.system ? null : e.actor_name,
+        party: h.label,
+        act: e.system ? "Due date moved for a document request" : "Extended the due date",
+        status: null,
+        note: e.system ? null : e.reason || null,
+        details: [`Due ${formatDate(e.due_at)}, was ${formatDate(e.previous_due_at)}`],
+        version: null,
+      });
+    }
+  }
+
+  // Null as `reviews` is, to a viewer who may not read the review (IR-479).
+  const comments = tracker.review_comments ?? [];
+  const roots = new Set(comments.filter((c) => c.reply_to === null).map((c) => c.id));
+  const replies = new Map<number, ReviewComment[]>();
+  for (const c of comments) {
+    if (c.reply_to !== null && roots.has(c.reply_to)) {
+      replies.set(c.reply_to, [...(replies.get(c.reply_to) ?? []), c]);
+    }
+  }
+  for (const c of comments) {
+    // A reply whose comment is not here stands alone, rather than be lost.
+    if (c.reply_to !== null && roots.has(c.reply_to)) continue;
+    entries.push({
+      key: `comment-${c.id}`,
+      kind: "comment",
+      at: c.created_at,
+      actor: c.author_name,
+      party: null,
+      act: c.reply_to === null ? "Commented" : "Replied",
+      status: null,
+      note: c.body,
+      details: [],
+      version: c.version,
+      // Replies keep the server's order, which is oldest first.
+      comment: { root: c, replies: replies.get(c.id) ?? [] },
     });
   }
 

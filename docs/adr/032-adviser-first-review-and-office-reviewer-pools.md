@@ -47,6 +47,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-11 (project lead, IR-517): §10.** Who is told when an owner deletes a record: open-seat holders on a withdrawal, the other owners on every delete, and RDCO on a delete request. No office pool is told. A withdrawal also withdraws open document requests. See the *Amendment* note under §10.
 
+**Amended 2026-10-30 (project lead, IR-419): §7, §10, §12 and Security Impact.** The review discussion is read under `may_read_review` and written by participants only. §12's "404 on the review timeline" is the discussion endpoint's 404 plus `null` in the tracker. See the *Amendment* note under §10.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -292,8 +294,8 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
 
 - **The act.** `POST /records/<id>/new-version/`, by an **owner** only. A reviewer who can see the record gets a 403; anyone else gets a 404. It needs a record on the new model with at least one open request. It writes v(n+1) through the one writer, resolves **every** open request as `resubmitted`, and records `resubmission_count` and `last_resubmitted_at`, so `preserved` is derived exactly as on the legacy path.
 - **What resets.** Under `CLEARANCE_AWARE`, only the requesting parties' clearance rows go back to pending. Under `RESTART_ALL`, every row does.
-    - Seats are the same under both policies, which is the card's "the two policies differ only in which clearances reset". Every `done` seat on a requesting party's active assignment returns to `in_review`, so an office whose second reviewer asked re-reviews the new version in full. Nobody else's seat changes.
-    - *Consequence, for review:* under `RESTART_ALL`, an office that had already completed keeps its completed assignment, and its pending clearance is re-cleared only if it is routed again. If the comparison arm should instead reopen those offices, that is a change to this rule.
+    - Seats are the same under both policies, which is the card's "the two policies differ only in which clearances reset". Every `done` seat on a requesting party's active assignment returns to `in_review`, so an office whose second reviewer asked re-reviews the new version in full. Nobody else's seat changes. *Superseded 2026-10-29 for `RESTART_ALL` by the IR-632 amendment below: every office whose clearance resets is reopened too. `CLEARANCE_AWARE` is unchanged.*
+    - *Consequence, for review:* under `RESTART_ALL`, an office that had already completed keeps its completed assignment, and its pending clearance is re-cleared only if it is routed again. If the comparison arm should instead reopen those offices, that is a change to this rule. *That change is the IR-632 amendment below.*
 - **What counts as a change** since the **newest** open request:
     - a manuscript other than the latest version's;
     - a supporting document an owner uploaded (`RecordUpload`);
@@ -309,7 +311,22 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
     - The legacy `declined` path keeps extracting on upload. No reviewer is acting on a declined record, and IR-274 deletes the path.
     - *Accepted:* for the extraction latency after a submission, Paper Chat may still quote the previous version. That is the same window every upload has.
 - **Which manuscript is current.** Between the owner's upload and their new version, `/manuscript/` serves everyone but an owner the latest version's file. An owner reads their own upload, and record detail's `manuscript_unsubmitted` labels it. The owner's version picker then offers the latest submitted version too, as `?version=N`.
-- **Notifications** go to the open seat holders of the requesting parties, in-app, and to nobody else.
+- **Notifications** go to the open seat holders of the requesting parties, in-app, and to nobody else. *Under `RESTART_ALL`, also to the reopened offices' seat holders: IR-632 amendment below.*
+
+**Amendment, 2026-10-29 (IR-632): under `RESTART_ALL`, every office whose clearance resets reviews the new version.** Settled in a design grilling with a team member, every recommendation accepted. **Pending the adviser's review.** Found by the 28 Oct audit: as built above, `RESTART_ALL` reset an office's clearance row but left its reviewer `done`, so nobody reviewed the new version for it. The two arms then differed only in a label, which is the arithmetic identity [ADR-004](004-restart-all-comparison-mode.md) rejects: *"the point of the experiment is that participants actually perform the repeated reviews."*
+
+`CLEARANCE_AWARE`, the production default, does not change. Under `RESTART_ALL`:
+
+- **Who reopens.** Every party whose clearance the version resets, which under `RESTART_ALL` is every clearance office with a row. The Adviser and RDCO have no clearance row, so they reopen only when they are the requesting party, exactly as under `CLEARANCE_AWARE`.
+    - *Rejected:* reopening the Adviser and RDCO as well. ADR-004 defines the control as resetting every *clearance*, and making the control stricter than that would inflate the effect being measured.
+- **How.** The reopened office's **same seats** go back: `done` → `in_review`, and its assignment back to active. This is the mechanism the requesting party already gets, so the same reviewer reviews the new version.
+    - *Rejected:* a fresh assignment that anyone in the pool can pick up. That adds a pick-up step `CLEARANCE_AWARE` never has, which would be a second difference between the arms.
+- **When.** Reopened offices review **in parallel** with the requesting party. ADR-004's "route to the first clearance stage for the record type" predates this ADR's parallel office pools, and is superseded by them. Replaying stages would make the control slower for a routing reason, not a re-review reason.
+- **Only finished work reopens.** A seat still `in_review` or not yet opened is left alone. That office has nothing to redo, and it behaves the same in both arms.
+- **Notifications.** The reopened offices' seat holders get the same new-version notification as the requesting party's, so no facilitator prompt is needed in one arm only.
+- **The record.** `rereview_parties` in the resubmission audit event names the reopened offices as well as the requesting ones, so the analysis export sees who reviewed again. Nothing that is preserved under `CLEARANCE_AWARE` changes.
+
+The "two policies differ only in which clearances reset" rule above becomes **the two policies differ only in which offices reset and review again**. `test_the_policies_differ_only_in_which_clearances_reset` pinned the old rule, and is rewritten on purpose to pin this one.
 
 ### 6. Lineage: an accepted Proposal continues as a new record
 
@@ -328,7 +345,7 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 | | Review discussion | Public discussion |
 |---|---|---|
 | **Model** | `ReviewComment` (record, author, body, version, reply_to, created_at, edited_at) | `PublicComment` (record, author, body, reply_to, created_at, hidden_by, hidden_at) |
-| **Who reads and writes** | The record's owners, plus every user who has ever held a seat on it | Any signed-in user |
+| **Who reads and writes** | The record's owners, plus every user who has ever held a seat on it. *Reads widened to `may_read_review` by the IR-419 amendment under §10; writes unchanged.* | Any signed-in user |
 | **On which records** | Every submitted record | `published` records and Discoverable Proposals (§8) only |
 | **Shown as** | One **timeline** interleaving comments, versions, seat openings, reviews and findings, routing, document requests, and resubmission requests and their resolution. The shape of a GitHub pull request. | A flat thread under the paper |
 
@@ -419,7 +436,7 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
   - `holds_seat(user, record, party)`
   - `is_office_member(user, party)`
   - `is_office_coordinator(user, party)`
-  - `is_record_participant(user, record)`, meaning an owner or anyone who has ever held a seat. It gates the review discussion and the timeline.
+  - `is_record_participant(user, record)`, meaning an owner or anyone who has ever held a seat. It gates the review discussion and the timeline. *Since the IR-419 amendment below it gates writing in the discussion; reading follows `may_read_review` (IR-479).*
 
 **What each mode of the Paper View shows:**
 
@@ -531,6 +548,14 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 - **A withdrawal also withdraws the record's open document requests**, with `closed_at` and no `closed_by_decision`, since there is no Decision to name (`reviews.withdrawal`). They used to be left open.
 - Notices go after commit and never raise into the request, as every notice does.
 
+**Amendment, 2026-10-30 (project lead, IR-419): who reads and writes the review discussion.** Settled in a design grilling, after IR-419's implementation found that §7's table and Security Impact still named `is_record_participant`, while the IR-479 amendment above had made `may_read_review` the one predicate for review content before `ReviewComment` existed.
+
+- **Reading follows `may_read_review`**: an owner, anyone who has ever held a seat, or a member of an office whose assignment on the record is active now, its pool included. The discussion is review content, and IR-479's reason applies to it most of all: a reviewer needs the history before claiming. Review content stays under one predicate.
+- **Writing stays with participants** (`is_record_participant`): the owners and anyone who has ever held a seat. A pool member who reads is refused with a 403 until they claim, so everyone who posts holds a part in the review.
+- **Access follows current business.** A pool member who read the discussion but never claimed stops reading it once their office's assignment is no longer active: the endpoint refuses with a 404 and the tracker sends `null`. This is intended. As IR-479 put it, a candid comment is not the business of every colleague who later joins. A coordinator who wants them to keep reading seats them.
+- **What §12's "404 on the review timeline" means.** The timeline is drawn from the tracker, which answers every reader of the record with 200 and gives `review_comments: null`, like its other review fields, to anyone `may_read_review` refuses. The 404 is the discussion endpoint's (`GET /records/<id>/review-comments/`). That 404 is word for word a missing record's, so a caller who sees the record learns nothing of its discussion (IR-153).
+- **Not settled here:** a hint explaining to a reader who may not write why there is no composer. It would need its own server-side reason, because the frontend never compares roles (§10).
+
 ### 11. Lifecycle
 
 `pipeline_status` stores:
@@ -573,7 +598,7 @@ Each rule above has a test at the REST seam Lee confirmed for IR-255:
 - Clearance-aware: IERC requests a revision after ITSO cleared. The new version resets IERC only, and ITSO's clearance and seat survive. Under `RESTART_ALL`, both reset.
 - Continuing a Proposal creates a linked `draft`, leaves the Proposal byte-identical, and refuses a second continuation.
 - A stranger gets the summary of a Discoverable Proposal, a 404 on `/records/<id>/` and on its manuscript, and **no** Ask IRIS citation of it.
-- A non-participant gets a 404 on the review timeline. A participant who is not an owner sees it.
+- A non-participant gets a 404 on the review timeline. A participant who is not an owner sees it. *Per the IR-419 amendment under §10: a caller `may_read_review` refuses gets a 404 from the discussion endpoint and `review_comments: null` from the tracker.*
 - An owner who is also named as Adviser is refused at submission.
 - `capabilities` for each role × state matches the action endpoints' own refusals. This is one table-driven test, so the rendering hint cannot drift from the authority.
 
@@ -686,7 +711,7 @@ Each authority is a named predicate in `core.permissions`, checked at the endpoi
 - **The summary read path for Discoverable Proposals.** Its serializer is allow-listed, and a test fails if a file, version or review field appears on it.
 - **Public comments.** Stored text, rendered escaped, and hideable.
 
-**Review discussion** is record data gated by `is_record_participant`. It refuses with a 404, per IR-153.
+**Review discussion** is record data gated by `is_record_participant`. It refuses with a 404, per IR-153. *Amended 2026-10-30 (IR-419, under §10): read under `may_read_review`, written under `is_record_participant`. The refusal is the same 404 as a missing record.*
 
 **No change** to `visible_to()` or to Ask IRIS retrieval.
 

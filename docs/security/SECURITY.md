@@ -25,7 +25,7 @@ JWT via SimpleJWT. Token rotation and blacklisting after rotation are **correctl
 | Control | State |
 |---|---|
 | HS256, rotation, blacklist-after-rotation | ✅ Correct |
-| Access token lifetime | ⚠️ Configured, but **30-minute inactivity expiry does not occur** — NFR-S2 unmet |
+| Access token lifetime | ✅ 30 minutes, and **separately** a 30-minute *inactivity* expiry enforced server-side on every request and refresh (IR-166, `apps/accounts/sessions.py`) — NFR-S2 |
 | Refresh handling in the client | ❌ Interceptor writes `localStorage` nothing reads, never calls `setTokens`, no deduplication against rotation — concurrent 401s force a hard logout |
 | Account lockout | ⚠️ Event types exist in the audit model; enforcement unverified |
 
@@ -156,8 +156,8 @@ Two consequences: the audit log cannot answer any question about the workflow, a
 | 5 | ~~`is_staff` seeding voids role-based restriction~~ | **High** | **Closed** — bypass removed, `accounts/0009` reverses the seeding, verified by `apps/tests/test_authorization_matrix.py` | IR-165 |
 | 6 | Hardcoded credentials, permissive CORS, unset `ALLOWED_HOSTS` | **High** | Open | IR-61 |
 | 7 | ~~Audit readable by all four offices, not only RDCO~~ | **Medium** | **Closed** — `IsAdmin` with `ADMIN_ROLES = {RDCO}`, asserted per-role | IR-165 |
-| 8 | No session inactivity expiry (NFR-S2) | **Medium** | Open | Epic C |
-| 9 | Audit log not immutable (NFR-S5) | **Medium** | Open | Epic C |
+| 8 | ~~No session inactivity expiry (NFR-S2)~~ | **Medium** | **Closed** (PR #307, 2026-10-29) — idle sessions refused server-side; polling does not count as activity | IR-166 |
+| 9 | ~~Audit log not immutable (NFR-S5)~~ | **Medium** | **Closed** (PR #307, 2026-10-29) — PostgreSQL trigger refuses every changing UPDATE and every DELETE, and the FKs no longer `SET_NULL`, so attribution cannot be stripped; TRUNCATE and the owner dropping the trigger remain possible by deliberate migration | IR-166 |
 | 10 | No automated tests — no regression detection on any control | **High** | **Partially closed** — a pytest harness exists and `apps/tests/test_authorization_matrix.py` now regression-tests role × action authorization in both directions. Other controls remain uncovered | IR-163, IR-165 |
 | 11 | External AI transmission permission unconfirmed | **Medium** | **Decision required** | — |
 | 12 | No backups, no rehearsed restore before the pilot | **High** | Open | Epic D |

@@ -15,7 +15,8 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
 from apps.accounts.models import Role, User
-from apps.records.models import Record, RecordType
+from apps.records.models import RecordType
+from apps.reviews.workflow_test_helpers import model_at_current_state
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -39,14 +40,14 @@ def test_the_backfill_fills_the_party_from_the_uploaders_current_role():
     try:
         OldRecordFile = old_apps.get_model("documents", "RecordFile")
 
-        # Users and the record through the current models: only `documents`
-        # is rewound, so the other apps' tables keep their latest schema.
+        # The record's model must match its actually applied migrations:
+        # rewinding documents can also rewind dependent records migrations.
         # `get_or_create`, because an earlier TransactionTestCase flush can
         # have removed the migration-seeded RecordType.
         record_type, _ = RecordType.objects.get_or_create(name="Thesis / Research")
         owner = _user("backfill-owner@cit.edu", "Student")
-        record = Record.objects.create(
-            title="Pre-existing disclosure", record_type=record_type, added_by=owner,
+        record = model_at_current_state("records", "Record").objects.create(
+            title="Pre-existing disclosure", record_type_id=record_type.pk, added_by_id=owner.pk,
         )
 
         uploaders = {

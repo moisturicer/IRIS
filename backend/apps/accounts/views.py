@@ -2,18 +2,20 @@ from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from core.enums import RequestStatus, RoleName
+from core.enums import RequestStatus, RoleName, SessionEndReason
 from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import IsAdmin
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
-    UserSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
+    UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
     RoleRequestSerializer, SystemSettingSerializer,
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
+from .sessions import end_session, start_session
+from .lockout import LOCKED_BY_ADMIN
 
 
 class RegisterView(generics.CreateAPIView):
@@ -46,16 +48,26 @@ class LoginView(APIView):
         from django.contrib.auth import authenticate
         email    = request.data.get("email")
         password = request.data.get("password")
-        user = authenticate(request, username=email, password=password)
+        # The Django request, not DRF's wrapper: axes marks a lockout by setting
+        # `axes_locked_out` on the request it is given, and its middleware reads
+        # it from the Django one. Through the wrapper the mark was lost, so a
+        # locked account was told "Invalid credentials." even with the right
+        # password, and no 429 was ever sent (IR-555).
+        user = authenticate(request._request, username=email, password=password)
         if not user:
             create_audit_event("FAILED_LOGIN", None, metadata={"email": email})
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
         if not user.is_verified:
             return Response({"detail": "Email not verified."}, status=status.HTTP_403_FORBIDDEN)
         if user.is_locked:
-            return Response({"detail": "Account is locked."}, status=status.HTTP_403_FORBIDDEN)
+            # RDCO's lock: it lifts only when RDCO unlocks, so no `unlock_at` (IR-555).
+            return Response(
+                {"detail": "Account is locked.", "code": LOCKED_BY_ADMIN},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
-        refresh = RefreshToken.for_user(user)
+        # A session the inactivity rule can end, its id inside both tokens (IR-166).
+        refresh = start_session(user)
         create_audit_event("LOGIN", user, metadata={"email": user.email})
         return Response({
             "access":  str(refresh.access_token),
@@ -70,6 +82,11 @@ class LogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        # Ended through the access token in hand, which is the one this request
+        # was authenticated with; the refresh token in the body may be stale.
+        sid = request.auth.get("sid") if request.auth else None
+        if sid:
+            end_session(sid, SessionEndReason.LOGOUT)
         try:
             token = RefreshToken(request.data["refresh"])
             token.blacklist()
@@ -112,6 +129,9 @@ class UserListView(generics.ListAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAdmin]
     queryset           = User.objects.select_related("role").order_by("-date_joined")
+    # The default SearchFilter matches nothing until a view names its fields,
+    # so the Users page's search box listed everyone (IR-478).
+    search_fields      = ["email", "first_name", "last_name"]
 
 
 class AdviserListView(generics.ListAPIView):
@@ -119,9 +139,10 @@ class AdviserListView(generics.ListAPIView):
     GET /users/advisers/
     Returns all active users whose role is "Adviser".
     Used by the record creation form so students can pick their adviser.
-    Any authenticated user may call this endpoint.
+    Any authenticated user may call this endpoint, which is why it serializes
+    only the picker's fields and no account state (IR-587).
     """
-    serializer_class   = UserSerializer
+    serializer_class   = AdviserOptionSerializer
     permission_classes = [IsAuthenticated]
     pagination_class   = LargeResultsPagination  # advisers list is small; return them all at once
 
@@ -238,7 +259,6 @@ class LockUserView(APIView):
             return Response({"detail": "is_locked is required."}, status=400)
         user.is_locked = bool(is_locked)
         user.save(update_fields=["is_locked"])
-        action     = "locked" if user.is_locked else "unlocked"
         event_type = "ACCOUNT_LOCKED" if user.is_locked else "ACCOUNT_UNLOCKED"
 
         create_audit_event(
@@ -246,7 +266,8 @@ class LockUserView(APIView):
             metadata={"target_user": user.email},
         )
 
-        return Response({"detail": f"Account {action}.", "is_locked": user.is_locked})
+        detail     = "Account locked." if user.is_locked else "Account unlocked."
+        return Response({"detail": detail, "is_locked": user.is_locked})
 
 
 class LockedUsersView(generics.ListAPIView):

@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
@@ -88,7 +88,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
-        if self.action == "metadata_suggestions":
+        if self.action in ("metadata_suggestions", "related_research"):
             # The Publish dialog's prefill is the manuscript's own text, offered
             # to the person publishing it (IR-406; IR-374 spec Appendix D:
             # "the owner through visible_to(), with a 404 otherwise").
@@ -166,6 +166,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Record starts as draft — notification fires only when the owner calls /submit/
         self._queue_manuscript_extraction_if_present(serializer, record)
 
+    @transaction.atomic
     def update(self, request, *args, **kwargs):
         """
         An owner edits only a `draft`, or a record awaiting their revision
@@ -177,6 +178,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         from .versions import details_editable
 
+        record = self.get_object()
+        Record.objects.select_for_update().get(pk=record.pk)
         record = self.get_object()
         if not details_editable(record):
             return Response(
@@ -277,6 +280,7 @@ class RecordViewSet(viewsets.ModelViewSet):
     # how this action ended up unprotected despite looking otherwise. Real
     # enforcement is the "submit" branch in get_permissions().
     @action(detail=True, methods=["post"])
+    @transaction.atomic
     def submit(self, request, pk=None):
         """
         POST /records/<id>/submit/
@@ -292,6 +296,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         Revised work uses the dedicated resubmission action.
         """
         record = self.get_object()  # enforces IsRecordOwner object permission
+        Record.objects.select_for_update().get(pk=record.pk)
+        record = self.get_object()
 
         if record.pipeline_status != PipelineStatus.DRAFT:
             return Response(
@@ -308,6 +314,11 @@ class RecordViewSet(viewsets.ModelViewSet):
         if not record.adviser_id:
             return Response(
                 {"detail": "An adviser must be assigned before a record can be submitted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if record.derived_from_id and not record.abstract_file:
+            return Response(
+                {"abstract_file": "Upload the full manuscript before submitting this continuation."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if record.owners.filter(user_id=record.adviser_id).exists():
@@ -473,6 +484,29 @@ class RecordViewSet(viewsets.ModelViewSet):
             {"results": [record_card(m.record, m.score) for m in matches]}
         )
 
+    @action(detail=True, methods=["get"], url_path="related-research")
+    def related_research(self, request, pk=None):
+        """
+        GET /records/<id>/related-research/ -- the Novelty check (IR-312).
+
+        Published work close to this Proposal, shown to its owner as "Related
+        published research" (ADR-029 §2, amendment item 9), recomputed on
+        every request. **Owner-only**, through `get_queryset()`: anyone else
+        gets the same 404 as a missing record (IR-153). A record that is not a
+        Proposal, or has no vector yet, answers `checked: false`.
+        """
+        from apps.ai.presentation import record_card
+        from apps.ai.similarity import related_published_research
+
+        matches = related_published_research(self.get_object(), request.user)
+        # `checked` is False when no comparison ran -- not a Proposal, or not
+        # indexed yet -- so "nothing close" is never shown for an unchecked one.
+        return Response({
+            "checked": matches is not None,
+            "results": [record_card(m.record, m.score) for m in matches or []],
+            "threshold": settings.AI_NOVELTY_MIN_SIMILARITY,
+        })
+
     @action(detail=True, methods=["get"])
     def tracker(self, request, pk=None):
         """
@@ -484,6 +518,60 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews.tracker import tracker_payload
 
         return Response(tracker_payload(self.get_object(), request.user))
+
+    def _comment_response(self, act, success=status.HTTP_200_OK):
+        """
+        Run a review-discussion act and answer with its result (IR-419,
+        ADR-032 §7). 404 for a record or a discussion the caller may not see,
+        403 for one they read but may not act in, 400 for what cannot be done.
+        The 404 is `get_object()`'s own for a missing record, word for word: a
+        caller who sees the record must not learn it has a discussion (IR-153).
+        """
+        from apps.reviews import comments
+
+        try:
+            return Response(act(comments), status=success)
+        except comments.CommentNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except comments.CommentRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except comments.CommentError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["get", "post"], url_path="review-comments")
+    def review_comments(self, request, pk=None):
+        """
+        GET  /records/<id>/review-comments/ -- the review discussion, oldest first.
+        POST /records/<id>/review-comments/ `{"body": str, "reply_to"?: id}`
+
+        Read under `may_read_review`; written by the record's participants, on
+        a submitted record (`apps.reviews.comments`). A new comment answers 201.
+        """
+        record = self.get_object()
+        if request.method == "GET":
+            return self._comment_response(lambda c: c.readable_comments(record, request.user))
+        return self._comment_response(
+            lambda c: c.comment_payload(c.post_comment(
+                record, request.user,
+                body=request.data.get("body"), reply_to=request.data.get("reply_to"),
+            ), request.user),
+            success=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        detail=True, methods=["patch"],
+        url_path=r"review-comments/(?P<comment_id>[0-9]+)", url_name="review-comment",
+    )
+    def review_comment(self, request, pk=None, comment_id=None):
+        """
+        PATCH /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+
+        Its author edits a comment; a changed body stamps `edited_at`.
+        """
+        record = self.get_object()
+        return self._comment_response(lambda c: c.comment_payload(c.edit_comment(
+            record, request.user, int(comment_id), body=request.data.get("body"),
+        ), request.user))
 
     @action(detail=True, methods=["get"], url_path="metadata-suggestions")
     def metadata_suggestions(self, request, pk=None):
@@ -753,6 +841,38 @@ class RecordViewSet(viewsets.ModelViewSet):
         record.refresh_from_db()
         return Response(tracker_payload(record, request.user))
 
+    @action(detail=True, methods=["post"], url_path="continue-as")
+    def continue_as(self, request, pk=None):
+        """
+        POST /records/<id>/continue-as/  {"record_type": <id>}
+
+        An owner of an accepted Proposal starts its continuation: a new Thesis
+        or Project `draft` linked back to it (ADR-032 §6, IR-417). Answers 201
+        with the draft's detail, which Publish then opens. 404 for a record the
+        caller cannot see, 403 for one they do not own, 400 for a record or
+        type that cannot be continued, 409 once it already has been.
+        """
+        from .continuation import ContinuationRefused, continue_proposal
+        from .models import RecordType
+
+        proposal = self.get_object()
+        record_type = RecordType.objects.filter(pk=request.data.get("record_type")).first() \
+            if str(request.data.get("record_type", "")).isdigit() else None
+        if record_type is None:
+            return Response(
+                {"record_type": "Choose Thesis / Research or Project."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            child = continue_proposal(proposal, request.user, record_type)
+        except ContinuationRefused as exc:
+            return Response({"detail": exc.message}, status=exc.status_code)
+        child = self.get_queryset().get(pk=child.pk)
+        return Response(
+            RecordDetailSerializer(child, context=self.get_serializer_context()).data,
+            status=status.HTTP_201_CREATED,
+        )
+
     @action(detail=True, methods=["post"])
     def decide(self, request, pk=None):
         """
@@ -904,14 +1024,28 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         return Response({"years": list(years)})
 
-    @action(detail=False, methods=["get", "put"], url_path="interests")
+    @action(detail=False, methods=["get", "put", "delete"], url_path="interests")
     def interests(self, request):
-        """The signed-in reader's optional Classification and PSCED Areas."""
-        from .discovery import get_interests, put_interests
+        """The signed-in reader's optional Classification and PSCED Areas.
+        DELETE is "Reset my interests": Areas and Not interested both go (IR-576)."""
+        from .discovery import get_interests, put_interests, reset_interests
 
         if request.method == "PUT":
             return put_interests(request.user, request.data)
+        if request.method == "DELETE":
+            return reset_interests(request.user)
         return get_interests(request.user)
+
+    @action(detail=True, methods=["post", "delete"], url_path="not-interested")
+    def not_interested(self, request, pk=None):
+        """POST /records/<id>/not-interested/ hides it from the reader's For you;
+        DELETE is Undo (IR-576). Only a Record the reader can read is dismissed,
+        and undoing names nothing, so it answers 204 either way."""
+        from .discovery import dismiss, undo_dismissal
+
+        if request.method == "DELETE":
+            return undo_dismissal(request.user, pk)
+        return dismiss(request.user, self.get_object())
 
     @action(detail=False, methods=["get"], url_path="for-you")
     def for_you(self, request):
@@ -932,8 +1066,13 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         from apps.reviews.tracker import workflow_facts
 
+        from django.db.models import Exists, OuterRef
+
         qs = (
             Record.objects.filter(owners__user=request.user).distinct()
+            .annotate(has_continuation=Exists(
+                Record.objects.with_deleted().filter(derived_from_id=OuterRef("pk"))
+            ))
             .select_related("record_type", "adviser")
             .prefetch_related("authors")
             .order_by("-updated_at", "-pk")
@@ -955,8 +1094,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         Accepts a multipart upload with key "file" (.xls or .xlsx).
         Creates published records from each valid row and returns a plaintext log.
         Legacy imports bypass the review pipeline — staff is the implicit reviewer.
+
+        Rows are independent, and a row is saved whole or not at all: its
+        Record, primary owner and authors share one savepoint, so a failed
+        write leaves nothing of it behind (IR-637).
         """
-        from .models import Author
+        from django.db import transaction
+
+        from .models import Author, RecordOwner
         from .models import RecordType, Classification, PSCEDClassification
 
         file = request.FILES.get("file")
@@ -996,33 +1141,36 @@ class RecordViewSet(viewsets.ModelViewSet):
                     if row["psced_name"] else None
                 )
 
-                record = Record.objects.create(
-                    title                = row["title"],
-                    abstract             = row["abstract"],
-                    year_accomplished    = row["year_accomplished"],
-                    year_completed       = row["year_completed"],
-                    record_type          = record_type,
-                    classification       = classification,
-                    psced                = psced,
-                    is_ip                = row["is_ip"],
-                    for_commercialization= row["for_commercialization"],
-                    community_extension  = row["community_extension"],
-                    added_by             = request.user,
-                    pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
-                )
-
-                from .models import RecordOwner
-                RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
-
-                for author_name in row["authors"]:
-                    Author.objects.create(record=record, name=author_name)
-
-                log_lines.append(f"✓  Created: {record.title[:70]}")
-                created += 1
-
+                with transaction.atomic():
+                    record = Record.objects.create(
+                        title                = row["title"],
+                        origin               = row["origin"],
+                        publication_year     = row["publication_year"],
+                        abstract             = row["abstract"],
+                        year_accomplished    = row["year_accomplished"],
+                        year_completed       = row["year_completed"],
+                        record_type          = record_type,
+                        classification       = classification,
+                        psced                = psced,
+                        is_ip                = row["is_ip"],
+                        for_commercialization= row["for_commercialization"],
+                        community_extension  = row["community_extension"],
+                        added_by             = request.user,
+                        pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
+                    )
+                    RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
+                    for author_name in row["authors"]:
+                        Author.objects.create(record=record, name=author_name)
             except Exception as exc:
-                log_lines.append(f"✗  Failed:  {row['title'][:70]} — {exc}")
+                # One line, whatever the database said: its full text can run
+                # to several lines and name the schema.
+                reason = (str(exc).splitlines() or [type(exc).__name__])[0]
+                log_lines.append(f"✗  Row {row['row_num']}: not saved — {row['title'][:70]} — {reason}")
                 failed += 1
+                continue
+
+            log_lines.append(f"✓  Row {row['row_num']}: created — {record.title[:70]}")
+            created += 1
 
         log_lines.append(f"\n{'─' * 50}")
         log_lines.append(f"Done — {created} record(s) created, {failed} skipped.")
@@ -1064,8 +1212,10 @@ class RecordViewSet(viewsets.ModelViewSet):
             "For Commercialization",
             "Community Extension",
             "Authors",
+            "Origin",
+            "Publication Year",
         ]
-        WIDTHS = [55, 65, 18, 16, 22, 28, 36, 10, 22, 22, 45]
+        WIDTHS = [55, 65, 18, 16, 22, 28, 36, 10, 22, 22, 45, 24, 20]
 
         # ---- Header row styling --------------------------------------------
         header_font  = Font(bold=True, color="FFFFFF", size=11)
@@ -1099,6 +1249,8 @@ class RecordViewSet(viewsets.ModelViewSet):
             "FALSE",
             "FALSE",
             "Juan Dela Cruz, Maria Santos",
+            "unknown",
+            None,
         ])
 
         # ---- Notes row (light grey) ----------------------------------------
@@ -1116,6 +1268,8 @@ class RecordViewSet(viewsets.ModelViewSet):
             "TRUE or FALSE",
             "TRUE or FALSE",
             "Comma-separated names",
+            "unknown / institutional / imported_reference / synthetic",
+            "Optional; separate from completion year",
         ]
         ws.append(note_row)
         note_row_idx = ws.max_row

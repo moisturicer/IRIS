@@ -12,9 +12,11 @@ from .seat_views import (
     OpenReviewView,
     ReassignView,
     WithdrawView,
+    ExtendAssignmentView,
 )
 
 urlpatterns = [
+    path("assignments/<int:pk>/extend/", ExtendAssignmentView.as_view(), name="assignment-extend"),
     path("assignments/<int:pk>/claim/", ClaimView.as_view(), name="assignment-claim"),
     path("assignments/<int:pk>/assign/", AssignView.as_view(), name="assignment-assign"),
     path("assignments/<int:pk>/add-reviewer/", AddReviewerView.as_view(),

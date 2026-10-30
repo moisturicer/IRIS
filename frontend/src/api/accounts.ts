@@ -1,5 +1,5 @@
 import { apiClient } from "./client";
-import type { User, UserListItem, RoleRequest } from "@/types/auth";
+import type { AdviserOption, User, UserListItem, RoleRequest } from "@/types/auth";
 
 interface College    { id: number; name: string; code: string; }
 interface Department { id: number; name: string; code: string; college: number; college_name: string; }
@@ -22,7 +22,7 @@ export const accountsApi = {
 
   /** List all active Adviser-role users — usable by any authenticated user. */
   listAdvisers: () =>
-    apiClient.get<PaginatedResponse<User>>("/users/advisers/"),
+    apiClient.get<PaginatedResponse<AdviserOption>>("/users/advisers/"),
 
   /** Alias used by UserListPage -- same endpoint, narrower return type */
   userList:   (params?: Record<string, unknown>) =>
@@ -38,6 +38,10 @@ export const accountsApi = {
   /** Legacy alias -- role by numeric ID */
   changeRole: (id: number, role: number) =>
     apiClient.patch(`/users/${id}/role/`, { role }),
+
+  /** Grant or remove office-coordinator status (ADR-032 §4). RDCO only; refused for anyone without an office role. */
+  setCoordinator: (id: number, isCoordinator: boolean) =>
+    apiClient.patch<User>(`/users/${id}/coordinator/`, { is_office_coordinator: isCoordinator }),
 
   /** Lock or unlock a user account */
   setLocked:  (id: number, locked: boolean) =>

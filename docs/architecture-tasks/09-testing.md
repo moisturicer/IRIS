@@ -304,6 +304,8 @@ Merged; four assertions passing in CI.
 Automatically detect known-vulnerable dependencies and committed secrets, so neither reaches the deployed system unnoticed.
 
 ## Problem
+> **Status, 2026-10-29:** the dependency audit now exists and fails CI. `pip-audit` and `npm audit` run in the `security` job through `security/audit_gate.py`, with a reviewed, expiring allowlist (IR-613, PR #306; silent-pass paths closed in IR-633). The rest of this section describes the state when the task was written.
+
 There is no scanning of any kind — no dependency audit, no secret detection, no automated alerting. This matters more than usual here, because the codebase has already demonstrated both failure modes: credentials committed to version control, and a dependency list that drifted out of step with the code.
 
 ## Evidence
@@ -333,7 +335,7 @@ Three CI steps and two repository settings, running on every push.
 - GitHub secret scanning and push protection enabled
 
 ## Out of Scope
-SAST tooling (Bandit, Semgrep) — disproportionate at this budget, and noisy on a Django codebase without tuning. Container image scanning. Licence scanning. Penetration testing. These are Phase 2 if IRIS becomes a commercial product with paying institutional customers.
+SAST tooling (Bandit, Semgrep) — disproportionate at this budget, and noisy on a Django codebase without tuning. **Superseded 2026-10-29 by IR-614 (parent IR-611, systematic security testing):** bandit and semgrep now run in the `security` job through the same gate and allowlist, failing on high only; see [`../testing/TEST_PLAN.md`](../testing/TEST_PLAN.md) §Security gate. The noise concern is handled by gating on high and reporting the rest as an artifact. Container image scanning. Licence scanning. Penetration testing. These are Phase 2 if IRIS becomes a commercial product with paying institutional customers.
 
 ## Technical Approach
 Fail the build on **high and critical only**. Failing on every advisory produces noise that gets ignored within a week, which is worse than no scanning at all.
@@ -370,8 +372,8 @@ P2
 XS
 
 ## Acceptance Criteria
-- [ ] `pip-audit` runs in CI and fails the build on a high or critical advisory.
-- [ ] `npm audit --audit-level=high` runs in CI and fails on high or critical.
+- [x] `pip-audit` runs in CI and fails the build on a high or critical advisory. (IR-613)
+- [x] `npm audit` runs in CI and fails on high or critical. (IR-613; the gate decides, so `--audit-level` is not used)
 - [ ] A deliberately introduced vulnerable dependency fails the build (demonstrated, then reverted).
 - [ ] Dependabot is enabled for `pip` and `npm` and has opened at least one pull request or reported clean.
 - [ ] Secret scanning with push protection is enabled, **or** a documented alternative (`gitleaks`) runs in CI if unavailable on this repository's plan.

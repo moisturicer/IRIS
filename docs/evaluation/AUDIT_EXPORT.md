@@ -5,8 +5,7 @@ metrics are computed from `GET /api/v1/audit/` rows alone.
 **Owns.** The workflow event types and their metadata keys.
 **Does not own.** The metrics' definitions ([ADR-011](../adr/011-evaluation-framework.md)),
 the resubmission arms ([ADR-003](../adr/003-clearance-aware-resubmission.md),
-[ADR-004](../adr/004-restart-all-comparison-mode.md)), and the CSV column mapping (IR-529
-adds it here).
+[ADR-004](../adr/004-restart-all-comparison-mode.md)). The CSV column mapping is below.
 **Update when.** An event type or metadata key changes. The keys are fixed in
 `backend/apps/audit/workflow.py`; change that file and this one in the same PR.
 
@@ -52,6 +51,31 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 ## Event types
 
+### Research metadata corrections (IR-563, ADR-046)
+
+`RESEARCH_METADATA_CORRECTED` is an administrative metadata event, excluded from workflow metrics. The actor is the active superuser named by the correction command. Metadata contains `reason`, per-record `evidence`, and `before`/`after` objects with `origin`, nullable `publication_year`, and ordered `authors`. Corrections and audit rows share one transaction: failure rolls back the entire manifest. Dry runs produce no audit rows.
+
+### Assignment deadlines (IR-619, ADR-043)
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `ASSIGNMENT_EXTENDED` | A coordinator extends an assignment, or a completed document-request pause moves its deadline | `assignment`, `party`, `extension`, `previous_due_at`, `due_at` (ISO-8601 timestamps), `reason`, `system` (true for a pause) |
+| `ASSIGNMENT_ESCALATED` | The hourly job records the latest overdue escalation moment (IR-621) | `assignment`, `party`, `due_at` (ISO-8601), `step` (0 initially, incremented every five working days), `overdue_working_days`, `recipients` (visible coordinator user ids) |
+
+Escalations have no actor. Their audit row is mandatory and commits with the
+sent-moment ledger; an audit failure rolls back the moment so the next tick
+can retry. Recipients are the visibility-checked intended recipients;
+notification delivery remains best effort and failures are logged. An empty
+recipient list records a moment with no eligible coordinator. Escalation
+changes no workflow state, clearance or Seat.
+
+The actor is null on a system Extension. Its reason is deliberately recorded
+as the explanation for a changed deadline. Unlike IR-144's best-effort events,
+this event is mandatory: an insert failure rolls back both the Extension and
+the deadline movement. New-Version clock starts are not Extensions; the
+assignment keeps its original date for that clock and earlier Extensions as
+history. Existing assignments receive no backfilled date or event.
+
 ### Entering review and moving between parties
 
 | Type | Written when | `metadata` |
@@ -78,7 +102,7 @@ and a Proposal's accept write no `PUBLISHED`.
 |---|---|---|
 | `RESUBMISSION_REQUESTED` | A party asks the owners to revise the work | `party`, `request`, `reason`, `version` (the version it was made against) |
 | `REVISION_REQUEST_WITHDRAWN` | The request is withdrawn unanswered | `party`, `request`, `closed_by` (`requesting_party`, or `record_withdrawn` when the owner withdrew the record) |
-| `RESUBMITTED` | The owner submits a new version answering every open request | `version`, `policy` (`clearance_aware` or `restart_all`, the active ADR-004 arm), `requests` (the request ids it answered), `rereview_parties` (the parties that asked, who review the new version), `reset_parties` (the offices whose clearance the policy reset), `preserved_parties` (the offices whose `cleared` clearance it kept) |
+| `RESUBMITTED` | The owner submits a new version answering every open request | `version`, `policy` (`clearance_aware` or `restart_all`, the active ADR-004 arm), `requests` (the request ids it answered), `rereview_parties` (the parties that review the new version: those that asked, and under `restart_all` the offices it reopens, IR-632), `reset_parties` (the offices whose clearance the policy reset), `preserved_parties` (the offices whose `cleared` clearance it kept) |
 | `CLEARANCE_PRESERVED` | One row per office in `preserved_parties`, right after its `RESUBMITTED` | `party`, `version`, `policy` |
 
 ### Reviewer seats (ADR-032 §4)
@@ -91,7 +115,7 @@ Every seat event carries `party`, `assignment`, `seat`, `reviewer` (user id) and
 | `SEAT_ASSIGNED` | A coordinator seats a member | |
 | `SEAT_NOMINATED` | The router named the member when routing | |
 | `REVIEWER_ADDED` | A seat holder adds a colleague from their own office | |
-| `SEAT_REASSIGNED` | A coordinator moves a seat to another member; `seat` is the new one | `previous_seat`, `previous_reviewer` |
+| `SEAT_REASSIGNED` | A coordinator moves a seat to another member; `seat` is the new one | `previous_seat`, `previous_reviewer`, `reason` (required since IR-623; absent on earlier rows) |
 | `SEAT_WITHDRAWN` | A coordinator takes a seat away | |
 | `SEAT_OPENED` | The holder opens their review for the **first** time; a second open writes nothing | |
 
@@ -123,6 +147,55 @@ Every document-request event carries `party` (the **requesting** party), `reques
 
 ## Computing the metrics
 
+### CSV export (IR-529)
+
+The Audit Log's **Export CSV** downloads `GET /api/v1/audit/export/`. It is RDCO-only,
+read-only, and applies the same validated `event_type`, `record`, `user`, `from` and
+`to` filters as the list. Dates are inclusive in Django's configured timezone.
+Apply the screen's Filter button first: export uses the applied filters. It exports
+**all matching rows**, ignoring pagination, in insertion (`id`) order. The list is
+newest first, breaking timestamp ties by `id`. An empty export contains its header.
+
+Columns are fixed, in this exact order; missing scalar values are empty cells:
+
+| Column | Source |
+|---|---|
+| `created_at` | Row timestamp, ISO 8601 with offset |
+| `event_type` | Row type |
+| `actor_id` | Row `user_id`, retained even if the account was deleted |
+| `actor_role` | Existing account's **current** role name; blank for missing/no account or no role. Historical roles were not captured and are not inferred |
+| `record_id` | Row `record_id`, retained even if the Record was deleted |
+| `party` | `metadata.party` |
+| `from_party` | `metadata.from_party` |
+| `to_party` | `metadata.to_party` |
+| `outcome` | `metadata.outcome` |
+| `version` | `metadata.version` (version number) |
+| `policy` | `metadata.policy` |
+| `preserved_parties` | `metadata.preserved_parties`, JSON array when present |
+| `reset_parties` | `metadata.reset_parties`, JSON array when present |
+| `request_id` | `metadata.request` (singular); resubmission's plural `requests` stays in `metadata_json` |
+| `item_ids` | JSON array of each `metadata.items[].id`; `[]` if absent |
+| `reason` | `metadata.reason` |
+| `metadata_json` | Complete metadata as JSON, including `opened`, `final`, `how`, `rereview_parties`, item labels and other keys not given a dedicated column |
+
+CSV quoting preserves commas, double quotes, Unicode and embedded newlines. Text
+cells whose first non-whitespace character is `=`, `+`, `-` or `@` receive a leading
+apostrophe to prevent spreadsheet formula execution. `metadata_json` retains the
+original text without that display escape. Neither export nor display edits a row.
+
+The fixed columns deliberately omit `id`: keep CSV row order to replay history
+when timestamps tie. For metric recipes below, use `json.loads(row["metadata_json"])`
+as metadata, `actor_id` as the user, and iterate CSV rows in their existing order.
+`AuditCsvTests.test_exports_every_matching_row_and_workflow_metrics_without_pagination`
+demonstrates total turnaround of 7,200 seconds and one preserved clearance from CSV
+alone, including the final-decision flag in `metadata_json`. The existing workflow
+tests exercise per-party clocks across resubmissions using the same metadata.
+
+Exports are not completeness certificates: pre-deployment or failed inserts cannot
+be reconstructed. Keep unmatched start/stop events as incomplete observations;
+never impute a zero duration or invent an event. Check the backend error log before
+trusting metrics, and widen the date filter if a clock begins outside the export.
+
 Fetch every row for the record (`?record=<id>`, all pages) and sort by `id`.
 `apps/audit/tests/test_workflow_events.py::MetricsFromTheExportTests` does exactly this
 for one record's whole life, then checks each clock against the workflow tables.
@@ -131,7 +204,8 @@ for one record's whole life, then checks each clock against the workflow tables.
 
 A party's clock **starts** when it is handed work and **stops** when its assignment closes:
 
-- start: `SUBMITTED` (for `to_party`), or `ROUTED` with `opened` true (for `to_party`);
+- start: `SUBMITTED` (for `to_party`), or `ROUTED` with `opened` true (for `to_party`), or
+  `RESUBMITTED` (for each of `rereview_parties` with no clock running);
 - stop: `ASSIGNMENT_CLOSED` (for `party`).
 
 ```python
@@ -140,6 +214,9 @@ for row in sorted(rows, key=lambda r: r["id"]):
     m, at = row["metadata"], parse(row["created_at"])
     if row["event_type"] == "SUBMITTED" or (row["event_type"] == "ROUTED" and m["opened"]):
         started[m["to_party"]] = at
+    elif row["event_type"] == "RESUBMITTED":
+        for party in m["rereview_parties"]:
+            started.setdefault(party, at)
     elif row["event_type"] == "ASSIGNMENT_CLOSED":
         turnaround.append((m["party"], m["how"], at - started.pop(m["party"])))
 ```
@@ -148,17 +225,20 @@ A party routed to again after it finished gets a second clock. Exclude `how ==
 "withdrawn"` and `"closed_by_decision"` when measuring how long a party took to finish:
 those turns were ended, not completed.
 
-**A revision does not stop the clock, so `RESUBMITTED` starts none.** IR-144's card says a
-clock also starts at `RESUBMITTED` for `reset_parties`. That rule was not built, deliberately:
+**A revision does not stop the clock, so `RESUBMITTED` restarts none.** IR-144's card says a
+clock also starts at `RESUBMITTED` for `reset_parties`. That rule was not built as written:
 
-- under `clearance_aware`, every reset party is a party that asked, and a party with an
-  open revision request cannot complete, so its clock is still running and restarting it
-  would erase the time before the request;
-- under `restart_all`, the other reset offices' assignments stay completed and nobody is
-  handed work (`new_version.py`: seats and assignments do not read the policy), so there is
-  no clock to start.
+- a party that asked has an open revision request and cannot complete, so its clock is
+  still running, and restarting it would erase the time before the request. `setdefault`
+  leaves it alone;
+- under `restart_all`, an office that had completed is reopened and reviews the new
+  version (ADR-032 §5, IR-632 amendment). It is in `rereview_parties` with no clock
+  running, so `RESUBMITTED` starts its second clock. Under `clearance_aware` no such
+  office exists, so the rule starts nothing there;
+- a reset office still reviewing is not in `rereview_parties` unless it asked; its first
+  clock simply keeps running.
 
-Instead, the author's share of a party's clock is
+The author's share of a requesting party's clock is
 `RESUBMITTED.created_at - RESUBMISSION_REQUESTED.created_at` for each party in
 `rereview_parties`; subtract it to get the reviewer-side time.
 

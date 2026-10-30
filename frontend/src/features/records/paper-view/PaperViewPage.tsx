@@ -4,19 +4,31 @@ import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
 import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useUIStore } from "@/store/ui.store";
 import { cn, formatDate } from "@/lib/utils";
-import { citedPage, followedFromPaperChat, type CitationNavigationState } from "@/lib/citedPage";
+import {
+  answerReference,
+  citedPage,
+  followedFromPaperChat,
+  hasCitationQuote,
+  landedAsPageContext,
+  trustedCitation,
+  type AnswerReturn,
+} from "@/lib/citedPage";
+import { conversationPath } from "@/lib/askHandoff";
 import type { RecordDetail, IpType } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { Region, SemanticSearchResult } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
+import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
+import { ContinueProposal } from "../ContinueProposal";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
@@ -52,6 +64,10 @@ import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
 import { ReadingHeader } from "./ReadingHeader";
+import { SubmissionStatus } from "./SubmissionStatus";
+import { useFragmentFocus } from "./useFragmentFocus";
+import { useCitationReference, type CitationResolution } from "./useCitationReference";
+import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
@@ -321,12 +337,48 @@ export default function PaperViewPage() {
   const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
   /** Bumped when a document request changes, so the tracker reloads. */
   const [trackerVersion, setTrackerVersion] = useState(0);
+  // A My Library link names the request it answers as `#fragment` (IR-625).
+  useFragmentFocus(location.hash, record != null);
 
   // A citation links here with `?page=` (IR-284), so acting on it lands on
   // the page that supports the claim rather than the paper's first. The
   // rules for reading that number live in `lib/citedPage`, testable without
   // standing up this screen.
-  const openAtPage = citedPage(searchParams.get("page"));
+  //
+  // The answer it was followed from rides in the address as ids (IR-578).
+  // A citation this page load carried is used as it is; any other -- after a
+  // reload, from a restored tab -- is re-resolved through the reader's own
+  // Conversation, and the page it reads now wins over the address's.
+  const reference = answerReference(searchParams);
+  const carried = trustedCitation(location.state, reference);
+  const resolution = useCitationReference(carried ? null : reference, id ? Number(id) : null);
+  const resolvedPage =
+    resolution.status === "passage" ? resolution.citation.page
+      : resolution.status === "changed" ? resolution.page
+        : null;
+  const openAtPage = resolvedPage ?? citedPage(searchParams.get("page"));
+  // The reader lands once per navigation, so it waits for the re-read: a
+  // landing on the address's page would not move again to the page it reads now.
+  const landingPage = resolution.status === "loading" ? null : openAtPage;
+  // Back to answer (IR-578): Ask IRIS's lives at its address; Paper Chat's is
+  // this page's panel, opened on that conversation.
+  const [chatReturn, setChatReturn] = useState<AnswerReturn | null>(null);
+  const backToAnswer =
+    reference && resolution.status !== "gone" && resolution.status !== "loading"
+      ? () => {
+          if (reference.from === "ask") {
+            navigate(`${conversationPath(reference.conversationId)}?turn=${reference.turnId}`);
+            return;
+          }
+          chat.setOpen(true);
+          chat.setMinimized(false);
+          setChatReturn((last) => ({
+            conversationId: reference.conversationId,
+            turnId: reference.turnId,
+            key: (last?.key ?? 0) + 1,
+          }));
+        }
+      : undefined;
 
   // What counts as arriving. A change of section or of the Edit details
   // dialog rewrites the URL, which gives the location a new key, but nobody
@@ -588,13 +640,7 @@ export default function PaperViewPage() {
 
   const editOpen = searchParams.get("edit") === "details" && can.has("edit_details") && !arriving;
 
-  const primaryOwner = record.owners.find((o) => o.is_primary) ?? record.owners[0];
-  const authorNames =
-    record.authors.length > 0
-      ? record.authors.map((a) => a.name)
-      : primaryOwner?.full_name
-        ? [primaryOwner.full_name]
-        : [];
+  const authorNames = record.authors.map((a) => a.name.trim()).filter(Boolean);
 
   // A citation carries the exact chunk it points at as router `state`
   // (IR-335), so the reader draws its highlight with no second fetch. A
@@ -602,7 +648,9 @@ export default function PaperViewPage() {
   // bookmark -- carries no state, and the reader still opens at `openAtPage`
   // with nothing to highlight, which is the same graceful case a passage
   // with no recovered regions already is.
-  const navCitation = (location.state as CitationNavigationState | null)?.citation;
+  const navCitation = carried ?? (resolution.status === "passage" ? resolution.citation : null);
+  // The Overview cites a page as a whole: only that page is marked (IR-578).
+  const pageContext = landedAsPageContext(searchParams, location.state);
   // One Ask IRIS everywhere (IR-569): a column or drawer in the Paper
   // workspace, a column beside the page on the other sections. The Review section has none
   // (spec §4.6): the panel stays mounted there, only hidden.
@@ -638,9 +686,14 @@ export default function PaperViewPage() {
   // A citation's regions and page are the current paper's (ADR-031), so an
   // earlier version opens at its start with nothing highlighted.
   const highlightRegions: Region[] =
-    !viewedVersion && navCitation && navCitation.record_id === record.id && "regions" in navCitation
-      ? navCitation.regions
+    !viewedVersion && navCitation && navCitation.record_id === record.id && hasCitationQuote(navCitation)
+      ? pageContext
+        ? navCitation.regions.filter((region) => region.page === navCitation.page)
+        : navCitation.regions
       : [];
+  const landingNotice = viewedVersion
+    ? null
+    : citationLandingNotice(resolution, pageContext, openAtPage, highlightRegions.length > 0);
   // The one reader (IR-352), for the Paper tab and the Review section alike:
   // a citation lands the same way in either (IR-354).
   const reader = () => (
@@ -674,11 +727,16 @@ export default function PaperViewPage() {
       )}
       </div>
       )}
+      {landingNotice && (
+        <p role="status" className={cn("text-small text-stone-600", onPaperTab ? "px-4 pt-3" : "mb-3")}>
+          {landingNotice}
+        </p>
+      )}
       <Suspense fallback={<Skeleton rows={8} label="Loading the reader…" />}>
         <PaperPdfReader
           recordId={record.id}
           version={viewedVersion?.number ?? null}
-          scrollToPage={viewedVersion ? null : openAtPage}
+          scrollToPage={viewedVersion ? null : landingPage}
           highlightRegions={highlightRegions}
           navKey={arrivalKey.current}
           contained={onPaperTab || tier === "wide"}
@@ -777,6 +835,7 @@ export default function PaperViewPage() {
         tabId={tabId}
         panelId={arriving ? undefined : `${tabsId}-panel`}
         onBack={() => navigate(-1)}
+        onBackToAnswer={backToAnswer}
         title={!onPaperTab ? undefined : arriving ? null : record.title}
         version={onPaperTab ? paperVersion : undefined}
       />
@@ -868,7 +927,7 @@ export default function PaperViewPage() {
               {/* Byline: authors, then adviser, college and year (spec §4.6).
                   No adviser line when the record names none (IR-472). */}
               <div className="space-y-2">
-                {authorNames.length > 0 && (
+                {authorNames.length > 0 ? (
                   <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
                     {authorNames.map((name) => (
                       <li
@@ -882,17 +941,28 @@ export default function PaperViewPage() {
                       </li>
                     ))}
                   </ul>
-                )}
+                ) : <p className="text-sm text-stone-500 italic">Authors not recorded</p>}
+                <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
                   {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
-                  <span>Cebu Institute of Technology – University</span>
-                  {record.year_accomplished && <span>{record.year_accomplished}</span>}
+                  {record.origin === "institutional" && <span>Cebu Institute of Technology – University</span>}
+                  {record.publication_year && <span>Published {record.publication_year}</span>}
+                  {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
                 </div>
               </div>
 
-              {/* Slots: lineage ("Developed from Proposal #123 →", IR-417)
-                  renders here once the payload carries it -- never an empty
-                  or made-up state (spec §4.11). The version picker (IR-416)
+              {record.lineage?.derived_from && (
+                <Link to={`/records/${record.lineage.derived_from.id}`} className="text-small underline">
+                  Developed from Proposal #{record.lineage.derived_from.id} — View proposal
+                </Link>
+              )}
+              {record.lineage?.continued_as && (
+                <Link to={`/records/${record.lineage.continued_as.id}`} className="text-small underline">
+                  Continued as {record.lineage.continued_as.record_type_name} #{record.lineage.continued_as.id}
+                </Link>
+              )}
+              {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
+              {/* The version picker (IR-416)
                   only with two or more versions to choose between, or one
                   beside the owner's unsubmitted revision (IR-273). */}
               {(versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1)) && (
@@ -983,11 +1053,14 @@ export default function PaperViewPage() {
               <>
                 {/* Action required (spec §4.10): what is waiting on the
                     owner comes first. */}
+                {record.submitter_status && <SubmissionStatus status={record.submitter_status} />}
                 {/* Revision requests are answered through Submit new version. */}
                 {userIsOwner && record.revision.open.length > 0 && (
                   <section
+                    id={WAITING_TARGET.revision}
+                    tabIndex={-1}
                     aria-labelledby="revision-requested-heading"
-                    className="rounded-2xl border border-brand-200 bg-brand-50 p-4"
+                    className="rounded-2xl border border-brand-200 bg-brand-50 p-4 scroll-mt-20 focus:outline-none"
                   >
                     <h2
                       id="revision-requested-heading"
@@ -1071,6 +1144,7 @@ export default function PaperViewPage() {
 
                 {userIsOwner && (
                   <ActionRequiredPanel
+                    id={WAITING_TARGET.document}
                     recordId={record.id}
                     onChanged={handleDocumentRequestChanged}
                   />
@@ -1113,6 +1187,12 @@ export default function PaperViewPage() {
                     currentIpType={record.ip_type}
                     onSaved={(updated) => setRecord(updated)}
                   />
+                )}
+
+                {/* The Novelty check (IR-312): the owner's own Proposal only,
+                    per ADR-029's 2026-09-26 amendment, item 9. */}
+                {userIsOwner && record.record_type_name === "Proposal" && (
+                  <RelatedPublishedResearch recordId={record.id} />
                 )}
 
                 <SimilarPapers recordId={record.id} />
@@ -1246,6 +1326,7 @@ export default function PaperViewPage() {
           minimized={chatMinimized}
           onRestore={() => chat.setMinimized(false)}
           viewingVersion={viewedVersion?.number ?? null}
+          returnTo={chatReturn}
           className={chatPanelClass}
         />
       )}
@@ -1257,4 +1338,36 @@ export default function PaperViewPage() {
       </div>
     </div>
   );
+}
+
+/**
+ * What a reader is told about where a citation landed, when it is not
+ * simply the passage, highlighted (IR-578). Every case says what is and is
+ * not marked, so nothing reads as a guess.
+ */
+function citationLandingNotice(
+  resolution: CitationResolution,
+  pageContext: boolean,
+  page: number | null,
+  marked: boolean,
+): string | null {
+  switch (resolution.status) {
+    case "changed":
+      // The stored page is from when the answer was written; the paper may
+      // have changed since, so it is offered as that, not as the passage.
+      return page != null
+        ? `The passage this answer quoted has changed since, so nothing is highlighted. Page ${page} is where it was when the answer was written.`
+        : "The passage this answer quoted has changed since, so nothing is highlighted.";
+    case "missing":
+      return "That citation is no longer part of the answer, so nothing is highlighted.";
+    case "elsewhere":
+      return "That citation points at another paper, so nothing is highlighted here.";
+    case "gone":
+      return "The answer this citation came from is no longer available, so nothing is highlighted.";
+    default:
+      if (!pageContext || page == null) return null;
+      return marked
+        ? `Page context: the Overview drew on page ${page} as a whole, so only page ${page} is marked.`
+        : `Page context: the Overview drew on page ${page} as a whole.`;
+  }
 }

@@ -33,6 +33,7 @@
  */
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { importedReference } from "@/test/fixtures/importedReference";
 import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -48,6 +49,7 @@ import { seatsApi } from "@/api/reviews";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
+import { citationNavigationState } from "@/lib/citedPage";
 
 const RECORD_ID = 7;
 const PAPER_URL = "https://iris.test/media/manuscripts/thesis.pdf";
@@ -107,6 +109,7 @@ const record: RecordDetail = {
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
   versions: null,
   manuscript_unsubmitted: false,
+  submitter_status: null,
 };
 
 /** An approved Proposal, for the Mark-as-completed tests. */
@@ -163,6 +166,7 @@ const approvedProposal: RecordDetail = {
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
   versions: null,
   manuscript_unsubmitted: false,
+  submitter_status: null,
 };
 
 /** Which record `recordsApi.detail` resolves with. Reset per describe block,
@@ -180,6 +184,9 @@ vi.mock("@/api/records", () => ({
     detail:           vi.fn(() => Promise.resolve({ data: shownRecord })),
     incrementAccess:  vi.fn(() => Promise.resolve({ data: {} })),
     similar:          vi.fn(() => Promise.resolve({ data: { results: [] } })),
+    // The Novelty check loads itself; its behaviour is
+    // `RelatedPublishedResearch.test.tsx`'s. Here only its placement is.
+    relatedResearch:  vi.fn(() => Promise.resolve({ data: { checked: true, results: [], threshold: 0.7 } })),
     // The tracker panel loads itself; it has its own test file (IR-258).
     tracker:          vi.fn(() => Promise.reject(new Error("not under test"))),
     // The Action required panel loads itself; its behaviour is tested in
@@ -223,6 +230,8 @@ vi.mock("@/api/ai", () => ({
     conversations: {
       findForRecord: vi.fn(() => new Promise(() => {})),
       create:        vi.fn(() => Promise.resolve({ data: { id: 50, turns: [] } })),
+      // A citation re-resolved from its address after a reload (IR-578).
+      get:           vi.fn(() => Promise.reject(new Error("not under test"))),
     },
     // A follow-up asked from Paper Chat (IR-355); nothing else here asks.
     askStream:     vi.fn(),
@@ -368,6 +377,31 @@ describe("Mark as completed is retired", () => {
 });
 
 const OWNER_ID = 40;
+
+describe("Proposal lineage", () => {
+  beforeEach(() => {
+    shownRecord = { ...approvedProposal, capabilities: ["continue_as"], lineage: {
+      derived_from: null, continued_as: { id: 456, title: "Full thesis", record_type_name: "Thesis / Research" },
+    } };
+  });
+
+  it("renders the supplied child link and continuation actions", async () => {
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+    expect(await screen.findByRole("link", { name: "Continued as Thesis / Research #456" })).toHaveAttribute("href", "/records/456");
+    expect(screen.getByRole("button", { name: "Continue as Thesis" })).toBeInTheDocument();
+  });
+
+  it("links a child back to its Proposal and hides actions when not offered", async () => {
+    shownRecord = { ...record, capabilities: [], lineage: {
+      derived_from: { id: 123, title: "Proposal", record_type_name: "Proposal" }, continued_as: null,
+    } };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+    expect(await screen.findByRole("link", { name: "Developed from Proposal #123 — View proposal" })).toHaveAttribute("href", "/records/123");
+    expect(screen.queryByRole("button", { name: "Continue as Thesis" })).not.toBeInTheDocument();
+  });
+});
 const OPEN_REVIEW = { name: "Open review" } as const;
 const RESUBMIT = { name: "Resubmit for review" } as const;
 
@@ -391,6 +425,7 @@ const inReview: RecordDetail = {
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
   versions: null,
   manuscript_unsubmitted: false,
+  submitter_status: null,
 };
 
 /**
@@ -671,6 +706,123 @@ describe("document requests (IR-262)", () => {
 
     await waitForRecord(inReview.title);
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
+  });
+});
+
+describe("related published research (IR-312)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const ownProposal: RecordDetail = {
+    ...inReview, record_type_name: "Proposal", record_type: "Proposal",
+  };
+  const heading = { name: "Related published research" };
+
+  it("is shown to the owner of a Proposal", async () => {
+    shownRecord = ownProposal;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", heading)).toBeInTheDocument();
+    expect(vi.mocked(recordsApi.relatedResearch)).toHaveBeenCalledWith(RECORD_ID);
+  });
+
+  it("is not shown, or asked for, by anyone who does not own the Proposal", async () => {
+    shownRecord = ownProposal;
+    signInAs(99, "Adviser");
+    renderPaperView();
+
+    await waitForRecord(ownProposal.title);
+    expect(screen.queryByRole("heading", heading)).not.toBeInTheDocument();
+    expect(vi.mocked(recordsApi.relatedResearch)).not.toHaveBeenCalled();
+  });
+
+  it("is not shown on a record that is not a Proposal, even to its owner", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("heading", heading)).not.toBeInTheDocument();
+    expect(vi.mocked(recordsApi.relatedResearch)).not.toHaveBeenCalled();
+  });
+});
+
+describe("the submitter's own status (IR-625)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  const openRequest = {
+    id: 1, party: "adviser", label: "Adviser", state: "open", state_label: "Open",
+    message: "The signed form, please.", requested_by: null,
+    created_at: "2026-09-20T02:00:00Z", closed_at: null, can_manage: false,
+    items: [],
+  };
+
+  const waitingOwner: RecordDetail = {
+    ...inReview,
+    workflow_state: "awaiting_resubmission",
+    workflow_state_label: "Awaiting resubmission",
+    submitter_status: {
+      line: "Revision requested by IERC: action needed",
+      waiting_on_you: [
+        { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" },
+        { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" },
+      ],
+      history: [
+        {
+          number: 1, cause_label: "Submission", submitted_at: "2026-09-01T02:00:00Z",
+          decisions: [
+            { party: "adviser", label: "Adviser", verdict: "approved", verdict_label: "Approved" },
+            { party: "ierc", label: "IERC", verdict: "declined", verdict_label: "Revision requested" },
+          ],
+        },
+        { number: 2, cause_label: "Revision", submitted_at: "2026-09-15T02:00:00Z", decisions: [] },
+      ],
+    },
+  };
+
+  it("tells the owner where the record is, what waits on them, and each version's history", async () => {
+    shownRecord = waitingOwner;
+    signInAs(OWNER_ID, "Student");
+    const { container } = renderPaperView();
+
+    const panel = await screen.findByRole("region", { name: "Your submission" });
+    expect(panel).toHaveTextContent("Revision requested by IERC: action needed");
+
+    const waiting = within(panel).getByRole("region", { name: "Waiting on you" });
+    expect(within(waiting).getByRole("link", { name: "Submit a new version (Revision requested by IERC)" }))
+      .toHaveAttribute("href", "#revision-requested");
+    expect(within(waiting).getByRole("link", { name: "Upload the documents (Documents requested by Adviser)" }))
+      .toHaveAttribute("href", "#documents-requested");
+
+    const versions = within(within(panel).getByRole("list", { name: "Version history" })).getAllByRole("listitem");
+    expect(versions).toHaveLength(2);
+    expect(versions[0]).toHaveTextContent("v1 · Submission");
+    expect(versions[0]).toHaveTextContent("Adviser: Approved · IERC: Revision requested");
+    expect(versions[1]).toHaveTextContent("No decision yet");
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows nothing of the kind to anyone the server sends none", async () => {
+    shownRecord = { ...waitingOwner, submitter_status: null };
+    signInAs(99, "Student");
+    renderPaperView();
+
+    await waitForRecord(inReview.title);
+    expect(screen.queryByRole("region", { name: "Your submission" })).not.toBeInTheDocument();
+  });
+
+  it("lands on the request a My Library link named, once it has loaded", async () => {
+    documentRequests.mockResolvedValueOnce({ data: [openRequest] });
+    shownRecord = waitingOwner;
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=overview#documents-requested`);
+
+    const panel = await screen.findByRole("region", { name: "Action required" });
+    await waitFor(() => expect(panel).toHaveFocus());
   });
 });
 
@@ -1258,6 +1410,11 @@ describe("following a citation to another paper (IR-355)", () => {
     vi.mocked(aiApi.conversations.findForRecord).mockImplementation(
       ((id: number) => Promise.resolve(conversations[id])) as never,
     );
+    // The atomic first-send POST returns the same default as the GET (IR-561),
+    // including when the panel remains pinned to X on Y's page.
+    vi.mocked(aiApi.conversations.create).mockImplementation(
+      ((body: { record: number }) => Promise.resolve({ data: conversations[body.record] })) as never,
+    );
     vi.mocked(aiApi.askStream).mockReset();
     vi.mocked(aiApi.askStream).mockImplementation((async function* () {
       yield {
@@ -1271,6 +1428,14 @@ describe("following a citation to another paper (IR-355)", () => {
     }) as never);
   });
 
+  beforeEach(async () => {
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.conversations.get).mockImplementation(((id: number) => {
+      const found = Object.values(conversations).find((c) => (c as { id: number }).id === id);
+      return found ? Promise.resolve({ data: found }) : Promise.reject({ response: { status: 404 } });
+    }) as never);
+  });
+
   afterEach(async () => {
     heldBack = null;
     vi.unstubAllGlobals();
@@ -1278,6 +1443,9 @@ describe("following a citation to another paper (IR-355)", () => {
     vi.mocked(recordsApi.detail).mockImplementation((() => Promise.resolve({ data: shownRecord })) as never);
     const { aiApi } = await import("@/api/ai");
     vi.mocked(aiApi.conversations.findForRecord).mockImplementation(() => new Promise(() => {}));
+    vi.mocked(aiApi.conversations.create).mockImplementation(
+      (() => Promise.resolve({ data: { id: 50, turns: [] } })) as never,
+    );
   });
 
   async function conversationsOpened(): Promise<number[]> {
@@ -1335,6 +1503,33 @@ describe("following a citation to another paper (IR-355)", () => {
     await screen.findByRole("heading", { level: 1, name: other.title });
     return view;
   }
+
+  // IR-578: the way back rides in the address, as ids.
+  it("links each Paper Chat citation to its conversation and answer", async () => {
+    await openChatOnX();
+
+    expect(within(panel()).getByRole("link", TO_OTHER)).toHaveAttribute(
+      "href",
+      `/records/${OTHER_ID}?page=3&conversation=42&turn=1&cite=1&from=paper`,
+    );
+  });
+
+  it("goes back to the Paper Chat answer from the header, after a reload, on the other paper", async () => {
+    // A reload of Y keeps the address and loses the panel that followed it.
+    renderPaper(`/records/${OTHER_ID}?page=3&conversation=42&turn=1&cite=1&from=paper`);
+    await screen.findByRole("heading", { level: 1, name: other.title });
+    const opened = await screen.findByRole("complementary", { name: "Ask IRIS" });
+    // Nothing is pinned on arrival (IR-355): Y's own conversation shows.
+    expect(await within(opened).findByText(QUESTION_ON_Y)).toBeInTheDocument();
+    // The passage is re-read through X's conversation, and still highlighted.
+    expect(await screen.findByText(/open at page 3, 1 region\(s\)/i)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to answer" }));
+
+    expect(await within(panel()).findByText(/Gauge density matters/)).toBeInTheDocument();
+    expect(within(panel()).getByText(PINNED_HEADER)).toHaveTextContent(`Chatting about ${record.title}`);
+    expect(within(panel()).queryByText(QUESTION_ON_Y)).not.toBeInTheDocument();
+  });
 
   it("shows Y's paper at the cited passage while the panel keeps X's conversation", async () => {
     await followToOtherPaper();
@@ -1722,6 +1917,7 @@ describe("the Review section (IR-412)", () => {
     routing_recorded_from: null,
     reviews: [],
     versions: [],
+    review_comments: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],
@@ -1781,6 +1977,21 @@ describe("the Review section (IR-412)", () => {
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("toolbar", { name: "Review actions" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
+  });
+
+  it("gives the review discussion's composer only where the server offers comment_review", async () => {
+    shownRecord = { ...inReview, is_participant: true, capabilities: ["cite", "comment_review"] };
+    signInAs(OWNER_ID, "Student");
+    const { unmount } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.getByRole("textbox", { name: "Comment" })).toBeInTheDocument();
+    unmount();
+
+    shownRecord = inReview;
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.queryByRole("textbox", { name: "Comment" })).not.toBeInTheDocument();
   });
 
   it("requests documents from the bar and re-reads the timeline after", async () => {
@@ -2037,6 +2248,30 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.getAllByText("Applied Research").length).toBeGreaterThan(0);
   });
 
+  it("never credits the submitting owner as an unrecorded author", async () => {
+    shownRecord = { ...record, authors: [], origin: "imported_reference", owners: [
+      { id: 1, user: 99, email: "loader@cit.edu", full_name: "Corpus Loader", is_primary: true },
+    ] };
+    renderPaperView();
+    await waitForRecord(record.title);
+    expect(screen.getByText("Authors not recorded")).toHaveClass("italic", "text-stone-500");
+    expect(screen.queryByRole("list", { name: "Authors" })).not.toBeInTheDocument();
+    expect(screen.getByText("Imported reference")).toBeInTheDocument();
+  });
+
+  it("shows a verified external reference without attributing it to CIT-U", async () => {
+    shownRecord = { ...record, ...importedReference, year_accomplished: 2020 };
+    renderPaperView();
+    await waitForRecord(importedReference.title);
+    const authors = screen.getByRole("list", { name: "Authors" });
+    expect(within(authors).getAllByRole("listitem")).toHaveLength(8);
+    expect(within(authors).getByText("Ashish Vaswani")).toBeInTheDocument();
+    expect(screen.getByText("Published 2017")).toBeInTheDocument();
+    expect(screen.getByText("Completed 2020")).toBeInTheDocument();
+    expect(screen.getByText("Imported reference")).toBeInTheDocument();
+    expect(screen.queryByText("Cebu Institute of Technology – University")).not.toBeInTheDocument();
+  });
+
   it("holds governance and documents in Record details, beside the page", async () => {
     renderPaperView();
     await waitForRecord(record.title);
@@ -2076,5 +2311,197 @@ describe("the section tabs (IR-569)", () => {
     expect(thumb.style.transform).toBe("translateX(100%)");
     // Half the track less its padding, as the browser normalises it.
     expect(thumb.style.width).toMatch(/^calc\((0\.5 \* \(100% - 4px\)|\(100% - 4px\) \/ 2)\)$/);
+  });
+});
+
+describe("back to the answer after following a citation (IR-578)", () => {
+  const CONVERSATION = 12;
+  const TURN = 88;
+  /** The passage as it reads now: page 14, running onto 15. */
+  const current = {
+    marker: 1,
+    chunk_id: 31,
+    record_id: RECORD_ID,
+    record_title: record.title,
+    page: 14,
+    text: "the network reduced mean absolute error by twelve per cent",
+    context_path: [record.title, "Results"],
+    regions: [
+      { page: 14, left: 0.1, top: 0.8, right: 0.9, bottom: 0.95 },
+      { page: 15, left: 0.1, top: 0.05, right: 0.9, bottom: 0.1 },
+    ],
+  };
+  const ADDRESS = `/records/${RECORD_ID}?page=12&conversation=${CONVERSATION}&turn=${TURN}&cite=1`;
+
+  function answeredWith(citations: unknown[]) {
+    return {
+      data: {
+        id: CONVERSATION, title: "Flood prediction", record: null, record_title: null, turn_count: 1,
+        created_at: "2026-10-20T00:00:00.000Z", updated_at: "2026-10-20T00:00:00.000Z",
+        turns: [{
+          id: TURN, question: "How accurate is it?", resolved_question: null,
+          answer: "Twelve per cent better [1].", message: null, state: "generative",
+          degraded: false, widened: false, created_at: "2026-10-20T00:00:00.000Z", citations,
+        }],
+      },
+    };
+  }
+
+  async function conversationReads(result: () => Promise<unknown>) {
+    const { aiApi } = await import("@/api/ai");
+    vi.mocked(aiApi.conversations.get).mockReset();
+    vi.mocked(aiApi.conversations.get).mockImplementation(result as never);
+    return vi.mocked(aiApi.conversations.get);
+  }
+
+  function renderWithAskIris(route: string) {
+    function Where() {
+      const location = useLocation();
+      return <p>Ask IRIS at {location.pathname + location.search}</p>;
+    }
+    return renderScreen(
+      <Routes>
+        <Route path="/records/:id" element={<PaperViewPage />} />
+        <Route path="/ai/conversations/:conversationId" element={<Where />} />
+      </Routes>,
+      { route },
+    );
+  }
+
+  beforeEach(() => {
+    shownRecord = record;
+    signInAs(99, "Student");
+  });
+
+  it("re-reads the citation through the reader's own conversation after a reload", async () => {
+    const get = await conversationReads(() => Promise.resolve(answeredWith([current])));
+
+    renderPaper(ADDRESS);
+
+    // The page it reads now wins over the one the address was written with,
+    // and a passage over two pages keeps both.
+    expect(await screen.findByText(/open at page 14, 2 region\(s\)/i)).toBeInTheDocument();
+    expect(get).toHaveBeenCalledWith(CONVERSATION);
+  });
+
+  it("lands only once the citation is re-read, on the page it reads now", async () => {
+    let answer: (value: unknown) => void = () => {};
+    await conversationReads(() => new Promise((resolve) => { answer = resolve; }));
+
+    renderPaper(ADDRESS);
+
+    // The Paper section opens at once; the reader waits rather than landing
+    // on page 12 and staying there when the re-read says 14.
+    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
+    expect(await screen.findByText(/open at page none, 0 region\(s\)/i)).toBeInTheDocument();
+    await act(async () => answer(answeredWith([current])));
+    expect(await screen.findByText(/open at page 14, 2 region\(s\)/i)).toBeInTheDocument();
+  });
+
+  it("does not trust the router state a reload kept", async () => {
+    await conversationReads(() => Promise.resolve(answeredWith([current])));
+    const stale = {
+      citation: { ...current, page: 12, regions: [{ page: 12, left: 0, top: 0, right: 1, bottom: 1 }] },
+      answer: { conversationId: CONVERSATION, turnId: TURN, load: "an earlier page load" },
+    };
+
+    renderPaper(ADDRESS, stale);
+
+    expect(await screen.findByText(/open at page 14, 2 region\(s\)/i)).toBeInTheDocument();
+  });
+
+  it("needs no fetch for a citation followed in this page load", async () => {
+    const get = await conversationReads(() => Promise.resolve(answeredWith([current])));
+
+    renderPaper(
+      `/records/${RECORD_ID}?page=14&conversation=${CONVERSATION}&turn=${TURN}&cite=1`,
+      citationNavigationState(current, null, { conversationId: CONVERSATION, turnId: TURN }),
+    );
+
+    expect(await screen.findByText(/open at page 14, 2 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to answer" })).toBeInTheDocument();
+    expect(get).not.toHaveBeenCalled();
+  });
+
+  it("lands a re-chunked passage on its page, highlights nothing, and says so", async () => {
+    await conversationReads(() =>
+      Promise.resolve(answeredWith([{ marker: 1, record_id: RECORD_ID, chunk_id: 31, page: 9 }])),
+    );
+
+    renderPaper(ADDRESS);
+
+    expect(await screen.findByText(/open at page 9, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "The passage this answer quoted has changed since, so nothing is highlighted. Page 9 is where it was when the answer was written.",
+    );
+  });
+
+  it("highlights nothing from a citation into another paper", async () => {
+    await conversationReads(() => Promise.resolve(answeredWith([{ ...current, record_id: 8 }])));
+
+    renderPaper(ADDRESS);
+
+    expect(await screen.findByRole("status")).toHaveTextContent("That citation points at another paper, so nothing is highlighted here.");
+    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+  });
+
+  it("highlights nothing from a citation the answer no longer has", async () => {
+    await conversationReads(() => Promise.resolve(answeredWith([])));
+
+    renderPaper(ADDRESS);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/no longer part of the answer/);
+    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Back to answer" })).toBeInTheDocument();
+  });
+
+  it("offers no way back into a conversation that is not the reader's", async () => {
+    // Someone else's reads exactly like a missing one (IR-548).
+    await conversationReads(() => Promise.reject({ response: { status: 404 } }));
+
+    renderPaper(ADDRESS);
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/answer this citation came from is no longer available/);
+    expect(screen.getByText(/open at page 12, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back to answer" })).not.toBeInTheDocument();
+  });
+
+  it("goes back to the Ask IRIS answer from the reading header", async () => {
+    await conversationReads(() => Promise.resolve(answeredWith([current])));
+    renderWithAskIris(ADDRESS);
+    await screen.findByText(/open at page 14/i);
+
+    await userEvent.click(screen.getByRole("button", { name: "Back to answer" }));
+
+    expect(await screen.findByText(`Ask IRIS at /ai/conversations/${CONVERSATION}?turn=${TURN}`)).toBeInTheDocument();
+  });
+
+  it("offers no way back on a paper reached without an answer", async () => {
+    renderPaper(`/records/${RECORD_ID}?page=12`);
+
+    await screen.findByText(/open at page 12/i);
+    expect(screen.queryByRole("button", { name: "Back to answer" })).not.toBeInTheDocument();
+  });
+
+  it("marks only the stated page of an Overview citation, and calls it page context", async () => {
+    // A page citation gathers every chunk on the page, one of which runs over.
+    renderPaper(`/records/${RECORD_ID}?page=14&context=page`, citationNavigationState(current, "overview"));
+
+    expect(await screen.findByText(/open at page 14, 1 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Page context: the Overview drew on page 14 as a whole, so only page 14 is marked.",
+    );
+  });
+
+  it("still lands an Overview page as page context after a reload, marking nothing it cannot recheck", async () => {
+    // A reload keeps router state; an Overview page cannot be re-read from
+    // its address, so the kept highlight is dropped, and the note says only
+    // what is true.
+    const kept = { citation: current, origin: "overview", load: "an earlier page load" };
+
+    renderPaper(`/records/${RECORD_ID}?page=14&context=page`, kept);
+
+    expect(await screen.findByText(/open at page 14, 0 region\(s\)/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent("Page context: the Overview drew on page 14 as a whole.");
   });
 });

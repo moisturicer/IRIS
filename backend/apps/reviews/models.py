@@ -152,6 +152,12 @@ class RecordAssignment(models.Model):
     )
     closed_at = models.DateTimeField(null=True, blank=True)
     reason    = models.TextField(blank=True)
+    # ADR-043: old assignments deliberately stay undated. Configuration is
+    # sampled once at opening, never on an ordinary save.
+    due_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    original_due_at = models.DateTimeField(null=True, blank=True)
+    clock_started_at = models.DateTimeField(null=True, blank=True)
+    document_pause_started_at = models.DateTimeField(null=True, blank=True)
     #: The Decision that closed this assignment: the decider's own, which
     #: completed, or another party's, which it withdrew (ADR-021 §12, IR-270).
     #: Null for anything closed another way.
@@ -181,8 +187,90 @@ class RecordAssignment(models.Model):
             ),
         ]
 
+    def save(self, *args, **kwargs):
+        if self._state.adding and self.state == AssignmentState.ACTIVE:
+            from .deadlines import start_clock
+
+            start_clock(self, self.opened_at)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Record {self.record_id} | {self.party} | {self.state}"
+
+
+class Turnaround(models.Model):
+    """Institution-entered working days; absence means no clock (ADR-043 §2)."""
+
+    party = models.CharField(max_length=20, choices=[
+        (p.value, p.label) for p in Party if p not in RETIRED_PARTIES
+    ], unique=True)
+    working_days = models.PositiveIntegerField()
+
+    def __str__(self):
+        return f"{self.get_party_display()}: {self.working_days} working days"
+
+
+class Holiday(models.Model):
+    date = models.DateField(unique=True)
+    name = models.CharField(max_length=200)
+
+    class Meta:
+        ordering = ["date"]
+
+    def __str__(self):
+        return f"{self.date}: {self.name}"
+
+
+class Extension(models.Model):
+    """Append-only history of a manual or document-pause date movement."""
+
+    assignment = models.ForeignKey(RecordAssignment, on_delete=models.CASCADE,
+                                   related_name="extensions")
+    previous_due_at = models.DateTimeField()
+    due_at = models.DateTimeField()
+    reason = models.TextField()
+    system = models.BooleanField(default=False)
+    actor = models.ForeignKey("accounts.User", on_delete=models.SET_NULL,
+                              null=True, blank=True)
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        constraints = [models.CheckConstraint(
+            condition=models.Q(due_at__gt=models.F("previous_due_at")),
+            name="extension_moves_deadline_later",
+        )]
+
+
+class DeadlineMoment(models.Model):
+    """
+    A reminder or escalation already sent for one due date (ADR-043 §8).
+
+    The unique constraint is the idempotency: a re-run, a missed tick or two
+    beat instances insert the same row, and only one insert wins. A new due
+    date is a new key, which is how an Extension or a pause re-arms every
+    moment. `step` counts the repeat escalations every 5 working days (§7);
+    it is 0 for both reminders.
+    """
+
+    class Kind(models.TextChoices):
+        DUE_SOON = "due_soon", "Due in 2 working days"
+        DUE_TODAY = "due_today", "Due today"
+        ESCALATION = "escalation", "Overdue escalation"
+
+    assignment = models.ForeignKey(RecordAssignment, on_delete=models.CASCADE,
+                                   related_name="deadline_moments")
+    due_at = models.DateTimeField()
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    step = models.PositiveIntegerField(default=0)
+    sent_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["sent_at", "pk"]
+        constraints = [models.UniqueConstraint(
+            fields=["assignment", "due_at", "kind", "step"],
+            name="one_deadline_moment_per_due_date",
+        )]
 
 
 class ReviewerSeat(models.Model):
@@ -229,6 +317,13 @@ class ReviewerSeat(models.Model):
         "reviews.Review", on_delete=models.RESTRICT,
         null=True, blank=True, related_name="closed_seats",
     )
+    #: The seat a coordinator's *Reassign* moved this one from, and why
+    #: (IR-623). Blank on every seat that was not reassigned.
+    reassigned_from = models.ForeignKey(
+        "self", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="reassigned_to",
+    )
+    reason      = models.TextField(blank=True, default="")
 
     class Meta:
         ordering = ["assignment", "assigned_at", "pk"]
@@ -332,18 +427,43 @@ class ResubmissionRequest(models.Model):
         return f"Record {self.record_id} | {self.party} | {self.state}"
 
 
-class RecordAuthPin(models.Model):
+class ReviewComment(models.Model):
     """
-    A one-time PIN emailed to a user to grant temporary access to a protected record.
-    PINs expire 24 hours after generation and can only be used once.
+    One message in a record's review discussion (ADR-032 §7, IR-419).
+
+    Private to the review: read under `may_read_review`, written by the
+    record's participants, and never shown in public discussion, which is a
+    separate model. Shown in the review timeline, which is derived from rows
+    like this one rather than copied into an event table.
     """
-    record     = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="auth_pins")
-    user       = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="auth_pins")
-    email      = models.EmailField()
-    pin        = models.CharField(max_length=6)
-    is_used    = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    expires_at = models.DateTimeField(null=True, blank=True)
+
+    record     = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="review_comments"
+    )
+    #: `SET_NULL`: the discussion outlives an account that is removed.
+    author     = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="review_comments",
+    )
+    body       = models.TextField()
+    #: The record's latest Version when the comment was written. Null on a
+    #: record with no version yet: no "v1" is invented (spec §4.11).
+    version    = models.ForeignKey(
+        "records.RecordVersion", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="review_comments",
+    )
+    #: The comment this one answers. Always a top-level comment on the same
+    #: record: a reply to a reply joins its thread (`apps.reviews.comments`).
+    reply_to   = models.ForeignKey(
+        "self", on_delete=models.CASCADE, null=True, blank=True, related_name="replies",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+    #: Stamped by an edit that changed the body; null until then.
+    edited_at  = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["record", "created_at", "pk"]
+        indexes  = [models.Index(fields=["record", "created_at"])]
 
     def __str__(self):
-        return f"Pin for record {self.record_id} user {self.user_id}"
+        return f"Record {self.record_id} | comment {self.pk} by {self.author_id}"

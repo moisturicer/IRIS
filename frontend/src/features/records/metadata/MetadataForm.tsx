@@ -20,7 +20,7 @@ import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/field
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
-import type { User } from "@/types/auth";
+import type { AdviserOption } from "@/types/auth";
 import type { Classification, PSCEDClassification } from "@/types/records";
 
 import { AdviserCombobox } from "./AdviserCombobox";
@@ -33,7 +33,11 @@ export const METADATA_FIELD_IDS: Record<keyof MetadataValues, string> = {
   abstract: "metadata-abstract",
   adviser: "metadata-adviser",
   authors: "metadata-author-input",
+  keywords: "metadata-keywords",
+  owner_emails: "metadata-owner-emails",
   year: "metadata-year",
+  origin: "metadata-origin",
+  publication_year: "metadata-publication-year",
   classification: "metadata-classification",
   psced: "metadata-psced",
   is_ip: "metadata-is-ip",
@@ -43,7 +47,7 @@ export const METADATA_FIELD_IDS: Record<keyof MetadataValues, string> = {
 
 /** The order fields appear in, which is the order focus should try them. */
 export const METADATA_FIELD_ORDER: Array<keyof MetadataValues> = [
-  "title", "abstract", "adviser", "authors", "year", "classification", "psced",
+  "title", "abstract", "adviser", "authors", "keywords", "owner_emails", "year", "origin", "publication_year", "classification", "psced",
 ];
 
 /** Fields that live inside More details, which must be open to be focused. */
@@ -57,7 +61,11 @@ export const FORM_FIELD: Record<string, keyof MetadataValues> = {
   abstract: "abstract",
   adviser: "adviser",
   authors: "authors",
+  keywords: "keywords",
+  owner_emails: "owner_emails",
   year_accomplished: "year",
+  origin: "origin",
+  publication_year: "publication_year",
   classification: "classification",
   psced: "psced",
 };
@@ -74,12 +82,13 @@ export function focusFirstInvalid(errors: FieldErrors<MetadataValues>, openMore:
 }
 
 interface MetadataFormProps {
-  advisers:        User[];
+  advisers:        AdviserOption[];
   classifications: Classification[];
   psceds:          PSCEDClassification[];
   /** Who is signed in, so they can be shown but not chosen as adviser. */
   selfId:          number | null;
   loadError?:      boolean;
+  loadErrorMessage?: string | null;
   /** More details is controlled, so a summary's "Edit hints" can open it. */
   moreOpen:        boolean;
   onMoreOpenChange: (open: boolean) => void;
@@ -88,6 +97,11 @@ interface MetadataFormProps {
    * (IR-507): they are shown, not edited, and the caller does not send them.
    */
   submitted?:      boolean;
+  /**
+   * Shown under the title and abstract. Publish puts its prefill here
+   * (IR-409); the form itself knows nothing of where a suggestion came from.
+   */
+  fieldNotes?:     Partial<Record<Extract<keyof MetadataValues, "title" | "abstract">, ReactNode>>;
 }
 
 const MAX_ABSTRACT = 5000;
@@ -98,9 +112,11 @@ export function MetadataForm({
   psceds,
   selfId,
   loadError = false,
+  loadErrorMessage,
   moreOpen,
   onMoreOpenChange,
   submitted = false,
+  fieldNotes,
 }: MetadataFormProps) {
   const {
     register,
@@ -139,7 +155,7 @@ export function MetadataForm({
       {loadError && (
         <p className={LOAD_ERROR} role="alert">
           <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-          We couldn't load the adviser and classification lists. Close this and try again.
+          {loadErrorMessage ?? "We couldn't load the adviser and classification lists. Close this and try again."}
         </p>
       )}
 
@@ -151,7 +167,23 @@ export function MetadataForm({
           aria-describedby={describedBy("title")}
           className={fieldClasses(Boolean(errors.title))}
         />
+        {fieldNotes?.title}
       </Field>
+
+      <Field label="Keywords" htmlFor={ids.keywords} error={errors.keywords?.message} errorId={errorId("keywords")}>
+        <input id={ids.keywords} {...register("keywords")}
+          aria-invalid={Boolean(errors.keywords)} aria-describedby={describedBy("keywords", "keywords-hint")}
+          className={fieldClasses(Boolean(errors.keywords))} />
+        <p id="keywords-hint" className="text-small text-stone-600">Separate keywords with commas.</p>
+      </Field>
+      {!submitted && (
+        <Field label="Owner emails" htmlFor={ids.owner_emails} error={errors.owner_emails?.message} errorId={errorId("owner_emails")}>
+          <input id={ids.owner_emails} {...register("owner_emails")}
+            aria-invalid={Boolean(errors.owner_emails)} aria-describedby={describedBy("owner_emails", "owner-emails-hint")}
+            className={fieldClasses(Boolean(errors.owner_emails))} />
+          <p id="owner-emails-hint" className="text-small text-stone-600">Existing account emails, separated by commas. Include yourself and exclude the Adviser.</p>
+        </Field>
+      )}
 
       <div>
         <div className="flex items-baseline justify-between gap-3">
@@ -172,6 +204,7 @@ export function MetadataForm({
           className={cn(fieldClasses(Boolean(errors.abstract)), "resize-y")}
         />
         {errors.abstract && <FieldError id={errorId("abstract")}>{errors.abstract.message}</FieldError>}
+        {fieldNotes?.abstract}
       </div>
 
       <div className="grid gap-section-sm sm:grid-cols-[minmax(0,1fr)_9rem]">
@@ -215,7 +248,7 @@ export function MetadataForm({
         </div>
         )}
 
-        <Field label="Year" htmlFor={ids.year} required error={errors.year?.message} errorId={errorId("year")}>
+        <Field label="Year (completed)" htmlFor={ids.year} required error={errors.year?.message} errorId={errorId("year")}>
           <input
             id={ids.year}
             type="number"
@@ -225,6 +258,22 @@ export function MetadataForm({
             aria-describedby={describedBy("year")}
             className={fieldClasses(Boolean(errors.year))}
           />
+        </Field>
+        <Field label="Research origin" htmlFor={ids.origin} error={errors.origin?.message} errorId={errorId("origin")}>
+          <select id={ids.origin} {...register("origin")} className={fieldClasses(Boolean(errors.origin))}
+            aria-invalid={Boolean(errors.origin) || undefined} aria-describedby={describedBy("origin")}>
+            <option value="unknown">Unknown</option>
+            <option value="institutional">Institutional (CIT-U research)</option>
+            <option value="imported_reference">Imported reference</option>
+            <option value="synthetic">Synthetic (demonstration or test)</option>
+          </select>
+        </Field>
+        <Field label="Publication year" htmlFor={ids.publication_year} error={errors.publication_year?.message} errorId={errorId("publication_year")}>
+          <input id={ids.publication_year} type="number" inputMode="numeric" min={1} max={9999}
+            {...register("publication_year", { setValueAs: (value) => value == null || value === "" ? null : Number(value) })}
+            aria-invalid={Boolean(errors.publication_year) || undefined} aria-describedby={describedBy("publication_year")}
+            className={fieldClasses(Boolean(errors.publication_year))} />
+          <p className="mt-1 text-small text-stone-600">Leave blank if not recorded. This is separate from the completion year.</p>
         </Field>
       </div>
 

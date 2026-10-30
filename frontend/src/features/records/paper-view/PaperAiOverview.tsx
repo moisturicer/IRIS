@@ -4,6 +4,7 @@ import type { RecordOverviewResponse } from "@/types/ai";
 import type { RecordDetail } from "@/types/records";
 import { AskIrisMark, SynthesisIcon } from "@/features/ai/components/AskIrisIcons";
 import { CitationText } from "@/features/ai/components/CitationText";
+import { CitationOriginContext } from "@/lib/citedPage";
 import { OVERVIEW_MARKDOWN } from "@/features/ai/components/answerLayout";
 import { DegradedNotice } from "@/features/ai/components/PassageQuote";
 import { cn } from "@/lib/utils";
@@ -201,12 +202,15 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
 
       {!loading && !failed && state === "ready" && overview && (
         <>
-          <CitationText
-            text={overview.text}
-            citations={overview.citations}
-            pageMarkers
-            className={OVERVIEW_MARKDOWN}
-          />
+          {/* Its citations are whole pages, and land as such (IR-578). */}
+          <CitationOriginContext.Provider value="overview">
+            <CitationText
+              text={overview.text}
+              citations={overview.citations}
+              pageMarkers
+              className={OVERVIEW_MARKDOWN}
+            />
+          </CitationOriginContext.Provider>
 
           {overview.degraded && <DegradedNotice subject="summary" />}
 

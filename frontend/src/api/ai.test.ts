@@ -1,8 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { aiApi } from "./ai";
 
-const { post, get } = vi.hoisted(() => ({ post: vi.fn(), get: vi.fn() }));
-vi.mock("./client", () => ({ apiClient: { post, get } }));
+const { post, get, refreshSession } = vi.hoisted(() => ({
+  post: vi.fn(), get: vi.fn(), refreshSession: vi.fn(),
+}));
+vi.mock("./client", () => ({ apiClient: { post, get }, refreshSession }));
 describe("starting a conversation (IR-548)", () => {
   // The server answers POST with the summary shape, which has no `turns`.
   const created = {
@@ -15,7 +17,7 @@ describe("starting a conversation (IR-548)", () => {
 
     const { data } = await aiApi.conversations.create({ record: 5 });
 
-    expect(post).toHaveBeenCalledWith("/ai/conversations/", { record: 5 });
+    expect(post).toHaveBeenCalledWith("/ai/conversations/", { record: 5 }, { headers: { "X-IRIS-Protocol": "public-1" } });
     expect(data).toEqual({ ...created, turns: [], latest_run: null });
   });
 
@@ -26,7 +28,7 @@ describe("finding a Record's conversation (IR-569)", () => {
     get.mockResolvedValue({ data: [] });
 
     expect(await aiApi.conversations.findForRecord(5)).toBeNull();
-    expect(get).toHaveBeenCalledWith("/ai/conversations/", { params: { record: 5 } });
+    expect(get).toHaveBeenCalledWith("/ai/conversations/", { params: { record: 5, default: true } });
     expect(post).not.toHaveBeenCalled();
   });
 
@@ -48,7 +50,7 @@ describe("the public reader protocol (IR-596)", () => {
     aiApi.ask("Original question", { conversationId: 42, widen: true });
     expect(post).toHaveBeenCalledWith(
       "/ai/ask/",
-      { question: "Original question", top_k: 5, conversation_id: 42, widen: true },
+      { question: "Original question", top_k: 5, conversation_id: 42, widen: true, request_id: expect.any(String) },
       { headers: PROTOCOL },
     );
   });
@@ -63,7 +65,7 @@ describe("the public reader protocol (IR-596)", () => {
     }
     expect(fetchMock.mock.calls[0][1].headers).toMatchObject(PROTOCOL);
     expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({
-      question: "Original question", top_k: 5, conversation_id: 42, widen: false,
+      question: "Original question", top_k: 5, conversation_id: 42, widen: false, request_id: expect.any(String),
     });
   });
 
@@ -126,5 +128,59 @@ describe("comparison paper limits", () => {
   it("does not fetch comparison configuration for an ordinary question", () => {
     aiApi.ask("What is this about?");
     expect(get).not.toHaveBeenCalled();
+  });
+});
+
+describe("a stream's session (IR-634)", () => {
+  const done = () => new Response("event: done\ndata: {}\n\n");
+  const refused = () => new Response(JSON.stringify({ detail: "Session expired.", code: "session_idle" }), { status: 401 });
+  const drain = async (stream: AsyncGenerator<unknown>) => { for await (const _ of stream) { /* read it all */ } };
+
+  it("reports how long the user has been idle", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(done());
+    vi.stubGlobal("fetch", fetchMock);
+    await drain(aiApi.resumeAskRun("run-1", 0));
+    expect(fetchMock.mock.calls[0][1].headers).toHaveProperty("X-IRIS-Idle-Seconds");
+  });
+
+  it("refreshes once on a 401 and retries with the new token", async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(refused()).mockResolvedValueOnce(done());
+    vi.stubGlobal("fetch", fetchMock);
+    refreshSession.mockResolvedValue("fresh");
+
+    await drain(aiApi.askStream("Question"));
+
+    expect(refreshSession).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][1].headers.Authorization).toBe("Bearer fresh");
+    expect(fetchMock.mock.calls[1][1].body).toBe(fetchMock.mock.calls[0][1].body);
+  });
+
+  it("does not retry when the session is over, and fails the stream", async () => {
+    // refreshSession has already logged out and redirected by the time it answers null.
+    const fetchMock = vi.fn().mockResolvedValue(refused());
+    vi.stubGlobal("fetch", fetchMock);
+    refreshSession.mockResolvedValue(null);
+
+    await expect(drain(aiApi.askStream("Question"))).rejects.toThrow("Session expired.");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not refresh for any other failure", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response("{}", { status: 503 })));
+    await expect(drain(aiApi.askStream("Question"))).rejects.toThrow("IRIS could not answer right now.");
+    expect(refreshSession).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ["{}", { "Retry-After": "841" }, "Too many requests — try again in about 15 minutes."],
+    [JSON.stringify({ detail: "Request was throttled. Expected available in 30 seconds." }), {}, "Too many requests — try again in about 30 seconds."],
+    ["upstream busy", {}, "Too many requests — try again later."],
+  ])("preserves a stream's rate-limit response for its caller", async (body, headers, message) => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(body, { status: 429, headers })));
+    await expect(drain(aiApi.askStream("Question"))).rejects.toMatchObject({
+      message, response: { status: 429 },
+    });
+    expect(refreshSession).not.toHaveBeenCalled();
   });
 });

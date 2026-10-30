@@ -2,10 +2,10 @@ import { apiClient } from "./client";
 import type {
   RecordListItem, RecordDetail, RecordFormData, MyResearchItem,
   Classification, PSCEDClassification, RecordType,
-  DownloadRequest, DeleteRequest, RecordTracker,
+  DownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
-  DiscoverInterests, ForYouPage,
+  DiscoverInterests, ForYouPage, MetadataSuggestions,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
@@ -28,6 +28,10 @@ export const recordsApi = {
     apiClient.put<DiscoverInterests>("/records/interests/", body),
   forYou:         (cursor?: string, params?: Record<string, unknown>) =>
     apiClient.get<ForYouPage>("/records/for-you/", { params: { ...params, ...(cursor ? { cursor } : {}) } }),
+  // For you feedback, owned by the signed-in account (IR-576).
+  notInterested:  (id: number) => apiClient.post(`/records/${id}/not-interested/`),
+  undoNotInterested: (id: number) => apiClient.delete(`/records/${id}/not-interested/`),
+  resetInterests: () => apiClient.delete<DiscoverInterests>("/records/interests/"),
 
   // My Library's *My research* list -- a plain array, not paginated, of
   // the narrow rows `MyResearchSerializer` returns (IR-410).
@@ -35,12 +39,23 @@ export const recordsApi = {
     apiClient.get<MyResearchItem[]>("/records/mine/", { params }),
 
   detail:         (id: number) => apiClient.get<RecordDetail>(`/records/${id}/`),
+  continueAs: (id: number, recordType: number) =>
+    apiClient.post<RecordDetail>(`/records/${id}/continue-as/`, { record_type: recordType }),
   /**
    * Related institutional works. The backend reuses the Ask IRIS retrieval
    * service, so this returns the retrieval shape (RetrievedSource.as_dict()),
    * not a RecordListItem.
    */
   tracker:        (id: number) => apiClient.get<RecordTracker>(`/records/${id}/tracker/`),
+  /**
+   * A participant comments in the review discussion, or replies to a comment
+   * (ADR-032 §7, IR-419). The timeline reads it back from the tracker.
+   */
+  postReviewComment: (id: number, body: { body: string; reply_to?: number }) =>
+    apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
+  /** Its author edits a comment; a changed body is marked edited. */
+  editReviewComment: (id: number, commentId: number, body: { body: string }) =>
+    apiClient.patch<ReviewComment>(`/records/${id}/review-comments/${commentId}/`, body),
 
   /** Document requests on a record, oldest first (ADR-022 §5, IR-262). */
   documentRequests: (id: number) =>
@@ -98,6 +113,22 @@ export const recordsApi = {
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),
   similar:        (id: number) =>
     apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
+  /**
+   * The manuscript's own title and abstract, read from its Docling structure
+   * (IR-406), for the Publish dialog's prefill (IR-409). Owner-only; anyone
+   * else gets a 404. No model and no vendor call, so polling it is free.
+   */
+  metadataSuggestions: (id: number) =>
+    apiClient.get<MetadataSuggestions>(`/records/${id}/metadata-suggestions/`),
+  /**
+   * The Novelty check (IR-312): published work close to this Proposal.
+   * Owner-only; anyone else gets a 404. `checked` is false when no comparison
+   * ran (not indexed yet); `threshold` is the similarity a match had to reach.
+   */
+  relatedResearch: (id: number) =>
+    apiClient.get<{ checked: boolean; results: SemanticSearchResult[]; threshold: number }>(
+      `/records/${id}/related-research/`,
+    ),
   create:         (data: RecordFormData) => apiClient.post<RecordDetail>("/records/", data),
   update:         (id: number, data: Partial<RecordFormData>) => apiClient.patch<RecordDetail>(`/records/${id}/`, data),
   /**

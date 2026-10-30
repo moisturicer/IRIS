@@ -77,13 +77,28 @@ beforeEach(() => {
   // stub is here so a regression fails an assertion rather than throwing.
   Element.prototype.scrollIntoView = vi.fn();
   findForRecord.mockResolvedValue(conversation());
-  create.mockResolvedValue({ data: conversation({ id: 43 }) });
+  create.mockResolvedValue({ data: conversation() });
   askStream.mockImplementation(() => doneStreamOf());
 });
 
 describe("Paper Chat opens or continues a Conversation scoped to the Record", () => {
+  it("puts the throttled message in the announced transcript", async () => {
+    askStream.mockImplementation(async function* () {
+      yield await Promise.reject({ response: { status: 429, data: { detail: "Request was throttled. Expected available in 61 seconds." } } });
+    });
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+    const input = await screen.findByRole("textbox", { name: /ask about this paper/i });
+    await waitFor(() => expect(input).toBeEnabled());
+    await userEvent.type(input, "What datasets were used?");
+    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+    const transcript = screen.getByRole("log", { name: "Paper chat messages" });
+    expect(await within(transcript).findByText("Too many requests — try again in about 2 minutes.")).toBeInTheDocument();
+    expect(transcript).toHaveAttribute("aria-live", "polite");
+  });
+
   it("opens on no Conversation, and starts one scoped to the Record only with the first question (IR-569)", async () => {
     findForRecord.mockResolvedValue(null);
+    create.mockResolvedValue({ data: conversation({ id: 43 }) });
     renderScreen(
       <PaperChatPanel record={record} onClose={noop} />,
     );
@@ -96,7 +111,7 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
     await userEvent.click(screen.getByRole("button", { name: /send/i }));
 
     await waitFor(() => expect(askStream).toHaveBeenCalled());
-    expect(create).toHaveBeenCalledWith({ record: record.id });
+    expect(create).toHaveBeenCalledWith({ record: record.id, reuse_default: true });
     expect(askStream.mock.calls[0][1]).toMatchObject({ conversationId: 43 });
   });
 
@@ -154,6 +169,28 @@ describe("Paper Chat opens or continues a Conversation scoped to the Record", ()
     await waitFor(() => expect(askStream).toHaveBeenCalled());
     const [, options] = askStream.mock.calls[0];
     expect(options).toMatchObject({ conversationId: 42, widen: false });
+    expect(options.requestId).toMatch(/^[0-9a-f-]{36}$/);
+  });
+
+  it("repeated empty opens create nothing, and concurrent first sends reuse the server default (IR-561)", async () => {
+    findForRecord.mockResolvedValue(null);
+    const first = renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+    await screen.findByRole("group", { name: /suggested questions/i });
+    first.unmount();
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+    await screen.findByRole("group", { name: /suggested questions/i });
+    expect(create).not.toHaveBeenCalled();
+    create.mockResolvedValue({ data: conversation({ id: 43, turns: [{
+      id: 10, question: "A question from another tab", answer: "The existing answer.",
+      message: null, state: "generative", degraded: false, widened: false,
+      created_at: "2026-09-20T00:00:00.000Z", citations: [], resolved_question: null,
+    }] }) });
+    await userEvent.type(screen.getByRole("textbox", { name: /ask about this paper/i }), "A follow-up");
+    await userEvent.dblClick(screen.getByRole("button", { name: /send/i }));
+    expect(await screen.findByText("The existing answer.")).toBeInTheDocument();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(create).toHaveBeenCalledWith({ record: record.id, reuse_default: true });
+    expect(askStream).toHaveBeenCalledTimes(1);
   });
 });
 

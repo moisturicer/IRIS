@@ -176,7 +176,26 @@ jobs:
         # because the run reported no per-test timing at all. A suite that
         # cannot say which test was slow cannot be fixed from its own
         # evidence.
-        run: pytest -ra --durations=25
+        run: pytest -ra --durations=25 --junitxml=pytest-results.xml
+
+      - name: Report authorization matrix duration
+        if: always()
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import xml.etree.ElementTree as ET
+          report = Path("pytest-results.xml")
+          if report.exists():
+              cases = [case for case in ET.parse(report).iter("testcase")
+                       if case.get("classname", "").startswith((
+                           "apps.tests.test_access_matrix", "apps.ai.tests.test_access_matrix_bodies"))]
+              seconds = sum(float(case.get("time", "0")) for case in cases)
+              line = f"Authorization matrix: {len(cases)} tests, {seconds:.3f}s (JUnit test durations, including setup/teardown)."
+              print(line)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
+                  summary.write(line + "\n")
+          PY
 
   frontend:
     name: Frontend
@@ -272,6 +291,23 @@ jobs:
       - name: Build the backend image
         run: docker compose -f docker-compose.yml build backend
 
+      # IR-620: beat's only job is ADR-043's hourly deadline task. Booting it
+      # proves the service starts and loads that entry; validating the file
+      # alone would not. --no-deps skips db and migrate, which beat does not
+      # touch until a worker runs the task. The secret is the same throwaway
+      # the Backend job uses. `timeout` ends the run, so its exit code is not
+      # the verdict: the two greps are.
+      - name: Boot celery-beat and see its schedule
+        run: |
+          docker compose -f docker-compose.yml up -d redis
+          docker compose -f docker-compose.yml run --rm --no-deps \
+            -e SECRET_KEY=ci-only-not-a-real-secret \
+            celery-beat sh -c 'timeout 30 celery -A config beat -l debug --schedule=/tmp/celerybeat-schedule' \
+            > beat.log 2>&1 || true
+          cat beat.log
+          grep -q 'beat: Starting' beat.log
+          grep -q 'deadline-notifications apps.reviews.tasks.send_deadline_notifications' beat.log
+
   security:
     name: Security
     runs-on: ubuntu-latest
@@ -290,11 +326,75 @@ jobs:
         with:
           python-version: '3.11'
 
+      # IR-613: the audits used to end in `|| true`, so a critical CVE left the
+      # job green. Now each tool writes JSON and security/audit_gate.py decides:
+      # high/critical fails unless security/allowlist.yml accepts it, and an
+      # expired allowlist entry fails on its own. Tools are pinned so a new
+      # release cannot change what the gate means.
+      - name: Install the audit gate
+        run: pip install pip-audit==2.10.1 bandit==1.9.4 semgrep==1.180.0 pyyaml==6.0.2 pytest==8.3.5
+
+      - name: Audit gate self-test
+        run: python -m pytest security/tests -q -p no:cacheprovider
+
+      # production.txt starts with `-r base.txt`, so this one run covers both
+      # files the ticket names. Each tool exits non-zero when it finds anything
+      # at all; that is expected, and the gate reads the report. A run that
+      # produced no report (resolver or network failure) fails here instead.
       - name: Dependency audit (Python)
         run: |
-          pip install pip-audit
-          pip-audit -r backend/requirements/base.txt --desc || true
+          pip-audit -r backend/requirements/production.txt --desc -f json -o pip-audit.json || true
+          test -s pip-audit.json || { echo "pip-audit produced no report"; exit 1; }
 
       - name: Dependency audit (Node)
         working-directory: frontend
-        run: npm audit --audit-level=high || true
+        run: |
+          npm audit --json > ../npm-audit.json || true
+          node -e 'if (!JSON.parse(require("fs").readFileSync("../npm-audit.json")).vulnerabilities) process.exit(1)' \
+            || { echo "npm audit produced no report"; exit 1; }
+
+      # IR-614: static analysis of our own code. Both write every finding to
+      # JSON and the same gate decides, so there is one allowlist, not three.
+      # bandit's only exclusion (assert in test files) is in security/bandit.yml
+      # with its reason; --exit-zero because the gate, not bandit, decides --
+      # a bandit crash still fails the step.
+      - name: SAST (bandit)
+        run: bandit -c security/bandit.yml -r backend ai -f json -o bandit.json -q --exit-zero
+
+      # Registry rulesets plus security/semgrep.yml, which raises request data
+      # reaching raw SQL to ERROR (the registry rates it WARNING). Run from the
+      # repo root with a relative --config so the local rule's id is the
+      # stable `security.iris-request-data-in-raw-sql`. Without --error,
+      # semgrep exits 0 on findings and non-zero only when the scan broke.
+      - name: SAST (semgrep)
+        run: |
+          semgrep scan --metrics=off --json -o semgrep.json \
+            --config p/django --config p/python --config p/typescript \
+            --config p/react --config p/secrets --config security/semgrep.yml .
+
+      - name: Security gate (fails on high/critical)
+        run: |
+          python -m security.audit_gate --allowlist security/allowlist.yml \
+            --pip-audit pip-audit.json --npm-audit npm-audit.json \
+            --bandit bandit.json --semgrep semgrep.json
+
+      - name: Keep the audit reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dependency-audit
+          path: |
+            pip-audit.json
+            npm-audit.json
+          if-no-files-found: ignore
+
+      # Medium and low findings do not fail the job; this is where they are read.
+      - name: Keep the SAST reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sast
+          path: |
+            bandit.json
+            semgrep.json
+          if-no-files-found: ignore

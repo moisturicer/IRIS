@@ -100,12 +100,8 @@ class AffiliationDisplayTests(APITestCase):
     """
 
     def setUp(self):
-        # Reuse the rows seeded by accounts/0003 rather than creating new ones.
-        # That migration inserts College/Department/Course with **explicit ids**,
-        # which leaves the Postgres identity sequence at 1 while rows already
-        # occupy 1..N -- so a plain College.objects.create() here raises
-        # IntegrityError "duplicate key value violates accounts_college_pkey".
-        # Reusing the seed data is both realistic and immune to that.
+        # Reuse the rows seeded by accounts/0003 rather than creating new ones:
+        # it is the reference data a real deployment has.
         self.course     = Course.objects.select_related("department__college").first()
         self.assertIsNotNone(self.course, "accounts/0003 should have seeded courses")
         self.department = self.course.department
@@ -245,3 +241,90 @@ class OwnRoleRequestTests(APITestCase):
             response.data["role_request"],
             {"status": "declined", "requested_role": "Student"},
         )
+
+
+class AdviserPickerTests(APITestCase):
+    """
+    `GET /users/advisers/` is open to every signed-in user so a student can
+    name their Adviser. It must carry what the IR-540 data notice promises --
+    name, email, college and department -- and no account state (IR-587).
+    """
+
+    PICKER_FIELDS = {
+        "id", "first_name", "middle_initial", "last_name", "email",
+        "college_name", "department_name",
+    }
+
+    def setUp(self):
+        # Seeded rows, not new ones: see AffiliationDisplayTests.setUp.
+        course          = Course.objects.select_related("department__college").first()
+        self.department = course.department
+        self.college    = self.department.college
+        self.adviser    = make_user("adviser@cit.edu", "Adviser", is_staff=True)
+        AdviserProfile.objects.create(
+            user=self.adviser, college=self.college, department=self.department,
+        )
+        self.url = reverse("user-advisers")
+        self.client.force_authenticate(make_user("student@cit.edu", "Student"))
+
+    def test_a_student_sees_exactly_the_fields_the_notice_names(self):
+        """
+        An exact key set, so any field added later fails here first -- and
+        whoever adds it has to check the data notice says so too.
+        """
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        [row] = response.data["results"]
+        self.assertEqual(set(row), self.PICKER_FIELDS)
+        self.assertEqual(row["email"], "adviser@cit.edu")
+        self.assertEqual(row["college_name"], self.college.name)
+        self.assertEqual(row["department_name"], self.department.name)
+
+
+class UserListTests(APITestCase):
+    """
+    `GET /users/` behind RDCO's Users page (IR-478). The page reads each row's
+    active and coordinator state, and its search box sends `?search=`.
+    """
+
+    def setUp(self):
+        self.url = reverse("user-list")
+        self.client.force_authenticate(make_user("rdco@cit.edu", "RDCO"))
+
+    def emails(self, **params):
+        response = self.client.get(self.url, params)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return {row["email"] for row in response.data["results"]}
+
+    def test_search_matches_email_and_name(self):
+        """It was ignored: `UserListView` named no `search_fields`, so every search listed everyone."""
+        ivan = make_user("ivan.santos@cit.edu", "ITSO")
+        ivan.first_name, ivan.last_name = "Ivan", "Santos"
+        ivan.save(update_fields=["first_name", "last_name"])
+        make_user("elena@cit.edu", "IERC")
+
+        self.assertEqual(self.emails(search="ivan.santos"), {"ivan.santos@cit.edu"})
+        self.assertEqual(self.emails(search="Santos"), {"ivan.santos@cit.edu"})
+
+    def test_each_row_says_whether_the_account_is_active_and_coordinates(self):
+        """The Status column read `is_active`, which the serializer never sent, so every row said Inactive."""
+        coordinator = make_user("itso.coordinator@cit.edu", "ITSO")
+        coordinator.is_office_coordinator = True
+        coordinator.save(update_fields=["is_office_coordinator"])
+
+        rows = {row["email"]: row for row in self.client.get(self.url).data["results"]}
+
+        self.assertIs(rows["itso.coordinator@cit.edu"]["is_active"], True)
+        self.assertIs(rows["itso.coordinator@cit.edu"]["is_office_coordinator"], True)
+        self.assertIs(rows["rdco@cit.edu"]["is_office_coordinator"], False)
+
+    def test_is_active_cannot_be_changed_through_the_own_profile(self):
+        """`/users/me/` is open to every user; an account cannot reactivate itself there."""
+        user = make_user("student@cit.edu", "Student")
+        self.client.force_authenticate(user)
+
+        self.client.patch(reverse("user-me"), {"is_active": False}, format="json")
+
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)

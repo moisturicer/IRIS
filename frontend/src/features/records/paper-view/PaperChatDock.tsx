@@ -1,9 +1,10 @@
+import { errorDetail } from "@/lib/errorDetail";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from "react";
 import { aiApi } from "@/api/ai";
 import type { RecordDetail } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
-import { CitationOriginContext } from "@/lib/citedPage";
+import { CitationConversationContext, CitationOriginContext, type AnswerReturn } from "@/lib/citedPage";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
 import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessageBubble";
@@ -135,10 +136,19 @@ interface PaperChatPanelProps {
   style?: CSSProperties;
   /** Where the reader drags the panel's edge; absent where it is not a column. */
   resize?: { width: number; max: number; onChange: (width: number) => void };
+  /**
+   * Back to the answer a citation was followed from (IR-578): that
+   * Conversation, shown at that Turn. `key` makes a second request for the
+   * same answer a request again.
+   */
+  returnTo?: AnswerReturn | null;
 }
 
-/** The paper a Paper Chat conversation is about. */
-type ChatSubject = Pick<RecordDetail, "id" | "title">;
+/**
+ * The paper a Paper Chat conversation is about, and, when the reader came
+ * back to one by its address, which of the paper's Conversations (IR-578).
+ */
+type ChatSubject = Pick<RecordDetail, "id" | "title"> & { conversationId?: number };
 
 function subjectOf(record: RecordDetail): ChatSubject {
   return { id: record.id, title: record.title };
@@ -176,16 +186,17 @@ export function PaperChatPanel({
   modal = false,
   style,
   resize,
+  returnTo = null,
 }: PaperChatPanelProps) {
   const headingId = useId();
   const [ownInput, setOwnInput] = useState("");
   const input = draft ?? ownInput;
   const setInput = onDraftChange ?? setOwnInput;
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<number | null>(null);
   const [widen, setWiden] = useState(false);
   const [ready, setReady] = useState(false);
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const transcriptScrollTop = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -196,6 +207,12 @@ export function PaperChatPanel({
   // while it streamed, and it belongs to the one it was asked in.
   const subjectId = useRef(subject.id);
   subjectId.current = subject.id;
+  /** The Conversation on screen, once there is one; its citations name it (IR-578). */
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const shownConversation = useRef<number | null>(null);
+  shownConversation.current = conversationId;
+  /** The Turn to show once the transcript has it (IR-578). */
+  const pendingTurn = useRef<number | null>(null);
 
   // A citation followed from this panel keeps its conversation; any other
   // arrival brings the page's record. Decided once the page has the record
@@ -217,28 +234,59 @@ export function PaperChatPanel({
     setReady(false);
     setWiden(false);
     // Nothing of the old conversation may receive or show anything meanwhile.
-    setConversationId(null);
     setMessages([]);
+    setConversationId(null);
 
     (async () => {
       try {
-        const conversation = await aiApi.conversations.findForRecord(subject.id);
+        const conversation = subject.conversationId
+          ? (await aiApi.conversations.get(subject.conversationId)).data
+          : await aiApi.conversations.findForRecord(subject.id);
         if (cancelled || !conversation) return;
         setConversationId(conversation.id);
         setMessages(conversation.turns.flatMap(turnToMessages));
+      } catch {
+        // No conversation to show: the panel starts empty, as with none yet.
       } finally {
         if (!cancelled) setReady(true);
       }
     })();
 
     return () => { cancelled = true; };
-  }, [subject.id]);
+  }, [subject.id, subject.conversationId]);
+
+  // Back to an answer (IR-578). The one on screen scrolls to it; another is
+  // opened first, about the paper it belongs to, which may not be this one.
+  useEffect(() => {
+    if (!returnTo) return;
+    pendingTurn.current = returnTo.turnId;
+    // On screen already: the scroll below, keyed by the same request, does it.
+    if (shownConversation.current === returnTo.conversationId) return;
+    let cancelled = false;
+    aiApi.conversations
+      .get(returnTo.conversationId)
+      .then(({ data }) => {
+        if (cancelled) return;
+        setSubject({
+          id: data.record ?? record.id,
+          title: data.record_title ?? record.title,
+          conversationId: data.id,
+        });
+      })
+      .catch(() => { pendingTurn.current = null; });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [returnTo?.key]);
 
   /** The subject's Conversation, started now if this is its first question. */
   const conversationFor = async (askedAbout: number): Promise<number> => {
-    if (conversationId != null) return conversationId;
-    const { data } = await aiApi.conversations.create({ record: askedAbout });
-    if (subjectId.current === askedAbout) setConversationId(data.id);
+    if (subject.conversationId && subject.id === askedAbout) return subject.conversationId;
+    const { data } = await aiApi.conversations.create({ record: askedAbout, reuse_default: true });
+    if (subjectId.current === askedAbout) {
+      // Another tab may have started this default after our initial GET.
+      setConversationId(data.id);
+      setMessages([...data.turns.flatMap(turnToMessages)]);
+    }
     return data.id;
   };
 
@@ -247,8 +295,18 @@ export function PaperChatPanel({
   // reader at page 6 back to the top of the paper just for opening the panel.
   useEffect(() => {
     const transcript = transcriptRef.current;
-    if (transcript) transcript.scrollTop = transcript.scrollHeight;
-  }, [messages, busy, streaming]);
+    if (!transcript) return;
+    const turn = pendingTurn.current;
+    const answer = turn == null ? null : transcript.querySelector(`[data-turn="${turn}"]`);
+    if (answer) {
+      // The answer returned to, at the top of the transcript (IR-578).
+      pendingTurn.current = null;
+      transcript.scrollTop += answer.getBoundingClientRect().top - transcript.getBoundingClientRect().top;
+      transcriptScrollTop.current = transcript.scrollTop;
+      return;
+    }
+    transcript.scrollTop = transcript.scrollHeight;
+  }, [messages, busy, streaming, returnTo?.key]);
 
   // A hidden transcript has no scroll position of its own to keep, so the
   // last one seen is put back when the panel is restored, before it paints.
@@ -258,9 +316,10 @@ export function PaperChatPanel({
   }, [minimized]);
 
   const sendQuestion = async (question: string, questionWiden: boolean) => {
-    if (!question || busy || !ready) return;
+    if (!question || sending.current || !ready) return;
+    sending.current = true;
+    const requestId = crypto.randomUUID();
 
-    setMessages((prev) => [...prev, newChatMessage("user", question)]);
     setBusy(true);
     const askedAbout = subject.id;
     // The answer is stored in the conversation it was asked in either way;
@@ -270,11 +329,13 @@ export function PaperChatPanel({
     };
     try {
       const conversationId = await conversationFor(askedAbout);
-      const { message } = await ask(question, { conversationId, widen: questionWiden });
+      if (subjectId.current === askedAbout) setMessages((prev) => [...prev, newChatMessage("user", question)]);
+      const { message } = await ask(question, { conversationId, widen: questionWiden, requestId });
       show(message);
-    } catch {
-      show(newChatMessage("assistant", "IRIS could not answer right now."));
+    } catch (error) {
+      show(newChatMessage("assistant", errorDetail(error, "IRIS could not answer right now.")));
     } finally {
+      sending.current = false;
       setBusy(false);
     }
   };
@@ -378,6 +439,9 @@ export function PaperChatPanel({
       {/* Transcript */}
       <div
         ref={transcriptRef}
+        role="log"
+        aria-label="Paper chat messages"
+        aria-live="polite"
         hidden={minimized}
         // Only while shown: hiding it is not the reader scrolling it.
         onScroll={minimized ? undefined : (e) => { transcriptScrollTop.current = e.currentTarget.scrollTop; }}
@@ -409,11 +473,13 @@ export function PaperChatPanel({
         {/* Its citations say they came from here, which is what keeps this
             conversation open on the paper they lead to (IR-355). */}
         <CitationOriginContext.Provider value="paper-chat">
+        <CitationConversationContext.Provider value={conversationId}>
           {messages.map((m) => (
             <ChatMessageBubble key={m.id} message={m} compact retryDisabled={busy || !ready} />
           ))}
 
           {busy && streaming && <StreamingMessageBubble state={streaming} compact onStop={() => void cancel()} />}
+        </CitationConversationContext.Provider>
         </CitationOriginContext.Provider>
       </div>
 

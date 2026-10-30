@@ -53,6 +53,9 @@ function row(
     in_pool: false,
     changes_requested: false,
     seats: null,
+    carryover: null, carryover_version: null, carryover_label: null,
+    due_at: null, original_due_at: null, is_overdue: false, clock_paused: false,
+    can_extend: false, extensions: [],
     ...extra,
   };
 }
@@ -69,6 +72,7 @@ function payload(overrides: Partial<RecordTracker>): RecordTracker {
     routing_recorded_from: "2026-09-19T12:00:00Z",
     reviews: [],
     versions: [],
+    review_comments: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],

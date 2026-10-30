@@ -1,5 +1,7 @@
 import type { PipelineStatus } from "@/lib/constants";
 
+export type ResearchOrigin = "unknown" | "institutional" | "imported_reference" | "synthetic";
+
 export type IpType = "patent" | "copyright" | "trade_secret" | "utility_model" | "";
 
 export const IP_TYPE_LABELS: Record<Exclude<IpType, "">, string> = {
@@ -24,6 +26,8 @@ export interface Author {
 }
 
 export interface RecordListItem {
+  origin?: ResearchOrigin;
+  publication_year?: number | null;
   id:                    number;
   title:                 string;
   abstract:              string;
@@ -67,6 +71,7 @@ export interface ForYouPage {
  * stay on Paper View, so the list costs the same queries for any length.
  */
 export interface MyResearchItem {
+  can_continue?:        boolean;
   id:                   number;
   title:                string;
   record_type_name:     string | null;
@@ -80,8 +85,38 @@ export interface MyResearchItem {
   holders:              { party: Party; label: string }[];
   /** Offices that have cleared it; `preserved` when kept through a resubmission (ADR-003). */
   cleared_offices:      { office: "itso" | "ierc" | "ktto"; label: string; preserved: boolean }[];
+  submitter_status:     SubmitterStatus;
   created_at:           string;
   updated_at:           string;
+}
+
+/** One open request the owner must answer, worded by the server (IR-625). */
+export interface WaitingItem {
+  kind:         "revision" | "document";
+  party:        Party;
+  /** "Revision requested by IERC". */
+  label:        string;
+  /** The act that answers it: "Submit a new version". */
+  action_label: string;
+}
+
+/**
+ * Where an owner's record is, in the server's words (IR-625). `waiting_on_you`
+ * is non-empty exactly when `workflow_state` is `awaiting_resubmission` or
+ * `awaiting_document`. Carries no reviewer's name or words.
+ */
+export interface SubmitterStatus {
+  /** "With your Adviser", "In specialist review: ITSO, IERC", … */
+  line:           string;
+  waiting_on_you: WaitingItem[];
+}
+
+/** One version as its owner reads its history: when it went in, and what each party decided. */
+export interface SubmitterVersion {
+  number:       number;
+  cause_label:  string;
+  submitted_at: string;
+  decisions:    { party: Party; label: string; verdict: string; verdict_label: string }[];
 }
 
 export interface RecordReview {
@@ -114,7 +149,19 @@ export interface RecordClearance {
    * the last decline, which is a different rule than `resubmit_record` applies.
    */
   preserved:        boolean;
+  /** What the latest version did to this clearance, with the version it applies to (IR-624). */
+  carryover:         Carryover | null;
+  carryover_version: number | null;
+  /** "Cleared on v1, preserved", "Reset by v2": the server's words. */
+  carryover_label:   string | null;
 }
+
+/**
+ * Across the latest version (IR-624): `preserved` -- cleared on an earlier
+ * version and kept -- or `reset` by it and awaiting review. The server's call
+ * (`clearance_state.carryover`); the client never works either out.
+ */
+export type Carryover = "preserved" | "reset";
 
 /** What happened across resubmissions, and which offices survived them. */
 export interface RecordResubmission {
@@ -179,7 +226,24 @@ export type Capability =
   | "comment_public"
   | "cite";
 
+/**
+ * `GET /records/<id>/metadata-suggestions/` (IR-406; spec §4.5). `pending`
+ * while Docling reads the manuscript, `ready` once it has, `failed` when it
+ * could not (an image-only scan included), `unsupported` when there is no
+ * manuscript extraction at all. A `ready` field with nothing found is null.
+ * There is deliberately no confidence value: Docling gives none.
+ */
+export interface MetadataSuggestions {
+  state:       "pending" | "ready" | "failed" | "unsupported";
+  suggestions: { title: string | null; abstract: string | null };
+  source:      "pdf_structure";
+}
+
 export interface RecordDetail extends RecordListItem {
+  lineage?: {
+    derived_from: { id: number; title: string; record_type_name: string | null } | null;
+    continued_as: { id: number; title: string; record_type_name: string | null } | null;
+  };
   /** Server-computed action offers (ADR-032 §10); every action re-checks authority. */
   capabilities:   Capability[];
   year_completed:  number | null;
@@ -274,6 +338,8 @@ export interface RecordDetail extends RecordListItem {
    * latest version's manuscript.
    */
   manuscript_unsubmitted: boolean;
+  /** The owner's status, what waits on them, and each version's history. Null to anyone but an owner (IR-625). */
+  submitter_status:     (SubmitterStatus & { history: SubmitterVersion[] }) | null;
 }
 
 /** One numbered snapshot of what the record put in front of its reviewers. */
@@ -491,6 +557,27 @@ export interface TrackerReview {
   version:          number | null;
 }
 
+/**
+ * One message in a record's review discussion (ADR-032 §7, IR-419). Private
+ * to the review; public discussion is a separate model.
+ */
+export interface ReviewComment {
+  id:          number;
+  author:      number | null;
+  author_name: string | null;
+  /** Plain text, verbatim. Never render as markup. */
+  body:        string;
+  /** The version it was made against; null on a record with no version yet. */
+  version:     number | null;
+  /** The top-level comment this one answers. Threads are one level deep. */
+  reply_to:    number | null;
+  created_at:  string;
+  /** Set once an edit changed the body. */
+  edited_at:   string | null;
+  /** The server's answer: Edit is offered only where this is true. */
+  can_edit:    boolean;
+}
+
 export interface TrackerHolder {
   party:     Party;
   label:     string;
@@ -498,7 +585,7 @@ export interface TrackerHolder {
   opened_by: string | null;
 }
 
-export interface TrackerPartyRow {
+export interface TrackerPartyRow extends AssignmentDeadline {
   party:         Party;
   /** Server-worded; Intake reads differently to staff and to students. */
   label:         string;
@@ -514,6 +601,10 @@ export interface TrackerPartyRow {
   outcome_label: string | null;
   at:            string | null;
   preserved:     boolean;
+  /** As on `RecordClearance`; null for a party that holds no clearance (IR-624). */
+  carryover:         Carryover | null;
+  carryover_version: number | null;
+  carryover_label:   string | null;
   /**
    * This party has an open document request and is waiting on it (◐). Null
    * when the viewer may not read the record's document requests (IR-349):
@@ -539,6 +630,34 @@ export interface TrackerPartyRow {
    * take part in the review: not disclosed, which is not the same as none.
    */
   seats:           TrackerSeat[] | null;
+}
+
+/**
+ * The party's turnaround clock (IR-619; `docs/testing/ASSIGNMENT_DEADLINES.md`),
+ * spread onto each tracker party row. All null and false for a party with no
+ * assignment, or none configured.
+ */
+export interface AssignmentDeadline {
+  due_at:          string | null;
+  /** The current version's original deadline, before any extension. */
+  original_due_at: string | null;
+  /** Never for a paused clock or a closed assignment: the server's call. */
+  is_overdue:      boolean;
+  /** Waiting on the owner: an open document request or revision. */
+  clock_paused:    boolean;
+  can_extend:      boolean;
+  extensions:      AssignmentExtension[];
+}
+
+export interface AssignmentExtension {
+  id:              number;
+  previous_due_at: string;
+  due_at:          string;
+  /** Null to a viewer who may not read the review. */
+  reason:          string | null;
+  system:          boolean;
+  actor:           number | null;
+  created_at:      string;
 }
 
 export interface TrackerSeat {
@@ -582,6 +701,43 @@ export interface TrackerResubmission {
   resolved_by:  string | null;
 }
 
+/**
+ * A seat a coordinator moved to another member (IR-623). The names and the
+ * reason are null to a viewer who may not read the review (IR-479).
+ */
+export interface TrackerReassignment {
+  seat:      number;
+  party:     Party;
+  label:     string;
+  from_name: string | null;
+  to_name:   string | null;
+  by_name:   string | null;
+  reason:    string | null;
+  at:        string | null;
+}
+
+/** One movement of an assignment's due date (ADR-043 §6): by a coordinator, or by a document pause. */
+export interface DeadlineExtension {
+  id:              number;
+  previous_due_at: string;
+  due_at:          string;
+  /** Null, as `actor` is, to a viewer who may not read the review. */
+  reason:          string | null;
+  /** Moved by IRIS itself, for a document-request pause; no person did it. */
+  system:          boolean;
+  actor:           number | null;
+  actor_name:      string | null;
+  created_at:      string;
+}
+
+/** An assignment's due-date history on the tracker. Only what the timeline reads is typed. */
+export interface TrackerDeadlineHistory {
+  assignment: number;
+  party:      Party;
+  label:      string;
+  extensions: DeadlineExtension[];
+}
+
 export interface RecordTracker {
   record_id:             number;
   record_type:           string | null;
@@ -599,14 +755,24 @@ export interface RecordTracker {
   reviews:               TrackerReview[] | null;
   /** Each a timeline entry of its own (IR-416). Null as `reviews` is. */
   versions:              RecordVersion[] | null;
+  /** The review discussion, oldest first (IR-419). Null as `reviews` is. */
+  review_comments:       ReviewComment[] | null;
   resubmissions:         TrackerResubmission[];
   /** Null when the viewer may not read them (IR-349) -- not "there are none". */
   document_requests:     DocumentRequest[] | null;
   clearances:            RecordClearance[];
   resubmission:          RecordResubmission;
+  /** Coordinators' reassignments (IR-623). Optional: a fixture may leave it out. */
+  reassignments?:               TrackerReassignment[];
+  /** Every assignment's due date and its extensions (ADR-043, IR-619). */
+  assignment_deadline_history?: TrackerDeadlineHistory[];
 }
 
 export interface RecordFormData {
+  origin?: ResearchOrigin;
+  publication_year?: number | null;
+  keywords?:             string[];
+  owner_emails?:         string[];
   title:                 string;
   year_accomplished?:    number;
   year_completed?:       number;

@@ -80,9 +80,16 @@ describe("the AI overview on a paper", () => {
       renderScreen(<PaperAiOverview record={record} />);
 
       expect(await screen.findByRole("status")).toHaveTextContent(/being prepared/i);
-      await act(async () => {
-        vi.advanceTimersByTime(2500);
-      });
+      // The poll's timer is set by an effect that runs after the text above is
+      // on screen, and React queues that effect on a (faked) timer too. A single
+      // advance can run the effect partway through and leave its 2500ms timer
+      // beyond the advance (IR-601). Advance until the poll has happened, a few
+      // steps at most. Not `waitFor`: its own timeout is a faked timer as well.
+      for (let step = 0; step < 3 && overview.mock.calls.length < 2; step++) {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(2500);
+        });
+      }
 
       expect(await screen.findByRole("heading", { level: 2, name: "Methodology" })).toBeTruthy();
       expect(overview).toHaveBeenCalledTimes(2);
@@ -144,11 +151,13 @@ describe("the AI overview on a paper", () => {
     expect((await screen.findByRole("link", { name: /at page 12/i })).textContent).toBe("p12");
   });
 
-  it("offers the cited passage as a link into the paper at that page", async () => {
+  // Changed deliberately by IR-578: an Overview citation is a page, and its
+  // link says so, so the paper lands it as page context even after a reload.
+  it("offers the cited page as a link into the paper, labelled as page context", async () => {
     renderScreen(<PaperAiOverview record={record} />);
 
-    const chip = await screen.findByRole("link", { name: /at page 12/i });
-    expect(chip.getAttribute("href")).toBe("/records/7?page=12");
+    const chip = await screen.findByRole("link", { name: /at page 12, page context/i });
+    expect(chip.getAttribute("href")).toBe("/records/7?page=12&context=page");
   });
 
   it("says when the summary came from the degraded path", async () => {

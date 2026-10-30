@@ -34,6 +34,45 @@ Read this first — several obvious commands fail for reasons that are already u
 - Python 3.11+ and Node 18+ if running outside containers
 - PostgreSQL 15+ and Redis if running services natively
 
+### API rate limits during development (IR-371)
+
+Every API call counts, including Paper View reloads and polling. Unset
+`API_THROTTLE_ANON`, `API_THROTTLE_USER` and `API_THROTTLE_AI_QUERY` retain
+`100/day`, `1000/day` and `60/hour`. `backend/.env.example` explicitly opts
+into local values of `10000/day`, `100000/day` and `6000/hour`; copy those
+keys into your local `backend/.env` and restart backend processes to use them.
+`DEBUG` never raises a limit. Each rate must be a positive integer followed by
+`/second`, `/minute`, `/hour` or `/day` (short forms s/sec, m/min, h and d
+also work). Invalid values stop startup and name the offending key.
+The separate AI overview budget is unchanged.
+
+A 429 recovers after its `Retry-After` window. **Production must wait out
+that window.** Locally, after changing a limit, old counters can still lock
+an account out. Open `docker compose exec backend python manage.py shell`
+and paste the following to inspect only DRF's `throttle_*` keys in Django's
+configured cache database (Compose uses Redis database 1, not Celery's 0):
+
+```python
+from django.conf import settings
+from redis import Redis
+
+if not settings.DEBUG:
+    raise RuntimeError("Local development only; production must wait out the window.")
+client = Redis.from_url(settings.CACHES["default"]["LOCATION"])
+pattern = f"{settings.CACHES['default'].get('KEY_PREFIX', '')}:*:throttle_*"
+keys = list(client.scan_iter(match=pattern))
+dry_run = True
+print(f"{len(keys)} throttle keys in the configured cache database")
+print("Dry run: nothing deleted" if dry_run else client.delete(*keys) if keys else 0)
+```
+
+To clear the local lockout, rerun with `dry_run = False`. This resets request
+budgets for **all local accounts**, including the throttled one, without
+flushing unrelated cache entries or Celery jobs. For a single authenticated
+account, narrow the pattern to `iris:*:throttle_user_42` (replace `42` with
+the numeric user id, and `iris` if you customized the prefix). Anonymous
+budgets are keyed by IP.
+
 ---
 
 ## 3 · Repository layout
@@ -190,6 +229,8 @@ docker compose exec backend python manage.py seed_demo
 ### Celery
 
 Workers consume the `default`, `extraction`, `embedding` and `shadow` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding`/`celery-shadow` services). `shadow` (IR-466) runs only `decide_evidence_shadow` at concurrency 1 and is idle unless `AI_EVIDENCE_DECISION=shadow`. `config/settings/base.py` sets `CELERY_TASK_ROUTES` (`extract_pdf_text` → `extraction`, `embed_record` → `embedding`) and `CELERY_TASK_DEFAULT_QUEUE = "default"` for everything else, including `chunk_record_document` (IR-164) — so publishers and consumers agree on queue names. Verified against the real docker-compose stack, not just the config: a task dispatched over the real Redis broker was consumed and completed by the real `celery-default` and `celery-extraction` containers.
+
+**`celery-beat` schedules one task (IR-620, ADR-043 §8).** `CELERY_BEAT_SCHEDULE` in `config/settings/base.py` sends `apps.reviews.tasks.send_deadline_notifications` to `default` at minute 0 of every hour. The task asks the database which deadline reminders are owed, so beat keeps no reminder schedule of its own: a missed tick is caught up by the next one, and the `DeadlineMoment` unique key stops a re-run or a second beat instance from sending twice. Beat keeps its own bookkeeping in `/tmp/celerybeat-schedule` inside the container, which is safe to lose. Until an administrator enters a Turnaround, no assignment has a due date and the task sends nothing. To run it once by hand: `docker compose exec backend python manage.py shell -c "from apps.reviews.reminders import run_deadline_notifications; print(run_deadline_notifications())"`.
 
 **Each worker declares a healthcheck** (IR-225). `celery -A config inspect ping -d <node>@$HOSTNAME` round-trips through the broker to that specific node, so it fails if the process is dead, wedged, or cannot reach Redis. This exists because `celery-extraction` once crash-looped for nine hours on a missing dependency in a stale image while `docker ps` showed only `Restarting` — with `restart: unless-stopped` and no healthcheck, a permanently broken worker looks exactly like one that happened to bounce. **When a worker misbehaves, check `docker ps` for `unhealthy` first, and rebuild it (`docker compose up -d --build <service>`) before debugging the task**: the four workers share one build spec but are separate images, and only one of them going stale is the failure that hides best.
 

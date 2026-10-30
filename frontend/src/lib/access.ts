@@ -52,6 +52,9 @@ const REVIEWERS: RoleName[] = [
  */
 const COORDINATOR: RoleName[] = [ROLES.RDCO];
 
+/** The four offices (`IsStaff` on the server). Not the Adviser, who has no office. */
+const OFFICES: RoleName[] = [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO];
+
 /**
  * The sidebar's groups (IR-413, spec §4.1). "Main" is one short, unlabelled
  * list every role shares; "Administration" is RDCO's labelled group. The five
@@ -126,6 +129,10 @@ export const SCREEN_ACCESS = {
                  nav: { label: "My Reviews", icon: "fa-list-check", section: "Main",
                         needsReviewAccess: true } },
 
+  // Workflow analytics (IR-626): an office's own figures, every office's for
+  // RDCO. Reached from My Reviews, not the sidebar.
+  reviewAnalytics: { path: "/review/analytics", roles: OFFICES },
+
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,
@@ -134,6 +141,10 @@ export const SCREEN_ACCESS = {
   // --- RDCO coordination -------------------------------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
                  nav: { label: "Import Records", icon: "fa-file-import", section: "Administration" } },
+  // Restored for RDCO by IR-478 after IR-160 removed it: the Django admin it
+  // was to move to never registered `User`, so nothing could reach this.
+  users:         { path: "/admin/users", roles: COORDINATOR,
+                 nav: { label: "Users", icon: "fa-users", section: "Administration" } },
   roleRequests:  { path: "/admin/role-requests", roles: COORDINATOR,
                  nav: { label: "Role Requests", icon: "fa-user-check", section: "Administration" } },
   downloadRequests: { path: "/admin/download-requests", roles: COORDINATOR,

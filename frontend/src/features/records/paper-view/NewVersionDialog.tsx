@@ -3,7 +3,7 @@ import { useState } from "react";
 import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
-import { errorDetail } from "@/features/document-requests/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { joinLabels } from "@/lib/utils";
 import type { NewVersionHint } from "@/types/records";
 

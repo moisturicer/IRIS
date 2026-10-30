@@ -3,7 +3,7 @@ from rest_framework import serializers
 from core.enums import PipelineStatus, ReviewDecision
 
 from apps.documents.validators import pdf_upload_problem
-from apps.reviews.clearance_state import clearance_payload, resubmission_payload
+from apps.reviews.clearance_state import clearance_payload, record_versions, resubmission_payload
 
 from .models import (
     Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
@@ -56,7 +56,7 @@ class RecordListSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Record
         fields = [
-            "id", "title", "abstract", "year_accomplished", "classification_name",
+            "id", "title", "abstract", "year_accomplished", "origin", "publication_year", "classification_name",
             "record_type_name", "pipeline_status", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "access_count", "file_count", "has_manuscript", "created_at", "authors", "ai_hook",
@@ -75,7 +75,16 @@ class MyResearchSerializer(serializers.ModelSerializer):
     not grow with its length. Record detail's viewer-dependent blocks stay
     on detail.
     """
+    can_continue         = serializers.SerializerMethodField()
     record_type_name     = serializers.CharField(source="record_type.name", read_only=True)
+
+    def get_can_continue(self, obj):
+        from core.enums import PipelineStatus, RecordTypeName
+
+        return (obj.record_type is not None
+                and obj.record_type.name == RecordTypeName.PROPOSAL
+                and obj.pipeline_status == PipelineStatus.APPROVED
+                and not obj.has_continuation)
     authors              = AuthorSerializer(many=True, read_only=True)
     adviser_name         = serializers.SerializerMethodField()
     workflow_state       = serializers.SerializerMethodField()
@@ -85,6 +94,9 @@ class MyResearchSerializer(serializers.ModelSerializer):
     # `[{office, label, preserved}]`: each office that has cleared it, and
     # whether that clearance was kept through a resubmission (ADR-003).
     cleared_offices      = serializers.SerializerMethodField()
+    # The owner's status line and what waits on them (IR-625). Every row
+    # here is the caller's own record.
+    submitter_status     = serializers.SerializerMethodField()
 
     def _facts(self, obj):
         return self.context["workflow_facts"][obj.pk]
@@ -108,18 +120,30 @@ class MyResearchSerializer(serializers.ModelSerializer):
     def get_cleared_offices(self, obj):
         return self._facts(obj)["cleared_offices"]
 
+    def get_submitter_status(self, obj):
+        from apps.reviews.submitter_status import submitter_status
+
+        facts = self._facts(obj)
+        return submitter_status(
+            record=obj, workflow_state=facts["workflow_state"],
+            holders=[h["party"] for h in facts["holders"]],
+            revision_parties=facts["revision_parties"],
+            document_parties=facts["document_parties"],
+        )
+
     class Meta:
         model  = Record
         fields = [
             "id", "title", "record_type_name", "authors", "adviser_name",
             "pipeline_status", "workflow_state", "workflow_state_label",
-            "holders", "cleared_offices", "created_at", "updated_at",
+            "holders", "cleared_offices", "submitter_status", "created_at", "updated_at", "can_continue",
         ]
         read_only_fields = fields
 
 
 class RecordDetailSerializer(serializers.ModelSerializer):
     """Full record detail including all related objects."""
+    keywords = serializers.ListField(child=serializers.CharField(), read_only=True)
     owners         = RecordOwnerSerializer(many=True, read_only=True)
     authors        = AuthorSerializer(many=True, read_only=True)
     classification = serializers.StringRelatedField()
@@ -192,6 +216,12 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # submitted (IR-273). True for an owner only; everyone else is served the
     # latest version's manuscript meanwhile, so it is never theirs to label.
     manuscript_unsubmitted = serializers.SerializerMethodField()
+    # The owner's status line, what waits on them, and each version's
+    # history (IR-625). `None` to anyone but an owner.
+    submitter_status     = serializers.SerializerMethodField()
+    # `{derived_from, continued_as}`: the Proposal this continues and what
+    # continues it (ADR-032 §6, IR-417), each only if the viewer may open it.
+    lineage              = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -339,6 +369,23 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return manuscript_unsubmitted(obj, self._viewer())
 
+    def get_lineage(self, obj):
+        from .continuation import lineage_payload
+
+        return lineage_payload(obj, self._viewer())
+
+    def get_submitter_status(self, obj):
+        from apps.reviews.submitter_status import detail_status
+        from core.permissions import is_record_owner
+
+        if not is_record_owner(self._viewer(), obj):
+            return None
+        workflow = self._workflow(obj)
+        return detail_status(
+            obj, workflow_state=workflow["workflow_state"],
+            holders=[h["party"] for h in workflow["current_holders"]],
+        )
+
     def _ordered_clearances(self, obj):
         return list(obj.clearances.select_related("reviewed_by").order_by("office"))
 
@@ -353,8 +400,12 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         against a different definition (IR-139).
         """
         readable = self._readable(obj)
+        versions = record_versions(obj)
         return [
-            clearance_payload(c, last_resubmitted_at=obj.last_resubmitted_at, readable=readable)
+            clearance_payload(
+                c, last_resubmitted_at=obj.last_resubmitted_at, readable=readable,
+                versions=versions,
+            )
             for c in self._ordered_clearances(obj)
         ]
 
@@ -423,7 +474,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         model  = Record
         fields = [
             "id", "title", "abstract", "abstract_file",
-            "year_accomplished", "year_completed",
+            "year_accomplished", "year_completed", "origin", "publication_year",
             "classification", "psced", "record_type",
             "classification_name", "record_type_name", "file_count", "has_manuscript", "ai_hook",
             "adviser", "adviser_name", "added_by", "is_ip", "ip_type",
@@ -432,11 +483,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "is_participant", "routing",
-            "office_review", "revision", "decision", "capabilities",
+            "office_review", "revision", "decision", "capabilities", "keywords",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
-            "versions", "manuscript_unsubmitted",
+            "versions", "manuscript_unsubmitted", "submitter_status", "lineage",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as
@@ -453,6 +504,8 @@ class RecordWriteSerializer(serializers.ModelSerializer):
     `authors` is a flat list of name strings — the serializer handles creating
     and replacing Author rows so callers never touch the Author model directly.
     """
+    keywords = serializers.ListField(child=serializers.CharField(max_length=100), max_length=30, required=False)
+    owner_emails = serializers.ListField(child=serializers.EmailField(), max_length=30, required=False, write_only=True)
     authors = serializers.ListField(
         child=serializers.CharField(max_length=200, allow_blank=False),
         write_only=True,
@@ -465,12 +518,12 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         model  = Record
         fields = [
             "id",
-            "title", "year_accomplished", "year_completed", "abstract",
+            "title", "year_accomplished", "year_completed", "abstract", "origin", "publication_year",
             "classification", "psced", "record_type", "adviser",
             "is_ip", "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "abstract_file",
-            "authors",
+            "authors", "keywords", "owner_emails",
         ]
         read_only_fields = ["id", "pipeline_status", "added_by"]
 
@@ -517,6 +570,23 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         from .versions import SUBMISSION_FIXED_FIELDS
 
         record = self.instance
+        if record.derived_from_id and "record_type" in attrs:
+            from .continuation import CONTINUATION_TYPES
+            if attrs["record_type"] is None or attrs["record_type"].name not in CONTINUATION_TYPES:
+                raise serializers.ValidationError({"record_type": "A continuation must remain a Thesis / Research or Project."})
+        if "owner_emails" in attrs:
+            from apps.accounts.models import User
+
+            if record.pipeline_status != PipelineStatus.DRAFT:
+                raise serializers.ValidationError({"owner_emails": "Owners can be changed only on a draft."})
+            emails = {email.lower() for email in attrs["owner_emails"]}
+            user = self.context["request"].user
+            from django.db.models.functions import Lower
+            owners = list(User.objects.annotate(normalized_email=Lower("email")).filter(normalized_email__in=emails, is_active=True))
+            adviser = attrs.get(Record.adviser.field.name, record.adviser)
+            if len(owners) != len(emails) or user.email.lower() not in emails or (adviser and adviser.email.lower() in emails):
+                raise serializers.ValidationError({"owner_emails": "Use existing active accounts, include yourself, and exclude the Adviser."})
+            attrs["owner_emails"] = owners
         if record.pipeline_status != PipelineStatus.DRAFT:
             changed = [
                 field for field in SUBMISSION_FIXED_FIELDS
@@ -538,6 +608,8 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         )
 
     def create(self, validated_data):
+        if "owner_emails" in validated_data:
+            raise serializers.ValidationError({"owner_emails": "Save the draft before editing its owners."})
         authors_data = validated_data.pop("authors", [])
         record = super().create(validated_data)
         if authors_data:
@@ -545,6 +617,10 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         return record
 
     def update(self, instance, validated_data):
+        from django.db import transaction
+        from .models import RecordOwner
+
+        owners = validated_data.pop("owner_emails", None)
         authors_data = validated_data.pop("authors", None)
         if self._details_changed(instance, validated_data, authors_data):
             # What a new version answers a revision request with, when no file
@@ -552,9 +628,18 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             # again answers nothing. Only an owner edits at all (IR-507), so
             # every change stamped here is the owner's own revision.
             validated_data["details_edited_at"] = timezone.now()
-        record = super().update(instance, validated_data)
-        if authors_data is not None:           # only replace when field was explicitly sent
-            self._sync_authors(record, authors_data)
+        with transaction.atomic():
+            record = super().update(instance, validated_data)
+            if authors_data is not None:
+                self._sync_authors(record, authors_data)
+            if owners is not None:
+                primary = record.owners.filter(is_primary=True, user__in=owners).first()
+                primary_id = primary.user_id if primary else self.context["request"].user.pk
+                record.owners.all().delete()
+                RecordOwner.objects.bulk_create([
+                    RecordOwner(record=record, user=user, is_primary=user.pk == primary_id)
+                    for user in owners
+                ])
         return record
 
     @staticmethod

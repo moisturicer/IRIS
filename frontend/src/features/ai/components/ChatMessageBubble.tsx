@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { ChatMessage } from "@/types/chat";
+import { CitationTurnContext } from "@/lib/citedPage";
 import { cn } from "@/lib/utils";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
@@ -28,6 +29,33 @@ interface ChatMessageBubbleProps {
   retryDisabled?: boolean;
   /** Ask a run that ended without its answer again (IR-548). */
   onRetry?: (message: ChatMessage) => void;
+  /** Whether the sources panel is describing this answer (IR-562). */
+  sourcesSelected?: boolean;
+  /** Show this answer's sources. Absent where there is no sources panel. */
+  onSelectSources?: (message: ChatMessage) => void;
+}
+
+/**
+ * Which answer the sources panel describes, chosen on the answer itself: the
+ * panel follows the latest answer until the reader picks an earlier one.
+ */
+function SourcesButton({ count, selected, onSelect }: { count: number; selected: boolean; onSelect: () => void }) {
+  const label = `${count} ${count === 1 ? "source" : "sources"}`;
+  return (
+    <button
+      type="button"
+      onClick={onSelect}
+      aria-pressed={selected}
+      aria-label={`${label} for this answer`}
+      className={cn(
+        "inline-flex items-center gap-1.5 min-h-8 px-2 -ml-2 rounded-md text-[13px] font-medium transition-colors",
+        selected ? "text-brand" : "text-stone-500 hover:text-stone-900 hover:bg-stone-100",
+      )}
+    >
+      <i className="fas fa-quote-left text-[10px]" aria-hidden />
+      {label}
+    </button>
+  );
 }
 
 /** A queued question that ended unanswered, and the way to ask it again. */
@@ -58,11 +86,17 @@ function RunEndedNotice({ onRetry, disabled }: { onRetry?: () => void; disabled?
  * text with no card/border/shadow, closer to a read surface than a chat
  * widget — the avatar is still what tells the two apart.
  */
-export function ChatMessageBubble({ message, compact = false, retryDisabled, onRetry }: ChatMessageBubbleProps) {
+export function ChatMessageBubble({
+  message, compact = false, retryDisabled, onRetry, sourcesSelected = false, onSelectSources,
+}: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
+  const cited = message.citations?.length ?? 0;
 
   return (
+    // Its citations name this answer, the way back to it (IR-578).
+    <CitationTurnContext.Provider value={message.turnId ?? null}>
     <div
+      data-turn={isUser ? undefined : message.turnId}
       className={cn(
         "group flex animate-fade-in-up motion-reduce:animate-none",
         compact ? "gap-2.5" : "gap-3",
@@ -135,11 +169,21 @@ export function ChatMessageBubble({ message, compact = false, retryDisabled, onR
         )}
 
         {!isUser && (
-          <div className="mt-1.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
-            <CopyButton text={message.content} label="Copy answer" />
+          <div className="mt-1.5 flex items-center gap-2">
+            {onSelectSources && cited > 0 && (
+              <SourcesButton
+                count={cited}
+                selected={sourcesSelected}
+                onSelect={() => onSelectSources(message)}
+              />
+            )}
+            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+              <CopyButton text={message.content} label="Copy answer" />
+            </div>
           </div>
         )}
       </div>
     </div>
+    </CitationTurnContext.Provider>
   );
 }

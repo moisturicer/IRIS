@@ -52,6 +52,7 @@ from core.enums import (
     ReviewDecision,
     ReviewStage,
     RoleName,
+    SessionEndReason,
     TrackerPartyState,
     WorkflowState,
 )
@@ -86,6 +87,9 @@ GOVERNED_ENUMS = (
     # so each entry's reason has to hold for the whole file.
     DocumentRequestState,
     DocumentRequestItemState,
+    # IR-645: why a sign-in ended. Its "locked" was also `LockUserView`'s
+    # response wording, rewritten there rather than allowing the whole module.
+    SessionEndReason,
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}
@@ -108,6 +112,12 @@ ALLOWED = {
     # awaiting backfill, not a person's request awaiting a decision. Two
     # concepts, one string; pointing this file at core.enums would be wrong.
     "ai/models/embedding_space.py",
+    # (IR-561) A submission identity's transport response is pending while
+    # its original answer is still running. This is not RequestStatus.PENDING
+    # (a workflow request awaiting a decision); importing that enum would
+    # couple chat retries to institutional workflow. This module contains
+    # no workflow states, only claim/replay handling for one chat request.
+    "ai/submissions.py",
     # (IR-406) Declares its own `SuggestionState` for the Publish dialog's
     # prefill (pending/ready/failed/unsupported, IR-374 spec §4.5): the
     # manuscript *extraction's* status restated for one client -- the same
@@ -407,6 +417,13 @@ class EnumsMatchTheDatabaseTests(TestCase):
                 field = model._meta.get_field("status")
                 self.assertEqual(list(field.choices), list(RequestStatus.choices))
                 self.assertEqual(field.default, RequestStatus.PENDING)
+
+    def test_session_end_reason_choices_come_from_the_enum(self):
+        from apps.accounts.models import UserSession
+
+        field = UserSession._meta.get_field("ended_reason")
+        self.assertEqual(list(field.choices), list(SessionEndReason.choices))
+        self.assertTrue(field.null)
 
     def test_ip_type_choices_come_from_the_enum(self):
         from apps.records.models import Record

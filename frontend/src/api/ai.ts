@@ -1,4 +1,6 @@
-import { apiClient } from "./client";
+import { errorDetail } from "@/lib/errorDetail";
+import { apiClient, refreshSession } from "./client";
+import { IDLE_HEADER, idleSeconds, markReported } from "@/lib/activity";
 import { API_BASE } from "@/lib/constants";
 import { readSSE, type SSEEvent } from "@/lib/sse";
 import { useAuthStore } from "@/store/auth.store";
@@ -24,6 +26,8 @@ interface SemanticSearchResponse {
 }
 
 interface AskOptions {
+  /** Reuse on transport retry; a new question gets a new identity. */
+  requestId?: string;
   comparisonRecordIds?: number[];
   topK?: number;
   /** Appends the question and its answer to this Conversation as a Turn (IR-295). */
@@ -59,9 +63,8 @@ async function checkComparisonLimit(recordIds?: number[]): Promise<void> {
 
 /**
  * `/ai/ask/stream/` as Server-Sent Events (IR-329). Goes through `fetch`
- * directly, not `apiClient` -- `EventSource` can't carry the auth header,
- * and this bypasses axios's 401-refresh interceptor too (accepted gap: a
- * session that expires mid-stream just surfaces as a stream failure).
+ * directly, not `apiClient` -- `EventSource` can't carry the auth header --
+ * so `openStream` does what the axios interceptors would (IR-634).
  */
 async function* streamAsk(
   body: Record<string, unknown>,
@@ -88,28 +91,45 @@ async function* resumeAskRun(
   );
 }
 
+/**
+ * What `apiClient`'s interceptors do, for `fetch`: report idleness, so a
+ * stream does not keep an idle session alive, and on a 401 refresh once and
+ * retry (IR-166, IR-634). A 401 is refused at authentication, before anything
+ * runs, so sending the request again is safe. When the refresh fails the user
+ * has been logged out and redirected, and the 401 surfaces as a stream error.
+ */
 async function* openStream(url: string, init: RequestInit): AsyncGenerator<SSEEvent> {
-  const token = useAuthStore.getState().accessToken;
-  const response = await fetch(url, {
-    ...init,
-    headers: {
-      ...(init.headers as Record<string, string> | undefined),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-  });
+  let response = await send(url, init, useAuthStore.getState().accessToken);
+  if (response.status === 401) {
+    const access = await refreshSession();
+    if (access) response = await send(url, init, access);
+  }
 
   if (!response.ok) {
-    let detail = "IRIS could not answer right now.";
+    let data: unknown;
     try {
-      const errorBody = await response.json();
-      detail = errorBody.detail ?? detail;
+      data = await response.json();
     } catch {
       /* a non-JSON error body -- the generic message stands */
     }
-    throw new Error(detail);
+    const failure = { response: {
+      status: response.status, data,
+      headers: { "retry-after": response.headers.get("Retry-After") },
+    } };
+    throw Object.assign(new Error(errorDetail(failure, "IRIS could not answer right now.")), failure);
   }
 
   yield* readSSE(response);
+}
+
+function send(url: string, init: RequestInit, token: string | null): Promise<Response> {
+  const headers: Record<string, string> = {
+    ...(init.headers as Record<string, string> | undefined),
+    [IDLE_HEADER]: String(idleSeconds()),
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+  markReported();
+  return fetch(url, { ...init, headers });
 }
 
 /**
@@ -118,10 +138,10 @@ async function* openStream(url: string, init: RequestInit): AsyncGenerator<SSEEv
  * here, once, rather than read as `undefined` by each caller (IR-548).
  */
 async function createConversation(
-  body: { record?: number; title?: string } = {},
+  body: { record?: number; title?: string; reuse_default?: boolean } = {},
 ): Promise<{ data: ConversationDetail }> {
-  const { data } = await apiClient.post<ConversationSummary>("/ai/conversations/", body);
-  return { data: { ...data, turns: [], latest_run: null } };
+  const { data } = await apiClient.post<ConversationDetail>("/ai/conversations/", body, PUBLIC_CONFIG);
+  return { data: { ...data, turns: data.turns ?? [], latest_run: data.latest_run ?? null } };
 }
 
 export const aiApi = {
@@ -142,11 +162,12 @@ export const aiApi = {
     apiClient.post<SemanticSearchResponse>("/ai/search/", { query, top_k: topK }),
 
   /** Grounded answer plus the records it cites. */
-  ask: (question: string, { topK = 5, conversationId, widen, comparisonRecordIds }: AskOptions = {}) => {
+  ask: (question: string, { topK = 5, conversationId, widen, comparisonRecordIds, requestId = crypto.randomUUID() }: AskOptions = {}) => {
     const send = () => apiClient.post<AIAnswer>("/ai/ask/", {
       question,
       top_k: topK,
       conversation_id: conversationId,
+      ...(conversationId ? { request_id: requestId } : {}),
       widen,
       ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}),
     }, PUBLIC_CONFIG);
@@ -156,11 +177,11 @@ export const aiApi = {
   /** The same question, narrated as SSE (IR-326, IR-329) -- see `streamAsk`. */
   askStream: (
     question: string,
-    { topK = 5, conversationId, widen, comparisonRecordIds }: AskOptions = {},
+    { topK = 5, conversationId, widen, comparisonRecordIds, requestId = crypto.randomUUID() }: AskOptions = {},
     signal?: AbortSignal,
   ) =>
     streamAsk(
-      { question, top_k: topK, conversation_id: conversationId, widen, ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}) },
+      { question, top_k: topK, conversation_id: conversationId, widen, ...(conversationId ? { request_id: requestId } : {}), ...(comparisonRecordIds !== undefined ? { comparison_record_ids: comparisonRecordIds } : {}) },
       signal,
     ),
 
@@ -204,7 +225,7 @@ export const aiApi = {
     findForRecord: async (recordId: number): Promise<ConversationDetail | null> => {
       const { data: existing } = await apiClient.get<ConversationSummary[]>(
         "/ai/conversations/",
-        { params: { record: recordId } },
+        { params: { record: recordId, default: true } },
       );
       if (!existing[0]) return null;
       const { data } = await apiClient.get<ConversationDetail>(

@@ -3,12 +3,14 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { cn, formatDate } from "@/lib/utils";
-import { errorDetail } from "./errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip } from "./itemStatus";
 import type { DocumentRequest, DocumentRequestItem } from "@/types/records";
 
 interface ActionRequiredPanelProps {
   recordId: number;
+  /** The panel's id, so a link can land on it (IR-625). */
+  id?: string;
   /** Told after an upload, so the page can refresh what it derived from the old state. */
   onChanged?: () => void;
 }
@@ -37,10 +39,10 @@ interface ActionRequiredPanelProps {
  * §3.4). A list that fails to load says so: an empty panel would read as
  * "nothing required", which is exactly the wrong thing to tell an owner.
  */
-export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanelProps) {
+export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredPanelProps) {
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   /** Ids of requests seen open since this panel mounted. */
   const seenOpen = useRef<Set<number>>(new Set());
 
@@ -51,9 +53,9 @@ export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanel
         .then(({ data }) => {
           data.filter((r) => r.state === "open").forEach((r) => seenOpen.current.add(r.id));
           setRequests(data);
-          setFailed(false);
+          setFailed(null);
         })
-        .catch(() => setFailed(true)),
+        .catch((error: unknown) => setFailed(errorDetail(error, "Could not load the documents reviewers asked for. Reload the page to try again."))),
     [recordId],
   );
 
@@ -67,7 +69,7 @@ export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanel
         role="alert"
         className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-dark"
       >
-        Could not load the documents reviewers asked for. Reload the page to try again.
+        {failed}
       </p>
     );
   }
@@ -85,8 +87,10 @@ export function ActionRequiredPanel({ recordId, onChanged }: ActionRequiredPanel
 
   return (
     <section
+      id={id}
+      tabIndex={id ? -1 : undefined}
       aria-labelledby={headingId}
-      className="rounded-2xl border border-brand-200 bg-brand-50 p-4 space-y-4"
+      className="rounded-2xl border border-brand-200 bg-brand-50 p-4 space-y-4 scroll-mt-20 focus:outline-none"
     >
       <h2 id={headingId} className="text-sm font-bold text-brand-dark flex items-center gap-2">
         <i className="fas fa-file-circle-exclamation text-xs" aria-hidden />

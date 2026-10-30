@@ -7,7 +7,9 @@
  *   1. **Your manuscript** — the type, and the PDF. Choosing the file creates
  *      the draft at once, titled from the file name, so nothing typed later
  *      can be lost, and the server starts reading the PDF straight away.
- *   2. **Details** — `MetadataForm`, patched onto the draft on Continue.
+ *   2. **Details** — `MetadataForm`, patched onto the draft on Continue. The
+ *      manuscript's own title and abstract are offered as chips while it is
+ *      shown (IR-409, `usePrefill`); they never block it.
  *   3. **Review & submit** — every value, consent, Submit.
  *
  * **Opened by the URL**: `/?publish=new` starts one, `/?publish=<draftId>`
@@ -31,10 +33,11 @@ import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { rolesFor } from "@/lib/access";
+import { errorDetail } from "@/lib/errorDetail";
 import { tabbableWithin } from "@/lib/focusTrap";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import type { User } from "@/types/auth";
+import type { AdviserOption, User } from "@/types/auth";
 import type { Classification, PSCEDClassification, RecordType, TrackerHolder } from "@/types/records";
 
 import { FORM_FIELD, MetadataForm, focusFirstInvalid } from "@/features/records/metadata/MetadataForm";
@@ -56,6 +59,8 @@ import {
   type PublishStep,
 } from "./draft";
 import { ManuscriptStep, type ManuscriptUpload } from "./ManuscriptStep";
+import { PrefillChip } from "./PrefillChip";
+import { usePrefill, type PrefillStatus } from "./prefill";
 import { PublishSuccess, successHeadline } from "./PublishSuccess";
 import { ReviewStep } from "./ReviewStep";
 
@@ -128,7 +133,7 @@ export function PublishDialog() {
 
 type Phase =
   | { kind: "loading" }
-  | { kind: "loadError" }
+  | { kind: "loadError"; message: string }
   | { kind: "notFound" }
   | { kind: "notDraft"; recordId: number }
   | { kind: "form" }
@@ -136,10 +141,15 @@ type Phase =
 
 interface Lists {
   recordTypes:     RecordType[];
-  advisers:        User[];
+  advisers:        AdviserOption[];
   classifications: Classification[];
   psceds:          PSCEDClassification[];
 }
+
+const PREFILL_FIELDS = ["title", "abstract"] as const;
+type PrefillField = (typeof PREFILL_FIELDS)[number];
+
+const NEUTRAL_PREFILL = "We couldn't read details from this file — fill them in below.";
 
 const NO_LISTS: Lists = { recordTypes: [], advisers: [], classifications: [], psceds: [] };
 
@@ -159,7 +169,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const schema = useMemo(() => metadataSchema(selfId), [selfId]);
   const form = useForm<MetadataValues>({
     resolver: zodResolver(schema),
-    defaultValues: emptyMetadata(personName(user)),
+    defaultValues: { ...emptyMetadata(personName(user)), owner_emails: user.email },
     mode: "onTouched",
     // Focus is moved by hand: the adviser is a custom control, and a field
     // inside a closed More details must be opened before it can take focus.
@@ -171,10 +181,12 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   // Which reference lists failed. Details still opens; a failed list's field is
   // left out of the save so a resumed draft's value is not erased.
   const [listsFailed, setListsFailed] = useState({ advisers: false, classification: false, psced: false });
+  const [listError, setListError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   const [step, setStep] = useState<PublishStep>(1);
   const [typeId, setTypeId] = useState<number | null>(null);
+  const [isContinuation, setIsContinuation] = useState(false);
   // The type the server holds, so Continue saves only a change.
   const savedTypeId = useRef<number | null>(null);
   // A ref as well as state: a retry reads it from a closure made before the
@@ -185,6 +197,13 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [upload, setUpload] = useState<ManuscriptUpload>({ status: "idle" });
   const fileRef = useRef<File | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // Which uploaded file the prefill is about; a replacement bumps it, which
+  // forgets the old file's suggestions and anything the author dismissed.
+  const [uploadGeneration, setUploadGeneration] = useState(0);
+  const [dismissed, setDismissed] = useState<ReadonlySet<PrefillField>>(new Set());
+  // The title the dialog itself wrote from the file name. Replacing it is not
+  // replacing the author's words, so its chip offers a plain Use.
+  const provisionalTitleRef = useRef<string | null>(null);
 
   const [moreOpen, setMoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -215,7 +234,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       if (cancelled) return;
       // Without the types nothing can start; the other three only degrade step 2.
       if (types.status === "rejected") {
-        setPhase({ kind: "loadError" });
+        setPhase({ kind: "loadError", message: errorDetail(types.reason, "We couldn't open Publish just now.") });
         return;
       }
       const loaded: Lists = {
@@ -230,6 +249,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         classification: classifications.status === "rejected",
         psced: psceds.status === "rejected",
       });
+      const listFailure = [advisers, classifications, psceds].find((result) => result.status === "rejected");
+      setListError(listFailure ? errorDetail(listFailure.reason, "We couldn't load the adviser and classification lists. Close this and try again.") : null);
 
       if (startTarget === "new") {
         setPhase({ kind: "form" });
@@ -249,6 +270,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           return;
         }
         const state = stateFromDraft(record, loaded);
+        setIsContinuation(Boolean(record.lineage?.derived_from));
         form.reset(state.values);
         draftIdRef.current = id;
         setDraftId(id);
@@ -261,7 +283,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       } catch (err) {
         if (cancelled) return;
         const status = (err as { response?: { status?: number } })?.response?.status;
-        setPhase(status === 404 ? { kind: "notFound" } : { kind: "loadError" });
+        setPhase(status === 404 ? { kind: "notFound" } : { kind: "loadError", message: errorDetail(err, "We couldn't open Publish just now.") });
       }
     })();
 
@@ -318,7 +340,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         setDraftId(id);
         savedTypeId.current = typeId;
         onDraftCreated(id);
-        if (!form.getValues("title")) form.setValue("title", title);
+        if (!form.getValues("title")) {
+          form.setValue("title", title);
+          provisionalTitleRef.current = title;
+        }
       }
       await recordsApi.uploadManuscript(id, file, {
         signal: controller.signal,
@@ -326,6 +351,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           setUpload((u) => (u.status === "uploading" ? { ...u, progress } : u)),
       });
       setUpload({ status: "done", fileName: file.name, size: file.size });
+      setUploadGeneration((n) => n + 1);
+      setDismissed(new Set());
     } catch (err) {
       if (controller.signal.aborted) return;
       const failure = describeFailure(err, "The upload failed.");
@@ -390,6 +417,28 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   const continueFromDetails = form.handleSubmit(saveDetails, (errors) => focusFirstInvalid(errors, () => setMoreOpen(true)));
 
+  const prefill = usePrefill({
+    recordId: draftId,
+    active: phase.kind === "form" && step === 2 && upload.status === "done",
+    generation: uploadGeneration,
+  });
+
+  /**
+   * Fill a field from its suggestion, and put the author in it. The chip goes
+   * for good: editing the filled text afterwards is the author's own change,
+   * not a reason to offer the suggestion back.
+   */
+  function acceptSuggestion(field: PrefillField, text: string) {
+    form.setValue(field, text, { shouldDirty: true, shouldValidate: true });
+    setDismissed((prev) => new Set(prev).add(field));
+    form.setFocus(field);
+  }
+
+  function dismissSuggestion(field: PrefillField) {
+    setDismissed((prev) => new Set(prev).add(field));
+    form.setFocus(field);
+  }
+
   /* ── Step 3: submit, then re-read who holds it ───────────────────────── */
   async function submit() {
     const id = draftIdRef.current;
@@ -410,7 +459,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     let holderAdviser: string | null = null;
     try {
       const { data } = await recordsApi.detail(id);
-      holders = data.current_holders ?? [];
+      holders = data.current_holders;
       // A holder is a party, not a person. When the party is the Adviser, the
       // person is the re-read record's own `adviser`, not the form's.
       const person = lists.advisers.find((a) => a.id === data.adviser);
@@ -437,11 +486,28 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   /* ── What the steps show ─────────────────────────────────────────────── */
   const values = form.watch();
+  const prefillNotes = prefillFieldNotes(prefill.status, (field) => {
+    const text = prefill.suggestions[field];
+    const current = values[field] ?? "";
+    if (text == null || dismissed.has(field) || current === text) return null;
+    const replaces = current.trim() !== "" && !(field === "title" && current === provisionalTitleRef.current);
+    return (
+      <PrefillChip
+        field={field}
+        suggestion={text}
+        replaces={replaces}
+        onUse={() => acceptSuggestion(field, text)}
+        onDismiss={() => dismissSuggestion(field)}
+      />
+    );
+  });
   const adviser = lists.advisers.find((a) => a.id === values.adviser);
   const adviserName = adviser ? personName(adviser) : null;
   const typeName = lists.recordTypes.find((t) => t.id === typeId)?.name ?? "";
 
   const summary = {
+    keywords: values.keywords,
+    ownerEmails: values.owner_emails,
     typeName,
     fileName: upload.status === "done" ? upload.fileName : null,
     title: values.title ?? "",
@@ -561,7 +627,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
       {phase.kind === "loadError" && (
         <Notice
-          message="We couldn't open Publish just now."
+          message={phase.message}
           action={
             <button type="button" onClick={() => setAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
               Try again
@@ -625,7 +691,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           <div ref={stepRef} tabIndex={-1} className="outline-none">
           {step === 1 && (
             <ManuscriptStep
-              recordTypes={lists.recordTypes}
+              recordTypes={isContinuation ? lists.recordTypes.filter((type) => !isProposal(type.name)) : lists.recordTypes}
               typeId={typeId}
               onTypeChange={setTypeId}
               upload={upload}
@@ -636,6 +702,14 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
           {step === 2 && (
             <FormProvider {...form}>
+              {/* One announcement for the prefill, where the visible lines sit
+                  under both fields and would be read twice. */}
+              <span role="status" className="sr-only">
+                {prefillAnnouncement(prefill.status, prefillNotes)}
+              </span>
+              {(prefill.status === "failed" || prefill.status === "unsupported") && (
+                <p className="mb-section-sm text-small text-stone-600">{NEUTRAL_PREFILL}</p>
+              )}
               <form
                 noValidate
                 onSubmit={(e) => {
@@ -649,8 +723,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
                   psceds={lists.psceds}
                   selfId={selfId}
                   loadError={listsFailed.advisers || listsFailed.classification || listsFailed.psced}
+                  loadErrorMessage={listError}
                   moreOpen={moreOpen}
                   onMoreOpenChange={setMoreOpen}
+                  fieldNotes={prefillNotes}
                 />
               </form>
             </FormProvider>
@@ -678,6 +754,38 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       )}
     </Modal>
   );
+}
+
+/**
+ * What sits under the title and abstract: "Reading your PDF…" while Docling
+ * runs (the fields stay editable), then each field's chip, if it has one.
+ */
+function prefillFieldNotes(
+  status: PrefillStatus,
+  chipFor: (field: PrefillField) => ReactNode,
+): Partial<Record<PrefillField, ReactNode>> {
+  if (status === "pending") {
+    // A still icon: this can sit on screen for a minute and a half, and a
+    // spinner that long is motion the reduced-motion rule (spec §7) forbids.
+    const reading = (
+      <p className="mt-1 flex items-center gap-1.5 text-small text-stone-600" aria-hidden>
+        <i className="fas fa-file-lines text-label" aria-hidden />
+        Reading your PDF…
+      </p>
+    );
+    return { title: reading, abstract: reading };
+  }
+  if (status !== "ready") return {};
+  return Object.fromEntries(PREFILL_FIELDS.map((f) => [f, chipFor(f)]).filter(([, chip]) => chip != null));
+}
+
+/** What the prefill's live region says; the chips themselves carry the detail. */
+function prefillAnnouncement(status: PrefillStatus, notes: Partial<Record<PrefillField, ReactNode>>): string {
+  // The neutral line is not repeated here: it is ordinary text above the form,
+  // read in order, and a failure to prefill needs no interruption.
+  if (status === "pending") return "Reading your PDF…";
+  const found = PREFILL_FIELDS.filter((f) => notes[f] != null);
+  return found.length > 0 ? `Found a ${found.join(" and ")} in your PDF. Suggestions are shown under each field.` : "";
 }
 
 /** Where the author is: done steps say so in words, the current one is marked. */
@@ -724,7 +832,7 @@ function StepIndicator({ current }: { current: PublishStep }) {
 
 function Notice({ message, action }: { message: string; action: ReactNode }) {
   return (
-    <div className="flex flex-col items-start gap-section py-section">
+    <div role="alert" className="flex flex-col items-start gap-section py-section">
       <p className="text-body text-stone-800">{message}</p>
       {action}
     </div>

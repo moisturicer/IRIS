@@ -40,8 +40,9 @@ what `preserved` is actually derived from (IR-139). Here the badge is a
 consequence of a real resubmission, so it cannot disagree with the rule.
 
 Idempotent: records are keyed by title and skipped if present. Accounts are
-re-saved every run, so **re-running resets the seven passwords to the default** --
-say so before a rehearsal if someone has changed one.
+re-saved every run, so **re-running resets the eleven passwords to the default**,
+and every office account's coordinator flag to what is seeded -- say so before a
+rehearsal if someone has changed one.
 
 Refuses to run with `DEBUG` off unless `--force`, because these are
 known-password accounts.
@@ -75,6 +76,17 @@ ROLE_ACCOUNTS = [
     ("itso@cit.edu", "Ivan", "Santos", RoleName.ITSO),
     ("ierc@cit.edu", "Elena", "Reyes", RoleName.IERC),
     ("ktto@cit.edu", "Karl", "Tan", RoleName.KTTO),
+]
+
+#: One coordinator per office (IR-478, ADR-032 §4), beside the plain
+#: `<role>@cit.edu` member above, so the demo can show that a member claims
+#: from the pool and a coordinator assigns it. The plain accounts are seeded
+#: with the flag off. email, first, last, role
+COORDINATOR_ACCOUNTS = [
+    ("itso.coordinator@cit.edu", "Irene", "Villanueva", RoleName.ITSO),
+    ("ierc.coordinator@cit.edu", "Edgar", "Mendoza", RoleName.IERC),
+    ("ktto.coordinator@cit.edu", "Katrina", "Lopez", RoleName.KTTO),
+    ("rdco.coordinator@cit.edu", "Ramon", "Bautista", RoleName.RDCO),
 ]
 
 #: The seventh account: **a Django superuser holding no application role.**
@@ -176,6 +188,11 @@ class Command(BaseCommand):
         users = self._seed_accounts()
 
         if not options["accounts_only"]:
+            from apps.reviews.models import Turnaround
+
+            for party in ("adviser", "itso", "ierc", "ktto", "rdco"):
+                Turnaround.objects.get_or_create(party=party, defaults={"working_days": 5})
+            self.stdout.write("Demo turnaround: 5 working days per unconfigured party (demonstration only).")
             self._seed_classifications()
             self._seed_catalogue(users)
             self._seed_workflow(users)
@@ -193,21 +210,10 @@ class Command(BaseCommand):
     def _seed_accounts(self) -> dict[str, User]:
         users: dict[str, User] = {}
         for email, first, last, role_name in ROLE_ACCOUNTS:
-            role = Role.objects.get_or_create(name=role_name)[0]
-            user, created = User.objects.get_or_create(
-                email=email, defaults={"first_name": first, "last_name": last},
-            )
-            user.first_name = first
-            user.last_name = last
-            user.role = role
-            user.is_verified = True   # LoginView rejects unverified accounts
-            user.is_active = True
-            user.is_locked = False
-            user.consent_given = True
-            user.set_password(self.password)
-            user.save()
-            users[role_name] = user
-            self._report(created, f"{email:22} role={role_name}")
+            users[role_name] = self._seed_account(email, first, last, role_name, coordinator=False)
+        # Not added to `users`: the workflow below acts as the plain members.
+        for email, first, last, role_name in COORDINATOR_ACCOUNTS:
+            self._seed_account(email, first, last, role_name, coordinator=True)
 
         admin, created = User.objects.get_or_create(
             email=ADMIN_EMAIL, defaults={"first_name": "Iris", "last_name": "Admin"},
@@ -219,9 +225,28 @@ class Command(BaseCommand):
         admin.is_active = True
         admin.set_password(self.password)
         admin.save()
-        self._report(created, f"{ADMIN_EMAIL:22} Django superuser, no application role")
+        self._report(created, f"{ADMIN_EMAIL:26} Django superuser, no application role")
 
         return users
+
+    def _seed_account(self, email, first, last, role_name, *, coordinator) -> User:
+        role = Role.objects.get_or_create(name=role_name)[0]
+        user, created = User.objects.get_or_create(
+            email=email, defaults={"first_name": first, "last_name": last},
+        )
+        user.first_name = first
+        user.last_name = last
+        user.role = role
+        user.is_office_coordinator = coordinator
+        user.is_verified = True   # LoginView rejects unverified accounts
+        user.is_active = True
+        user.is_locked = False
+        user.consent_given = True
+        user.set_password(self.password)
+        user.save()
+        label = f"role={role_name}" + (" coordinator" if coordinator else "")
+        self._report(created, f"{email:26} {label}")
+        return user
 
     # -- phase 2: reference data -------------------------------------------
 
@@ -271,6 +296,7 @@ class Command(BaseCommand):
 
             record = Record.objects.create(
                 title=title,
+                origin=Record.Origin.SYNTHETIC,
                 abstract=ABSTRACT.format(topic=classification_name.lower()),
                 classification=Classification.objects.filter(name=classification_name).first(),
                 record_type=RecordType.objects.get_or_create(name=type_name)[0],
@@ -324,6 +350,7 @@ class Command(BaseCommand):
 
         record = Record.objects.create(
             title=full_title,
+            origin=Record.Origin.SYNTHETIC,
             abstract=(
                 "Seeded by manage.py seed_demo to demonstrate this pipeline "
                 "state. Not a real disclosure."
@@ -492,9 +519,12 @@ class Command(BaseCommand):
             return
 
         owner = users[RoleName.STUDENT]
-        # A new version requires a document uploaded since the request.
+        # A new version requires a document uploaded since the request. The
+        # lookup is for the type-level slot: another record's ad-hoc "Other"
+        # slot can carry the same name and type (IR-348).
         slot, _ = UploadSlot.objects.get_or_create(
-            name="Revised ethics consent form", record_type=record.record_type
+            name="Revised ethics consent form", record_type=record.record_type,
+            record=None,
         )
         RecordUpload.objects.create(
             record=record, slot=slot, file="documents/demo-revised-consent.pdf",

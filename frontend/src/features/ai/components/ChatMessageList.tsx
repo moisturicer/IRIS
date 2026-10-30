@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/types/chat";
-import type { StreamingState } from "../hooks/useAskStream";
+import type { StreamingState } from "../conversation/answerStream";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AssistantMessageSkeleton } from "./AssistantMessageSkeleton";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
@@ -26,6 +26,15 @@ interface ChatMessageListProps {
   onRetry?:           (message: ChatMessage) => void;
   /** Cancel the queued run in flight (IR-548). */
   onStop?:            () => void;
+  /** The answer whose sources are showing (IR-562). */
+  selectedId?:        string | null;
+  /** Show the sources of `message` rather than another answer's. */
+  onSelectSources?:   (message: ChatMessage) => void;
+  /**
+   * The answer a reader came back to from a citation (IR-578): shown once,
+   * where it is, instead of the transcript's end.
+   */
+  anchorTurn?:        number | null;
 }
 
 export function ChatMessageList({
@@ -37,12 +46,25 @@ export function ChatMessageList({
   indexedRecords = null,
   onRetry,
   onStop,
+  selectedId = null,
+  onSelectSources,
+  anchorTurn = null,
 }: ChatMessageListProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+  const columnRef = useRef<HTMLDivElement>(null);
+  const anchored = useRef<number | null>(null);
 
   useEffect(() => {
+    if (anchorTurn != null && anchored.current !== anchorTurn) {
+      const answer = columnRef.current?.querySelector(`[data-turn="${anchorTurn}"]`);
+      if (answer) {
+        anchored.current = anchorTurn;
+        answer.scrollIntoView({ block: "start" });
+        return;
+      }
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isLoading, streaming]);
+  }, [messages, isLoading, streaming, anchorTurn]);
 
   if (messages.length === 0 && !isLoading) {
     return (
@@ -85,9 +107,16 @@ export function ChatMessageList({
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin px-4 sm:px-6 py-6">
       {/* One shared column with ChatInput below it -- see CHAT_COLUMN. */}
-      <div className={`${CHAT_COLUMN} space-y-6`}>
+      <div ref={columnRef} className={`${CHAT_COLUMN} space-y-6`}>
         {messages.map((m) => (
-          <ChatMessageBubble key={m.id} message={m} retryDisabled={isLoading} onRetry={onRetry} />
+          <ChatMessageBubble
+            key={m.id}
+            message={m}
+            retryDisabled={isLoading}
+            onRetry={onRetry}
+            sourcesSelected={m.id === selectedId}
+            onSelectSources={onSelectSources}
+          />
         ))}
         {isLoading && (streaming ? <StreamingMessageBubble state={streaming} onStop={onStop} /> : <AssistantMessageSkeleton />)}
         <div ref={bottomRef} />

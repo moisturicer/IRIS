@@ -1,3 +1,4 @@
+import pyexcel
 from django.contrib.postgres.search import SearchVector
 from core.enums import RecordTypeName
 from .models import Record, RecordOwner
@@ -45,7 +46,10 @@ def soft_delete_record(record: Record, deleted_by):
 def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     """
     Parse a .xls or .xlsx spreadsheet and return (rows, errors).
-    Uses pyexcel-xls / pyexcel-xlsx (see requirements/base.txt).
+    Uses pyexcel with its pyexcel-xls / pyexcel-xlsx plugins (see
+    requirements/base.txt). pyexcel is imported at module level, not caught
+    here: a missing dependency is a broken deployment, and reporting it as a
+    skipped row is what hid it until IR-315.
 
     Expected columns (header row 1 — case-insensitive):
       Title, Abstract, Year Accomplished, Year Completed,
@@ -60,7 +64,8 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     - Authors should be comma-separated (e.g. "Juan Dela Cruz, Maria Santos").
     - Boolean columns accept: TRUE / FALSE / YES / NO / 1 / 0 (case-insensitive).
     - Record Type defaults to "Project" when blank or unrecognised.
-    - Year columns accept integers; non-integer values are stored as None.
+    - Completion year columns tolerate legacy blanks; Publication Year must be a whole year.
+    - Optional Origin declares provenance; omitted or blank means unknown.
 
     Returns
     -------
@@ -74,10 +79,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     file_type = "xls" if ext == ".xls" else "xlsx"
 
     try:
-        import pyexcel
         all_rows = pyexcel.get_array(file_stream=file, file_type=file_type)
-    except ImportError:
-        return [], ["pyexcel is not installed. Check requirements/base.txt."]
     except Exception as exc:
         return [], [f"Could not open file: {exc}. Make sure it is a valid .xls or .xlsx file."]
 
@@ -111,7 +113,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
             return None
         try:
             return int(float(val))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             return None
 
     # --- Parse data rows ----------------------------------------------------
@@ -136,8 +138,21 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
         authors_raw = get_col(row, "authors") or ""
         authors = [a.strip() for a in authors_raw.split(",") if a.strip()]
 
+        origin = get_col(row, "origin") or Record.Origin.UNKNOWN
+        if origin not in Record.Origin.values:
+            errors.append(f"Row {row_num}: skipped — Origin must be unknown, institutional, imported_reference or synthetic.")
+            continue
+        publication_raw = get_col(row, "publication year")
+        publication_year = parse_year(publication_raw)
+        if publication_raw and (publication_year is None or not 1 <= publication_year <= 9999 or float(publication_raw) != publication_year):
+            errors.append(f"Row {row_num}: skipped — Publication Year must be a whole year from 1 to 9999.")
+            continue
+
         records.append({
+            "row_num":               row_num,
             "title":                 title,
+            "origin":                origin,
+            "publication_year":      publication_year,
             "abstract":              get_col(row, "abstract") or "",
             "year_accomplished":     parse_year(get_col(row, "year accomplished")),
             "year_completed":        parse_year(get_col(row, "year completed")),

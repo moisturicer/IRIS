@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent } from "react";
 import { CHAT_COLUMN } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
 
@@ -8,16 +8,19 @@ interface ChatInputProps {
   placeholder?: string;
   /** The box's accessible name, when the placeholder is shortened for a narrow page. */
   label?: string;
-  /** Text to place in the box for the reader to edit; never sent on its own. */
-  draft?: string | null;
+  /**
+   * The box's text, when the page keeps it: Ask IRIS keeps one unsent draft
+   * per conversation (IR-562). Never sent on its own. Without it the box
+   * keeps its own text.
+   */
+  draft?: string;
+  onDraftChange?: (text: string) => void;
 }
 
-export function ChatInput({ onSend, disabled, placeholder, label, draft }: ChatInputProps) {
-  const [text, setText] = useState(draft ?? "");
-
-  useEffect(() => {
-    if (draft) setText(draft);
-  }, [draft]);
+export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraftChange }: ChatInputProps) {
+  const [ownText, setOwnText] = useState("");
+  const text = draft ?? ownText;
+  const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
 
   const submit = () => {
     const trimmed = text.trim();

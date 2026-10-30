@@ -4,6 +4,34 @@ Institutional research and IP disclosure workflow system for CIT-U. The thesis c
 
 ## Language
 
+**Declared origin**:
+The recorded category of a work's provenance, independent of its authors, submitting owner and import actor.
+_Avoid_: Inferred origin, author affiliation
+
+**Institutional research**:
+Research declared to be CIT-U work.
+_Avoid_: Any research stored in IRIS
+
+**Imported reference**:
+Externally sourced research kept as reference material, including real external papers used in evaluation.
+_Avoid_: Synthetic paper, institutional output
+
+**Synthetic research**:
+Deliberately fabricated research used for demonstrations or testing.
+_Avoid_: Imported reference, real evaluation paper
+
+**Unknown origin**:
+A work's origin has not been recorded.
+_Avoid_: Institutional by default
+
+**Publication year**:
+The recorded year a work was published, distinct from its completion year and the date it was added to IRIS.
+_Avoid_: Completion year, added year
+
+**Author**:
+A person or organization explicitly credited with creating the work.
+_Avoid_: Submitting owner, import actor
+
 **Record**:
 One research/IP disclosure submission moving through the workflow. Has one or more uploads, authors (byline names, not accounts), and owners (the `User` accounts who submitted/manage it).
 _Avoid_: Submission, paper, thesis (a Record's `record_type` may be a thesis, but not every Record is one), document (too generic — see Upload/Extraction below for the file-shaped things).
@@ -126,6 +154,22 @@ _Avoid_: Route to RDCO, escalation, final routing.
 One [[Specialist office]]'s review of a Record, from being routed the Record until its [[Seat]]s are done. An office routed the same Record again starts a new Review round, and the latest completed one sets the office's [[Clearance]]; the earlier outcome stands until then.
 _Avoid_: Round alone (a chat exchange is a [[Turn]]), assignment in prose (reads as a person being assigned, which is a Seat), pass.
 
+**Due date**:
+When a party's turn at a Record is expected to finish: a [[Review round]] for a [[Specialist office]], or the Adviser's or RDCO's turn. Set from that party's [[Turnaround]] when the party receives the Record, in working days, and fixed from then on except by an [[Extension]]. It belongs to the office, not a person, so an unclaimed [[Pool]] has one too; every [[Seat]] shows the same date. A due date only prompts reminders and an [[Escalation]]; it never decides, clears or routes anything (ADR-043).
+_Avoid_: Deadline (implies something happens automatically when it passes), SLA (an external commitment IRIS does not make), seat due date.
+
+**Turnaround**:
+How many working days a party is given for its turn at a Record, set per party by an administrator. A party with no Turnaround has no [[Due date]] at all; IRIS never supplies one. Changing it affects only turns that start afterwards.
+_Avoid_: SLA, deadline, review period.
+
+**Extension**:
+Moving a [[Due date]] later, always with a reason and always visible beside the original date. Made by a coordinator of that office, or by IRIS itself while the office's own document request waits on the owner. An Adviser's due date is never extended by hand.
+_Avoid_: Reset (a new Version gives reopened parties a fresh due date, which is not an Extension), postponement.
+
+**Escalation**:
+Telling an office's coordinators that its [[Due date]] has passed. Only a notification: the Record, its [[Seat]]s and its [[Clearance]]s are unchanged. The Adviser stage has no Escalation.
+_Avoid_: Using it for the [[Hand-back]] to RDCO, auto-escalation (suggests the Record moves).
+
 **Revision request**:
 One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and nobody can decide it; the party that asked cannot finish its own review either. Answered by the next Version, or withdrawn by the party that asked. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
 _Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
@@ -149,3 +193,25 @@ _Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision r
 **Version**:
 A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
 _Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).
+
+### Library
+
+**Library**:
+A reader's private collection of [[Saved Record]]s. It belongs to the reader's account, and nobody else can see it.
+_Avoid_: Repository, catalogue (that is Discover), collection, bookshelf.
+
+**Saved Record**:
+A Record a reader has kept in their [[Library]]. A reader saves a Record at most once, and saving tells no one else anything.
+_Avoid_: Like, star, favourite, bookmark.
+
+**Reading status**:
+Where a reader is with a [[Saved Record]]: Want to read, Reading or Completed. A Saved Record has at most one; giving a Record a status saves it, and unsaving it clears the status.
+_Avoid_: Status folder, shelf, progress.
+
+**Folder**:
+A named group a reader makes for their own [[Saved Record]]s. A Reading status is not a Folder, even where the interface shows them side by side.
+_Avoid_: Collection, list, tag.
+
+**Reading history**:
+The papers recently opened in this browser. It is not part of the [[Library]], never leaves the browser, and is cleared on sign-out.
+_Avoid_: Recently viewed, activity, reading log.

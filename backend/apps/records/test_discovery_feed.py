@@ -1,4 +1,4 @@
-"""IR-567 at the authenticated records API seam."""
+"""IR-567 and IR-576 at the authenticated records API seam."""
 
 from datetime import timedelta
 
@@ -14,6 +14,10 @@ from core.enums import PipelineStatus, RecordTypeName, RoleName
 
 FEED = "/api/v1/records/for-you/"
 INTERESTS = "/api/v1/records/interests/"
+
+
+def not_interested(record):
+    return f"/api/v1/records/{record.id}/not-interested/"
 
 
 class DiscoveryFeedTests(APITestCase):
@@ -215,3 +219,85 @@ class DiscoveryFeedTests(APITestCase):
         self.client.force_authenticate(self.other)
         self.assertEqual(self.client.get(INTERESTS).data["classifications"], [])
         self.assertEqual(self.client.get(FEED).data["mode"], "latest")
+
+    # ── IR-576: Not interested, Undo and reset ──────────────────────────────
+
+    def test_not_interested_removes_at_once_and_persists_without_staling_the_cursor(self):
+        records = [self.record(f"Record {i}") for i in range(23)]
+        first = self.client.get(FEED).data
+        first_ids = {row["id"] for row in first["results"]}
+        later = next(record for record in records if record.id not in first_ids)
+
+        dismissed = self.client.post(not_interested(later))
+        self.assertEqual(dismissed.status_code, 201)
+        self.assertEqual(self.client.post(not_interested(later)).status_code, 200)
+
+        # The page already frozen in the snapshot drops it, and the cursor still works.
+        second = self.client.get(FEED, {"cursor": first["next_cursor"]})
+        self.assertEqual(second.status_code, 200)
+        self.assertNotIn(later.id, [row["id"] for row in second.data["results"]])
+        self.assertEqual(second.data["count"], 22)
+
+        # A new snapshot leaves it out from the start.
+        fresh = self.client.get(FEED).data
+        self.assertEqual(fresh["count"], 22)
+        self.assertNotIn(later.id, [row["id"] for row in fresh["results"]])
+
+    def test_undo_restores_the_item_under_a_fresh_snapshot(self):
+        for i in range(21):
+            self.record(f"Record {i}")
+        target = self.record("Newest")
+        self.client.post(not_interested(target))
+        before = self.client.get(FEED).data
+        self.assertNotIn(target.id, [row["id"] for row in before["results"]])
+
+        undone = self.client.delete(not_interested(target))
+        self.assertEqual(undone.status_code, 204)
+
+        stale = self.client.get(FEED, {"cursor": before["next_cursor"]})
+        self.assertEqual(stale.status_code, 409)
+        after = self.client.get(FEED).data
+        self.assertEqual(after["results"][0]["id"], target.id)
+        # Undoing something never dismissed is harmless.
+        self.assertEqual(self.client.delete(not_interested(target)).status_code, 204)
+
+    def test_not_interested_needs_a_record_the_reader_can_read(self):
+        hidden = self.record("Someone else's draft", status=PipelineStatus.DRAFT)
+
+        self.assertEqual(self.client.post(not_interested(hidden)).status_code, 404)
+        Record.objects.filter(pk=hidden.pk).update(pipeline_status=PipelineStatus.PUBLISHED)
+        self.assertIn(hidden.id, [row["id"] for row in self.client.get(FEED).data["results"]])
+
+    def test_reset_clears_areas_and_feedback_and_invalidates_the_feed(self):
+        for i in range(21):
+            self.record(f"Record {i}")
+        dismissed = self.record("Dismissed", classification=self.agriculture)
+        self.client.put(
+            INTERESTS, {"classification_ids": [self.agriculture.id], "psced_ids": []},
+            format="json",
+        )
+        self.client.post(not_interested(dismissed))
+        before = self.client.get(FEED).data
+        self.assertIsNotNone(before["next_cursor"])
+
+        reset = self.client.delete(INTERESTS)
+
+        self.assertEqual(reset.status_code, 200)
+        self.assertEqual(reset.data, {"classifications": [], "psced": []})
+        self.assertEqual(self.client.get(INTERESTS).data, {"classifications": [], "psced": []})
+        self.assertEqual(self.client.get(FEED, {"cursor": before["next_cursor"]}).status_code, 409)
+        after = self.client.get(FEED).data
+        self.assertEqual(after["mode"], "latest")
+        self.assertEqual(after["results"][0]["id"], dismissed.id)
+
+    def test_feedback_belongs_to_one_account(self):
+        shared = self.record("Shared")
+        self.client.post(not_interested(shared))
+
+        self.client.force_authenticate(self.other)
+        self.assertIn(shared.id, [row["id"] for row in self.client.get(FEED).data["results"]])
+        self.client.delete(INTERESTS)
+        self.client.delete(not_interested(shared))
+
+        self.client.force_authenticate(self.reader)
+        self.assertNotIn(shared.id, [row["id"] for row in self.client.get(FEED).data["results"]])

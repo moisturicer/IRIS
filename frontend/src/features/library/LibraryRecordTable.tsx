@@ -155,7 +155,7 @@ export function LibraryRecordTable({
               </Link>
             </div>
             <p className="text-[13px] text-stone-500 truncate mb-1">
-              {formatAuthorList(record.authors, 2)}
+              <span className={formatAuthorList(record.authors, 2) === "Authors not recorded" ? "italic text-stone-500" : undefined}>{formatAuthorList(record.authors, 2)}</span>
             </p>
             <p className="text-[12px] text-stone-400 mb-2.5">
               {recordYearLabel(record)}
@@ -238,7 +238,7 @@ export function LibraryRecordTable({
 
             <p className="text-[13px] text-stone-500 truncate">
               <span className="md:hidden text-stone-400">By </span>
-              {formatAuthorList(record.authors, 2)}
+              <span className={formatAuthorList(record.authors, 2) === "Authors not recorded" ? "italic text-stone-500" : undefined}>{formatAuthorList(record.authors, 2)}</span>
             </p>
 
             <p className="text-[13px] text-stone-500 tabular-nums">{recordYearLabel(record)}</p>

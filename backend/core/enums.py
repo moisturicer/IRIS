@@ -392,6 +392,22 @@ class RequestStatus(models.TextChoices):
     DECLINED = "declined", "Declined"
 
 
+class SessionEndReason(models.TextChoices):
+    """
+    Why a sign-in ended: `UserSession.ended_reason` (IR-645).
+
+    A refused session's 401 names its reason, so the interface can say "you
+    signed out" rather than "you were away too long". Null on sessions ended
+    before the field existed, which read as `IDLE` -- see
+    `apps.accounts.sessions`.
+    """
+
+    LOGOUT = "logout", "Signed out"
+    IDLE = "idle", "Inactive too long"
+    LOCKED = "locked", "Account locked"
+    PASSWORD_CHANGED = "password_changed", "Password changed"
+
+
 class IPType(models.TextChoices):
     """Specific IP classification set by RDCO/KTTO after final review. `Record.ip_type`."""
 

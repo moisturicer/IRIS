@@ -1,6 +1,9 @@
 from pathlib import Path
 from datetime import timedelta
+import re
 
+from celery.schedules import crontab
+from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
@@ -160,9 +163,21 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # ---- REST Framework -----------------------------------------------------
 
+def throttle_rate(name, default):
+    """Read a positive DRF rate, rejecting typos before serving requests."""
+    value = config(name, default=default)
+    if not re.fullmatch(r"[1-9][0-9]*/(s|sec|second|m|min|minute|h|hour|d|day)", value):
+        raise ImproperlyConfigured(
+            f"{name} must be a positive rate such as '100/day' or '60/hour'; "
+            "see backend/.env.example."
+        )
+    return value
+
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
-        "rest_framework_simplejwt.authentication.JWTAuthentication",
+        # simplejwt's, plus the 30-minute inactivity rule (IR-166).
+        "apps.accounts.authentication.IdleAwareJWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated",
@@ -179,9 +194,9 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/day",
-        "user": "1000/day",
-        "ai_query": "60/hour",
+        "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
+        "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
+        "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
         "ai_overview": "600/hour",
@@ -200,7 +215,14 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "AUTH_HEADER_TYPES": ("Bearer",),
+    # Refuses a refresh for a session idle past the limit below (IR-166).
+    "TOKEN_REFRESH_SERIALIZER": "apps.accounts.authentication.IdleAwareTokenRefreshSerializer",
 }
+
+# NFR-S2: a session ends after this long with no user activity, independent of
+# the token lifetimes above (IR-166, apps/accounts/sessions.py). The interface
+# signs itself out on the same figure: frontend/src/lib/activity.ts.
+SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30, cast=int)
 
 # ---- CORS ---------------------------------------------------------------
 
@@ -216,6 +238,9 @@ CORS_ALLOWED_ORIGINS = config(
     "CORS_ALLOWED_ORIGINS", default=FRONTEND_URL, cast=csv_list
 )
 CORS_ALLOW_CREDENTIALS = True
+# The interface reports the user's idle time on every request (IR-166); a
+# cross-origin deployment's preflight refuses any header not listed here.
+CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds")
 
 # ---- Email --------------------------------------------------------------
 
@@ -273,6 +298,16 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.generate_paper_brief": {"queue": "embedding"},
     # IR-466: its own concurrency-1 worker, apart from reader work.
     "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
+}
+
+# ADR-043 §8 (IR-620): the `celery-beat` service's only entry. Hourly, on
+# `default`; the task asks the database what is owed, so the schedule of
+# reminders lives in data and a missed tick is caught up by the next one.
+CELERY_BEAT_SCHEDULE = {
+    "deadline-notifications": {
+        "task": "apps.reviews.tasks.send_deadline_notifications",
+        "schedule": crontab(minute=0),
+    },
 }
 
 # ---- Static / Media -----------------------------------------------------
@@ -488,6 +523,11 @@ AI_SCREEN_MAX_RECORDS = config("AI_SCREEN_MAX_RECORDS", default=500, cast=int)
 AI_SCREEN_BATCH_SIZE = config("AI_SCREEN_BATCH_SIZE", default=20, cast=int)
 AI_SCREEN_TIMEOUT_SECONDS = config("AI_SCREEN_TIMEOUT_SECONDS", default=20.0, cast=float)
 AI_SCREEN_DUPLICATE_MIN_SIMILARITY = config("AI_SCREEN_DUPLICATE_MIN_SIMILARITY", default=0.98, cast=float)
+# The Novelty check's "close" (IR-312, ADR-029 amendment item 7): the cosine
+# similarity at which published work is shown on a Proposal as related
+# research. UNTUNED -- the AI track sets it against real proposals once
+# indexing is unblocked (IR-250).
+AI_NOVELTY_MIN_SIMILARITY = config("AI_NOVELTY_MIN_SIMILARITY", default=0.70, cast=float)
 # IR-546: screening batches in flight at once, passages read for an uncertain
 # paper, and uncertain papers rechecked. Initial pilot values, not measured.
 AI_SCREEN_CONCURRENCY = config("AI_SCREEN_CONCURRENCY", default=3, cast=int)
@@ -1082,10 +1122,17 @@ AI_CHUNK_EXCLUDE_SECTIONS = config(
 
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)
 AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+# The key axes reads the username from. It defaults to the user model's
+# USERNAME_FIELD (`email`), but LoginView authenticates with `username=`, so
+# axes found none and recorded every failure against no user at all (IR-555).
+AXES_USERNAME_FORM_FIELD = "username"
 AXES_RESET_ON_SUCCESS = True
 AXES_COOLOFF_TIME = timedelta(
     minutes=config("AXES_COOLOFF_TIME_MINUTES", default=10, cast=int)
 )
+# A JSON 429 naming the lock and when axes will admit the next attempt, so the
+# sign-in screen counts down to the server's time rather than its own (IR-555).
+AXES_LOCKOUT_CALLABLE = "apps.accounts.lockout.lockout_response"
 
 # ---- Internationalisation -----------------------------------------------
 

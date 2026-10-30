@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { useLocation } from "react-router-dom";
-import { CitationOriginContext } from "@/lib/citedPage";
+import { CitationConversationContext, CitationOriginContext, CitationTurnContext } from "@/lib/citedPage";
 import { turnToMessages } from "@/lib/chatMessages";
 import { renderScreen, screen, within, userEvent } from "@/test/render";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -34,6 +34,20 @@ describe("a checked paper comparison", () => {
     const navigation = JSON.parse(screen.getByLabelText("Citation destination").textContent!);
     expect(navigation.origin).toBe("paper-chat");
     expect(navigation.citation).toMatchObject({ record_id: 7, page: 4, chunk_id: 11, text: "Used rainfall gauges", marker: 4 });
+  });
+
+  // IR-578: a comparison's markers are its own, so the way back names the
+  // answer but no citation to re-read after a reload.
+  it("links a page chip back to its answer without naming a citation to re-read", () => {
+    renderScreen(
+      <CitationConversationContext.Provider value={9}>
+        <CitationTurnContext.Provider value={3}>
+          <ComparisonTable comparison={comparison} />
+        </CitationTurnContext.Provider>
+      </CitationConversationContext.Provider>,
+    );
+    expect(screen.getByRole("link", { name: "Open Flood Prediction at page 4" }))
+      .toHaveAttribute("href", "/records/7?page=4&conversation=9&turn=3");
   });
 
   it("keeps checked facts when the same cell also had unsupported claims", () => {

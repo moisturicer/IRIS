@@ -361,6 +361,10 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         offered.append("request_revision")
 
     if is_record_owner(user, record):
+        from apps.records.continuation import continuable
+
+        if continuable(record):
+            offered.append("continue_as")
         if workflow["workflow_state"] == PipelineStatus.DRAFT:
             offered.extend(["continue_draft", "edit_details"])
         elif workflow["workflow_state"] == WorkflowState.AWAITING_RESUBMISSION:
@@ -370,6 +374,12 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         delete_act = DELETE_CAPABILITY.get(record.pipeline_status)
         if delete_act is not None:
             offered.append(delete_act)
+
+    # `review-comments/`: the record's participants, once it is submitted
+    # (ADR-032 §7, IR-419). A pool member reads the discussion but is not
+    # offered a place in it.
+    if record.pipeline_status != PipelineStatus.DRAFT and is_record_participant(user, record):
+        offered.append("comment_review")
 
     # Both role-gated endpoints refuse anyone who is not office staff
     # (`IsStaff`) before any other check, so the offers do too.

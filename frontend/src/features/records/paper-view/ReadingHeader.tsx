@@ -22,6 +22,8 @@ interface ReadingHeaderProps {
   /** The tab panel's id, or undefined while there is none. */
   panelId?: string;
   onBack: () => void;
+  /** Back to the answer a citation was followed from (IR-578); absent when there is none. */
+  onBackToAnswer?: () => void;
   /** The paper in one line; null while it loads, absent where the page heads itself. */
   title?: string | null;
   version?: ReactNode;
@@ -42,6 +44,7 @@ export function ReadingHeader({
   tabId,
   panelId,
   onBack,
+  onBackToAnswer,
   title,
   version,
   inert = false,
@@ -70,6 +73,21 @@ export function ReadingHeader({
         <i className="fas fa-chevron-left text-2xs" aria-hidden />
         <span>Back</span>
       </button>
+      {onBackToAnswer && (
+        <button
+          type="button"
+          onClick={onBackToAnswer}
+          className={cn(
+            "shrink-0 inline-flex items-center gap-1.5 px-2 text-small font-semibold text-brand hover:bg-brand-50",
+            CONTROL_SIZE,
+            CONTROL_SHAPE,
+            FOCUS_RING,
+          )}
+        >
+          <i className="fas fa-reply text-2xs" aria-hidden />
+          <span>Back to answer</span>
+        </button>
+      )}
       <span aria-hidden className="hidden reading-split:block w-px h-5 bg-stone-300 shrink-0" />
 
       <div className="flex items-center gap-2.5 min-w-0 flex-1 h-14 reading-split:h-auto">

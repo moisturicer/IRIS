@@ -26,6 +26,7 @@ class AuditEvent(models.Model):
     ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
     SESSION_REVOKE   = "SESSION_REVOKE"
     QUESTION_INJECTION = "QUESTION_INJECTION"
+    RESEARCH_METADATA_CORRECTED = "RESEARCH_METADATA_CORRECTED"
 
     # Workflow events (IR-144): one type per act, written by the workflow
     # services inside the act's own transaction (`apps.audit.workflow`). Their
@@ -33,6 +34,8 @@ class AuditEvent(models.Model):
     SUBMITTED                  = "SUBMITTED"
     ROUTED                     = "ROUTED"
     ASSIGNMENT_CLOSED          = "ASSIGNMENT_CLOSED"
+    ASSIGNMENT_EXTENDED        = "ASSIGNMENT_EXTENDED"
+    ASSIGNMENT_ESCALATED       = "ASSIGNMENT_ESCALATED"
     DECISION_RECORDED          = "DECISION_RECORDED"
     PUBLISHED                  = "PUBLISHED"
     RESUBMISSION_REQUESTED     = "RESUBMISSION_REQUESTED"
@@ -69,9 +72,12 @@ class AuditEvent(models.Model):
         (ACCOUNT_UNLOCKED, "Account Unlocked"),
         (SESSION_REVOKE,   "Session Revoked"),
         (QUESTION_INJECTION, "Reader Question Injection Flagged"),
+        (RESEARCH_METADATA_CORRECTED, "Research Metadata Corrected"),
         (SUBMITTED,                  "Submitted"),
         (ROUTED,                     "Routed"),
         (ASSIGNMENT_CLOSED,          "Assignment Closed"),
+        (ASSIGNMENT_EXTENDED,        "Assignment Deadline Extended"),
+        (ASSIGNMENT_ESCALATED,       "Assignment Overdue Escalated"),
         (DECISION_RECORDED,          "Decision Recorded"),
         (PUBLISHED,                  "Published"),
         (RESUBMISSION_REQUESTED,     "Revision Requested"),
@@ -94,11 +100,17 @@ class AuditEvent(models.Model):
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)
+    # DO_NOTHING with no database constraint (IR-166): deleting a User or a
+    # Record must not touch its audit rows, which are insert-only at the
+    # database. The row keeps the deleted subject's id; `select_related` reads
+    # it as None. SET_NULL would have needed an UPDATE the trigger allowed, and
+    # that exception let anyone strip attribution from the whole log.
     user       = models.ForeignKey(
-        "accounts.User", on_delete=models.SET_NULL, null=True, related_name="audit_events"
+        "accounts.User", on_delete=models.DO_NOTHING, db_constraint=False, null=True,
+        related_name="audit_events"
     )
     record     = models.ForeignKey(
-        "records.Record", on_delete=models.SET_NULL, null=True, blank=True,
+        "records.Record", on_delete=models.DO_NOTHING, db_constraint=False, null=True, blank=True,
         related_name="audit_events"
     )
     # Store extra details without polluting the schema with more columns

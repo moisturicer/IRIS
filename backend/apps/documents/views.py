@@ -78,6 +78,25 @@ def _slot_for_record(record, slot_id):
     return slot, None
 
 
+def _on_visible_record(user, queryset, pk):
+    """
+    The object `pk` from `queryset`, or None when it is missing or sits on a
+    record `user` cannot see. The caller answers both with the same 404.
+
+    IR-627, ADR-022 §Amendment 4. These routes take an upload or file id, not a
+    record id, so unlike `authorize_record_documents` the id is the thing being
+    probed: a 403 for a hidden record beside a 404 for a missing id told any
+    account which ids exist on drafts it cannot read. A caller who can see the
+    record but may not reach its documents still gets the view's 403.
+    """
+    from apps.records.models import Record
+
+    obj = queryset.filter(pk=pk).first()
+    if obj is None or not Record.objects.visible_to(user).filter(pk=obj.record_id).exists():
+        return None
+    return obj
+
+
 def _store_slot_upload(record, slot, file, user):
     """
     Store a file uploaded into a slot. An owner's upload also answers every
@@ -351,13 +370,15 @@ class RecordUploadDownloadView(APIView):
     GET /documents/uploads/<id>/download/?inline=true  -- serve for in-browser viewing
 
     Permission: any record owner OR staff (KTTO, RDCO, ITSO, IERC, Django staff).
+    Refusals follow ADR-022 §Amendment 4 (IR-627): see `_on_visible_record`.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        try:
-            upload = RecordUpload.objects.select_related("record", "slot", "uploaded_by").get(pk=pk)
-        except RecordUpload.DoesNotExist:
+        upload = _on_visible_record(
+            request.user, RecordUpload.objects.select_related("record", "slot", "uploaded_by"), pk,
+        )
+        if upload is None:
             return Response({"detail": "Upload not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if not owns_or_staffs_record(request.user, upload.record):
@@ -453,13 +474,13 @@ class RecordUploadDeleteView(APIView):
     DELETE /documents/uploads/<id>/
     Owners may delete any version > 1.  Staff may delete any version (force=True).
     The physical file is removed from storage before the DB row is deleted.
+    Refusals follow ADR-022 §Amendment 4 (IR-627): see `_on_visible_record`.
     """
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
-        try:
-            upload = RecordUpload.objects.select_related("record", "slot").get(pk=pk)
-        except RecordUpload.DoesNotExist:
+        upload = _on_visible_record(request.user, RecordUpload.objects.select_related("record", "slot"), pk)
+        if upload is None:
             return Response({"detail": "Upload not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if not owns_or_staffs_record(request.user, upload.record):
@@ -490,13 +511,13 @@ class RecordFileDownloadView(APIView):
     GET /documents/files/<id>/download/?inline=true  -- serve for in-browser viewing
 
     Permission: any record owner OR staff.
+    Refusals follow ADR-022 §Amendment 4 (IR-627): see `_on_visible_record`.
     """
     permission_classes = [IsAuthenticated]
 
     def get(self, request, pk):
-        try:
-            record_file = RecordFile.objects.select_related("record").get(pk=pk)
-        except RecordFile.DoesNotExist:
+        record_file = _on_visible_record(request.user, RecordFile.objects.select_related("record"), pk)
+        if record_file is None:
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if not owns_or_staffs_record(request.user, record_file.record):
@@ -538,14 +559,10 @@ class RecordFileDeleteView(APIView):
     permission_classes = [IsAuthenticated]
 
     def delete(self, request, pk):
-        from apps.records.models import Record
-
         from .attachments import delete_record_file, may_remove
 
-        record_file = RecordFile.objects.select_related("record").filter(pk=pk).first()
-        if record_file is None or not (
-            Record.objects.visible_to(request.user).filter(pk=record_file.record_id).exists()
-        ):
+        record_file = _on_visible_record(request.user, RecordFile.objects.select_related("record"), pk)
+        if record_file is None:
             return Response({"detail": "File not found."}, status=status.HTTP_404_NOT_FOUND)
 
         if not may_remove(record_file, request.user):

@@ -9,6 +9,10 @@ New-model records reach their state through routing, as in `test_routing.py`;
 old-pipeline records are parked at a stage, as the legacy queue tests do.
 """
 
+from datetime import datetime
+from unittest.mock import patch
+from zoneinfo import ZoneInfo
+
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
@@ -16,7 +20,13 @@ from django.utils import timezone
 from rest_framework import status
 
 from apps.records.models import Record, RecordOwner, RecordType
-from apps.reviews.models import RecordAssignment, Review, ReviewerSeat
+from apps.reviews.models import (
+    Holiday,
+    RecordAssignment,
+    Review,
+    ReviewerSeat,
+    Turnaround,
+)
 from core.enums import (
     AssignmentState,
     Party,
@@ -483,6 +493,108 @@ class ContractTests(MyReviewsTestBase):
         build(5)
         large = {tab: queries(tab) for tab in ("to_review", "done")}
         self.assertEqual(small, large)
+
+
+# --- IR-622: due dates, sort and the overdue filter --------------------------------------------
+
+MANILA = ZoneInfo("Asia/Manila")
+
+
+def at(day, hour=12):
+    """A moment in March 2027, Manila time. The 25th is a Thursday."""
+    return datetime(2027, 3, day, hour, tzinfo=MANILA)
+
+
+class DueDateTests(MyReviewsTestBase):
+    """
+    ADR-043 counts in Manila working days, holidays excluded, so how late a
+    row is comes from the server: the browser knows no holidays (IR-622).
+    """
+
+    def setUp(self):
+        Turnaround.objects.create(party=Party.ITSO, working_days=1)
+
+    def routed_on(self, day, *parties):
+        with patch("django.utils.timezone.now", return_value=at(day)):
+            return self.routed(*(parties or (Party.ITSO,)))
+
+    def row_at(self, when, record, **params):
+        with patch("django.utils.timezone.now", return_value=when):
+            rows = self.rows(self.itso, **params)
+        return next(r for r in rows if r["record"] == record.pk)
+
+    def test_overdue_days_count_working_days_after_the_due_date(self):
+        record = self.routed_on(25)  # due Friday the 26th, 23:59
+        Holiday.objects.create(date=at(30).date(), name="Demo holiday")
+
+        for when, expected in (
+            (at(26, 23), None),  # due today: not late
+            (at(27), 0),         # Saturday: late, but no working day missed
+            (at(29), 1),         # Monday
+            (at(30), 1),         # Tuesday is a holiday
+            (at(31), 2),
+        ):
+            with self.subTest(when=when):
+                row = self.row_at(when, record)
+                self.assertEqual(row["overdue_days"], expected)
+                self.assertEqual(row["is_overdue"], expected is not None)
+
+    def turnaround(self, days):
+        Turnaround.objects.filter(party=Party.ITSO).delete()
+        if days is not None:
+            Turnaround.objects.create(party=Party.ITSO, working_days=days)
+
+    def three_rows(self):
+        """Due-date order and waiting order disagree: (soonest due, later due, no clock)."""
+        self.turnaround(None)
+        undated = self.routed_on(19)             # waiting longest, no due date
+        self.turnaround(5)
+        later = self.routed_on(22)               # due Monday the 29th
+        self.turnaround(1)
+        soonest = self.routed_on(24)             # due Thursday the 25th
+        return soonest, later, undated
+
+    def order(self, **params):
+        with patch("django.utils.timezone.now", return_value=at(25)):
+            return [r["record"] for r in self.rows(self.itso, **params)]
+
+    def test_soonest_due_comes_first_and_undated_rows_last(self):
+        soonest, later, undated = self.three_rows()
+        self.assertEqual(self.order(), [soonest.pk, later.pk, undated.pk])
+        self.assertEqual(self.order(sort="due"), [soonest.pk, later.pk, undated.pk])
+
+    def test_sort_waiting_keeps_the_longest_waiting_first(self):
+        soonest, later, undated = self.three_rows()
+        self.assertEqual(self.order(sort="waiting"), [undated.pk, later.pk, soonest.pk])
+
+    def test_overdue_only_lists_overdue_rows_and_leaves_the_counts_alone(self):
+        late = self.routed_on(22)                # due Tuesday the 23rd
+        on_time = self.routed_on(25)             # due Friday the 26th
+        with patch("django.utils.timezone.now", return_value=at(25)):
+            page = self.page(self.itso, overdue="1")
+            everything = self.page(self.itso)
+        self.assertEqual([r["record"] for r in page["rows"]], [late.pk])
+        self.assertEqual({r["record"] for r in everything["rows"]}, {late.pk, on_time.pk})
+        self.assertEqual(page["counts"], everything["counts"])
+
+    def test_a_finished_seat_is_never_overdue_while_a_colleague_still_reviews(self):
+        """Found in review: a done seat can sit on an assignment still active for its colleague."""
+        record = self.routed_on(25)  # due Friday the 26th
+        mine = self.seat(record, Party.ITSO, self.itso)
+        self.seat(record, Party.ITSO, self.itso2)
+        mine.state, mine.done_at = SeatState.DONE, at(26)
+        mine.save(update_fields=["state", "done_at"])
+
+        row = self.row_at(at(31), record, tab="done")
+        self.assertEqual(row["kind"], "seat")
+        self.assertFalse(row["is_overdue"])
+        self.assertIsNone(row["overdue_days"])
+
+    def test_done_takes_no_sort_or_overdue_and_unknown_values_are_refused(self):
+        for params in ({"tab": "done", "sort": "due"}, {"tab": "done", "overdue": "1"},
+                       {"sort": "title"}, {"overdue": "yes"}):
+            with self.subTest(params=params):
+                self.assertEqual(self.mine(self.itso, **params).status_code, status.HTTP_400_BAD_REQUEST)
 
 
 # --- Settled 2026-10-08: the Assign picklist ----------------------------------------------------

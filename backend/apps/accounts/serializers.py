@@ -1,3 +1,5 @@
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from core.enums import RequestStatus, RoleName
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
@@ -21,7 +23,7 @@ class UserSerializer(serializers.ModelSerializer):
             "id", "email", "first_name", "middle_initial", "last_name",
             "role", "role_name",
             "is_staff", "is_superuser",
-            "is_verified", "is_locked", "consent_given", "date_joined",
+            "is_verified", "is_locked", "is_active", "consent_given", "date_joined",
             "is_office_coordinator",
             "college_name", "department_name", "course_name",
         ]
@@ -38,7 +40,7 @@ class UserSerializer(serializers.ModelSerializer):
         # is an administrator's, through `PATCH /users/<id>/coordinator/`.
         read_only_fields = [
             "email", "role", "is_staff", "is_superuser",
-            "is_verified", "is_locked", "consent_given", "date_joined",
+            "is_verified", "is_locked", "is_active", "consent_given", "date_joined",
             "is_office_coordinator",
         ]
 
@@ -69,6 +71,27 @@ class UserSerializer(serializers.ModelSerializer):
         return student.course.name if student and student.course else ""
 
 
+class AdviserOptionSerializer(UserSerializer):
+    """
+    One row of `GET /users/advisers/`, the adviser picker every signed-in user
+    can read (IR-587).
+
+    Exactly what the IR-540 data notice tells registrants an approved Adviser
+    shows to signed-in users: name, email, college and department. The account
+    state `UserSerializer` carries for RDCO -- `is_locked`, `is_verified`,
+    `is_staff`, `date_joined` and the rest -- has no reason to reach a student.
+    `college_name` has no reader in the picker today; it stays so the notice is
+    exact and two advisers with one name can be told apart.
+    """
+
+    class Meta(UserSerializer.Meta):
+        fields = [
+            "id", "first_name", "middle_initial", "last_name", "email",
+            "college_name", "department_name",
+        ]
+        read_only_fields = fields
+
+
 class MeSerializer(UserSerializer):
     """
     `GET /users/me/`: the signed-in user, plus what only they may read about
@@ -77,7 +100,8 @@ class MeSerializer(UserSerializer):
     `review_access` (spec Appendix D · B3, IR-415) says whether the user has
     review work: My Reviews' sidebar entry, its route guard and the landing
     after sign-in all read it. It is never on another user's payload -- the
-    adviser picker and the admin list use `UserSerializer` -- so nobody learns
+    adviser picker uses `AdviserOptionSerializer` and the admin list
+    `UserSerializer` -- so nobody learns
     who else reviews what.
 
     `role_request` (IR-537) is the user's latest role request while they have
@@ -112,8 +136,21 @@ class MeSerializer(UserSerializer):
         return {"status": latest.status, "requested_role": latest.requested_role.name}
 
 
+def enforce_password_policy(password, user, field):
+    """Refuse ``password`` unless it passes `AUTH_PASSWORD_VALIDATORS` (IR-647).
+
+    The settings are the one definition of the policy; this is how the API
+    applies it. Every validator's message is reported on ``field`` together,
+    so the person can fix them all in one try.
+    """
+    try:
+        validate_password(password, user)
+    except DjangoValidationError as exc:
+        raise serializers.ValidationError({field: list(exc.messages)})
+
+
 class RegisterSerializer(serializers.ModelSerializer):
-    password         = serializers.CharField(write_only=True, min_length=8)
+    password         = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
     consent_given    = serializers.BooleanField(write_only=True)
 
@@ -145,6 +182,15 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate(self, data):
         if data["password"] != data.pop("confirm_password"):
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
+
+        # An unsaved user, so validators that compare against the person's own
+        # name or email have something to compare with.
+        candidate = User(
+            email=data.get("email", ""),
+            first_name=data.get("first_name", ""),
+            last_name=data.get("last_name", ""),
+        )
+        enforce_password_policy(data["password"], candidate, "password")
 
         role_name = data.get("role_name")
         if role_name == RoleName.STUDENT and not data.get("course_id"):
@@ -188,13 +234,17 @@ class RegisterSerializer(serializers.ModelSerializer):
 
 class ChangePasswordSerializer(serializers.Serializer):
     old_password = serializers.CharField()
-    new_password = serializers.CharField(min_length=8)
+    new_password = serializers.CharField()
 
     def validate_old_password(self, value):
         user = self.context["request"].user
         if not user.check_password(value):
             raise serializers.ValidationError("Old password is incorrect.")
         return value
+
+    def validate(self, attrs):
+        enforce_password_policy(attrs["new_password"], self.context["request"].user, "new_password")
+        return attrs
 
 
 class CollegeSerializer(serializers.ModelSerializer):

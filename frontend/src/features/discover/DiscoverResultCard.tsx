@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { ResearchCard } from "@/components/shared/ResearchCard";
+import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 import type { ForYouItem, RecordListItem } from "@/types/records";
@@ -13,6 +14,7 @@ import {
   highlightMatch,
   ipTypeLabel,
   isStarred,
+  indexedOnLabel,
   recordYearLabel,
   toggleStarred,
 } from "./discoverUtils";
@@ -23,6 +25,8 @@ interface DiscoverResultCardProps {
   onCite:          () => void;
   reason?:         ForYouItem["reason"];
   expanded?:       boolean;
+  /** For you only: hide this recommendation for the reader's account (IR-576). */
+  onNotInterested?: () => void;
 }
 
 /**
@@ -33,7 +37,7 @@ interface DiscoverResultCardProps {
  * so the card names none rather than guessing one; citation and download
  * counts do not exist, so views are the only figure.
  */
-export function DiscoverResultCard({ record, searchHighlight, onCite, reason, expanded = false }: DiscoverResultCardProps) {
+export function DiscoverResultCard({ record, searchHighlight, onCite, reason, expanded = false, onNotInterested }: DiscoverResultCardProps) {
   const [starred, setStarred] = useState(() => isStarred(record.id));
   const abstract = record.abstract?.trim() ?? "";
   const hook = cardHook({ abstract, ai_hook: record.ai_hook });
@@ -63,8 +67,10 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
           </span>}
         </span>
       }
-      meta={recordYearLabel(record)}
-      byline={highlightMatch(formatAuthorList(record.authors), searchHighlight)}
+      meta={record.publication_year ? `Published ${recordYearLabel(record)}` : indexedOnLabel(record)}
+      byline={formatAuthorList(record.authors) === "Authors not recorded"
+        ? <span className="italic text-stone-500">Authors not recorded</span>
+        : highlightMatch(formatAuthorList(record.authors), searchHighlight)}
       summary={abstract ? highlightMatch(abstract, searchHighlight) : <span className="italic">No abstract provided.</span>}
       summaryClassName={expanded ? "xl:line-clamp-5" : undefined}
       splitFooter={expanded}
@@ -84,6 +90,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
       footerClassName="rounded-b-xl border-stone-200 bg-white"
       footer={
         <>
+          <ResearchOriginBadge origin={record.origin} />
           <span className="inline-flex items-center gap-1.5 text-stone-700" title="Times this record has been opened">
             <i className="fas fa-eye text-[12px] text-brand" aria-hidden />
             {record.access_count} {record.access_count === 1 ? "view" : "views"}
@@ -129,6 +136,21 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
           >
             <CitationIcon className="w-[13px] h-[13px]" />
           </button>
+          {onNotInterested && (
+            <button
+              type="button"
+              onClick={onNotInterested}
+              aria-label="Not interested"
+              title="Not interested"
+              className={cn(
+                "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border border-stone-200 bg-white text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50 flex items-center justify-center",
+                COLOUR_TRANSITION,
+                FOCUS_RING,
+              )}
+            >
+              <i className="far fa-eye-slash text-[13px]" aria-hidden />
+            </button>
+          )}
         </>
       }
     />

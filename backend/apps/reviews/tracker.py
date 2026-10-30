@@ -45,7 +45,10 @@ from core.enums import (
 )
 from core.permissions import REVIEWER_ROLES, get_role_name, may_read_review
 
-from .clearance_state import clearance_payload, is_preserved, resubmission_payload
+from .clearance_state import (
+    carryover_fields, clearance_payload, is_preserved, record_versions, resubmission_payload,
+)
+from .comments import comments_payload
 from .decisions import withdrawn_by_label
 from .models import (
     RecordAssignment, RecordClearance, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
@@ -194,6 +197,8 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
       `derive_workflow_state`'s alone.
     - `holders`: the parties with an active assignment, in tracker order,
       as `{party, label}` -- who has the record now.
+    - `revision_parties`, `document_parties`: the asking party of each open
+      revision and document request on a record in review.
     - `cleared_offices`: each office whose clearance is `cleared`, with
       `preserved` from `clearance_state.is_preserved`, so a clearance kept
       through a resubmission reads as kept here exactly as on Record detail.
@@ -221,7 +226,7 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
         ResubmissionRequest.objects.filter(
             record_id__in=in_review, state=ResubmissionRequestState.OPEN
         ),
-        "pk",
+        "party",
     )
     documents = per_record(
         DocumentRequest.objects.filter(record_id__in=in_review, state=DocumentRequestState.OPEN),
@@ -263,6 +268,9 @@ def workflow_facts(records) -> dict[int, dict[str, Any]]:
                 deciding_parties=lifecycle.deciding_parties_for(r),
             ),
             "holders": holders(r.pk),
+            # Who asked, per open request: what `submitter_status` names (IR-625).
+            "revision_parties": resubmissions.get(r.pk, []),
+            "document_parties": documents.get(r.pk, []),
             "cleared_offices": [
                 {
                     "office": office,
@@ -407,6 +415,7 @@ def current_holders(
 def workflow_fields(record, user, *, readable: Optional[bool] = None) -> dict[str, Any]:
     """The workflow fields Record detail carries (IR-258, IR-262)."""
     active = _active_assignments(record)
+    from .deadlines import deadline_payload
     state = workflow_state(record, active_assignments=active)
     return {
         "workflow_state": state,
@@ -415,6 +424,11 @@ def workflow_fields(record, user, *, readable: Optional[bool] = None) -> dict[st
             record, user, active_assignments=active, readable=readable,
         ),
         "can_request_document": requestable_parties(record, user, active_assignments=active),
+        "assignment_deadlines": [
+            {"assignment": a.pk, "party": a.party,
+             **deadline_payload(a, user, readable=may_read_review(user, record))}
+            for a in active
+        ],
     }
 
 
@@ -453,10 +467,17 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
     return rows
 
 
+#: A party row's carryover keys for a party that holds no clearance.
+_NO_CARRYOVER = {
+    "preserved": False, "carryover": None, "carryover_version": None, "carryover_label": None,
+}
+
+
 def _party_rows(
     record, *, reviews: list, clearances: list, staff: bool, disclose_requests: bool,
-    disclose_seats: bool = False,
+    versions: list, disclose_seats: bool = False, user=None,
 ) -> list[dict]:
+    from .deadlines import deadline_payload
     assignments: dict[str, RecordAssignment] = {}
     for a in (
         RecordAssignment.objects.filter(record=record)
@@ -573,6 +594,7 @@ def _party_rows(
             # completed round still stands beside it (ADR-032 §5 Amendment,
             # IR-272). Which party asked is not review content (IR-479).
             "changes_requested": party in asking,
+            **deadline_payload(assignment, user, readable=disclose_seats),
             # The outcome is an earlier review round's, standing while a new
             # one runs (IR-269).
             "outcome_earlier": earlier,
@@ -599,11 +621,14 @@ def _party_rows(
                 if state is TrackerPartyState.WITHDRAWN
                 and assignment.closed_by_decision_id is not None else None
             ),
-            "preserved": (
-                clearance_payload(
-                    clearance, last_resubmitted_at=record.last_resubmitted_at, readable=False,
-                )["preserved"]
-                if clearance is not None else False
+            # Preserved from an earlier version, or reset by a revision, as the
+            # clearance payload states it (IR-624). An outcome, not review
+            # content. None for a party that holds no clearance.
+            **(
+                carryover_fields(
+                    clearance, last_resubmitted_at=record.last_resubmitted_at, versions=versions,
+                )
+                if clearance is not None else _NO_CARRYOVER
             ),
         })
     return rows
@@ -675,6 +700,43 @@ def _resubmissions(record, *, staff: bool, readable: bool) -> list[dict]:
     ]
 
 
+def _deadline_history(record, user, *, readable):
+    from .deadlines import deadline_payload
+
+    return [
+        {"assignment": a.pk, "party": a.party, "label": party_label(a.party, staff_viewer=False),
+         "state": a.state,
+         "opened_at": _iso(a.opened_at), "clock_started_at": _iso(a.clock_started_at),
+         **deadline_payload(a, user, readable=readable)}
+        for a in record.assignments.order_by("opened_at", "pk").prefetch_related("extensions__actor")
+    ]
+
+
+def _reassignments(record, *, staff: bool, readable: bool) -> list[dict]:
+    """
+    Every seat a coordinator reassigned (IR-623), oldest first. Who lost it,
+    who got it, who moved it and why are review content: `None` to a viewer
+    who may not read the review (IR-479). That one happened, for which
+    party, and when, is not.
+    """
+    return [
+        {
+            "seat": s.pk,
+            "party": s.assignment.party,
+            "label": party_label(s.assignment.party, staff_viewer=staff),
+            "from_name": _name(s.reassigned_from.reviewer) if readable else None,
+            "to_name": _name(s.reviewer) if readable else None,
+            "by_name": _name(s.assigned_by) if readable else None,
+            "reason": s.reason if readable else None,
+            "at": _iso(s.assigned_at),
+        }
+        for s in ReviewerSeat.objects.filter(
+            assignment__record=record, reassigned_from__isnull=False,
+        ).select_related("assignment", "reviewer", "assigned_by", "reassigned_from__reviewer")
+        .order_by("assigned_at", "pk")
+    ]
+
+
 def tracker_payload(record, user) -> dict[str, Any]:
     """`GET /records/<id>/tracker/` -- §8.1 of the architecture doc."""
     from apps.documents.request_serializers import serialize_requests
@@ -695,15 +757,18 @@ def tracker_payload(record, user) -> dict[str, Any]:
     latest_decline = next(
         (r for r in reversed(reviews) if r.status == ReviewDecision.DECLINED), None
     )
+    versions = record_versions(record)
 
     payload = {
         "record_id": record.pk,
         "record_type": lifecycle.type_name_of(record) or None,
         **workflow_fields(record, user, readable=readable),
+        # Earlier rounds remain available after re-routing opens a new one.
+        "assignment_deadline_history": _deadline_history(record, user, readable=readable),
         "parties": _party_rows(
             record, reviews=reviews, clearances=clearances, staff=staff,
             disclose_requests=disclose_requests,
-            disclose_seats=readable,
+            disclose_seats=readable, user=user, versions=versions,
         ),
         "routing_history": _routing_history(record, staff=staff, readable=readable),
         "routing_recorded_from": _routing_recorded_from(),
@@ -726,12 +791,19 @@ def tracker_payload(record, user) -> dict[str, Any]:
         # Each version is a timeline entry of its own (ADR-032 §5, IR-416).
         # Review material, so `None` to a viewer who may not read the review.
         "versions": versions_payload(record) if readable else None,
+        # The review discussion (ADR-032 §7, IR-419), oldest first. `None`,
+        # as `reviews` is, to a viewer who may not read the review.
+        "review_comments": comments_payload(record, user) if readable else None,
         "resubmissions": _resubmissions(record, staff=staff, readable=readable),
+        "reassignments": _reassignments(record, staff=staff, readable=readable),
         "document_requests": (
             serialize_requests(record, user, requests_for(record)) if disclose_requests else None
         ),
         "clearances": [
-            clearance_payload(c, last_resubmitted_at=record.last_resubmitted_at, readable=readable)
+            clearance_payload(
+                c, last_resubmitted_at=record.last_resubmitted_at, readable=readable,
+                versions=versions,
+            )
             for c in clearances
         ],
         "resubmission": resubmission_payload(

@@ -32,7 +32,7 @@ MINE = reverse("record-mine")
 LIST_FIELDS = {
     "id", "title", "record_type_name", "authors", "adviser_name",
     "pipeline_status", "workflow_state", "workflow_state_label",
-    "holders", "cleared_offices", "created_at", "updated_at",
+    "holders", "cleared_offices", "submitter_status", "created_at", "updated_at", "can_continue",
 }
 
 

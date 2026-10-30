@@ -102,6 +102,20 @@ class PassagesOnTheWireTests:
     reaches the wire verifies nothing for anybody.
     """
 
+    def test_source_metadata_does_not_invent_authors_or_publication_year(self, embedder, space, client_for):
+        reader = make_user("metadata-reader@cit.edu")
+        record = make_record(title="External reference", text=FLOOD_TEXT, embedder=embedder, space=space)
+        record.authors.all().delete()
+        record.origin = "imported_reference"
+        record.year_accomplished = 2020
+        record.save()
+        with use_composition_root(root_with(embedder=embedder)):
+            body = ask(client_for(reader), FLOOD_QUESTION).json()
+        source, = body["sources"]
+        assert source["authors"] == ""
+        assert source["origin"] == "imported_reference"
+        assert source["year"] is None
+
     def test_a_citation_carries_its_record_page_and_quoted_passage(
         self, embedder, space, client_for
     ):
@@ -138,7 +152,8 @@ class PassagesOnTheWireTests:
         assert source["id"] == flood.pk
         assert source["title"] == "Flood Prediction"
         assert source["abstract"]
-        assert source["authors"]
+        # This fixture records no authors. IR-563 removes the old fabricated byline.
+        assert source["authors"] == ""
 
     def test_search_returns_the_same_passage_shape(
         self, embedder, space, client_for

@@ -26,6 +26,7 @@ const ownRecord = (overrides: Partial<MyResearchItem>): MyResearchItem => ({
   workflow_state_label: "Draft",
   holders: [],
   cleared_offices: [],
+  submitter_status: { line: "Draft: not yet submitted", waiting_on_you: [] },
   created_at: "2026-10-01T00:00:00Z",
   updated_at: "2026-10-02T00:00:00Z",
   ...overrides,
@@ -45,35 +46,49 @@ beforeEach(() => {
 });
 
 describe("My Library: an author's research", () => {
+  it("offers continuation only when the server permits it", async () => {
+    mine([ownRecord({ pipeline_status: "approved", workflow_state: "approved", can_continue: true })]);
+    renderScreen(<MyLibraryPage />);
+    expect(await screen.findByRole("button", { name: "Continue as Thesis" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue as Project" })).toBeInTheDocument();
+  });
   it("opens on the author's research, with the server's status and Continue into Publish for a draft", async () => {
     mine([ownRecord({})]);
     const { container } = renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("link", { name: "Community Water Monitoring" })).toHaveAttribute("href", "/records/12");
-    expect(within(section("Drafts")).getByText("Draft")).toBeInTheDocument();
+    expect(within(section("Drafts")).getByText("Draft: not yet submitted")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Continue" })).toHaveAttribute("href", "/?publish=12");
     expect(recordsApi.mine).toHaveBeenCalledOnce();
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("puts what waits on the author first, with the next step and Respond into the right Paper View section", async () => {
+  it("puts what waits on the author first, each request linking straight to the act that answers it", async () => {
+    const revision = { kind: "revision", party: "ierc", label: "Revision requested by IERC", action_label: "Submit a new version" } as const;
+    const document = { kind: "document", party: "adviser", label: "Documents requested by Adviser", action_label: "Upload the documents" } as const;
     mine([
-      ownRecord({ id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }] }),
-      ownRecord({ id: 14, title: "Asked to revise", pipeline_status: "in_review", workflow_state: "awaiting_resubmission", workflow_state_label: "Revision requested", holders: [{ party: "ierc", label: "IERC" }] }),
-      ownRecord({ id: 15, title: "Asked for a form", pipeline_status: "in_review", workflow_state: "awaiting_document", workflow_state_label: "Document requested", holders: [{ party: "adviser", label: "Adviser" }] }),
+      ownRecord({ id: 13, title: "Still with the offices", pipeline_status: "in_review", workflow_state: "in_review", workflow_state_label: "In review", holders: [{ party: "ierc", label: "IERC" }], submitter_status: { line: "In specialist review: IERC", waiting_on_you: [] } }),
+      ownRecord({ id: 14, title: "Asked to revise", pipeline_status: "in_review", workflow_state: "awaiting_resubmission", workflow_state_label: "Awaiting resubmission", holders: [{ party: "ierc", label: "IERC" }], submitter_status: { line: "Revision requested by IERC: action needed", waiting_on_you: [revision, document] } }),
+      ownRecord({ id: 15, title: "Asked for a form", pipeline_status: "in_review", workflow_state: "awaiting_document", workflow_state_label: "Awaiting document", holders: [{ party: "adviser", label: "Adviser" }], submitter_status: { line: "Documents requested by Adviser: action needed", waiting_on_you: [document] } }),
     ]);
-    renderScreen(<MyLibraryPage />);
+    const { container } = renderScreen(<MyLibraryPage />);
 
     await screen.findByRole("link", { name: "Asked to revise" });
     const headings = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(headings.indexOf("Waiting on you")).toBeLessThan(headings.indexOf("With the offices"));
 
     const waiting = section("Waiting on you");
-    expect(within(waiting).getByText(/submit a new version/i)).toBeInTheDocument();
-    const [revise, form] = within(waiting).getAllByRole("link", { name: "Respond" });
-    expect(revise).toHaveAttribute("href", "/records/14?section=review");
-    expect(form).toHaveAttribute("href", "/records/15?section=files");
+    expect(within(waiting).getByText("Revision requested by IERC: action needed")).toBeInTheDocument();
+    expect(within(waiting).getByRole("link", { name: "Submit a new version (Revision requested by IERC)" }))
+      .toHaveAttribute("href", "/records/14?section=overview#revision-requested");
+    const uploads = within(waiting).getAllByRole("link", { name: "Upload the documents (Documents requested by Adviser)" });
+    expect(uploads.map((link) => link.getAttribute("href"))).toEqual([
+      "/records/14?section=overview#documents-requested",
+      "/records/15?section=overview#documents-requested",
+    ]);
     expect(within(waiting).queryByRole("link", { name: "Still with the offices" })).not.toBeInTheDocument();
+    expect(within(section("With the offices")).getByText("In specialist review: IERC")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("groups review by who holds it and shows each office's clearance, kept ones marked", async () => {
@@ -91,7 +106,6 @@ describe("My Library: an author's research", () => {
     const offices = section("With the offices");
     expect(within(offices).getByText("ITSO cleared")).toBeInTheDocument();
     expect(within(offices).getByText("· kept")).toBeInTheDocument();
-    expect(within(offices).getByText("IERC reviewing")).toBeInTheDocument();
     expect(within(section("With your Adviser")).getByRole("link", { name: "First reading" })).toBeInTheDocument();
   });
 
