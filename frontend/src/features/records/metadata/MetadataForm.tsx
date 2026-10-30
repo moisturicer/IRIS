@@ -88,6 +88,7 @@ interface MetadataFormProps {
   /** Who is signed in, so they can be shown but not chosen as adviser. */
   selfId:          number | null;
   loadError?:      boolean;
+  loadErrorMessage?: string | null;
   /** More details is controlled, so a summary's "Edit hints" can open it. */
   moreOpen:        boolean;
   onMoreOpenChange: (open: boolean) => void;
@@ -111,6 +112,7 @@ export function MetadataForm({
   psceds,
   selfId,
   loadError = false,
+  loadErrorMessage,
   moreOpen,
   onMoreOpenChange,
   submitted = false,
@@ -153,7 +155,7 @@ export function MetadataForm({
       {loadError && (
         <p className={LOAD_ERROR} role="alert">
           <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-          We couldn't load the adviser and classification lists. Close this and try again.
+          {loadErrorMessage ?? "We couldn't load the adviser and classification lists. Close this and try again."}
         </p>
       )}
 

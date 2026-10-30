@@ -11,7 +11,11 @@ import type { WorkflowState } from "@/types/records";
  */
 const { quiet: QUIET, active: ACTIVE, attention: ATTENTION, settled: SETTLED } = TONES;
 
-const WORKFLOW_COLORS: Record<string, string> = {
+/**
+ * Exhaustive over `WorkflowState` (IR-341): a state the server starts sending
+ * fails `tsc` until it is given a tone here, rather than rendering grey.
+ */
+const WORKFLOW_COLORS: Record<WorkflowState, string> = {
   draft:                 QUIET,
   submitted:             QUIET,
   in_review:             ACTIVE,
@@ -25,14 +29,12 @@ const WORKFLOW_COLORS: Record<string, string> = {
   pending_delete:        ATTENTION,
 };
 
-const NEUTRAL = QUIET;
-
 /**
  * The states that stop a record carry a shape as well as a word, so that a
  * recoverable one never reads like a terminal one at a glance: resubmission
  * is the thesis contribution (01-design-system.md section 7).
  */
-const WORKFLOW_ICONS: Record<string, string> = {
+const WORKFLOW_ICONS: Partial<Record<WorkflowState, string>> = {
   awaiting_resubmission: "fa-rotate-left", // revision requested: recoverable
   rejected:              "fa-ban",         // terminal
   pending_delete:        "fa-trash-can",
@@ -44,7 +46,7 @@ type StatusBadgeProps = { state: WorkflowState; label: string };
  * screen (IR-274): every caller passes the server's state and its label.
  */
 export function StatusBadge({ state, label }: StatusBadgeProps) {
-  const color = WORKFLOW_COLORS[state] ?? NEUTRAL;
+  const color = WORKFLOW_COLORS[state];
   const icon = WORKFLOW_ICONS[state];
 
   return (

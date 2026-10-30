@@ -32,6 +32,17 @@ describe("refreshSession", () => {
     expect(redirect).toHaveBeenCalledTimes(1);
   });
 
+  it("passes on why the server refused the session", async () => {
+    // IR-645: the refusal names a reason, and the login screen says it.
+    post.mockRejectedValue(Object.assign(new Error("Request failed with status code 401"), {
+      isAxiosError: true,
+      response: { status: 401, data: { detail: "This session was signed out.", code: "session_ended" } },
+    }));
+
+    await refreshSession();
+    expect(redirect).toHaveBeenCalledWith("session_ended");
+  });
+
   it("logs out and redirects with no refresh token to spend", async () => {
     useAuthStore.setState({ refreshToken: null });
 

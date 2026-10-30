@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { errorDetail } from "@/lib/errorDetail";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
@@ -114,7 +115,7 @@ export default function DiscoverPage() {
   const [interestSelection, setInterestSelection] = useState<{ classification_ids: number[]; psced_ids: number[] }>({ classification_ids: [], psced_ids: [] });
   const [interestOpen, setInterestOpen] = useState(false);
   const [interestLoading, setInterestLoading] = useState(true);
-  const [interestLoadFailed, setInterestLoadFailed] = useState(false);
+  const [interestLoadFailed, setInterestLoadFailed] = useState<string | null>(null);
   const [interestSaving, setInterestSaving] = useState(false);
   const [interestError, setInterestError] = useState("");
   const [resetConfirming, setResetConfirming] = useState(false);
@@ -125,8 +126,8 @@ export default function DiscoverPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [failed, setFailed] = useState(false);
-  const [loadMoreFailed, setLoadMoreFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
+  const [loadMoreFailed, setLoadMoreFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   /* ── The query lives in the URL; this is its one parsed form ────────── */
@@ -161,7 +162,7 @@ export default function DiscoverPage() {
   const [recordTypes, setRecordTypes] = useState<FilterOption[]>([]);
   const [years, setYears] = useState<string[]>([]);
   const [refLoading, setRefLoading] = useState(true);
-  const [refFailed, setRefFailed] = useState(false);
+  const [refFailed, setRefFailed] = useState<string | null>(null);
   const [refAttempt, setRefAttempt] = useState(0);
 
   const [citeRecord, setCiteRecord] = useState<RecordListItem | null>(null);
@@ -190,7 +191,7 @@ export default function DiscoverPage() {
   useEffect(() => {
     let cancelled = false;
     setRefLoading(true);
-    setRefFailed(false);
+    setRefFailed(null);
 
     Promise.allSettled([
       recordsApi.classifications(),
@@ -202,7 +203,8 @@ export default function DiscoverPage() {
     ])
       .then(([classRes, collegeRes, typeRes, facetRes]) => {
         if (cancelled) return;
-        setRefFailed([classRes, collegeRes, typeRes, facetRes].some((r) => r.status === "rejected"));
+        const failure = [classRes, collegeRes, typeRes, facetRes].find((r) => r.status === "rejected");
+        setRefFailed(failure ? errorDetail(failure.reason, "Some filters couldn't load, so their lists may be incomplete.") : null);
         if (classRes.status === "fulfilled") {
           setClassifications(
             (classRes.value.data.results ?? []).map((c) => ({ value: String(c.id), label: c.name })),
@@ -250,7 +252,7 @@ export default function DiscoverPage() {
           psced: psced.data.results ?? [],
         });
       })
-      .catch(() => { if (!cancelled) setInterestLoadFailed(true); })
+      .catch((error: unknown) => { if (!cancelled) setInterestLoadFailed(errorDetail(error, "Areas couldn’t load. You can still browse Latest; try setting them again later.")); })
       .finally(() => { if (!cancelled) setInterestLoading(false); });
     return () => { cancelled = true; };
   }, []);
@@ -293,9 +295,9 @@ export default function DiscoverPage() {
     restoreScrollTo.current = restored && restored.pages <= MAX_RESTORED_PAGES ? restored.scrollY : null;
 
     setLoading(true);
-    setFailed(false);
+    setFailed(null);
     setLoadingMore(false);
-    setLoadMoreFailed(false);
+    setLoadMoreFailed(null);
     setNextCursor(null);
 
     (feed === "for_you"
@@ -327,11 +329,11 @@ export default function DiscoverPage() {
         setPage(loaded);
         position.current = { key: queryKey, pages: loaded };
       })
-      .catch(() => {
+      .catch((error: unknown) => {
         if (current !== generation.current) return;
         setRecords([]);
         setTotalCount(null);
-        setFailed(true);
+        setFailed(errorDetail(error, "Check your connection, then try again."));
       })
       .finally(() => {
         if (current === generation.current) setLoading(false);
@@ -346,7 +348,7 @@ export default function DiscoverPage() {
     const nextPage = page + 1;
     const loadingFeed = feed === "for_you";
     setLoadingMore(true);
-    setLoadMoreFailed(false);
+    setLoadMoreFailed(null);
     (loadingFeed
       ? recordsApi.forYou(nextCursor ?? undefined, listParams(query))
       : recordsApi.list({ ...listParams(query), page: nextPage, page_size: PAGE_SIZE }))
@@ -377,7 +379,7 @@ export default function DiscoverPage() {
           setFeedNotice("This recommendation list changed. Refreshing it now.");
           setNextCursor(null);
           setAttempt((n) => n + 1);
-        } else setLoadMoreFailed(true);
+        } else setLoadMoreFailed(errorDetail(error, "More results didn't load."));
       })
       .finally(() => {
         if (current === generation.current) setLoadingMore(false);
@@ -457,7 +459,7 @@ export default function DiscoverPage() {
     setFeedRecords((prev) => prev.filter((r) => r.id !== record.id));
     adjustCount(-1);
     report(`“${record.title}” won’t be recommended to you again.`, record);
-    const stored = recordsApi.notInterested(record.id).then(() => true, () => {
+    const stored = recordsApi.notInterested(record.id).then(() => true, (error: unknown) => {
       // Put it back only into the list it left; a reloaded feed already has the truth.
       if (shownIn === generation.current) {
         setFeedRecords((prev) => prev.some((r) => r.id === record.id)
@@ -466,7 +468,7 @@ export default function DiscoverPage() {
         adjustCount(1);
       }
       setFeedback((current) => (current?.undo?.id === record.id ? null : current));
-      setFeedbackError("That recommendation couldn’t be hidden. Please try again.");
+      setFeedbackError(errorDetail(error, "That recommendation couldn’t be hidden. Please try again."));
       return false;
     }).finally(() => pendingDismissals.current.delete(record.id));
     pendingDismissals.current.set(record.id, stored);
@@ -481,8 +483,8 @@ export default function DiscoverPage() {
       await recordsApi.undoNotInterested(record.id);
       report(`“${record.title}” is back in For you.`);
       setAttempt((n) => n + 1);
-    } catch {
-      setFeedbackError("Undo didn’t go through. Please try again.");
+    } catch (error) {
+      setFeedbackError(errorDetail(error, "Undo didn’t go through. Please try again."));
     }
   };
 
@@ -497,8 +499,8 @@ export default function DiscoverPage() {
       setResetConfirming(false);
       report("Your interests were reset. Your saved papers and folders are unchanged.");
       if (feed === "for_you") setAttempt((n) => n + 1);
-    } catch {
-      setInterestError("Your interests couldn’t be reset. Please try again.");
+    } catch (error) {
+      setInterestError(errorDetail(error, "Your interests couldn’t be reset. Please try again."));
     } finally {
       setResetting(false);
     }
@@ -515,8 +517,8 @@ export default function DiscoverPage() {
       setFeedNotice("");
       updateQuery((current) => ({ ...current, feed: "for_you" }));
       if (feed === "for_you") setAttempt((n) => n + 1);
-    } catch {
-      setInterestError("Your Areas couldn’t be saved. Please try again.");
+    } catch (error) {
+      setInterestError(errorDetail(error, "Your Areas couldn’t be saved. Please try again."));
     } finally {
       setInterestSaving(false);
     }
@@ -589,7 +591,7 @@ export default function DiscoverPage() {
       {feed === "for_you" && feedbackError && <p role="alert" className="mt-3 text-small text-brand">{feedbackError}</p>}
       {refFailed && (
         <div role="alert" className="mb-3 flex flex-wrap items-center gap-3 text-small text-stone-700">
-          Some filters couldn&apos;t load, so their lists may be incomplete.
+          {refFailed}
           <button type="button" onClick={() => setRefAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
             Retry filters
           </button>
@@ -610,7 +612,7 @@ export default function DiscoverPage() {
           tone="error"
           icon="fa-triangle-exclamation"
           title="We couldn't load research"
-          message="Check your connection, then try again."
+          message={failed}
           action={
             <button type="button" onClick={() => setAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>
               Try again
@@ -665,7 +667,7 @@ export default function DiscoverPage() {
             <div className="flex flex-col items-center gap-2 mt-8">
               {loadMoreFailed && (
                 <p role="alert" className="text-small text-stone-700">
-                  More results didn&apos;t load.
+                  {loadMoreFailed}
                 </p>
               )}
               <button type="button" onClick={loadMore} disabled={loadingMore} className={cn(PILL_SECONDARY, FOCUS_RING)}>
@@ -704,11 +706,11 @@ export default function DiscoverPage() {
       <Modal open={interestOpen} onClose={() => { setInterestOpen(false); setResetConfirming(false); }} title="Choose Areas for your recommendations" sheet
         footer={<div className="flex items-center justify-between gap-3">
           <button type="button" className={cn(PILL_SECONDARY, FOCUS_RING)} onClick={() => setInterestSelection({ classification_ids: [], psced_ids: [] })}>Clear Areas</button>
-          <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={interestSaving || interestLoading || interestLoadFailed} onClick={() => void saveInterests()}>{interestLoading ? "Loading…" : interestSaving ? "Saving…" : "Save Areas"}</button>
+          <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={interestSaving || interestLoading || Boolean(interestLoadFailed)} onClick={() => void saveInterests()}>{interestLoading ? "Loading…" : interestSaving ? "Saving…" : "Save Areas"}</button>
         </div>}>
         <div className="space-y-5 p-5">
           <p className="text-small text-stone-600">Choose any Areas you’d like to see more often. Leave this blank to browse the latest research.</p>
-          {interestLoadFailed && <p role="alert" className="text-small text-brand">Areas couldn’t load. You can still browse Latest; try setting them again later.</p>}
+          {interestLoadFailed && <p role="alert" className="text-small text-brand">{interestLoadFailed}</p>}
           {interestError && <p role="alert" className="text-small text-brand">{interestError}</p>}
           <InterestChoices title="Research classifications" options={interestOptions.classifications} selected={interestSelection.classification_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, classification_ids: ids }))} />
           <InterestChoices title="PSCED areas" options={interestOptions.psced} selected={interestSelection.psced_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, psced_ids: ids }))} />

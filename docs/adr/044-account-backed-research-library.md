@@ -2,9 +2,9 @@
 
 ## Status
 
-**Proposed** — 2026-10-15 (IR-566, under IR-553). **Awaiting approval by a named person.**
+**Accepted** — 2026-10-30 by Lee Jasmin Adolfo (IR-566, under IR-553). Proposed 2026-10-15.
 
-IR-566 lists four things to settle before it is ready for an agent. This ADR settles one of them, how saves are stored and owned, once it is accepted. The other three are product decisions, set out as open questions in §Open questions with their benefits and drawbacks; this ADR does not make them. IR-566 is built only after acceptance and those answers.
+IR-566 listed four things to settle before it is ready for an agent: how saves are stored and owned (§Decision), and three product decisions — Likes, reading history and Calls & Conferences saves. The team answered all three on 2026-10-30; they are recorded in §Product decisions with the options that were weighed.
 
 ## Context
 
@@ -27,7 +27,7 @@ IR-553's later slices all assume an account-owned library: folders (IR-572), res
 
 ## Decision
 
-1. **A new Django app, `apps/library`, owns the reader's private library.** It is not `apps/records`, which owns institutional workflow, and not `apps/storage`, which holds uploaded files and is slated for removal. Later slices (folders, positions, notes) add to the same app.
+1. **A new Django app, `apps/library`, owns the reader's private library.** It is not `apps/records`, which owns institutional workflow, and not `apps/documents`, which owns uploaded files. Later slices (folders, positions, notes) add to the same app.
 
 2. **One table to start: `SavedRecord`.**
 
@@ -60,32 +60,34 @@ IR-553's later slices all assume an account-owned library: folders (IR-572), res
 
 7. **New saves stop writing to `localStorage`. Existing browser keys are left untouched**, because IR-579 imports them with the reader's explicit choice. Reading them here would quietly hand one person's browser data to whoever signs in next, which is the bug this ADR exists to fix.
 
-## Open questions
+## Product decisions
 
-These are product decisions for the team. They are listed here because IR-566 names them, and each changes what IR-566 builds.
+Decided 2026-10-30. Each changes what IR-566 builds.
 
-### Q1 — Likes (the Star button)
+### Q1 — Likes (the Star button): **retired**
 
-| Option | Benefits | Drawbacks |
-|---|---|---|
-| **A. Account-backed and private**: a boolean on `SavedRecord`, or its own table | Follows the reader like saves do; no shared-PC leak | Two near-identical gestures (Star and Save) both stored, so readers must learn the difference; more API and UI surface to test |
-| **B. Retired**: Star is removed and Save covers it | One gesture; less to build and explain; IR-553 already says no public popularity count is added, so a Like has no other use | Readers lose a quick "I liked this" with no folder attached; existing stars need IR-579's import or are dropped |
-| **C. Stays browser-only and labelled** | Nothing to build now | Keeps the shared-PC leak for Likes, which the IR-553 spec says to end |
-
-### Q2 — Reading history
+The Star button is removed and Save covers it. Existing stars in `iris_starred_records` are left untouched; IR-579 offers them for import as saves.
 
 | Option | Benefits | Drawbacks |
 |---|---|---|
-| **A. Stays browser-only, labelled, and cleared on sign-out** | No new server data about what people read, the most sensitive part of a library; clearing on sign-out ends the shared-PC leak | Does not follow the reader across devices |
-| **B. Account-backed** | Follows the reader | Stores a reading log on the server. IR-557 must then promise never to use private reading as a discovery signal, and its retention needs its own decision |
+| A. Account-backed and private | Follows the reader; no shared-PC leak | Two near-identical gestures to store, explain and test |
+| **B. Retired (chosen)** | One gesture; less to build and explain; IR-553 adds no public popularity count, so a Like has no other use | Readers lose a quick mark with no folder; stars survive only through IR-579 |
+| C. Browser-only and labelled | Nothing to build | Keeps the shared-PC leak IR-553 says to end |
 
-### Q3 — Calls & Conferences saves
+### Q2 — Reading history: **browser-only, cleared on sign-out**
 
-The IR-566 ticket proposes keeping them out of scope. They stay in `lib/opportunityLibrary.ts`, still labelled browser-only, unless the team adds them explicitly.
+History stays in `iris_reading_history`, labelled browser-only, and IR-566 clears it on sign-out and on an account switch, which ends its shared-PC leak. Moving between devices is served by account-backed Reading status here and by IR-573's per-Record position, not by a history log.
 
-### Q4 — Who accepts this ADR
+| Option | Benefits | Drawbacks |
+|---|---|---|
+| **A. Browser-only, cleared on sign-out (chosen)** | No server-side log of what people read, the most sensitive part of a library, so no new retention, access or deletion duty under the Data Privacy Act; reversible — server history can be added later | Papers opened but never saved do not follow the reader |
+| B. Account-backed | Follows the reader | A server-side reading log needing a retention rule, a deletion control and IR-557's promise never to use it as a discovery signal; hard to undo once collected |
 
-The ticket asks for a named person. That is not an agent's call (CLAUDE.md §What AI does not decide).
+### Q3 — Calls & Conferences saves: **out of scope**
+
+They stay in `lib/opportunityLibrary.ts`, labelled browser-only, and keep their shared-PC leak until a follow-up ticket moves them. A Calls save reveals far less about a reader than a paper library does, and including them would add a second model and API to this slice.
+
+### Q4 — Who accepts this ADR: **Lee Jasmin Adolfo**, 2026-10-30.
 
 ## Alternatives Considered
 
@@ -105,6 +107,8 @@ The ticket asks for a named person. That is not an agent's call (CLAUDE.md §Wha
 - **Record deletion cascades.** A deleted Record disappears from every library, while a Record that is withdrawn or restricted stays listed as unavailable. To the reader, a deleted Record looks the same as one that never existed, which matches how the rest of the API treats a missing Record.
 - **The "stored in this browser only" wording goes** wherever saves become account-backed: `PaperSaveDropdown`, `SavedView`, IR-410's Saved note and PRODUCT.md §Capabilities. The design-system document records the change in the same PR, as IR-566 requires.
 - **The migration only adds a table.** It is still run against a copy of a realistic database before merge (CLAUDE.md §Migrations).
+- **A reader's own Folders stay in the browser until IR-572.** Between IR-566 and IR-572 the Save menu holds account-backed saves and Reading status beside browser-only Folders, labelled as such, so Folders keep the shared-PC leak for that interval. IR-572 should follow IR-566 directly.
+- **The Star button goes** (Q1), and reading history is cleared on sign-out (Q2).
 - **IR-572 (folders) builds on this app and model.** A reader's own folders are additive, so they need their own membership table. That is IR-572's design, not this ADR's.
 
 ## MVP Impact
@@ -119,7 +123,7 @@ None. IRIS is CIT-U only (PRODUCT.md).
 
 - New endpoints: an object-level owner filter on every query, and `visible_to` on every Record they touch.
 - A saved Record that is now hidden discloses nothing beyond the id the reader supplied.
-- The shared-PC leak of saves ends for new saves; Q2 decides history.
+- The shared-PC leak ends for new saves and for reading history (cleared on sign-out). It remains for Folders until IR-572 and for Calls & Conferences saves until their follow-up.
 
 ## Deployment Impact
 

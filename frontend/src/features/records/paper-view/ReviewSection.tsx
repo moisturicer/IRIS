@@ -84,7 +84,7 @@ export function ReviewSection({
               Ask about this paper
             </button>
           )}
-          <ReviewTimeline key={timelineVersion} recordId={record.id} />
+          <ReviewTimeline key={timelineVersion} recordId={record.id} canComment={can.has("comment_review")} />
         </div>
 
         <ReviewActionBar

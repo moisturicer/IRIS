@@ -149,6 +149,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
             continue
 
         records.append({
+            "row_num":               row_num,
             "title":                 title,
             "origin":                origin,
             "publication_year":      publication_year,

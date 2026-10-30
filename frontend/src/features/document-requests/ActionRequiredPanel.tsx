@@ -3,7 +3,7 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { cn, formatDate } from "@/lib/utils";
-import { errorDetail } from "./errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip } from "./itemStatus";
 import type { DocumentRequest, DocumentRequestItem } from "@/types/records";
 
@@ -42,7 +42,7 @@ interface ActionRequiredPanelProps {
 export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredPanelProps) {
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[] | null>(null);
-  const [failed, setFailed] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   /** Ids of requests seen open since this panel mounted. */
   const seenOpen = useRef<Set<number>>(new Set());
 
@@ -53,9 +53,9 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
         .then(({ data }) => {
           data.filter((r) => r.state === "open").forEach((r) => seenOpen.current.add(r.id));
           setRequests(data);
-          setFailed(false);
+          setFailed(null);
         })
-        .catch(() => setFailed(true)),
+        .catch((error: unknown) => setFailed(errorDetail(error, "Could not load the documents reviewers asked for. Reload the page to try again."))),
     [recordId],
   );
 
@@ -69,7 +69,7 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
         role="alert"
         className="rounded-2xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-dark"
       >
-        Could not load the documents reviewers asked for. Reload the page to try again.
+        {failed}
       </p>
     );
   }
