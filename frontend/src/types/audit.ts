@@ -6,6 +6,15 @@ export const AUDIT_EVENT_GROUPS = {
   },
   Files: { ACCESS: "Record Access", UPLOAD: "File Upload", DOWNLOAD: "File Download", DELETE: "File Delete", RENAME: "File Rename" },
   Research: { RESEARCH_METADATA_CORRECTED: "Research Metadata Corrected" },
+  "Account recovery": {
+    RECOVERY_REQUESTED: "Recovery Requested",
+    RECOVERY_SUPPRESSED: "Recovery Suppressed",
+    RECOVERY_TOKEN_REJECTED: "Recovery Link Rejected",
+    RECOVERY_EMAIL_SENT: "Recovery Email Sent",
+    RECOVERY_EMAIL_FAILED: "Recovery Email Failed",
+    PASSWORD_RESET_COMPLETED: "Password Reset Completed",
+    EMAIL_VERIFICATION_COMPLETED: "Email Verification Completed",
+  },
   Workflow: {
     SUBMITTED: "Submitted", ROUTED: "Routed", ASSIGNMENT_CLOSED: "Assignment Closed",
     ASSIGNMENT_EXTENDED: "Assignment Deadline Extended", DECISION_RECORDED: "Decision Recorded",

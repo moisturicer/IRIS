@@ -9,7 +9,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0012_reset_seeded_reference_sequences'),
+        ('accounts', '0013_usersession_ended_reason'),
     ]
 
     operations = [

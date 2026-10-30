@@ -1,6 +1,7 @@
 import uuid
 
-from django.db import models
+from django.db import models, transaction
+from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
 from core.enums import RequestStatus, SessionEndReason
@@ -92,6 +93,22 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     USERNAME_FIELD  = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
+
+    def save(self, *args, **kwargs):
+        # Admin edits use save(), unlike the read-only public email field.
+        # Persist revocation so changing an address back cannot revive a link.
+        fields = kwargs.get("update_fields")
+        if not self._state.adding and (fields is None or "email" in fields):
+            using = kwargs.get("using") or self._state.db or "default"
+            with transaction.atomic(using=using):
+                previous = type(self).objects.using(using).select_for_update().get(pk=self.pk)
+                result = super().save(*args, **kwargs)
+                if previous.email != self.email:
+                    RecoveryToken.objects.using(using).filter(
+                        user_id=self.pk, consumed_at__isnull=True, revoked_at__isnull=True,
+                    ).update(revoked_at=timezone.now())
+                return result
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.email} ({self.get_full_name()})"

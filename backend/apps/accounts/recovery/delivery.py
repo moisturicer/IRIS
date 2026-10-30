@@ -164,7 +164,7 @@ def _purpose_applies(user, purpose) -> bool:
 
 def _sendable(intent, at) -> bool:
     if intent.purpose == RecoveryPurpose.PASSWORD_CHANGED:
-        return intent.user is not None and bool(intent.user.email)
+        return at < intent.expires_at and intent.user is not None and bool(intent.user.email)
     token = RecoveryToken.objects.filter(intent=intent).select_related("user").first()
     return token is not None and usable(token, token.user, intent.purpose, at) \
         and _purpose_applies(token.user, intent.purpose)
@@ -194,7 +194,7 @@ def _compose(intent) -> EmailMessage:
             "Someone asked to reset the password for your IRIS account.\n\n"
             "To choose a new password, open this link:\n\n"
             f"{settings.FRONTEND_URL}/password/reset#token={raw}\n\n"
-            f"The link works once and expires at {expires:%Y-%m-%d %H:%M} UTC.\n\n"
+            f"The link works once and expires at {expires.isoformat()} UTC.\n\n"
             "If you did not request this, ignore this email. Your password has not changed.\n\n"
             f"{help_line}\n"
         ),

@@ -112,12 +112,16 @@ class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
         # The same invalidation as a reset (ADR-045 §4): every session ends,
         # this one included, and so does any outstanding reset link.
         with transaction.atomic():
             user = User.objects.select_for_update().get(pk=request.user.pk)
+            if user.credential_version != request.user.credential_version:
+                from .authentication import CredentialsChanged
+                raise CredentialsChanged()
+            request.user = user
+            serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+            serializer.is_valid(raise_exception=True)
             set_password_and_invalidate(user, serializer.validated_data["new_password"], timezone.now())
         return Response({"detail": "Password changed. Sign in again with your new password.",
                          "code": "password_changed"})

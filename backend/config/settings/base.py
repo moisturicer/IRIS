@@ -370,14 +370,19 @@ WORKFLOW_TABLE = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {"recovery_redaction": {"()": "core.logging.RecoveryRedaction"}},
     "formatters": {
         "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+        "console": {"class": "logging.StreamHandler", "formatter": "standard",
+                    "filters": ["recovery_redaction"]},
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {
+        "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "django.server": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "uvicorn.access": {"handlers": ["console"], "level": "INFO", "propagate": False},
         "apps": {
             "handlers": ["console"],
             "level": config("APP_LOG_LEVEL", default="INFO"),

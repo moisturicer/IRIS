@@ -39,6 +39,16 @@ def emailed_reset_token(client, email):
 
 
 class CredentialTests(APITestCase):
+    def test_reset_invalidates_django_auth_sessions_too(self):
+        from django.test import Client
+        self.user.is_staff = True
+        self.user.save(update_fields=["is_staff"])
+        browser = Client()
+        browser.force_login(self.user)
+        self.assertEqual(browser.get("/admin/").status_code, 200)
+        self.reset()
+        self.assertEqual(browser.get("/admin/").status_code, 302)
+
     def setUp(self):
         self.user = User.objects.create_user(email="reader@cit.edu", password=OLD,
                                              first_name="R", last_name="D", is_verified=True)
@@ -114,6 +124,38 @@ class CredentialTests(APITestCase):
 
 
 class ResetVersusSignInRaceTests(TransactionTestCase):
+    def test_a_refresh_racing_reset_cannot_leave_live_credentials(self):
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+        token = emailed_reset_token(APIClient(), "race@cit.edu")
+        signed_in = APIClient().post(LOGIN, {"email": "race@cit.edu", "password": OLD}, format="json").json()
+        barrier = threading.Barrier(2)
+        results = {}
+
+        def run(name, path, body):
+            try:
+                barrier.wait(10)
+                results[name] = APIClient().post(path, body, format="json")
+            finally:
+                connection.close()
+
+        threads = [
+            threading.Thread(target=run, args=("refresh", REFRESH, {"refresh": signed_in["refresh"]})),
+            threading.Thread(target=run, args=("reset", CONFIRM, {
+                "token": token, "new_password": NEW, "confirm_password": NEW,
+            })),
+        ]
+        with patch("apps.accounts.recovery.service.enqueue"):
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(30)
+        self.assertEqual(results["reset"].status_code, 200)
+        self.assertIn(results["refresh"].status_code, (200, 401))
+        if results["refresh"].status_code == 200:
+            credentials = results["refresh"].json()
+            self.assertEqual(APIClient().get(ME, HTTP_AUTHORIZATION=f"Bearer {credentials['access']}").status_code, 401)
+        self.assertFalse(OutstandingToken.objects.filter(user=self.user, blacklistedtoken__isnull=True).exists())
+
     """§4: a sign-in that checked the old password cannot mint a token that
     outlives the reset racing it."""
 

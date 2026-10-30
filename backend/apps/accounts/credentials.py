@@ -18,6 +18,7 @@ Verification links survive: only a reset is bound to the password (§3).
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from .models import RecoveryPurpose, RecoveryToken, UserSession
+from core.enums import SessionEndReason
 
 
 def set_password_and_invalidate(user, raw_password, at) -> None:
@@ -31,7 +32,9 @@ def set_password_and_invalidate(user, raw_password, at) -> None:
     user.credential_version += 1
     user.save(update_fields=["password", "credential_version"])
 
-    UserSession.objects.filter(user=user, ended_at__isnull=True).update(ended_at=at)
+    UserSession.objects.filter(user=user, ended_at__isnull=True).update(
+        ended_at=at, ended_reason=SessionEndReason.PASSWORD_CHANGED,
+    )
     outstanding = OutstandingToken.objects.filter(user=user, blacklistedtoken__isnull=True)
     BlacklistedToken.objects.bulk_create(
         [BlacklistedToken(token=token) for token in outstanding], ignore_conflicts=True

@@ -215,6 +215,26 @@ class RequestContractTests(RecoveryTestCase):
 
 
 class ConsumptionTests(RecoveryTestCase):
+    def test_a_verification_token_cannot_reset_a_password(self):
+        from apps.accounts.models import RecoveryToken
+        token = self.emailed_token()
+        RecoveryToken.objects.update(purpose="email_verification")
+        self.assertEqual(self.confirm(token).json(), INVALID_LINK)
+        self.assertTrue(User.objects.get(pk=self.user.pk).check_password(OLD))
+
+    def test_a_completion_failure_rolls_back_password_token_audit_and_notice(self):
+        from apps.accounts.models import RecoveryToken
+        from apps.audit.models import AuditEvent
+        token = self.emailed_token()
+        with patch("apps.accounts.recovery.service.audit.record", side_effect=RuntimeError("fail")), \
+                patch("apps.accounts.recovery.service.notify_password_changed") as notify:
+            with self.assertRaises(RuntimeError):
+                self.confirm(token)
+        self.assertTrue(User.objects.get(pk=self.user.pk).check_password(OLD))
+        self.assertIsNone(RecoveryToken.objects.get().consumed_at)
+        self.assertFalse(AuditEvent.objects.filter(event_type=AuditEvent.PASSWORD_RESET_COMPLETED).exists())
+        notify.assert_not_called()
+
     """§2-§3: links are single use, short lived and judged against the account now."""
 
     def test_a_used_link_is_refused_and_the_password_stays_put(self):
@@ -264,6 +284,15 @@ class ConsumptionTests(RecoveryTestCase):
     def test_a_changed_email_makes_the_link_unusable(self):
         token = self.emailed_token()
         User.objects.filter(pk=self.user.pk).update(email="moved@cit.edu")
+        self.assertEqual(self.confirm(token).json(), INVALID_LINK)
+
+    def test_restoring_an_old_email_does_not_restore_its_reset_link(self):
+        token = self.emailed_token()
+        original = self.user.email
+        self.user.email = "changed@cit.edu"
+        self.user.save(update_fields=["email"])
+        self.user.email = original
+        self.user.save(update_fields=["email"])
         self.assertEqual(self.confirm(token).json(), INVALID_LINK)
 
     def test_reset_changes_only_the_password(self):
@@ -549,3 +578,45 @@ class ConcurrentConsumptionTests(TransactionTestCase):
         self.assertFalse(thread.is_alive())
         self.assertEqual(results[0].json(), INVALID_LINK)
         self.assertTrue(User.objects.get(pk=self.user.pk).check_password(OLD))
+
+    def test_duplicate_workers_send_one_link(self):
+        from apps.accounts.recovery.service import admit_request
+        from apps.accounts.models import RecoveryToken
+        with patch("apps.accounts.recovery.service.enqueue"):
+            admit_request("password_reset", self.user.email)
+        intent_id = str(RecoveryIntent.objects.get().pk)
+        results = self.race(*[lambda: deliver_recovery_intent(intent_id) for _ in range(2)])
+        self.assertEqual(results, [None, None])
+        self.assertEqual(RecoveryToken.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_the_ip_limit_is_atomic_across_connections(self):
+        from rest_framework.test import APIClient
+        with self.settings(RECOVERY_REQUEST_IP_10M=1), patch("apps.accounts.recovery.service.enqueue"):
+            results = self.race(*[
+                lambda: APIClient().post(REQUEST, {"email": "unknown@cit.edu"}, format="json").status_code
+                for _ in range(2)
+            ])
+        self.assertEqual(sorted(results), [202, 429])
+
+    def test_new_issuance_serializes_with_consuming_the_old_link(self):
+        from apps.accounts.models import RecoveryAttempt
+        from apps.accounts.recovery.service import admit_request
+        from rest_framework.test import APIClient
+
+        old = self.token()
+        RecoveryAttempt.objects.all().delete()
+        with patch("apps.accounts.recovery.service.enqueue"):
+            admit_request("password_reset", self.user.email)
+            intent_id = str(RecoveryIntent.objects.get(status="pending").pk)
+            results = self.race(
+                lambda: deliver_recovery_intent(intent_id),
+                lambda: APIClient().post(CONFIRM, {"token": old, "new_password": NEW,
+                                                   "confirm_password": NEW}, format="json").status_code,
+            )
+        self.assertIsNone(results[0])
+        self.assertIn(results[1], (200, 400))
+        latest = re.search(r"#token=([A-Za-z0-9_-]{43})", mail.outbox[-1].body).group(1)
+        response = APIClient().post(CONFIRM, {"token": latest, "new_password": "Third-pass-333",
+                                              "confirm_password": "Third-pass-333"}, format="json")
+        self.assertEqual(response.status_code, 200, response.content)

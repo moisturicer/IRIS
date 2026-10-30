@@ -81,6 +81,12 @@ USER appuser
 # output is identical either way, since STATIC_ROOT and the WhiteNoise storage
 # both live in base.py.
 RUN SECRET_KEY=build-time-only \
+    RECOVERY_COUNTER_HMAC_KEY=build-time-counter-only \
+    RECOVERY_MAIL_ENCRYPTION_KEY=ZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmQ= \
+    FRONTEND_URL=https://build.invalid \
+    EMAIL_HOST=smtp.build.invalid \
+    EMAIL_HOST_USER=build@build.invalid \
+    EMAIL_HOST_PASSWORD=build-time-only \
     DB_NAME=build-time-only \
     DB_USER=build-time-only \
     DB_PASSWORD=build-time-only \

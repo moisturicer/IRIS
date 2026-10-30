@@ -67,6 +67,7 @@ def admit_request(purpose: str, address: str) -> None:
                           .filter(recipient=recipient, purpose=purpose).first())
         generation.current += 1
         generation.save(update_fields=["current"])
+        at = clock.now()
 
         RecoveryIntent.objects.filter(
             recipient=recipient, purpose=purpose, status=RecoveryIntent.Status.PENDING,
@@ -104,7 +105,7 @@ def usable(token, user, purpose, at) -> bool:
         and token.revoked_at is None
         and at < token.expires_at
         and token.email == user.email
-        and token.credential_version == user.credential_version
+        and (purpose != RecoveryPurpose.PASSWORD_RESET or token.credential_version == user.credential_version)
         and is_eligible(user)
     )
 
@@ -187,4 +188,4 @@ def notify_password_changed(user_id) -> None:
             )
             transaction.on_commit(lambda: enqueue(intent.pk))
     except Exception:  # noqa: BLE001 -- the reset has committed; the notice is best effort
-        logger.exception("password-changed notice for user %s was not recorded", user_id)
+        logger.error("password-changed notice for user %s was not recorded", user_id)

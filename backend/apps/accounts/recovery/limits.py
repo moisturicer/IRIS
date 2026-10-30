@@ -73,6 +73,7 @@ def admit(key: str, windows, at) -> int | None:
     Must run inside a transaction: the bucket lock is held until it commits.
     """
     bucket = _locked(key)
+    at = clock.now()
     longest = max(window.seconds for window in windows)
     recent = list(
         RecoveryAttempt.objects.filter(bucket=bucket, at__gt=at - timedelta(seconds=longest))

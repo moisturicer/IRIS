@@ -124,6 +124,25 @@ class IssueTests(RecoveryTestCase):
 
 
 class SendTests(RecoveryTestCase):
+    def test_a_stale_sender_cannot_overwrite_a_newer_success(self):
+        self.request_reset()
+        calls = 0
+
+        def send(message, fail_silently=False):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                self.clock.advance(seconds=121)
+                self.deliver()
+                raise ConnectionError("uncertain send")
+            return REAL_SEND(message, fail_silently=fail_silently)
+
+        with patch.object(EmailMessage, "send", send):
+            self.deliver()
+        self.assertEqual(intent().status, "sent")
+        self.assertEqual(intent().attempts, 2)
+        self.assertEqual(len(mail.outbox), 1)
+
     def test_repeated_worker_crashes_cannot_exceed_four_attempts(self):
         self.request_reset()
         with patch.object(EmailMessage, "send", side_effect=KeyboardInterrupt) as send:
