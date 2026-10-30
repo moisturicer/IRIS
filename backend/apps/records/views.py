@@ -1040,8 +1040,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         Accepts a multipart upload with key "file" (.xls or .xlsx).
         Creates published records from each valid row and returns a plaintext log.
         Legacy imports bypass the review pipeline — staff is the implicit reviewer.
+
+        Rows are independent, and a row is saved whole or not at all: its
+        Record, primary owner and authors share one savepoint, so a failed
+        write leaves nothing of it behind (IR-637).
         """
-        from .models import Author
+        from django.db import transaction
+
+        from .models import Author, RecordOwner
         from .models import RecordType, Classification, PSCEDClassification
 
         file = request.FILES.get("file")
@@ -1081,33 +1087,34 @@ class RecordViewSet(viewsets.ModelViewSet):
                     if row["psced_name"] else None
                 )
 
-                record = Record.objects.create(
-                    title                = row["title"],
-                    abstract             = row["abstract"],
-                    year_accomplished    = row["year_accomplished"],
-                    year_completed       = row["year_completed"],
-                    record_type          = record_type,
-                    classification       = classification,
-                    psced                = psced,
-                    is_ip                = row["is_ip"],
-                    for_commercialization= row["for_commercialization"],
-                    community_extension  = row["community_extension"],
-                    added_by             = request.user,
-                    pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
-                )
-
-                from .models import RecordOwner
-                RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
-
-                for author_name in row["authors"]:
-                    Author.objects.create(record=record, name=author_name)
-
-                log_lines.append(f"✓  Created: {record.title[:70]}")
-                created += 1
-
+                with transaction.atomic():
+                    record = Record.objects.create(
+                        title                = row["title"],
+                        abstract             = row["abstract"],
+                        year_accomplished    = row["year_accomplished"],
+                        year_completed       = row["year_completed"],
+                        record_type          = record_type,
+                        classification       = classification,
+                        psced                = psced,
+                        is_ip                = row["is_ip"],
+                        for_commercialization= row["for_commercialization"],
+                        community_extension  = row["community_extension"],
+                        added_by             = request.user,
+                        pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
+                    )
+                    RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
+                    for author_name in row["authors"]:
+                        Author.objects.create(record=record, name=author_name)
             except Exception as exc:
-                log_lines.append(f"✗  Failed:  {row['title'][:70]} — {exc}")
+                # One line, whatever the database said: its full text can run
+                # to several lines and name the schema.
+                reason = (str(exc).splitlines() or [type(exc).__name__])[0]
+                log_lines.append(f"✗  Row {row['row_num']}: not saved — {row['title'][:70]} — {reason}")
                 failed += 1
+                continue
+
+            log_lines.append(f"✓  Row {row['row_num']}: created — {record.title[:70]}")
+            created += 1
 
         log_lines.append(f"\n{'─' * 50}")
         log_lines.append(f"Done — {created} record(s) created, {failed} skipped.")
