@@ -579,7 +579,7 @@ describe("why the session ended", () => {
     {
       code: "session_ended_password_changed",
       title: "Password Changed",
-      text: /your password was changed/,
+      text: /your password was changed on another device/,
     },
   ];
 

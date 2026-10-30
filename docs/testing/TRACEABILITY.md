@@ -1694,3 +1694,20 @@ Verification on 2026-10-30: local frontend full suite **105 files / 1,323 tests 
 [PR #348](https://github.com/moisturicer/IRIS/pull/348), implementation commit `0757adc`: [clean CI run 40990153412](https://github.com/moisturicer/IRIS/actions/runs/40990153412) passed **Backend, Frontend, Security and Docker Compose**. Backend: **4,556 passed, 1 expected xfail, 415 subtests passed**; the authorization matrix executed **40 tests**. Frontend: **106 files / 1,335 tests passed**, plus lint/build. Migration consistency and backend static checks passed. Agent review against `b2c5187`: Standards **0 hard violations, 1 nonblocking duplicated-renderer concern**; Spec **0 findings**. Human approval and merge remain outstanding.
 
 The interrupted broad local run included `No active EmbeddingSpace is configured` errors in its reused test database; it did not establish a code regression. The clean CI database executed the full backend suite successfully. Task-owned test databases and temporary source copies may be removed after verification; no live metadata corrections were executed.
+
+## IR-646 and IR-648 — Account locks and password changes end sessions
+
+Locking an account ends all its open tracked sessions with reason `locked` and blacklists its outstanding refresh tokens. Unlocking never revives those sessions. Both JWT authentication and refresh apply the same active-and-unlocked account rule, including direct database locks, deactivation, and access tokens without `sid`.
+
+A successful password change ends every other tracked session with reason `password_changed`, preserving the request's session and its refresh token. Without `sid`, every tracked session ends. A rejected change does not end sessions or emit an audit event. `PASSWORD_CHANGED` records the actor with empty metadata; its choice-only migration is `audit/0009_password_changed` and the frontend audit filter includes it.
+
+| Guarantee | Public verification boundary |
+| --- | --- |
+| Lock, unlock, direct lock, deactivation, no-sid access, session list and unchanged lock audit events | `accounts/test_session_invalidation.py::LockingEndsSessionsTests`: real sign-in, authenticated HTTP request, refresh, administrative API and audit API |
+| Current device survives; other device ends; new/old passwords; rejected change; no sid; rotation; older stored JWT payloads | `accounts/test_session_invalidation.py::PasswordChangeEndsOtherSessionsTests`: password API, request, refresh, sign-in and audit API |
+| Distinct account-locked and password-changed-elsewhere sign-out messages, with axe checks | `features/auth/LoginPage.test.tsx`: rendered login alert queried by accessible role |
+| New audit event is available in the audit filter | `features/audit/AuditLogPage.test.tsx`: rendered filter options compared with the backend vocabulary |
+
+Compatibility: before this change, `OutstandingToken.token` was stored before `sid` was added to the issued token. New sign-ins store the complete payload. During a password change, older stored payloads without a session identity are not individually blacklisted because the current device cannot be identified safely from them; every issued refresh still carries its session identity and the shared session rule refuses ended sessions. Account locking blacklists all outstanding tokens, including these older records.
+
+Local focused verification on 2026-10-30: backend session invalidation, existing session, password-policy and enum-vocabulary suites passed. TypeScript passed; focused frontend suites passed **46 tests**. Both security regressions were observed before the fixes: a locked no-sid access token returned 200, and another device's access token returned 200 after a password change. The strengthened password-changed-elsewhere UI assertion also failed before the message changed. Full-suite, migration-copy and CI evidence are recorded in the PR when complete. Human review and approval remain required.

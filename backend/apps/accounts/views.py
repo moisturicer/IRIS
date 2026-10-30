@@ -1,3 +1,4 @@
+from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -7,6 +8,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import IsAdmin
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
+from apps.audit.models import AuditEvent
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
@@ -14,7 +16,7 @@ from .serializers import (
     RoleRequestSerializer, SystemSettingSerializer,
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
-from .sessions import end_session, start_session
+from .sessions import end_all_sessions, end_session, start_session
 from .lockout import LOCKED_BY_ADMIN
 
 
@@ -109,11 +111,15 @@ class ActivateView(APIView):
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request):
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         request.user.set_password(serializer.validated_data["new_password"])
-        request.user.save()
+        request.user.save(update_fields=["password"])
+        sid = request.auth.get("sid") if request.auth else None
+        end_all_sessions(request.user, SessionEndReason.PASSWORD_CHANGED, except_sid=sid)
+        create_audit_event(AuditEvent.PASSWORD_CHANGED, request.user)
         return Response({"detail": "Password changed."})
 
 
@@ -252,6 +258,7 @@ class LockUserView(APIView):
     """PATCH /users/<id>/lock/ -- lock or unlock an account."""
     permission_classes = [IsAuthenticated, IsAdmin]
 
+    @transaction.atomic
     def patch(self, request, pk):
         user      = User.objects.get(pk=pk)
         is_locked = request.data.get("is_locked")
@@ -259,6 +266,8 @@ class LockUserView(APIView):
             return Response({"detail": "is_locked is required."}, status=400)
         user.is_locked = bool(is_locked)
         user.save(update_fields=["is_locked"])
+        if user.is_locked:
+            end_all_sessions(user, SessionEndReason.LOCKED)
         event_type = "ACCOUNT_LOCKED" if user.is_locked else "ACCOUNT_UNLOCKED"
 
         create_audit_event(

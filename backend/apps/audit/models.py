@@ -24,6 +24,7 @@ class AuditEvent(models.Model):
     ROLE_CHANGE      = "ROLE_CHANGE"
     ACCOUNT_LOCKED   = "ACCOUNT_LOCKED"
     ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"
     SESSION_REVOKE   = "SESSION_REVOKE"
     QUESTION_INJECTION = "QUESTION_INJECTION"
     RESEARCH_METADATA_CORRECTED = "RESEARCH_METADATA_CORRECTED"
@@ -70,6 +71,7 @@ class AuditEvent(models.Model):
         (ROLE_CHANGE,      "Role Change"),
         (ACCOUNT_LOCKED,   "Account Locked"),
         (ACCOUNT_UNLOCKED, "Account Unlocked"),
+        (PASSWORD_CHANGED, "Password Changed"),
         (SESSION_REVOKE,   "Session Revoked"),
         (QUESTION_INJECTION, "Reader Question Injection Flagged"),
         (RESEARCH_METADATA_CORRECTED, "Research Metadata Corrected"),
