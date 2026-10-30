@@ -204,6 +204,24 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-new-version": Entry({
         "POST": _case(OWNER_ACTS, kwargs={"pk": Ref("revising")}, data={}),
     }),
+    # The review discussion (IR-419, ADR-032 §7): read under `may_read_review`
+    # (participants, and the pool of a party holding the record now), written by
+    # participants alone, so ITSO's unseated pool reads and is refused. RDCO
+    # holds no assignment on `record`. An edit is its author's: the owner's here.
+    "record-review-comments": Entry({
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
+        "POST": _case(
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, HIDE, HIDE),
+            kwargs=RECORD, data={"body": "Which version is this?"},
+        ),
+    }),
+    "record-review-comment": Entry({
+        "PATCH": _case(
+            row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
+            data={"body": "Is the signed endorsement enough?"},
+        ),
+    }),
 
     # -- bulk import: staff file on others' behalf --------------------------
     "record-import-excel": Entry({"POST": _case(OFFICE_ONLY, data={}, format="multipart")}),

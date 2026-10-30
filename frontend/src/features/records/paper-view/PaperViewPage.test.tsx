@@ -1916,6 +1916,7 @@ describe("the Review section (IR-412)", () => {
     routing_recorded_from: null,
     reviews: [],
     versions: [],
+    review_comments: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],
@@ -1975,6 +1976,21 @@ describe("the Review section (IR-412)", () => {
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("toolbar", { name: "Review actions" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
+  });
+
+  it("gives the review discussion's composer only where the server offers comment_review", async () => {
+    shownRecord = { ...inReview, is_participant: true, capabilities: ["cite", "comment_review"] };
+    signInAs(OWNER_ID, "Student");
+    const { unmount } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.getByRole("textbox", { name: "Comment" })).toBeInTheDocument();
+    unmount();
+
+    shownRecord = inReview;
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.queryByRole("textbox", { name: "Comment" })).not.toBeInTheDocument();
   });
 
   it("requests documents from the bar and re-reads the timeline after", async () => {

@@ -6,7 +6,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from django.conf import settings
-from django.http import FileResponse, HttpResponse
+from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
@@ -518,6 +518,60 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews.tracker import tracker_payload
 
         return Response(tracker_payload(self.get_object(), request.user))
+
+    def _comment_response(self, act, success=status.HTTP_200_OK):
+        """
+        Run a review-discussion act and answer with its result (IR-419,
+        ADR-032 §7). 404 for a record or a discussion the caller may not see,
+        403 for one they read but may not act in, 400 for what cannot be done.
+        The 404 is `get_object()`'s own for a missing record, word for word: a
+        caller who sees the record must not learn it has a discussion (IR-153).
+        """
+        from apps.reviews import comments
+
+        try:
+            return Response(act(comments), status=success)
+        except comments.CommentNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except comments.CommentRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except comments.CommentError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=["get", "post"], url_path="review-comments")
+    def review_comments(self, request, pk=None):
+        """
+        GET  /records/<id>/review-comments/ -- the review discussion, oldest first.
+        POST /records/<id>/review-comments/ `{"body": str, "reply_to"?: id}`
+
+        Read under `may_read_review`; written by the record's participants, on
+        a submitted record (`apps.reviews.comments`). A new comment answers 201.
+        """
+        record = self.get_object()
+        if request.method == "GET":
+            return self._comment_response(lambda c: c.readable_comments(record, request.user))
+        return self._comment_response(
+            lambda c: c.comment_payload(c.post_comment(
+                record, request.user,
+                body=request.data.get("body"), reply_to=request.data.get("reply_to"),
+            ), request.user),
+            success=status.HTTP_201_CREATED,
+        )
+
+    @action(
+        detail=True, methods=["patch"],
+        url_path=r"review-comments/(?P<comment_id>[0-9]+)", url_name="review-comment",
+    )
+    def review_comment(self, request, pk=None, comment_id=None):
+        """
+        PATCH /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+
+        Its author edits a comment; a changed body stamps `edited_at`.
+        """
+        record = self.get_object()
+        return self._comment_response(lambda c: c.comment_payload(c.edit_comment(
+            record, request.user, int(comment_id), body=request.data.get("body"),
+        ), request.user))
 
     @action(detail=True, methods=["get"], url_path="metadata-suggestions")
     def metadata_suggestions(self, request, pk=None):

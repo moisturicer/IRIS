@@ -8,15 +8,32 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, within } from "@/test/render";
-import type { RecordTracker } from "@/types/records";
+import type { RecordTracker, ReviewComment } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
 
 import { ReviewTimeline } from "./ReviewTimeline";
 
-vi.mock("@/api/records", () => ({ recordsApi: { tracker: vi.fn() } }));
+vi.mock("@/api/records", () => ({
+  recordsApi: { tracker: vi.fn(), postReviewComment: vi.fn(), editReviewComment: vi.fn() },
+}));
 
 const tracker = vi.mocked(recordsApi.tracker);
+const postComment = vi.mocked(recordsApi.postReviewComment);
+const editComment = vi.mocked(recordsApi.editReviewComment);
+
+const comment = (overrides: Partial<ReviewComment>): ReviewComment => ({
+  id: 1,
+  author: 3,
+  author_name: "Rhea Owner",
+  body: "Is the consent form attached?",
+  version: 1,
+  reply_to: null,
+  created_at: "2026-09-06T08:00:00Z",
+  edited_at: null,
+  can_edit: false,
+  ...overrides,
+});
 
 const payload: RecordTracker = {
   record_id: 7,
@@ -54,6 +71,7 @@ const payload: RecordTracker = {
     },
   ],
   versions: [],
+  review_comments: [],
   resubmissions: [],
   document_requests: null,
   clearances: [],
@@ -142,5 +160,111 @@ describe("ReviewTimeline", () => {
 
     expect(await screen.findByRole("list", { name: "Review timeline" })).toBeInTheDocument();
     expect(tracker).toHaveBeenCalledTimes(2);
+  });
+
+  describe("the review discussion (IR-419)", () => {
+    const discussion = (comments: ReviewComment[]) => ({ ...payload, review_comments: comments });
+
+    it("shows each comment, by its author, with its version and its replies under it", async () => {
+      respond(discussion([
+        comment({ id: 1, body: "Which sample size?", author_name: "Mara Santos" }),
+        comment({
+          id: 2, reply_to: 1, body: "Forty respondents.", created_at: "2026-09-07T08:00:00Z",
+          edited_at: "2026-09-07T09:00:00Z",
+        }),
+      ]));
+      const { container } = renderScreen(<ReviewTimeline recordId={7} />);
+
+      const list = await screen.findByRole("list", { name: "Review timeline" });
+      const thread = within(list).getByText("Which sample size?").closest("li")!;
+      expect(thread).toHaveTextContent("Mara Santos");
+      expect(thread).toHaveTextContent("Made against v1");
+      const replies = within(thread).getByRole("list", { name: "Replies to Mara Santos" });
+      const [reply] = within(replies).getAllByRole("listitem");
+      expect(reply).toHaveTextContent("Forty respondents.");
+      expect(reply).toHaveTextContent("Rhea Owner");
+      expect(reply).toHaveTextContent("Edited");
+      await expectNoBlockingA11yViolations(container);
+    });
+
+    it("offers no composer, reply or edit to a viewer who may not comment", async () => {
+      respond(discussion([comment({ can_edit: true })]));
+      renderScreen(<ReviewTimeline recordId={7} />);
+
+      await screen.findByRole("list", { name: "Review timeline" });
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /reply|edit|^comment$/i })).not.toBeInTheDocument();
+    });
+
+    it("posts a comment and reads the timeline again", async () => {
+      respond(discussion([]));
+      postComment.mockResolvedValue({ data: comment({ id: 9 }) } as never);
+      const { container } = renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      await userEvent.type(await screen.findByRole("textbox", { name: "Comment" }), "  Is it attached?  ");
+      respond(discussion([comment({ id: 9, body: "Is it attached?" })]));
+      await userEvent.click(screen.getByRole("button", { name: "Comment" }));
+
+      expect(postComment).toHaveBeenCalledWith(7, { body: "Is it attached?" });
+      expect(await screen.findByText("Is it attached?")).toBeInTheDocument();
+      expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("");
+      expect(tracker).toHaveBeenCalledTimes(2);
+      await expectNoBlockingA11yViolations(container);
+    });
+
+    it("will not post an empty comment", async () => {
+      respond(discussion([]));
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      await screen.findByRole("textbox", { name: "Comment" });
+      expect(screen.getByRole("button", { name: "Comment" })).toBeDisabled();
+    });
+
+    it("keeps what was written beside the server's refusal", async () => {
+      respond(discussion([]));
+      postComment.mockRejectedValue({ response: { data: { detail: "A draft is not under review." } } });
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      const box = await screen.findByRole("textbox", { name: "Comment" });
+      await userEvent.type(box, "Hello");
+      await userEvent.click(screen.getByRole("button", { name: "Comment" }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("A draft is not under review.");
+      expect(box).toHaveValue("Hello");
+    });
+
+    it("replies in the thread of the comment answered", async () => {
+      respond(discussion([comment({ id: 4, author_name: "Mara Santos", body: "Which sample size?" })]));
+      postComment.mockResolvedValue({ data: comment({ id: 5, reply_to: 4 }) } as never);
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      await userEvent.click(await screen.findByRole("button", { name: "Reply to Mara Santos" }));
+      await userEvent.type(screen.getByRole("textbox", { name: "Reply to Mara Santos" }), "Forty.");
+      await userEvent.click(screen.getByRole("button", { name: "Send reply" }));
+
+      expect(postComment).toHaveBeenCalledWith(7, { body: "Forty.", reply_to: 4 });
+    });
+
+    it("offers Edit only on a comment the server says this viewer may edit", async () => {
+      respond(discussion([
+        comment({ id: 1, body: "Mine.", can_edit: true }),
+        comment({ id: 2, body: "Theirs.", can_edit: false, created_at: "2026-09-07T08:00:00Z" }),
+      ]));
+      editComment.mockResolvedValue({ data: comment({ id: 1, body: "Mine, fixed." }) } as never);
+      renderScreen(<ReviewTimeline recordId={7} canComment />);
+
+      const list = await screen.findByRole("list", { name: "Review timeline" });
+      const theirs = within(list).getByText("Theirs.").closest("li")!;
+      expect(within(theirs).queryByRole("button", { name: /edit/i })).not.toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Edit your comment" }));
+      const box = screen.getByRole("textbox", { name: "Edit your comment" });
+      expect(box).toHaveValue("Mine.");
+      await userEvent.clear(box);
+      await userEvent.type(box, "Mine, fixed.");
+      await userEvent.click(screen.getByRole("button", { name: "Save" }));
+
+      expect(editComment).toHaveBeenCalledWith(7, 1, { body: "Mine, fixed." });
+    });
   });
 });
