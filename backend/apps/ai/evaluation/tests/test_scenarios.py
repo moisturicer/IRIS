@@ -52,3 +52,19 @@ def test_invalid_report_is_not_measured(tmp_path):
     path = tmp_path / "report.xml"
     path.write_text("incomplete")
     assert junit_result(path, 2)["status"] == "not_measured"
+
+
+@pytest.mark.parametrize("declaration", [
+    '<!ENTITY payload "expanded content">',
+    '<!ENTITY payload SYSTEM "file:///must-not-be-read">',
+])
+def test_xml_entities_are_rejected_as_unmeasured(tmp_path, declaration):
+    path = tmp_path / "report.xml"
+    path.write_text(
+        f'<!DOCTYPE testsuite [{declaration}]>'
+        '<testsuite><testcase><system-out>&payload;</system-out></testcase></testsuite>'
+    )
+    result = junit_result(path, 0)
+    assert result["status"] == "not_measured"
+    assert not result["passed"]
+    assert "expanded content" not in json.dumps(result)

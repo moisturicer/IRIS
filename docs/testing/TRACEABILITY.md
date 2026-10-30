@@ -1704,3 +1704,5 @@ The interrupted broad local run included `No active EmbeddingSpace is configured
 - A15: `test_controller_security_http.py` exercises malicious paper instructions and disabled public research without widening the tool registry or Paper Chat scope.
 
 `eval_scenarios --workers` writes measured/not_measured results, distinguishes provider/worker/browser evidence and blocks enablement on failures or missing exercises. `evaluation/tests/test_scenarios.py` verifies that skipped/absent checks never pass and diagnostics never enter the report. See the IR-608 PR for executed results and remaining browser measurements.
+
+IR-608 CI security follow-up: scenario JUnit XML uses `defusedxml`; `test_xml_entities_are_rejected_as_unmeasured` verifies entity expansion and external entities cannot enter measured evidence.

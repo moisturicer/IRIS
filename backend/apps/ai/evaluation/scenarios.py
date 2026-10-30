@@ -1,7 +1,8 @@
 """IR-608 scenario evidence. Contract checks never stand in for a browser/worker run."""
 from __future__ import annotations
 
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 # Fixed suites: an operator cannot turn an unrelated passing test into safety evidence.
 SUITES = {
@@ -29,7 +30,7 @@ def junit_result(path, returncode):
     """Only counts leave pytest; failure messages can contain protected paper text."""
     try:
         root = ET.parse(path).getroot()
-    except (OSError, ET.ParseError):
+    except (OSError, ET.ParseError, DefusedXmlException):
         return {"status": "not_measured", "passed": False, "reason": "invalid_or_missing_test_report"}
     rows = list(root.iter("testcase"))
     failed = sum(row.find("failure") is not None for row in rows)
