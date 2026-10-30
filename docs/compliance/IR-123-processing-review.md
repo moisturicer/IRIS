@@ -15,6 +15,8 @@ export is generated from the displayed sections so the two cannot drift.
 Consumers are `DpaConsentInline` (submission), `DpaConsentModal` (read and copy),
 and `SettingsPage`. Signup's separate interim data notice and university policy
 documents remain tracked in IR-214; this change does not replace them.
+Settings labels this as the current disclosure notice and explicitly says that
+the historical account consent record does not prove acceptance of this revision.
 
 ## Processing inventory from code
 
@@ -69,3 +71,5 @@ processing disclosure, pending review status, unchecked consent, and that every
 displayed modal heading and paragraph is included in the clipboard output.
 The original notice fails both regression cases. Final suite, typecheck,
 lint/build and review evidence are recorded on the PR and Jira issue.
+`frontend/src/features/settings/SettingsPage.test.tsx` also verifies that an
+existing account's consent is not presented as acceptance of the revised notice.

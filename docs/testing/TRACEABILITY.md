@@ -7,6 +7,8 @@ and reranking, and configured language-model answers and whole-paper summaries.
 The consent label names external AI processing; the expanded terms show pending
 CIT-U DPO / legal review. Modal clipboard output is derived from the displayed
 sections instead of maintaining separate wording.
+Settings identifies the text as the current notice, rather than as historical
+terms accepted at registration (`SettingsPage.test.tsx`).
 
 **Evidence:** `components/compliance/DpaConsent.test.tsx` renders the submission
 notice and exercises Copy content in the modal. The old notice fails both
