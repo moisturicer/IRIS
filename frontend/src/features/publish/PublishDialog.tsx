@@ -459,7 +459,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     let holderAdviser: string | null = null;
     try {
       const { data } = await recordsApi.detail(id);
-      holders = data.current_holders ?? [];
+      holders = data.current_holders;
       // A holder is a party, not a person. When the party is the Adviser, the
       // person is the re-read record's own `adviser`, not the form's.
       const person = lists.advisers.find((a) => a.id === data.adviser);

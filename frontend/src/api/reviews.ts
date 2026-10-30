@@ -79,9 +79,4 @@ export const reviewsApi = {
   /** A coordinator's console of their office's open work (IR-623). Refused (403) to anyone else. */
   office: (office: string | null) =>
     apiClient.get<OfficeConsole>("/reviews/office/", { params: office ? { office } : {} }),
-
-  /** Request a one-time PIN emailed to the current user's account email. */
-  generatePin:(recordId: number) => apiClient.post("/reviews/pin/generate/", { record_id: recordId }),
-  /** Verify a PIN and confirm access. Returns { verified: true, record_id }. */
-  verifyPin:  (recordId: number, pin: string) => apiClient.post<{ verified: boolean; record_id: number }>("/reviews/pin/verify/", { record_id: recordId, pin }),
 };
