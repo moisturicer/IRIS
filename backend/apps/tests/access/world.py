@@ -24,6 +24,7 @@ from django.utils import timezone
 
 from apps.accounts.models import Role, User
 from apps.documents.models import RecordFile, RecordUpload, UploadSlot, UploadStatus
+from apps.documents.testing import real_pdf_bytes
 from apps.documents.requests import ItemSpec, create_request, requesting_party
 from apps.records.download_tokens import make_download_token
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
@@ -50,7 +51,7 @@ ROLES = (
 #: replaced by this one, and a refusal must read exactly like that response.
 MISSING_PK = 2_000_000_000
 
-PDF_BYTES = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
+PDF_BYTES = real_pdf_bytes()
 
 
 def pdf(name="paper.pdf") -> SimpleUploadedFile:

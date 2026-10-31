@@ -20,6 +20,7 @@ from rest_framework import status
 
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.notifications.models import Notification
+from apps.documents.testing import real_pdf_bytes
 from apps.records import lifecycle
 from apps.records.models import Record, RecordVersion
 from apps.reviews import routing, seats
@@ -58,6 +59,10 @@ def manuscript_url(record):
     return reverse("record-manuscript", args=[record.pk])
 
 
+V1 = real_pdf_bytes(b"v1")
+V2 = real_pdf_bytes(b"v2")
+
+
 def _pdf(body, name="paper.pdf"):
     return SimpleUploadedFile(name, body, content_type="application/pdf")
 
@@ -66,7 +71,7 @@ class NewVersionTestBase(RevisionTestBase):
 
     def thesis(self, *parties):
         """A Thesis with a manuscript, accepted and routed to `parties`."""
-        record = self.new_model(abstract_file=_pdf(b"%PDF-1.7 v1"))
+        record = self.new_model(abstract_file=_pdf(V1))
         self.accepted_to(record, *parties)
         return record
 
@@ -85,7 +90,7 @@ class NewVersionTestBase(RevisionTestBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         return response
 
-    def upload_manuscript(self, record, body=b"%PDF-1.7 v2", as_user=None):
+    def upload_manuscript(self, record, body=V2, as_user=None):
         self.client.force_authenticate(as_user or self.owner)
         with patch("apps.documents.tasks.extract_manuscript_text.delay"):
             return self.client.patch(
@@ -191,7 +196,7 @@ class UploadVersionTests(NewVersionTestBase):
         self.assertEqual(v2.manuscript.name, record.abstract_file.name)
         self.assertNotEqual(v2.manuscript.name, v1.manuscript.name)
         # The earlier version still reads as it did.
-        self.assertEqual(v1.manuscript.read(), b"%PDF-1.7 v1")
+        self.assertEqual(v1.manuscript.read(), V1)
 
     def test_the_owner_may_replace_the_manuscript_only_while_a_revision_is_asked_for(self):
         """
@@ -231,14 +236,14 @@ class UploadVersionTests(NewVersionTestBase):
         record = self.itso_cleared_and_ierc_asked()
         self.upload_manuscript(record)
 
-        self.assertEqual(self.read_manuscript(record, self.ierc), b"%PDF-1.7 v1")
-        self.assertEqual(self.read_manuscript(record, self.owner), b"%PDF-1.7 v2")
+        self.assertEqual(self.read_manuscript(record, self.ierc), V1)
+        self.assertEqual(self.read_manuscript(record, self.owner), V2)
         self.assertTrue(self.detail(record, self.owner)["manuscript_unsubmitted"])
         self.assertFalse(self.detail(record, self.ierc)["manuscript_unsubmitted"])
 
         self.submitted(record)
 
-        self.assertEqual(self.read_manuscript(record, self.ierc), b"%PDF-1.7 v2")
+        self.assertEqual(self.read_manuscript(record, self.ierc), V2)
         self.assertFalse(self.detail(record, self.owner)["manuscript_unsubmitted"])
 
     def test_withdrawing_the_last_request_puts_the_submitted_manuscript_back(self):
@@ -253,7 +258,7 @@ class UploadVersionTests(NewVersionTestBase):
         record.refresh_from_db()
         [v1] = self.versions(record)
         self.assertEqual(record.abstract_file.name, v1.manuscript.name)
-        self.assertEqual(self.read_manuscript(record, self.owner), b"%PDF-1.7 v1")
+        self.assertEqual(self.read_manuscript(record, self.owner), V1)
         self.assertFalse(self.detail(record, self.owner)["manuscript_unsubmitted"])
 
     def test_withdrawing_one_of_two_requests_keeps_the_owner_s_upload(self):
@@ -266,7 +271,7 @@ class UploadVersionTests(NewVersionTestBase):
 
         self.withdraw(record, self.ierc, ierc_request.pk)
 
-        self.assertEqual(self.read_manuscript(record, self.owner), b"%PDF-1.7 v2")
+        self.assertEqual(self.read_manuscript(record, self.owner), V2)
 
 
 # --- what Ask IRIS answers from (settled 2026-10-08, after review) ----------------------
@@ -352,7 +357,7 @@ class NothingChangedTests(NewVersionTestBase):
         edit stamps `details_edited_at` just the same, so the question this
         asks -- does an earlier stamp answer a later request? -- is unchanged.
         """
-        record = self.make_record(abstract_file=_pdf(b"%PDF-1.7 v1"))
+        record = self.make_record(abstract_file=_pdf(V1))
         self.edit_title(record)
         routing.enter_at_adviser(record, self.owner)
         self.accepted_to(record, Party.IERC)

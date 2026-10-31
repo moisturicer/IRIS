@@ -24,6 +24,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 from rest_framework import status
 
+from apps.documents.testing import real_pdf_bytes
 from apps.documents.models import DocumentRequest, RecordUpload, UploadSlot
 from apps.notifications.models import Notification
 from apps.records.test_tracker import TrackerTestBase
@@ -35,7 +36,7 @@ SLOTS = "/api/v1/documents/slots/"
 
 
 def pdf(name="evidence.pdf"):
-    return SimpleUploadedFile(name, b"%PDF-1.4 requested", content_type="application/pdf")
+    return SimpleUploadedFile(name, real_pdf_bytes(b"requested"), content_type="application/pdf")
 
 
 class DocumentRequestTestBase(TrackerTestBase):
