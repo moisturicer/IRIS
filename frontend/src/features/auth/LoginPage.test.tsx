@@ -22,7 +22,7 @@ import { getRoleDashboardPath } from "@/lib/roleDashboard";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { FIXTURE_ROLE, makeUser } from "@/test/authFixtures";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 
 import LoginPage from "./LoginPage";
 
@@ -79,6 +79,86 @@ describe("the login screen", () => {
     const { container } = renderScreen(<LoginPage />, { route: "/login" });
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+/**
+ * The Dossier frame (IR-706; IR-704 stories 1-5, 12, 58).
+ *
+ * The masthead is the page's one visible `<h1>`, and both logos are inside it,
+ * so its accessible name says whose system this is.
+ */
+describe("the frame sign in opens in", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("names IRIS and CIT-U in the masthead, the page's only top-level heading", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const [masthead, ...others] = screen.getAllByRole("heading", { level: 1 });
+    expect(others).toEqual([]);
+    expect(masthead).toHaveAccessibleName(/IRIS/);
+    expect(masthead).toHaveAccessibleName(/Cebu Institute of Technology/);
+    expect(screen.getByRole("heading", { level: 2, name: "Welcome Back" })).toBeInTheDocument();
+  });
+
+  it("offers Register in the masthead and under the form, and no longer says 'Sign up'", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const links = screen.getAllByRole("link", { name: "Register" });
+    expect(links).toHaveLength(2);
+    links.forEach((link) => expect(link).toHaveAttribute("href", "/signup"));
+    expect(screen.queryByRole("link", { name: /sign up/i })).not.toBeInTheDocument();
+  });
+
+  it("labels the sheet with one Sign in tab that is not a control", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    expect(screen.getByText("Sign in")).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+  });
+
+  it("says what IRIS is in one plain sentence under the headline", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    expect(screen.getByText(/Your research has/)).toHaveTextContent("Your research has a place.");
+    expect(screen.getByText(/^IRIS is CIT-U's system for submitting/)).toBeInTheDocument();
+  });
+
+  it("carries CIT-U's name in the footer and no policy link until IR-214", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveTextContent("Cebu Institute of Technology – University");
+    expect(within(footer).queryAllByRole("link")).toEqual([]);
+  });
+
+  it("announces a failed sign-in once, by the banner, and only marks the fields", async () => {
+    vi.spyOn(authApi, "login").mockRejectedValueOnce(
+      Object.assign(new Error("Request failed with status code 401"), {
+        isAxiosError: true,
+        response: { status: 401, data: { detail: "Invalid credentials." }, headers: {} },
+      }),
+    );
+    const user = userEvent.setup();
+    const { container } = renderScreen(<LoginPage />, { route: "/login" });
+
+    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "student@cit.edu");
+    await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+    // One live region in the whole page: the banner. The fields say nothing.
+    // `aria-live` has no role to query by, so the live-region semantics are
+    // read as attributes -- still the accessible tree, never a class or test id.
+    expect(container.ownerDocument.querySelectorAll('[role="alert"], [role="status"], [aria-live]')).toHaveLength(1);
+    const email = screen.getByRole("textbox", { name: "Email Address" });
+    expect(email).toBeInvalid();
+    expect(email).not.toHaveAccessibleDescription();
+    expect(screen.getByLabelText("Password")).toBeInvalid();
+    expect(screen.getByLabelText("Password")).not.toHaveAccessibleDescription();
   });
 });
 
