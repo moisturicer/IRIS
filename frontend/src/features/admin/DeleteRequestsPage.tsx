@@ -1,6 +1,6 @@
 /**
  * Admin page — list pending delete requests and approve them.
- * Accessible to staff roles only (gated by RoleRoute in router/index.tsx).
+ * Accessible to staff roles only (gated by ProtectedRoute in router/index.tsx).
  *
  * Notes:
  *   - Only admins can approve deletions (backend: IsAdmin permission).

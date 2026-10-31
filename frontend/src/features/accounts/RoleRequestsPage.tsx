@@ -11,12 +11,16 @@ import { Button }        from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import type { RoleRequest } from "@/types/auth";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function RoleRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
 
   const [requests,  setRequests]  = useState<RoleRequest[]>([]);
   const [loading,   setLoading]   = useState(true);
+  // A failed load is not an empty queue (IR-745): "All caught up!" after an
+  // error would tell RDCO there is nothing to decide when there may be.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
   const [_acting,   setActing]    = useState(false);
 
@@ -24,8 +28,11 @@ export default function RoleRequestsPage() {
     setLoading(true);
     accountsApi
       .roleRequests()
-      .then(({ data }) => setRequests(data.results))
-      .catch(() => addToast({ type: "error", message: "Failed to load role requests." }))
+      .then(({ data }) => {
+        setRequests(data.results);
+        setLoadFailed(false);
+      })
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   };
 
@@ -58,6 +65,15 @@ export default function RoleRequestsPage() {
 
       {loading ? (
         <Skeleton />
+      ) : loadFailed ? (
+        <EmptyState
+          framed
+          tone="error"
+          icon="fa-circle-exclamation"
+          title="Couldn't load role requests"
+          message="Check your connection and try again."
+          action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
+        />
       ) : requests.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
           <i className="fas fa-check-circle text-[32px] text-green-400 mb-3 block" aria-hidden />
