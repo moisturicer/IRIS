@@ -422,9 +422,16 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         For a reader who is exempt or holds a live grant. Anyone else who can
         see the record gets a 403 whose `code` says why; `get_object()` has
-        already given everyone else the 404 of a missing record.
+        already given everyone else the 404 of a missing record. The copy is
+        marked with who it was made for, or not served at all (IR-676).
         """
-        from .download_service import DOWNLOAD_REFUSALS, download_access, resolve_served_manuscript
+        from .download_service import (
+            DOWNLOAD_REFUSALS,
+            copy_identity,
+            download_access,
+            resolve_served_manuscript,
+        )
+        from .watermark import WatermarkFailed, watermark_pdf
 
         record = self.get_object()
         access = download_access(request.user, record)
@@ -445,8 +452,28 @@ class RecordViewSet(viewsets.ModelViewSet):
             metadata["request"] = access.request.pk
         if access.exemption:
             metadata["exemption"] = access.exemption
+
+        with handle:
+            source = handle.read()
+        try:
+            marked = watermark_pdf(source, copy_identity(request.user, access))
+        except WatermarkFailed:
+            create_audit_event(
+                "DOWNLOAD", request.user, record=record,
+                metadata={**metadata, "outcome": "watermark_failed"},
+            )
+            return Response(
+                {
+                    "detail": "A copy of this paper could not be prepared. Please contact RDCO.",
+                    "code": "watermark_failed",
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
         create_audit_event("DOWNLOAD", request.user, record=record, metadata=metadata)
-        return FileResponse(handle, content_type="application/pdf", as_attachment=True, filename=filename)
+        response = FileResponse(marked, content_type="application/pdf", as_attachment=True, filename=filename)
+        response["Cache-Control"] = "private, no-store"  # This copy names one reader
+        return response
 
     @action(
         detail=True, methods=["get"],
