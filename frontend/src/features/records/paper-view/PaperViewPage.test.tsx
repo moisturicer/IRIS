@@ -2427,6 +2427,46 @@ describe("the Review section (IR-412)", () => {
     await waitFor(() => expect(document.activeElement).toHaveTextContent(/^IERC/));
   });
 
+  describe("document requests and the viewer's due date (IR-684)", () => {
+    const documentsAndDue = () => readinessFor([
+      { kind: "document_request", severity: "blocker", label: "ITSO asked the author for a document.", party: "itso",
+        actor_name: "Ito Itso", since: "2026-09-03T08:00:00Z", action: { kind: "open_documents", target: "5" } },
+      { kind: "due_date", severity: "info", party: "itso", paused: true,
+        label: "ITSO is due Fri 11 Sep. The clock is paused while ITSO's document request is open." },
+    ]);
+
+    it("renders both kinds in the server's words, and Open Documents focuses the sidebar's Documents", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing, readiness: documentsAndDue() };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+      const panel = (await screen.findByRole("heading", { name: "Readiness" })).closest("section")!;
+      const [request, due] = within(panel).getAllByRole("listitem");
+      expect(request).toHaveTextContent("Blocker: ITSO asked the author for a document.");
+      expect(request).toHaveTextContent("Ito Itso");
+      expect(request).toHaveTextContent(`since ${formatDate("2026-09-03T08:00:00Z")}`);
+      expect(due).toHaveTextContent("ITSO is due Fri 11 Sep. The clock is paused while ITSO's document request is open.");
+      expect(due).toHaveTextContent("clock paused");
+      expect(due).not.toHaveTextContent("Blocker");
+      expect(within(due).queryByRole("button")).not.toBeInTheDocument();
+
+      await userEvent.click(within(request).getByRole("button", { name: "Open Documents" }));
+      const side = screen.getByRole("complementary", { name: "Review details" });
+      await waitFor(() => expect(document.activeElement).toHaveTextContent(/^Documents/));
+      expect(side).toContainElement(document.activeElement as HTMLElement);
+    });
+
+    it("takes a folded Open Documents to the Details tab", async () => {
+      workspaceAt(1100);
+      shownRecord = { ...inReview, ...reviewing, readiness: documentsAndDue() };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+      await userEvent.click(await screen.findByRole("button", { name: "Open Documents" }));
+      expect(screen.getByRole("tab", { name: "Details", selected: true })).toBeInTheDocument();
+      await waitFor(() => expect(document.activeElement).toHaveTextContent(/^Documents/));
+    });
+  });
+
   it("puts the paper beside the timeline, from the tracker", async () => {
     shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");

@@ -8,7 +8,7 @@ accepted, and a blocker item for every refusal the decision block names.
 
 from apps.documents.models import DocumentRequest
 from apps.reviews import seats
-from apps.reviews.models import RecordAssignment
+from apps.reviews.models import RecordAssignment, Turnaround
 from core.enums import AssignmentState, Party
 from core.permissions import may_read_review
 
@@ -230,3 +230,149 @@ class ReadinessExplainsEveryRefusalTests(ReadinessTestBase):
                             if i["severity"] == "blocker" and i["kind"] != "refusal"]
                 self.assertTrue(specific, f"{name}: refused with {response.data} and no blocker shown")
         self.assertEqual(refused, self.REFUSED)
+
+
+class DocumentRequestAndDueDateTests(ReadinessTestBase):
+    """IR-684: open document requests, and the viewer's own due date."""
+
+    def asked_for_documents(self, record, party, by):
+        return DocumentRequest.objects.create(
+            record=record, party=party, assignment=self.assignment(record, party),
+            requested_by=by, message="Signed consent forms, please.",
+        )
+
+    def items(self, readiness, kind):
+        return [i for i in readiness["items"] if i["kind"] == kind]
+
+    def test_itso_own_document_request_blocks_itso_and_informs_the_adviser(self):
+        record = self.routed(Party.ITSO)
+        self.opened_seat(record, Party.ITSO, self.itso)
+        request = self.asked_for_documents(record, Party.ITSO, self.itso)
+
+        mine = self.readiness(record, self.itso)
+        self.assertEqual(mine["verdict"], "blocked")
+        [item] = self.items(mine, "document_request")
+        self.assertEqual((item["severity"], item["party"]), ("blocker", Party.ITSO))
+        self.assertIn("ITSO", item["label"])
+        self.assertEqual(item["actor_name"], self.itso.get_full_name())
+        self.assertEqual(item["since"], request.created_at.isoformat())
+        self.assertEqual(item["action"], {"kind": "open_documents", "target": str(request.pk)})
+        # The refusal it explains is the service's own.
+        self.assertEqual(self.review(record, self.itso).status_code, 400)
+
+        adviser = self.readiness(record, self.adviser)
+        [item] = self.items(adviser, "document_request")
+        self.assertEqual(item["severity"], "info")
+        self.assertNotIn("blocker", [i["severity"] for i in adviser["items"]])
+
+    def test_a_paused_itso_due_date_is_information_and_says_why(self):
+        Turnaround.objects.create(party=Party.ITSO, working_days=5)
+        record = self.routed(Party.ITSO)
+        self.opened_seat(record, Party.ITSO, self.itso)
+        self.asked_for_documents(record, Party.ITSO, self.itso)
+
+        [item] = self.items(self.readiness(record, self.itso), "due_date")
+        self.assertEqual((item["severity"], item["paused"], item["party"]), ("info", True, Party.ITSO))
+        self.assertIn("document request", item["label"])
+        self.assertIsNone(item["action"])
+
+    def test_a_running_due_date_is_not_paused(self):
+        Turnaround.objects.create(party=Party.ITSO, working_days=5)
+        record = self.routed(Party.ITSO)
+        self.opened_seat(record, Party.ITSO, self.itso)
+
+        [item] = self.items(self.readiness(record, self.itso), "due_date")
+        self.assertIs(item["paused"], False)
+        self.assertNotIn("paused", item["label"])
+
+    def test_only_the_viewers_own_party_due_date_is_shown(self):
+        Turnaround.objects.create(party=Party.ITSO, working_days=5)
+        Turnaround.objects.create(party=Party.IERC, working_days=5)
+        record = self.routed(Party.ITSO, Party.IERC)
+        self.opened_seat(record, Party.ITSO, self.itso)
+        self.opened_seat(record, Party.IERC, self.ierc)
+
+        [item] = self.items(self.readiness(record, self.itso), "due_date")
+        self.assertEqual(item["party"], Party.ITSO)
+
+    def test_a_pool_member_sees_the_due_date_of_the_review_they_may_claim(self):
+        Turnaround.objects.create(party=Party.ITSO, working_days=5)
+        record = self.routed(Party.ITSO)
+
+        [item] = self.items(self.readiness(record, self.itso), "due_date")
+        self.assertEqual(item["party"], Party.ITSO)
+
+    def test_a_party_with_no_turnaround_shows_no_due_date(self):
+        record = self.routed(Party.ITSO)
+        self.opened_seat(record, Party.ITSO, self.itso)
+        self.asked_for_documents(record, Party.ITSO, self.itso)
+
+        self.assertEqual(self.items(self.readiness(record, self.itso), "due_date"), [])
+
+
+class ReadinessExplainsEveryRefusedFinishTests(ReadinessTestBase):
+    """
+    The office side of the property (IR-684): across these states, ITSO's
+    Clear is accepted exactly when readiness said `waiting_on_you`, and a
+    refused Clear was explained by a blocker of its own kind already shown.
+    A due date, paused or not, never blocks.
+    """
+
+    def states(self):
+        def opened():
+            record = self.routed(Party.ITSO, Party.IERC)
+            self.opened_seat(record, Party.ITSO, self.itso)
+            self.opened_seat(record, Party.IERC, self.ierc)
+            return record
+
+        def document_request(party, by):
+            record = opened()
+            DocumentRequest.objects.create(
+                record=record, party=party, assignment=self.assignment(record, party),
+                requested_by=by, message="Signed consent forms, please.",
+            )
+            return record
+
+        def revision_request(by):
+            record = opened()
+            self.asked(record, by)
+            return record
+
+        def unopened():
+            record = self.routed(Party.ITSO)
+            self.seat(record, Party.ITSO, self.itso)
+            return record
+
+        def paused_own_clock():
+            Turnaround.objects.create(party=Party.ITSO, working_days=5)
+            return document_request(Party.ITSO, self.itso)
+
+        return {
+            "opened": (opened, None),
+            "own document request": (lambda: document_request(Party.ITSO, self.itso), "document_request"),
+            "another office's document request": (lambda: document_request(Party.IERC, self.ierc), None),
+            "own revision request": (lambda: revision_request(self.itso), "revision_request"),
+            "another office's revision request": (lambda: revision_request(self.ierc), None),
+            "unopened seat": (unopened, "open_review"),
+            "own document request, clock paused": (paused_own_clock, "document_request"),
+        }
+
+    def test_a_refused_clear_is_always_explained_by_a_blocker_already_shown(self):
+        for name, (build, expected) in self.states().items():
+            with self.subTest(state=name):
+                Turnaround.objects.all().delete()
+                record = build()
+                blocked = self.detail(record, self.itso)["office_review"]["blocked"]
+                readiness = self.readiness(record, self.itso)
+                response = self.review(record, self.itso)
+                accepted = response.status_code == 200
+                self.assertEqual(accepted, readiness["verdict"] == "waiting_on_you", response.data)
+                self.assertTrue(all(i["severity"] == "info" for i in readiness["items"]
+                                    if i["kind"] == "due_date"))
+                if accepted:
+                    self.assertIsNone(expected, f"{name}: accepted, expected a {expected} blocker")
+                    continue
+                self.assertIsNotNone(expected, f"{name}: refused with {response.data}")
+                self.assertEqual(str(response.data["detail"]), blocked)
+                kinds = {i["kind"] for i in readiness["items"] if i["severity"] == "blocker"}
+                self.assertIn(expected, kinds, f"{name}: refused with {response.data}")
