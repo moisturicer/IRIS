@@ -160,8 +160,8 @@ wrong-address sentence read exactly, with the sign-in link and axe; no password
 text, no input and no password-labelled control on the confirmation. The copy
 case failed first (no list named "What happens next") and passed after the
 change; the tab and password checks passed first, pinning behaviour IR-707
-already had. The file passes (35), the full frontend suite passes (110 files,
-1454 tests), `tsc --noEmit` and eslint clean. CI evidence on the PR. **No browser evidence recorded yet.**
+already had. The file passes (35); typecheck, lint and the full suite are
+CI's, recorded on the PR. **No browser evidence recorded yet.**
 
 ## IR-538 · Announced email verification in the shared entry frame
 
