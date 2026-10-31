@@ -294,6 +294,8 @@ export interface RecordDetail extends RecordListItem {
    * (ADR-032 §4, IR-415). Never anyone else's.
    */
   my_seats:             ReviewerSeat[];
+  /** A server-offered claim from the viewer's office Pool; absent on older APIs. */
+  review_claim?:        { assignment: number; label: string; party_label: string } | null;
   /**
    * ADR-032's `is_record_participant`: an owner, or anyone who has ever held
    * a seat here -- so a reviewer whose part is done keeps Review and Files.
@@ -497,6 +499,8 @@ export interface ReviewerSeat {
   reviewer_name: string | null;
   state:         SeatState;
   state_label:   string;
+  /** The viewer's own recorded verdict in the server's words; on my_seats. */
+  verdict_label?: string | null;
   source:        SeatSource;
   assigned_by:   number | null;
   assigned_at:   string | null;

@@ -1,0 +1,32 @@
+.review-workspace-container { container: review-workspace / inline-size; min-width: 0; min-height: 0; flex: 1; display: flex; }
+.review-workspace { flex: 1; min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) var(--mid-w, 30%) var(--side-w, 20%); position: relative; min-height: 0; color: theme('colors.stone.700'); background: theme('colors.stone.50'); }
+.review-paper { display: flex; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: theme('colors.stone.200'); }
+.review-paper[inert] { position: relative; }
+.review-paper[inert]::after { content: ''; position: absolute; inset: 0; z-index: 10; background: rgb(41 37 36 / .2); }
+.review-pane { position: relative; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-left: 1px solid theme('colors.stone.300'); }
+.review-pane-head { padding: 12px 16px 0; border-bottom: 1px solid theme('colors.stone.200'); background: theme('colors.stone.100'); }
+.review-tab { position: relative; min-height: 44px; padding: 0 8px; font-size: 13px; font-weight: 600; }
+.review-tab[aria-selected=true] { color: theme('colors.stone.900'); box-shadow: inset 0 -2px theme('colors.stone.900'); }
+.review-pane-body { flex: 1; min-height: 0; overflow-y: auto; }
+.review-pane-foot { flex: none; padding: 12px 16px; border-top: 1px solid theme('colors.stone.300'); background: white; }
+.review-pane-foot > p { margin-bottom: 8px; }
+.review-details { position: relative; min-width: 0; min-height: 0; padding: 16px 18px; border-left: 1px solid theme('colors.stone.300'); }
+.review-details > div:last-child { overflow-y: auto; max-height: calc(100% - 64px); }
+.review-resize-edge { position: absolute; left: -4px; top: 0; bottom: 0; width: 8px; cursor: col-resize; z-index: 5; touch-action: none; }
+.review-resize-edge:hover, .review-resize-edge:focus-visible { background: theme('colors.brand.DEFAULT'); outline: 2px solid theme('colors.brand.DEFAULT'); outline-offset: 0; }
+.review-control { min-height: 44px; padding: 0 8px; border-radius: 8px; font-size: 13px; }
+.review-paper-foot { display: none; }
+.review-without-paper { grid-template-columns: minmax(320px, 1fr) var(--side-w, 20%); }
+@media (pointer: fine) { .review-control { min-height: 36px; } }
+@container review-workspace (max-width: 1199px) {
+  .review-workspace { grid-template-columns: minmax(0, 1fr) var(--mid-w, 40%); }
+  .review-without-paper { grid-template-columns: minmax(0, 1fr); }
+}
+@container review-workspace (max-width: 899px) {
+  .review-workspace { grid-template-columns: minmax(0, 1fr); }
+  .review-workspace:not(.review-without-paper) > .review-pane { position: absolute; inset: 0 0 0 auto; width: min(440px, 100%); z-index: 20; visibility: hidden; transform: translateX(100%); background: theme('colors.stone.50'); }
+  .review-workspace:not(.review-without-paper) > .review-pane-open { visibility: visible; transform: none; }
+  .review-resize-edge { display: none; }
+  .review-paper-foot { display: flex; justify-content: flex-end; position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 16px; border-top: 1px solid theme('colors.stone.300'); background: theme('colors.stone.100'); }
+  .review-paper { padding-bottom: 60px; }
+}

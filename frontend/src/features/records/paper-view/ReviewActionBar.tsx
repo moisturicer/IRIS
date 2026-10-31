@@ -21,6 +21,8 @@ interface ReviewActionBarProps {
   onChanged: () => void;
   /** The bar's own box, where the host places it; drawn only when there is a bar. */
   className?: string;
+  /** False when the workspace footer already offers Open review or Claim. */
+  primary?: boolean;
 }
 
 /** The controls the arrow keys move between: enabled buttons and links. */
@@ -45,6 +47,7 @@ export function ReviewActionBar({
   actions = REVIEW_ACTIONS,
   onChanged,
   className,
+  primary = true,
 }: ReviewActionBarProps) {
   const ids = useId();
   const [openDialog, setOpenDialog] = useState<ReviewAction | null>(null);
@@ -131,7 +134,7 @@ export function ReviewActionBar({
                   }}
                   // The first action is the filled one: the bar's primary, as
                   // the header has its own (01-design-system §0).
-                  className={cn(i === 0 ? PILL_PRIMARY : PILL_SECONDARY, FOCUS_RING)}
+                  className={cn(i === 0 && primary ? PILL_PRIMARY : PILL_SECONDARY, FOCUS_RING)}
                 >
                   <i className={cn("fas text-2xs", action.icon)} aria-hidden />
                   {action.label}

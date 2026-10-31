@@ -37,7 +37,7 @@ import { importedReference } from "@/test/fixtures/importedReference";
 import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
+import { act, fireEvent, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { useAuthStore } from "@/store/auth.store";
 import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import type { User } from "@/types/auth";
@@ -216,7 +216,7 @@ vi.mock("@/api/accounts", () => ({
 
 vi.mock("@/api/reviews", () => ({
   reviewsApi: { resubmit: vi.fn() },
-  seatsApi: { open: vi.fn(() => Promise.resolve({ data: {} })) },
+  seatsApi: { open: vi.fn(() => Promise.resolve({ data: {} })), claim: vi.fn(() => Promise.resolve({ data: {} })) },
 }));
 
 // The AI overview reads its own cache; this screen is not what that
@@ -498,7 +498,9 @@ describe("the review control follows the server's capabilities", () => {
 
     expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
+    // IR-681 keeps the server's offered action in the review footer, even
+    // when this fixture's re-read still offers it after navigation.
+    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).getByRole("button", OPEN_REVIEW)).toBeInTheDocument();
   });
 
   // ADR-032 §4, IR-415: opening the review records when this reviewer started.
@@ -1931,9 +1933,176 @@ describe("the Review section (IR-412)", () => {
 
   afterEach(() => {
     vi.mocked(recordsApi.tracker).mockImplementation(() => Promise.reject(new Error("not under test")));
+    localStorage.removeItem("iris-review-cols");
+    vi.unstubAllGlobals();
   });
 
   const bar = () => screen.getByRole("toolbar", { name: "Review actions" });
+
+  it("resizes by 24px with arrow keys and restores each column on double click (IR-681)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const mid = await screen.findByRole("separator", { name: "Resize the review pane" });
+    const side = screen.getByRole("separator", { name: "Resize the details sidebar" });
+    mid.focus();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(mid).toHaveAttribute("aria-valuenow", "504");
+    await userEvent.keyboard("{ArrowRight}");
+    expect(mid).toHaveAttribute("aria-valuenow", "480");
+    side.focus();
+    await userEvent.keyboard("{ArrowRight}");
+    expect(side).toHaveAttribute("aria-valuenow", "296");
+    await userEvent.dblClick(side);
+    expect(side).toHaveAttribute("aria-valuenow", "320");
+    mid.focus();
+    await userEvent.keyboard("{ArrowLeft}");
+    await userEvent.dblClick(mid);
+    expect(mid).toHaveAttribute("aria-valuenow", "480");
+  });
+
+  it("keeps one filled footer action and words for an unopened review (IR-681)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["open_review", "office_review", "request_revision"],
+      my_seats: [{ ...reviewingSeat, state: "assigned", state_label: "Assigned", opened_at: null }] };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const foot = await screen.findByRole("contentinfo", { name: "Your review" });
+    expect(within(foot).getByText(/Your review: Assigned/)).toBeInTheDocument();
+    const primary = within(foot).getAllByRole("button").filter((b) => b.classList.contains("bg-brand"));
+    expect(primary).toHaveLength(1);
+    expect(primary[0]).toHaveAccessibleName("Open review");
+    await userEvent.click(primary[0]);
+    expect(seatsApi.open).toHaveBeenCalledWith(78);
+  });
+
+  it("offers a pool member Claim review and refreshes after claiming (IR-681)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, capabilities: ["cite"], review_claim: { assignment: 55, label: "Claim review", party_label: "ITSO" } };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const foot = await screen.findByRole("contentinfo", { name: "Your review" });
+    const claim = within(foot).getByRole("button", { name: "Claim review" });
+    expect(within(foot).getAllByRole("button").filter((b) => b.classList.contains("bg-brand"))).toEqual([claim]);
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["open_review"] };
+    await userEvent.click(claim);
+    expect(seatsApi.claim).toHaveBeenCalledWith(55);
+    expect(await within(foot).findByRole("button", { name: "Open review" })).toBeInTheDocument();
+  });
+
+  it.each([
+    { role: "Adviser", party: "adviser", capabilities: ["accept_publish", "accept_route", "reject"], primary: "Accept & publish…" },
+    { role: "ITSO", party: "itso", capabilities: ["office_review", "request_revision", "route"], primary: "Clear…" },
+    { role: "RDCO", party: "rdco", capabilities: ["accept_publish", "keep_unlisted", "reject"], primary: "Accept & publish…" },
+  ] as const)("keeps one filled footer action for $role from its granted actions (IR-681)", async ({ role, party, capabilities, primary }) => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing, capabilities: [...capabilities], my_seats: [{ ...reviewingSeat, party }] };
+    signInAs(2, role);
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const foot = await screen.findByRole("contentinfo", { name: "Your review" });
+    expect(within(foot).getByText(/Your review: In review/)).toBeInTheDocument();
+    expect(within(foot).getAllByRole("button").filter((b) => b.classList.contains("bg-brand")))
+      .toEqual([within(foot).getByRole("button", { name: primary })]);
+  });
+
+  it("shows the viewer's recorded verdict and offers no new authority on a finished seat (IR-681)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["cite"],
+      my_seats: [{ ...reviewingSeat, state: "done", state_label: "Done", verdict_label: "Cleared" }] };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const foot = await screen.findByRole("contentinfo", { name: "Your review" });
+    expect(within(foot).getByText(/Your review: Cleared/)).toBeInTheDocument();
+    expect(within(foot).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("clamps dragging to leave the paper 480px and the sidebar slimmer than the pane (IR-681)", async () => {
+    workspaceAt(1200);
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const mid = await screen.findByRole("separator", { name: "Resize the review pane" });
+    const side = screen.getByRole("separator", { name: "Resize the details sidebar" });
+    fireEvent.pointerDown(mid, { button: 0, pointerId: 1, clientX: 600 });
+    fireEvent.pointerMove(mid, { pointerId: 1, clientX: -1000 });
+    fireEvent.pointerUp(mid, { pointerId: 1 });
+    expect(mid).toHaveAttribute("aria-valuenow", "480");
+    fireEvent.pointerDown(side, { button: 0, pointerId: 2, clientX: 900 });
+    fireEvent.pointerMove(side, { pointerId: 2, clientX: -1000 });
+    fireEvent.pointerUp(side, { pointerId: 2 });
+    expect(mid).toHaveAttribute("aria-valuenow", "320");
+    expect(side).toHaveAttribute("aria-valuenow", "280");
+    mid.focus();
+    await userEvent.keyboard("{ArrowRight>30/}");
+    expect(mid).toHaveAttribute("aria-valuenow", "320");
+    side.focus();
+    await userEvent.keyboard("{ArrowRight>30/}");
+    expect(side).toHaveAttribute("aria-valuenow", "220");
+  });
+
+  it("remembers widths across a remount and safely ignores broken storage (IR-681)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    const first = renderPaper(`/records/${RECORD_ID}?section=review`);
+    const mid = await screen.findByRole("separator", { name: "Resize the review pane" });
+    mid.focus();
+    await userEvent.keyboard("{ArrowLeft}");
+    first.unmount();
+    const second = renderPaper(`/records/${RECORD_ID}?section=review`);
+    expect(await screen.findByRole("separator", { name: "Resize the review pane" })).toHaveAttribute("aria-valuenow", "504");
+    second.unmount();
+    vi.spyOn(Storage.prototype, "getItem").mockImplementation(() => { throw new Error("storage blocked"); });
+    vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("storage blocked"); });
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const fallback = await screen.findByRole("separator", { name: "Resize the review pane" });
+    expect(fallback).toHaveAttribute("aria-valuenow", "480");
+    fallback.focus();
+    await userEvent.keyboard("{ArrowLeft}");
+    expect(fallback).toHaveAttribute("aria-valuenow", "504");
+  });
+
+  it("folds Details at the container breakpoint, then gives the paper a dismissible drawer (IR-681)", async () => {
+    const workspace = workspaceAt(1199);
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["comment_review"] };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    await userEvent.type(await screen.findByRole("textbox", { name: "Comment" }), "Keep this draft");
+    await userEvent.click(screen.getByRole("tab", { name: "Details" }));
+    expect(screen.getByRole("heading", { name: "Where it stands" })).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Review details" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("tab", { name: "Conversation" }));
+    expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Keep this draft");
+    act(() => workspace.resizeTo(899));
+    const drawer = screen.getByRole("dialog", { name: "Review pane" });
+    expect(drawer).toHaveAttribute("aria-modal", "true");
+    expect(drawer).toHaveFocus();
+    expect(screen.queryByRole("separator")).not.toBeInTheDocument();
+    await userEvent.click(within(drawer).getByRole("button", { name: "Back to paper" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open review pane" }));
+    expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Keep this draft");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Review pane" })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Open review pane" })).toHaveFocus());
+  });
+
+  it("opens the three review regions at 50/30/20 of a wide workspace (IR-681)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    expect(await screen.findByRole("separator", { name: "Resize the review pane" }))
+      .toHaveAttribute("aria-valuenow", "480");
+    expect(screen.getByRole("separator", { name: "Resize the details sidebar" }))
+      .toHaveAttribute("aria-valuenow", "320");
+    expect(screen.getByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
+    expect(await within(screen.getByRole("complementary", { name: "Review details" }))
+      .findByRole("heading", { name: "Where it stands" })).toBeInTheDocument();
+    expect(recordsApi.tracker).toHaveBeenCalledTimes(1);
+    vi.unstubAllGlobals();
+  });
 
   it("puts the paper beside the timeline, from the tracker", async () => {
     shownRecord = { ...inReview, ...reviewing };

@@ -1,4 +1,5 @@
 import { useEffect, useId, useState, type FormEvent, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
 import { recordsApi } from "@/api/records";
 import { Button } from "@/components/ui";
@@ -52,7 +53,12 @@ interface Discussion {
  *
  * The host remounts it (a new `key`) when something it shows has changed.
  */
-export function ReviewTimeline({ recordId, canComment = false }: { recordId: number; canComment?: boolean }) {
+export function ReviewTimeline({ recordId, canComment = false, statusTarget }: {
+  recordId: number;
+  canComment?: boolean;
+  /** Move the existing status to the workspace sidebar, sharing this tracker read. */
+  statusTarget?: HTMLElement | null;
+}) {
   const headingId = useId();
   const [data, setData] = useState<RecordTracker | null>(null);
   const [failed, setFailed] = useState(false);
@@ -91,7 +97,9 @@ export function ReviewTimeline({ recordId, canComment = false }: { recordId: num
 
   return (
     <div className="space-y-6">
-      {data && !failed && <ReviewStatus data={data} />}
+      {data && !failed && (statusTarget === undefined
+        ? <ReviewStatus data={data} />
+        : statusTarget && createPortal(<ReviewStatus data={data} />, statusTarget))}
       <section aria-labelledby={headingId} className="space-y-3">
         <RailHeading id={headingId}>Timeline</RailHeading>
 
