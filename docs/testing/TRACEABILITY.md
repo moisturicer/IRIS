@@ -1722,6 +1722,22 @@ Verification on 2026-10-30: local frontend full suite **105 files / 1,323 tests 
 
 The interrupted broad local run included `No active EmbeddingSpace is configured` errors in its reused test database; it did not establish a code regression. The clean CI database executed the full backend suite successfully. Task-owned test databases and temporary source copies may be removed after verification; no live metadata corrections were executed.
 
+## IR-646 and IR-648 — Account locks and password changes end sessions
+
+Locking an account ends all its open tracked sessions with reason `locked` and blacklists its outstanding refresh tokens. Unlocking never revives those sessions. Both JWT authentication and refresh apply the same active-and-unlocked account rule, including direct database locks, deactivation, and access tokens without `sid`.
+
+A successful password change ends every other tracked session with reason `password_changed`, preserving the request's session and its refresh token. Without `sid`, every tracked session ends. A rejected change does not end sessions or emit an audit event. `PASSWORD_CHANGED` records the actor with empty metadata; its choice-only migration is `audit/0009_password_changed` and the frontend audit filter includes it.
+
+| Guarantee | Public verification boundary |
+| --- | --- |
+| Lock, unlock, direct lock, deactivation, no-sid access, session list and unchanged lock audit events | `accounts/test_session_invalidation.py::LockingEndsSessionsTests`: real sign-in, authenticated HTTP request, refresh, administrative API and audit API |
+| Current device survives; other device ends; new/old passwords; rejected change; no sid; rotation; older stored JWT payloads | `accounts/test_session_invalidation.py::PasswordChangeEndsOtherSessionsTests`: password API, request, refresh, sign-in and audit API |
+| Distinct account-locked and password-changed-elsewhere sign-out messages, with axe checks | `features/auth/LoginPage.test.tsx`: rendered login alert queried by accessible role |
+| New audit event is available in the audit filter | `features/audit/AuditLogPage.test.tsx`: rendered filter options compared with the backend vocabulary |
+
+Compatibility: before this change, `OutstandingToken.token` was stored before `sid` was added to the issued token. New sign-ins store the complete payload. During a password change, older stored payloads without a session identity are not individually blacklisted because the current device cannot be identified safely from them; every issued refresh still carries its session identity and the shared session rule refuses ended sessions. Account locking blacklists all outstanding tokens, including these older records.
+
+Local focused verification on 2026-10-30: backend session invalidation, existing session, password-policy and enum-vocabulary suites passed. TypeScript passed; focused frontend suites passed **46 tests**. Both security regressions were observed before the fixes: a locked no-sid access token returned 200, and another device's access token returned 200 after a password change. The strengthened password-changed-elsewhere UI assertion also failed before the message changed. Full-suite, migration-copy and CI evidence are recorded in the PR when complete. Human review and approval remain required.
 ### IR-533 / IR-538 / IR-207 / IR-555 — entry-flow accessibility and truthful lock reporting
 
 **Requirements:** NFR-A1 (WCAG 2.1 AA), NFR-U3 (readable, consistent entry controls), NFR-S6 (account protection). The project lead confirmed the four-screen scope, remaining lock dialog, removal of unsupported statistics, and automated plus manual review evidence on 2026-10-30. The 44×44 and disabled-text contrast criteria are stricter product requirements, not blanket AA rules. The authority for entry accessibility remains `docs/ui-ux/12-accessibility.md`; IR-533 and its children identify the implementation work.
@@ -1758,8 +1774,19 @@ Authority: IR-609 under IR-605, ADR-042 and the general-tools evaluation contrac
 **Executed evidence (2026-10-30, Windows, local Postgres):** `python -m pytest apps/ai/evaluation/tests/test_campaign_report.py apps/ai/evaluation/tests/test_campaign_command.py`: 52 passed. `flake8` on the touched modules: clean. `python manage.py eval_campaign --smoke <fixture smoke run> --case-cost-usd 0.1 --campaign-cost-usd 2 --planned-cases 20` ran from the CLI and reported `not ready` (fake providers, one turn with missing usage), as expected. The full backend suite's failures were compared file by file against a clean `origin/main` worktree: none is added by this change. Pre-existing failures come from the local `.env` (inference profiles), `core.autocrlf` (proxy audit digest) and an uncommitted engine switch in the author's checkout. No campaign was run and no quality claim is made.
 
 
-## IR-679 — Review workspace contract (proposed)
+## IR-679 — Accepted review workspace contract
 
-**Design basis.** Proposed 2026-10-30 amendment to ADR-032 §7/§10 and screen spec 16 §4, indexed in the ADR README. Covers Conversation/Readiness, three regions, width clamps and container breakpoints, capability-driven actions, and review privacy. Existing accepted workflow rules remain in force; ADR-047 is separate.
+**Design basis.** Amendment proposed 2026-10-30 and accepted 2026-10-31 by Lee Jasmin Adolfo to ADR-032 §7/§10 and screen spec 16 §4, indexed in the ADR README. Covers Conversation/Readiness, three regions, width clamps and container breakpoints, capability-driven actions, and review privacy. Existing workflow rules remain in force; ADR-047 is separate.
 
-**Verification.** Documentation checked against IR-679 and IR-678 acceptance criteria and the committed prototype; relative links checked and `git diff --check` passed. No runtime behavior or requirements implementation is claimed. Named project-lead acceptance remains pending and must be recorded in ADR-032 before workspace implementation merges.
+**Verification.** Documentation checked against IR-679 and IR-678 acceptance criteria and the committed prototype; relative links checked and `git diff --check` passed. No runtime behavior or requirements implementation is claimed. Lee Jasmin Adolfo accepted the amendment and authorized merge on 2026-10-31 in the implementation chat. Acceptance is recorded in ADR-032 and on PR #363. The conflict resolution preserves both IR-679 and IR-680 evidence entries.
+
+
+## IR-680 — Review workspace composition boundary
+
+**Basis and scope.** IR-678/IR-680, ADR-032 §10 and Paper View spec 16 §4. Current `main` already composed the reader, status/timeline and action bar in `ReviewSection`; this pure refactor moves that boundary to `ReviewWorkspace`. PaperViewPage still owns the record fetch, reader, section selection and existing callbacks, passing the viewer's server-derived capabilities. ReviewTimeline keeps its existing tracker read. The Overview-only routing tracker stays in Overview. No workflow, permission or visible layout changes; the proposed three-column workspace remains IR-681.
+
+**Executed evidence (2026-10-30).** Frontend `npm test -- --maxWorkers=2`: **110 files, 1402 tests passed**, with existing tests unchanged, including PaperViewPage, ReviewActionBar, ReviewStatus, ReviewTimeline and ReviewRoutingTracker. The initial targeted run passed 172 tests but failed to spawn its last Windows forks worker (`spawn UNKNOWN`); the complete two-worker rerun passed without that error. `npm run build` passed TypeScript and Vite production build. `npm run lint` passed with zero errors and six existing warnings. `git diff --check` passed. No new behavior was introduced, so no new test suite was added for the rename.
+
+**Visual comparison.** [Before/after evidence](evidence/IR-680/README.md) for an Adviser and ITSO reviewer in Review mode: both pairs have identical PNG SHA-256 hashes and the same record/manuscript/tracker requests. Real app and PDF reader, synthetic API fixtures, 1600×1000 viewport. This establishes the requested wide-layout regression comparison, not every workflow state.
+
+**Review.** Independent Standards and Spec reviews against baseline `c6b6c1e` found no defects. Lee Jasmin Adolfo merged PR #364 on 2026-10-31 (Manila); all four CI checks passed. The implementation chat also explicitly authorizes merge and cleanup. Merge commit: `9933202dd69cf4466b8ef0530486b7334a3f92f7`.

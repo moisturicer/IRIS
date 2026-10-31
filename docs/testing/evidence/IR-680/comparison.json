@@ -1,0 +1,69 @@
+{
+  "baseline": "c6b6c1e",
+  "viewport": "1600x1000",
+  "source": "Synthetic fixture using existing page-test records; real app and PDF renderer; API intercepted; no live credentials or records.",
+  "results": [
+    {
+      "role": "Adviser",
+      "pixelIdentical": true,
+      "sha256": [
+        "62d9c3186f9f28eb26f5e7414fa33a38a558d8ad99cbebed1589df50bcd08a4b",
+        "62d9c3186f9f28eb26f5e7414fa33a38a558d8ad99cbebed1589df50bcd08a4b"
+      ],
+      "recordRequests": [
+        [
+          "/api/v1/records/7/",
+          "/api/v1/records/7/",
+          "/api/v1/records/7/increment_access/",
+          "/api/v1/records/7/increment_access/",
+          "/api/v1/records/7/manuscript/",
+          "/api/v1/records/7/manuscript/",
+          "/api/v1/records/7/tracker/",
+          "/api/v1/records/7/tracker/"
+        ],
+        [
+          "/api/v1/records/7/",
+          "/api/v1/records/7/",
+          "/api/v1/records/7/increment_access/",
+          "/api/v1/records/7/increment_access/",
+          "/api/v1/records/7/manuscript/",
+          "/api/v1/records/7/manuscript/",
+          "/api/v1/records/7/tracker/",
+          "/api/v1/records/7/tracker/"
+        ]
+      ],
+      "requestParity": true
+    },
+    {
+      "role": "ITSO",
+      "pixelIdentical": true,
+      "sha256": [
+        "6eb4d37f6939db266e41bf3eec1c8691eff14517cd72c0558e96b2e052985e57",
+        "6eb4d37f6939db266e41bf3eec1c8691eff14517cd72c0558e96b2e052985e57"
+      ],
+      "recordRequests": [
+        [
+          "/api/v1/records/7/",
+          "/api/v1/records/7/",
+          "/api/v1/records/7/increment_access/",
+          "/api/v1/records/7/increment_access/",
+          "/api/v1/records/7/manuscript/",
+          "/api/v1/records/7/manuscript/",
+          "/api/v1/records/7/tracker/",
+          "/api/v1/records/7/tracker/"
+        ],
+        [
+          "/api/v1/records/7/",
+          "/api/v1/records/7/",
+          "/api/v1/records/7/increment_access/",
+          "/api/v1/records/7/increment_access/",
+          "/api/v1/records/7/manuscript/",
+          "/api/v1/records/7/manuscript/",
+          "/api/v1/records/7/tracker/",
+          "/api/v1/records/7/tracker/"
+        ]
+      ],
+      "requestParity": true
+    }
+  ]
+}

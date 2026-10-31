@@ -82,7 +82,7 @@ Choosing an older version swaps the manuscript and shows a banner: *"You are vie
 
 ## 4 · Review mode
 
-**Amendment proposed, 2026-10-30 (IR-679): Phase 1 review workspace.** Acceptance is pending the project lead's named review in [ADR-032 §7 and §10](../adr/032-adviser-first-review-and-office-reviewer-pools.md). Until accepted and implemented, the two-column description below remains the current behavior. On acceptance the following replaces the Review mode regions, party status placement and action-bar placement; existing acts and dialogs remain.
+**Amendment, proposed 2026-10-30, accepted 2026-10-31 by Lee Jasmin Adolfo (IR-679): Phase 1 review workspace.** Acceptance is recorded in [ADR-032 §7 and §10](../adr/032-adviser-first-review-and-office-reviewer-pools.md) and on [PR #363](https://github.com/moisturicer/IRIS/pull/363). Until implemented, the two-column description below remains the current behavior. The following replaces the Review mode regions, party status placement and action-bar placement; existing acts and dialogs remain.
 
 | Region | Phase 1 content |
 |---|---|
@@ -98,7 +98,7 @@ Reviewers replaces the separate status strip in Review mode. People show an icon
 
 Read mode, Ask IRIS's entry point and the author's existing view stay unchanged. The [prototype](prototypes/review-workspace.html) also illustrates later phases, which are excluded here: Changes, Threads, review submissions, resolution, suggested wording and notification subscriptions. ADR-047's proposed routing change is separate and is not implemented by this amendment.
 
-**Existing layout, retained until the amendment is accepted and implemented:**
+**Existing layout, retained until the accepted amendment is implemented:**
 
 ```
 ┌──────────────────────────────┬──────────────────────────────────────┐

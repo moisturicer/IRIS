@@ -353,7 +353,7 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 - **The timeline is derived** from the rows that already exist plus `ReviewComment`, the same way the tracker is (ADR-021 §14). Nothing is duplicated into an event table.
 - **Public comments are moderated by hiding, not by deleting.** Owners and system administrators can hide a comment.
 
-**Amendment proposed, 2026-10-30 (IR-679): the Conversation tab.** Awaiting named acceptance by the project lead; this amendment does not change the accepted rules until then. IR-678's workspace implementation must not merge before acceptance is recorded here.
+**Amendment, proposed 2026-10-30, accepted 2026-10-31 (IR-679): the Conversation tab.** Accepted by **Lee Jasmin Adolfo** (project lead), who instructed "resolve conflicted prs and merge" after the implementation and proposal were prepared for review. The acceptance is also recorded on [PR #363](https://github.com/moisturicer/IRIS/pull/363).
 
 The review discussion remains one record-level timeline, with the same readers, writers and version tags. In Review mode it becomes the **Conversation** tab of the review pane. The timeline is followed by the server-authored **Readiness** panel and the record comment box. Changes and Threads are later phases and their tabs are absent until implemented. This adds no anchored threads, pending review submissions or new discussion channel. The author's existing surfaces remain unchanged. The regions and Readiness contract are specified in the proposed amendment under §10.
 
@@ -451,7 +451,7 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 | **Review** | Seat holders, after **Open review** | The paper beside the review timeline (*amended 2026-09-26: no Ask IRIS here; it stays on the Paper tab, IR-372*), the party status strip (Adviser ✓ · ITSO ● · IERC ● · KTTO — · RDCO ○), and an action bar built from `capabilities` |
 | **Summary** | Strangers on a Discoverable Proposal | The §8 summary and public discussion. No PDF. |
 
-**Amendment proposed, 2026-10-30 (IR-679): Review workspace, Phase 1.** **Acceptance: pending the project lead's named review.** On acceptance, this supersedes the Review row's two-region layout and the standalone party status strip in Review mode. It changes presentation and adds a read-only projection; existing workflow rules and action permissions remain authoritative.
+**Amendment, proposed 2026-10-30, accepted 2026-10-31 (IR-679): Review workspace, Phase 1.** **Accepted by Lee Jasmin Adolfo** (project lead), as recorded under §7 and on PR #363. This supersedes the Review row's two-region layout and the standalone party status strip in Review mode. It changes presentation and adds a read-only projection; existing workflow rules and action permissions remain authoritative.
 
 **Three regions.** Left: the whole Manuscript through the existing Paper reader. Middle: a review pane with Conversation (§7), ending in Readiness and the record comment box; its footer always shows the viewer's verdict in words and the single filled primary action currently offered by the server. Right: a details sidebar, visible whichever review tab is selected. Its first section, **Reviewers**, groups people and their states by party, showing an unclaimed Pool as an office rather than a person. **Request review** reuses routing and **Add a colleague** reuses the separate add-reviewer act. Targets and controls come only from `routing` and capabilities, never a client role table.
 
