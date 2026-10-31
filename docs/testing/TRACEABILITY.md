@@ -140,6 +140,29 @@ seen failing with the prefix removed. The auth and auth-component suites pass
 (192), with `tsc --noEmit` and eslint clean. **No browser evidence recorded yet**
 for the steps; it is owed before IR-704 closes.
 
+## IR-704 / IR-709 · The confirmation closes the folder
+
+After a successful registration the confirmation stays inside the folder, under
+three tabs marked completed that are plain labels: no link, no button, so a sent
+form cannot be reopened. Focus moves to the "Check your email" h2. It names the
+exact address entered, lists "What happens next" (verify the email, then RDCO
+reviews the role request) as a list named by its heading, says "You can sign in
+once it is verified. Signing in shows that your request is waiting." (the
+pending screen, IR-537), and for a wrong address: "If that address is wrong,
+register again with the right one. Your first request stays pending until RDCO
+declines it." Correcting the address in place is IR-705. "Go to sign in" links
+to `/login`. No password and no input appear on it.
+
+**Verification (2026-10-31):** in `SignupPage.test.tsx`'s finish block, all
+through the accessible tree, the existing confirmation case now also asserts
+the nav holds no button and exactly three tabs, and two cases are added: the next steps, the sign-in sentence and the
+wrong-address sentence read exactly, with the sign-in link and axe; no password
+text, no input and no password-labelled control on the confirmation. The copy
+case failed first (no list named "What happens next") and passed after the
+change; the tab and password checks passed first, pinning behaviour IR-707
+already had. The file passes (35); typecheck, lint and the full suite are
+CI's, recorded on the PR. **No browser evidence recorded yet.**
+
 ## IR-538 · Announced email verification in the shared entry frame
 
 `EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains
