@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-15T16:17:21Z",
+  "generatedAt": "2026-10-31T15:00:00Z",
   "title": "Design System: IRIS",
   "extensions": {
     "colorMeta": {
@@ -36,12 +36,15 @@
     "motion": [
       { "name": "colour-fade", "value": "150-200ms ease-out", "purpose": "Hover and focus colour changes." },
       { "name": "settle", "value": "300ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The section thumb sliding; Record details folding away beside Ask IRIS." },
-      { "name": "panel-in", "value": "320ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Ask IRIS arriving from the edge it is docked to (1.5rem, opacity)." }
+      { "name": "panel-in", "value": "320ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Ask IRIS arriving from the edge it is docked to (1.5rem, opacity)." },
+      { "name": "sheet-settle", "value": "280ms cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "The entry folder settling once on load (0.5rem rise, opacity); motion-safe only." },
+      { "name": "step-fade", "value": "150ms ease-out", "purpose": "Register's step panel cross-fading on a step change; opacity only, motion-safe only." }
     ],
     "breakpoints": [
       { "name": "reading-split", "value": "@container reading (min-width: 640px)" },
       { "name": "reading-wide", "value": "@container reading (min-width: 1000px)" },
-      { "name": "overview-wide", "value": "@container overview (min-width: 64rem)" }
+      { "name": "overview-wide", "value": "@container overview (min-width: 64rem)" },
+      { "name": "narrow", "value": "(max-width: 389.98px)", "purpose": "Register's folder tabs other than the current one show only their mark (IR-711)." }
     ]
   },
   "components": [
@@ -116,7 +119,8 @@
       "description": "The question field, holding the scope chip and the one filled control, Send.",
       "html": "<div class=\"ds-composer\"><textarea class=\"ds-composer-field\" rows=\"1\" placeholder=\"Ask about methodology, findings, datasets...\"></textarea><div class=\"ds-composer-row\"><span class=\"ds-scope\"><span class=\"ds-scope-dot\"></span>This paper</span><button class=\"ds-send\" aria-label=\"Send\"><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"><path d=\"M12 19V5M5 12l7-7 7 7\"/></svg></button></div></div>",
       "css": ".ds-composer { border: 1px solid #d6d3d1; border-radius: 12px; background: #fff; transition: border-color 200ms, box-shadow 200ms; } .ds-composer:focus-within { border-color: rgb(107 15 18 / 0.6); box-shadow: 0 0 0 2px rgb(107 15 18 / 0.2); } .ds-composer-field { display: block; width: 100%; box-sizing: border-box; resize: none; border: none; background: transparent; padding: 10px 12px 0; color: #292524; font: 400 14px/21px Inter, system-ui, sans-serif; outline: none; } .ds-composer-field::placeholder { color: #78716c; } .ds-composer-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 8px 8px; } .ds-scope { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid #f9b8b9; border-radius: 12px; background: #fdf2f2; color: #6B0F12; font: 600 13px/20px Inter, system-ui, sans-serif; } .ds-scope-dot { width: 6px; height: 6px; border-radius: 9999px; background: #6B0F12; } .ds-send { width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #6B0F12; border-radius: 12px; background: #6B0F12; color: #fff; cursor: pointer; transition: background-color 200ms; } .ds-send:hover { background: #8B1316; } .ds-send:focus-visible { outline: 2px solid #6B0F12; outline-offset: 2px; }"
-    }
+    },
+    { "name": "Entry folder", "kind": "custom", "refersTo": "entry-sheet", "description": "The Dossier frame's folder (IR-704): index tabs on a white sheet with a stone sheet behind it. The tab joined to the sheet carries a 2px maroon top edge (a recorded exception); a completed register step has a check and a solid outline, one not started is dashed.", "html": "<div class=\"ds-folder\"><div class=\"ds-folder-tabs\"><span class=\"ds-ftab ds-ftab-done\"><span class=\"ds-fmark ds-fmark-done\">&#10003;</span>Identity</span><span class=\"ds-ftab ds-ftab-on\"><span class=\"ds-fmark ds-fmark-on\">2</span>Affiliation</span><span class=\"ds-ftab ds-ftab-todo\"><span class=\"ds-fmark ds-fmark-todo\">3</span>Security</span></div><div class=\"ds-folder-back\"></div><div class=\"ds-folder-sheet\"><h2 class=\"ds-folder-title\">Create an Account</h2><p class=\"ds-folder-step\">Step 2 of 3 &middot; Affiliation</p></div></div>", "css": ".ds-folder { position: relative; isolation: isolate; max-width: 36rem; } .ds-folder-tabs { position: relative; z-index: 10; display: flex; gap: 4px; padding-left: 20px; } .ds-ftab { display: flex; align-items: center; gap: 8px; min-height: 44px; margin-bottom: -1px; padding: 10px 16px; border: 1px solid; border-bottom: 0; border-radius: 8px 8px 0 0; font: 600 13px/20px Inter, system-ui, sans-serif; } .ds-ftab-done { border-color: #d6d3d1; background: #f5f5f4; color: #292524; } .ds-ftab-on { border-color: #e7e5e4; border-top: 2px solid #6B0F12; background: #fff; color: #6B0F12; } .ds-ftab-todo { border-style: dashed; border-color: #a8a29e; color: #57534e; } .ds-fmark { display: flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 9999px; font-size: 12px; } .ds-fmark-done { background: #1c1917; color: #fff; } .ds-fmark-on { background: #6B0F12; color: #fff; } .ds-fmark-todo { border: 1px dashed #78716c; color: #44403c; } .ds-folder-back { position: absolute; inset: 44px 0 0 0; z-index: -1; transform: translate(8px, 8px); border: 1px solid #e7e5e4; border-radius: 12px; background: #f5f5f4; } .ds-folder-sheet { padding: 40px 44px; border: 1px solid #e7e5e4; border-radius: 12px; background: #fff; box-shadow: 0 4px 12px 0 rgb(0 0 0 / 0.08); } .ds-folder-title { margin: 0; font: 600 28px/34px 'EB Garamond', Georgia, serif; color: #1c1917; } .ds-folder-step { margin: 4px 0 0; font: 600 12px/16px Inter, system-ui, sans-serif; color: #6B0F12; }"}
   ],
   "narrative": {
     "northStar": "The Bound Volume",
