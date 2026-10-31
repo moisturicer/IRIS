@@ -239,7 +239,42 @@ export interface MetadataSuggestions {
   source:      "pdf_structure";
 }
 
+/** Server-filtered fields: null means withheld or not recorded. */
+export interface PaperPerson {
+  id: number;
+  name: string;
+  role: string;
+  office: string | null;
+  college: string | null;
+  department: string | null;
+  program: string | null;
+  email: string | null;
+}
+
+export interface PaperDueDate {
+  party: Party;
+  label: string;
+  due_at: string | null;
+  original_due_at: string | null;
+  is_overdue: boolean;
+  clock_paused: boolean;
+}
+
+export interface PaperDetails {
+  /** Null when the viewer may not read every owner's registration affiliation. */
+  colleges: string[] | null;
+  programs: string[] | null;
+  author_flags: { office: Party; label: string; hint: string }[];
+  researchers: PaperPerson[];
+  adviser: PaperPerson | null;
+  /** Review content: null means not disclosed, not an empty review. */
+  participants: PaperPerson[] | null;
+  due_dates: PaperDueDate[] | null;
+}
+
 export interface RecordDetail extends RecordListItem {
+  /** Added in IR-686; absent only when using an older API. */
+  paper_details?: PaperDetails;
   lineage?: {
     derived_from: { id: number; title: string; record_type_name: string | null } | null;
     continued_as: { id: number; title: string; record_type_name: string | null } | null;
@@ -456,6 +491,12 @@ export interface AddReviewerOptions {
 export interface RoutingFlags {
   accept_and_route: boolean;
   route_as:         Party | null;
+  /**
+   * Where onward *Route* may send this record, as the server's party graph
+   * has it (IR-685): *Request review* lists exactly these. Empty when the
+   * viewer cannot route.
+   */
+  targets:          { party: Party; label: string }[];
 }
 
 /** One office the routing dialog offers (`GET /records/<id>/route-options/`). */
@@ -692,6 +733,8 @@ export interface AssignmentExtension {
 }
 
 export interface TrackerSeat {
+  /** Stable identity for a server-projected profile card (IR-686). */
+  reviewer?: number | null;
   reviewer_name: string | null;
   state:         SeatState;
   state_label:   string;
