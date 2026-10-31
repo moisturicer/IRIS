@@ -502,6 +502,90 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     await expectNoBlockingA11yViolations(document.body);
   });
 
+  it("lists exactly role, name, email, college and program under Check your details, never a password", async () => {
+    const user = userEvent.setup();
+    renderSignup();
+    await reachSecurity(user);
+    await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
+    await user.type(screen.getByLabelText("Confirm Password"), "IrisDemo123!");
+
+    const summary = screen.getByRole("region", { name: "Check your details" });
+    const terms = within(summary).getAllByRole("term").map((t) => t.textContent);
+    const values = within(summary).getAllByRole("definition").map((d) => d.textContent);
+    expect(terms).toEqual(["Role", "Name", "Email", "College", "Program"]);
+    expect(values).toEqual([
+      expect.stringContaining("Student"),
+      expect.stringContaining("Juan S. Dela Cruz"),
+      expect.stringContaining("juan@cit.edu"),
+      expect.stringContaining("College of Computer Studies"),
+      expect.stringContaining("BS Computer Science"),
+    ]);
+    expect(summary).not.toHaveTextContent("IrisDemo123!");
+    expect(summary).not.toHaveTextContent(/password/i);
+  });
+
+  it("names an Adviser's department in the summary instead of a program", async () => {
+    const user = userEvent.setup();
+    renderSignup();
+    await fillIdentity(user, "Adviser");
+    await fillAffiliation(user, "Adviser");
+
+    const summary = screen.getByRole("region", { name: "Check your details" });
+    expect(within(summary).getAllByRole("term").map((t) => t.textContent)).toEqual(
+      ["Role", "Name", "Email", "College", "Department"],
+    );
+    expect(summary).toHaveTextContent("Adviser");
+    expect(summary).toHaveTextContent("Information Technology");
+  });
+
+  it("takes each Change link to the step that owns the line, with its answers intact", async () => {
+    const user = userEvent.setup();
+    renderSignup();
+    await reachSecurity(user);
+    await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
+    const change = (what: string) =>
+      within(screen.getByRole("region", { name: "Check your details" })).getByRole("link", { name: `Change ${what}` });
+
+    for (const what of ["role", "name", "email"]) {
+      await user.click(change(what));
+      expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity");
+      expect(stepHeading()).toHaveFocus();
+      expect(screen.getByRole("radio", { name: "Student" })).toBeChecked();
+      expect(firstName()).toHaveValue(" Juan ");
+      expect(email()).toHaveValue("juan@cit.edu");
+      await user.click(tab(/^Affiliation, completed$/));
+      await user.click(screen.getByRole("button", { name: "Continue to security" }));
+    }
+
+    for (const what of ["college", "program"]) {
+      await user.click(change(what));
+      expect(stepHeading()).toHaveTextContent("Step 2 of 3 · Affiliation");
+      expect(college()).toHaveDisplayValue("College of Computer Studies");
+      expect(program()).toHaveDisplayValue("BS Computer Science");
+      await user.click(screen.getByRole("button", { name: "Continue to security" }));
+    }
+    expect(screen.getByLabelText("Password")).toHaveValue("IrisDemo123!");
+  });
+
+  it("reads heading, summary, passwords, consent, then Register", async () => {
+    const user = userEvent.setup();
+    const { container } = renderSignup();
+    await reachSecurity(user);
+
+    const order = [
+      stepHeading(),
+      screen.getByRole("region", { name: "Check your details" }),
+      screen.getByLabelText("Password"),
+      screen.getByLabelText("Confirm Password"),
+      screen.getByRole("checkbox", { name: CONSENT }),
+      screen.getByRole("button", { name: "Register" }),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1].compareDocumentPosition(order[i]) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    await expectNoBlockingA11yViolations(container);
+  });
+
   it("links to no page that does not exist", async () => {
     const user = userEvent.setup();
     renderSignup();
@@ -669,8 +753,9 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
 });
 
 /**
- * A refused registration says why, where it applies (IR-540). These are the
- * refusals that belong to Security & agreement itself; IR-708 routes the rest.
+ * A refused registration says why, where it applies (IR-540), and takes the
+ * registrant to the earliest step a field refusal names (IR-708). A failure
+ * with nothing to say about the fields stays on Security, every answer kept.
  */
 describe("a refused registration", { timeout: 30_000 }, () => {
   const refuse = (data: unknown, status = 400) =>
@@ -690,21 +775,115 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("says a refusal on an earlier step's field on Security, and keeps it on that field", async () => {
+  it("takes a duplicate email back to Identity, on the email field, keeping everything else", async () => {
+    const user = userEvent.setup();
+    refuse({ email: ["This email address is already registered."] });
+    const { container } = renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
+    expect(stepHeading()).toHaveFocus();
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(/We brought you back/);
+    expect(alert).toHaveTextContent(/everything else you entered is kept/i);
+    expect(email()).toHaveAccessibleDescription("This email address is already registered.");
+    expect(email()).toHaveAttribute("aria-invalid", "true");
+    expect(email()).toHaveValue("juan@cit.edu");
+    expect(firstName()).toHaveValue(" Juan ");
+
+    // Leaving the field without changing it keeps the server's message.
+    await user.click(email());
+    await user.tab();
+    expect(email()).toHaveAccessibleDescription("This email address is already registered.");
+
+    // Affiliation and Security stay completed; Identity is not, until the email changes.
+    expect(tab(/^Affiliation, completed$/)).toBeInTheDocument();
+    expect(tab(/^Security & agreement, completed$/)).toBeInTheDocument();
+    await user.click(tab(/^Affiliation, completed$/));
+    expect(within(steps()).getByRole("link", { name: "Identity, not started" })).toHaveAttribute("aria-disabled", "true");
+    expect(college()).toHaveDisplayValue("College of Computer Studies");
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.clear(email());
+    await user.type(email(), "juan.dc@cit.edu");
+    expect(email()).not.toHaveAttribute("aria-invalid");
+
+    await user.click(tab(/^Security & agreement, completed$/));
+    expect(tab(/^Identity, completed$/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toHaveValue("IrisDemo123!");
+    expect(screen.getByRole("checkbox", { name: CONSENT })).toBeChecked();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("keeps Identity closed to Continue while the refused email is unchanged", async () => {
     const user = userEvent.setup();
     refuse({ email: ["This email address is already registered."] });
     renderSignup();
     await submit(user);
+    await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
 
-    // Email is not on screen here, so the message is said where the registrant is.
-    const alert = await screen.findByRole("alert");
-    expect(alert).toHaveTextContent("This email address is already registered.");
-    expect(stepHeading()).toHaveTextContent("Step 3 of 3 · Security & agreement");
-
-    await user.click(tab(/^Identity, completed$/));
+    await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
+    expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity");
     expect(email()).toHaveAccessibleDescription("This email address is already registered.");
-    expect(email()).toHaveAttribute("aria-invalid", "true");
-    expect(email()).toHaveValue("juan@cit.edu");
+  });
+
+  it("takes a role refusal back to Identity, said on the role group until the role changes", async () => {
+    const user = userEvent.setup();
+    refuse({ role_name: ["This role is not open for registration."] });
+    const { container } = renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
+    expect(screen.getByRole("alert")).toHaveTextContent(/We brought you back/);
+    const roles = screen.getByRole("radiogroup", { name: "I am registering as" });
+    expect(roles).toHaveAccessibleDescription("This role is not open for registration.");
+    await expectNoBlockingA11yViolations(container);
+
+    await user.click(screen.getByRole("radio", { name: "Adviser" }));
+    expect(roles).not.toHaveAccessibleDescription(/not open/);
+  });
+
+  it("takes an affiliation refusal back to Affiliation, on its field", async () => {
+    const user = userEvent.setup();
+    refuse({ course_id: ["This program is not open for registration."] });
+    const { container } = renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 2 of 3 · Affiliation"));
+    expect(screen.getByRole("alert")).toHaveTextContent(/We brought you back/);
+    expect(program()).toHaveAccessibleDescription("This program is not open for registration.");
+    expect(program()).toHaveDisplayValue("BS Computer Science");
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("keeps a password-policy refusal on Security, on the password field, with no return alert", async () => {
+    const user = userEvent.setup();
+    refuse({ password: ["This password is too common."] });
+    const { container } = renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(screen.getByLabelText("Password")).toHaveAccessibleDescription("This password is too common."));
+    expect(stepHeading()).toHaveTextContent("Step 3 of 3 · Security & agreement");
+    expect(screen.queryByText(/We brought you back/)).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("goes to the earliest step with an error when several have one", async () => {
+    const user = userEvent.setup();
+    refuse({
+      password: ["This password is too common."],
+      department_id: ["Choose a department in this college."],
+      first_name: ["Enter your name as CIT-U records it."],
+    });
+    renderSignup();
+    await submit(user, "Adviser");
+
+    await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
+    expect(firstName()).toHaveAccessibleDescription("Enter your name as CIT-U records it.");
+    await user.clear(firstName());
+    await user.type(firstName(), "Juana");
+    await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
+    expect(stepHeading()).toHaveTextContent("Step 2 of 3 · Affiliation");
+    expect(department()).toHaveAccessibleDescription("Choose a department in this college.");
   });
 
   it("puts errors named the server's way on the field they mean", async () => {
@@ -739,6 +918,46 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent(/IRIS can't be reached right now/);
     expect(screen.getByLabelText("Password")).not.toHaveAttribute("aria-invalid");
+    expect(stepHeading()).toHaveTextContent("Step 3 of 3 · Security & agreement");
+    expect(screen.getByLabelText("Password")).toHaveValue("IrisDemo123!");
+  });
+
+  it("stays on Security with every answer kept when the server fails", async () => {
+    const user = userEvent.setup();
+    refuse({ email: ["ignored on a 5xx"] }, 503);
+    const { container } = renderSignup();
+    await submit(user);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/IRIS can't be reached right now/);
+    expect(stepHeading()).toHaveTextContent("Step 3 of 3 · Security & agreement");
+    expect(screen.getByLabelText("Password")).toHaveValue("IrisDemo123!");
+    expect(screen.getByLabelText("Confirm Password")).toHaveValue("IrisDemo123!");
+    expect(screen.getByRole("checkbox", { name: CONSENT })).toBeChecked();
+    expect(tab(/^Identity, completed$/)).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("leaves no password in localStorage or sessionStorage after a refused and then a successful submit", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(authApi, "register")
+      .mockRejectedValueOnce({ response: { status: 400, data: { email: ["This email address is already registered."] } } })
+      .mockResolvedValue({ data: {} } as never);
+    renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
+    await user.clear(email());
+    await user.type(email(), "juan.dc@cit.edu");
+    await user.click(tab(/^Security & agreement, completed$/));
+    await user.click(screen.getByRole("button", { name: "Register" }));
+    await screen.findByRole("heading", { name: "Check your email" });
+
+    for (const store of [localStorage, sessionStorage]) {
+      for (let i = 0; i < store.length; i++) {
+        expect(store.getItem(store.key(i)!)).not.toContain("IrisDemo123!");
+      }
+    }
   });
 });
 

@@ -161,7 +161,8 @@ IR-709's. The step panel cross-fades in 150 ms, opacity only, behind
 **Deliberate changes to existing behaviour:** a server error on an Identity or
 Affiliation field (for example an email already registered) is now also said in
 the alert on Security, because its field is no longer on screen; it stays on
-the field too. Taking the registrant to that step is IR-708. The options-load
+the field too. Taking the registrant to that step is IR-708 (superseded there:
+the alert on Security no longer repeats it). The options-load
 failure now shows on Affiliation, where the selects are, not at the top of the
 whole form.
 
@@ -184,6 +185,45 @@ that every `animate-` utility on an entry screen sits behind `motion-safe:`,
 seen failing with the prefix removed. The auth and auth-component suites pass
 (192), with `tsc --noEmit` and eslint clean. **No browser evidence recorded yet**
 for the steps; it is owed before IR-704 closes.
+
+## IR-704 / IR-708 · Step 3 summary, and refusals routed to their step
+
+Security & agreement shows "Check your details" in the left column under the
+step heading: role, name, email, college and program (department for an
+Adviser), never a password. Each line has a "Change <line>" link that opens the
+step owning it with every answer kept. On a phone the page reads heading →
+summary → passwords → consent → Register.
+
+A 400 with field errors takes the registrant to the earliest step owning one
+(Identity: names, email, `role_name`; Affiliation: college, program,
+department; Security: passwords, consent), focuses its heading and, when that
+step is earlier than Security, says "We brought you back to <step>" with
+"everything else you entered is kept". The server's message sits on its field
+(the role refusal on the role group) and survives a blur; it clears when that
+field changes. A refused step is incomplete and blocks Continue and Register
+until then, while the steps after it stay completed — the refusal does not
+cascade the way the screen's own checks do. Network, timeout and 5xx failures
+stay on Security with the unreachable alert and every answer kept; non-field
+errors stay on Security as an alert.
+
+**Deliberate changes to existing behaviour:** the IR-707 case "says a refusal on
+an earlier step's field on Security, and keeps it on that field" asserted the
+interim behaviour this ticket replaces, and was rewritten as "takes a duplicate
+email back to Identity". `role_name` moves from the alert to the role group.
+
+**Known limitation:** while a refused step is not current its tab reads "not
+started" and is disabled, as `EntrySteps` has no "incomplete but reachable"
+state; Back and the summary's Change links reach it.
+
+**Verification (2026-10-31):** `SignupPage.test.tsx`, 44 cases, all passing
+(`npx vitest run src/features/auth/SignupPage.test.tsx`). New: summary lines for
+a Student and an Adviser, each Change link with answers intact, reading order,
+duplicate email to Identity (tabs, blur, change clearing it), Continue blocked
+while refused, role refusal, affiliation refusal, password refusal staying put,
+earliest step winning, 5xx staying on Security, and no password in either
+storage after a refused then a successful submit; axe on each refusal state.
+`tsc --noEmit` reports only the existing `DataTable.tsx` import error, unchanged
+from `main`; eslint clean on both files. **No browser evidence recorded yet.**
 
 ## IR-704 / IR-709 · The confirmation closes the folder
 
@@ -2058,3 +2098,13 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 **Tests.** `apps/reviews/test_readiness.py` `PartiesReviewingAndUnclaimedPoolsTests` (ITSO reviewing, IERC's Pool unclaimed, RDCO holding): RDCO sees exactly one `party_reviewing` (ITSO) and one `pool_unclaimed` (IERC), both `info`, each with `since` and *Show reviewers*, and the verdict stays `ready`; *Claim* is offered to both IERC members and to nobody else (RDCO, ITSO, the Adviser); the offices named as closing equal `decision.closes`; a viewer who cannot decide is never told what a Decision closes; the Adviser, who no longer decides, sees ITSO and RDCO reviewing and IERC's Pool, all `info` with *Show reviewers*. `ReadinessExplainsEveryRefusalTests` gains two states (that one, accepted; and the same with RDCO's own revision request open, refused). `PaperViewPage.test.tsx`: "renders a party still reviewing and an unclaimed Pool, each with its one control (IR-683)".
 
 **Executed evidence (2026-10-31).** Backend, locally against Postgres with private test databases (`DB_NAME=iris_ir683`, `iris_ir683b`), because another session was dropping the shared `test_iris_local` mid-run: `apps/reviews/test_readiness.py` 14 passed, which is also the first run of IR-682's tightened property test; `apps/reviews` and `apps/records` together 819 passed, 0 failed, 0 skipped (run before the review fixes, which renamed a helper and changed tests only; the readiness file was re-run after them). Frontend: `tsc --noEmit` clean, eslint clean on the changed test, and all of `src/features/records/paper-view/` passes (27 files, 442 tests). The full `npm test` and full backend suites were not run on this machine (low memory) and are left to CI.
+
+## IR-684 — Readiness: open document requests and the viewer's due date
+
+**Basis and scope.** ADR-032 §10 Amendment (Readiness contract) and ADR-043 (deadlines). IR-681 already emitted a `document_request` item for each open request (a blocker only for the office that asked, which is where the service refuses that office's Clear or Record finding) and a `due_date` item for every party. It also already dispatched *Open Documents* to the sidebar's Documents section, or to the Details tab when the sidebar is folded. IR-684 narrows `due_date` to the viewer's own party: the party they hold a seat for, or the pool they may claim. Other parties' dates stay in the sidebar's Due dates. A paused date now says in its label what stopped the clock, which is that party's own document request or else its own revision request (ADR-043 §4, `readiness_facts`' `paused_by`). `due_date` is always `info` and carries `paused` (no `since`); a party with no Turnaround has no `due_at` and gets no item. No rule, permission or service changes.
+
+**Divergence from the ticket, recorded rather than reconciled.** The ticket says the due date reports whether the clock is paused "by the party's own document request". ADR-043 §4 also pauses a party's clock on its own open revision request, so the label names whichever pause applies. It does not report only document-request pauses.
+
+**Tests.** `apps/reviews/test_readiness.py`: `DocumentRequestAndDueDateTests`. ITSO's own request is a blocker for ITSO, naming who asked, when, and `open_documents`, and Clear is refused with 400; the Adviser sees it as `info`. A paused ITSO due date is `info` with `paused: true` and names the document request. A running date is not paused. Only the viewer's own party's date is shown. A pool member sees the date of the review they may claim. No Turnaround means no `due_date`. `ReadinessExplainsEveryRefusedFinishTests` covers seven states through the real services and ITSO's `review/`: Clear is accepted exactly when readiness says `waiting_on_you`; each refusal is the `office_review.blocked` reason and is explained by a blocker of its own kind (`document_request`, `revision_request`, `open_review`); a due date, paused or not, is never a blocker. `PaperViewPage.test.tsx`: "document requests and the viewer's due date (IR-684)". Both kinds render in the server's words, and *Open Documents* focuses the sidebar's Documents at 1600px and the Details tab's Documents at 1100px.
+
+**Executed evidence (2026-10-31).** Backend, in the `iris-backend` image (worktree mounted, development requirements installed) against the compose Postgres with a freshly created test database: `apps/reviews/test_readiness.py` 16 passed. The wider backend run is left to CI. Frontend: `npm test` 110 files, 1436 tests passed. `npm run lint` 0 errors, 6 existing warnings. `npm run build` passed.

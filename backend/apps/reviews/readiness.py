@@ -57,7 +57,7 @@ def readiness_facts(record, user) -> dict:
     from apps.documents.models import DocumentRequest
     from apps.documents.requests import may_read_requests
 
-    from .deadlines import deadline_payload
+    from .deadlines import deadline_payload, revision_pending
 
     assignments = []
     for assignment in (
@@ -68,7 +68,14 @@ def readiness_facts(record, user) -> dict:
             assignment.seats.exclude(state=SeatState.WITHDRAWN)
             .select_related("reviewer").order_by("assigned_at", "pk")
         )
+        # What stopped this party's clock (ADR-043 §4): its own document
+        # request, else its own revision request.
+        paused_by = (
+            "document_request" if assignment.document_pause_started_at
+            else "revision_request" if revision_pending(assignment) else None
+        )
         assignments.append({
+            "paused_by": paused_by,
             "id": assignment.pk,
             "party": assignment.party,
             "label": _label(assignment.party),
@@ -159,17 +166,23 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
             since=assignment["opened_at"], action=_action("show_party", party),
         ))
 
+    # The viewer's own due date (IR-684): the party they hold a seat for, or
+    # the pool they may claim. Other parties' dates stay in the sidebar.
+    claim = review_claim["assignment"] if review_claim else None
     for assignment in facts["assignments"]:
         due = assignment["due_at"]
         if not due:
             continue  # no configured Turnaround, no due date
+        if assignment["id"] != claim and not any(s["reviewer"] == viewer for s in assignment["seats"]):
+            continue
         when = _day(datetime.fromisoformat(due))
         label = assignment["label"]
+        text = f"{label} was due {when}." if assignment["is_overdue"] else f"{label} is due {when}."
+        if assignment["clock_paused"]:
+            why = "document request" if assignment["paused_by"] == "document_request" else "revision request"
+            text = f"{label} is due {when}. The clock is paused while {label}'s {why} is open."
         items.append(_item(
-            "due_date", INFO,
-            f"{label} was due {when}." if assignment["is_overdue"] else f"{label} is due {when}.",
-            party=assignment["party"], since=assignment["opened_at"],
-            paused=assignment["clock_paused"],
+            "due_date", INFO, text, party=assignment["party"], paused=assignment["clock_paused"],
         ))
 
     if blocked and not any(i["severity"] == BLOCKER for i in items):
