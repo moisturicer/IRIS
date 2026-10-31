@@ -8,15 +8,9 @@ import { cn } from "@/lib/utils";
  * Ask IRIS icon (IR-744): the folio's leaves as brackets around three lines of
  * a passage, drawn in `currentColor`.
  *
- * Two deliberate departures from the original drafts, still held by the
- * remaining icons:
- *
- * 1. Gradient and filter ids come from `useId()`. Hard-coding `id="irisGrad"`
- *    breaks the moment two instances render on one page — SVG ids are global,
- *    the browser resolves `url(#irisGrad)` to whichever node is first in the
- *    document, and unmounting that one blanks every other instance.
- * 2. The line icons stroke with `currentColor` instead of a baked `#6B0F12`,
- *    so they stay legible on maroon message bubbles and dark surfaces.
+ * The line icons that remain (the grounded citation) stroke with
+ * `currentColor` instead of a baked `#6B0F12`, so they stay legible on maroon
+ * message bubbles and dark surfaces.
  *
  * The amber accent that used to mark AI affordances is gone (IR-356): the
  * interface is white, black, grey and maroon, so the emblem's accents are

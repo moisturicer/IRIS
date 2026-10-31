@@ -172,7 +172,7 @@ The inventory is worth nothing without these.
 | `components/ui/pillStyles.ts` | `PILL_PRIMARY` / `PILL_SECONDARY` / `PILL_SELECTED`: the 44 px page-action pills, shared by buttons, router links and the Save trigger ([01](01-design-system.md) §0) |
 | `paper-view/headings.tsx` | `SectionHeading` (serif, reading column) and `RailHeading` (tracked capitals, side cards): one definition each |
 | `StatusBadge` | Revision requested / rejected / pending delete carry an icon (return arrow / ban / bin) as well as a tone and label |
-| `AskIrisEmblem` and the Ask IRIS line icons | Amber and green accents replaced by maroon shades and `currentColor`; the "IRIS AI" label marks AI content |
+| `AskIrisEmblem` and the Ask IRIS line icons | Amber and green accents replaced by maroon shades and `currentColor`; the "IRIS AI" label marks AI content. *Since IR-744 the emblem, mark and synthesis state draw the Folio Ribbon `AskIrisGlyph`* |
 
 ## IR-372 additions (2026-09-25)
 
@@ -218,3 +218,11 @@ The Publish dialog replaces Submit Disclosure ([`frontend_redesign_spec.md`](../
 | `router/redirects.tsx` | **New.** The retired-URL table, one entry per URL, each followed by `redirects.test.tsx`. `/records/add` → `/?publish=new`. F1 adds the others |
 | ~~`AddRecordPage`~~, ~~`TypeRouteStep`~~, ~~`PaperDetailsStep`~~, ~~`lib/submissionRoutes`~~ | **Deleted.** `TitleAbstractStep`, `RecordDetailsStep` and `UploadsStep` stay until F5 deletes `EditRecordPage`, which still imports them |
 
+
+## IR-744 additions (2026-11-01)
+
+| Component | What it is |
+|---|---|
+| `components/brand/IrisBrand.tsx` | The Folio Ribbon identity: `IrisMark`, `IrisWordmark`, `IrisLoader` (storyboard loop, `role="status"` when labelled), `SearchGlyph` and `AskIrisGlyph` (`answering` writes its lines). All `currentColor` |
+| `components/brand/brandPaths.ts` | Generated path data, written by `docs/brand/folio-ribbon/final/build.py`; never edited by hand |
+| `Spinner` | `md`/`lg` render `IrisLoader` (28 / 40 px) and take a `label`; `sm` stays the button ring |

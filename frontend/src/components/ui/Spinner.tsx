@@ -3,6 +3,8 @@ import { IrisLoader } from "@/components/brand/IrisBrand";
 interface SpinnerProps {
   size?: "sm" | "md" | "lg";
   className?: string;
+  /** Says what is loading and makes the loader a polite status (`md`/`lg`). */
+  label?: string;
 }
 
 const SIZE: Record<string, string> = {
@@ -15,12 +17,13 @@ const SIZE: Record<string, string> = {
  * A page or panel loading uses the Folio Ribbon loader (IR-744); `sm` stays a
  * plain ring because it sits inside a button beside words like "Deleting…".
  *
- * Decorative either way: every caller says what is loading in its own
- * `role="status"` region, and a second announcement would only repeat it.
+ * Pass `label` where nothing else announces the wait; leave it out where the
+ * caller already has its own `role="status"` text (ProtectedRoute,
+ * EmailVerifyPage, the Publish dialog) or the ring sits beside a verb.
  */
-export function Spinner({ size = "md", className = "" }: SpinnerProps) {
+export function Spinner({ size = "md", className = "", label }: SpinnerProps) {
   if (size !== "sm") {
-    return <IrisLoader className={`${SIZE[size]} text-brand ${className}`} />;
+    return <IrisLoader className={`${SIZE[size]} text-brand ${className}`} label={label} />;
   }
   return (
     <svg

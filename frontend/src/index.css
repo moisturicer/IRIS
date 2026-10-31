@@ -135,8 +135,8 @@
 
 /* ── Folio Ribbon motion (IR-744) ────────────────────────────────────────
    The loader plays the concept board's storyboard: one leaf, its partner,
-   then the two ribbons unspool from the spine and the I appears in the space
-   they leave. Ask IRIS answering writes its three lines one after another.
+   then the two ribbons unspool from the spine, leaving the I standing in the
+   white space between them. Ask IRIS answering writes its three lines one after another.
    Under reduced motion both become a slow fade. */
 .iris-loading .iris-leaf-tl,
 .iris-loading .iris-leaf-br,
@@ -166,8 +166,8 @@
 }
 
 .iris-answering .iris-ask-line { transform-origin: 0% 50%; animation: iris-write 1.8s cubic-bezier(.16, 1, .3, 1) infinite; }
-.iris-answering .iris-ask-line:nth-of-type(3) { animation-delay: .18s; }
-.iris-answering .iris-ask-line:nth-of-type(4) { animation-delay: .36s; }
+.iris-answering .iris-ask-line-2 { animation-delay: .18s; }
+.iris-answering .iris-ask-line-3 { animation-delay: .36s; }
 @keyframes iris-write {
   0% { transform: scaleX(0); }
   35%, 78% { transform: none; }

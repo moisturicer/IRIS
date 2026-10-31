@@ -11,7 +11,7 @@ import {
 } from "./brandPaths";
 
 /**
- * The Folio Ribbon identity (IR-744): the IRIS mark, its lockup, the loader
+ * The Folio Ribbon identity (IR-744): the IRIS mark, its wordmark, the loader
  * and the two product glyphs, all traced from the approved concept artwork
  * (docs/brand/folio-ribbon/final). Everything fills with `currentColor`, so a
  * `text-brand` or `text-white` class sets the colour; the reversed versions
@@ -62,26 +62,9 @@ export function IrisWordmark({ className = "h-4", title }: GlyphProps) {
 }
 
 /**
- * The horizontal lockup: the mark stands about 1.85 times the height of the
- * capitals, as on the concept's banner. Read as one image named by `title`.
- */
-export function IrisLockup({
-  className,
-  markClassName = "h-9 w-9",
-  wordmarkClassName = "h-5",
-  title,
-}: GlyphProps & { markClassName?: string; wordmarkClassName?: string }) {
-  return (
-    <span className={cn("inline-flex items-center gap-2.5", className)} {...a11y(title)}>
-      <IrisMark className={cn("shrink-0", markClassName)} />
-      <IrisWordmark className={cn("w-auto shrink-0", wordmarkClassName)} />
-    </span>
-  );
-}
-
-/**
  * The loader: the concept board's storyboard on a 2 s loop (one leaf, its
- * partner, then the ribbons close and the I appears). Under reduced motion it
+ * partner, then the ribbons close, leaving the I standing in the white space
+ * between them; the I itself is never drawn). Under reduced motion it
  * becomes a slow fade (see `.iris-loading` in index.css).
  *
  * With a `label` it is a polite status; without one it is decorative, for
@@ -134,8 +117,8 @@ export function AskIrisGlyph({ className = "h-5 w-5", title, answering = false }
       {...a11y(title)}
     >
       <path d={ASK.brackets} />
-      {ASK_LINES.map((d) => (
-        <path key={d.slice(0, 24)} className="iris-ask-line" d={d} />
+      {ASK_LINES.map((d, line) => (
+        <path key={line} className={`iris-ask-line iris-ask-line-${line + 1}`} d={d} />
       ))}
     </svg>
   );

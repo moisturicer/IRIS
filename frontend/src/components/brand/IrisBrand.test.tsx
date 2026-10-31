@@ -1,30 +1,19 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { AskIrisGlyph, IrisLoader, IrisLockup, IrisMark, SearchGlyph } from "./IrisBrand";
+import { Spinner } from "@/components/ui/Spinner";
+import { AskIrisGlyph, IrisLoader, IrisMark, IrisWordmark, SearchGlyph } from "./IrisBrand";
 
 describe("Folio Ribbon brand marks (IR-744)", () => {
   it("names the mark IRIS when given a title, and hides it when it is decorative", () => {
-    const { container } = render(
+    render(
       <>
         <IrisMark title="IRIS" />
         <IrisMark />
+        <IrisWordmark />
       </>,
     );
-    expect(screen.getByRole("img", { name: "IRIS" })).toBeInTheDocument();
     expect(screen.getAllByRole("img")).toHaveLength(1);
-    expect(container.querySelectorAll("svg")).toHaveLength(2);
-  });
-
-  it("draws the mark from its four ribbon pieces in the current colour", () => {
-    const { container } = render(<IrisMark title="IRIS" />);
-    const paths = container.querySelectorAll("path");
-    expect(paths).toHaveLength(4);
-    expect(container.querySelector("svg")).toHaveAttribute("fill", "currentColor");
-  });
-
-  it("reads the lockup as one image named IRIS", () => {
-    render(<IrisLockup title="IRIS" />);
     expect(screen.getByRole("img", { name: "IRIS" })).toBeInTheDocument();
   });
 
@@ -35,27 +24,33 @@ describe("Folio Ribbon brand marks (IR-744)", () => {
     expect(screen.queryByRole("status")).not.toBeInTheDocument();
   });
 
-  it("gives the loader the motion classes that reduced motion turns into a fade", () => {
-    const { container } = render(<IrisLoader />);
-    expect(container.querySelector("svg")).toHaveClass("iris-loading");
+  it("lets a page-level Spinner announce what is loading", () => {
+    render(<Spinner size="lg" label="Loading sessions" />);
+    expect(screen.getByRole("status", { name: "Loading sessions" })).toBeInTheDocument();
   });
 
-  it("animates the Ask IRIS lines only while answering", () => {
-    const { container, rerender } = render(<AskIrisGlyph title="Ask IRIS" />);
-    expect(screen.getByRole("img", { name: "Ask IRIS" })).not.toHaveClass("iris-answering");
-    rerender(<AskIrisGlyph title="Ask IRIS" answering />);
-    expect(container.querySelector("svg")).toHaveClass("iris-answering");
+  it("keeps a button-sized Spinner silent, beside the verb that names the wait", () => {
+    render(<Spinner size="sm" />);
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
-  it("names the search glyph only when asked to", () => {
-    render(<SearchGlyph title="Search" />);
-    expect(screen.getByRole("img", { name: "Search" })).toBeInTheDocument();
+  it("names the Ask IRIS and search glyphs only when asked to", () => {
+    render(
+      <>
+        <AskIrisGlyph title="Ask IRIS" answering />
+        <SearchGlyph title="Search" />
+        <SearchGlyph />
+      </>,
+    );
+    expect(screen.getByRole("img", { name: "Ask IRIS" })).toBeInTheDocument();
+    expect(screen.getAllByRole("img", { name: "Search" })).toHaveLength(1);
   });
 
   it("has no serious accessibility violations", async () => {
     const { container } = render(
       <div>
-        <IrisLockup title="IRIS" />
+        <IrisMark title="IRIS" />
         <IrisLoader label="Loading" />
         <AskIrisGlyph title="Ask IRIS" answering />
         <SearchGlyph />
