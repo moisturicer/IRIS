@@ -132,6 +132,13 @@ python manage.py load_corpus <dir> --dry-run             # bulk-load PDFs as Rec
                                    # corpus loaded 12 new records (8 already present from an earlier
                                    # partial load, correctly skipped) and every one extracted and
                                    # chunked cleanly — 354 chunks, zero failures
+python manage.py backfill_abstracts --dry-run [--classification NAME ...]
+                                   # fill EMPTY Record abstracts from each record's own
+                                   # manuscript chunks (IR-703): an "Abstract" section, an inline
+                                   # "Abstract", or text after "(Dated: ...)". Never overwrites.
+                                   # Record vectors embed title + abstract, so re-embed afterwards.
+                                   # Refuses with DEBUG off unless --force. Verified on the dev
+                                   # database 2026-10-31: 40 of 40 proxy papers
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 python manage.py run_research_tool --user EMAIL --call TOOL='{json}' [--call ...]
                                    # run research-lane tools as a user, no model

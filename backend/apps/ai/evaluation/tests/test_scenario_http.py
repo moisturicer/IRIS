@@ -11,6 +11,7 @@ from apps.ai.providers.fakes import ScriptedLLM, ScriptedToolCallingLLM
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.research.tests.conftest import fresh_vector_indexes
 from apps.ai.tests.corpus import FLOOD_TEXT, make_record, make_user
+from apps.records.models import Record
 from apps.ai.tests.test_controller_http import call, compose, controller_root
 from core.enums import PipelineStatus
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
@@ -88,6 +89,11 @@ def test_controlled_outcomes(condition, client_for, embedder, space, monkeypatch
     paper = None
     if condition != "no_candidates":
         paper = make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder, space=space)
+        if condition == "candidates_without_passages":
+            # IR-703: abstracts and best passages are sources now; this case has neither.
+            from apps.ai.research.tools import search
+            monkeypatch.setattr(search, "BEST_PASSAGES", 0)
+            Record.objects.filter(pk=paper.pk).update(abstract="")
     arguments = {"query": "flood prediction", "target": "papers" if condition == "candidates_without_passages" else "passages"}
     if condition == "rejected_arguments":
         arguments["user"] = 999

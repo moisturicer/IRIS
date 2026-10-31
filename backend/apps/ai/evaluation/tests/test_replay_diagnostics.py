@@ -11,6 +11,7 @@ from apps.ai.providers.fakes import ScriptedLLM, ScriptedToolCallingLLM
 from apps.ai.research.tests.conftest import fresh_vector_indexes
 from apps.ai.tests.corpus import FLOOD_TEXT, make_record, make_user
 from apps.ai.tests.test_controller_http import call, compose, controller_root
+from apps.records.models import Record
 
 from .test_replay import Reader
 
@@ -44,6 +45,11 @@ def replay(monkeypatch, embedder, client_for, email, planner, *, diagnostics=Tru
 def test_candidates_found_then_no_results_is_a_handoff_failure(
     scene, monkeypatch, embedder, client_for,
 ):
+    # IR-703: a found paper's abstract is now a source, so only a paper with
+    # nothing citable leaves the handoff empty; so is its best passage.
+    from apps.ai.research.tools import search
+    monkeypatch.setattr(search, "BEST_PASSAGES", 0)
+    Record.objects.filter(title="Flood Prediction").update(abstract="")
     planner = ScriptedToolCallingLLM([
         call("search_research", {"query": "flood", "target": "papers"}, "c1"),
         compose(basis="evidence"),

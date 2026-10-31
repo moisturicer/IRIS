@@ -26,6 +26,30 @@ class NotConfigured(Exception):
     """A limit is unset; the controller refuses rather than guess one."""
 
 
+def verify_controller_configuration() -> None:
+    """Startup check (IR-703): under admission, the answer limit must hold one full read.
+
+    Admission counts bytes as an upper bound on tokens, and a token is at least
+    one byte, so a smaller limit drops the answer to any question that read.
+    """
+    from django.core.exceptions import ImproperlyConfigured
+
+    from apps.ai.admission.ledger import estimate_tokens
+    from apps.ai.admission.limits import enforcing
+
+    from .compose import ANSWER_POLICY, CONTRACT
+
+    limit = getattr(settings, "AI_CONTROLLER_ANSWER_RESERVE_TOKENS", None)
+    if not enforcing() or limit is None:
+        return
+    needed = estimate_tokens(ANSWER_POLICY + CONTRACT) + settings.AI_RESEARCH_READ_TOKEN_CAP
+    if limit < needed:
+        raise ImproperlyConfigured(
+            f"AI_CONTROLLER_ANSWER_RESERVE_TOKENS={limit} cannot hold the answer prompt plus "
+            f"one full read (AI_RESEARCH_READ_TOKEN_CAP); set it to at least {needed}."
+        )
+
+
 @dataclass(frozen=True)
 class ControllerBudget:
     max_rounds: int

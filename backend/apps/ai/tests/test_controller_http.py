@@ -47,8 +47,10 @@ def compose(**fields):
 
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])
 def test_a_request_needing_no_tool_is_composed_by_the_answer_model_not_the_planner(
-    endpoint, budget, monkeypatch, client_for,
+    endpoint, budget, monkeypatch, client_for, settings,
 ):
+    # IR-703: briefs on, so every general tool is usable and offered.
+    settings.AI_PAPER_BRIEFS_ENABLED = True
     reader = make_user("direct@cit.edu")
     conversation = Conversation.objects.create(user=reader)
     planner = ScriptedToolCallingLLM([ScriptedToolCallingLLM.answering(
@@ -476,3 +478,106 @@ def test_a_count_over_a_population_that_changed_mid_run_is_not_composed(
 
     assert body["answer"] is None and body["mode"] == "no_results"
     assert all("metadata" not in user for _, user in writer.calls)
+
+
+def test_a_papers_search_alone_answers_from_abstracts_citing_the_record(
+    flood_scene, monkeypatch, embedder,
+):
+    """IR-703: a papers search held records and abstracts but no passages, so
+    a discovery question composed from nothing and answered no_results."""
+    from apps.ai.research.tools import search
+    monkeypatch.setattr(search, "BEST_PASSAGES", 0)
+    planner = ScriptedToolCallingLLM([
+        call("search_research", {"query": "flood prediction", "target": "papers"}, "c1"),
+        compose(basis="evidence", topic="flood prediction"),
+    ])
+    writer = ScriptedLLM(reply="Flood Prediction is about forecasting floods [1].")
+    root = controller_root(monkeypatch, embedder=embedder, planner=planner, writer=writer)
+    with use_composition_root(root):
+        body = asked_flood(flood_scene["client"], flood_scene["conversation"])
+
+    assert body["mode"] == "generative" and body["answer"].endswith("[1].")
+    cited = body["citations"][0]
+    assert cited["record_id"] == flood_scene["flood"].pk
+    assert cited["page"] is None and not cited.get("chunk_id")
+    assert "An abstract for Flood Prediction." in writer.calls[0][1]
+    stored = Turn.objects.get(conversation=flood_scene["conversation"]).citations.get()
+    assert stored.record_id == flood_scene["flood"].pk and stored.chunk_id is None
+
+
+def test_a_papers_search_answers_from_the_top_papers_best_passage_with_its_page(
+    flood_scene, monkeypatch, embedder,
+):
+    """IR-703: a paper with no abstract is citable through its best-matching passage."""
+    from apps.records.models import Record
+    Record.objects.filter(pk=flood_scene["flood"].pk).update(abstract="")
+    planner = ScriptedToolCallingLLM([
+        call("search_research", {"query": "flood prediction", "target": "papers"}, "c1"),
+        compose(basis="evidence", topic="flood prediction"),
+    ])
+    writer = ScriptedLLM(reply="Flood Prediction forecasts river levels [1].")
+    root = controller_root(monkeypatch, embedder=embedder, planner=planner, writer=writer)
+    with use_composition_root(root):
+        body = asked_flood(flood_scene["client"], flood_scene["conversation"])
+
+    assert body["mode"] == "generative"
+    cited = body["citations"][0]
+    assert cited["record_id"] == flood_scene["flood"].pk and cited["page"] == 4
+    assert FLOOD_TEXT in writer.calls[0][1]
+
+
+def test_an_abstract_is_not_sent_when_a_passage_of_that_paper_was_read(
+    flood_scene, monkeypatch, embedder,
+):
+    planner = ScriptedToolCallingLLM([
+        call("search_research", {"query": "flood prediction", "target": "passages"}, "c1"),
+        compose(basis="evidence", topic="flood prediction"),
+    ])
+    writer = ScriptedLLM(reply="It forecasts river levels [1].")
+    root = controller_root(monkeypatch, embedder=embedder, planner=planner, writer=writer)
+    with use_composition_root(root):
+        asked_flood(flood_scene["client"], flood_scene["conversation"])
+    assert "An abstract for Flood Prediction." not in writer.calls[0][1]
+
+
+
+def test_tools_that_cannot_work_here_are_not_offered_to_the_planner(
+    budget, monkeypatch, client_for, settings,
+):
+    """IR-703: with briefs off and no verified context window, the brief view and
+    extract_evidence always came back empty or unavailable and wasted rounds."""
+    settings.AI_PAPER_BRIEFS_ENABLED = False
+    settings.LLM_ANSWER_CONTEXT_WINDOWS = ""
+    reader = make_user("offered@cit.edu")
+    planner = ScriptedToolCallingLLM([compose(basis="general")])
+    root = controller_root(monkeypatch, planner=planner, reply="Background only.")
+    with use_composition_root(root):
+        answer(client_for(reader), "ai-ask", "Explain a p-value simply.")
+
+    tools = {tool.name: tool for tool in planner.conversation_requests[0].tools}
+    assert set(tools) == GENERAL - {"extract_evidence"}
+    read = tools["read_papers"]
+    assert "brief" not in read.parameters["properties"]["view"]["enum"]
+    assert "brief" not in read.description
+
+
+def test_only_the_top_ranked_found_papers_are_sent_by_abstract(
+    flood_scene, monkeypatch, embedder,
+):
+    """IR-703: every candidate's abstract was sent, so low-ranked, unrelated
+    papers were cited instead of the search's best match."""
+    from apps.ai.controller import loop
+    from apps.ai.research.tools import search
+    monkeypatch.setattr(loop, "ABSTRACT_SOURCES", 1)
+    monkeypatch.setattr(search, "BEST_PASSAGES", 0)
+    planner = ScriptedToolCallingLLM([
+        call("search_research", {"query": "flood prediction", "target": "papers"}, "c1"),
+        compose(basis="evidence", topic="flood prediction"),
+    ])
+    writer = ScriptedLLM(reply="Flood Prediction forecasts floods [1].")
+    root = controller_root(monkeypatch, embedder=embedder, planner=planner, writer=writer)
+    with use_composition_root(root):
+        asked_flood(flood_scene["client"], flood_scene["conversation"])
+    sent = writer.calls[0][1]
+    assert "An abstract for Flood Prediction." in sent
+    assert "An abstract for Tilapia ponds." not in sent
