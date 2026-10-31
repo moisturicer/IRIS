@@ -384,17 +384,24 @@ export default function SignupPage() {
             Your account was created. We sent a verification link to{" "}
             <strong className="font-semibold text-stone-900">{registered.email}</strong>.
           </p>
-          <ol className="mt-section list-decimal space-y-2 pl-5 text-body text-stone-700">
+          <p id={nextStepsId} className="mt-section text-small font-semibold text-stone-700">What happens next</p>
+          <ol aria-labelledby={nextStepsId} className="mt-1 list-decimal space-y-2 pl-5 text-body text-stone-700">
             <li>Open the link in that email to verify your address.</li>
             <li>
               RDCO reviews your request to join as {registered.role === "Adviser" ? "an Adviser" : "a Student"}, and
               emails you when they decide.
             </li>
           </ol>
+          {/* Sign in works before RDCO decides: it opens the pending screen (IR-537). */}
+          <p className="mt-section text-pretty text-body text-stone-700">
+            You can sign in once it is verified. Signing in shows that your request is waiting.
+          </p>
           {/* Not "contact RDCO": an email is read-only to every IRIS screen,
-              RDCO's included, so the only fix IRIS offers is a fresh registration. */}
-          <p className="mt-section text-small text-stone-600">
-            If that address is wrong, register again with the right one.
+              RDCO's included, so the only fix IRIS offers is a fresh registration.
+              Correcting it in place is IR-705. */}
+          <p className="mt-section text-pretty text-small text-stone-600">
+            If that address is wrong, register again with the right one. Your first request stays pending until
+            RDCO declines it.
           </p>
           <ButtonLink to="/login" size="full" className="mt-section-lg">
             Go to sign in
