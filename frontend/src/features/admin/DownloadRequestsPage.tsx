@@ -1,6 +1,6 @@
 /**
  * Admin page — list pending download requests and approve or decline them.
- * Accessible to staff roles only (gated by RoleRoute in router/index.tsx).
+ * Accessible to staff roles only (gated by ProtectedRoute in router/index.tsx).
  *
  * Backend endpoints:
  *   GET  /records/download-requests/        → list all requests

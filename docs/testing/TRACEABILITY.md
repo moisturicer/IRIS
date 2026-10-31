@@ -2174,3 +2174,24 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 **Recorded, not fixed here.** `docs/engineering/DEVELOPMENT.md` §5 still says there is no `npm test`, which contradicts CLAUDE.md (vitest, IR-210). For IR-695 to confirm: whether the server applies a JPEG's EXIF orientation before cutting the crop, since the browser shows it rotated.
 
 **Status.** **PARTIAL** until IR-695 ships and the contract is accepted.
+
+## IR-745 — Help, Not found and recoverable error screens
+
+**Basis and scope.** IR-745. Before this change, an unknown address rendered a blank page inside the shell, a render crash fell through to React Router's developer error page, `/help` was a "coming soon" placeholder titled "Settings & Help", and `ForbiddenScreen` claimed "Access violation attempt logged to AuditLog". The gate is client-side UX and writes no audit event, so that claim was untrue.
+
+- **Not found.** There is a catch-all `*` route behind sign-in, inside the shell. `NotFoundScreen` takes an optional subject and gives one wording for missing and refused ("doesn't exist, or it isn't available to you"), keeping IR-153's rule that the interface never confirms a record exists. `records/:id` now uses it ("Record not available"). It offers **Go to Discover**, and **Go back** only when there is an IRIS page to return to. `Error 404` appears as small print, never as the headline.
+- **Recoverable errors.** `RouteErrorScreen` is the `errorElement` of a pathless route around every page in the shell, so the sidebar and in-memory state survive a crash. **Try again** re-renders the same address. After a repeat failure, **Reload page** is offered as well. A standalone variant at the root covers the public pages and a crash in the shell itself. There is no reference number, because IRIS sends crashes nowhere. "Details for RDCO" copies the address, time and error message, never a stack or tokens. Failed loads on Notifications, Role Requests and Users said "No notifications yet", "All caught up!" and showed an empty table. They now show `EmptyState tone="error"` with Try again.
+- **403.** `ForbiddenScreen` drops the audit claim, says "Go to Discover", keeps the Your role / Required role panel, and shares `StatusScreen` with the other two. The unreferenced `RoleRoute` → `ForbiddenPage` path, which repeated the claim, is deleted with `lib/roleDisplay.ts`, and `ForbiddenPage` is taken off the palette guard's lists.
+- **Help.** One page with a contents list and anchored sections (`/help#ask-iris`). Each section is shown by the same `lib/access.ts` rules as the sidebar, so a reader only sees help for screens they can open. "How a record moves through review" and "Still stuck?" are always shown. The latter names the Research and Development Coordinating Office without inventing a contact address (IR-536's rule). The copy describes built features only.
+
+**Tests.** `features/errors/errorScreens.test.tsx` (8): Not found inside the shell with axe; Go back only with history; the subject wording; a crash replaced inside the shell with axe; Try again recovering with the shell's typed draft intact; Reload page only after a second failure; no reference number and the copied details; the standalone fallback when the shell itself fails. `features/help/HelpPage.test.tsx` (6) covers contents and anchors with axe, and the sections shown to a Student, an Adviser without review work, an office member, and an RDCO coordinator. `components/auth/ForbiddenScreen.test.tsx` covers both roles, Discover, no audit or dashboard wording, and axe. The failed-load cases in `UserListPage.test.tsx`, `RoleRequestsPage.test.tsx` and `NotificationsPage.test.tsx` each retry to a real result.
+
+**Executed evidence (2026-11-01).** The touched files only, per the team's CI-as-gate practice:
+- `npx vitest run` on the error screens, Help, ForbiddenScreen, ProtectedRoute, palette and UserList tests: 6 files, 52 tests passed.
+- The accounts and notifications folders: 3 files, 14 passed.
+- `PaperViewPage.test.tsx -t "cannot read"`: 2 passed.
+- eslint on the touched files: 0 errors, 2 warnings that were already there.
+
+`tsc`, the full suite and the build are left to CI.
+
+**Status.** Implemented; awaiting review.
