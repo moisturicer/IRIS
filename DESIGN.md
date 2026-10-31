@@ -51,6 +51,7 @@ typography:
 rounded:
   thumb: "0.375rem"
   control: "0.75rem"
+  sheet: "1rem"
   card: "1.25rem"
   pill: "9999px"
 spacing:
@@ -128,7 +129,7 @@ components:
     textColor: "{colors.binding-maroon}"
   entry-sheet:
     backgroundColor: "{colors.page-white}"
-    rounded: "{rounded.control}"
+    rounded: "{rounded.sheet}"
     padding: "40px 44px"
   entry-tab-current:
     backgroundColor: "{colors.page-white}"
@@ -285,10 +286,10 @@ Abstract, AI Overview, Related works and Comments, each under one Desk Stone hai
 Sign in, register, email verification and the pending and declined screens share one frame (`EntryFrame`, IR-704), read like a file handed across a registry desk.
 - **Masthead:** a white bar with a Desk Stone hairline under it, the page's one visible h1: the IRIS mark and maroon wordmark, a hairline divider and the CIT-U logo, both at their natural proportions. Sign in and register carry the link to each other here, at least 44 px, at every width.
 - **Lede** (sign in and register only): a Garamond 600 headline, 36 px on a phone to 60 px from `lg`, Ink with its last words in Binding Maroon, and one plain Body Ink sentence. Below `md` it is left-aligned and the sentence follows the folder, so the first field stays in the first screenful.
-- **Folder:** index tabs on the top edge of one Page White sheet (0.75 rem radius, `stone-200` border, card lift), with a Bar Stone sheet offset behind it. The tab joined to the sheet is white with a 2 px maroon top edge and maroon label text. Sign in, verification and the pending screen have one tab that only labels the sheet.
+- **Folder:** index tabs on the top edge of one Page White sheet (1 rem radius, `stone-200` border, card lift; the tabs' top corners are 0.75 rem), with a Bar Stone sheet offset behind it. The tab joined to the sheet is white with a 2 px maroon top edge and maroon label text. Sign in, verification and the pending screen have one tab that only labels the sheet.
 - **Register stepper:** completed tabs carry an Ink check and a solid Rule Stone outline on Bar Stone and link back; the current tab is joined to the sheet with a maroon number; tabs not started are dashed and cannot be reached. Below 390 px only the current tab shows its name, the others their mark.
 - **Footer:** CIT-U identity in 13 px Quiet Ink under a hairline, and no policy link until the policies exist.
-- **Motion:** the sheet settles once (280 ms, 0.5 rem rise and fade) and register's steps cross-fade (150 ms), both only when motion is welcome.
+- **Motion:** the sheet settles once (280 ms, 0.5 rem rise and fade, a recorded exception to the 150–200 ms rule because it runs once on load) and register's steps cross-fade (150 ms), both only when motion is welcome.
 
 Replaced the split screen with its "shelf of bound work" brand panel (IR-535, IR-586), deleted in IR-711.
 

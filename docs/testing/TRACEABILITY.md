@@ -45,17 +45,22 @@ deleted `AuthBrandPanel.test.tsx` cases are gone with the component. Full lint,
 suite and build are CI's, recorded on the PR.
 
 **Browser evidence (headless Chrome against `vite` with the API mocked,
-2026-10-31):** sign in and register steps 1, 2 and 3 at 320×640, 360×640,
-390×844, 768×1024, 1024×768, 1280×720, 1440×900 and 1745×980, 32 captures:
-no horizontal overflow (scroll width equals the viewport at every size),
-exactly one visible h1, and no shelf or spine element anywhere. Every register
-tab ends inside the sheet: at 320 px the current tab is 104–116×46 and the
-mark-only tabs 50×46, and the rightmost tab ends by 256 px on a sheet ending at 304; at
-390 px all three show their names and the last ends at 365 of 374. This is the
-browser evidence IR-707 recorded as owed for the steps; IR-709's confirmation
-was not captured here. Screenshots
-and the capture script were kept locally; the PR records the check and CI
-results.
+2026-10-31):** sign in, register steps 1, 2 and 3, and the register
+confirmation at 320×640, 360×640, 390×844, 768×1024, 1024×768, 1280×720,
+1440×900 and 1745×980, 40 captures: no horizontal overflow (scroll width equals
+the viewport at every size), exactly one visible h1, and no shelf or spine
+element anywhere. Every register tab ends inside the sheet. At 320 px the
+current tab is 104–116×46, the mark-only tabs 50×46, and the rightmost tab ends
+by 256 px on a sheet ending at 304. At 390 px all three show their names and the
+last ends at 365 of 374. On the confirmation below 390 px the three completed
+tabs are three 50×45 checks. Sign in's email field ends at 464 px of 640 at
+360×640 and at 544 of 720 at 1280×720, as IR-706 recorded. This is the browser
+evidence IR-707 and IR-709 recorded as owed for the steps and the confirmation.
+**Step 3 was captured before IR-708's summary landed**, so its captures must be
+retaken once IR-708 merges. Tap targets, contrast, Tab order and reduced motion
+were not re-measured here; IR-706 and IR-710 record them for sign in and the
+other entry screens. Screenshots and the capture script were kept locally; the
+PR records the check and CI results.
 
 ## IR-704 / IR-710 · Verification, pending and declined move into the Dossier frame
 
