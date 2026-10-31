@@ -54,7 +54,6 @@ from .services import soft_delete_record, parse_excel_import
 from apps.notifications.services import (
     notify_new_record,
     notify_download_request,
-    notify_download_reviewed,
     notify_delete_approved,
     notify_delete_declined,
 )
