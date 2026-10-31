@@ -93,7 +93,9 @@ def test_document_instructions_cannot_enable_web_or_widen_paper_scope(
         body = answer(flood_scene["client"], "ai-ask-stream", "Explain this paper.",
                       conversation_id=conversation.pk)
     assert len(planner.conversation_requests) == 3
-    assert all({t.name for t in request.tools} == GENERAL for request in planner.conversation_requests)
+    # IR-703: only usable general tools are offered; a document never adds one.
+    offered = [{t.name for t in request.tools} for request in planner.conversation_requests]
+    assert all(names <= GENERAL and "search_public" not in names for names in offered)
     assert "unknown_tool" in repr(planner.conversation_requests[-1].messages)
     assert "Flood Prediction" not in repr(planner.conversation_requests[-1].messages)
     assert {c["record_id"] for c in body["citations"]} <= {hostile.pk}

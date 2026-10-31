@@ -1780,6 +1780,20 @@ Authority: IR-609 under IR-605, ADR-042 and the general-tools evaluation contrac
 **Executed evidence (2026-10-30, Windows, local Postgres):** `python -m pytest apps/ai/evaluation/tests/test_campaign_report.py apps/ai/evaluation/tests/test_campaign_command.py`: 52 passed. `flake8` on the touched modules: clean. `python manage.py eval_campaign --smoke <fixture smoke run> --case-cost-usd 0.1 --campaign-cost-usd 2 --planned-cases 20` ran from the CLI and reported `not ready` (fake providers, one turn with missing usage), as expected. The full backend suite's failures were compared file by file against a clean `origin/main` worktree: none is added by this change. Pre-existing failures come from the local `.env` (inference profiles), `core.autocrlf` (proxy audit digest) and an uncommitted engine switch in the author's checkout. No campaign was run and no quality claim is made.
 
 
+## IR-703 — controller answers from what it gathered
+
+Authority: ADR-042 §Amendment 2026-10-31 (IR-703), approved by Jive Tyler Revalde. Root causes found by the IR-702 real smoke.
+
+- Answer fitted to its input limit, lowest-scored sources dropped first and logged; unavailable only when none fits; startup refusal under `enforce` when the reserve cannot hold the prompt plus one read. Tests: `test_answer_composer.py`.
+- Found papers' abstracts (top five ranked) are record-level sources; a read passage replaces its paper's abstract. Tests: `test_controller_http.py` abstract tests.
+- A papers search keeps the top three shown papers' best-matching passage, page-cited. Tests: `test_general_tools.py::test_a_papers_search_keeps_the_top_papers_best_matching_passage`, `test_controller_http.py::test_a_papers_search_answers_from_the_top_papers_best_passage_with_its_page`.
+- Only working tools offered (no brief view with briefs off, no `extract_evidence` without a verified window). Tests: `test_controller_http.py`, `test_controller_security_http.py`.
+- `manage.py backfill_abstracts` fills empty abstracts from the manuscript's front chunks (headed, inline or dated front matter), never overwrites, `--classification` scopes it. Tests: `test_backfill_abstracts.py`.
+- Deliberately changed tests: three IR-608/controller tests that constructed "candidates found, nothing citable" now pin `BEST_PASSAGES = 0` and blank the abstract; the security test asserts offered tools are a subset of the general set.
+
+**Executed evidence (2026-10-31, Windows, local Postgres):** research, controller, answer-composer, evaluation and backfill suites pass, except four failures that also fail on `main` (legacy-engine pin, plan/screen profile, proxy-audit fixture). `flake8` on touched modules: clean. Dev data: `backfill_abstracts` wrote 40 of 40 proxy abstracts; the 40 record vectors were re-embedded (title + abstract). The corpus snapshot digest covers titles and categories, so the signed IR-702 labels and lock are unchanged.
+
+
 ## IR-679 — Accepted review workspace contract
 
 **Design basis.** Amendment proposed 2026-10-30 and accepted 2026-10-31 by Lee Jasmin Adolfo to ADR-032 §7/§10 and screen spec 16 §4, indexed in the ADR README. Covers Conversation/Readiness, three regions, width clamps and container breakpoints, capability-driven actions, and review privacy. Existing workflow rules remain in force; ADR-047 is separate.

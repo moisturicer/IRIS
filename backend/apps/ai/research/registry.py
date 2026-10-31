@@ -268,3 +268,24 @@ def general_tools() -> ToolRegistry:
     from .tools import GENERAL_TOOLS
 
     return ToolRegistry(GENERAL_TOOLS)
+
+
+def offered(registry: ToolRegistry) -> ToolRegistry:
+    """Only what can work in this deployment is offered to the planner (IR-703).
+
+    Without briefs the brief view always returns `brief_unavailable`; without
+    briefs or a verified context window `extract_evidence` always returns
+    `extraction_unavailable`. Each tool keeps its own `execute`.
+    """
+    from django.conf import settings
+
+    from .tools.extract import extraction_configured
+    from .tools.read import without_brief
+
+    briefs = bool(getattr(settings, "AI_PAPER_BRIEFS_ENABLED", False))
+    tools = []
+    for tool in registry._tools.values():
+        if tool.name == "extract_evidence" and not (briefs or extraction_configured()):
+            continue
+        tools.append(tool if briefs or tool.name != "read_papers" else without_brief(tool))
+    return ToolRegistry(tools)
