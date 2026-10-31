@@ -52,6 +52,7 @@ import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
 import { citationNavigationState } from "@/lib/citedPage";
+import { formatDate } from "@/lib/utils";
 
 const RECORD_ID = 7;
 const PAPER_URL = "https://iris.test/media/manuscripts/thesis.pdf";
@@ -2169,6 +2170,33 @@ describe("the Review section (IR-412)", () => {
     expect(panel.compareDocumentPosition(comment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await userEvent.click(within(panel).getByRole("button", { name: "Open review" }));
     expect(seatsApi.open).toHaveBeenCalledWith(78);
+  });
+
+  it("offers Withdraw request only on the Revision request whose action allows it (IR-682)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["withdraw_revision"], readiness: readinessFor([
+      { kind: "revision_request", severity: "blocker", label: "IERC asked the author for a revision.", party: "ierc",
+        actor_name: "Ina Ierc", since: "2026-09-03T08:00:00Z", action: { kind: "withdraw_revision", target: "3" } },
+      { kind: "revision_request", severity: "info", label: "ITSO asked the author for a revision.", party: "itso",
+        actor_name: "Ito Itso", since: "2026-09-04T08:00:00Z" },
+    ]) };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const panel = (await screen.findByRole("heading", { name: "Readiness" })).closest("section")!;
+    expect(within(panel).getByRole("status")).toHaveTextContent("You can't decide yet.");
+    const [ierc, itso] = within(panel).getAllByRole("listitem");
+    expect(ierc).toHaveTextContent("Blocker: IERC asked the author for a revision.");
+    expect(ierc).toHaveTextContent("Ina Ierc");
+    expect(ierc).toHaveTextContent(`since ${formatDate("2026-09-03T08:00:00Z")}`);
+    expect(itso).toHaveTextContent("ITSO asked the author for a revision.");
+    expect(itso).not.toHaveTextContent("Blocker");
+    expect(within(itso).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(panel).getAllByRole("button", { name: "Withdraw request" })).toHaveLength(1);
+
+    // It hands over to the footer's own Withdraw, which still asks first.
+    await userEvent.click(within(ierc).getByRole("button", { name: "Withdraw request" }));
+    expect(within(screen.getByRole("contentinfo", { name: "Your review" }))
+      .getByRole("button", { name: "Withdraw revision request" })).toHaveFocus();
   });
 
   it("shows no Readiness when the server does not disclose it (IR-681)", async () => {
