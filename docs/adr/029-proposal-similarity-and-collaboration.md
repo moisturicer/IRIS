@@ -10,7 +10,7 @@
 
 > **Amended 2026-09-26 (project lead, IR-374 design session).** It follows ADR-032 §8 as amended, and it replaces the parts of §3, §4 and §6 noted below. See *Amendment, 2026-09-26* at the end of §7.
 
-> **Amendment proposed 2026-10-31 (IR-311): the notification names each Proposal's Contact person and their email.** See *Amendment, 2026-10-31* after the 2026-09-26 one. Not yet accepted.
+> **Amended 2026-10-31 (project lead, IR-311): the notification names each Proposal's Contact person and their email.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. See *Amendment, 2026-10-31* after the 2026-09-26 one.
 
 **Accepted** — 2026-09-19.
 
@@ -109,7 +109,7 @@ Settled by the project lead, in the IR-374 design session. The plan in one line:
 
 ### Amendment, 2026-10-31: the notification names a Contact person and their email
 
-**Proposed** — decided by Hermoine Zozobrado in a design session on 2026-10-31 (IR-311), transcribed by an agent. It takes effect when Lee Jasmin Adolfo, the project lead, accepts it.
+**Accepted** — Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado in a design session on 2026-10-31 (IR-311), transcribed by an agent.
 
 The 2026-09-26 notification gives names but no way to reach them. IRIS shows no email address on a Profile (IR-694) and has no messaging, so "the students take it from there" left a matched student knowing *who* but not *how*.
 
@@ -170,7 +170,7 @@ The Novelty check discloses nothing at all: it reads only completed work already
 
 The failure to guard against is scope creep in the notification. "It would be more useful with the title in it" is true and is a different decision, requiring a different consent.
 
-*Both amendments made exactly that kind of decision, each with its consent.* The 2026-09-26 one added the title and names, covered by ADR-032's Discoverable text. The proposed 2026-10-31 one adds one email address, the Contact person's, shown only to the owners of a matched Discoverable Proposal and covered by the amended Discoverable text. It is personal data shared with another person and is listed in `docs/compliance/IR-123-processing-review.md`.
+*Both amendments made exactly that kind of decision, each with its consent.* The 2026-09-26 one added the title and names, covered by ADR-032's Discoverable text. The 2026-10-31 one adds one email address, the Contact person's, shown only to the owners of a matched Discoverable Proposal and covered by the amended Discoverable text. It is personal data shared with another person and is listed in `docs/compliance/IR-123-processing-review.md`.
 
 ## Deployment Impact
 
