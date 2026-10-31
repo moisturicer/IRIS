@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="IRIS Index Orbit mark"><title>IRIS Index Orbit mark</title><defs><mask id="or-m" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="120">
+  <rect width="120" height="120" fill="#fff"/>
+  <path d="M52 54 Q52 51 55 51 H61 Q64 51 64 54 V104 H52 Z" fill="#000"/>
+</mask></defs><circle cx="58" cy="64" r="34" fill="#6B0F12" mask="url(#or-m)"/>
+<g>
+  <path d="M95.82 34.45 A48 48 0 1 1 17.29 38.56" fill="none" stroke="#6B0F12" stroke-width="4.5" stroke-linecap="round"/>
+  <circle cx="80.53" cy="21.62" r="7.5" fill="#C9973A"/>
+</g></svg>

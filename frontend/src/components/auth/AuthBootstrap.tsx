@@ -42,7 +42,7 @@ export function AuthBootstrap({ children }: { children: React.ReactNode }) {
   if (!authReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <Spinner size="lg" />
+        <Spinner size="lg" label="Loading IRIS" />
       </div>
     );
   }

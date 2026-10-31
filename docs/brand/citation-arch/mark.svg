@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="IRIS Citation Arch mark"><title>IRIS Citation Arch mark</title><defs><mask id="ar-m" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="120">
+  <rect width="120" height="120" fill="#fff"/>
+  <rect x="29.5" y="36" width="7" height="58" rx="1" fill="#000"/>
+  <rect x="83.5" y="36" width="7" height="58" rx="1" fill="#000"/>
+</mask></defs><g mask="url(#ar-m)" fill="#6B0F12">
+  <path d="M20 102 V38 Q20 16 42 16 H58 V26.2 A10 10 0 0 0 58 45.8 V49 L54 54 V102 Z"/>
+  <path d="M100 102 V38 Q100 16 78 16 H62 V26.2 A10 10 0 0 1 62 45.8 V49 L66 54 V102 Z"/>
+</g>
+<g fill="#C9973A">
+  <rect x="31.5" y="38" width="3" height="54" rx="1"/>
+  <rect x="85.5" y="38" width="3" height="54" rx="1"/>
+</g></svg>

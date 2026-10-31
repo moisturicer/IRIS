@@ -132,3 +132,56 @@
   outline: 2px solid rgb(234 88 12 / 0.85);
   outline-offset: 1px;
 }
+
+/* ── Folio Ribbon motion (IR-744) ────────────────────────────────────────
+   The loader plays the concept board's storyboard: one leaf, its partner,
+   then the two ribbons unspool from the spine, leaving the I standing in the
+   white space between them. Ask IRIS answering writes its three lines one after another.
+   Under reduced motion both become a slow fade. */
+.iris-loading .iris-leaf-tl,
+.iris-loading .iris-leaf-br,
+.iris-loading .iris-ribbon-tr,
+.iris-loading .iris-ribbon-bl,
+.iris-answering .iris-ask-line {
+  transform-box: fill-box;
+}
+.iris-loading .iris-leaf-tl { transform-origin: 100% 50%; animation: iris-leaf-a 2s cubic-bezier(.16, 1, .3, 1) infinite; }
+.iris-loading .iris-leaf-br { transform-origin: 0% 50%;   animation: iris-leaf-b 2s cubic-bezier(.16, 1, .3, 1) infinite; }
+.iris-loading .iris-ribbon-tr { transform-origin: 0% 50%;   animation: iris-ribbon 2s cubic-bezier(.16, 1, .3, 1) infinite; }
+.iris-loading .iris-ribbon-bl { transform-origin: 100% 50%; animation: iris-ribbon 2s cubic-bezier(.16, 1, .3, 1) infinite; }
+@keyframes iris-leaf-a {
+  0% { opacity: .18; transform: scaleX(.55); }
+  18%, 82% { opacity: 1; transform: none; }
+  100% { opacity: .18; transform: scaleX(.55); }
+}
+@keyframes iris-leaf-b {
+  0%, 14% { opacity: .18; transform: scaleX(.55); }
+  34%, 82% { opacity: 1; transform: none; }
+  100% { opacity: .18; transform: scaleX(.55); }
+}
+@keyframes iris-ribbon {
+  0%, 30% { opacity: 0; transform: scaleX(0); }
+  54%, 82% { opacity: 1; transform: none; }
+  100% { opacity: 0; transform: none; }
+}
+
+.iris-answering .iris-ask-line { transform-origin: 0% 50%; animation: iris-write 1.8s cubic-bezier(.16, 1, .3, 1) infinite; }
+.iris-answering .iris-ask-line-2 { animation-delay: .18s; }
+.iris-answering .iris-ask-line-3 { animation-delay: .36s; }
+@keyframes iris-write {
+  0% { transform: scaleX(0); }
+  35%, 78% { transform: none; }
+  100% { transform: none; opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iris-loading .iris-leaf-tl,
+  .iris-loading .iris-leaf-br,
+  .iris-loading .iris-ribbon-tr,
+  .iris-loading .iris-ribbon-bl,
+  .iris-answering .iris-ask-line {
+    animation: iris-fade 2s ease-in-out infinite;
+    transform: none;
+  }
+  @keyframes iris-fade { 0%, 100% { opacity: 1; } 50% { opacity: .4; } }
+}

@@ -63,6 +63,7 @@ import { PrefillChip } from "./PrefillChip";
 import { usePrefill, type PrefillStatus } from "./prefill";
 import { PublishSuccess, successHeadline } from "./PublishSuccess";
 import { ReviewStep } from "./ReviewStep";
+import { IrisLoader } from "@/components/brand/IrisBrand";
 
 export const PUBLISH_PARAM = "publish";
 
@@ -621,7 +622,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
       {phase.kind === "loading" && (
         <p className="flex items-center gap-2 py-section text-body text-stone-600" role="status">
-          <i className="fas fa-spinner fa-spin" aria-hidden /> Getting things ready…
+          <IrisLoader className="h-5 w-5 text-brand" /> Getting things ready…
         </p>
       )}
 

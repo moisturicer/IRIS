@@ -21,6 +21,7 @@ import { ALL_ROLES, STAFF_ROLES } from "@/lib/constants";
 import { useUIStore }   from "@/store/ui.store";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { UserListItem } from "@/types/auth";
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 /** The four office roles: the only ones the server lets coordinate. */
 function isOfficeMember(user: UserListItem): boolean {
@@ -207,7 +208,7 @@ export default function UserListPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          leading={<i className="fa fa-search text-[14px]" aria-hidden />}
+          leading={<SearchGlyph className="h-3.5 w-3.5" />}
           className="max-w-xs"
         />
         <Button variant="secondary" size="sm" onClick={handleSearch}>Filter</Button>

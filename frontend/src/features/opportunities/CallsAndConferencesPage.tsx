@@ -26,6 +26,7 @@ import {
   deadlineGroup,
   matchesQuery,
 } from "./opportunityUtils";
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 /** A filter chip, as My Reviews draws them: soft maroon when on. */
 function chipClass(on: boolean) {
@@ -243,7 +244,7 @@ export function CallsAndConferencesPage() {
               placeholder="Search calls"
               aria-label="Search calls by title, office or tag"
               disabled={loadFailed}
-              leading={<i className="fas fa-magnifying-glass text-xs" aria-hidden="true" />}
+              leading={<SearchGlyph className="h-3 w-3" />}
             />
           </div>
           <button

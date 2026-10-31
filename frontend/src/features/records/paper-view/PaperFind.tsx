@@ -1,5 +1,6 @@
 import { forwardRef, type KeyboardEvent } from "react";
 import { Button } from "@/components/ui";
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 /** Where find is, as the bar reports it. */
 export type FindStatus =
@@ -69,10 +70,7 @@ export const PaperFind = forwardRef<HTMLInputElement, PaperFindProps>(function P
       className="flex flex-wrap basis-full items-center gap-x-1 gap-y-0.5 pt-1"
     >
       <div className="relative flex-1 min-w-0">
-        <i
-          className="fas fa-magnifying-glass pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-2xs text-stone-400"
-          aria-hidden
-        />
+        <SearchGlyph className="pointer-events-none absolute left-2.5 top-1/2 h-3 w-3 -translate-y-1/2 text-stone-400" />
         <input
           ref={inputRef}
           type="search"

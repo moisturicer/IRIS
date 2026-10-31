@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="Loading"><title>Loading</title><style>
+.ap-blades{transform-origin:60px 60px;animation:turn 2s cubic-bezier(.65,0,.35,1) infinite alternate}
+.ap-hole{transform-origin:60px 60px;animation:dilate 2s cubic-bezier(.65,0,.35,1) infinite alternate}
+@keyframes turn{from{transform:rotate(-24deg)}to{transform:rotate(18deg)}}
+@keyframes dilate{from{transform:scale(.45)}to{transform:scale(1.55)}}@media (prefers-reduced-motion: reduce){*{animation:none!important}}</style><defs><mask id="ap-l" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="120">
+  <rect width="120" height="120" fill="#fff"/>
+  <g class="ap-blades" stroke="#000" stroke-width="3.2" stroke-linecap="butt"><line x1="73.52" y1="63.62" x2="32.82" y2="104.33"/><line x1="63.62" y1="73.52" x2="8.02" y2="58.62"/><line x1="50.10" y1="69.90" x2="35.20" y2="14.29"/><line x1="46.48" y1="56.38" x2="87.18" y2="15.67"/><line x1="56.38" y1="46.48" x2="111.98" y2="61.38"/><line x1="69.90" y1="50.10" x2="84.80" y2="105.71"/></g>
+  <path class="ap-hole" d="M73.52 63.62 L63.62 73.52 L50.10 69.90 L46.48 56.38 L56.38 46.48 L69.90 50.10 Z" fill="#000" stroke="#000" stroke-width="1" stroke-linejoin="round"/>
+</mask></defs><circle cx="60" cy="60" r="50" fill="#6B0F12" mask="url(#ap-l)"/>
+<circle cx="60" cy="60" r="5.04" fill="#C9973A"/></svg>

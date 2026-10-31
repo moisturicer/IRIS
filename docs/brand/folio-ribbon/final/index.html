@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRIS · Folio Ribbon final assets</title>
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<style>
+@font-face{font-family:"EB Garamond";src:url(../../fonts/eb-garamond-latin-600-normal.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Inter";src:url(../../fonts/inter-latin-wght-normal.woff2) format("woff2");font-weight:100 900;font-display:swap}
+:root{color-scheme:light;--brand:#6B0F12;--paper:#fafaf9;--stone:#e7e5e4;--rule:#d6d3d1;--ink:#1c1917;--muted:#57534e;--faint:#78716c}
+*,*::before,*::after{box-sizing:border-box}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 Inter,system-ui,sans-serif}
+::selection{background:#fdf2f2;color:var(--brand)}
+.topbar{background:#fff;border-bottom:1px solid var(--stone);padding:14px clamp(20px,5vw,64px);display:flex;align-items:center;gap:18px}
+.topbar img{height:30px}
+.topbar span{color:var(--muted);font-size:13px}
+main{max-width:1240px;margin:0 auto;padding:36px clamp(16px,4vw,48px) 80px}
+h1,h2{font-family:"EB Garamond",Georgia,serif;font-weight:600;margin:0}
+h1{font-size:clamp(34px,4vw,48px);line-height:1.1}
+h2{font-size:24px;line-height:32px;margin:44px 0 16px}
+.lede{color:var(--muted);max-width:68ch;margin:10px 0 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
+.grid.wide{grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+figure{margin:0;background:#fff;border:1px solid var(--stone);border-radius:16px;overflow:hidden;display:grid;grid-template-rows:1fr auto}
+figure .art{min-height:170px;display:grid;place-items:center;padding:24px}
+figure.dark .art{background:var(--brand)}
+figure.ink .art{background:var(--paper)}
+figure .art img{max-width:100%;max-height:130px}
+figcaption{border-top:1px solid var(--stone);padding:10px 14px;font-size:13px;color:var(--muted);display:flex;justify-content:space-between;gap:10px}
+figcaption a{color:var(--brand);text-underline-offset:3px;font-weight:600}
+.ladder{display:flex;align-items:flex-end;gap:22px;flex-wrap:wrap;background:#fff;border:1px solid var(--stone);border-radius:16px;padding:26px}
+.ladder.dark{background:var(--brand);border-color:var(--brand);margin-top:12px}
+.ladder div{display:grid;justify-items:center;gap:8px;font-size:12px;color:var(--faint);font-variant-numeric:tabular-nums}
+.ladder.dark div{color:#f9b8b9}
+footer{margin-top:48px;border-top:1px solid var(--stone);padding-top:18px;font-size:13px;color:var(--faint)}
+</style>
+</head>
+<body>
+<div class="topbar"><img src="lockup-horizontal.svg" alt="IRIS"><span>Folio Ribbon · final assets</span></div>
+<main>
+  <h1>Folio Ribbon, final assets.</h1>
+  <p class="lede">Every file here is a vector traced from the approved concept artwork, in Binding Maroon #6B0F12, Ink #1C1917 and white. The animated files carry their own motion and stop under reduced motion. Click a file name to open it.</p>
+
+  <h2>Mark and lockups</h2>
+  <div class="grid">
+    <figure><div class="art"><img src="mark.svg" alt=""></div><figcaption><a href="mark.svg">mark.svg</a><span>maroon</span></figcaption></figure>
+    <figure class="dark"><div class="art"><img src="mark-reversed.svg" alt=""></div><figcaption><a href="mark-reversed.svg">mark-reversed.svg</a><span>on maroon</span></figcaption></figure>
+    <figure><div class="art"><img src="mark-ink.svg" alt=""></div><figcaption><a href="mark-ink.svg">mark-ink.svg</a><span>one colour</span></figcaption></figure>
+    <figure><div class="art"><img src="app-icon.svg" alt=""></div><figcaption><a href="app-icon.svg">app-icon.svg</a><span>app tiles</span></figcaption></figure>
+    <figure><div class="art"><img src="lockup-stacked.svg" alt=""></div><figcaption><a href="lockup-stacked.svg">lockup-stacked.svg</a></figcaption></figure>
+    <figure class="dark"><div class="art"><img src="lockup-stacked-reversed.svg" alt=""></div><figcaption><a href="lockup-stacked-reversed.svg">lockup-stacked-reversed.svg</a></figcaption></figure>
+    <figure><div class="art"><img src="wordmark.svg" alt=""></div><figcaption><a href="wordmark.svg">wordmark.svg</a></figcaption></figure>
+  </div>
+  <div class="grid wide" style="margin-top:14px">
+    <figure><div class="art"><img src="lockup-horizontal.svg" alt="" style="max-height:72px"></div><figcaption><a href="lockup-horizontal.svg">lockup-horizontal.svg</a><span>sidebar, headers</span></figcaption></figure>
+    <figure class="dark"><div class="art"><img src="lockup-horizontal-reversed.svg" alt="" style="max-height:72px"></div><figcaption><a href="lockup-horizontal-reversed.svg">lockup-horizontal-reversed.svg</a><span>sign-in panel</span></figcaption></figure>
+    <figure class="ink"><div class="art"><img src="banner-reversed.svg" alt=""></div><figcaption><a href="banner-reversed.svg">banner-reversed.svg</a><span>banners, slides</span></figcaption></figure>
+  </div>
+
+  <h2>Icons</h2>
+  <div class="grid">
+    <figure><div class="art"><img src="icon-search.svg" alt="" width="96"></div><figcaption><a href="icon-search.svg">icon-search.svg</a><span>two-tone</span></figcaption></figure>
+    <figure><div class="art"><img src="icon-search-maroon.svg" alt="" width="96"></div><figcaption><a href="icon-search-maroon.svg">icon-search-maroon.svg</a></figcaption></figure>
+    <figure class="dark"><div class="art"><img src="icon-search-reversed.svg" alt="" width="96"></div><figcaption><a href="icon-search-reversed.svg">icon-search-reversed.svg</a></figcaption></figure>
+    <figure><div class="art"><img src="icon-ask-iris.svg" alt="" width="96"></div><figcaption><a href="icon-ask-iris.svg">icon-ask-iris.svg</a><span>two-tone</span></figcaption></figure>
+    <figure><div class="art"><img src="icon-ask-iris-maroon.svg" alt="" width="96"></div><figcaption><a href="icon-ask-iris-maroon.svg">icon-ask-iris-maroon.svg</a></figcaption></figure>
+    <figure class="dark"><div class="art"><img src="icon-ask-iris-reversed.svg" alt="" width="96"></div><figcaption><a href="icon-ask-iris-reversed.svg">icon-ask-iris-reversed.svg</a></figcaption></figure>
+  </div>
+
+  <h2>Motion</h2>
+  <div class="grid">
+    <figure><div class="art"><img src="opening.svg" alt="" width="120" id="op1"></div><figcaption><a href="opening.svg">opening.svg</a><span>once, 1.1 s</span></figcaption></figure>
+    <figure class="dark"><div class="art"><img src="opening-reversed.svg" alt="" width="120" id="op2"></div><figcaption><a href="opening-reversed.svg">opening-reversed.svg</a></figcaption></figure>
+    <figure><div class="art"><img src="loading.svg" alt="" width="96"></div><figcaption><a href="loading.svg">loading.svg</a><span>2 s loop</span></figcaption></figure>
+    <figure class="dark"><div class="art"><img src="loading-reversed.svg" alt="" width="96"></div><figcaption><a href="loading-reversed.svg">loading-reversed.svg</a></figcaption></figure>
+    <figure><div class="art"><img src="ask-iris-answering.svg" alt="" width="96"></div><figcaption><a href="ask-iris-answering.svg">ask-iris-answering.svg</a><span>1.8 s loop</span></figcaption></figure>
+    <figure class="dark"><div class="art"><img src="ask-iris-answering-reversed.svg" alt="" width="96"></div><figcaption><a href="ask-iris-answering-reversed.svg">ask-iris-answering-reversed.svg</a></figcaption></figure>
+  </div>
+
+  <h2>At UI sizes</h2>
+  <div class="ladder">
+    <div><img src="favicon.svg" width="16" height="16" alt="">16</div>
+    <div><img src="mark.svg" width="24" height="24" alt="">24</div>
+    <div><img src="mark.svg" width="32" height="32" alt="">32</div>
+    <div><img src="mark.svg" width="56" height="56" alt="">56</div>
+    <div><img src="icon-search.svg" width="24" height="24" alt="">search 24</div>
+    <div><img src="icon-ask-iris.svg" width="24" height="24" alt="">ask 24</div>
+    <div><img src="loading.svg" width="24" height="24" alt="">loading 24</div>
+  </div>
+  <div class="ladder dark">
+    <div><img src="mark-reversed.svg" width="16" height="16" alt="">16</div>
+    <div><img src="mark-reversed.svg" width="24" height="24" alt="">24</div>
+    <div><img src="mark-reversed.svg" width="32" height="32" alt="">32</div>
+    <div><img src="mark-reversed.svg" width="56" height="56" alt="">56</div>
+    <div><img src="icon-search-reversed.svg" width="24" height="24" alt="">search 24</div>
+    <div><img src="icon-ask-iris-reversed.svg" width="24" height="24" alt="">ask 24</div>
+    <div><img src="loading-reversed.svg" width="24" height="24" alt="">loading 24</div>
+  </div>
+
+  <footer>Rasters are in <code>png/</code>. Rebuild the SVGs with <code>python docs/brand/folio-ribbon/final/build.py</code>. Proposal: the application still uses its current mark until this is adopted in docs/ui-ux/01-design-system.md.</footer>
+</main>
+<script>
+// replay the opening when it scrolls into view or is clicked
+document.querySelectorAll('#op1, #op2').forEach(img => img.addEventListener('click', () => { const s = img.src; img.src = ''; img.src = s; }));
+</script>
+</body>
+</html>
