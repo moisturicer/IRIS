@@ -1,5 +1,7 @@
 """IR-594: the controller's composer validates, repairs once, then keeps
 only supported parts (ADR-042, spec §5). No database, no vendor."""
+import logging
+
 import pytest
 
 from apps.ai.answers.citations import GENERATED, NO_SOURCES, UNAVAILABLE
@@ -143,3 +145,63 @@ def test_a_general_explanation_is_composed_without_sources():
     writer = Writer("A confusion matrix tabulates right and wrong guesses.")
     answer = compose(writer, passages=(), basis=GENERAL)
     assert answer.state == GENERATED and "general background" in writer.calls[0][0]
+
+
+@pytest.fixture
+def composer_logs(caplog):
+    """`apps` does not propagate, so the handler goes on this logger itself."""
+    logger = logging.getLogger("apps.ai.controller.compose")
+    logger.addHandler(caplog.handler)
+    caplog.set_level(logging.WARNING, logger="apps.ai.controller.compose")
+    try:
+        yield caplog
+    finally:
+        logger.removeHandler(caplog.handler)
+
+
+def _limit_for(*sources):
+    """The admission estimate of a prompt holding exactly ``sources``."""
+    from apps.ai.admission.ledger import estimate_tokens
+    from apps.ai.controller.compose import _prompt
+    return estimate_tokens(*_prompt(ready(), sources))
+
+
+def test_over_the_input_limit_the_top_ranked_sources_that_fit_are_kept(settings, composer_logs):
+    """IR-703: a prompt over the limit kept 0 sources and silently answered nothing."""
+    settings.AI_PROVIDER_ADMISSION = "enforce"
+    writer = Writer("The LSTM reached 92.4% accuracy [1].")
+    answer = compose(writer, answer_input_limit=_limit_for(FLOOD))
+    assert answer.state == GENERATED and len(writer.calls) == 1
+    assert "Flood Prediction" in writer.calls[0][1] and "Tilapia" not in writer.calls[0][1]
+    assert "kept 1 of 2" in composer_logs.text
+
+
+def test_when_no_source_fits_the_answer_is_unavailable_and_says_why(settings, composer_logs):
+    settings.AI_PROVIDER_ADMISSION = "enforce"
+    writer = Writer("never sent")
+    answer = compose(writer, answer_input_limit=10)
+    assert answer.state == UNAVAILABLE and writer.calls == []
+    assert "kept 0 of 2" in composer_logs.text
+
+
+def test_without_enforcement_every_source_is_sent(settings):
+    settings.AI_PROVIDER_ADMISSION = "off"
+    writer = Writer("Both [1] [2].")
+    compose(writer, answer_input_limit=10)
+    assert "Tilapia" in writer.calls[0][1]
+
+
+def test_startup_refuses_an_answer_limit_that_cannot_hold_one_full_read(settings):
+    from django.core.exceptions import ImproperlyConfigured
+
+    from apps.ai.controller.budget import verify_controller_configuration
+    settings.AI_PROVIDER_ADMISSION = "enforce"
+    settings.AI_RESEARCH_READ_TOKEN_CAP = 3000
+    settings.AI_CONTROLLER_ANSWER_RESERVE_TOKENS = 4000
+    with pytest.raises(ImproperlyConfigured, match="AI_CONTROLLER_ANSWER_RESERVE_TOKENS"):
+        verify_controller_configuration()
+    settings.AI_CONTROLLER_ANSWER_RESERVE_TOKENS = 24000
+    verify_controller_configuration()
+    settings.AI_PROVIDER_ADMISSION = "off"
+    settings.AI_CONTROLLER_ANSWER_RESERVE_TOKENS = 4000
+    verify_controller_configuration()

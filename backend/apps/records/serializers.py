@@ -183,6 +183,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # review at all -- an owner, or anyone who has ever held a seat
     # (ADR-032 §4, §10; IR-415).
     my_seats             = serializers.SerializerMethodField()
+    review_claim         = serializers.SerializerMethodField()
     is_participant       = serializers.SerializerMethodField()
     # What Paper View's action bar may offer for routing (ADR-032 §4, IR-261):
     # `{accept_and_route: bool, route_as: party | null}`. A rendering hint;
@@ -209,6 +210,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # assembles it from the blocks above. A rendering hint; every action
     # endpoint re-checks its own predicate, so the server stays authoritative.
     capabilities         = serializers.SerializerMethodField()
+    # What stands between the viewer and their part of the review, in words
+    # (ADR-032 §10 Amendment, IR-679/IR-681). Read from the blocks above;
+    # `None` -- not disclosed -- to a viewer who may not read the review.
+    readiness            = serializers.SerializerMethodField()
     # The record's versions, for the header's version picker (IR-416).
     # Participants only, like `reviews`.
     versions             = serializers.SerializerMethodField()
@@ -222,6 +227,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # `{derived_from, continued_as}`: the Proposal this continues and what
     # continues it (ADR-032 §6, IR-417), each only if the viewer may open it.
     lineage              = serializers.SerializerMethodField()
+    # The review sidebar's paper details and profile cards (IR-686);
+    # participants and due dates are `None` to a viewer refused the review.
+    paper_details        = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -289,6 +297,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return is_record_participant(self._viewer(), obj)
 
+    def get_review_claim(self, obj):
+        from apps.reviews.seats import claim_offer
+
+        return self._once(obj, "review_claim", lambda: claim_offer(obj, self._viewer()))
+
     def get_routing(self, obj):
         from apps.reviews.routing import routing_flags
 
@@ -321,6 +334,23 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             office_review=self.get_office_review(obj), revision=self.get_revision(obj),
             decision=self.get_decision(obj),
         )
+
+    def get_readiness(self, obj):
+        from apps.reviews import readiness, routing
+
+        def compute():
+            readable = self._readable(obj)
+            in_review = routing.is_in_review(obj)
+            return readiness.build_readiness(
+                user=self._viewer(), readable=readable, in_review=in_review,
+                decision=self.get_decision(obj), revision=self.get_revision(obj),
+                office_review=self.get_office_review(obj), my_seats=self.get_my_seats(obj),
+                review_claim=self.get_review_claim(obj),
+                facts=readiness.readiness_facts(obj, self._viewer())
+                if readable and in_review else {"assignments": [], "document_requests": []},
+            )
+
+        return self._once(obj, "readiness", compute)
 
     def get_reviews(self, obj):
         """
@@ -363,6 +393,14 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         if not self._readable(obj):
             return None
         return versions_payload(obj)
+
+    def get_paper_details(self, obj):
+        from .paper_details import paper_details
+
+        return paper_details(
+            obj, self._viewer(), readable=self._readable(obj),
+            deadlines=self._workflow(obj)["assignment_deadlines"],
+        )
 
     def get_manuscript_unsubmitted(self, obj):
         from .versions import manuscript_unsubmitted
@@ -482,12 +520,13 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "workflow_state", "workflow_state_label", "current_holders",
-            "can_request_document", "my_seats", "is_participant", "routing",
-            "office_review", "revision", "decision", "capabilities", "keywords",
+            "can_request_document", "my_seats", "review_claim", "is_participant", "routing",
+            "office_review", "revision", "decision", "capabilities", "readiness", "keywords",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
             "versions", "manuscript_unsubmitted", "submitter_status", "lineage",
+            "paper_details",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as

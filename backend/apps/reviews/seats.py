@@ -34,6 +34,7 @@ retired (IR-274).
 from __future__ import annotations
 
 from django.db import IntegrityError, transaction
+from django.db.models import Exists, OuterRef
 from django.utils import timezone
 
 from apps.audit import workflow as audit
@@ -41,9 +42,12 @@ from apps.audit.models import AuditEvent
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
+    ClearanceStatus,
+    Office,
     Party,
     PipelineStatus,
     ResubmissionRequestState,
+    ReviewDecision,
     SeatSource,
     SeatState,
 )
@@ -55,7 +59,7 @@ from core.permissions import (
     office_parties_of,
 )
 
-from .models import RecordAssignment, ResubmissionRequest, ReviewerSeat
+from .models import RecordAssignment, ResubmissionRequest, Review, ReviewerSeat
 
 #: The parties that are offices, and so have members, a pool and coordinators.
 OFFICE_PARTIES = frozenset(str(p) for p in OFFICE_PARTY_BY_ROLE.values())
@@ -475,13 +479,45 @@ def my_seats(record, user) -> list[dict]:
     """
     if user is None or not getattr(user, "is_authenticated", False):
         return []
-    seats = (
+    seats = list(
         ReviewerSeat.objects.filter(assignment__record=record, reviewer=user)
         .exclude(state=SeatState.WITHDRAWN)
         .select_related("assignment", "reviewer")
         .order_by("assigned_at", "pk")
     )
-    return [seat_payload(s, user) for s in seats]
+    finished = [s.assignment_id for s in seats if s.state == SeatState.DONE]
+    verdicts = {
+        r.assignment_id: r for r in Review.objects.filter(
+            assignment_id__in=finished, reviewed_by=user,
+        ).order_by("created_at", "pk")
+    } if finished else {}
+    return [{
+        **seat_payload(s, user),
+        "verdict_label": seat_verdict_label(verdicts.get(s.assignment_id), s.assignment.party)
+        if s.state == SeatState.DONE else None,
+    } for s in seats]
+
+
+def seat_verdict_label(review, party) -> str | None:
+    """The same verdict words on a viewer's seat and on the party tracker."""
+    if review is None:
+        return None
+    if party in Office.values and review.status == ReviewDecision.APPROVED:
+        return str(ClearanceStatus.CLEARED.label)
+    return review.get_status_display()
+
+
+def claim_offer(record, user) -> dict | None:
+    """Record detail's claim control: the same active pool as My Reviews (IR-681)."""
+    if record.pipeline_status != PipelineStatus.IN_REVIEW:
+        return None
+    live = ReviewerSeat.objects.filter(assignment=OuterRef("pk")).exclude(state=SeatState.WITHDRAWN)
+    assignment = RecordAssignment.objects.filter(
+        record=record, party__in=office_parties_of(user), state=AssignmentState.ACTIVE,
+    ).exclude(Exists(live)).order_by("pk").first()
+    if assignment is None:
+        return None
+    return {"assignment": assignment.pk, "label": "Claim review", "party_label": _label(assignment.party)}
 
 
 def review_access(user) -> dict:

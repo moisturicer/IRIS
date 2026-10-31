@@ -1,5 +1,19 @@
 {
   "set_id": "general-tools-conversations-v1",
-  "development": "f11ab3beb3539af14a92015ebd7507be67ec3e2c3c5642d40831fbb988e022c0",
-  "held_out": "429c4015a3c448f63cc5263121eec82fb52d2d836147d23d29b97ee15a27da1e"
+  "development": "e7b8e94b58a5502c436594d117b21f5a9e857b435ae093e26bfb39f3716d1c2f",
+  "held_out": "1b20a3cb8fc257ec43fc957f208f5f3ce490d95a03213e0283183ffccb73aca6",
+  "corpus": "02447ea319ecc52e6dcce81b908be60746f9717e25357e93d986728d8e6f1712",
+  "rubric_version": 1,
+  "thresholds": {
+    "task_completion": 0.9,
+    "claim_support": 0.95,
+    "citation_support": 0.95,
+    "page_support": 0.95
+  },
+  "locked_at": "2026-10-31T03:02:08.533382+00:00",
+  "label_review": {
+    "reviewer": "Jive Tyler I. Revalde",
+    "fixture": false,
+    "sha256": "0e51a8a8e2e1c438bc8695b0f36959e20d8b0022d55c89310691ab570c7431e0"
+  }
 }

@@ -3,6 +3,8 @@ export const AUDIT_EVENT_GROUPS = {
     LOGIN: "Login", LOGOUT: "Logout", FAILED_LOGIN: "Failed Login",
     PIN_GENERATED: "PIN Generated", PIN_VERIFIED: "PIN Verified", ROLE_CHANGE: "Role Change",
     ACCOUNT_LOCKED: "Account Locked", ACCOUNT_UNLOCKED: "Account Unlocked", SESSION_REVOKE: "Session Revoked",
+    PASSWORD_CHANGED: "Password Changed",
+    SYSTEM_SETTING_CHANGED: "System Setting Changed",
   },
   Files: { ACCESS: "Record Access", UPLOAD: "File Upload", DOWNLOAD: "File Download", DELETE: "File Delete", RENAME: "File Rename" },
   Research: { RESEARCH_METADATA_CORRECTED: "Research Metadata Corrected" },

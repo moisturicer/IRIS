@@ -37,9 +37,11 @@ message it had before.
 from datetime import timedelta
 
 from django.conf import settings
+from django.db import transaction
 from django.utils import timezone
 from rest_framework.exceptions import AuthenticationFailed
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
+from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 
 from core.enums import SessionEndReason
 
@@ -91,6 +93,7 @@ _REFUSALS = {
         "session_ended_password_changed",
         "You were signed out because your password was changed.",
     ),
+    SessionEndReason.REVOKED: ("session_ended_revoked", "An administrator ended this session."),
 }
 
 
@@ -100,12 +103,58 @@ def start_session(user) -> RefreshToken:
     session = UserSession.objects.create(user=user, created_at=at, last_activity_at=at)
     refresh = RefreshToken.for_user(user)
     refresh["sid"] = str(session.id)
+    # for_user stores the token before we add sid. Keep its stored payload in
+    # sync so end_all_sessions can identify the device it must spare.
+    OutstandingToken.objects.filter(jti=refresh["jti"]).update(token=str(refresh))
     return refresh
 
 
 def end_session(sid, reason: SessionEndReason) -> None:
     """End session ``sid`` for ``reason``. The first ending stands."""
     UserSession.objects.filter(id=sid, ended_at__isnull=True).update(ended_at=now(), ended_reason=reason)
+
+
+def require_eligible_account(user) -> None:
+    """The same account-state rule for requests and refresh, including no sid."""
+    if not user.is_active or user.is_locked:
+        raise SessionEnded(SessionEndReason.LOCKED)
+
+
+@transaction.atomic
+def end_all_sessions(user, reason: SessionEndReason, *, except_sid=None) -> None:
+    """End open sessions, preserving their first reason and optionally one device.
+
+    Older stored refresh payloads lack sid even though the issued token has it.
+    When sparing a device these cannot safely be blacklisted: their presented
+    sid still goes through the ended-session rule on every request and refresh.
+    Without an exception (account lock), every outstanding token is blacklisted.
+    """
+    open_sessions = UserSession.objects.filter(user=user, ended_at__isnull=True)
+    if except_sid:
+        open_sessions = open_sessions.exclude(id=except_sid)
+    open_sessions.update(ended_at=now(), ended_reason=reason)
+    tokens = OutstandingToken.objects.filter(user=user, blacklistedtoken__isnull=True)
+    for token in tokens.iterator():
+        if except_sid:
+            # These are our own stored payloads; ignore expiry while reading
+            # their session identity. Authentication verifies the issued JWT.
+            sid = UntypedToken(token.token, verify=False).get("sid")
+            if sid is None or str(sid) == str(except_sid):
+                continue
+        BlacklistedToken.objects.get_or_create(token=token)
+
+
+@transaction.atomic
+def revoke_token(token: OutstandingToken) -> None:
+    """End the session a stored refresh token belongs to, and blacklist it (IR-657).
+
+    Blacklisting alone leaves the access token working until it expires. A stored
+    payload with no sid predates that being kept, and only the blacklisting applies.
+    """
+    sid = UntypedToken(token.token, verify=False).get("sid")
+    if sid:
+        end_session(sid, SessionEndReason.REVOKED)
+    BlacklistedToken.objects.get_or_create(token=token)
 
 
 def refuse_if_ended(sid) -> None:

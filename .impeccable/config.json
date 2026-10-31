@@ -17,7 +17,23 @@
         ],
         "createdAt": "2026-10-14T18:18:22.721Z",
         "reason": "Assistant triage: false positive. The class names are a list of classes the test asserts are absent from the AI Overview; no element is rendered with them."
+      },
+      {
+        "rule": "border-accent-on-rounded",
+        "value": "*",
+        "files": [
+          "frontend/src/components/auth/EntryFrame.tsx"
+        ],
+        "createdAt": "2026-10-31T05:40:38.765Z",
+        "reason": "IR-704 approved Dossier Folder preview (.impeccable/review/previews/01-sign-in-desktop.png) draws the current folder tab with a maroon top edge on rounded top corners"
       }
     ]
+  },
+  "hook": {
+    "enabled": true,
+    "limits": {
+      "maxFindings": 5,
+      "maxChars": 8000
+    }
   }
 }

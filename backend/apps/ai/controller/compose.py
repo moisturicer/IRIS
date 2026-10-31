@@ -104,6 +104,25 @@ _HELP = {
 }
 
 
+ABSTRACT_PATH = ("Abstract",)
+
+
+def abstract_source(record, *, rank: int = 1) -> RetrievedChunk:
+    """A found paper's abstract as a source (IR-703, ADR-042 amendment).
+
+    It has no chunk: the negative id keeps it distinct in memory and never
+    leaves the composer; its citation names the record and no page. A negative
+    score puts it below every passage, the better search rank higher.
+    """
+    return RetrievedChunk(chunk_id=-record.record_id, record_id=record.record_id,
+                          record_title=record.record_title, content=record.text,
+                          context_path=ABSTRACT_PATH, source_page=None, score=-float(rank))
+
+
+def is_abstract(source) -> bool:
+    return source.chunk_id is not None and source.chunk_id < 0
+
+
 @dataclass(frozen=True)
 class ReadyToCompose:
     """What the controller gathered; everything here is currently readable."""
@@ -159,6 +178,10 @@ class AnswerComposer:
             llm = self.root.llm_for(InferenceTask.ANSWER)
         except (LLMUnavailable, CircuitOpen):
             return _unavailable(_live(ready, sources))
+        if sources:
+            sources = _fitted(ready, sources)
+            if not sources:
+                return _unavailable(live)
         system, prompt = _prompt(ready, sources)
         raw = _draft(llm, system, prompt, ready)
         if raw is None:
@@ -188,6 +211,7 @@ class AnswerComposer:
         cited = {c.chunk_id for c in citations}
         evidence = "\n".join(s.content for s in sources if s.chunk_id in cited)
         summary = "" if issues else safe_summary(draft.summary, text, evidence)
+        citations = tuple(replace(c, chunk_id=None) if is_abstract(c) else c for c in citations)
         return GroundedAnswer(
             text=text, citations=citations, sources=live, model=model_that_answered(llm),
             degraded=ready.degraded or bool(ready.limitations) or bool(issues),
@@ -231,6 +255,7 @@ def _draft(llm, system: str, prompt: str, ready) -> Optional[str]:
             return None
         if (enforcing() and ready.answer_input_limit is not None
                 and admission_tokens(system, prompt) > ready.answer_input_limit):
+            logger.warning("controller answer prompt over its input limit; not sent")
             return None
         if ready.spend is not None:
             if ready.spend.remaining_seconds <= 0:
@@ -242,6 +267,26 @@ def _draft(llm, system: str, prompt: str, ready) -> Optional[str]:
         return None
     raw = without_leaked_reasoning(raw or "")
     return raw if raw.strip() else None
+
+
+def _fitted(ready, sources) -> tuple:
+    """The highest-ranked sources whose prompt fits the admitted input limit."""
+    limit = ready.answer_input_limit
+    if not enforcing() or limit is None:
+        return tuple(sources)
+    # Drop the lowest-scored first (ties: the latest gathered); keep gathered order.
+    drop_order = sorted(range(len(sources)), key=lambda i: (sources[i].score or 0, -i))
+    kept = list(sources)
+    for index in drop_order:
+        if admission_tokens(*_prompt(ready, tuple(kept))) <= limit:
+            break
+        kept.remove(sources[index])
+    if kept and admission_tokens(*_prompt(ready, tuple(kept))) > limit:
+        kept = []
+    if len(kept) < len(sources):
+        logger.warning("controller answer sources trimmed to the input limit: kept %d of %d",
+                       len(kept), len(sources))
+    return tuple(kept)
 
 
 def _feedback(draft, issues) -> str:

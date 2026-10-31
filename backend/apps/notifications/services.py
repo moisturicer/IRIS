@@ -583,22 +583,21 @@ def notify_role_request(user, requested_role):
 
 
 def notify_download_request(record, requested_by):
-    """Broadcast to KTTO and RDCO when a user requests to download a record's files."""
+    """Broadcast to RDCO, who alone decides, when a user requests a record's files."""
     try:
         notif_type = _get_type("Download Request Submitted")
-        for role_name in (RoleName.KTTO, RoleName.RDCO):
-            role = _role(role_name)
-            if role:
-                Notification.objects.create(
-                    sender=requested_by,
-                    broadcast_to_role=role,
-                    record=record,
-                    notif_type=notif_type,
-                    message=(
-                        f"{requested_by.get_full_name()} has requested to download "
-                        f'files for record "{record.title}".'
-                    ),
-                )
+        role = _role(RoleName.RDCO)
+        if role:
+            Notification.objects.create(
+                sender=requested_by,
+                broadcast_to_role=role,
+                record=record,
+                notif_type=notif_type,
+                message=(
+                    f"{requested_by.get_full_name()} has requested to download "
+                    f'files for record "{record.title}".'
+                ),
+            )
     except Exception:
         _log_failure("notify_download_request", record=record)
 

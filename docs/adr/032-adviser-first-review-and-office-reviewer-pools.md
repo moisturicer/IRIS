@@ -355,6 +355,10 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 - **The timeline is derived** from the rows that already exist plus `ReviewComment`, the same way the tracker is (ADR-021 §14). Nothing is duplicated into an event table.
 - **Public comments are moderated by hiding, not by deleting.** Owners and system administrators can hide a comment.
 
+**Amendment, proposed 2026-10-30, accepted 2026-10-31 (IR-679): the Conversation tab.** Accepted by **Lee Jasmin Adolfo** (project lead), who instructed "resolve conflicted prs and merge" after the implementation and proposal were prepared for review. The acceptance is also recorded on [PR #363](https://github.com/moisturicer/IRIS/pull/363).
+
+The review discussion remains one record-level timeline, with the same readers, writers and version tags. In Review mode it becomes the **Conversation** tab of the review pane. The timeline is followed by the server-authored **Readiness** panel and the record comment box. Changes and Threads are later phases and their tabs are absent until implemented. This adds no anchored threads, pending review submissions or new discussion channel. The author's existing surfaces remain unchanged. The regions and Readiness contract are specified in the amendment under §10.
+
 **Amendment, 2026-10-31 (project lead, IR-689; spec IR-420): the public thread is "Comments", and who may remove a comment changes.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. It replaces the public-discussion column above where they differ; the review discussion is unchanged.
 
 - **Name.** The interface calls the public thread **Comments** ("Comments (n)"). `CONTEXT.md` defines Comment, Comment report and Review discussion.
@@ -462,6 +466,45 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 | **Author** | Owners | Reading, plus the version picker, **New version** (when a revision is requested), the Action Required panel (ADR-022), **Continue as…** (on an accepted Proposal), visibility, and the review timeline read/reply |
 | **Review** | Seat holders, after **Open review** | The paper beside the review timeline (*amended 2026-09-26: no Ask IRIS here; it stays on the Paper tab, IR-372*), the party status strip (Adviser ✓ · ITSO ● · IERC ● · KTTO — · RDCO ○), and an action bar built from `capabilities` |
 | **Summary** | Strangers on a Discoverable Proposal | The §8 summary and public discussion. No PDF. |
+
+**Amendment, proposed 2026-10-30, accepted 2026-10-31 (IR-679): Review workspace, Phase 1.** **Accepted by Lee Jasmin Adolfo** (project lead), as recorded under §7 and on PR #363. This supersedes the Review row's two-region layout and the standalone party status strip in Review mode. It changes presentation and adds a read-only projection; existing workflow rules and action permissions remain authoritative.
+
+**Three regions.** Left: the whole Manuscript through the existing Paper reader. Middle: a review pane with Conversation (§7), ending in Readiness and the record comment box; its footer always shows the viewer's verdict in words and the single filled primary action currently offered by the server. Right: a details sidebar, visible whichever review tab is selected. Its first section, **Reviewers**, groups people and their states by party, showing an unclaimed Pool as an office rather than a person. **Request review** reuses routing and **Add a colleague** reuses the separate add-reviewer act. Targets and controls come only from `routing` and capabilities, never a client role table.
+
+The remaining sidebar sections are Researchers, Adviser, Classification (type, area, PSCED, college, program), Flagged by the authors, Keywords, Version and date, Due dates, Documents, and Participants, in that order. People open profile cards containing only fields the viewer may already read. Missing participant/profile fields are projected by the server, not reconstructed by the client. Review-only facts, including participants and due dates, are withheld when `may_read_review` refuses the viewer. Read mode, Ask IRIS's entry point and the author's existing view are unchanged.
+
+**Geometry.** A CSS grid uses the workspace's container width, not the viewport: `minmax(0, 1fr) var(--mid-w, 30%) var(--side-w, 20%)`. Defaults are 30% review pane and 20% sidebar, with the paper taking the remainder. Clamp the pane to 320px–half the workspace; clamp the sidebar to 220–420px and no wider than pane minus 40px; then cap the pane so the paper keeps at least 480px. Below 1200px the sidebar folds into a **Details** tab; below 900px the pane is a drawer over the paper with **Back to paper**, and drag edges are hidden. Each edge is a focusable `role="separator"` with current value, arrow keys move it 24px, and double click resets that column. Widths persist under one browser-storage key; failed reads or writes fall back safely. Maroon, stone, white and ink; Garamond headings; hairlines between regions; statuses use icons plus words; controls are 36px for pointers and 44px for touch. The [prototype](../ui-ux/prototypes/review-workspace.html) is a visual reference, including later phases that Phase 1 does not ship.
+
+**Readiness contract.** Record detail adds `readiness` alongside the existing decision, revision, clearance, routing and office-review projections. A pure reviews-app builder consumes those same computed facts, seats, deadlines and open document requests without re-deriving their rules, and is cached once per record/request through the serializer's existing cache. No migration is required.
+
+```text
+readiness: null | {
+  verdict: "ready" | "blocked" | "waiting_on_you" | "none",
+  headline: string,
+  items: [{
+    kind: string,
+    severity: "blocker" | "info",
+    label: string,
+    party: string | null,
+    actor_name: string | null,
+    since: iso8601 | null,
+    paused: boolean | null,
+    action: null | { kind: string, target: string | null }
+  }]
+}
+```
+
+- **`ready` exactly when a Decision would be accepted:** the decision block offers outcomes and has no blocker, for a valid submission against the same record state. It is not a promise against a later concurrent change; action endpoints still re-check everything.
+- **Every non-null `decision.blocked` reason has at least one blocker item**, including the requirement to open a review first. The builder must not drop a reason merely because it is not a Revision request. Other refused acts, such as an office finishing with its own document request open, likewise retain their existing refusal facts.
+- **`readiness: null` means not disclosed**, and is returned whenever `may_read_review` refuses the viewer. It is distinct from an empty items list. Reviewers' states, timeline and other review-only material follow the same privacy predicate.
+- Headlines and item labels are non-empty, server-authored English. The browser renders them and dispatches offered actions; it computes neither verdicts, blocker severity nor status-to-English sentences.
+- Phase 1 item kinds include `revision_request`, `party_reviewing`, `pool_unclaimed`, `document_request` and `due_date`; additional decision refusal facts must also be represented. Items name the party, actor and since when where available. `paused` applies only to due dates and is null otherwise. Due dates are information, never blockers.
+- Open Revision requests reflect existing Decision blockers. Offices still reviewing and unclaimed Pools are information unless current decision facts already block; any closure warning reads `decision.closes`. A document request blocks only its requesting party's finish act where the existing service refuses it; it is information to other parties. No configured Turnaround means no due-date item.
+- Actions identify an allowed control and its target: withdraw a request, open Documents, show a party, claim a Pool, route, or open the review where required. Withdraw is offered only to a seat holder of the requesting party; claim only where allowed. Controls reveal no new authority and reuse existing endpoints. Links to a folded sidebar activate Details and focus their destination.
+
+**Verification.** Record-detail endpoint tests use real workflow services to check verdict/Decision parity, coverage of blockers, server text and privacy. Page tests render payload fixtures and exercise the controls, single primary action, container breakpoints, keyboard clamps, reset and unavailable storage. The visual layout is checked against the prototype. This supporting UX changes no workflow contribution. Under ADR-004 it must be present in both comparison arms or absent from both.
+
+**Separate work.** ADR-047 remains Proposed and is not a dependency: this UI follows today's server flags without implementing its routing graph, hand-back removal or Revision override. Version diffs, anchored threads, resolution, suggested wording and notification subscriptions remain later phases. Acceptance of this amendment does not accept ADR-047.
 
 **Amendment, 2026-10-06 (project lead, IR-411): two more capabilities.** The list above is examples, not a closed set; these two are named so the capabilities payload (IR-418) sends them and the frontend never derives them itself once it does:
 

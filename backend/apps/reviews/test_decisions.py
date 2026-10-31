@@ -324,6 +324,8 @@ class OpenWorkClosesTests(DecisionTestBase):
             [(s["reviewer_name"], s["state"]) for s in ierc["seats"]],
             [(self.ierc.get_full_name(), SeatState.WITHDRAWN)],
         )
+        # IR-685: the sidebar shows what cut the seat short, in the server's words.
+        self.assertEqual(ierc["seats"][0]["state_label"], "Closed by the Decision")
         # RDCO's own turn: the decider's seat done, the colleague's withdrawn.
         self.assertEqual(
             [s["state"] for s in self.rows(tracker)[Party.RDCO]["seats"]],
