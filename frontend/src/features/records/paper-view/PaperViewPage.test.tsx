@@ -2199,6 +2199,43 @@ describe("the Review section (IR-412)", () => {
       .getByRole("button", { name: "Withdraw revision request" })).toHaveFocus();
   });
 
+  it("renders a party still reviewing and an unclaimed Pool, each with its one control (IR-683)", async () => {
+    workspaceAt(1600);
+    vi.mocked(recordsApi.tracker).mockResolvedValue({
+      data: { ...trackerPayload, parties: [partyRow("itso", "ITSO"), partyRow("ierc", "IERC", { in_pool: true })] },
+    } as never);
+    // What the server sends an IERC member while ITSO reviews and IERC's Pool
+    // waits: nobody here decides, so no item speaks of closing.
+    shownRecord = { ...inReview, ...reviewing, review_claim: { assignment: 55, label: "Claim review", party_label: "IERC" },
+      readiness: { ...readinessFor([
+        { kind: "party_reviewing", severity: "info", label: "ITSO is reviewing.",
+          party: "itso", actor_name: "Ito Itso", since: "2026-09-03T08:00:00Z", action: { kind: "show_party", target: "itso" } },
+        { kind: "pool_unclaimed", severity: "info", label: "Nobody at IERC has claimed this review yet.",
+          party: "ierc", since: "2026-09-04T08:00:00Z", action: { kind: "claim", target: "55" } },
+      ]), verdict: "waiting_on_you", headline: "IERC has not claimed this review yet." } };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const panel = (await screen.findByRole("heading", { name: "Readiness" })).closest("section")!;
+    expect(within(panel).getByRole("status")).toHaveTextContent("IERC has not claimed this review yet.");
+    const [itso, ierc] = within(panel).getAllByRole("listitem");
+    expect(itso).toHaveTextContent("ITSO is reviewing.");
+    expect(itso).toHaveTextContent("Ito Itso");
+    expect(itso).toHaveTextContent(`since ${formatDate("2026-09-03T08:00:00Z")}`);
+    expect(itso).not.toHaveTextContent("Blocker");
+    expect(ierc).toHaveTextContent("Nobody at IERC has claimed this review yet.");
+    expect(ierc).toHaveTextContent(`since ${formatDate("2026-09-04T08:00:00Z")}`);
+    expect(ierc).not.toHaveTextContent("Blocker");
+    expect(within(itso).getAllByRole("button").map((b) => b.textContent)).toEqual(["Show reviewers"]);
+    expect(within(ierc).getAllByRole("button").map((b) => b.textContent)).toEqual(["Claim review"]);
+
+    // Show reviewers jumps to that party in the sidebar's Reviewers.
+    await userEvent.click(within(itso).getByRole("button", { name: "Show reviewers" }));
+    await waitFor(() => expect(document.activeElement).toHaveTextContent(/^ITSO/));
+    // Claim review hands over to the page's own claim.
+    await userEvent.click(within(ierc).getByRole("button", { name: "Claim review" }));
+    expect(seatsApi.claim).toHaveBeenCalledWith(55);
+  });
+
   it("shows no Readiness when the server does not disclose it (IR-681)", async () => {
     workspaceAt(1600);
     shownRecord = { ...inReview, ...reviewing, readiness: null };
@@ -2425,6 +2462,46 @@ describe("the Review section (IR-412)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Show reviewers" }));
     expect(screen.getByRole("tab", { name: "Details", selected: true })).toBeInTheDocument();
     await waitFor(() => expect(document.activeElement).toHaveTextContent(/^IERC/));
+  });
+
+  describe("document requests and the viewer's due date (IR-684)", () => {
+    const documentsAndDue = () => readinessFor([
+      { kind: "document_request", severity: "blocker", label: "ITSO asked the author for a document.", party: "itso",
+        actor_name: "Ito Itso", since: "2026-09-03T08:00:00Z", action: { kind: "open_documents", target: "5" } },
+      { kind: "due_date", severity: "info", party: "itso", paused: true,
+        label: "ITSO is due Fri 11 Sep. The clock is paused while ITSO's document request is open." },
+    ]);
+
+    it("renders both kinds in the server's words, and Open Documents focuses the sidebar's Documents", async () => {
+      workspaceAt(1600);
+      shownRecord = { ...inReview, ...reviewing, readiness: documentsAndDue() };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+      const panel = (await screen.findByRole("heading", { name: "Readiness" })).closest("section")!;
+      const [request, due] = within(panel).getAllByRole("listitem");
+      expect(request).toHaveTextContent("Blocker: ITSO asked the author for a document.");
+      expect(request).toHaveTextContent("Ito Itso");
+      expect(request).toHaveTextContent(`since ${formatDate("2026-09-03T08:00:00Z")}`);
+      expect(due).toHaveTextContent("ITSO is due Fri 11 Sep. The clock is paused while ITSO's document request is open.");
+      expect(due).toHaveTextContent("clock paused");
+      expect(due).not.toHaveTextContent("Blocker");
+      expect(within(due).queryByRole("button")).not.toBeInTheDocument();
+
+      await userEvent.click(within(request).getByRole("button", { name: "Open Documents" }));
+      const side = screen.getByRole("complementary", { name: "Review details" });
+      await waitFor(() => expect(document.activeElement).toHaveTextContent(/^Documents/));
+      expect(side).toContainElement(document.activeElement as HTMLElement);
+    });
+
+    it("takes a folded Open Documents to the Details tab", async () => {
+      workspaceAt(1100);
+      shownRecord = { ...inReview, ...reviewing, readiness: documentsAndDue() };
+      signInAs(2, "ITSO");
+      renderPaper(`/records/${RECORD_ID}?section=review`);
+      await userEvent.click(await screen.findByRole("button", { name: "Open Documents" }));
+      expect(screen.getByRole("tab", { name: "Details", selected: true })).toBeInTheDocument();
+      await waitFor(() => expect(document.activeElement).toHaveTextContent(/^Documents/));
+    });
   });
 
   it("puts the paper beside the timeline, from the tracker", async () => {

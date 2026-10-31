@@ -40,10 +40,10 @@ interface EntryFrameProps {
  * optional lede, a folder whose tabs sit on a white sheet, and the CIT-U
  * footer.
  *
- * Built beside `AuthLayout` (IR-706): sign in uses it first, register moved
- * across in IR-707, and email verification and the pending and declined
- * screens follow without the lede (IR-710) before IR-711 retires the split
- * frame.
+ * Sign in moved onto it first (IR-706), register in IR-707, and email
+ * verification and the pending and declined screens without the lede in
+ * IR-710. It is the only entry frame: IR-711 deleted the split frame
+ * (`AuthLayout` and its brand panel).
  *
  * The masthead is the page's one `<h1>`, and it is visible at every width, so
  * no breakpoint can take it out of the accessibility tree as IR-211 found the

@@ -46,13 +46,6 @@
     display: none;
   }
 
-  /* A spine title, read bottom to top as on a bound volume on a shelf: the
-     entry screens' brand panel (IR-535). Tailwind has no writing-mode utility. */
-  .text-spine {
-    writing-mode: vertical-rl;
-    transform: rotate(180deg);
-  }
-
   /* Thin scrollbar for sidebar and panels */
   .scrollbar-thin {
     scrollbar-width: thin;

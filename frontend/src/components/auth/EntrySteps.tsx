@@ -109,11 +109,17 @@ export function EntrySteps({ steps, onSelect }: EntryStepsProps) {
 }
 
 function StepName({ step }: { step: EntryStep }) {
-  if (!step.shortName || !step.name.startsWith(step.shortName)) return <span>{step.name}</span>;
+  // Below 390px three named tabs overran the screen (IR-711), so only the
+  // current tab shows its name there; the others show their mark (a check or
+  // a number) and keep their name for a screen reader.
+  const hideOnNarrow = step.state === "current" ? undefined : "narrow:sr-only";
+  if (!step.shortName || !step.name.startsWith(step.shortName)) {
+    return <span className={hideOnNarrow}>{step.name}</span>;
+  }
   // The rest of the name is visually hidden on a phone, never removed: the
   // accessible name stays "Security & agreement" at every width.
   return (
-    <span>
+    <span className={hideOnNarrow}>
       {/* The space sits outside the hidden part: a name computed from a
           child's text trims the child's own leading space. */}
       {step.shortName}{" "}
