@@ -1,6 +1,8 @@
 /**
  * Shown to a signed-in user who has no role yet. Replaces the app shell: no
- * sidebar, no navigation, only the shared entry frame (IR-537).
+ * sidebar, no navigation, only the Dossier entry frame (IR-537, IR-710), under
+ * an "Account status" tab, with no lede and no masthead cross-link: the reader
+ * is already signed in, and Sign out is on the sheet.
  *
  * Every registration creates a role request that RDCO approves or declines,
  * and `role_request` on the user's own payload says which of the two it is
@@ -10,7 +12,7 @@
 import { useId } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/api/auth";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { Button } from "@/components/ui/Button";
 import type { OwnRoleRequest } from "@/types/auth";
 
@@ -65,7 +67,7 @@ export function PendingApprovalPage() {
   const { title, message } = standingOf(request, user.email);
 
   return (
-    <AuthLayout variant={request?.status === "declined" ? "declined" : "pending"}>
+    <EntryFrame tabs={<EntryTab>Account status</EntryTab>}>
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">{title}</h2>
       <p className="mt-3 text-pretty text-body text-stone-700">{message}</p>
 
@@ -103,6 +105,6 @@ export function PendingApprovalPage() {
           </p>
         )}
       </div>
-    </AuthLayout>
+    </EntryFrame>
   );
 }

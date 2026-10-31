@@ -18,8 +18,12 @@ interface EntryLede {
 }
 
 interface EntryFrameProps {
-  /** The masthead's link to the other entry screen; never hidden at any width. */
-  crossLink: CrossLink;
+  /**
+   * The masthead's link to the other entry screen; never hidden at any width.
+   * Sign in and register only: verification's sheet already offers every way
+   * on, and the pending screen's reader is signed in (IR-710).
+   */
+  crossLink?: CrossLink;
   /** Headline and plain sentence, on sign in and register only (IR-704). */
   lede?: EntryLede;
   /** The folder's index tabs, sitting on the sheet's top edge. */
@@ -34,8 +38,9 @@ interface EntryFrameProps {
  * optional lede, a folder whose tabs sit on a white sheet, and the CIT-U
  * footer.
  *
- * Built beside `AuthLayout` (IR-706): sign in uses it first, and the other
- * entry screens move across in IR-707 and IR-710 before IR-711 retires the
+ * Built beside `AuthLayout` (IR-706): sign in uses it first, email
+ * verification and the pending and declined screens follow without the lede
+ * (IR-710), and register moves across in IR-707 before IR-711 retires the
  * split frame.
  *
  * The masthead is the page's one `<h1>`, and it is visible at every width, so
@@ -71,18 +76,20 @@ export function EntryFrame({ crossLink, lede, tabs, before, children }: EntryFra
               className="h-6 w-auto min-w-0 object-contain sm:h-9"
             />
           </h1>
-          <p className="shrink-0 text-small text-stone-600">
-            <span className="hidden sm:inline">{crossLink.prompt} </span>
-            <Link
-              to={crossLink.to}
-              className={cn(
-                "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
-                FOCUS_RING,
-              )}
-            >
-              {crossLink.label}
-            </Link>
-          </p>
+          {crossLink && (
+            <p className="shrink-0 text-small text-stone-600">
+              <span className="hidden sm:inline">{crossLink.prompt} </span>
+              <Link
+                to={crossLink.to}
+                className={cn(
+                  "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
+                  FOCUS_RING,
+                )}
+              >
+                {crossLink.label}
+              </Link>
+            </p>
+          )}
         </div>
       </header>
 
@@ -123,7 +130,8 @@ export function EntryFrame({ crossLink, lede, tabs, before, children }: EntryFra
 }
 
 /**
- * A tab on the entry folder that only labels the sheet: sign in's one tab.
+ * A tab on the entry folder that only labels the sheet: the one tab of sign
+ * in, email verification and the pending screen.
  * Not named for the domain's Folder, which is a reader's group of Saved
  * Records (CONTEXT.md). It is not a
  * control, so it is neither a link nor a tab role. Register's stepper (IR-707)
