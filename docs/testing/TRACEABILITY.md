@@ -49,6 +49,13 @@ each with a visible maroon ring or outline. The folder's computed animation is
 `sheet-settle 0.28s` with motion allowed and `none` under
 `prefers-reduced-motion: reduce`.
 
+**Design exception verification (2026-10-31):** the approved tab's maroon top
+edge is scoped to `EntryFrame.tsx` in both the root and frontend-local
+Impeccable configs. Running `impeccable detect src/components/auth/EntryFrame.tsx`
+from `frontend/` passes after adding the local config; before it, the same scan
+reported `border-accent-on-rounded` at line 134. This is a source regex check,
+not a rendered-page accessibility check.
+
 ## IR-538 · Announced email verification in the shared entry frame
 
 `EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains
