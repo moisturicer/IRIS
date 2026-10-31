@@ -1,5 +1,5 @@
 import { useState, useEffect, useId, useRef, useCallback, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { accountsApi } from "@/api/accounts";
 import { AuthAlert } from "@/components/auth/AuthAlert";
@@ -148,6 +148,12 @@ export default function SignupPage() {
   const [consented, setConsented]   = useState(false);
   const [consentError, setConsentError] = useState<string>();
   const [formAlert, setFormAlert]   = useState<FormAlert | null>(null);
+  // The server's refusals, kept apart from the screen's own checks (IR-708): a
+  // blur re-runs those, and must not erase a message only the server can give.
+  // Each one stays on its field, and keeps its step open, until that field changes.
+  const [serverErrors, setServerErrors] = useState<FieldErrors>({});
+  // The step a refusal brought the registrant back to, which says so while open.
+  const [returnedTo, setReturnedTo] = useState<number | null>(null);
   // Set when the role changes after an affiliation was chosen, and said on
   // Affiliation until the new program or department is picked (IR-704 story 28).
   const [roleChangedTo, setRoleChangedTo] = useState<Role | null>(null);
@@ -156,6 +162,8 @@ export default function SignupPage() {
   const noticeId        = useId();
   const consentErrorId  = useId();
   const nextStepsId     = useId();
+  const summaryId       = useId();
+  const { pathname }    = useLocation();
   // Set once the account exists: the screen then confirms in place instead of
   // leaving on a toast (IR-540), naming the address exactly as it was entered.
   const [registered, setRegistered] = useState<{ email: string; role: Role } | null>(null);
@@ -205,6 +213,7 @@ export default function SignupPage() {
 
   const goTo = (next: number) => {
     stepChanged.current = true;
+    setReturnedTo(null);
     setStep(next);
   };
 
@@ -214,6 +223,9 @@ export default function SignupPage() {
   const complete = STEPS.map((_, i) =>
     !hasAny(stepErrors(allErrors, i)) && (i !== LAST_STEP || consented),
   );
+  // A server refusal reopens only its own step (IR-708): the steps after it
+  // were answered and checked, so they stay completed and reachable.
+  const refused = STEPS.map((_, i) => hasAny(stepErrors(serverErrors, i)));
 
   const collegeNum = Number(form.college_id);
   const filteredDepts = allDepts.filter((d) => d.college === collegeNum);
@@ -237,6 +249,12 @@ export default function SignupPage() {
     const next = { ...form, [name]: value };
     if (name === "college_id") { next.course_id = ""; next.dept_id = ""; }
     if ((name === "course_id" || name === "dept_id") && value) setRoleChangedTo(null);
+    setServerErrors((prev) => {
+      const n = { ...prev };
+      delete n[name];
+      if (name === "college_id") { delete n.course_id; delete n.dept_id; }
+      return n;
+    });
     setForm(next);
     setTouched((prev) => ({ ...prev, [name]: true }));
     const liveErrs = validateLive(next, role);
@@ -262,7 +280,7 @@ export default function SignupPage() {
   const handleContinue = () => {
     const errs = validateAll(form, role);
     revealStep(step, errs);
-    if (hasAny(stepErrors(errs, step))) return;
+    if (hasAny(stepErrors(errs, step)) || refused[step]) return;
     goTo(step + 1);
   };
 
@@ -275,7 +293,9 @@ export default function SignupPage() {
     // The tabs never reach Security past an incomplete step, so this is a
     // guard: whatever got here, an incomplete form is never sent, and the
     // registrant is taken to the earliest step that needs them.
-    const earliest = STEPS.findIndex((_, i) => hasAny(stepErrors(errs, i)));
+    // A refusal not yet answered by a change counts too: the same request
+    // would only be refused again.
+    const earliest = STEPS.findIndex((_, i) => hasAny(stepErrors(errs, i)) || refused[i]);
     if (earliest !== -1 && earliest < LAST_STEP) {
       revealStep(earliest, errs);
       goTo(earliest);
@@ -284,6 +304,7 @@ export default function SignupPage() {
     if (earliest !== -1 || !consented) return;
 
     setFormAlert(null);
+    setReturnedTo(null);
     setSubmitting(true);
     try {
       await authApi.register({
@@ -313,18 +334,19 @@ export default function SignupPage() {
       const elsewhere: string[] = [];
       for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
         if (key === "consent_given") setConsentError(firstMessage(val));
-        else if (SERVER_FIELD[key]) {
-          const name = SERVER_FIELD[key];
-          onFields[name] = allMessages(val);
-          // A field on an earlier step is not on screen, so its message is
-          // said here too, never lost. IR-708 takes the registrant to it.
-          if (!STEPS[LAST_STEP].fields.includes(name)) elsewhere.push(onFields[name]);
-        }
+        else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = allMessages(val);
         else elsewhere.push(firstMessage(val));
       }
-      setErrors((prev) => ({ ...prev, ...onFields }));
-      setTouched((prev) => ({ ...prev, ...Object.fromEntries(Object.keys(onFields).map((k) => [k, true])) }));
+      setServerErrors(onFields);
+      // Anything no field owns stays here on Security, as an alert above Register.
       if (elsewhere.length) setFormAlert({ title: "Registration failed", message: elsewhere.join(" ") });
+      // The registrant goes to the earliest step a refusal names (IR-708);
+      // every answer is kept, and the steps after it stay completed.
+      const owning = STEPS.findIndex((s) => s.fields.some((name) => onFields[name]));
+      if (owning !== -1 && owning < LAST_STEP) {
+        goTo(owning);
+        setReturnedTo(owning);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -340,18 +362,20 @@ export default function SignupPage() {
     if (form.college_id || form.course_id || form.dept_id) setRoleChangedTo(r);
     setRole(r);
     setForm((prev) => ({ ...prev, course_id: "", dept_id: "" }));
+    setServerErrors((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
     setErrors((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
     setTouched((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
   };
 
   // An error shows once its field has been touched, as before IR-539; the
-  // primitives then make it the field's description and mark it invalid.
+  // primitives then make it the field's description and mark it invalid. A
+  // server refusal shows until the field changes (IR-708).
   const field = (name: FieldName) => ({
     value:    form[name],
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       handleChange(name, e.target.value),
     onBlur:   () => handleBlur(name),
-    error:    touched[name] && errors[name] ? errors[name] : undefined,
+    error:    serverErrors[name] ?? (touched[name] && errors[name] ? errors[name] : undefined),
     size:     "lg" as const,
   });
 
@@ -410,7 +434,9 @@ export default function SignupPage() {
   const tabs: EntryStep[] = STEPS.map(({ name, shortName }, i) => ({
     name,
     shortName,
-    state: i === step ? "current" : complete.slice(0, i + 1).every(Boolean) ? "completed" : "not-started",
+    state: i === step
+      ? "current"
+      : complete.slice(0, i + 1).every(Boolean) && !refused[i] ? "completed" : "not-started",
   }));
 
   const roleArticle = role === "Adviser" ? "an Adviser" : "a Student";
@@ -426,6 +452,19 @@ export default function SignupPage() {
     </>,
     null,
   ][step];
+
+  // Step 3's summary (IR-708): what will be sent, minus the passwords, each
+  // line with a way back to the step that asked for it. Names, not ids.
+  const affiliationName = role === "Student"
+    ? allCourses.find((c) => String(c.id) === form.course_id)?.name
+    : allDepts.find((d) => String(d.id) === form.dept_id)?.name;
+  const summary: { term: string; value: string; owner: number }[] = [
+    { term: "Role",    value: role,            owner: 0 },
+    { term: "Name",    value: fullName,        owner: 0 },
+    { term: "Email",   value: form.email.trim(), owner: 0 },
+    { term: "College", value: colleges.find((c) => String(c.id) === form.college_id)?.name ?? "", owner: 1 },
+    { term: role === "Student" ? "Program" : "Department", value: affiliationName ?? "", owner: 1 },
+  ];
 
   return (
     <EntryFrame
@@ -451,9 +490,45 @@ export default function SignupPage() {
               {aside}
             </p>
           )}
+          {step === LAST_STEP && (
+            <section aria-labelledby={summaryId} className="mt-section border-t border-stone-200 pt-section">
+              <h4 id={summaryId} className="text-small font-semibold text-stone-900">Check your details</h4>
+              <dl className="mt-2 divide-y divide-stone-200">
+                {summary.map(({ term, value, owner }) => (
+                  // dt and dd sit directly in the div, as a dl group must; the
+                  // Change link rides in the dd beside the value it changes.
+                  <div key={term} className="py-1">
+                    <dt className="text-label font-semibold uppercase tracking-wide text-stone-600">{term}</dt>
+                    <dd className="flex items-center gap-3">
+                      <span className="min-w-0 flex-1 break-words text-small text-stone-900">{value}</span>
+                      <Link
+                        to={pathname}
+                        onClick={(e) => { e.preventDefault(); goTo(owner); }}
+                        className={cn(
+                          "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded text-small font-semibold text-brand hover:underline",
+                          FOCUS_RING,
+                        )}
+                      >
+                        {/* The space sits outside the hidden part: a name computed
+                            from a child's text trims the child's own leading space. */}
+                        Change{" "}<span className="sr-only">{term.toLowerCase()}</span>
+                      </Link>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
         </div>
 
         <div key={step} className="flex flex-col gap-5 motion-safe:animate-step-fade lg:col-span-3">
+          {returnedTo === step && (
+            <AuthAlert variant="error" title={`We brought you back to ${STEPS[step].name}`}>
+              IRIS couldn&apos;t register you with what&apos;s marked below. Change it and register
+              again; everything else you entered is kept.
+            </AuthAlert>
+          )}
+
           {loadFailed && step === 1 && (
             <AuthAlert variant="error" title="Some of this form didn't load">
               IRIS couldn&apos;t load the colleges, programs and departments to choose from.
