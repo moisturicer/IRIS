@@ -29,8 +29,6 @@ const NOT_YET_CONVERTED: readonly string[] = [
   "src/features/admin/DeleteRequestsPage.tsx",
   "src/features/admin/DownloadRequestsPage.tsx",
   "src/features/admin/SessionsPage.tsx",
-  "src/features/download/DownloadTokenPage.tsx",
-  "src/features/requests/AccessRequestsPage.tsx",
   // IR-364 -- sign-up, account and error screens
   "src/features/errors/ForbiddenPage.tsx",
   "src/features/settings/SettingsPage.tsx",
@@ -59,9 +57,7 @@ const GREY_NOT_YET_CONVERTED: readonly string[] = [
   "src/features/admin/DownloadRequestsPage.tsx",
   "src/features/admin/SessionsPage.tsx",
   "src/features/audit/AuditLogPage.tsx",
-  "src/features/download/DownloadTokenPage.tsx",
   "src/features/records/ImportRecordsPage.tsx",
-  "src/features/requests/AccessRequestsPage.tsx",
   // IR-364 -- sign-up, account and error screens
   "src/components/auth/AuthBootstrap.tsx",
   "src/features/errors/ForbiddenPage.tsx",

@@ -472,6 +472,9 @@ class DownloadRequest(models.Model):
     )
     created_at  = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    # When an approval stops letting the requester download (ADR-048). Expired
+    # is worked out from this, not stored.
+    grant_expires_at = models.DateTimeField(null=True, blank=True)
 
 
 class DeleteRequest(models.Model):

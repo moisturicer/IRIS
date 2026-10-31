@@ -71,10 +71,6 @@ class Upload:
     filename: str = "paper.pdf"
 
 
-#: Replaced by the world's download token.
-DOWNLOAD_TOKEN = object()
-
-
 @dataclass(frozen=True)
 class Call:
     """How to fire a route: path kwargs, query string and body, any of them `Ref`s."""
@@ -108,19 +104,17 @@ class Call:
         return {v.name for v in self.kwargs.values() if isinstance(v, Ref)} | set(self.objects)
 
 
-def resolve(value, lookup: Callable[[Ref], object], token: str):
+def resolve(value, lookup: Callable[[Ref], object]):
     if isinstance(value, Ref):
         return lookup(value)
     if isinstance(value, Upload):
         from .world import pdf
 
         return pdf(value.filename)
-    if value is DOWNLOAD_TOKEN:
-        return token
     if isinstance(value, dict):
-        return {k: resolve(v, lookup, token) for k, v in value.items()}
+        return {k: resolve(v, lookup) for k, v in value.items()}
     if isinstance(value, list):
-        return [resolve(v, lookup, token) for v in value]
+        return [resolve(v, lookup) for v in value]
     return value
 
 
@@ -130,7 +124,7 @@ class Case:
 
     call: Call
     cells: tuple[Cell, ...]
-    #: Names a case when a method needs more than one (a valid and a forged token).
+    #: Names a case when a method needs more than one.
     label: str = ""
 
     def cell(self, role: str) -> Cell:

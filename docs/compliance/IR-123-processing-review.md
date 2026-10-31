@@ -76,6 +76,7 @@ the DPO review should cover them.
 | View counting | A server-side record of which accounts opened which published paper, kept only to count each account once and never shown or exposed by any API, deleted with the account or the paper; and at most one `ACCESS` audit event per account, paper and 24 hours. **Already in production today:** an `ACCESS` audit event naming the account on every opening of a paper (`RecordViewSet.increment_access`), which the inventory above does not list. | IR-369 |
 | Comments on published papers | The comment, the writer's name and an Author badge, shown to every signed-in user. A deleted or removed comment's text is kept and shown to no one. A report keeps a copy of the reported text, the reporter and the reason, visible to RDCO only. A removal reason is sent to the writer. | IR-420 |
 | Download requests | The reader's note on each request, RDCO's decline and revocation notes, the grant's dates, and an audit event per download naming the downloader. Once IR-676 lands, each downloaded copy carries the downloader's name and email in its footer and metadata. A request flow already exists without notes or grants. | IR-672, IR-676 |
+| Collaboration matching | When two Discoverable Proposals are similar, every owner of each is notified with the other's title, owners' names, and its Contact person's name and email. Only the owners of the matched Proposal see that email; it stays in their notification after either Proposal closes. The AI compares title and abstract only; no email is sent to a vendor. Consent is the Discoverable setting's text. Decided in ADR-029's 2026-10-31 amendment, accepted by the project lead. | IR-311, IR-421 |
 
 Decisions these features add:
 
@@ -89,6 +90,9 @@ Decisions these features add:
   set yet.
 - [ ] Confirm that printing a downloader's name and email in each copy (IR-676)
   is acceptable.
+- [ ] Confirm that the Discoverable consent text covers sharing a Proposal's
+  Contact person's email with matched proposers, and that the email may stay
+  in a notification after either Proposal closes (IR-311).
 - [ ] Update `dpaTerms.ts` and this inventory as each feature ships. As above,
   editing the notice does not re-collect consent.
 

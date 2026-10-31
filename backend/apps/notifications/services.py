@@ -13,6 +13,7 @@ import logging
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from core.enums import Party, RecordTypeName, RoleName
 from core.utils import send_email_async
 from .models import Notification, NotificationType
@@ -611,7 +612,11 @@ def notify_download_reviewed(download_request, reviewed_by, approved: bool):
 
         if approved:
             notif_type = _get_type("Download Request Approved")
-            message    = f'Your download request for "{record.title}" has been approved.'
+            expires    = timezone.localtime(download_request.grant_expires_at).strftime("%d %B %Y")
+            message    = (
+                f'Your download request for "{record.title}" has been approved. '
+                f"You can download it until {expires}."
+            )
             Notification.objects.create(
                 sender=reviewed_by,
                 recipient=requester,
@@ -623,8 +628,8 @@ def notify_download_reviewed(download_request, reviewed_by, approved: bool):
                 subject=f"[IRIS] Download request approved: {record.title[:60]}",
                 message=(
                     f"Hello {requester.first_name},\n\n"
-                    f'Your request to download files for "{record.title}" has been approved.\n\n'
-                    f"You can access the record here:\n{url}\n\n"
+                    f'Your request to download "{record.title}" has been approved.\n\n'
+                    f"You can download it from the record's page, while signed in, until {expires}:\n{url}\n\n"
                     f"-- The IRIS Team"
                 ),
                 recipient_list=[requester.email],
