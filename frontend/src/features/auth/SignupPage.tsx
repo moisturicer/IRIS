@@ -50,8 +50,9 @@ const LAST_STEP = STEPS.length - 1;
 /**
  * The register serializer's error keys, onto the fields they mean (IR-540). Two
  * are named differently on the server; `consent_given` belongs to the consent
- * box. Anything else -- `non_field_errors`, `detail`, `role_name` -- is shown
- * as an alert, because no field here can own it.
+ * box and `role_name` to the role group (IR-708). Anything else --
+ * `non_field_errors`, `detail` -- is shown as an alert, because no field here
+ * can own it.
  */
 const SERVER_FIELD: Record<string, FieldName> = {
   email:            "email",
@@ -137,6 +138,14 @@ function stepErrors(all: FieldErrors, step: number): FieldErrors {
 
 const hasAny = (e: FieldErrors) => Object.values(e).some(Boolean);
 
+/** A copy without the program and department, which a college or role change voids. */
+function withoutAffiliation<T extends Partial<Record<FieldName, unknown>>>(map: T): T {
+  const n = { ...map };
+  delete n.course_id;
+  delete n.dept_id;
+  return n;
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 export default function SignupPage() {
 
@@ -152,6 +161,10 @@ export default function SignupPage() {
   // blur re-runs those, and must not erase a message only the server can give.
   // Each one stays on its field, and keeps its step open, until that field changes.
   const [serverErrors, setServerErrors] = useState<FieldErrors>({});
+  // The role is a radio group, not a FormState field, so its refusal is kept
+  // here; it belongs to Identity and stays until the role changes.
+  const [roleRefusal, setRoleRefusal] = useState<string>();
+  const roleRefusalId = useId();
   // The step a refusal brought the registrant back to, which says so while open.
   const [returnedTo, setReturnedTo] = useState<number | null>(null);
   // Set when the role changes after an affiliation was chosen, and said on
@@ -211,9 +224,10 @@ export default function SignupPage() {
     if (stepChanged.current) stepHeadingRef.current?.focus();
   }, [step]);
 
-  const goTo = (next: number) => {
+  /** Moves to a step; `returned` says a refusal brought the registrant there. */
+  const goTo = (next: number, returned = false) => {
     stepChanged.current = true;
-    setReturnedTo(null);
+    setReturnedTo(returned ? next : null);
     setStep(next);
   };
 
@@ -225,7 +239,7 @@ export default function SignupPage() {
   );
   // A server refusal reopens only its own step (IR-708): the steps after it
   // were answered and checked, so they stay completed and reachable.
-  const refused = STEPS.map((_, i) => hasAny(stepErrors(serverErrors, i)));
+  const refused = STEPS.map((_, i) => hasAny(stepErrors(serverErrors, i)) || (i === 0 && !!roleRefusal));
 
   const collegeNum = Number(form.college_id);
   const filteredDepts = allDepts.filter((d) => d.college === collegeNum);
@@ -250,9 +264,8 @@ export default function SignupPage() {
     if (name === "college_id") { next.course_id = ""; next.dept_id = ""; }
     if ((name === "course_id" || name === "dept_id") && value) setRoleChangedTo(null);
     setServerErrors((prev) => {
-      const n = { ...prev };
+      const n = name === "college_id" ? withoutAffiliation(prev) : { ...prev };
       delete n[name];
-      if (name === "college_id") { delete n.course_id; delete n.dept_id; }
       return n;
     });
     setForm(next);
@@ -332,21 +345,23 @@ export default function SignupPage() {
       }
       const onFields: FieldErrors = {};
       const elsewhere: string[] = [];
+      let onRole: string | undefined;
       for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
         if (key === "consent_given") setConsentError(firstMessage(val));
+        else if (key === "role_name") onRole = allMessages(val);
         else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = allMessages(val);
         else elsewhere.push(firstMessage(val));
       }
       setServerErrors(onFields);
+      setRoleRefusal(onRole);
       // Anything no field owns stays here on Security, as an alert above Register.
       if (elsewhere.length) setFormAlert({ title: "Registration failed", message: elsewhere.join(" ") });
       // The registrant goes to the earliest step a refusal names (IR-708);
       // every answer is kept, and the steps after it stay completed.
-      const owning = STEPS.findIndex((s) => s.fields.some((name) => onFields[name]));
-      if (owning !== -1 && owning < LAST_STEP) {
-        goTo(owning);
-        setReturnedTo(owning);
-      }
+      const earliestRefused = onRole
+        ? 0
+        : STEPS.findIndex((s) => s.fields.some((name) => onFields[name]));
+      if (earliestRefused !== -1 && earliestRefused < LAST_STEP) goTo(earliestRefused, true);
     } finally {
       setSubmitting(false);
     }
@@ -362,9 +377,10 @@ export default function SignupPage() {
     if (form.college_id || form.course_id || form.dept_id) setRoleChangedTo(r);
     setRole(r);
     setForm((prev) => ({ ...prev, course_id: "", dept_id: "" }));
-    setServerErrors((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
-    setErrors((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
-    setTouched((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
+    setRoleRefusal(undefined);
+    setServerErrors(withoutAffiliation);
+    setErrors(withoutAffiliation);
+    setTouched(withoutAffiliation);
   };
 
   // An error shows once its field has been touched, as before IR-539; the
@@ -545,7 +561,7 @@ export default function SignupPage() {
               {/* A real radio group (IR-539): it announces its question, both
                   choices and which one is chosen, and the arrow keys move
                   between them. */}
-              <fieldset role="radiogroup">
+              <fieldset role="radiogroup" aria-describedby={roleRefusal ? roleRefusalId : undefined}>
                 <legend className="mb-1 text-sm font-medium text-stone-700">I am registering as</legend>
                 <div className="grid grid-cols-2 gap-2">
                   {ROLES.map((value) => (
@@ -569,6 +585,12 @@ export default function SignupPage() {
                     </label>
                   ))}
                 </div>
+                {roleRefusal && (
+                  <p id={roleRefusalId} className="mt-1.5 flex items-start gap-1.5 text-small text-brand">
+                    <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+                    {roleRefusal}
+                  </p>
+                )}
               </fieldset>
 
               <div className="grid gap-5 sm:grid-cols-5 sm:gap-3">

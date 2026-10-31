@@ -784,27 +784,45 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     expect(email()).toHaveAccessibleDescription("This email address is already registered.");
   });
 
+  it("takes a role refusal back to Identity, said on the role group until the role changes", async () => {
+    const user = userEvent.setup();
+    refuse({ role_name: ["This role is not open for registration."] });
+    const { container } = renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
+    expect(screen.getByRole("alert")).toHaveTextContent(/We brought you back/);
+    const roles = screen.getByRole("radiogroup", { name: "I am registering as" });
+    expect(roles).toHaveAccessibleDescription("This role is not open for registration.");
+    await expectNoBlockingA11yViolations(container);
+
+    await user.click(screen.getByRole("radio", { name: "Adviser" }));
+    expect(roles).not.toHaveAccessibleDescription(/not open/);
+  });
+
   it("takes an affiliation refusal back to Affiliation, on its field", async () => {
     const user = userEvent.setup();
     refuse({ course_id: ["This program is not open for registration."] });
-    renderSignup();
+    const { container } = renderSignup();
     await submit(user);
 
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 2 of 3 · Affiliation"));
     expect(screen.getByRole("alert")).toHaveTextContent(/We brought you back/);
     expect(program()).toHaveAccessibleDescription("This program is not open for registration.");
     expect(program()).toHaveDisplayValue("BS Computer Science");
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("keeps a password-policy refusal on Security, on the password field, with no return alert", async () => {
     const user = userEvent.setup();
     refuse({ password: ["This password is too common."] });
-    renderSignup();
+    const { container } = renderSignup();
     await submit(user);
 
     await waitFor(() => expect(screen.getByLabelText("Password")).toHaveAccessibleDescription("This password is too common."));
     expect(stepHeading()).toHaveTextContent("Step 3 of 3 · Security & agreement");
     expect(screen.queryByText(/We brought you back/)).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("goes to the earliest step with an error when several have one", async () => {
@@ -865,7 +883,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
   it("stays on Security with every answer kept when the server fails", async () => {
     const user = userEvent.setup();
     refuse({ email: ["ignored on a 5xx"] }, 503);
-    renderSignup();
+    const { container } = renderSignup();
     await submit(user);
 
     const alert = await screen.findByRole("alert");
@@ -875,6 +893,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     expect(screen.getByLabelText("Confirm Password")).toHaveValue("IrisDemo123!");
     expect(screen.getByRole("checkbox", { name: CONSENT })).toBeChecked();
     expect(tab(/^Identity, completed$/)).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("leaves no password in localStorage or sessionStorage after a refused and then a successful submit", async () => {

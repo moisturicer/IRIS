@@ -82,7 +82,8 @@ IR-709's. The step panel cross-fades in 150 ms, opacity only, behind
 **Deliberate changes to existing behaviour:** a server error on an Identity or
 Affiliation field (for example an email already registered) is now also said in
 the alert on Security, because its field is no longer on screen; it stays on
-the field too. Taking the registrant to that step is IR-708. The options-load
+the field too. Taking the registrant to that step is IR-708 (superseded there:
+the alert on Security no longer repeats it). The options-load
 failure now shows on Affiliation, where the selects are, not at the top of the
 whole form.
 
@@ -105,6 +106,45 @@ that every `animate-` utility on an entry screen sits behind `motion-safe:`,
 seen failing with the prefix removed. The auth and auth-component suites pass
 (192), with `tsc --noEmit` and eslint clean. **No browser evidence recorded yet**
 for the steps; it is owed before IR-704 closes.
+
+## IR-704 / IR-708 · Step 3 summary, and refusals routed to their step
+
+Security & agreement shows "Check your details" in the left column under the
+step heading: role, name, email, college and program (department for an
+Adviser), never a password. Each line has a "Change <line>" link that opens the
+step owning it with every answer kept. On a phone the page reads heading →
+summary → passwords → consent → Register.
+
+A 400 with field errors takes the registrant to the earliest step owning one
+(Identity: names, email, `role_name`; Affiliation: college, program,
+department; Security: passwords, consent), focuses its heading and, when that
+step is earlier than Security, says "We brought you back to <step>" with
+"everything else you entered is kept". The server's message sits on its field
+(the role refusal on the role group) and survives a blur; it clears when that
+field changes. A refused step is incomplete and blocks Continue and Register
+until then, while the steps after it stay completed — the refusal does not
+cascade the way the screen's own checks do. Network, timeout and 5xx failures
+stay on Security with the unreachable alert and every answer kept; non-field
+errors stay on Security as an alert.
+
+**Deliberate changes to existing behaviour:** the IR-707 case "says a refusal on
+an earlier step's field on Security, and keeps it on that field" asserted the
+interim behaviour this ticket replaces, and was rewritten as "takes a duplicate
+email back to Identity". `role_name` moves from the alert to the role group.
+
+**Known limitation:** while a refused step is not current its tab reads "not
+started" and is disabled, as `EntrySteps` has no "incomplete but reachable"
+state; Back and the summary's Change links reach it.
+
+**Verification (2026-10-31):** `SignupPage.test.tsx`, 44 cases, all passing
+(`npx vitest run src/features/auth/SignupPage.test.tsx`). New: summary lines for
+a Student and an Adviser, each Change link with answers intact, reading order,
+duplicate email to Identity (tabs, blur, change clearing it), Continue blocked
+while refused, role refusal, affiliation refusal, password refusal staying put,
+earliest step winning, 5xx staying on Security, and no password in either
+storage after a refused then a successful submit; axe on each refusal state.
+`tsc --noEmit` reports only the existing `DataTable.tsx` import error, unchanged
+from `main`; eslint clean on both files. **No browser evidence recorded yet.**
 
 ## IR-538 · Announced email verification in the shared entry frame
 
