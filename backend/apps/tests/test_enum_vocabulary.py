@@ -191,6 +191,15 @@ ALLOWED = {
     # (IR-546) A listing candidate's state ("pending" until screened). Not a
     # person's request awaiting a decision. Same shape as embedding_space.py.
     "ai/answers/events.py",
+    # (IR-688) `RequestStatus.CANCELLED` is a reader withdrawing a download
+    # request. Each file below spells a queued Ask IRIS question's own
+    # `cancelled` (an `AskRun` the asker stopped, ADR-040), which predates it:
+    # another concept, one string. Same shape as embedding_space.py.
+    "ai/controller/loop.py",
+    "ai/durable.py",
+    "ai/evaluation/capacity.py",
+    "ai/models/queued.py",
+    "ai/public.py",
 }
 
 

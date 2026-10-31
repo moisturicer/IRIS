@@ -475,6 +475,19 @@ class DownloadRequest(models.Model):
     # When an approval stops letting the requester download (ADR-048). Expired
     # is worked out from this, not stored.
     grant_expires_at = models.DateTimeField(null=True, blank=True)
+    # Why the reader asks (IR-688). Required of every new request; blank only
+    # on requests made before notes existed.
+    note = models.CharField(max_length=500, blank=True, default="")
+    # RDCO's reason for a decline or a revocation (IR-688). An approval takes
+    # none. Blank on a decline made before notes existed: "No note recorded".
+    rdco_note = models.CharField(max_length=500, blank=True, default="")
+    # A revocation keeps `reviewed_by`/`reviewed_at` as the approval's.
+    revoked_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="revoked_download_requests",
+    )
+    revoked_at   = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
 
 
 class DeleteRequest(models.Model):

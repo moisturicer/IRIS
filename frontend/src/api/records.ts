@@ -203,14 +203,18 @@ export const recordsApi = {
   recordTypes:     () => apiClient.get<PaginatedResponse<RecordType>>("/records/record-types/"),
 
   // Download requests
-  requestDownload:         (recordId: number) =>
-    apiClient.post("/records/download-requests/", { record: recordId }),
+  requestDownload:         (recordId: number, note: string) =>
+    apiClient.post("/records/download-requests/", { record: recordId, note }),
   listDownloadRequests:    (params?: Record<string, unknown>) =>
     apiClient.get<PaginatedResponse<DownloadRequest>>("/records/download-requests/", { params }),
   approveDownloadRequest:  (id: number) =>
     apiClient.post(`/records/download-requests/${id}/approve/`),
-  declineDownloadRequest:  (id: number) =>
-    apiClient.post(`/records/download-requests/${id}/decline/`),
+  declineDownloadRequest:  (id: number, note: string) =>
+    apiClient.post(`/records/download-requests/${id}/decline/`, { note }),
+  revokeDownloadRequest:   (id: number, note: string) =>
+    apiClient.post<DownloadRequest>(`/records/download-requests/${id}/revoke/`, { note }),
+  cancelDownloadRequest:   (id: number) =>
+    apiClient.post<DownloadRequest>(`/records/download-requests/${id}/cancel/`),
 
   // Delete requests: raised by `delete` above (DELETE /records/<id>/), then only
   // read and decided here. The queue has no create or update route (IR-496).

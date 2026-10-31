@@ -38,6 +38,8 @@ from apps.records.models import (
 from core.enums import PipelineStatus, RecordTypeName, RoleName, RequestStatus
 
 DOWNLOAD_REQUESTS = "/api/v1/records/download-requests/"
+#: A download request says why (IR-688); these tests are about the record id.
+NOTE = {"note": "For my thesis."}
 DELETE_REQUESTS = "/api/v1/records/delete-requests/"
 
 
@@ -113,19 +115,19 @@ class RequestVisibilityFixtures(APITestCase):
 class DownloadRequestVisibilityTests(RequestVisibilityFixtures):
 
     def test_a_stranger_is_refused_a_private_proposal_as_if_it_did_not_exist(self):
-        self.assert_refused_as_missing(DOWNLOAD_REQUESTS, self.stranger, self.approved_proposal)
+        self.assert_refused_as_missing(DOWNLOAD_REQUESTS, self.stranger, self.approved_proposal, NOTE)
 
     def test_a_refused_request_creates_nothing_and_notifies_nobody(self):
         notifications = Notification.objects.count()
 
-        self.post_as(self.stranger, DOWNLOAD_REQUESTS, {"record": self.approved_proposal.pk})
+        self.post_as(self.stranger, DOWNLOAD_REQUESTS, {"record": self.approved_proposal.pk, **NOTE})
 
         self.assertFalse(DownloadRequest.objects.exists())
         self.assertEqual(Notification.objects.count(), notifications)
 
     def test_anyone_may_request_a_published_record(self):
         response = self.post_as(
-            self.stranger, DOWNLOAD_REQUESTS, {"record": self.published_thesis.pk}
+            self.stranger, DOWNLOAD_REQUESTS, {"record": self.published_thesis.pk, **NOTE}
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
@@ -137,7 +139,7 @@ class DownloadRequestVisibilityTests(RequestVisibilityFixtures):
 
     def test_an_owner_may_request_their_own_private_proposal(self):
         response = self.post_as(
-            self.owner, DOWNLOAD_REQUESTS, {"record": self.approved_proposal.pk}
+            self.owner, DOWNLOAD_REQUESTS, {"record": self.approved_proposal.pk, **NOTE}
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
@@ -146,7 +148,7 @@ class DownloadRequestVisibilityTests(RequestVisibilityFixtures):
         response = self.post_as(
             self.stranger,
             DOWNLOAD_REQUESTS,
-            {"record": self.published_thesis.pk, "status": RequestStatus.APPROVED},
+            {"record": self.published_thesis.pk, "status": RequestStatus.APPROVED, **NOTE},
         )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
@@ -193,7 +195,7 @@ class DeleteRequestWriteRouteTests(RequestVisibilityFixtures):
                 self.client.force_authenticate(user)
                 response = self.client.patch(
                     f"{DELETE_REQUESTS}{pending.pk}/",
-                    {"record": self.published_thesis.pk, "status": RequestStatus.APPROVED},
+                    {"record": self.published_thesis.pk, "status": RequestStatus.APPROVED, **NOTE},
                     format="json",
                 )
 

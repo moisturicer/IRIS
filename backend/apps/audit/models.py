@@ -29,6 +29,10 @@ class AuditEvent(models.Model):
     SYSTEM_SETTING_CHANGED = "SYSTEM_SETTING_CHANGED"
     QUESTION_INJECTION = "QUESTION_INJECTION"
     RESEARCH_METADATA_CORRECTED = "RESEARCH_METADATA_CORRECTED"
+    # Download requests (ADR-048 decision 9, IR-688). Metadata: `request`, the
+    # DownloadRequest id; a revocation adds `requested_by`, the reader's id.
+    DOWNLOAD_REQUEST_CANCELLED = "DOWNLOAD_REQUEST_CANCELLED"
+    DOWNLOAD_GRANT_REVOKED     = "DOWNLOAD_GRANT_REVOKED"
 
     # Workflow events (IR-144): one type per act, written by the workflow
     # services inside the act's own transaction (`apps.audit.workflow`). Their
@@ -88,6 +92,8 @@ class AuditEvent(models.Model):
         (SYSTEM_SETTING_CHANGED, "System Setting Changed"),
         (QUESTION_INJECTION, "Reader Question Injection Flagged"),
         (RESEARCH_METADATA_CORRECTED, "Research Metadata Corrected"),
+        (DOWNLOAD_REQUEST_CANCELLED, "Download Request Cancelled"),
+        (DOWNLOAD_GRANT_REVOKED,     "Download Access Revoked"),
         (SUBMITTED,                  "Submitted"),
         (ROUTED,                     "Routed"),
         (ASSIGNMENT_CLOSED,          "Assignment Closed"),

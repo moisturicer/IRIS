@@ -8,8 +8,10 @@ from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 
+from apps.audit.models import AuditEvent
+from apps.audit.services import create_audit_event
 from apps.documents.models import RecordUpload
-from apps.notifications.services import notify_download_reviewed
+from apps.notifications.services import notify_download_reviewed, notify_download_revoked
 from core.enums import RequestStatus
 from core.permissions import is_record_owner, is_record_participant, office_parties_of
 
@@ -22,15 +24,39 @@ class OwnDownloadRequest(Exception):
 
 
 class DownloadRequestAlreadyDecided(Exception):
-    """Only a pending request can be decided."""
+    """Only a pending request can be decided or cancelled."""
 
 
-def decide_download_request(download_request, reviewer, *, approved: bool) -> None:
+class GrantNotLive(Exception):
+    """Only an approved, unexpired grant can be revoked."""
+
+
+class NoteRequired(Exception):
+    """A decline or a revocation says why (ADR-048, decision 4)."""
+
+
+#: The longest note a reader or RDCO may leave (IR-688).
+NOTE_MAX_LENGTH = 500
+
+
+def _clean_note(note) -> str:
+    # It arrives straight from the request body, so it may be any JSON value.
+    note = note.strip() if isinstance(note, str) else ""
+    if not note:
+        raise NoteRequired("Say why, in a note the reader will see.")
+    if len(note) > NOTE_MAX_LENGTH:
+        raise NoteRequired(f"Keep the note to {NOTE_MAX_LENGTH} characters.")
+    return note
+
+
+def decide_download_request(download_request, reviewer, *, approved: bool, note: str = "") -> None:
     """
     Record RDCO's decision and tell the requester (IR-674). Every route that
     decides a request comes through here, so its rules cannot drift apart. The
     row lock makes two simultaneous decisions one decision and one refusal.
+    A decline needs a note and an approval takes none (IR-688).
     """
+    note = "" if approved else _clean_note(note)
     with transaction.atomic():
         current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
         if current.requested_by_id == reviewer.pk:
@@ -40,12 +66,60 @@ def decide_download_request(download_request, reviewer, *, approved: bool) -> No
         download_request.status = RequestStatus.APPROVED if approved else RequestStatus.DECLINED
         download_request.reviewed_by = reviewer
         download_request.reviewed_at = timezone.now()
+        download_request.rdco_note = note
         if approved:
             download_request.grant_expires_at = (
                 download_request.reviewed_at + timedelta(days=settings.DOWNLOAD_GRANT_DAYS)
             )
-        download_request.save(update_fields=["status", "reviewed_by", "reviewed_at", "grant_expires_at"])
+        download_request.save(
+            update_fields=["status", "reviewed_by", "reviewed_at", "grant_expires_at", "rdco_note"],
+        )
     notify_download_reviewed(download_request, reviewed_by=reviewer, approved=approved)
+
+
+def cancel_download_request(download_request, user) -> None:
+    """
+    The requester withdraws a pending request (IR-688). It leaves RDCO's queue
+    and the reader may ask again. Nobody is notified; the act is audited.
+    The caller has already narrowed the lookup to the user's own requests.
+    """
+    with transaction.atomic():
+        current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
+        if current.requested_by_id != user.pk:
+            raise OwnDownloadRequest("You can cancel only your own download request.")
+        if current.status != RequestStatus.PENDING:
+            raise DownloadRequestAlreadyDecided("Only a pending request can be cancelled.")
+        download_request.status = RequestStatus.CANCELLED
+        download_request.cancelled_at = timezone.now()
+        download_request.save(update_fields=["status", "cancelled_at"])
+        create_audit_event(
+            AuditEvent.DOWNLOAD_REQUEST_CANCELLED, user, record=download_request.record,
+            metadata={"request": download_request.pk},
+        )
+
+
+def revoke_download_grant(download_request, reviewer, *, note: str) -> None:
+    """
+    RDCO ends a live grant early, saying why (IR-688). The reader can no longer
+    download, is told in-app and by email, and may ask again.
+    """
+    note = _clean_note(note)
+    with transaction.atomic():
+        current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
+        if current.requested_by_id == reviewer.pk:
+            raise OwnDownloadRequest("You cannot revoke your own download access.")
+        if not grant_is_live(current):
+            raise GrantNotLive("Only an approved, unexpired grant can be revoked.")
+        download_request.status = RequestStatus.REVOKED
+        download_request.revoked_by = reviewer
+        download_request.revoked_at = timezone.now()
+        download_request.rdco_note = note
+        download_request.save(update_fields=["status", "revoked_by", "revoked_at", "rdco_note"])
+        create_audit_event(
+            AuditEvent.DOWNLOAD_GRANT_REVOKED, reviewer, record=download_request.record,
+            metadata={"request": download_request.pk, "requested_by": download_request.requested_by_id},
+        )
+    notify_download_revoked(download_request, revoked_by=reviewer)
 
 
 def grant_is_live(download_request) -> bool:
@@ -110,8 +184,11 @@ def download_access(user, record) -> DownloadAccess:
     if exemption:
         return DownloadAccess(allowed=True, source="exempt", exemption=exemption)
 
+    # A cancelled request was withdrawn before anyone decided it: as if never made.
     requests = list(
-        DownloadRequest.objects.filter(record=record, requested_by=user).order_by("-created_at", "-pk")
+        DownloadRequest.objects.filter(record=record, requested_by=user)
+        .exclude(status=RequestStatus.CANCELLED)
+        .order_by("-created_at", "-pk")
     )
     decided = next((r for r in requests if r.status != RequestStatus.PENDING), None)
     if decided and grant_is_live(decided):
@@ -121,7 +198,7 @@ def download_access(user, record) -> DownloadAccess:
         return DownloadAccess(allowed=False, refusal="request_pending", request=pending)
     if decided is None:
         return DownloadAccess(allowed=False, refusal="request_needed")
-    return DownloadAccess(allowed=False, refusal=_REFUSAL_BY_STATUS[decided.status])
+    return DownloadAccess(allowed=False, refusal=_REFUSAL_BY_STATUS[decided.status], request=decided)
 
 
 #: The paper page's state for each refusal (IR-677).
@@ -154,12 +231,16 @@ def download_state(user, record) -> dict:
         state = _STATE_BY_REFUSAL[access.refusal]
         message = DOWNLOAD_REFUSALS[access.refusal]
     granted = state == "granted"
+    ended_by_rdco = state in (RequestStatus.DECLINED.value, RequestStatus.REVOKED.value)
     return {
         "state": state,
         "allowed": access.allowed,
         "message": message,
         "grant_expires_at": access.request.grant_expires_at if granted else None,
         "request": access.request.pk if access.request else None,
+        # Why RDCO declined or revoked it (IR-688); "" on a decline made before
+        # notes existed, which the page shows as "No note recorded".
+        "rdco_note": access.request.rdco_note if ended_by_rdco else "",
     }
 
 

@@ -57,6 +57,10 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 `RESEARCH_METADATA_CORRECTED` is an administrative metadata event, excluded from workflow metrics. The actor is the active superuser named by the correction command. Metadata contains `reason`, per-record `evidence`, and `before`/`after` objects with `origin`, nullable `publication_year`, and ordered `authors`. Corrections and audit rows share one transaction: failure rolls back the entire manifest. Dry runs produce no audit rows.
 
+### Download requests (IR-688, ADR-048)
+
+`DOWNLOAD_REQUEST_CANCELLED` is written when a reader withdraws their own pending request; the actor is the reader and metadata is `request` (the `DownloadRequest` id). `DOWNLOAD_GRANT_REVOKED` is written when RDCO ends a live grant; the actor is RDCO and metadata is `request` plus `requested_by` (the reader's user id). RDCO's note is kept on the request, not in the audit row. Both are administrative events, excluded from workflow metrics.
+
 ### Assignment deadlines (IR-619, ADR-043)
 
 | Type | Written when | `metadata` |

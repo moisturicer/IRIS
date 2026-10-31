@@ -226,10 +226,10 @@ def build_world() -> World:
         "Matrix: a published Thesis", owner, users["adviser"], status=PipelineStatus.PUBLISHED,
     )
     o["download_request"] = DownloadRequest.objects.create(
-        record=published, requested_by=other,
+        record=published, requested_by=other, note="For my thesis.",
     )
-    DownloadRequest.objects.create(
-        record=published, requested_by=other, status=RequestStatus.APPROVED,
+    o["download_grant"] = DownloadRequest.objects.create(
+        record=published, requested_by=other, status=RequestStatus.APPROVED, note="For my thesis.",
         grant_expires_at=timezone.now() + timedelta(days=30),
     )
     pending = _record(
