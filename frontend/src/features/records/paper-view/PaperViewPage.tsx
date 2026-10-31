@@ -635,6 +635,7 @@ export default function PaperViewPage() {
 
   const can = capabilitiesFor(record);
   const userIsOwner = isOwner(record, viewer);
+  const reviewerWorkspace = onReviewTab && !userIsOwner;
   const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
 
@@ -739,8 +740,8 @@ export default function PaperViewPage() {
           scrollToPage={viewedVersion ? null : landingPage}
           highlightRegions={highlightRegions}
           navKey={arrivalKey.current}
-          contained={onPaperTab || tier === "wide"}
-          fill={onPaperTab}
+          contained={onPaperTab || reviewerWorkspace || tier === "wide"}
+          fill={onPaperTab || reviewerWorkspace}
         />
       </Suspense>
     </>
@@ -822,12 +823,12 @@ export default function PaperViewPage() {
       ref={observeWorkspace}
       className={cn(
         "relative [container-type:inline-size] [container-name:reading]",
-        onPaperTab && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
+        (onPaperTab || reviewerWorkspace) && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
       )}
     >
       <ReadingHeader
         inert={chatModal}
-        className={cn(!onPaperTab && "sticky top-0 z-30")}
+        className={cn(!onPaperTab && !reviewerWorkspace && "sticky top-0 z-30")}
         sections={sections}
         section={section}
         onSelect={(s) => setViewParam("section", s)}
@@ -836,12 +837,12 @@ export default function PaperViewPage() {
         panelId={arriving ? undefined : `${tabsId}-panel`}
         onBack={() => navigate(-1)}
         onBackToAnswer={backToAnswer}
-        title={!onPaperTab ? undefined : arriving ? null : record.title}
-        version={onPaperTab ? paperVersion : undefined}
+        title={!onPaperTab && !reviewerWorkspace ? undefined : arriving ? null : record.title}
+        version={onPaperTab || reviewerWorkspace ? paperVersion : undefined}
       />
       <div
         className={cn(
-          onPaperTab
+          onPaperTab || reviewerWorkspace
             ? "flex-1 min-h-0 flex"
             : onReviewTab
               ? "px-4 sm:px-7 pt-6 pb-7"
@@ -852,7 +853,7 @@ export default function PaperViewPage() {
           {...(chatModal ? { inert: "" } : {})}
           className={cn(
             "min-w-0",
-            onPaperTab && "flex-1 flex flex-col",
+            (onPaperTab || reviewerWorkspace) && "flex-1 min-h-0 flex flex-col",
             // Its own container, so the rail and the page read the room the
             // panel leaves them (IR-569), as the reader reads the paper's.
             !onPaperTab && !onReviewTab && "flex-1 [container-type:inline-size] [container-name:overview]",
@@ -861,7 +862,7 @@ export default function PaperViewPage() {
 
           <div
             className={cn(
-              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
+              onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
               !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8 pb-12", PAGE_WIDTH.standard),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
@@ -885,7 +886,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               "min-w-0",
-              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
+              onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
               // The Overview reads in one column, up to 60rem, set against
               // what is beside it (Ask IRIS, or the rail) with the room left
               // over on its left (IR-569).
@@ -895,7 +896,7 @@ export default function PaperViewPage() {
             {/* Editorial header (IR-356): what it is, who wrote it, then
                 what to do with it. Not in Paper mode, where the record bar
                 holds the paper in one line (IR-569). */}
-            {!onPaperTab && (
+            {!onPaperTab && !reviewerWorkspace && (
             <header className="space-y-5">
               <p className="flex items-center gap-x-2 text-small text-stone-500">
                 <span>Added {formatDate(record.created_at)}</span>
@@ -1045,7 +1046,7 @@ export default function PaperViewPage() {
               id={`${tabsId}-panel`}
               role="tabpanel"
               aria-labelledby={tabId(section)}
-              className={onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
+              className={onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
             >
             {section === "paper" && reader()}
 
@@ -1208,6 +1209,8 @@ export default function PaperViewPage() {
             {section === "review" && (
               <ReviewWorkspace
                 record={record}
+                authorView={userIsOwner}
+                onOpenReview={openReview}
                 can={can}
                 reader={sections.includes("paper") ? reader() : null}
                 timelineVersion={trackerVersion}

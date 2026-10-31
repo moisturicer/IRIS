@@ -18,6 +18,7 @@ from .serializers import (
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
 from .sessions import (
     end_all_sessions, end_session, start_session, require_eligible_account, refuse_if_ended,
+    revoke_token,
 )
 from .lockout import LOCKED_BY_ADMIN
 
@@ -441,34 +442,36 @@ class ActiveSessionsView(APIView):
 class RevokeSessionView(APIView):
     """
     DELETE /users/sessions/<jti>/
-    Blacklists a specific JWT by its JTI (JWT ID), forcing that session to
-    log out on the next request.  Admin only.
+    Ends the session of a specific JWT, found by its JTI (JWT ID), so its access
+    and refresh tokens are both refused on their next use.  Admin only.
     """
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def delete(self, request, jti):
-        from rest_framework_simplejwt.token_blacklist.models import (
-            OutstandingToken, BlacklistedToken,
-        )
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
         try:
             token = OutstandingToken.objects.get(jti=jti)
         except OutstandingToken.DoesNotExist:
             return Response({"detail": "Session not found."}, status=404)
 
-        BlacklistedToken.objects.get_or_create(token=token)
+        revoke_token(token)
         create_audit_event(
             "SESSION_REVOKE", request.user,
-            metadata={"revoked_jti": jti},
+            metadata={"revoked_jti": jti, "user_id": token.user_id},
         )
         return Response({"detail": "Session revoked."})
 
 
 class SystemSettingView(APIView):
-    """GET or PATCH a single setting by key."""
-    def get_permissions(self):
-        if self.request.method == "PATCH":
-            return [IsAuthenticated(), IsAdmin()]
-        return [IsAuthenticated()]
+    """
+    GET or PATCH a single setting by key. RDCO alone (IR-667).
+
+    A PATCH changes an existing key and never creates one, and a change is
+    audited with its old and new value. Settings hold no secrets, so neither
+    value is masked.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request, key):
         setting = SystemSetting.objects.filter(key=key).first()
@@ -477,8 +480,19 @@ class SystemSettingView(APIView):
         return Response(SystemSettingSerializer(setting).data)
 
     def patch(self, request, key):
-        setting, _ = SystemSetting.objects.get_or_create(key=key)
-        setting.value      = request.data.get("value", setting.value)
-        setting.updated_by = request.user
-        setting.save()
+        value = request.data.get("value")
+        if not isinstance(value, str):
+            return Response({"value": ["A text value is required."]}, status=400)
+        with transaction.atomic():
+            setting = SystemSetting.objects.select_for_update().filter(key=key).first()
+            if not setting:
+                return Response({"detail": "Not found."}, status=404)
+            if setting.value != value:
+                create_audit_event(
+                    AuditEvent.SYSTEM_SETTING_CHANGED, request.user,
+                    metadata={"key": key, "old_value": setting.value, "new_value": value},
+                )
+                setting.value      = value
+                setting.updated_by = request.user
+                setting.save()
         return Response(SystemSettingSerializer(setting).data)

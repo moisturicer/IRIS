@@ -406,6 +406,7 @@ class SessionEndReason(models.TextChoices):
     IDLE = "idle", "Inactive too long"
     LOCKED = "locked", "Account locked"
     PASSWORD_CHANGED = "password_changed", "Password changed"
+    REVOKED = "revoked", "Revoked by an administrator"
 
 
 class IPType(models.TextChoices):

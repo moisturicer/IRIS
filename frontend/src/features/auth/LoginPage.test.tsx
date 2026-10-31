@@ -581,6 +581,7 @@ describe("why the session ended", () => {
       title: "Password Changed",
       text: /your password was changed on another device/,
     },
+    { code: "session_ended_revoked", title: "Session Ended", text: /An administrator ended this session/ },
   ];
 
   it.each(cases)("says why for $code", async ({ code, title, text }) => {

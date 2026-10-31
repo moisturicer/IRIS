@@ -21,6 +21,7 @@ from rest_framework import status
 
 from apps.audit.models import AuditEvent
 from apps.audit.services import create_audit_event
+from apps.documents.testing import real_pdf_bytes
 from apps.documents.models import DocumentRequest, DocumentRequestItem, UploadSlot
 from apps.records.models import Record
 from apps.reviews.models import RecordAssignment, ResubmissionRequest, ReviewerSeat
@@ -119,7 +120,7 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
         with self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(
                 SUBMIT_DOCUMENT,
-                {"record": record.pk, "file": _pdf(b"%PDF-1.4 requested", "form.pdf"), **target},
+                {"record": record.pk, "file": _pdf(real_pdf_bytes(b"requested"), "form.pdf"), **target},
                 format="multipart",
             )
         return self.ok(response, status.HTTP_201_CREATED)

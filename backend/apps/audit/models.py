@@ -26,6 +26,7 @@ class AuditEvent(models.Model):
     ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
     PASSWORD_CHANGED = "PASSWORD_CHANGED"
     SESSION_REVOKE   = "SESSION_REVOKE"
+    SYSTEM_SETTING_CHANGED = "SYSTEM_SETTING_CHANGED"
     QUESTION_INJECTION = "QUESTION_INJECTION"
     RESEARCH_METADATA_CORRECTED = "RESEARCH_METADATA_CORRECTED"
 
@@ -73,6 +74,7 @@ class AuditEvent(models.Model):
         (ACCOUNT_UNLOCKED, "Account Unlocked"),
         (PASSWORD_CHANGED, "Password Changed"),
         (SESSION_REVOKE,   "Session Revoked"),
+        (SYSTEM_SETTING_CHANGED, "System Setting Changed"),
         (QUESTION_INJECTION, "Reader Question Injection Flagged"),
         (RESEARCH_METADATA_CORRECTED, "Research Metadata Corrected"),
         (SUBMITTED,                  "Submitted"),

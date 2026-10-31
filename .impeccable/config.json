@@ -19,5 +19,12 @@
         "reason": "Assistant triage: false positive. The class names are a list of classes the test asserts are absent from the AI Overview; no element is rendered with them."
       }
     ]
+  },
+  "hook": {
+    "enabled": true,
+    "limits": {
+      "maxFindings": 5,
+      "maxChars": 8000
+    }
   }
 }

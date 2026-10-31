@@ -229,3 +229,17 @@ _Avoid_: Access request (the old page's name), download link.
 **Download grant**:
 What an approved [[Download request]] gives its reader: they may download that paper while signed in, as often as they like, until the grant expires or RDCO revokes it with a note. It is never a link, and nothing emailed works on its own.
 _Avoid_: Download link, token, download permission.
+
+### Accounts
+
+**Sign in**:
+Entering IRIS with an existing account's CIT-U email and password.
+_Avoid_: Login, log in, sign on.
+
+**Register**:
+Asking for an IRIS account as a Student or an [[Adviser]]. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request.
+_Avoid_: Sign up, signup, create account (the screen's title, not the act).
+
+**Adviser**:
+The role of the person who reviews their advisees' Records first and routes them onward. It is a role someone asks for when they register, not a job title.
+_Avoid_: Faculty, faculty adviser, professor.

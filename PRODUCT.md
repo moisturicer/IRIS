@@ -41,7 +41,7 @@ IRIS has two mechanisms a neighbouring product could not truthfully claim:
 - **Status uses the server's wording** (`workflow_state_label`), never a client mapping.
 - **Honest copy:** never invent a metric, count, status or capability that the API cannot supply. Mockup-only fields do not enter the interface.
 - **Fixed vocabulary.** *Archived* is a rejected record. *Unlisted* is a Thesis or Project kept out of the catalogue. *Accepted* is a Proposal its Adviser accepted.
-- **Not built yet:** Proposal continuation ("Continue as Thesis / Project") and lineage. Leave a slot for them; do not show them as working.
+- **Proposal continuation is built (IR-417):** an accepted Proposal can be continued as a Thesis or Project, which creates an ordinary child draft linked to it (lineage) and opens it in Publish.
 
 ## Brand Commitments
 

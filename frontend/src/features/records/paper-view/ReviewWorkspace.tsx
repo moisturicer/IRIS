@@ -9,8 +9,9 @@ import type { RecordDetail } from "@/types/records";
 import { READING_PANE_HEIGHT, READING_PANE_TOP } from "./paneLayout";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { ReviewTimeline } from "./ReviewTimeline";
+import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 
-interface ReviewWorkspaceProps {
+export interface ReviewWorkspaceProps {
   record: RecordDetail;
   /** What the capabilities adapter grants this viewer. */
   can: ReadonlySet<Capability>;
@@ -22,6 +23,13 @@ interface ReviewWorkspaceProps {
   onChanged: () => void;
   /** Go to the Paper tab with Ask IRIS open. Absent when there is no paper. */
   onAskAboutPaper?: () => void;
+  /** Authors retain their existing timeline and reader. */
+  authorView?: boolean;
+  onOpenReview?: () => Promise<void>;
+}
+
+export function ReviewWorkspace(props: ReviewWorkspaceProps) {
+  return props.authorView ? <AuthorReviewWorkspace {...props} /> : <ReviewWorkspaceLayout {...props} />;
 }
 
 /**
@@ -45,7 +53,7 @@ interface ReviewWorkspaceProps {
  *
  * Decisions use the adviser-first review actions in `REVIEW_ACTIONS`.
  */
-export function ReviewWorkspace({
+function AuthorReviewWorkspace({
   record,
   can,
   reader,

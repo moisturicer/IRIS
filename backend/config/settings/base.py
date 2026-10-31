@@ -1126,7 +1126,11 @@ AI_CHUNK_EXCLUDE_SECTIONS = config(
 # ---- Axes (brute force protection) --------------------------------------
 
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)
-AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+# How many proxies sit in front of Django, nginx included. Zero trusts no
+# forwarded address, which is development talking to Django directly (IR-656).
+TRUSTED_PROXY_COUNT = config("TRUSTED_PROXY_COUNT", default=0, cast=int)
+AXES_CLIENT_IP_CALLABLE = "apps.accounts.client_address.client_address"
 # The key axes reads the username from. It defaults to the user model's
 # USERNAME_FIELD (`email`), but LoginView authenticates with `username=`, so
 # axes found none and recorded every failure against no user at all (IR-555).

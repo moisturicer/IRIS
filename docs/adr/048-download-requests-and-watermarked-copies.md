@@ -12,7 +12,7 @@ Observed on `main`, 2026-10-30:
 - **No page renders `DownloadRequestModal`**, so a reader has no way to ask. A second, unrouted RDCO page, `AccessRequestsPage`, still copies the bearer link to the clipboard.
 - A request carries only the record: the reader gives no reason, and a decline records none.
 - The Paper reader (`GET /records/<id>/manuscript/`, inline, IR-335) serves the full manuscript to anyone `visible_to` admits. Its own download button (`PaperPdfReader.handleDownload`) saves those bytes. So downloading is effectively ungated today.
-- Approval rights disagree. `partial_update` and the UI admit RDCO only, as IR-165 intended, while the `approve` and `decline` actions admit any of the four offices (`IsStaff`). A new request notifies every KTTO and RDCO account.
+- Approval is already RDCO-only on every route. The `approve` and `decline` actions declare `IsStaff`, but the viewset's `get_permissions` overrides that (corrected 2026-10-31 under IR-674; this line previously said any office could approve). RDCO could decide their own request, the `PATCH` route did not notify the requester, and a new request notified every KTTO and RDCO account.
 - No PDF-editing library is installed. PyMuPDF was removed with the prototype extractors (ADR-016).
 
 ## Decision

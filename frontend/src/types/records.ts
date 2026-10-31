@@ -295,6 +295,14 @@ export interface RecordDetail extends RecordListItem {
    */
   my_seats:             ReviewerSeat[];
   /**
+   * What stands between the viewer and their part of the review, in the
+   * server's words (ADR-032 §10 Amendment, IR-681). Null when the viewer may
+   * not read the review: not disclosed, which is not "nothing to say".
+   */
+  readiness?:           Readiness | null;
+  /** A server-offered claim from the viewer's office Pool; absent on older APIs. */
+  review_claim?:        { assignment: number; label: string; party_label: string } | null;
+  /**
    * ADR-032's `is_record_participant`: an owner, or anyone who has ever held
    * a seat here -- so a reviewer whose part is done keeps Review and Files.
    */
@@ -487,6 +495,27 @@ export type SeatSource = "entry" | "claimed" | "assigned" | "nominated" | "added
 export const OPEN_SEAT_STATES: readonly SeatState[] = ["assigned", "in_review"];
 
 /** One person reviewing a record for a party. Every seat endpoint answers with this. */
+export type ReadinessVerdict = "ready" | "blocked" | "waiting_on_you" | "none";
+
+/** One fact in Readiness. The browser renders `label` and never words its own. */
+export interface ReadinessItem {
+  kind:       string;
+  severity:   "blocker" | "info";
+  label:      string;
+  party:      string | null;
+  actor_name: string | null;
+  since:      string | null;
+  /** Due dates only; null on every other item. */
+  paused:     boolean | null;
+  action:     { kind: string; target: string | null } | null;
+}
+
+export interface Readiness {
+  verdict:  ReadinessVerdict;
+  headline: string;
+  items:    ReadinessItem[];
+}
+
 export interface ReviewerSeat {
   id:            number;
   assignment:    number;
@@ -497,6 +526,8 @@ export interface ReviewerSeat {
   reviewer_name: string | null;
   state:         SeatState;
   state_label:   string;
+  /** The viewer's own recorded verdict in the server's words; on my_seats. */
+  verdict_label?: string | null;
   source:        SeatSource;
   assigned_by:   number | null;
   assigned_at:   string | null;

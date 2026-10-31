@@ -14,6 +14,7 @@ from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITransactionTestCase, APIClient
 
+from apps.documents.testing import real_pdf_bytes
 from apps.records.models import Classification, Record, RecordOwner, RecordType
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import PipelineStatus, RecordTypeName
@@ -167,7 +168,7 @@ class ContinueCreatesALinkedDraftTests(ContinuationTestBase):
         self.client.force_authenticate(self.owner)
         response = self.client.patch(
             reverse("record-detail", args=[child_id]),
-            {"abstract_file": SimpleUploadedFile("thesis.pdf", b"%PDF-1.4\n%%EOF", "application/pdf")},
+            {"abstract_file": SimpleUploadedFile("thesis.pdf", real_pdf_bytes(), "application/pdf")},
             format="multipart",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)

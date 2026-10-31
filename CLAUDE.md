@@ -282,13 +282,16 @@ python manage.py eval_conversations --set <set.json> --validate [--lock <lock.js
                                    # mismatch) and refuses a draft_unreviewed set unless
                                    # --allow-draft, which marks the run exploratory_draft_labels.
                                    # --score has run only on test fixtures: no real reviews exist.
-                                   # --validate verified 2026-10-16 on
+                                   # Label-reviewed 2026-10-31 (IR-702) on
                                    # docs/evaluation/general-tools/conversation_set_v1.json: 105
-                                   # draft conversations (62 development, 43 held out, seven per
-                                   # family), 36 supported and unambiguous, zero leakage, `valid`,
-                                   # lock written and re-checked. Labels are AI-drafted
-                                   # (`draft_unreviewed`, `labelled_by` empty), so no score on it
-                                   # counts until a named person reviews it. No arm has been run.
+                                   # conversations (62 development, 43 held out, seven per family),
+                                   # 39 supported and unambiguous, zero leakage. Signed by Jive Tyler
+                                   # I. Revalde (`human_reviewed`; 89 confirmed, 16 corrected against
+                                   # the dev database); lock rewritten and re-checked `valid`. Counts
+                                   # assume a database holding only the 40 proxy papers: the dev
+                                   # database also publishes 8 seed_demo records. No arm has been run.
+                                   # scripts/label_review.py prep|finalize builds the worksheet and
+                                   # the label-review file; finalize refuses untouched AI drafts.
                                    # IR-607: the lock also pins corpus and rubric_version (older
                                    # locks read stale); --write-lock refuses while A09 lacks
                                    # distinct a09_case missing_field/no_match/outage cases;

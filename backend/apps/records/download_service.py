@@ -1,10 +1,43 @@
-"""Resolve record files for approved download requests."""
+"""Decide download requests, and resolve record files for approved ones."""
 import re
 from pathlib import Path
 
+from django.db import transaction
 from django.http import FileResponse
+from django.utils import timezone
 
 from apps.documents.models import RecordUpload
+from apps.notifications.services import notify_download_reviewed
+from core.enums import RequestStatus
+
+from .models import DownloadRequest
+
+
+class OwnDownloadRequest(Exception):
+    """RDCO may not decide a request they made themselves."""
+
+
+class DownloadRequestAlreadyDecided(Exception):
+    """Only a pending request can be decided."""
+
+
+def decide_download_request(download_request, reviewer, *, approved: bool) -> None:
+    """
+    Record RDCO's decision and tell the requester (IR-674). Every route that
+    decides a request comes through here, so its rules cannot drift apart. The
+    row lock makes two simultaneous decisions one decision and one refusal.
+    """
+    with transaction.atomic():
+        current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
+        if current.requested_by_id == reviewer.pk:
+            raise OwnDownloadRequest("You cannot decide your own download request.")
+        if current.status != RequestStatus.PENDING:
+            raise DownloadRequestAlreadyDecided("This request has already been reviewed.")
+        download_request.status = RequestStatus.APPROVED if approved else RequestStatus.DECLINED
+        download_request.reviewed_by = reviewer
+        download_request.reviewed_at = timezone.now()
+        download_request.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+    notify_download_reviewed(download_request, reviewed_by=reviewer, approved=approved)
 
 
 def manuscript_download_name(record, stored_name: str, *, version=None) -> str:
