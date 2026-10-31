@@ -17,7 +17,10 @@
 .review-control { min-height: 44px; padding: 0 8px; border-radius: 8px; font-size: 13px; }
 .review-paper-foot { display: none; }
 .review-without-paper { grid-template-columns: minmax(320px, 1fr) var(--side-w, 20%); }
-@media (pointer: fine) { .review-control { min-height: 36px; } }
+/* The footer keeps its acts compact, so the conversation keeps its room: 36px for a pointer, 44px for touch. */
+.review-pane-foot [role=toolbar], .review-details [role=toolbar] { gap: 6px; }
+.review-pane-foot button, .review-details [role=toolbar] button { min-height: 44px; padding: 0 12px; font-size: 13px; }
+@media (pointer: fine) { .review-control, .review-pane-foot button, .review-details [role=toolbar] button { min-height: 36px; } }
 @container review-workspace (max-width: 1199px) {
   .review-workspace { grid-template-columns: minmax(0, 1fr) var(--mid-w, 40%); }
   .review-without-paper { grid-template-columns: minmax(0, 1fr); }

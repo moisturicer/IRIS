@@ -8,7 +8,7 @@ import { useElementWidth } from "@/hooks/useElementWidth";
 import { cn } from "@/lib/utils";
 import type { RecordTracker } from "@/types/records";
 
-import { ReadinessPanel } from "./ReadinessPanel";
+import { ReadinessPanel, ReadinessSummary } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
@@ -183,12 +183,27 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             <div className="flex items-center justify-between gap-2">
               <div>
                 <p className="text-2xs font-semibold uppercase tracking-wider text-stone-500">Review workspace / current record</p>
-                {record.current_holders.length > 0 && <p className="text-small text-stone-600 mt-1">With {record.current_holders.map((h) => h.label).join(", ")}</p>}
+                {record.current_holders.length > 0 && (
+                  <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-2 py-0.5 text-2xs font-semibold text-brand">
+                    <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />
+                    With {record.current_holders.map((h) => h.label).join(", ")}
+                  </p>
+                )}
                 <h2 className="font-display text-xl font-semibold text-stone-900 mt-1">Review</h2>
               </div>
               {drawer && <button type="button" className={cn("review-control text-brand", FOCUS_RING)}
                 onClick={closeDrawer}>Back to paper</button>}
             </div>
+            {record.readiness && (
+              <ReadinessSummary readiness={record.readiness} onShow={() => {
+                setTab("conversation");
+                requestAnimationFrame(() => {
+                  const panel = document.getElementById(`${ids}-readiness`);
+                  panel?.scrollIntoView({ block: "start" });
+                  panel?.focus({ preventScroll: true });
+                });
+              }} />
+            )}
             <div role="tablist" aria-label="Review pane sections" onKeyDown={(e) => {
               if (!folded || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
               e.preventDefault();
@@ -210,7 +225,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
               {onAskAboutPaper && <button type="button" onClick={onAskAboutPaper} className={cn("review-control text-brand hover:underline", FOCUS_RING)}>Ask about this paper</button>}
               <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
                 renderStatus={renderDetails}
-                beforeComment={record.readiness ? <ReadinessPanel readiness={record.readiness} onAction={onReadinessAction} /> : null} />
+                beforeComment={record.readiness ? <ReadinessPanel id={`${ids}-readiness`} readiness={record.readiness} onAction={onReadinessAction} /> : null} />
             </div>
             {folded && <div role="tabpanel" id={`${ids}-details`} aria-labelledby={`${ids}-tab-details`} hidden={tab !== "details"} className="p-4">{details}</div>}
           </div>

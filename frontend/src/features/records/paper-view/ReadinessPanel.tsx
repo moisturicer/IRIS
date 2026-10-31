@@ -31,19 +31,21 @@ const ACTION_WORDS: Record<string, string> = {
  * status sentence: every string here is the server's, and an offered action
  * dispatches to a control the page already has.
  */
-export function ReadinessPanel({ readiness, onAction }: {
+export function ReadinessPanel({ readiness, onAction, id }: {
   readiness: Readiness;
   onAction: (action: NonNullable<ReadinessItem["action"]>) => void;
+  /** Where the pane head's summary jumps to. */
+  id?: string;
 }) {
   const headingId = useId();
   return (
-    <section aria-labelledby={headingId} className="space-y-3">
+    <section id={id} tabIndex={-1} aria-labelledby={headingId} className={cn("space-y-3 rounded", FOCUS_RING)}>
       <RailHeading id={headingId}>Readiness</RailHeading>
       <p
         role="status"
         className={cn(
-          "flex items-center gap-2 rounded-lg px-3 py-2 text-small font-semibold",
-          readiness.verdict === "ready" ? "bg-stone-900 text-white" : "bg-stone-100 text-stone-900",
+          "flex items-center gap-2 rounded-lg border border-stone-300 border-l-[3px] border-l-brand bg-white px-3 py-2.5 text-small font-semibold text-stone-900",
+          readiness.verdict === "ready" && "border-l-stone-900",
         )}
       >
         <i className={cn("fas", VERDICT_ICON[readiness.verdict])} aria-hidden />
@@ -94,5 +96,32 @@ export function ReadinessPanel({ readiness, onAction }: {
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * The pane head's one-line summary (the prototype's "Your readiness"): the
+ * server's headline, and a jump to the whole Readiness panel.
+ */
+export function ReadinessSummary({ readiness, onShow }: { readiness: Readiness; onShow: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onShow}
+      aria-label={`${readiness.headline} Show Readiness`}
+      className={cn(
+        "mt-2 flex w-full items-center gap-3 rounded-lg border border-stone-300 border-l-[3px] border-l-brand bg-white px-3 py-2 text-left",
+        FOCUS_RING,
+      )}
+    >
+      <i className={cn("fas text-base text-stone-900", VERDICT_ICON[readiness.verdict])} aria-hidden />
+      <span className="min-w-0 flex-1">
+        <span className="block text-2xs font-semibold uppercase tracking-wider text-stone-500">Your readiness</span>
+        <span className="block truncate text-small font-semibold text-stone-900">{readiness.headline}</span>
+      </span>
+      <span className="text-2xs font-semibold text-brand whitespace-nowrap">
+        View why <i className="fas fa-arrow-right ml-0.5" aria-hidden />
+      </span>
+    </button>
   );
 }
