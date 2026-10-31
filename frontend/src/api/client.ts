@@ -1,4 +1,4 @@
-import axios, { type InternalAxiosRequestConfig, type AxiosError } from "axios";
+import axios, { isAxiosError, type InternalAxiosRequestConfig, type AxiosError } from "axios";
 import { IDLE_HEADER, idleSeconds, markReported } from "@/lib/activity";
 import { API_BASE } from "@/lib/constants";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
@@ -78,11 +78,12 @@ export async function refreshSession(): Promise<string | null> {
     // 401'd again.
     setTokens(tokens.access, tokens.refresh);
     return tokens.access;
-  } catch {
-    // The refresh itself failed -- expired, idle (IR-166), rotated out from
-    // under us, or the server is down. Nothing to retry with.
+  } catch (err) {
+    // The refresh itself failed -- expired, idle (IR-166), signed out, rotated
+    // out from under us, or the server is down. Nothing to retry with. When the
+    // server said why, the login screen says it too (IR-645).
     logout();
-    redirectToLoginSessionExpired();
+    redirectToLoginSessionExpired(isAxiosError(err) ? err.response?.data?.code : undefined);
     return null;
   }
 }

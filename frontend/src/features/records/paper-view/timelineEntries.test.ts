@@ -5,7 +5,9 @@
  */
 import { describe, expect, it } from "vitest";
 
-import type { DocumentRequest, RecordTracker, TrackerResubmission, TrackerReview } from "@/types/records";
+import type {
+  DocumentRequest, RecordTracker, ReviewComment, TrackerResubmission, TrackerReview,
+} from "@/types/records";
 
 import { timelineEntries } from "./timelineEntries";
 
@@ -21,6 +23,7 @@ function tracker(overrides: Partial<RecordTracker> = {}): RecordTracker {
     routing_recorded_from: null,
     reviews: [],
     versions: [],
+    review_comments: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],
@@ -39,6 +42,19 @@ const review = (overrides: Partial<TrackerReview>): TrackerReview => ({
   reviewed_by_name: "Mara Santos",
   created_at: "2026-09-05T08:00:00Z",
   version: null,
+  ...overrides,
+});
+
+const comment = (overrides: Partial<ReviewComment>): ReviewComment => ({
+  id: 1,
+  author: 3,
+  author_name: "Rhea Owner",
+  body: "Is the consent form attached?",
+  version: 1,
+  reply_to: null,
+  created_at: "2026-09-07T08:00:00Z",
+  edited_at: null,
+  can_edit: false,
   ...overrides,
 });
 
@@ -347,5 +363,48 @@ describe("timelineEntries", () => {
     const entries = timelineEntries(tracker({ reviews: [review({ version: null })], versions: null }));
 
     expect(entries.map((e) => e.version)).toEqual([null]);
+  });
+
+  it("adds each comment where it was made, by its author, tagged with its version", () => {
+    const entries = timelineEntries(tracker({
+      reviews: [review({ created_at: "2026-09-05T08:00:00Z" })],
+      review_comments: [
+        comment({ id: 1, created_at: "2026-09-04T08:00:00Z", body: "Before the review." }),
+        comment({ id: 2, created_at: "2026-09-06T08:00:00Z", body: "After it.", version: 2 }),
+      ],
+    }));
+
+    expect(entries.map((e) => e.key)).toEqual(["comment-1", "review-1", "comment-2"]);
+    const [first, , second] = entries;
+    expect(first).toMatchObject({
+      kind: "comment", actor: "Rhea Owner", party: null, act: "Commented",
+      note: "Before the review.", version: 1,
+    });
+    expect(second.version).toBe(2);
+  });
+
+  it("threads each reply under the comment it answers, oldest first", () => {
+    const entries = timelineEntries(tracker({
+      review_comments: [
+        comment({ id: 1, body: "Which sample size?" }),
+        comment({ id: 2, reply_to: 1, body: "Forty.", created_at: "2026-09-08T08:00:00Z" }),
+        comment({ id: 3, body: "Another question.", created_at: "2026-09-08T09:00:00Z" }),
+        comment({ id: 4, reply_to: 1, body: "Why forty?", created_at: "2026-09-09T08:00:00Z" }),
+      ],
+    }));
+
+    expect(entries.map((e) => e.key)).toEqual(["comment-1", "comment-3"]);
+    expect(entries[0].comment?.replies.map((r) => r.body)).toEqual(["Forty.", "Why forty?"]);
+    expect(entries[1].comment?.replies).toEqual([]);
+  });
+
+  it("tags no comment on a record with no version, rather than invent v1", () => {
+    const [entry] = timelineEntries(tracker({ review_comments: [comment({ version: null })] }));
+
+    expect(entry.version).toBeNull();
+  });
+
+  it("leaves comments out when the viewer may not read the review", () => {
+    expect(timelineEntries(tracker({ review_comments: null }))).toEqual([]);
   });
 });

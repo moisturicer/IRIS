@@ -309,10 +309,15 @@ function SecurityTab() {
       setNewPassword("");
       setConfirmPassword("");
     } catch (err: unknown) {
-      const res = (err as { response?: { data?: { detail?: string; old_password?: string[] } } })?.response;
+      const res = (err as {
+        response?: { data?: { detail?: string; old_password?: string[]; new_password?: string[] } };
+      })?.response;
       setError(
         res?.data?.detail ??
           res?.data?.old_password?.[0] ??
+          // The configured policy can refuse one password for several reasons;
+          // say all of them (IR-647).
+          res?.data?.new_password?.join(" ") ??
           "Failed to change password. Please check your current password.",
       );
     } finally {
@@ -396,7 +401,10 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
         </p>
       </Panel>
 
-      <Panel title="What you agreed to" caption="The full notice, as shown at registration.">
+      <Panel
+        title="Current disclosure notice"
+        caption="This is the current notice for research disclosures. Your account consent record does not confirm that you accepted this revised notice or its external AI processing terms."
+      >
         <div className="space-y-5 max-h-[420px] overflow-y-auto scrollbar-thin pr-1">
           {DPA_SECTIONS.map((section) => (
             <div key={section.title}>

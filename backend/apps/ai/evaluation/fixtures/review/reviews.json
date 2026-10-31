@@ -1,0 +1,216 @@
+[
+  {
+    "conversation": "R01",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer A",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "yes",
+    "pair_usefulness": "na",
+    "claims": [
+      {
+        "record_id": 100,
+        "supported": true,
+        "citation_correct": true,
+        "page_correct": true
+      }
+    ],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  },
+  {
+    "conversation": "R01",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer B",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "yes",
+    "pair_usefulness": "na",
+    "claims": [
+      {
+        "record_id": 100,
+        "supported": true,
+        "citation_correct": true,
+        "page_correct": true
+      }
+    ],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  },
+  {
+    "conversation": "R02",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer A",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "partial",
+    "pair_usefulness": "na",
+    "claims": [
+      {
+        "record_id": 101,
+        "supported": true,
+        "citation_correct": true,
+        "page_correct": true
+      }
+    ],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  },
+  {
+    "conversation": "R02",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer B",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "partial",
+    "pair_usefulness": "na",
+    "claims": [
+      {
+        "record_id": 101,
+        "supported": true,
+        "citation_correct": true,
+        "page_correct": true
+      }
+    ],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  },
+  {
+    "conversation": "R03",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer A",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "yes",
+    "pair_usefulness": "na",
+    "claims": [
+      {
+        "record_id": 102,
+        "supported": false,
+        "citation_correct": true,
+        "page_correct": true
+      },
+      {
+        "record_id": 102,
+        "supported": true,
+        "citation_correct": true,
+        "page_correct": true
+      }
+    ],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  },
+  {
+    "conversation": "R04",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer A",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "yes",
+    "pair_usefulness": "na",
+    "claims": [
+      {
+        "record_id": 103,
+        "supported": true,
+        "citation_correct": true,
+        "page_correct": false
+      }
+    ],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  },
+  {
+    "conversation": "R05",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer A",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "yes",
+    "pair_usefulness": "na",
+    "claims": [],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  },
+  {
+    "conversation": "R05",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer B",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "no",
+    "pair_usefulness": "na",
+    "claims": [],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  },
+  {
+    "conversation": "R05",
+    "arm": "controller",
+    "reviewer": "Fixture Adjudicator",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "no",
+    "pair_usefulness": "na",
+    "claims": [],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false,
+    "role": "adjudication"
+  },
+  {
+    "conversation": "R06",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer A",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "not_reviewed"
+  },
+  {
+    "conversation": "R07",
+    "arm": "controller",
+    "reviewer": "Fixture Reviewer A",
+    "reviewer_kind": "human",
+    "rubric_version": 1,
+    "status": "reviewed",
+    "task_completion": "yes",
+    "pair_usefulness": "na",
+    "claims": [
+      {
+        "record_id": 106,
+        "supported": true,
+        "citation_correct": true,
+        "page_correct": true
+      }
+    ],
+    "unnecessary_clarification": false,
+    "presentation_leak": false,
+    "access_breach": false,
+    "no_answer": false
+  }
+]

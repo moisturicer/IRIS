@@ -66,6 +66,8 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("directory", help="Root directory, one subfolder per category.")
+        parser.add_argument("--origin", choices=Record.Origin.values, default=Record.Origin.UNKNOWN,
+                            help="Declared origin; never inferred from corpus titles or importer identity.")
         parser.add_argument(
             "--record-type", default=RecordTypeName.THESIS_RESEARCH,
             help=f"RecordType name for every loaded Record (default: {RecordTypeName.THESIS_RESEARCH}).",
@@ -101,6 +103,7 @@ class Command(BaseCommand):
 
         self.dry_run = options["dry_run"]
         self.status = options["status"]
+        self.origin = options["origin"]
 
         categories = sorted(p for p in root.iterdir() if p.is_dir())
         if not categories:
@@ -189,6 +192,7 @@ class Command(BaseCommand):
         with transaction.atomic():
             record = Record.objects.create(
                 title=title,
+                origin=self.origin,
                 record_type=record_type,
                 classification=classification,
                 added_by=owner,

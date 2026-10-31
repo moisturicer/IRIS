@@ -422,6 +422,103 @@ describe("what a failed sign-in says", () => {
 
     await expectNoBlockingA11yViolations(container);
   });
+
+  /**
+   * Which lock it is, and when it lifts (IR-555). The dialog used to say "try
+   * again in 15:00" for every lock. axes lifts after its own cool-off, and
+   * RDCO's manual lock never lifts on its own, so the dialog now counts down
+   * only to a time the server gave it.
+   */
+  describe("the locked dialog", () => {
+    it("moves focus inside, traps Tab, and returns focus when Escape closes it", async () => {
+      // jsdom has no layout; report a visible rect for the browser focus trap.
+      vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
+      failSignInWith(serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" }));
+      renderScreen(<LoginPage />, { route: "/login" });
+      const user = await signIn();
+      await screen.findByRole("dialog", { name: "Account Locked" });
+
+      const close = screen.getByRole("button", { name: "Close" });
+      expect(close).toHaveFocus();
+      await user.tab();
+      expect(close).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(close).toHaveFocus();
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign In" })).toHaveFocus();
+    });
+
+    it("counts down to the server's unlock_at for an axes lockout", async () => {
+      const unlockAt = new Date(Date.now() + 90_000).toISOString();
+      failSignInWith(
+        serverReplied(429, {
+          detail: "Account locked: too many failed sign-in attempts.",
+          code: "too_many_attempts",
+          unlock_at: unlockAt,
+        }),
+      );
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/try again in 1:(29|30)/i);
+    });
+
+    it("names RDCO and shows no countdown for an account RDCO locked", async () => {
+      failSignInWith(serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" }));
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/RDCO/);
+      expect(dialog).not.toHaveTextContent(/try again in|\d+:\d\d/i);
+    });
+
+    it("shows no countdown for the plain-text 429 an older server sends", async () => {
+      failSignInWith(serverReplied(429, "Account locked: too many login attempts."));
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/too many failed sign-in attempts/i);
+      expect(dialog).not.toHaveTextContent(/\d+:\d\d/);
+    });
+
+    it("keeps the browser's own 15-minute countdown for its own lock", async () => {
+      failSignInWith(
+        serverReplied(401, { detail: "Invalid credentials." }),
+        serverReplied(401, { detail: "Invalid credentials." }),
+        serverReplied(401, { detail: "Invalid credentials." }),
+      );
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      const user = await signIn();
+      await screen.findByRole("alert");
+      await user.click(screen.getByRole("button", { name: "Sign In" }));
+      await screen.findByText(/2 of 3/);
+      await user.click(screen.getByRole("button", { name: "Sign In" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/try again in (15:00|14:59)/i);
+    });
+
+    it.each([
+      ["an axes lockout", serverReplied(429, { code: "too_many_attempts", detail: "Locked.", unlock_at: new Date(Date.now() + 60_000).toISOString() })],
+      ["an RDCO lock", serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" })],
+    ])("has no serious or critical accessibility violations for %s", async (_label, error) => {
+      failSignInWith(error);
+      const { container } = renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+      await screen.findByRole("dialog", { name: "Account Locked" });
+
+      await expectNoBlockingA11yViolations(container);
+    });
+  });
 });
 
 /**
@@ -462,5 +559,68 @@ describe("forgot password", () => {
     await user.click(screen.getByRole("button", { name: "Forgot password?" }));
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+/**
+ * Why the session ended (IR-645).
+ *
+ * The server's refusal names a reason (`code`), and `lib/authSession.ts`
+ * carries it across the full page load as `?code=`. Each reason has its own
+ * message: someone who signed out in another tab must not be told they were
+ * away too long. A missing or unknown code keeps the inactivity message, which
+ * is what every sign-out said before.
+ */
+describe("why the session ended", () => {
+  const cases = [
+    { code: "session_idle", title: "Session Expired", text: /30 minutes of inactivity/ },
+    { code: "session_ended", title: "Signed Out", text: /signed out of this session/ },
+    { code: "account_locked", title: "Account Locked", text: /your account was locked/ },
+    {
+      code: "session_ended_password_changed",
+      title: "Password Changed",
+      text: /your password was changed on another device/,
+    },
+  ];
+
+  it.each(cases)("says why for $code", async ({ code, title, text }) => {
+    const { container } = renderScreen(<LoginPage />, {
+      route: `/login?reason=session_expired&code=${code}`,
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveTextContent(title);
+    expect(alert).toHaveTextContent(text);
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("gives every code a message of its own", () => {
+    const shown = cases.map(({ code }) => {
+      const { unmount } = renderScreen(<LoginPage />, {
+        route: `/login?reason=session_expired&code=${code}`,
+      });
+      const text = screen.getByRole("alert").textContent;
+      unmount();
+      return text;
+    });
+    expect(new Set(shown).size).toBe(cases.length);
+  });
+
+  it.each([
+    { label: "no code", route: "/login?reason=session_expired" },
+    { label: "an unknown code", route: "/login?reason=session_expired&code=token_not_valid" },
+  ])("keeps the inactivity message for $label", ({ route }) => {
+    renderScreen(<LoginPage />, { route });
+
+    expect(screen.getByRole("alert")).toHaveTextContent(/30 minutes of inactivity/);
+  });
+
+  it("clears the reason from the address when dismissed", async () => {
+    const user = userEvent.setup();
+    renderScreen(<LoginPage />, { route: "/login?reason=session_expired&code=session_ended" });
+
+    await user.click(screen.getByRole("button", { name: "Dismiss" }));
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 });

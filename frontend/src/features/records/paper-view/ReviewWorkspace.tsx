@@ -10,7 +10,7 @@ import { READING_PANE_HEIGHT, READING_PANE_TOP } from "./paneLayout";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { ReviewTimeline } from "./ReviewTimeline";
 
-interface ReviewSectionProps {
+interface ReviewWorkspaceProps {
   record: RecordDetail;
   /** What the capabilities adapter grants this viewer. */
   can: ReadonlySet<Capability>;
@@ -25,6 +25,11 @@ interface ReviewSectionProps {
 }
 
 /**
+ * Review mode's composition boundary (IR-680). The page owns the record,
+ * section selection and reader; this component receives the viewer's
+ * capabilities and existing callbacks, and adds no data requests.
+ * ReviewTimeline retains its existing tracker read and status strip.
+ *
  * The Review section (IR-412; spec §4.6, §4.7): the paper on the left and,
  * on the right, the review pane -- the timeline, with the action bar under
  * it. Like a pull request: the work, what has happened to it, and what you
@@ -40,14 +45,14 @@ interface ReviewSectionProps {
  *
  * Decisions use the adviser-first review actions in `REVIEW_ACTIONS`.
  */
-export function ReviewSection({
+export function ReviewWorkspace({
   record,
   can,
   reader,
   timelineVersion,
   onChanged,
   onAskAboutPaper,
-}: ReviewSectionProps) {
+}: ReviewWorkspaceProps) {
   return (
     <div className={cn("reading-wide:flex reading-wide:gap-6 reading-wide:items-start", !reader && "max-w-3xl mx-auto")}>
       {reader && <div className="min-w-0 reading-wide:flex-1">{reader}</div>}
@@ -84,7 +89,7 @@ export function ReviewSection({
               Ask about this paper
             </button>
           )}
-          <ReviewTimeline key={timelineVersion} recordId={record.id} />
+          <ReviewTimeline key={timelineVersion} recordId={record.id} canComment={can.has("comment_review")} />
         </div>
 
         <ReviewActionBar

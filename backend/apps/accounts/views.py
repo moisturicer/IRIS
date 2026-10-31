@@ -1,12 +1,14 @@
+from django.db import transaction
 from rest_framework import generics, status
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
-from core.enums import RequestStatus, RoleName
+from core.enums import RequestStatus, RoleName, SessionEndReason
 from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import IsAdmin
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
+from apps.audit.models import AuditEvent
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
@@ -14,7 +16,10 @@ from .serializers import (
     RoleRequestSerializer, SystemSettingSerializer,
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
-from .sessions import end_session, start_session
+from .sessions import (
+    end_all_sessions, end_session, start_session, require_eligible_account, refuse_if_ended,
+)
+from .lockout import LOCKED_BY_ADMIN
 
 
 class RegisterView(generics.CreateAPIView):
@@ -43,18 +48,36 @@ class RegisterView(generics.CreateAPIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @transaction.atomic
     def post(self, request):
         from django.contrib.auth import authenticate
         email    = request.data.get("email")
         password = request.data.get("password")
-        user = authenticate(request, username=email, password=password)
+        # The Django request, not DRF's wrapper: axes marks a lockout by setting
+        # `axes_locked_out` on the request it is given, and its middleware reads
+        # it from the Django one. Through the wrapper the mark was lost, so a
+        # locked account was told "Invalid credentials." even with the right
+        # password, and no 429 was ever sent (IR-555).
+        user = authenticate(request._request, username=email, password=password)
+        if user:
+            # A password change or account lock may have committed since
+            # authenticate read the credentials. Serialize that check and
+            # token issuance with those actions on the account row.
+            verified_hash = user.password
+            user = User.objects.select_for_update().get(pk=user.pk)
+            if user.password != verified_hash or not user.is_active:
+                user = None
         if not user:
             create_audit_event("FAILED_LOGIN", None, metadata={"email": email})
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
         if not user.is_verified:
             return Response({"detail": "Email not verified."}, status=status.HTTP_403_FORBIDDEN)
         if user.is_locked:
-            return Response({"detail": "Account is locked."}, status=status.HTTP_403_FORBIDDEN)
+            # RDCO's lock: it lifts only when RDCO unlocks, so no `unlock_at` (IR-555).
+            return Response(
+                {"detail": "Account is locked.", "code": LOCKED_BY_ADMIN},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         # A session the inactivity rule can end, its id inside both tokens (IR-166).
         refresh = start_session(user)
@@ -76,7 +99,7 @@ class LogoutView(APIView):
         # was authenticated with; the refresh token in the body may be stale.
         sid = request.auth.get("sid") if request.auth else None
         if sid:
-            end_session(sid)
+            end_session(sid, SessionEndReason.LOGOUT)
         try:
             token = RefreshToken(request.data["refresh"])
             token.blacklist()
@@ -99,11 +122,19 @@ class ActivateView(APIView):
 class ChangePasswordView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request):
+        request.user = User.objects.select_for_update().get(pk=request.user.pk)
+        require_eligible_account(request.user)
+        sid = request.auth.get("sid") if request.auth else None
+        if sid:
+            refuse_if_ended(sid)
         serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         request.user.set_password(serializer.validated_data["new_password"])
-        request.user.save()
+        request.user.save(update_fields=["password"])
+        end_all_sessions(request.user, SessionEndReason.PASSWORD_CHANGED, except_sid=sid)
+        create_audit_event(AuditEvent.PASSWORD_CHANGED, request.user)
         return Response({"detail": "Password changed."})
 
 
@@ -242,14 +273,16 @@ class LockUserView(APIView):
     """PATCH /users/<id>/lock/ -- lock or unlock an account."""
     permission_classes = [IsAuthenticated, IsAdmin]
 
+    @transaction.atomic
     def patch(self, request, pk):
-        user      = User.objects.get(pk=pk)
+        user      = User.objects.select_for_update().get(pk=pk)
         is_locked = request.data.get("is_locked")
         if is_locked is None:
             return Response({"detail": "is_locked is required."}, status=400)
         user.is_locked = bool(is_locked)
         user.save(update_fields=["is_locked"])
-        action     = "locked" if user.is_locked else "unlocked"
+        if user.is_locked:
+            end_all_sessions(user, SessionEndReason.LOCKED)
         event_type = "ACCOUNT_LOCKED" if user.is_locked else "ACCOUNT_UNLOCKED"
 
         create_audit_event(
@@ -257,7 +290,8 @@ class LockUserView(APIView):
             metadata={"target_user": user.email},
         )
 
-        return Response({"detail": f"Account {action}.", "is_locked": user.is_locked})
+        detail     = "Account locked." if user.is_locked else "Account unlocked."
+        return Response({"detail": detail, "is_locked": user.is_locked})
 
 
 class LockedUsersView(generics.ListAPIView):

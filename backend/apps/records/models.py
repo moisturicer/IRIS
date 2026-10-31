@@ -2,6 +2,7 @@ import uuid
 from pathlib import Path
 
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.utils import timezone
 from django.contrib.postgres.search import SearchVectorField
 from django.contrib.postgres.indexes import GinIndex
@@ -174,6 +175,12 @@ class RecordManager(models.Manager):
 
 
 class Record(models.Model):
+    class Origin(models.TextChoices):
+        UNKNOWN = "unknown", "Unknown"
+        INSTITUTIONAL = "institutional", "Institutional"
+        IMPORTED_REFERENCE = "imported_reference", "Imported reference"
+        SYNTHETIC = "synthetic", "Synthetic"
+
     #: Kept as a class attribute for callers that reach for
     #: `Record.PIPELINE_STATUS`; the values themselves are `core.enums`
     #: (IR-135). The per-status commentary that used to live here is on
@@ -181,6 +188,8 @@ class Record(models.Model):
     PIPELINE_STATUS = PipelineStatus.choices
 
     title              = models.CharField(max_length=500)
+    origin             = models.CharField(max_length=24, choices=Origin.choices, default=Origin.UNKNOWN)
+    publication_year   = models.PositiveIntegerField(null=True, blank=True, validators=[MinValueValidator(1), MaxValueValidator(9999)])
     year_accomplished  = models.PositiveIntegerField(null=True, blank=True)
     year_completed     = models.PositiveIntegerField(null=True, blank=True)
     abstract           = models.TextField(blank=True)
@@ -296,6 +305,16 @@ class Record(models.Model):
         related_name="deleted_records"
     )
 
+    # Lineage (ADR-032 §6, IR-417): the accepted Proposal this Thesis or
+    # Project continues. Written once, by `continuation.continue_proposal`,
+    # and never through a serializer. One continuation per Proposal, including
+    # a soft-deleted child, is enforced by the constraint below.
+    derived_from = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="continuations",
+    )
+    keywords = models.JSONField(default=list, blank=True)
+
     access_count = models.PositiveIntegerField(default=0)
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
@@ -308,6 +327,12 @@ class Record(models.Model):
     class Meta:
         ordering = ["-created_at"]
         indexes  = [GinIndex(fields=["search_vector"])]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["derived_from"],
+                name="record_one_continuation",
+            ),
+        ]
 
     def __str__(self):
         return self.title[:80]

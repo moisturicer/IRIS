@@ -24,8 +24,10 @@ class AuditEvent(models.Model):
     ROLE_CHANGE      = "ROLE_CHANGE"
     ACCOUNT_LOCKED   = "ACCOUNT_LOCKED"
     ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"
     SESSION_REVOKE   = "SESSION_REVOKE"
     QUESTION_INJECTION = "QUESTION_INJECTION"
+    RESEARCH_METADATA_CORRECTED = "RESEARCH_METADATA_CORRECTED"
 
     # Workflow events (IR-144): one type per act, written by the workflow
     # services inside the act's own transaction (`apps.audit.workflow`). Their
@@ -34,6 +36,7 @@ class AuditEvent(models.Model):
     ROUTED                     = "ROUTED"
     ASSIGNMENT_CLOSED          = "ASSIGNMENT_CLOSED"
     ASSIGNMENT_EXTENDED        = "ASSIGNMENT_EXTENDED"
+    ASSIGNMENT_ESCALATED       = "ASSIGNMENT_ESCALATED"
     DECISION_RECORDED          = "DECISION_RECORDED"
     PUBLISHED                  = "PUBLISHED"
     RESUBMISSION_REQUESTED     = "RESUBMISSION_REQUESTED"
@@ -68,12 +71,15 @@ class AuditEvent(models.Model):
         (ROLE_CHANGE,      "Role Change"),
         (ACCOUNT_LOCKED,   "Account Locked"),
         (ACCOUNT_UNLOCKED, "Account Unlocked"),
+        (PASSWORD_CHANGED, "Password Changed"),
         (SESSION_REVOKE,   "Session Revoked"),
         (QUESTION_INJECTION, "Reader Question Injection Flagged"),
+        (RESEARCH_METADATA_CORRECTED, "Research Metadata Corrected"),
         (SUBMITTED,                  "Submitted"),
         (ROUTED,                     "Routed"),
         (ASSIGNMENT_CLOSED,          "Assignment Closed"),
         (ASSIGNMENT_EXTENDED,        "Assignment Deadline Extended"),
+        (ASSIGNMENT_ESCALATED,       "Assignment Overdue Escalated"),
         (DECISION_RECORDED,          "Decision Recorded"),
         (PUBLISHED,                  "Published"),
         (RESUBMISSION_REQUESTED,     "Revision Requested"),

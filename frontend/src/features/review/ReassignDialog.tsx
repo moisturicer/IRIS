@@ -3,7 +3,7 @@ import { useEffect, useId, useState, type FormEvent } from "react";
 import { seatsApi } from "@/api/reviews";
 import { Button, Modal, Skeleton } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
-import { errorDetail } from "@/features/document-requests/errorDetail";
+import { errorDetail } from "@/lib/errorDetail";
 import type { AddReviewerOptions } from "@/types/records";
 
 interface ReassignDialogProps {

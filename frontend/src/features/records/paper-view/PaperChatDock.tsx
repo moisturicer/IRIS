@@ -1,3 +1,4 @@
+import { errorDetail } from "@/lib/errorDetail";
 import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent, type Ref } from "react";
 import { aiApi } from "@/api/ai";
 import type { RecordDetail } from "@/types/records";
@@ -331,8 +332,8 @@ export function PaperChatPanel({
       if (subjectId.current === askedAbout) setMessages((prev) => [...prev, newChatMessage("user", question)]);
       const { message } = await ask(question, { conversationId, widen: questionWiden, requestId });
       show(message);
-    } catch {
-      show(newChatMessage("assistant", "IRIS could not answer right now."));
+    } catch (error) {
+      show(newChatMessage("assistant", errorDetail(error, "IRIS could not answer right now.")));
     } finally {
       sending.current = false;
       setBusy(false);
@@ -438,6 +439,9 @@ export function PaperChatPanel({
       {/* Transcript */}
       <div
         ref={transcriptRef}
+        role="log"
+        aria-label="Paper chat messages"
+        aria-live="polite"
         hidden={minimized}
         // Only while shown: hiding it is not the reader scrolling it.
         onScroll={minimized ? undefined : (e) => { transcriptScrollTop.current = e.currentTarget.scrollTop; }}

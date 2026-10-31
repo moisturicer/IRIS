@@ -68,6 +68,7 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
     This only reads the sheet. Whether a row's values can be accepted --
     Title present, years, names -- is `check_import_row`'s (IR-638), which
     reports every problem in a row rather than the first.
+    - Optional Origin declares provenance; omitted or blank means unknown.
 
     Returns
     -------
@@ -130,6 +131,8 @@ def parse_excel_import(file) -> tuple[list[dict], list[str]]:
         records.append({
             "row_num":               row_num,
             "title":                 get_col(row, "title"),
+            "origin":                get_col(row, "origin"),
+            "publication_year":      get_col(row, "publication year"),
             "abstract":              get_col(row, "abstract") or "",
             "year_accomplished":     get_col(row, "year accomplished"),
             "year_completed":        get_col(row, "year completed"),
@@ -165,7 +168,7 @@ class ImportChoices:
 
 #: A year cell as a spreadsheet gives it: a whole number, or one written as a
 #: float (``2021.0``). Not ``float()``, which would also read "2_024" or "2.024e3".
-_YEAR_CELL = re.compile(r"\d+(\.0+)?")
+_YEAR_CELL = re.compile(r"(\d{1,9})(?:\.0+)?")
 
 
 def _accepted_names(names: dict) -> str:
@@ -186,6 +189,9 @@ def check_import_row(row: dict, choices: ImportChoices) -> tuple[dict, list[str]
     - Record Type, Classification and PSCED Classification must match an
       existing name, ignoring case. A blank Classification or PSCED stays
       blank; a blank Record Type is Project.
+    - Origin is blank (unknown) or one of `Record.Origin`, exactly, and is
+      never reclassified. Publication Year is blank or a whole year from 1 to
+      9999 (IR-563), a wider range because a reference can be old.
 
     Each problem names its column and the value given, and a name lists the
     accepted ones. The row is imported only when the list is empty.
@@ -196,17 +202,19 @@ def check_import_row(row: dict, choices: ImportChoices) -> tuple[dict, list[str]
     if not row["title"]:
         problems.append("Title is required")
 
-    def year(column: str, raw: str | None) -> int | None:
+    def year(column: str, raw: str | None, earliest: int, last: int) -> int | None:
         if raw is None:
             return None
-        value = int(float(raw)) if _YEAR_CELL.fullmatch(raw) else None
-        if value is None or not EARLIEST_IMPORT_YEAR <= value <= latest:
-            problems.append(f'{column} "{raw}" is not a year from {EARLIEST_IMPORT_YEAR} to {latest}')
+        cell = _YEAR_CELL.fullmatch(raw)
+        value = int(cell.group(1)) if cell else None
+        if value is None or not earliest <= value <= last:
+            problems.append(f'{column} "{raw}" is not a year from {earliest} to {last}')
             return None
         return value
 
-    accomplished = year("Year Accomplished", row["year_accomplished"])
-    completed = year("Year Completed", row["year_completed"])
+    accomplished = year("Year Accomplished", row["year_accomplished"], EARLIEST_IMPORT_YEAR, latest)
+    completed = year("Year Completed", row["year_completed"], EARLIEST_IMPORT_YEAR, latest)
+    publication = year("Publication Year", row["publication_year"], 1, 9999)
     if accomplished is not None and completed is not None and completed < accomplished:
         problems.append(f'Year Completed "{completed}" is earlier than Year Accomplished "{accomplished}"')
 
@@ -228,8 +236,14 @@ def check_import_row(row: dict, choices: ImportChoices) -> tuple[dict, list[str]
     classification = look_up("Classification", row["classification_name"], choices.classifications)
     psced = look_up("PSCED Classification", row["psced_name"], choices.psced)
 
+    origin = row["origin"] or Record.Origin.UNKNOWN
+    if origin not in Record.Origin.values:
+        problems.append(f'Origin "{origin}" is not one of: {", ".join(Record.Origin.values)}')
+
     return {
         "title":                 row["title"],
+        "origin":                origin,
+        "publication_year":      publication,
         "abstract":              row["abstract"],
         "year_accomplished":     accomplished,
         "year_completed":        completed,

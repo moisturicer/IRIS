@@ -52,6 +52,7 @@ from core.enums import (
     ReviewDecision,
     ReviewStage,
     RoleName,
+    SessionEndReason,
     TrackerPartyState,
     WorkflowState,
 )
@@ -86,6 +87,9 @@ GOVERNED_ENUMS = (
     # so each entry's reason has to hold for the whole file.
     DocumentRequestState,
     DocumentRequestItemState,
+    # IR-645: why a sign-in ended. Its "locked" was also `LockUserView`'s
+    # response wording, rewritten there rather than allowing the whole module.
+    SessionEndReason,
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}
@@ -175,6 +179,10 @@ ALLOWED = {
     # "missing" is a report key, three times: cases with no reported count,
     # no assessment and no latency. A list, not an item's state.
     "ai/evaluation/milestone.py",
+    # (IR-606) "missing" labels unreported usage in replay evidence;
+    # "open" is a provider reservation awaiting settlement. Neither is a
+    # document-request item or request state.
+    "ai/evaluation/replay.py",
     # "missing" reads that report key from milestone.py to print it.
     "ai/management/commands/eval_pilot_milestone.py",
     # (IR-500) A research tool call's outcome: "rejected" means a malformed
@@ -413,6 +421,13 @@ class EnumsMatchTheDatabaseTests(TestCase):
                 field = model._meta.get_field("status")
                 self.assertEqual(list(field.choices), list(RequestStatus.choices))
                 self.assertEqual(field.default, RequestStatus.PENDING)
+
+    def test_session_end_reason_choices_come_from_the_enum(self):
+        from apps.accounts.models import UserSession
+
+        field = UserSession._meta.get_field("ended_reason")
+        self.assertEqual(list(field.choices), list(SessionEndReason.choices))
+        self.assertTrue(field.null)
 
     def test_ip_type_choices_come_from_the_enum(self):
         from apps.records.models import Record

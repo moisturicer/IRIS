@@ -1,4 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes } from "react";
+import { Link, type LinkProps } from "react-router-dom";
 
 type Variant = "primary" | "secondary" | "danger" | "ghost" | "outline";
 // "full" is the entry-screen step: full width, a size larger than `lg`, and a
@@ -52,15 +53,26 @@ const SIZE_CLASSES: Record<Size, string> = {
   icon: "w-11 h-11 lg:w-9 lg:h-9 justify-center text-xs",
 };
 
+/** The one place a button's look is assembled, for `Button` and `ButtonLink` alike. */
+function buttonClasses(variant: Variant, size: Size, className: string): string {
+  // Entry controls keep readable disabled text (IR-533), rather than fading
+  // the entire control below the project's 4.5:1 threshold.
+  const variantClasses = size === "full"
+    ? VARIANT_CLASSES[variant].replace("disabled:opacity-50", "")
+    : VARIANT_CLASSES[variant];
+  return `inline-flex items-center gap-2 rounded-lg font-medium transition-colors
+          cursor-pointer disabled:cursor-not-allowed
+          ${variantClasses} ${SIZE_CLASSES[size]}
+          ${size === "full" ? "disabled:bg-stone-100 disabled:text-stone-700" : ""} ${className}`;
+}
+
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ variant = "primary", size = "md", loading, children, className = "", disabled, ...rest }, ref) => {
     return (
       <button
         ref={ref}
         disabled={disabled || loading}
-        className={`inline-flex items-center gap-2 rounded-lg font-medium transition-colors
-          cursor-pointer disabled:cursor-not-allowed
-          ${VARIANT_CLASSES[variant]} ${SIZE_CLASSES[size]} ${className}`}
+        className={buttonClasses(variant, size, className)}
         {...rest}
       >
         {loading && (
@@ -79,3 +91,26 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
 );
 
 Button.displayName = "Button";
+
+interface ButtonLinkProps extends LinkProps {
+  variant?: Variant;
+  size?: Exclude<Size, "icon">;
+}
+
+/**
+ * An action that navigates is a link, so assistive technology announces it as
+ * one, but it can look like a button (IR-538, the decision IR-213 recorded).
+ * It takes the button's variants and size steps from `buttonClasses` rather
+ * than having them copied onto an anchor. No `loading` or `disabled`: a link
+ * has neither. No `icon` size: an icon link would need its own name contract.
+ */
+export const ButtonLink = forwardRef<HTMLAnchorElement, ButtonLinkProps>(
+  ({ variant = "primary", size = "md", className = "", children, ...rest }, ref) => (
+    <Link ref={ref} className={buttonClasses(variant, size, className)} {...rest}>
+      {variant === "danger" && <i className="fas fa-triangle-exclamation shrink-0" aria-hidden />}
+      {children}
+    </Link>
+  ),
+);
+
+ButtonLink.displayName = "ButtonLink";

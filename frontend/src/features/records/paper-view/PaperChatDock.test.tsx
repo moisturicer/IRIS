@@ -82,6 +82,20 @@ beforeEach(() => {
 });
 
 describe("Paper Chat opens or continues a Conversation scoped to the Record", () => {
+  it("puts the throttled message in the announced transcript", async () => {
+    askStream.mockImplementation(async function* () {
+      yield await Promise.reject({ response: { status: 429, data: { detail: "Request was throttled. Expected available in 61 seconds." } } });
+    });
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+    const input = await screen.findByRole("textbox", { name: /ask about this paper/i });
+    await waitFor(() => expect(input).toBeEnabled());
+    await userEvent.type(input, "What datasets were used?");
+    await userEvent.click(screen.getByRole("button", { name: /send/i }));
+    const transcript = screen.getByRole("log", { name: "Paper chat messages" });
+    expect(await within(transcript).findByText("Too many requests — try again in about 2 minutes.")).toBeInTheDocument();
+    expect(transcript).toHaveAttribute("aria-live", "polite");
+  });
+
   it("opens on no Conversation, and starts one scoped to the Record only with the first question (IR-569)", async () => {
     findForRecord.mockResolvedValue(null);
     create.mockResolvedValue({ data: conversation({ id: 43 }) });

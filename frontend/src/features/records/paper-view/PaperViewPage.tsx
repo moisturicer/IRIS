@@ -4,6 +4,7 @@ import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { StatusBadge } from "@/components/shared/StatusBadge";
+import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
 import { Skeleton } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
@@ -27,6 +28,7 @@ import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
+import { ContinueProposal } from "../ContinueProposal";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
@@ -57,7 +59,7 @@ import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
-import { ReviewSection } from "./ReviewSection";
+import { ReviewWorkspace } from "./ReviewWorkspace";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
@@ -638,13 +640,7 @@ export default function PaperViewPage() {
 
   const editOpen = searchParams.get("edit") === "details" && can.has("edit_details") && !arriving;
 
-  const primaryOwner = record.owners.find((o) => o.is_primary) ?? record.owners[0];
-  const authorNames =
-    record.authors.length > 0
-      ? record.authors.map((a) => a.name)
-      : primaryOwner?.full_name
-        ? [primaryOwner.full_name]
-        : [];
+  const authorNames = record.authors.map((a) => a.name.trim()).filter(Boolean);
 
   // A citation carries the exact chunk it points at as router `state`
   // (IR-335), so the reader draws its highlight with no second fetch. A
@@ -931,7 +927,7 @@ export default function PaperViewPage() {
               {/* Byline: authors, then adviser, college and year (spec §4.6).
                   No adviser line when the record names none (IR-472). */}
               <div className="space-y-2">
-                {authorNames.length > 0 && (
+                {authorNames.length > 0 ? (
                   <ul className="flex items-center gap-2 flex-wrap" aria-label="Authors">
                     {authorNames.map((name) => (
                       <li
@@ -945,17 +941,28 @@ export default function PaperViewPage() {
                       </li>
                     ))}
                   </ul>
-                )}
+                ) : <p className="text-sm text-stone-500 italic">Authors not recorded</p>}
+                <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
                   {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
-                  <span>Cebu Institute of Technology – University</span>
-                  {record.year_accomplished && <span>{record.year_accomplished}</span>}
+                  {record.origin === "institutional" && <span>Cebu Institute of Technology – University</span>}
+                  {record.publication_year && <span>Published {record.publication_year}</span>}
+                  {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
                 </div>
               </div>
 
-              {/* Slots: lineage ("Developed from Proposal #123 →", IR-417)
-                  renders here once the payload carries it -- never an empty
-                  or made-up state (spec §4.11). The version picker (IR-416)
+              {record.lineage?.derived_from && (
+                <Link to={`/records/${record.lineage.derived_from.id}`} className="text-small underline">
+                  Developed from Proposal #{record.lineage.derived_from.id} — View proposal
+                </Link>
+              )}
+              {record.lineage?.continued_as && (
+                <Link to={`/records/${record.lineage.continued_as.id}`} className="text-small underline">
+                  Continued as {record.lineage.continued_as.record_type_name} #{record.lineage.continued_as.id}
+                </Link>
+              )}
+              {can.has("continue_as") && <ContinueProposal recordId={record.id} />}
+              {/* The version picker (IR-416)
                   only with two or more versions to choose between, or one
                   beside the owner's unsubmitted revision (IR-273). */}
               {(versions.length >= 2 || (record.manuscript_unsubmitted && versions.length >= 1)) && (
@@ -1199,7 +1206,7 @@ export default function PaperViewPage() {
             )}
 
             {section === "review" && (
-              <ReviewSection
+              <ReviewWorkspace
                 record={record}
                 can={can}
                 reader={sections.includes("paper") ? reader() : null}

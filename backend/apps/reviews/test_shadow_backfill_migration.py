@@ -23,8 +23,8 @@ from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
-from apps.records.models import Record, RecordType
-from apps.reviews.workflow_test_helpers import purge_records_at_current_state
+from apps.records.models import RecordType
+from apps.reviews.workflow_test_helpers import model_at_current_state, purge_records_at_current_state
 from apps.reviews.models import (
     RecordClearance,
     ResubmissionRequest,
@@ -109,8 +109,10 @@ class _World:
         self.minute = 0
 
     def record(self, title, status, type_name="Project", **extra):
-        return Record.objects.create(
-            title=title, record_type=self.types[type_name], added_by=self.owner,
+        if "adviser" in extra:
+            extra["adviser_id"] = extra.pop("adviser").pk
+        return model_at_current_state("records", "Record").objects.create(
+            title=title, record_type_id=self.types[type_name].pk, added_by_id=self.owner.pk,
             pipeline_status=status, **extra,
         )
 
@@ -129,7 +131,7 @@ class _World:
         return review
 
     def clearance(self, record, office, status):
-        return RecordClearance.objects.create(record=record, office=office, status=status)
+        return RecordClearance.objects.create(record_id=record.pk, office=office, status=status)
 
 
 def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
@@ -194,7 +196,7 @@ def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
         assert (_active(final), _completed(final)) == ({"rdco"}, {"intake", "ierc"})
 
         assert (_active(by_office), _completed(by_office)) == ({"ierc", "ktto"}, {"intake", "itso"})
-        request = ResubmissionRequest.objects.get(record=by_office)
+        request = ResubmissionRequest.objects.get(record_id=by_office.pk)
         assert (request.party, request.state, request.review_id) == ("ierc", "open", ierc_decline.pk)
         held = _assignments().get(pk=request.assignment_id)
         assert held.party == "ierc" and held.state == "active"
@@ -203,7 +205,7 @@ def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
 
         # A decline at intake is Intake's request, and Intake was never passed.
         assert (_active(at_intake), _completed(at_intake)) == ({"intake"}, set())
-        assert ResubmissionRequest.objects.get(record=at_intake).review_id == intake_decline.pk
+        assert ResubmissionRequest.objects.get(record_id=at_intake.pk).review_id == intake_decline.pk
 
         # Terminal: one completed row per distinct stage, dated from its reviews.
         assert _active(published) == set()

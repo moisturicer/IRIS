@@ -72,6 +72,7 @@ function afterRevision(): RecordTracker {
     routing_recorded_from: null,
     reviews: [],
     versions: [],
+    review_comments: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],

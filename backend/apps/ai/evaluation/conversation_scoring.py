@@ -27,6 +27,11 @@ TARGETS = {"task_completion": 0.90, "claim_support": 0.95, "citation_support": 0
 COMPLETION = ("yes", "partial", "no")
 PAIR = ("useful", "weak", "wrong", "na")
 PREFERENCES = ("candidate", "baseline", "tie")
+ROLES = ("independent", "adjudication")
+REVIEWED, NOT_REVIEWED = "reviewed", "not_reviewed"
+STATUSES = (REVIEWED, NOT_REVIEWED)
+#: Judgments a reviewed record must state rather than leave out (IR-607).
+EXPLICIT = ("unnecessary_clarification", "access_breach")
 CONDITION_KEYS = ("corpus_snapshot_digest", "model_ids", "data_policy", "limits",
                   "set_digests", "rubric_version")
 MIN_CAPACITY_BURST = 100
@@ -77,14 +82,68 @@ def _require_named(record: Mapping, field: str, label: Any, who: str = "reviewer
 
 def _validate_review(r: Mapping, known: set[str]) -> None:
     _require_named(r, "reviewer", r.get("conversation"))
+    if r.get("reviewer_kind", "human") != "human":
+        raise ScoringError(f"{r.get('conversation')}: only a human reviewer may supply a "
+                           f"verdict, not {r.get('reviewer_kind')!r}")
     if r.get("rubric_version") in (None, ""):
         raise ScoringError(f"{r.get('conversation')}: rubric_version is required")
     if r.get("conversation") not in known:
         raise ScoringError(f"{r.get('conversation')}: conversation is not in the set")
+    if r.get("role", "independent") not in ROLES:
+        raise ScoringError(f"{r['conversation']}: role must be one of {ROLES}")
+    if r.get("status", REVIEWED) not in STATUSES:
+        raise ScoringError(f"{r['conversation']}: status must be one of {STATUSES}")
+    if r.get("status", REVIEWED) == NOT_REVIEWED:
+        return
     if r.get("task_completion") not in COMPLETION:
         raise ScoringError(f"{r['conversation']}: task_completion must be one of {COMPLETION}")
     if r.get("pair_usefulness") not in PAIR:
         raise ScoringError(f"{r['conversation']}: pair_usefulness must be one of {PAIR}")
+    for field in EXPLICIT:
+        if not isinstance(r.get(field), bool):
+            raise ScoringError(f"{r['conversation']}: {field} must be stated true or false")
+    for claim in r.get("claims", ()):
+        if not (isinstance(claim.get("supported"), bool)
+                and isinstance(claim.get("citation_correct"), bool)
+                and claim.get("page_correct") in (True, False, None)):
+            raise ScoringError(f"{r['conversation']}: each claim states supported and "
+                               "citation_correct, and page_correct or null")
+
+
+def _verdict(r: Mapping) -> tuple:
+    claims = tuple((bool(c.get("supported")), bool(c.get("citation_correct")),
+                    c.get("page_correct")) for c in r.get("claims", ()))
+    return (r["task_completion"], r["pair_usefulness"], claims,
+            *(bool(r.get(f)) for f in (*EXPLICIT, "presentation_leak", "no_answer")))
+
+
+def _resolve(cid: str, rows: Sequence[Mapping]) -> tuple[Optional[Mapping], dict]:
+    """One verdict per conversation; every original record stays in the audit."""
+    independent = [r for r in rows if r.get("role", "independent") == "independent"]
+    verdicts = [r for r in rows if r.get("role") == "adjudication"]
+    names = [r["reviewer"] for r in independent]
+    if len(set(names)) != len(names):
+        raise ScoringError(f"{cid}: one person filed two independent reviews")
+    if len(verdicts) > 1:
+        raise ScoringError(f"{cid}: more than one adjudicated verdict")
+    audit = {"reviewers": names, "adjudicated_by": None, "records": [dict(r) for r in rows]}
+    done = [r for r in independent if r.get("status", REVIEWED) == REVIEWED]
+    if verdicts:
+        if len(done) < 2:
+            raise ScoringError(f"{cid}: an adjudication needs two independent reviews")
+        if verdicts[0].get("status", REVIEWED) != REVIEWED:
+            raise ScoringError(f"{cid}: the adjudication is not finished")
+        if verdicts[0]["reviewer"] in names:
+            raise ScoringError(f"{cid}: the adjudicator must not be one of the two reviewers")
+        audit.update(resolution="adjudicated", adjudicated_by=verdicts[0]["reviewer"])
+        return verdicts[0], audit
+    if not done:
+        audit["resolution"] = NOT_REVIEWED
+        return None, audit
+    if len({_verdict(r) for r in done}) > 1:
+        raise ScoringError(f"{cid}: independent reviews disagree; adjudicate first")
+    audit["resolution"] = "agreed" if len(done) > 1 else "single"
+    return done[0], audit
 
 
 def _metrics(reviews: Sequence[Mapping], supported: set[str]) -> dict:
@@ -112,16 +171,19 @@ def score_reviews(data: Mapping[str, Any], reviews: Sequence[Mapping], *, arm: s
                   rubric_version: Any = None) -> dict:
     conversations = {c["id"]: c for c in data["conversations"]}
     supported = {cid for cid, c in conversations.items() if c.get("supported_unambiguous")}
-    mine = [r for r in reviews if r.get("arm") == arm]
-    seen = set()
-    for r in mine:
+    records = [r for r in reviews if r.get("arm") == arm]
+    grouped: dict[str, list] = {}
+    for r in records:
         _validate_review(r, set(conversations))
         if rubric_version is not None and r["rubric_version"] != rubric_version:
             raise ScoringError(f"{r['conversation']}: rubric_version {r['rubric_version']} "
                                f"differs from the run manifest's {rubric_version}")
-        if r["conversation"] in seen:
-            raise ScoringError(f"{r['conversation']}: duplicate review for arm {arm}; adjudicate first")
-        seen.add(r["conversation"])
+        grouped.setdefault(r["conversation"], []).append(r)
+    mine, audit = [], {}
+    for cid, rows in grouped.items():
+        chosen, audit[cid] = _resolve(cid, rows)
+        if chosen is not None:
+            mine.append(chosen)
 
     families = {}
     for family in sorted({c["family"] for c in conversations.values()}):
@@ -138,7 +200,11 @@ def score_reviews(data: Mapping[str, Any], reviews: Sequence[Mapping], *, arm: s
     breaches = sorted(r["conversation"] for r in mine if r.get("access_breach"))
     return {
         "arm": arm, "min_examples": min_examples,
-        "reviewers": sorted({r["reviewer"] for r in mine}),
+        "reviewers": sorted({r["reviewer"] for r in records}),
+        "review_audit": audit,
+        "not_reviewed": sorted(c for c, a in audit.items() if a["resolution"] == NOT_REVIEWED),
+        "double_reviewed": sum(a["resolution"] in ("agreed", "adjudicated")
+                               for a in audit.values()),
         "rubric_versions": sorted({str(r["rubric_version"]) for r in mine}),
         "families": families, "overall": overall, "splits": splits,
         "targets": {k: _target(overall[k], t) for k, t in TARGETS.items()},
@@ -148,6 +214,48 @@ def score_reviews(data: Mapping[str, Any], reviews: Sequence[Mapping], *, arm: s
             "note": ZERO_BREACH_NOTE if not breaches else
             "Any access breach blocks enablement regardless of other numbers."},
     }
+
+
+DIAGNOSTIC_NOTE = ("private diagnostic stage from the run file; it explains where a turn "
+                   "ended and never overrides a human verdict")
+
+
+def diagnostic_stages(run: Mapping) -> dict:
+    """Per-turn research stages, counted apart from every human judgment."""
+    stages: Counter = Counter()
+    by_family: dict[str, Counter] = {}
+    for row in run.get("conversations", ()):
+        for turn in row.get("turns", ()):
+            stage = (turn.get("diagnostics") or {}).get("stage", "not_traced")
+            stages[stage] += 1
+            by_family.setdefault(row.get("family"), Counter())[stage] += 1
+    return {"stages": dict(stages), "by_family": {f: dict(c) for f, c in by_family.items()},
+            "note": DIAGNOSTIC_NOTE}
+
+
+def check_evidence(reviews: Sequence[Mapping], bundles: Sequence[Mapping],
+                   runs: Mapping[str, Mapping]) -> None:
+    """Refuse a review citing a record outside the packet its reviewer was given."""
+    allowed = {}
+    for bundle in bundles:
+        for packet in bundle.get("packets", ()):
+            allowed[(bundle.get("arm"), bundle.get("reviewer"), packet.get("conversation"))] = (
+                bundle.get("run_id"), set(packet.get("authorized_record_ids", ())))
+    for r in reviews:
+        if r.get("arm") not in runs or r.get("status", REVIEWED) == NOT_REVIEWED:
+            continue
+        key = (r["arm"], r.get("reviewer"), r.get("conversation"))
+        if key not in allowed:
+            raise ScoringError(f"{r.get('conversation')}: no review packet was issued to "
+                               f"{r.get('reviewer')!r} for arm {r['arm']}")
+        run_id, ids = allowed[key]
+        if run_id != runs[r["arm"]].get("run_id"):
+            raise ScoringError(f"{r['conversation']}: {r['reviewer']}'s packet is for another run")
+        used = {c["record_id"] for c in r.get("claims", ()) if c.get("record_id") is not None}
+        used |= set(r.get("evidence_record_ids", ()))
+        if used - ids:
+            raise ScoringError(f"{r['conversation']}: {r['reviewer']} cites records "
+                               f"{sorted(used - ids)} not authorized in their packet")
 
 
 def check_conditions(runs: Mapping[str, Mapping], *, mode: str,

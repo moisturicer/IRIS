@@ -33,6 +33,7 @@
  */
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { importedReference } from "@/test/fixtures/importedReference";
 import { Link, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
@@ -376,6 +377,31 @@ describe("Mark as completed is retired", () => {
 });
 
 const OWNER_ID = 40;
+
+describe("Proposal lineage", () => {
+  beforeEach(() => {
+    shownRecord = { ...approvedProposal, capabilities: ["continue_as"], lineage: {
+      derived_from: null, continued_as: { id: 456, title: "Full thesis", record_type_name: "Thesis / Research" },
+    } };
+  });
+
+  it("renders the supplied child link and continuation actions", async () => {
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+    expect(await screen.findByRole("link", { name: "Continued as Thesis / Research #456" })).toHaveAttribute("href", "/records/456");
+    expect(screen.getByRole("button", { name: "Continue as Thesis" })).toBeInTheDocument();
+  });
+
+  it("links a child back to its Proposal and hides actions when not offered", async () => {
+    shownRecord = { ...record, capabilities: [], lineage: {
+      derived_from: { id: 123, title: "Proposal", record_type_name: "Proposal" }, continued_as: null,
+    } };
+    signInAs(OWNER_ID, "Student");
+    renderPaperView();
+    expect(await screen.findByRole("link", { name: "Developed from Proposal #123 — View proposal" })).toHaveAttribute("href", "/records/123");
+    expect(screen.queryByRole("button", { name: "Continue as Thesis" })).not.toBeInTheDocument();
+  });
+});
 const OPEN_REVIEW = { name: "Open review" } as const;
 const RESUBMIT = { name: "Resubmit for review" } as const;
 
@@ -1891,6 +1917,7 @@ describe("the Review section (IR-412)", () => {
     routing_recorded_from: null,
     reviews: [],
     versions: [],
+    review_comments: [],
     resubmissions: [],
     document_requests: [],
     clearances: [],
@@ -1950,6 +1977,21 @@ describe("the Review section (IR-412)", () => {
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("toolbar", { name: "Review actions" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Request documents" })).not.toBeInTheDocument();
+  });
+
+  it("gives the review discussion's composer only where the server offers comment_review", async () => {
+    shownRecord = { ...inReview, is_participant: true, capabilities: ["cite", "comment_review"] };
+    signInAs(OWNER_ID, "Student");
+    const { unmount } = renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.getByRole("textbox", { name: "Comment" })).toBeInTheDocument();
+    unmount();
+
+    shownRecord = inReview;
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.queryByRole("textbox", { name: "Comment" })).not.toBeInTheDocument();
   });
 
   it("requests documents from the bar and re-reads the timeline after", async () => {
@@ -2204,6 +2246,30 @@ describe("the Overview's header (IR-569)", () => {
     expect(within(authors).getByText("R. Dela Cruz")).toBeInTheDocument();
     expect(screen.getAllByText("Thesis/Research").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Applied Research").length).toBeGreaterThan(0);
+  });
+
+  it("never credits the submitting owner as an unrecorded author", async () => {
+    shownRecord = { ...record, authors: [], origin: "imported_reference", owners: [
+      { id: 1, user: 99, email: "loader@cit.edu", full_name: "Corpus Loader", is_primary: true },
+    ] };
+    renderPaperView();
+    await waitForRecord(record.title);
+    expect(screen.getByText("Authors not recorded")).toHaveClass("italic", "text-stone-500");
+    expect(screen.queryByRole("list", { name: "Authors" })).not.toBeInTheDocument();
+    expect(screen.getByText("Imported reference")).toBeInTheDocument();
+  });
+
+  it("shows a verified external reference without attributing it to CIT-U", async () => {
+    shownRecord = { ...record, ...importedReference, year_accomplished: 2020 };
+    renderPaperView();
+    await waitForRecord(importedReference.title);
+    const authors = screen.getByRole("list", { name: "Authors" });
+    expect(within(authors).getAllByRole("listitem")).toHaveLength(8);
+    expect(within(authors).getByText("Ashish Vaswani")).toBeInTheDocument();
+    expect(screen.getByText("Published 2017")).toBeInTheDocument();
+    expect(screen.getByText("Completed 2020")).toBeInTheDocument();
+    expect(screen.getByText("Imported reference")).toBeInTheDocument();
+    expect(screen.queryByText("Cebu Institute of Technology – University")).not.toBeInTheDocument();
   });
 
   it("holds governance and documents in Record details, beside the page", async () => {

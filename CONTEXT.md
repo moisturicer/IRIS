@@ -4,6 +4,34 @@ Institutional research and IP disclosure workflow system for CIT-U. The thesis c
 
 ## Language
 
+**Declared origin**:
+The recorded category of a work's provenance, independent of its authors, submitting owner and import actor.
+_Avoid_: Inferred origin, author affiliation
+
+**Institutional research**:
+Research declared to be CIT-U work.
+_Avoid_: Any research stored in IRIS
+
+**Imported reference**:
+Externally sourced research kept as reference material, including real external papers used in evaluation.
+_Avoid_: Synthetic paper, institutional output
+
+**Synthetic research**:
+Deliberately fabricated research used for demonstrations or testing.
+_Avoid_: Imported reference, real evaluation paper
+
+**Unknown origin**:
+A work's origin has not been recorded.
+_Avoid_: Institutional by default
+
+**Publication year**:
+The recorded year a work was published, distinct from its completion year and the date it was added to IRIS.
+_Avoid_: Completion year, added year
+
+**Author**:
+A person or organization explicitly credited with creating the work.
+_Avoid_: Submitting owner, import actor
+
 **Record**:
 One research/IP disclosure submission moving through the workflow. Has one or more uploads, authors (byline names, not accounts), and owners (the `User` accounts who submitted/manage it).
 _Avoid_: Submission, paper, thesis (a Record's `record_type` may be a thesis, but not every Record is one), document (too generic — see Upload/Extraction below for the file-shaped things).
@@ -165,3 +193,39 @@ _Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision r
 **Version**:
 A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
 _Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).
+
+### Library
+
+**Library**:
+A reader's private collection of [[Saved Record]]s. It belongs to the reader's account, and nobody else can see it.
+_Avoid_: Repository, catalogue (that is Discover), collection, bookshelf.
+
+**Saved Record**:
+A Record a reader has kept in their [[Library]]. A reader saves a Record at most once, and saving tells no one else anything.
+_Avoid_: Like, star, favourite, bookmark.
+
+**Reading status**:
+Where a reader is with a [[Saved Record]]: Want to read, Reading or Completed. A Saved Record has at most one; giving a Record a status saves it, and unsaving it clears the status.
+_Avoid_: Status folder, shelf, progress.
+
+**Folder**:
+A named group a reader makes for their own [[Saved Record]]s. A Reading status is not a Folder, even where the interface shows them side by side.
+_Avoid_: Collection, list, tag.
+
+**Reading history**:
+The papers recently opened in this browser. It is not part of the [[Library]], never leaves the browser, and is cleared on sign-out.
+_Avoid_: Recently viewed, activity, reading log.
+
+### Downloads
+
+**Download**:
+Saving a copy of a published paper's [[Manuscript]] to take out of IRIS. Distinct from reading it inside IRIS, which stays open to every reader who can see the paper.
+_Avoid_: Export, access, view.
+
+**Download request**:
+A reader asking RDCO to [[Download]] one published paper, always with a note saying why. RDCO alone approves or declines it, and a decline always carries a note. A reader holds at most one pending request per paper; a declined or expired one may be made again. The paper's owners, its Adviser, office staff and its assigned reviewers download without one.
+_Avoid_: Access request (the old page's name), download link.
+
+**Download grant**:
+What an approved [[Download request]] gives its reader: they may download that paper while signed in, as often as they like, until the grant expires or RDCO revokes it with a note. It is never a link, and nothing emailed works on its own.
+_Avoid_: Download link, token, download permission.

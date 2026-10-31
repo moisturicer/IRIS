@@ -67,6 +67,29 @@ class ImportTestCase(APITestCase):
 
 
 class ExcelImportTests(ImportTestCase):
+    def test_declared_external_origin_and_publication_year_survive_import(self):
+        wb = openpyxl.Workbook()
+        wb.active.append(["Title", "Authors", "Origin", "Publication Year", "Year Accomplished"])
+        # Verified 2026-10-30 against https://arxiv.org/abs/1706.03762.
+        authors = ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar", "Jakob Uszkoreit", "Llion Jones", "Aidan N. Gomez", "Lukasz Kaiser", "Illia Polosukhin"]
+        wb.active.append(["Attention Is All You Need", ", ".join(authors), "imported_reference", 2017, 2020])
+        buffer = BytesIO()
+        wb.save(buffer)
+        response = self.post(buffer.getvalue())
+        self.assertEqual(response.status_code, 200)
+        record = Record.objects.get(title="Attention Is All You Need")
+        self.assertEqual((record.origin, record.publication_year, record.year_accomplished), ("imported_reference", 2017, 2020))
+        self.assertEqual(list(record.authors.order_by("pk").values_list("name", flat=True)), authors)
+
+    def test_invalid_origin_is_reported_and_never_reclassified(self):
+        wb = openpyxl.Workbook()
+        wb.active.append(["Title", "Origin"])
+        wb.active.append(["Bad provenance", "guessed"])
+        buffer = BytesIO()
+        wb.save(buffer)
+        response = self.post(buffer.getvalue())
+        self.assertEqual(response.data["created"], 0)
+        self.assertIn("Origin", response.data["log"])
 
     def test_a_real_xlsx_upload_creates_a_published_record(self):
         response = self.post(workbook([
@@ -332,3 +355,25 @@ class ImportRefusesValuesItCannotAcceptTests(ImportTestCase):
         self.assertFalse(Record.objects.filter(title="Required").exists())
         self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])
         self.assertIn('Row 3: skipped — Year Accomplished "e.g. 2024"', response.data["log"])
+
+    def test_origin_and_publication_year_are_reported_with_the_rest_of_the_row(self):
+        wb = openpyxl.Workbook()
+        wb.active.append(["Title", "Year Accomplished", "Origin", "Publication Year"])
+        wb.active.append(["Three Bad Cells", "20O4", "guessed", "1999.5"])
+        wb.active.append(["Fine Reference", None, "imported_reference", 1687])
+        buffer = BytesIO()
+        wb.save(buffer)
+
+        response = self.post(buffer.getvalue())
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])
+        line = next(l for l in response.data["log"].splitlines() if "Row 2:" in l)
+        for column in ('Year Accomplished "20O4"', 'Origin "guessed"', 'Publication Year "1999.5"'):
+            self.assertIn(column, line)
+        self.assertEqual(Record.objects.get(title="Fine Reference").publication_year, 1687)
+
+    def test_a_year_too_long_to_be_a_number_is_a_skipped_row_not_a_crash(self):
+        response = self.post_rows(row("Endless Year", None, "9" * 400), row("Good Year", None, 2004))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])

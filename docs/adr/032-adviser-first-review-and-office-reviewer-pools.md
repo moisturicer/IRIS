@@ -47,6 +47,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-11 (project lead, IR-517): §10.** Who is told when an owner deletes a record: open-seat holders on a withdrawal, the other owners on every delete, and RDCO on a delete request. No office pool is told. A withdrawal also withdraws open document requests. See the *Amendment* note under §10.
 
+**Amended 2026-10-30 (project lead, IR-419): §7, §10, §12 and Security Impact.** The review discussion is read under `may_read_review` and written by participants only. §12's "404 on the review timeline" is the discussion endpoint's 404 plus `null` in the tracker. See the *Amendment* note under §10.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -343,13 +345,17 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 | | Review discussion | Public discussion |
 |---|---|---|
 | **Model** | `ReviewComment` (record, author, body, version, reply_to, created_at, edited_at) | `PublicComment` (record, author, body, reply_to, created_at, hidden_by, hidden_at) |
-| **Who reads and writes** | The record's owners, plus every user who has ever held a seat on it | Any signed-in user |
+| **Who reads and writes** | The record's owners, plus every user who has ever held a seat on it. *Reads widened to `may_read_review` by the IR-419 amendment under §10; writes unchanged.* | Any signed-in user |
 | **On which records** | Every submitted record | `published` records and Discoverable Proposals (§8) only |
 | **Shown as** | One **timeline** interleaving comments, versions, seat openings, reviews and findings, routing, document requests, and resubmission requests and their resolution. The shape of a GitHub pull request. | A flat thread under the paper |
 
 - **The author takes part in the review discussion.** It is their pull request. *Confirmed at acceptance. If an office later needs notes the author must not see, that is a third, reviewer-only channel, not a visibility flag on this one.*
 - **The timeline is derived** from the rows that already exist plus `ReviewComment`, the same way the tracker is (ADR-021 §14). Nothing is duplicated into an event table.
 - **Public comments are moderated by hiding, not by deleting.** Owners and system administrators can hide a comment.
+
+**Amendment, proposed 2026-10-30, accepted 2026-10-31 (IR-679): the Conversation tab.** Accepted by **Lee Jasmin Adolfo** (project lead), who instructed "resolve conflicted prs and merge" after the implementation and proposal were prepared for review. The acceptance is also recorded on [PR #363](https://github.com/moisturicer/IRIS/pull/363).
+
+The review discussion remains one record-level timeline, with the same readers, writers and version tags. In Review mode it becomes the **Conversation** tab of the review pane. The timeline is followed by the server-authored **Readiness** panel and the record comment box. Changes and Threads are later phases and their tabs are absent until implemented. This adds no anchored threads, pending review submissions or new discussion channel. The author's existing surfaces remain unchanged. The regions and Readiness contract are specified in the amendment under §10.
 
 ### 8. Discover: research, and Discoverable Proposals
 
@@ -434,7 +440,7 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
   - `holds_seat(user, record, party)`
   - `is_office_member(user, party)`
   - `is_office_coordinator(user, party)`
-  - `is_record_participant(user, record)`, meaning an owner or anyone who has ever held a seat. It gates the review discussion and the timeline.
+  - `is_record_participant(user, record)`, meaning an owner or anyone who has ever held a seat. It gates the review discussion and the timeline. *Since the IR-419 amendment below it gates writing in the discussion; reading follows `may_read_review` (IR-479).*
 
 **What each mode of the Paper View shows:**
 
@@ -444,6 +450,45 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 | **Author** | Owners | Reading, plus the version picker, **New version** (when a revision is requested), the Action Required panel (ADR-022), **Continue as…** (on an accepted Proposal), visibility, and the review timeline read/reply |
 | **Review** | Seat holders, after **Open review** | The paper beside the review timeline (*amended 2026-09-26: no Ask IRIS here; it stays on the Paper tab, IR-372*), the party status strip (Adviser ✓ · ITSO ● · IERC ● · KTTO — · RDCO ○), and an action bar built from `capabilities` |
 | **Summary** | Strangers on a Discoverable Proposal | The §8 summary and public discussion. No PDF. |
+
+**Amendment, proposed 2026-10-30, accepted 2026-10-31 (IR-679): Review workspace, Phase 1.** **Accepted by Lee Jasmin Adolfo** (project lead), as recorded under §7 and on PR #363. This supersedes the Review row's two-region layout and the standalone party status strip in Review mode. It changes presentation and adds a read-only projection; existing workflow rules and action permissions remain authoritative.
+
+**Three regions.** Left: the whole Manuscript through the existing Paper reader. Middle: a review pane with Conversation (§7), ending in Readiness and the record comment box; its footer always shows the viewer's verdict in words and the single filled primary action currently offered by the server. Right: a details sidebar, visible whichever review tab is selected. Its first section, **Reviewers**, groups people and their states by party, showing an unclaimed Pool as an office rather than a person. **Request review** reuses routing and **Add a colleague** reuses the separate add-reviewer act. Targets and controls come only from `routing` and capabilities, never a client role table.
+
+The remaining sidebar sections are Researchers, Adviser, Classification (type, area, PSCED, college, program), Flagged by the authors, Keywords, Version and date, Due dates, Documents, and Participants, in that order. People open profile cards containing only fields the viewer may already read. Missing participant/profile fields are projected by the server, not reconstructed by the client. Review-only facts, including participants and due dates, are withheld when `may_read_review` refuses the viewer. Read mode, Ask IRIS's entry point and the author's existing view are unchanged.
+
+**Geometry.** A CSS grid uses the workspace's container width, not the viewport: `minmax(0, 1fr) var(--mid-w, 30%) var(--side-w, 20%)`. Defaults are 30% review pane and 20% sidebar, with the paper taking the remainder. Clamp the pane to 320px–half the workspace; clamp the sidebar to 220–420px and no wider than pane minus 40px; then cap the pane so the paper keeps at least 480px. Below 1200px the sidebar folds into a **Details** tab; below 900px the pane is a drawer over the paper with **Back to paper**, and drag edges are hidden. Each edge is a focusable `role="separator"` with current value, arrow keys move it 24px, and double click resets that column. Widths persist under one browser-storage key; failed reads or writes fall back safely. Maroon, stone, white and ink; Garamond headings; hairlines between regions; statuses use icons plus words; controls are 36px for pointers and 44px for touch. The [prototype](../ui-ux/prototypes/review-workspace.html) is a visual reference, including later phases that Phase 1 does not ship.
+
+**Readiness contract.** Record detail adds `readiness` alongside the existing decision, revision, clearance, routing and office-review projections. A pure reviews-app builder consumes those same computed facts, seats, deadlines and open document requests without re-deriving their rules, and is cached once per record/request through the serializer's existing cache. No migration is required.
+
+```text
+readiness: null | {
+  verdict: "ready" | "blocked" | "waiting_on_you" | "none",
+  headline: string,
+  items: [{
+    kind: string,
+    severity: "blocker" | "info",
+    label: string,
+    party: string | null,
+    actor_name: string | null,
+    since: iso8601 | null,
+    paused: boolean | null,
+    action: null | { kind: string, target: string | null }
+  }]
+}
+```
+
+- **`ready` exactly when a Decision would be accepted:** the decision block offers outcomes and has no blocker, for a valid submission against the same record state. It is not a promise against a later concurrent change; action endpoints still re-check everything.
+- **Every non-null `decision.blocked` reason has at least one blocker item**, including the requirement to open a review first. The builder must not drop a reason merely because it is not a Revision request. Other refused acts, such as an office finishing with its own document request open, likewise retain their existing refusal facts.
+- **`readiness: null` means not disclosed**, and is returned whenever `may_read_review` refuses the viewer. It is distinct from an empty items list. Reviewers' states, timeline and other review-only material follow the same privacy predicate.
+- Headlines and item labels are non-empty, server-authored English. The browser renders them and dispatches offered actions; it computes neither verdicts, blocker severity nor status-to-English sentences.
+- Phase 1 item kinds include `revision_request`, `party_reviewing`, `pool_unclaimed`, `document_request` and `due_date`; additional decision refusal facts must also be represented. Items name the party, actor and since when where available. `paused` applies only to due dates and is null otherwise. Due dates are information, never blockers.
+- Open Revision requests reflect existing Decision blockers. Offices still reviewing and unclaimed Pools are information unless current decision facts already block; any closure warning reads `decision.closes`. A document request blocks only its requesting party's finish act where the existing service refuses it; it is information to other parties. No configured Turnaround means no due-date item.
+- Actions identify an allowed control and its target: withdraw a request, open Documents, show a party, claim a Pool, route, or open the review where required. Withdraw is offered only to a seat holder of the requesting party; claim only where allowed. Controls reveal no new authority and reuse existing endpoints. Links to a folded sidebar activate Details and focus their destination.
+
+**Verification.** Record-detail endpoint tests use real workflow services to check verdict/Decision parity, coverage of blockers, server text and privacy. Page tests render payload fixtures and exercise the controls, single primary action, container breakpoints, keyboard clamps, reset and unavailable storage. The visual layout is checked against the prototype. This supporting UX changes no workflow contribution. Under ADR-004 it must be present in both comparison arms or absent from both.
+
+**Separate work.** ADR-047 remains Proposed and is not a dependency: this UI follows today's server flags without implementing its routing graph, hand-back removal or Revision override. Version diffs, anchored threads, resolution, suggested wording and notification subscriptions remain later phases. Acceptance of this amendment does not accept ADR-047.
 
 **Amendment, 2026-10-06 (project lead, IR-411): two more capabilities.** The list above is examples, not a closed set; these two are named so the capabilities payload (IR-418) sends them and the frontend never derives them itself once it does:
 
@@ -546,6 +591,14 @@ The record detail payload carries a **`capabilities`** list, computed by `core.p
 - **A withdrawal also withdraws the record's open document requests**, with `closed_at` and no `closed_by_decision`, since there is no Decision to name (`reviews.withdrawal`). They used to be left open.
 - Notices go after commit and never raise into the request, as every notice does.
 
+**Amendment, 2026-10-30 (project lead, IR-419): who reads and writes the review discussion.** Settled in a design grilling, after IR-419's implementation found that §7's table and Security Impact still named `is_record_participant`, while the IR-479 amendment above had made `may_read_review` the one predicate for review content before `ReviewComment` existed.
+
+- **Reading follows `may_read_review`**: an owner, anyone who has ever held a seat, or a member of an office whose assignment on the record is active now, its pool included. The discussion is review content, and IR-479's reason applies to it most of all: a reviewer needs the history before claiming. Review content stays under one predicate.
+- **Writing stays with participants** (`is_record_participant`): the owners and anyone who has ever held a seat. A pool member who reads is refused with a 403 until they claim, so everyone who posts holds a part in the review.
+- **Access follows current business.** A pool member who read the discussion but never claimed stops reading it once their office's assignment is no longer active: the endpoint refuses with a 404 and the tracker sends `null`. This is intended. As IR-479 put it, a candid comment is not the business of every colleague who later joins. A coordinator who wants them to keep reading seats them.
+- **What §12's "404 on the review timeline" means.** The timeline is drawn from the tracker, which answers every reader of the record with 200 and gives `review_comments: null`, like its other review fields, to anyone `may_read_review` refuses. The 404 is the discussion endpoint's (`GET /records/<id>/review-comments/`). That 404 is word for word a missing record's, so a caller who sees the record learns nothing of its discussion (IR-153).
+- **Not settled here:** a hint explaining to a reader who may not write why there is no composer. It would need its own server-side reason, because the frontend never compares roles (§10).
+
 ### 11. Lifecycle
 
 `pipeline_status` stores:
@@ -588,7 +641,7 @@ Each rule above has a test at the REST seam Lee confirmed for IR-255:
 - Clearance-aware: IERC requests a revision after ITSO cleared. The new version resets IERC only, and ITSO's clearance and seat survive. Under `RESTART_ALL`, both reset.
 - Continuing a Proposal creates a linked `draft`, leaves the Proposal byte-identical, and refuses a second continuation.
 - A stranger gets the summary of a Discoverable Proposal, a 404 on `/records/<id>/` and on its manuscript, and **no** Ask IRIS citation of it.
-- A non-participant gets a 404 on the review timeline. A participant who is not an owner sees it.
+- A non-participant gets a 404 on the review timeline. A participant who is not an owner sees it. *Per the IR-419 amendment under §10: a caller `may_read_review` refuses gets a 404 from the discussion endpoint and `review_comments: null` from the tracker.*
 - An owner who is also named as Adviser is refused at submission.
 - `capabilities` for each role × state matches the action endpoints' own refusals. This is one table-driven test, so the rendering hint cannot drift from the authority.
 
@@ -701,7 +754,7 @@ Each authority is a named predicate in `core.permissions`, checked at the endpoi
 - **The summary read path for Discoverable Proposals.** Its serializer is allow-listed, and a test fails if a file, version or review field appears on it.
 - **Public comments.** Stored text, rendered escaped, and hideable.
 
-**Review discussion** is record data gated by `is_record_participant`. It refuses with a 404, per IR-153.
+**Review discussion** is record data gated by `is_record_participant`. It refuses with a 404, per IR-153. *Amended 2026-10-30 (IR-419, under §10): read under `may_read_review`, written under `is_record_participant`. The refusal is the same 404 as a missing record.*
 
 **No change** to `visible_to()` or to Ask IRIS retrieval.
 

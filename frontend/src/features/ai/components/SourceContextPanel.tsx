@@ -1,6 +1,7 @@
 import type { ChatCitation, SemanticSearchResult } from "@/types/ai";
 import { hasCitationQuote } from "@/lib/citedPage";
 import { OpenPassageLink, PassageQuote } from "./PassageQuote";
+import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
 
 interface SourceContextPanelProps {
   open:       boolean;
@@ -118,9 +119,12 @@ export function SourcePassages({
                 </span>
               )}
             </div>
-            {card?.authors && (
-              <p className="text-[12px] text-stone-500 mt-0.5 line-clamp-1">{card.authors}</p>
-            )}
+            {card && <>
+              <p className={`text-[12px] text-stone-500 mt-0.5 line-clamp-1 ${card.authors?.trim() ? "" : "italic"}`}>
+                {card.authors?.trim() || "Authors not recorded"}
+              </p>
+              <ResearchOriginBadge origin={card.origin} />
+            </>}
 
             {hasQuote && <PassageQuote text={citation.text} className="mt-1" />}
 

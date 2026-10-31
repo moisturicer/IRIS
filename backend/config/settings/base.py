@@ -1,5 +1,6 @@
 from pathlib import Path
 from datetime import timedelta
+import re
 
 from celery.schedules import crontab
 from corsheaders.defaults import default_headers
@@ -162,6 +163,17 @@ AUTH_PASSWORD_VALIDATORS = [
 
 # ---- REST Framework -----------------------------------------------------
 
+def throttle_rate(name, default):
+    """Read a positive DRF rate, rejecting typos before serving requests."""
+    value = config(name, default=default)
+    if not re.fullmatch(r"[1-9][0-9]*/(s|sec|second|m|min|minute|h|hour|d|day)", value):
+        raise ImproperlyConfigured(
+            f"{name} must be a positive rate such as '100/day' or '60/hour'; "
+            "see backend/.env.example."
+        )
+    return value
+
+
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         # simplejwt's, plus the 30-minute inactivity rule (IR-166).
@@ -182,9 +194,9 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "100/day",
-        "user": "1000/day",
-        "ai_query": "60/hour",
+        "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
+        "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
+        "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
         "ai_overview": "600/hour",
@@ -977,6 +989,11 @@ AI_EMBEDDING_TOKEN_CEILING = config(
 AI_OVERVIEW_TOKEN_CEILING = config(
     "AI_OVERVIEW_TOKEN_CEILING", default=100_000, cast=int
 )
+# A `generating` overview claim older than this is re-queued on the next read
+# (IR-650): its task was lost. Longer than the task's retries. 0 disables.
+AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS = config(
+    "AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS", default=900, cast=int
+)
 # Full-paper briefs remain off pending acceptance of their proposed ADR.
 # Generation additionally requires enforced shared provider admission.
 AI_PAPER_BRIEFS_ENABLED = config("AI_PAPER_BRIEFS_ENABLED", default=False, cast=bool)
@@ -1110,10 +1127,17 @@ AI_CHUNK_EXCLUDE_SECTIONS = config(
 
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)
 AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+# The key axes reads the username from. It defaults to the user model's
+# USERNAME_FIELD (`email`), but LoginView authenticates with `username=`, so
+# axes found none and recorded every failure against no user at all (IR-555).
+AXES_USERNAME_FORM_FIELD = "username"
 AXES_RESET_ON_SUCCESS = True
 AXES_COOLOFF_TIME = timedelta(
     minutes=config("AXES_COOLOFF_TIME_MINUTES", default=10, cast=int)
 )
+# A JSON 429 naming the lock and when axes will admit the next attempt, so the
+# sign-in screen counts down to the server's time rather than its own (IR-555).
+AXES_LOCKOUT_CALLABLE = "apps.accounts.lockout.lockout_response"
 
 # ---- Internationalisation -----------------------------------------------
 

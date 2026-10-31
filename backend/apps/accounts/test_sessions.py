@@ -204,3 +204,66 @@ class SessionLifecycleTests(SessionTestBase):
     def test_an_access_token_with_no_session_still_authenticates(self):
         # Its own 30-minute lifetime already bounds it.
         self.assertEqual(self.get_me(access=str(AccessToken.for_user(self.user))).status_code, 200)
+
+
+class RefusalSaysWhyTheSessionEndedTests(SessionTestBase):
+    """A refused session's 401 names why it ended (IR-645).
+
+    Before this every refusal said ``session_idle``, so a user who signed out
+    in another tab was told they had been away too long.
+    """
+
+    def log_out(self):
+        response = self.client.post(
+            LOGOUT, {"refresh": self.refresh}, format="json", HTTP_AUTHORIZATION=f"Bearer {self.access}",
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def end_as(self, reason):
+        UserSession.objects.filter(user=self.user).update(ended_at=timezone.now(), ended_reason=reason)
+
+    def test_after_logout_the_old_access_token_is_refused_as_ended(self):
+        self.sign_in()
+        self.log_out()
+        response = self.get_me()
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.data["code"], "session_ended")
+
+    def test_after_logout_the_old_refresh_token_is_refused_as_ended(self):
+        # The refresh token is blacklisted too; that alone would answer
+        # `token_not_valid`, which says nothing about why.
+        self.sign_in()
+        self.log_out()
+        response = self.refresh_tokens()
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.data["code"], "session_ended")
+
+    def test_idle_expiry_is_recorded_as_idle(self):
+        self.sign_in()
+        self.clock.advance(minutes=31)
+        self.assertEqual(self.get_me().data["code"], "session_idle")
+        self.assertEqual(UserSession.objects.get(user=self.user).ended_reason, "idle")
+        # Asked again, the stored reason answers the same.
+        self.assertEqual(self.refresh_tokens().data["code"], "session_idle")
+
+    def test_a_session_ended_before_reasons_were_recorded_reads_as_idle(self):
+        # No backfill: whether such a session idled out or logged out cannot
+        # be known, so it keeps the message it would have had before.
+        self.sign_in()
+        self.end_as(None)
+        self.assertEqual(self.get_me().data["code"], "session_idle")
+        self.assertEqual(self.refresh_tokens().data["code"], "session_idle")
+
+    def test_a_locked_account_s_session_is_refused_as_locked(self):
+        # Nothing writes this reason yet; IR-644's lock slice will.
+        self.sign_in()
+        self.end_as("locked")
+        self.assertEqual(self.get_me().data["code"], "account_locked")
+        self.assertEqual(self.refresh_tokens().data["code"], "account_locked")
+
+    def test_a_session_ended_by_a_password_change_says_so(self):
+        # Nothing writes this reason yet; IR-644's password slice will.
+        self.sign_in()
+        self.end_as("password_changed")
+        self.assertEqual(self.get_me().data["code"], "session_ended_password_changed")
+        self.assertEqual(self.refresh_tokens().data["code"], "session_ended_password_changed")

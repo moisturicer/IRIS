@@ -42,7 +42,7 @@ from core.permissions import DELETE_CAPABILITY
 
 # Keys ADR-032 names that no endpoint serves yet, plus `decide`, the legacy
 # decision form IR-260 removed. The server must never offer one.
-UNBUILT = {"continue_as", "set_visibility", "comment_review", "comment_public", "decide"}
+UNBUILT = {"set_visibility", "comment_public", "decide"}
 
 
 def _rolled_back(call):
@@ -104,6 +104,26 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
 
     def proposal_with_adviser(self):
         return self.at_adviser(RecordTypeName.PROPOSAL)
+
+    def accepted_proposal(self):
+        record = self.at_adviser(RecordTypeName.PROPOSAL)
+        self.decided(record, self.adviser, "accept")
+        return record
+
+    def continued_proposal(self):
+        record = self.accepted_proposal()
+        self.client.force_authenticate(self.owner)
+        response = self.client.post(
+            reverse("record-continue-as", args=[record.pk]),
+            {"record_type": self._thesis_type_id()}, format="json",
+        )
+        assert response.status_code == 201, response.data
+        return record
+
+    def _thesis_type_id(self):
+        from apps.records.models import RecordType
+
+        return RecordType.objects.get_or_create(name=RecordTypeName.THESIS_RESEARCH)[0].pk
 
     # --- the probes: one real call per capability -------------------------------------
 
@@ -201,7 +221,13 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 u, "post", url("record-submit", r), {"dpa_accepted": True},
             ),
             "create_version": lambda r, u, d: self._call(u, "post", url("record-new-version", r)),
+            "continue_as": lambda r, u, d: self._call(
+                u, "post", url("record-continue-as", r), {"record_type": self._thesis_type_id()},
+            ),
             "open_review": open_review,
+            "comment_review": lambda r, u, d: self._call(
+                u, "post", url("record-review-comments", r), {"body": "A question on section 3."},
+            ),
             "delete_record": delete_as("delete_record"),
             "withdraw_submission": delete_as("withdraw_submission"),
             "request_deletion": delete_as("request_deletion"),
@@ -219,16 +245,21 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # Office staff are offered `tag_ip` on every record they can see (decided
     # 2026-10-11: the offer follows `tags/`, not published records alone).
     OFFICE = {"cite", "tag_ip"}
+    # The review discussion is its participants': the owners and anyone who
+    # has ever held a seat, on a submitted record (ADR-032 §7, IR-419). A
+    # reviewer whose part is done keeps it, so the Adviser keeps it after
+    # routing and ITSO after clearing.
+    TAKES_PART = {"cite", "comment_review"}
     ADVISER_AT_ENTRY = {
         "cite", "open_review", "accept_route", "accept_publish", "reject",
-        "request_document", "request_revision",
+        "request_document", "request_revision", "comment_review",
     }
     ITSO_SEATED = {
         "cite", "tag_ip", "attach_file", "request_document", "open_review",
-        "office_review", "add_reviewer", "route",
+        "office_review", "add_reviewer", "route", "comment_review",
     }
     # An owner is offered the one delete its record's status names (IR-508).
-    OWNER_IN_REVIEW = {"cite", "withdraw_submission"}
+    OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"}
     EXPECTED = {
         "draft": {
             "owner": {"cite", "continue_draft", "edit_details", "delete_record"}, "adviser": {"cite"},
@@ -245,32 +276,33 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         # ITSO's pool: any ITSO member may file and ask for documents, but
         # opens, clears and routes only once seated.
         "itso_pool": {
-            "owner": OWNER_IN_REVIEW, "adviser": {"cite"},
+            "owner": OWNER_IN_REVIEW, "adviser": TAKES_PART,
             "itso": {"cite", "tag_ip", "attach_file", "request_document"},
             "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         "itso_open": {
-            "owner": OWNER_IN_REVIEW, "adviser": {"cite"}, "itso": ITSO_SEATED | {"request_revision"},
+            "owner": OWNER_IN_REVIEW, "adviser": TAKES_PART, "itso": ITSO_SEATED | {"request_revision"},
             "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         # ITSO asked once, so it is offered the withdrawal, not a second ask.
         "revision_asked_by_itso": {
             "owner": OWNER_IN_REVIEW | {"create_version", "replace_manuscript", "edit_details"},
-            "adviser": {"cite"}, "itso": ITSO_SEATED | {"withdraw_revision"},
+            "adviser": TAKES_PART, "itso": ITSO_SEATED | {"withdraw_revision"},
             "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
         # RDCO decides, and -- seated on an office party -- may add a colleague.
         "rdco_open": {
-            "owner": OWNER_IN_REVIEW, "adviser": {"cite"}, "itso": OFFICE, "ierc": OFFICE,
+            "owner": OWNER_IN_REVIEW, "adviser": TAKES_PART, "itso": OFFICE | TAKES_PART,
+            "ierc": OFFICE,
             "rdco": {
                 "cite", "tag_ip", "attach_file", "request_document", "open_review",
                 "add_reviewer", "route", "request_revision",
-                "accept_publish", "keep_unlisted", "reject",
+                "accept_publish", "keep_unlisted", "reject", "comment_review",
             },
             "stranger": None,
         },
         "published": {
-            "owner": {"cite", "request_deletion"}, "adviser": {"cite"},
+            "owner": {"cite", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": {"cite"},
         },
         # A Proposal's Adviser accepts it or rejects it; it is never routed.
@@ -278,8 +310,17 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "owner": OWNER_IN_REVIEW,
             "adviser": {
                 "cite", "open_review", "accept_proposal", "reject",
-                "request_document", "request_revision",
+                "request_document", "request_revision", "comment_review",
             },
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+        },
+        # An accepted Proposal's owner may continue it once (ADR-032 §6, IR-417).
+        "accepted_proposal": {
+            "owner": {"cite", "continue_as", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+        },
+        "continued_proposal": {
+            "owner": {"cite", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
         },
     }

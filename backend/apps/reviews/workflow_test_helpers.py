@@ -13,6 +13,15 @@ def make_user(email, role_name):
     )
 
 
+def model_at_current_state(app_label, model_name):
+    """A fixture model matching the migrations actually applied to its table."""
+    from django.db import connection
+    from django.db.migrations.executor import MigrationExecutor
+
+    loader = MigrationExecutor(connection).loader
+    return loader.project_state(list(loader.applied_migrations)).apps.get_model(app_label, model_name)
+
+
 def purge_records_at_current_state():
     """
     Delete every Record, through the models as of the migrations applied now.
@@ -25,12 +34,7 @@ def purge_records_at_current_state():
     the historical models, since the live ones may name columns the rewound
     tables lack.
     """
-    from django.db import connection
-    from django.db.migrations.executor import MigrationExecutor
-
-    loader = MigrationExecutor(connection).loader
-    state = loader.project_state(list(loader.applied_migrations))
-    state.apps.get_model("records", "Record").objects.all().delete()
+    model_at_current_state("records", "Record").objects.all().delete()
 
 
 def at_the_cutover_schema():
