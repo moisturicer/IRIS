@@ -52,6 +52,7 @@ def production():
         "DEBUG": "False",
         "ALLOWED_HOSTS": "testserver",
         "CORS_ALLOWED_ORIGINS": "https://iris.example.edu",
+        "TRUSTED_PROXY_COUNT": "2",
     }
     done = subprocess.run(
         [sys.executable, "-c", PROBE], cwd=BACKEND, env=env,
