@@ -103,6 +103,9 @@ def start_session(user) -> RefreshToken:
     session = UserSession.objects.create(user=user, created_at=at, last_activity_at=at)
     refresh = RefreshToken.for_user(user)
     refresh["sid"] = str(session.id)
+    # ADR-045 §4: copied into every access token and through every rotation,
+    # so a password change refuses all of them at once.
+    refresh["cv"] = user.credential_version
     # for_user stores the token before we add sid. Keep its stored payload in
     # sync so end_all_sessions can identify the device it must spare.
     OutstandingToken.objects.filter(jti=refresh["jti"]).update(token=str(refresh))

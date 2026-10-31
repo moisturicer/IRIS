@@ -73,15 +73,22 @@ USER appuser
 # Do NOT "simplify" this by restoring defaults in settings. The whole point of
 # IR-154 is that a deployment missing a real credential fails loudly instead of
 # connecting to something it guessed.
-# The full set is exactly seven: SECRET_KEY, DB_NAME, DB_USER and DB_PASSWORD from
-# base.py, plus ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS and TRUSTED_PROXY_COUNT, which
-# production.py adds.
+# The original set is SECRET_KEY, DB_NAME, DB_USER and DB_PASSWORD from base.py,
+# plus ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS and TRUSTED_PROXY_COUNT, which
+# production.py adds. Recovery (IR-642) additionally requires its keys and
+# frontend/SMTP configuration.
 # Every one is a throwaway that lives only for this RUN. Enumerating them keeps
 # the image built against the *real* production settings path rather than
 # quietly switching to development settings for the build -- and the static
 # output is identical either way, since STATIC_ROOT and the WhiteNoise storage
 # both live in base.py.
 RUN SECRET_KEY=build-time-only \
+    RECOVERY_COUNTER_HMAC_KEY=build-time-counter-only \
+    RECOVERY_MAIL_ENCRYPTION_KEY=ZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmQ= \
+    FRONTEND_URL=https://build.invalid \
+    EMAIL_HOST=smtp.build.invalid \
+    EMAIL_HOST_USER=build@build.invalid \
+    EMAIL_HOST_PASSWORD=build-time-only \
     DB_NAME=build-time-only \
     DB_USER=build-time-only \
     DB_PASSWORD=build-time-only \

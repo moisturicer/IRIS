@@ -58,6 +58,17 @@ class AuditEvent(models.Model):
     DOCUMENT_REQUEST_REJECTED  = "DOCUMENT_REQUEST_REJECTED"
     DOCUMENT_REQUEST_WITHDRAWN = "DOCUMENT_REQUEST_WITHDRAWN"
 
+    # Account recovery (ADR-045 §8, IR-642). Metadata is an allowlist --
+    # purpose, correlation_id, outcome, reason, attempt -- written only by
+    # `apps.accounts.recovery.audit`. Never an address, token or password.
+    RECOVERY_REQUESTED           = "RECOVERY_REQUESTED"
+    RECOVERY_SUPPRESSED          = "RECOVERY_SUPPRESSED"
+    RECOVERY_TOKEN_REJECTED      = "RECOVERY_TOKEN_REJECTED"
+    RECOVERY_EMAIL_SENT          = "RECOVERY_EMAIL_SENT"
+    RECOVERY_EMAIL_FAILED        = "RECOVERY_EMAIL_FAILED"
+    PASSWORD_RESET_COMPLETED     = "PASSWORD_RESET_COMPLETED"
+    EMAIL_VERIFICATION_COMPLETED = "EMAIL_VERIFICATION_COMPLETED"
+
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
         (LOGOUT,           "Logout"),
@@ -101,6 +112,13 @@ class AuditEvent(models.Model):
         (DOCUMENT_REQUEST_ACCEPTED,  "Requested Document Accepted"),
         (DOCUMENT_REQUEST_REJECTED,  "Requested Document Rejected"),
         (DOCUMENT_REQUEST_WITHDRAWN, "Document Request Withdrawn"),
+        (RECOVERY_REQUESTED,           "Recovery Requested"),
+        (RECOVERY_SUPPRESSED,          "Recovery Suppressed"),
+        (RECOVERY_TOKEN_REJECTED,      "Recovery Link Rejected"),
+        (RECOVERY_EMAIL_SENT,          "Recovery Email Sent"),
+        (RECOVERY_EMAIL_FAILED,        "Recovery Email Failed"),
+        (PASSWORD_RESET_COMPLETED,     "Password Reset Completed"),
+        (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

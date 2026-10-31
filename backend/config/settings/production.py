@@ -14,7 +14,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401,F403
 from .base import csv_list, required
-from .validation import production_problems
+from .validation import production_problems, recovery_transport_problems
 
 DEBUG = False
 
@@ -56,6 +56,10 @@ _problems = production_problems(
     # Absent is the point — `globals()` rather than a reference, so this reads
     # False when no settings module defines it and stays honest if one does.
     cors_allow_all_origins=globals().get("CORS_ALLOW_ALL_ORIGINS", False),
+) + recovery_transport_problems(
+    frontend_url=FRONTEND_URL,  # noqa: F405
+    email_host=EMAIL_HOST, email_user=EMAIL_HOST_USER,  # noqa: F405
+    email_password=EMAIL_HOST_PASSWORD, sender=DEFAULT_FROM_EMAIL,  # noqa: F405
 )
 
 if _problems:

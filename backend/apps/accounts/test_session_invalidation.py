@@ -105,7 +105,13 @@ class LockingEndsSessionsTests(AccountSessionTestBase):
 NEW_PASSWORD = "Fresh-Kingfisher-739!"
 
 
-class PasswordChangeEndsOtherSessionsTests(AccountSessionTestBase):
+class PasswordChangeEndsEverySessionTests(AccountSessionTestBase):
+    """ADR-045 §4: a change shares the reset's primitive, so every session ends.
+
+    IR-646 originally spared the requesting device; these tests were revised
+    deliberately when IR-642 merged, because ADR-045 is the authority.
+    """
+
     def change_password(self, *, access=None, old_password=PASSWORD):
         return self.client.post(
             "/api/v1/auth/password/change/",
@@ -113,15 +119,15 @@ class PasswordChangeEndsOtherSessionsTests(AccountSessionTestBase):
             HTTP_AUTHORIZATION=f"Bearer {access or self.access}",
         )
 
-    def test_password_change_spares_this_device_and_ends_the_other_device(self):
+    def test_password_change_ends_this_device_and_the_other_device(self):
         self.sign_in()
         other = self.access, self.refresh
         self.sign_in()
+        this = self.access, self.refresh
         response = self.change_password()
         self.assertEqual(response.status_code, 200, response.content)
-        self.assertEqual(self.get_me().status_code, 200)
-        self.assertEqual(self.refresh_tokens().status_code, 200)
-        self.assert_refused(*other, "session_ended_password_changed")
+        for tokens in (this, other):
+            self.assert_refused(*tokens, "session_ended_password_changed")
         response = self.client.post(
             LOGIN, {"email": self.user.email, "password": PASSWORD}, format="json",
         )
@@ -148,17 +154,14 @@ class PasswordChangeEndsOtherSessionsTests(AccountSessionTestBase):
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(self.audit_events("PASSWORD_CHANGED"), [])
 
-    def test_change_without_sid_ends_every_tracked_session(self):
+    def test_a_token_without_sid_cannot_change_the_password(self):
         self.sign_in()
-        first = self.access, self.refresh
-        self.sign_in()
-        second = self.access, self.refresh
         response = self.change_password(access=str(AccessToken.for_user(self.user)))
-        self.assertEqual(response.status_code, 200, response.content)
-        for tokens in (first, second):
-            self.assert_refused(*tokens, "session_ended_password_changed")
+        self.assertEqual(response.status_code, 401, response.content)
+        self.assertEqual(self.get_me().status_code, 200)
+        self.assertEqual(self.audit_events("PASSWORD_CHANGED"), [])
 
-    def test_a_rotated_current_refresh_still_works_after_the_change(self):
+    def test_a_rotated_refresh_is_refused_after_the_change(self):
         self.sign_in()
         other = self.access, self.refresh
         self.sign_in()
@@ -166,24 +169,23 @@ class PasswordChangeEndsOtherSessionsTests(AccountSessionTestBase):
         self.assertEqual(response.status_code, 200, response.content)
         self.access, self.refresh = response.data["access"], response.data["refresh"]
         self.assertEqual(self.change_password().status_code, 200)
-        self.assertEqual(self.get_me().status_code, 200)
-        self.assertEqual(self.refresh_tokens().status_code, 200)
-        self.assert_refused(*other, "session_ended_password_changed")
+        for tokens in ((self.access, self.refresh), other):
+            self.assert_refused(*tokens, "session_ended_password_changed")
 
-    def test_preexisting_stored_tokens_without_sid_keep_the_current_device_signed_in(self):
+    def test_preexisting_stored_tokens_without_sid_are_refused_too(self):
         self.sign_in()
         other = self.access, self.refresh
         self.sign_in()
+        this = self.access, self.refresh
         # Fixture for the stored payload before IR-646: for_user persisted it
         # before sid was added to the JWT sent to the browser. Observe only HTTP.
-        for raw in (other[1], self.refresh):
+        for raw in (other[1], this[1]):
             stored = RefreshToken(raw)
             del stored["sid"]
             OutstandingToken.objects.filter(jti=stored["jti"]).update(token=str(stored))
         self.assertEqual(self.change_password().status_code, 200)
-        self.assertEqual(self.get_me().status_code, 200)
-        self.assertEqual(self.refresh_tokens().status_code, 200)
-        self.assert_refused(*other, "session_ended_password_changed")
+        for tokens in (this, other):
+            self.assert_refused(*tokens, "session_ended_password_changed")
 
 
 class ConcurrentPasswordChangeTests(APITransactionTestCase):

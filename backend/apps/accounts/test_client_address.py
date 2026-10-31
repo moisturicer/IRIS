@@ -111,6 +111,11 @@ class ProductionSettingTests(APITestCase):
             "DEBUG": "False",
             "ALLOWED_HOSTS": "testserver",
             "CORS_ALLOWED_ORIGINS": "https://iris.example.edu",
+            # Recovery transport (IR-642) is required in production too.
+            "FRONTEND_URL": "https://iris.example.edu",
+            "EMAIL_HOST": "smtp.example.edu",
+            "EMAIL_HOST_USER": "iris@example.edu",
+            "EMAIL_HOST_PASSWORD": "test-only",
         }
         env.pop("TRUSTED_PROXY_COUNT", None)
         env.update(extra)

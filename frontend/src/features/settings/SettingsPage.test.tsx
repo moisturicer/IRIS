@@ -5,6 +5,7 @@
  * password for several reasons at once. The form must say all of them.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { Route, Routes } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/auth.store";
@@ -12,6 +13,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent } from "@/test/render";
 
+import LoginPage from "@/features/auth/LoginPage";
 import SettingsPage from "./SettingsPage";
 
 beforeEach(() => {
@@ -66,6 +68,30 @@ describe("changing your password", () => {
     await changePassword(user, "Kalamansi-Tide-42");
 
     expect(await screen.findByRole("status")).toHaveTextContent("Old password is incorrect.");
+  });
+
+  it("signs out everywhere, this tab included, and says why on the sign-in screen", async () => {
+    // ADR-045 §4 (IR-642): a change ends every session, so staying signed in
+    // here would only fail on the next request.
+    const user = userEvent.setup();
+    vi.spyOn(authApi, "changePassword").mockResolvedValue({
+      data: { code: "password_changed", detail: "Password changed. Sign in again with your new password." },
+    } as never);
+    renderScreen(
+      <Routes>
+        <Route path="/settings" element={<SettingsPage />} />
+        <Route path="/login" element={<LoginPage />} />
+      </Routes>,
+      { route: "/settings" },
+    );
+
+    await changePassword(user, "Kalamansi-Tide-42");
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Password changed");
+    expect(alert).toHaveTextContent("Sign in again with your new password.");
+    expect(screen.getByRole("button", { name: "Sign In" })).toBeInTheDocument();
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 });
 

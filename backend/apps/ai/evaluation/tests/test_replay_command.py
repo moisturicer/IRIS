@@ -5,7 +5,7 @@ import json
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from rest_framework_simplejwt.tokens import RefreshToken
+from apps.accounts.sessions import start_session
 
 from apps.ai.evaluation.conversations import lock_record, split_digests
 
@@ -26,7 +26,7 @@ def _inputs(tmp_path):
 def test_smoke_records_cost_and_public_evidence(tmp_path, monkeypatch, settings):
     set_path, lock_path = _inputs(tmp_path)
     user = make_user("ir606-command@cit.edu")
-    monkeypatch.setenv("IRIS_EVAL_TOKEN", str(RefreshToken.for_user(user).access_token))
+    monkeypatch.setenv("IRIS_EVAL_TOKEN", str(start_session(user).access_token))
     monkeypatch.setattr("apps.ai.controller.versions.NEW_RUN_ENGINE", "controller-v1")
     settings.AI_DURABLE_ASK = False
     settings.AI_RESEARCH_LANE = "off"

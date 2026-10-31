@@ -463,3 +463,38 @@ class RecordTypeName(models.TextChoices):
     PROPOSAL = "Proposal", "Proposal"
     THESIS_RESEARCH = "Thesis / Research", "Thesis / Research"
     PROJECT = "Project", "Project"
+
+
+class RecoveryPurpose(models.TextChoices):
+    """What a recovery token or email is for. Immutable once written.
+
+    `email_verification` is ADR-045's second journey (IR-643): the schema
+    carries it so both journeys share one contract, and nothing in IR-642
+    issues it. `password_changed` is the non-secret notice sent after a reset;
+    it never has a token.
+    """
+    PASSWORD_RESET     = "password_reset", "Password reset"
+    EMAIL_VERIFICATION = "email_verification", "Email verification"
+    PASSWORD_CHANGED   = "password_changed", "Password changed notice"
+
+
+class RecoveryDeliveryStatus(models.TextChoices):
+    PENDING    = "pending"     # admitted; no token yet
+    ISSUED     = "issued"      # token issued; mail owed
+    SENT       = "sent"        # SMTP accepted it
+    FAILED     = "failed"      # permanent rejection, or attempts exhausted
+    SUPERSEDED = "superseded"  # a newer request for this recipient won
+    EXPIRED    = "expired"     # not issued within RECOVERY_INTENT_TTL_SECONDS
+    INELIGIBLE = "ineligible"  # no eligible account: nothing is sent
+    WITHDRAWN  = "withdrawn"   # its token stopped being usable before sending
+
+
+class RecoveryAuditOutcome(models.TextChoices):
+    """Coarse recovery audit outcomes (ADR-045), separate from review decisions."""
+
+    ADMITTED = "admitted", "Admitted"
+    SUPPRESSED = "suppressed", "Suppressed"
+    REJECTED = "rejected", "Rejected"
+    COMPLETED = "completed", "Completed"
+    SENT = "sent", "Sent"
+    FAILED = "failed", "Failed"

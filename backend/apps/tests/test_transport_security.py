@@ -53,6 +53,11 @@ def production():
         "ALLOWED_HOSTS": "testserver",
         "CORS_ALLOWED_ORIGINS": "https://iris.example.edu",
         "TRUSTED_PROXY_COUNT": "2",
+        # Recovery transport (IR-642) is required in production too.
+        "FRONTEND_URL": "https://iris.example.edu",
+        "EMAIL_HOST": "smtp.example.edu",
+        "EMAIL_HOST_USER": "iris@example.edu",
+        "EMAIL_HOST_PASSWORD": "test-only",
     }
     done = subprocess.run(
         [sys.executable, "-c", PROBE], cwd=BACKEND, env=env,

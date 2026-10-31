@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactNode, Ref } from "react";
 
 export type AuthAlertVariant = "error" | "session" | "warning";
 
@@ -7,6 +7,11 @@ interface AuthAlertProps {
   readonly title: string;
   readonly children: ReactNode;
   readonly onDismiss?: () => void;
+  /**
+   * Given, the alert can take focus, so a screen can move focus to it as an
+   * error summary (IR-642, ADR-045 §7). Without it, nothing changes.
+   */
+  readonly focusRef?: Ref<HTMLDivElement>;
 }
 
 // Errors and an expired session stop the sign-in, so they take solid maroon; a
@@ -25,9 +30,11 @@ function AlertIcon({ variant }: { variant: AuthAlertVariant }) {
   );
 }
 
-export function AuthAlert({ variant, title, children, onDismiss }: AuthAlertProps) {
+export function AuthAlert({ variant, title, children, onDismiss, focusRef }: AuthAlertProps) {
   return (
     <div
+      ref={focusRef}
+      tabIndex={focusRef ? -1 : undefined}
       className="relative mb-6 rounded-lg border border-brand/25 bg-brand-50 px-4 py-3 text-brand"
       role="alert"
     >

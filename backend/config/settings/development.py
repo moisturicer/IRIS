@@ -26,9 +26,9 @@ CORS_ALLOWED_ORIGINS = list(
     )
 )
 
-# Local dev: print emails (activation links, notifications) to the container log
-# instead of trying to reach an SMTP server with placeholder credentials.
-EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+# Recovery links are secrets and must never be printed to application logs.
+# Local mail is in memory unless a developer explicitly configures SMTP.
+EMAIL_BACKEND = config("EMAIL_BACKEND", default="django.core.mail.backends.locmem.EmailBackend")  # noqa: F405
 DEFAULT_FROM_EMAIL = "iris@localhost"
 
 # Request budgets come from the same explicit environment keys as production.

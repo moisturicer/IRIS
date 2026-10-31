@@ -1,9 +1,10 @@
 import uuid
 
-from django.db import models
+from django.db import models, transaction
+from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
-from core.enums import RequestStatus, SessionEndReason
+from core.enums import RecoveryDeliveryStatus, RecoveryPurpose, RequestStatus, SessionEndReason
 
 
 class Role(models.Model):
@@ -81,11 +82,38 @@ class User(AbstractBaseUser, PermissionsMixin):
     #: (`PATCH /users/<id>/coordinator/`), never by the user. Meaningless
     #: without an office role: `core.permissions.is_office_coordinator` asks both.
     is_office_coordinator = models.BooleanField(default=False)
+    #: ADR-045 §4 (IR-642): every access and refresh token carries this as its
+    #: `cv` claim, and authentication refuses one that does not match. A
+    #: password change or reset increments it, which is what ends every
+    #: sign-in on every device at once. Change it only through
+    #: `apps.accounts.credentials.set_password_and_invalidate`.
+    credential_version = models.PositiveIntegerField(default=0)
 
     objects = UserManager()
 
     USERNAME_FIELD  = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
+
+    def save(self, *args, **kwargs):
+        # Admin edits use save(), unlike the read-only public email field.
+        # Persist revocation so changing an address back cannot revive a link.
+        fields = kwargs.get("update_fields")
+        if not self._state.adding and (fields is None or "email" in fields):
+            using = kwargs.get("using") or self._state.db or "default"
+            with transaction.atomic(using=using):
+                previous = type(self).objects.using(using).select_for_update().get(pk=self.pk)
+                if fields is None and self.credential_version != previous.credential_version:
+                    # An already-authorized profile/admin write may finish
+                    # after reset, but cannot restore its earlier credentials.
+                    self.password = previous.password
+                    self.credential_version = previous.credential_version
+                result = super().save(*args, **kwargs)
+                if previous.email != self.email:
+                    RecoveryToken.objects.using(using).filter(
+                        user_id=self.pk, consumed_at__isnull=True, revoked_at__isnull=True,
+                    ).update(revoked_at=timezone.now())
+                return result
+        return super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.email} ({self.get_full_name()})"
@@ -183,3 +211,122 @@ class UserSession(models.Model):
 
     def __str__(self):
         return f"{self.user.email} session {self.id}"
+
+
+# ---- Account recovery (ADR-045, IR-642) ---------------------------------
+
+
+class RecoveryToken(models.Model):
+    """One emailed single-use link (ADR-045 §3).
+
+    Only the SHA-256 digest of the 32 random bytes is stored, so a database
+    read cannot sign anyone in. The token is bound to the address and the
+    `credential_version` it was issued against: a changed email or password
+    makes it unusable without anything having to remember to revoke it.
+    """
+    digest             = models.CharField(max_length=64, unique=True)
+    user               = models.ForeignKey(User, on_delete=models.CASCADE, related_name="recovery_tokens")
+    purpose            = models.CharField(max_length=32, choices=RecoveryPurpose.choices)
+    email              = models.EmailField()
+    credential_version = models.PositiveIntegerField()
+    issued_at          = models.DateTimeField()
+    expires_at         = models.DateTimeField()
+    consumed_at        = models.DateTimeField(null=True, blank=True)
+    revoked_at         = models.DateTimeField(null=True, blank=True)
+    #: The intent that issued it. One-to-one is what makes a duplicate or
+    #: concurrent worker reuse the token instead of issuing a second (§6).
+    intent             = models.OneToOneField(
+        "RecoveryIntent", on_delete=models.SET_NULL, null=True, blank=True, related_name="token"
+    )
+
+    class Meta:
+        indexes = [models.Index(fields=["user", "purpose"])]
+
+    def __str__(self):
+        return f"{self.purpose} token {self.pk}"
+
+
+class RecoveryIntent(models.Model):
+    """A request to send one recovery email, durable from the moment it is
+    admitted (ADR-045 §6).
+
+    Written in the request's own transaction and enqueued only after it
+    commits; the periodic dispatcher finds any whose broker message was lost.
+    The recipient address and the raw token are stored only encrypted
+    (`apps.accounts.recovery.crypto`), and both are deleted once the intent
+    reaches a terminal state. The broker sees nothing but this row's id.
+    """
+
+    Status = RecoveryDeliveryStatus
+
+    TERMINAL = (Status.SENT, Status.FAILED, Status.SUPERSEDED, Status.EXPIRED,
+                Status.INELIGIBLE, Status.WITHDRAWN)
+
+    id                = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    purpose           = models.CharField(max_length=32, choices=RecoveryPurpose.choices)
+    #: Keyed HMAC of the normalized address; empty for a notice, which names
+    #: its user instead.
+    recipient         = models.CharField(max_length=64, blank=True, default="")
+    generation        = models.PositiveIntegerField(default=0)
+    #: Fernet ciphertext of the normalized address the request named.
+    address_encrypted = models.TextField(blank=True, default="")
+    #: Fernet ciphertext of the raw token, held only while mail is owed.
+    payload_encrypted = models.TextField(blank=True, default="")
+    user              = models.ForeignKey(
+        User, on_delete=models.CASCADE, null=True, blank=True, related_name="recovery_intents"
+    )
+    status            = models.CharField(max_length=16, choices=Status.choices, default=Status.PENDING)
+    #: Correlates this intent's audit events without naming the recipient.
+    correlation_id    = models.UUIDField(default=uuid.uuid4, editable=False)
+    created_at        = models.DateTimeField()
+    expires_at        = models.DateTimeField()
+    attempts          = models.PositiveSmallIntegerField(default=0)
+    next_attempt_at   = models.DateTimeField()
+    #: A worker sending this intent holds it until then; another skips it.
+    lease_until       = models.DateTimeField(null=True, blank=True)
+    finished_at       = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["status", "next_attempt_at"]),
+            models.Index(fields=["recipient", "purpose", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.purpose} intent {self.pk} ({self.status})"
+
+
+class RecoveryGeneration(models.Model):
+    """The newest admitted request per recipient and purpose (ADR-045 §6).
+
+    Kept for unknown addresses too, so admission takes the same path whether
+    or not an account exists. Only the intent holding `current` may issue.
+    """
+    recipient = models.CharField(max_length=64)
+    purpose   = models.CharField(max_length=32, choices=RecoveryPurpose.choices)
+    current   = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["recipient", "purpose"], name="recovery_generation_unique"),
+        ]
+
+
+class RecoveryBucket(models.Model):
+    """One limit counter's lock row (ADR-045 §5).
+
+    The counter is the `RecoveryAttempt` rows that share its key; this row
+    exists so every worker serialises on it before counting. In Postgres
+    rather than Redis on purpose: an admission and the intent it admits commit
+    together, and the counters are shared across workers by construction.
+    """
+    key = models.CharField(max_length=96, primary_key=True)
+
+
+class RecoveryAttempt(models.Model):
+    """One counted attempt in a sliding window. Purged after a day."""
+    bucket = models.ForeignKey(RecoveryBucket, on_delete=models.CASCADE, related_name="attempts")
+    at     = models.DateTimeField()
+
+    class Meta:
+        indexes = [models.Index(fields=["bucket", "at"])]

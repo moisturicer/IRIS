@@ -1,4 +1,5 @@
-import { useId, useState, type Ref } from "react";
+import { useState, type Ref } from "react";
+import { Link } from "react-router-dom";
 import { Formik, Form, Field, type FormikHelpers, type FieldProps } from "formik";
 import * as Yup from "yup";
 import { Button, Input } from "@/components/ui";
@@ -35,9 +36,6 @@ export function LoginForm({
   submitRef,
 }: LoginFormProps) {
   const [showPassword, setShowPassword] = useState(false);
-  const [forgotOpen, setForgotOpen] = useState(false);
-  const forgotTriggerId = useId();
-  const forgotAnswerId = useId();
 
   return (
     <Formik<LoginFormValues>
@@ -110,36 +108,18 @@ export function LoginForm({
             )}
           </Field>
 
-          {/* An honest answer in place of a dead end (IR-536). IRIS has no
-              self-service reset, so the disclosure says who resets one. It
-              names the office rather than an address: the product holds no
-              contact route for RDCO to point at. */}
-          <div className="-mt-1">
-            <div className="flex justify-end">
-              <button
-                type="button"
-                id={forgotTriggerId}
-                aria-expanded={forgotOpen}
-                aria-controls={forgotAnswerId}
-                onClick={() => setForgotOpen((v) => !v)}
-                // The same 44px target as the Show toggle above (2.5.5).
-                className="inline-flex items-center min-h-11 px-1 text-sm font-semibold
-                  text-brand hover:underline"
-              >
-                Forgot password?
-              </button>
-            </div>
-            {forgotOpen && (
-              <div
-                id={forgotAnswerId}
-                role="region"
-                aria-labelledby={forgotTriggerId}
-                className="mt-2 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-sm text-stone-700"
-              >
-                IRIS has no self-service password reset. Ask RDCO or your department
-                administrator to reset it for you.
-              </div>
-            )}
+          {/* Self-service recovery (IR-642, ADR-045 §7). IR-536's disclosure
+              naming RDCO answered a dead end; there is a journey now, and RDCO
+              stays as support guidance in its email and confirmation. */}
+          <div className="-mt-1 flex justify-end">
+            <Link
+              to="/password/forgot"
+              // The same 44px target as the Show toggle above (2.5.5).
+              className="inline-flex items-center min-h-11 px-1 text-sm font-semibold
+                text-brand hover:underline"
+            >
+              Forgot password?
+            </Link>
           </div>
 
           {/* `size="full"` carries the full width and the larger step. Passing

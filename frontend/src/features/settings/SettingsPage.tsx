@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuth } from "@/hooks/useAuth";
@@ -285,16 +286,16 @@ function ProfileTab({ user, onSaved }: { user: NonNullable<ReturnType<typeof use
 /* -------------------------------------------------------------------------- */
 
 function SecurityTab() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [oldPassword,     setOldPassword]     = useState("");
   const [newPassword,     setNewPassword]     = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
-  const [ok,     setOk]     = useState(false);
   const [error,  setError]  = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setOk(false);
     setError(null);
 
     if (newPassword !== confirmPassword) return setError("New passwords do not match.");
@@ -304,10 +305,11 @@ function SecurityTab() {
     setSaving(true);
     try {
       await authApi.changePassword({ old_password: oldPassword, new_password: newPassword });
-      setOk(true);
-      setOldPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      // ADR-045 §4 (IR-642): the change has ended every session, this one
+      // included, so the next request would fail. Sign out here and say why.
+      logout();
+      navigate("/login", { replace: true, state: { reason: "password_changed" } });
+      return;
     } catch (err: unknown) {
       const res = (err as {
         response?: { data?: { detail?: string; old_password?: string[]; new_password?: string[] } };
@@ -344,7 +346,6 @@ function SecurityTab() {
         </div>
 
         <div className="flex items-center gap-2 mt-5 pt-4 border-t border-stone-100">
-          {ok && <Notice tone="ok">Password changed.</Notice>}
           {error && <Notice tone="error">{error}</Notice>}
           <button
             type="submit"

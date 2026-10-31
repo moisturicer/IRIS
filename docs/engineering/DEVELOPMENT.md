@@ -75,6 +75,36 @@ budgets are keyed by IP.
 
 ---
 
+### Password recovery (IR-642)
+
+Run `python scripts/setup_env.py` before starting this revision. It adds missing
+recovery HMAC and mail-encryption keys to `backend/.env` without replacing
+existing values. Both keys are required at startup. Production also requires
+a fixed HTTPS `FRONTEND_URL` origin and populated SMTP configuration. Retain old
+mail-encryption keys until every pending or issued payload using them is terminal;
+an issued token can outlive the ten-minute request-intent lifetime.
+
+Apply accounts migration `0014_account_recovery` and audit migration
+`0009_recovery_event_types` before serving requests, then restart backend,
+Celery workers and beat together. This rollout deliberately signs out existing
+JWT holders: old access/refresh tokens lack the new credential version. Password
+reset and authenticated password change end every device session. A profile edit
+already in flight may finish, but cannot restore pre-reset credentials.
+
+Recovery uses the `default` worker queue and beat's thirty-second dispatcher.
+The HTTP request commits an encrypted delivery intent; neither SMTP nor account
+lookup runs on that path. Broker loss is recovered from the intent. SMTP uses
+a thirty-second timeout, up to four attempts, and the same single-use link on
+retry. Monitor aggregate failed-intent counts and the age of pending work;
+neither logs nor alerts should contain recipients, bodies or links.
+
+Development mail stays in memory, so recovery and legacy activation links are
+never printed to container logs. To exercise actual delivery, configure
+`EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend` and a development
+SMTP server. Production continues to use SMTP. Verification resend and legacy
+activation retirement remain IR-643; this rollout implements password recovery.
+No production deployment was performed.
+
 ## 3 · Repository layout
 
 ```
@@ -252,7 +282,8 @@ Compose needs its own file because `${DB_PASSWORD}` in a compose file is interpo
 **`docker compose up` fails by name without the root `.env`** — every reference is written `${DB_NAME:?set DB_NAME in the repo-root .env}`, which is the intended behaviour, not a bug to work around:
 
 ```bash
-python scripts/setup_env.py   # creates both, never overwrites either
+python scripts/setup_env.py   # creates both; never overwrites, except to add
+                              # missing recovery secrets to backend/.env (IR-642)
 ```
 
 It derives the repo-root `.env` from your existing `backend/.env` when you have
