@@ -3,8 +3,7 @@ from io import BytesIO
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
@@ -12,7 +11,6 @@ from django.db import transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-import jwt
 
 from core.enums import (
     DELETE_REVIEW_STATUSES,
@@ -34,9 +32,7 @@ from .download_service import (
     DownloadRequestAlreadyDecided,
     OwnDownloadRequest,
     decide_download_request,
-    file_response_for_record,
 )
-from .download_tokens import make_download_token, verify_download_token
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
 # .models: IR-153 added it to this line while IR-135 moved the definition into
 # core.enums, and taking it from both was a redefinition. The models module
@@ -418,6 +414,39 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
         return response
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        """
+        GET /records/<id>/download/ -- save a copy of the manuscript (ADR-048).
+
+        For a reader who is exempt or holds a live grant. Anyone else who can
+        see the record gets a 403 whose `code` says why; `get_object()` has
+        already given everyone else the 404 of a missing record.
+        """
+        from .download_service import DOWNLOAD_REFUSALS, download_access, resolve_served_manuscript
+
+        record = self.get_object()
+        access = download_access(request.user, record)
+        if not access.allowed:
+            return Response(
+                {"detail": DOWNLOAD_REFUSALS[access.refusal], "code": access.refusal},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        handle, filename = resolve_served_manuscript(record, request.user)
+        if handle is None:
+            return Response(
+                {"detail": "No paper has been uploaded for this record."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        metadata = {"source": access.source}
+        if access.request:
+            metadata["request"] = access.request.pk
+        if access.exemption:
+            metadata["exemption"] = access.exemption
+        create_audit_event("DOWNLOAD", request.user, record=record, metadata=metadata)
+        return FileResponse(handle, content_type="application/pdf", as_attachment=True, filename=filename)
 
     @action(
         detail=True, methods=["get"],
@@ -1305,7 +1334,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     """
     GET    /download-requests/                    -- RDCO: all requests
     POST   /download-requests/                    -- authenticated user requests download
-    POST   /download-requests/<id>/approve/       -- RDCO: approve, email requester
+    POST   /download-requests/<id>/approve/       -- RDCO: grant, email requester
     POST   /download-requests/<id>/decline/       -- RDCO: decline, in-app notify requester
     PATCH  /download-requests/<id>/               -- RDCO: the same decision, by `action`
     """
@@ -1331,12 +1360,19 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         record = serializer.validated_data["record"]
         user   = self.request.user
+        from rest_framework.exceptions import ValidationError
+
+        from .download_service import download_access
+
         if DownloadRequest.objects.filter(
             record=record, requested_by=user, status=RequestStatus.PENDING
         ).exists():
-            from rest_framework.exceptions import ValidationError
             raise ValidationError(
                 {"record": ["You already have a pending download request for this record."]}
+            )
+        if download_access(user, record).source == "grant":
+            raise ValidationError(
+                {"record": ["You can already download this record."]}
             )
         dr = serializer.save(requested_by=user)
         notify_download_request(dr.record, requested_by=user)
@@ -1352,16 +1388,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         response = self._decide(request, instance, approved=action == "approve")
         if response is not None:
             return response
-
-        data = self.get_serializer(instance).data
-        if action == "approve":
-            token = make_download_token(
-                download_request_id=instance.id,
-                record_id=instance.record_id,
-                user_id=instance.requested_by_id,
-            )
-            data["download_url"] = f"{settings.FRONTEND_URL.rstrip('/')}/download?token={token}"
-        return Response(data)
+        return Response(self.get_serializer(instance).data)
 
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
@@ -1388,45 +1415,6 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         except DownloadRequestAlreadyDecided as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return None
-
-
-class DownloadRedeemView(APIView):
-    """
-    GET /records/download/?token=<jwt>
-    Redeem an approved download JWT and stream the record PDF.
-    """
-    permission_classes = [AllowAny]
-
-    def get(self, request):
-        token = request.query_params.get("token")
-        if not token:
-            return Response({"detail": "token is required."}, status=status.HTTP_400_BAD_REQUEST)
-
-        try:
-            claims = verify_download_token(token)
-        except jwt.ExpiredSignatureError:
-            return Response({"detail": "Download link has expired."}, status=status.HTTP_403_FORBIDDEN)
-        except jwt.InvalidTokenError:
-            return Response({"detail": "Invalid download link."}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            dl_request = DownloadRequest.objects.select_related("record").get(
-                pk=claims["drid"], status=RequestStatus.APPROVED
-            )
-        except DownloadRequest.DoesNotExist:
-            return Response({"detail": "Download request not found or not approved."}, status=404)
-
-        if dl_request.record_id != claims["rid"] or dl_request.requested_by_id != claims["uid"]:
-            return Response({"detail": "Invalid download link."}, status=status.HTTP_403_FORBIDDEN)
-
-        response = file_response_for_record(dl_request.record)
-        if not response:
-            return Response(
-                {"detail": "No downloadable file is available for this record."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        # TODO(SRS): apply per-user watermark (email, date) before streaming when required
-        return response
 
 
 class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):

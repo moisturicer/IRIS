@@ -228,6 +228,9 @@ SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
 
+# How long an approved download request lets its requester download (ADR-048).
+DOWNLOAD_GRANT_DAYS = config("DOWNLOAD_GRANT_DAYS", default=30, cast=int)
+
 # An explicit allowlist, always — there is no "allow all" switch in any
 # settings module, and production.py refuses to start if one reappears.
 # CORS_ALLOW_CREDENTIALS below is why: with credentials enabled, a wildcard
