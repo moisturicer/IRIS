@@ -407,7 +407,8 @@ class RoutingOptionsTests(RoutingTestBase):
 
         self.client.force_authenticate(self.adviser)
         self.assertEqual(
-            self.client.get(detail).data["routing"], {"accept_and_route": True, "route_as": None},
+            self.client.get(detail).data["routing"],
+            {"accept_and_route": True, "route_as": None, "targets": []},
         )
 
         self.accepted_to(record, Party.ITSO)
@@ -415,4 +416,7 @@ class RoutingOptionsTests(RoutingTestBase):
         self.client.force_authenticate(self.adviser)
         self.assertFalse(self.client.get(detail).data["routing"]["accept_and_route"])
         self.client.force_authenticate(self.itso)
-        self.assertEqual(self.client.get(detail).data["routing"]["route_as"], Party.ITSO)
+        routing = self.client.get(detail).data["routing"]
+        self.assertEqual(routing["route_as"], Party.ITSO)
+        # IR-685: exactly the offices ITSO may route to, in the graph's order.
+        self.assertEqual([t["party"] for t in routing["targets"]], [Party.IERC, Party.KTTO])

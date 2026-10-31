@@ -456,6 +456,12 @@ export interface AddReviewerOptions {
 export interface RoutingFlags {
   accept_and_route: boolean;
   route_as:         Party | null;
+  /**
+   * Where onward *Route* may send this record, as the server's party graph
+   * has it (IR-685): *Request review* lists exactly these. Empty when the
+   * viewer cannot route.
+   */
+  targets:          { party: Party; label: string }[];
 }
 
 /** One office the routing dialog offers (`GET /records/<id>/route-options/`). */

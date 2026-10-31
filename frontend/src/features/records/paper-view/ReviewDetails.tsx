@@ -1,8 +1,8 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { cn, formatDate } from "@/lib/utils";
-import type { RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState } from "@/types/records";
+import { cn, formatDate, joinLabels } from "@/lib/utils";
+import type { RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState, TrackerSeat } from "@/types/records";
 
 import { dueText } from "./ReviewStatus";
 
@@ -15,6 +15,20 @@ const STATE_ICON: Partial<Record<TrackerPartyState, string>> = {
   completed: "fa-circle-check",
   withdrawn: "fa-circle-minus",
   awaiting: "fa-clock",
+};
+
+/** A person's glyph: their verdict once finished, else how far their seat has got. */
+const VERDICT_ICON: Partial<Record<string, string>> = {
+  approved: "fa-circle-check",
+  negative_finding: "fa-flag",
+  declined: "fa-rotate-left",
+  rejected: "fa-ban",
+};
+const SEAT_ICON: Record<TrackerSeat["state"], string> = {
+  assigned: "fa-clock",
+  in_review: "fa-circle-dot",
+  done: "fa-circle-check",
+  withdrawn: "fa-circle-minus",
 };
 
 /** The flags an author set on submission, in the submission form's terms. */
@@ -37,15 +51,21 @@ export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`
  * Who is reviewing, due dates and participants are review content: the
  * tracker sends seats and reviews as null to a viewer who may not read the
  * review (IR-479), and then those sections are withheld, not shown empty.
- * `reviewerActions` is the host's Request review and Add a colleague, from
- * the viewer's capabilities.
+ *
+ * Reviewers lists every party the tracker sends (IR-685): one not involved
+ * reads as the tracker says, an unclaimed Pool as the office itself. The host
+ * passes `requestReview` (the gear on the heading, with the routing flags'
+ * targets) and `addColleague` only when the viewer may take them; the two
+ * stay separate controls.
  */
-export function ReviewDetails({ record, tracker, ids, reviewerActions }: {
+export function ReviewDetails({ record, tracker, ids, requestReview, addColleague }: {
   record: RecordDetail;
   tracker: RecordTracker;
   ids: string;
-  reviewerActions?: ReactNode;
+  requestReview?: { targets: string[]; onOpen: () => void };
+  addColleague?: ReactNode;
 }) {
+  const requestNoteId = useId();
   const readable = tracker.reviews !== null;
   const asked = tracker.parties.filter((p) => !UNASKED.has(p.state));
   const authors = record.authors.map((a) => a.name);
@@ -66,13 +86,19 @@ export function ReviewDetails({ record, tracker, ids, reviewerActions }: {
 
   return (
     <div className="space-y-5">
-      <Section id={detailsTarget(ids, "reviewers")} title={`Reviewers · ${asked.length} ${asked.length === 1 ? "party" : "parties"}`}>
-        {asked.length === 0 ? <p className="text-small text-stone-600">No party has been asked yet.</p> : (
+      <Section id={detailsTarget(ids, "reviewers")} title="Reviewers" action={requestReview && (
+        <button type="button" aria-label="Request review" title="Request review" aria-describedby={requestNoteId}
+          onClick={requestReview.onOpen} className={cn("review-control text-stone-600 hover:text-brand", FOCUS_RING)}>
+          <i className="fas fa-gear" aria-hidden />
+        </button>
+      )}>
+        {requestReview && <p id={requestNoteId} className="text-2xs text-stone-600">Can be sent to {joinLabels(requestReview.targets)}</p>}
+        {tracker.parties.length === 0 ? <p className="text-small text-stone-600">No party has been asked yet.</p> : (
           <ul className="space-y-3">
-            {asked.map((row) => <PartyReviewers key={row.party} row={row} ids={ids} readable={readable} />)}
+            {tracker.parties.map((row) => <PartyReviewers key={row.party} row={row} ids={ids} readable={readable} />)}
           </ul>
         )}
-        {reviewerActions}
+        {addColleague}
       </Section>
       <Section title="Researchers">
         {authors.length ? <ul className="space-y-1">{authors.map((n) => <li key={n}><Person name={n} role="Researcher" /></li>)}</ul>
@@ -147,11 +173,12 @@ export function ReviewDetails({ record, tracker, ids, reviewerActions }: {
   );
 }
 
-function Section({ id, title, children }: { id?: string; title: string; children: ReactNode }) {
+function Section({ id, title, action, children }: { id?: string; title: string; action?: ReactNode; children: ReactNode }) {
   const headingId = useId();
+  const heading = <h3 id={headingId} className="font-display text-base font-semibold text-stone-900">{title}</h3>;
   return (
     <section id={id} tabIndex={id ? -1 : undefined} aria-labelledby={headingId} className={cn("space-y-2 border-t border-stone-200 pt-4 first:border-0 first:pt-0", FOCUS_RING)}>
-      <h3 id={headingId} className="font-display text-base font-semibold text-stone-900">{title}</h3>
+      {action ? <div className="flex items-center justify-between gap-2">{heading}{action}</div> : heading}
       {children}
     </section>
   );
@@ -162,27 +189,31 @@ function Fact({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
 }
 
 function PartyReviewers({ row, ids, readable }: { row: TrackerPartyRow; ids: string; readable: boolean }) {
-  const seats = (row.seats ?? []).filter((s) => s.state !== "withdrawn");
+  // The tracker sends only the withdrawn seats a Decision cut short, labelled so.
+  const seats = row.seats ?? [];
   const outcome = row.outcome && row.outcome !== "pending" ? row.outcome_label : null;
+  const unasked = UNASKED.has(row.state);
   return (
     <li id={detailsTarget(ids, row.party)} tabIndex={-1} className={cn("rounded", FOCUS_RING)}>
-      <p className="flex items-center gap-2 text-small font-semibold text-stone-900">
-        {row.label}
+      <p className={cn("flex items-center gap-2 text-small font-semibold", unasked ? "text-stone-600" : "text-stone-900")}>
+        <span>{row.label}</span>
         <span className="text-2xs font-normal text-stone-600">
           <i className={cn("fas mr-1", STATE_ICON[row.state] ?? "fa-circle")} aria-hidden />
           {[row.state_label, outcome, row.changes_requested ? "Changes requested" : null].filter(Boolean).join(" · ")}
         </span>
       </p>
       {row.in_pool ? (
-        <p className="mt-1 text-small text-stone-600">
-          <i className="fas fa-users mr-2" aria-hidden />{row.label} review pool · Nobody has claimed it
-        </p>
+        // The office, not a person: nobody holds a seat to show.
+        <p className="mt-1 text-small text-stone-600"><i className="fas fa-users mr-2" aria-hidden />Nobody has claimed this yet</p>
       ) : readable && seats.length > 0 && (
         <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-1">
           {seats.map((seat, i) => (
             <li key={i} className="flex items-center justify-between gap-2">
               <Person name={seat.reviewer_name ?? "A reviewer"} role={row.label} />
-              <span className="text-2xs text-stone-600">{seat.verdict_label ?? seat.state_label}</span>
+              <span className="text-2xs text-stone-600">
+                <i className={cn("fas mr-1", (seat.verdict && VERDICT_ICON[seat.verdict]) ?? SEAT_ICON[seat.state])} aria-hidden />
+                {seat.verdict_label ?? seat.state_label}
+              </span>
             </li>
           ))}
         </ul>
