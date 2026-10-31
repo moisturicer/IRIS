@@ -17,6 +17,45 @@ regression cases. Final command results are recorded in the PR.
 re-collection remain outstanding. Existing consent stamps are not renewed.
 See [the processing inventory and review checklist](../compliance/IR-123-processing-review.md).
 
+## IR-704 / IR-706 · Sign in opens in the Dossier frame
+
+`LoginPage` uses the new `EntryFrame` (`components/auth/EntryFrame.tsx`), built
+beside `AuthLayout`: register, verify and pending stay on the split frame until
+IR-707 and IR-710 move them. The masthead is the one visible h1 (both logos at
+natural proportions, the CIT-U logo's alt text naming the university), with a
+Register link at every width. "Welcome Back" stays the h2. The lede's
+sentence follows the folder on a phone. The footer carries no policy link (IR-214).
+Every IR-236/536/555/645 sign-in behaviour is unchanged; the link under the form
+reads "Register" (was "Sign up").
+
+**Verification (2026-10-31):** `LoginPage.test.tsx` adds six frame cases: one h1
+naming IRIS and CIT-U, two Register links and no "Sign up", a non-interactive
+Sign in tab, the lede, a link-free footer, and a failed sign-in with exactly one
+live region and the fields marked invalid with no description. All 49 cases
+pass, the 43 existing ones unchanged. `entryTokens.test.ts` now reads
+`EntryFrame.tsx`; it, `entryHeadings.test.tsx` and `palette.test.ts` pass.
+
+**Browser evidence (headless Chrome, 2026-10-31):** 320×640, 360×640, 390×844,
+768×1024, 1024×768, 1280×720, 1440×900 and 1745×980: no horizontal overflow and
+exactly one visible h1 at every size. The email field's bottom edge sits at
+464 px (of 640) at 360×640 and at 544 px (of 720) at 1280×720. Tap targets at
+every width: masthead Register 52×44, Show 46×44, Forgot password? 129×44,
+Sign In 52 px tall, Register under the form 56×44. Below 768 px the headline is
+left-aligned, with the sentence after the folder; from 768 px both are centred
+above it. Contrast: Sign In 12.34:1, the tab
+12.34:1, the lede sentence 9.84:1 on the canvas. At 360 px Tab runs masthead
+Register → email → password → Show → Forgot password? → Sign In → Register,
+each with a visible maroon ring or outline. The folder's computed animation is
+`sheet-settle 0.28s` with motion allowed and `none` under
+`prefers-reduced-motion: reduce`.
+
+**Design exception verification (2026-10-31):** the approved tab's maroon top
+edge is scoped to `EntryFrame.tsx` in both the root and frontend-local
+Impeccable configs. Running `impeccable detect src/components/auth/EntryFrame.tsx`
+from `frontend/` passes after adding the local config; before it, the same scan
+reported `border-accent-on-rounded` at line 134. This is a source regex check,
+not a rendered-page accessibility check.
+
 ## IR-538 · Announced email verification in the shared entry frame
 
 `EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains
@@ -1829,3 +1868,21 @@ Authority: IR-702 under IR-605; IR-607's label-review gate ([review.md](../evalu
 **Executed evidence (2026-10-31).** Backend, in the `iris-backend` image against the compose Postgres: `apps/reviews/test_readiness.py` (7 tests: verdict/Decision parity in every scenario, an accepted Decision when `ready`, a blocker for every `decision.blocked` reason including *Open the review first*, an office blocked only by its own revision or document request, claim offered only to the pool, and `null` exactly where `may_read_review` refuses) and `apps/records/test_review_claim.py` (3) pass; the wider `apps/reviews apps/records apps/documents core` run exited 0 with no failures (its summary line was not captured). Frontend: `npm run build` passed; `npm run lint` 0 errors, 6 existing warnings; Paper View tests 434 passed, including 16 IR-681 page tests (Readiness order and wording, undisclosed Readiness, Reviewers by party with an unclaimed pool, sidebar section order, Request review/Add a colleague from capabilities, profile card focus return, withheld review-only sections, folded Details links, single primary action, keyboard/drag clamps, reset, unavailable storage, breakpoints and drawer). The full `npm test` run had 1417 of 1418 passing; the one failure, SignupPage "names every control", is in a file this change does not touch and passed 28/28 when rerun alone. Two IR-681 page tests written before Reviewers existed asserted the old "Where it stands" heading and were changed deliberately, as the contract replaces that strip. **Visual comparison (2026-10-31).** In Chrome at 1600px, against `frontend/docs/review-workspace.html` (the IR-678 prototype, ITSO viewer), with the real Paper View page on synthetic fixtures served from this worktree. Region order, the pane head, Reviewers by party with an unclaimed pool, the sidebar's section order and the footer match. Three drifts were fixed: the head now carries the holder chip and the prototype's *Your readiness* summary with *View why*, the verdict is a white card with a maroon edge, and footer and sidebar acts are sized 36px for a pointer and 44px for touch. Checked at 1150px (Details folds into a tab) and 860px (drawer with Back to paper). Not compared: the prototype's later-phase panels, which the contract excludes. The reader opens at its existing 140%, wider than the prototype's 100%, and scrolls sideways in the narrower paper column.
 
 **Not built here.** Records carry no college or program, so Classification shows type, area and PSCED only; the contract forbids reconstructing them in the browser. Profile cards show only the person's name and part in this record, which the page already reads; a server profile projection is not built. Changes, Threads, review submissions and the later-phase prototype panels are excluded by the contract.
+
+## IR-686 — sidebar paper details and permission-filtered profile cards
+
+**Authority and scope.** IR-686; ADR-032 §10 and screen spec 16 §4. Record detail projects `paper_details`: owner researchers, Adviser, affiliation Classification, ADR-018 office hints, participants and active-party due dates. The sidebar renders the payload in the specified order, with Keywords and Version empty states and links to documents. Tracker seats now carry reviewer identity so two people with the same name open their own cards. The same content is used in the Details tab below 1200 px; profile cards escape the scroll container, stay inside the viewport, close on Escape/outside click and return focus.
+
+**Privacy resolution (Lee Jasmin Adolfo, 2026-10-31).** Preserve IR-540's existing registration visibility. A person's affiliation is disclosed to that person and RDCO; active listed Advisers also disclose the picker's email, college and department. Owner email is already disclosed on record owners. Other reviewer cards contain name and office only. Classification uses the owners' stored student-profile affiliations, not invented record metadata: colleges/programs are `null` unless the viewer can read every owner's affiliation, and empty lists mean no affiliation is recorded. A coowner cannot read another coowner's program through Classification. Publicly shareable record-level affiliation would require a separate policy/model decision. The existing seeded College → Department → Course catalogue contains the supplied six CIT-U colleges; no new catalogue or data migration is introduced.
+
+Participants and due dates are `null` under `may_read_review` refusal, including for unrelated RDCO staff: registration access does not grant review-history access. The sidebar omits those sections. Withheld card fields remain null; the client never fills them from Classification or other people.
+
+**Executed verification (2026-10-31).** Isolated `iris-backend` test container on `iris_default`, with the worktree mounted and declared development requirements installed (the original image lacks pypdf): `python manage.py check` passed; `apps/records/test_paper_details.py` passed 9 API tests. Tests cover an unrelated published-paper reader, self/coowner visibility, RDCO with and without review access, duplicate names, withdrawn/completed seats, ADR-018 flags, missing profiles, inactive Advisers and paused/overdue deadlines. The first targeted frontend run exposed outside-click focus loss; the handler was corrected, and the subsequent PaperViewPage/ReviewStatus run passed 160 tests. TypeScript/Vite production build passed; lint has zero errors and six existing warnings. Final portal-positioning verification and wider suites are recorded below when complete.
+
+**Deliberate fixture changes.** IR-681 sidebar tests now supply the server's person-card projection instead of relying on `adviser_name` or synthesizing participants from tracker names. Their expected section order includes Version's explicit empty state. New IR-686 page cases cover 1600/1100 px, all sections, owners instead of imported authors, classification and office hints, deadlines, document links, permitted contact fields, withheld fields, Escape/outside-click dismissal and focus return.
+
+**Final frontend and review verification (2026-10-31).** Full frontend suite: 110 files / 1,422 tests passed after the portal and focus fixes. Standards review found one overlay-token issue; Spec review found unauthenticated bare document links. Both were fixed and both reviewers rechecked with zero unresolved findings. Final affected-suite run: PaperViewPage + ReviewStatus, 161 tests passed, including authenticated supplementary/version download clicks and current manuscript failure/retry. Final TypeScript/Vite build passed; lint remains zero errors / six existing warnings. Backend flake8 on all four touched Python modules passed.
+
+**Browser card geometry and interaction.** [Measurements](evidence/IR-686/browser-check.json) and [1600 px](evidence/IR-686/profile-1600.png), [1100 px](evidence/IR-686/profile-1100.png), [375 px](evidence/IR-686/profile-375.png) screenshots use the real ReviewDetails component and styles on a synthetic isolated fixture. At every viewport, the final participant's card stays inside the viewport, Escape and outside click close it, and focus returns. This checks the card, not the full review page; the actual page's wide/sidebar and folded Details-tab behavior is covered by the 1600/1100 px page tests.
+
+**Final backend regression result (2026-10-31).** `python -m pytest apps/records apps/reviews apps/documents core` (invoked through `pytest.main` with the isolated test database name `test_ir686_sidebar`) completed: **996 passed, 3 skipped, 400 subtests passed**, exit 0. This includes the nine new paper-details API tests and the existing tracker, review-privacy, document-authorization, deadline and readiness tests. Runtime was 17m48s on the local Docker database. Warnings include absent local staticfiles and existing unordered supplementary-file pagination. No migration or live-data mutation is part of this change. PR: [IR-686 #384](https://github.com/moisturicer/IRIS/pull/384).

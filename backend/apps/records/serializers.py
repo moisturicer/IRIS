@@ -227,6 +227,9 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # `{derived_from, continued_as}`: the Proposal this continues and what
     # continues it (ADR-032 §6, IR-417), each only if the viewer may open it.
     lineage              = serializers.SerializerMethodField()
+    # The review sidebar's paper details and profile cards (IR-686);
+    # participants and due dates are `None` to a viewer refused the review.
+    paper_details        = serializers.SerializerMethodField()
 
     def _workflow(self, obj):
         """
@@ -391,6 +394,14 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             return None
         return versions_payload(obj)
 
+    def get_paper_details(self, obj):
+        from .paper_details import paper_details
+
+        return paper_details(
+            obj, self._viewer(), readable=self._readable(obj),
+            deadlines=self._workflow(obj)["assignment_deadlines"],
+        )
+
     def get_manuscript_unsubmitted(self, obj):
         from .versions import manuscript_unsubmitted
 
@@ -515,6 +526,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
             "versions", "manuscript_unsubmitted", "submitter_status", "lineage",
+            "paper_details",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as
