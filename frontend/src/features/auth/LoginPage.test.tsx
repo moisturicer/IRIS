@@ -89,6 +89,10 @@ describe("the login screen", () => {
  * so its accessible name says whose system this is.
  */
 describe("the frame sign in opens in", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("names IRIS and CIT-U in the masthead, the page's only top-level heading", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
@@ -147,13 +151,14 @@ describe("the frame sign in opens in", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
     // One live region in the whole page: the banner. The fields say nothing.
+    // `aria-live` has no role to query by, so the live-region semantics are
+    // read as attributes -- still the accessible tree, never a class or test id.
     expect(container.ownerDocument.querySelectorAll('[role="alert"], [role="status"], [aria-live]')).toHaveLength(1);
     const email = screen.getByRole("textbox", { name: "Email Address" });
     expect(email).toBeInvalid();
     expect(email).not.toHaveAccessibleDescription();
     expect(screen.getByLabelText("Password")).toBeInvalid();
     expect(screen.getByLabelText("Password")).not.toHaveAccessibleDescription();
-    vi.restoreAllMocks();
   });
 });
 

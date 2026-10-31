@@ -38,8 +38,11 @@ pass, the 43 existing ones unchanged. `entryTokens.test.ts` now reads
 **Browser evidence (headless Chrome, 2026-10-31):** 320×640, 360×640, 390×844,
 768×1024, 1024×768, 1280×720, 1440×900 and 1745×980: no horizontal overflow and
 exactly one visible h1 at every size. The email field's bottom edge sits at
-464 px (of 640) at 360×640 and at 544 px (of 720) at 1280×720. The masthead
-Register link is 52×44 px at every width. Contrast: Sign In 12.34:1, the tab
+464 px (of 640) at 360×640 and at 544 px (of 720) at 1280×720. Tap targets at
+every width: masthead Register 52×44, Show 46×44, Forgot password? 129×44,
+Sign In 52 px tall, Register under the form 56×44. Below 768 px the headline is
+left-aligned, with the sentence after the folder; from 768 px both are centred
+above it. Contrast: Sign In 12.34:1, the tab
 12.34:1, the lede sentence 9.84:1 on the canvas. At 360 px Tab runs masthead
 Register → email → password → Show → Forgot password? → Sign In → Register,
 each with a visible maroon ring or outline. The folder's computed animation is

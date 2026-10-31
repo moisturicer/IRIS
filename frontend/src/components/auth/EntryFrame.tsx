@@ -88,12 +88,12 @@ export function EntryFrame({ crossLink, lede, tabs, before, children }: EntryFra
 
       <main className="flex flex-1 flex-col items-center px-4 pb-12 pt-section sm:px-8 sm:pt-10 lg:pt-12">
         {lede && (
-          <p className="order-1 max-w-4xl text-balance font-display text-4xl font-semibold leading-tight text-stone-900 sm:text-center sm:text-5xl lg:text-6xl">
+          <p className="order-1 max-w-4xl text-balance font-display text-4xl font-semibold leading-tight text-stone-900 sm:text-5xl md:text-center lg:text-6xl">
             {lede.headline}
           </p>
         )}
         {lede && (
-          <p className="order-3 mt-section max-w-2xl text-pretty text-body text-stone-700 sm:text-center md:order-2 md:mt-4 md:text-lg">
+          <p className="order-3 mt-section max-w-2xl text-pretty text-body text-stone-700 md:order-2 md:text-center md:mt-4 md:text-lg">
             {lede.sentence}
           </p>
         )}
@@ -123,11 +123,13 @@ export function EntryFrame({ crossLink, lede, tabs, before, children }: EntryFra
 }
 
 /**
- * A folder tab that only labels the sheet: sign in's one tab. It is not a
+ * A tab on the entry folder that only labels the sheet: sign in's one tab.
+ * Not named for the domain's Folder, which is a reader's group of Saved
+ * Records (CONTEXT.md). It is not a
  * control, so it is neither a link nor a tab role. Register's stepper (IR-707)
  * brings the interactive tabs.
  */
-export function FolderTab({ children }: { children: ReactNode }) {
+export function EntryTab({ children }: { children: ReactNode }) {
   return (
     <span className="-mb-px rounded-t-lg border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
       {children}
