@@ -28,7 +28,7 @@ export function DownloadRequestModal({
       await recordsApi.requestDownload(recordId);
       addToast({
         type:    "success",
-        message: "Download request submitted. You will be notified when it is approved.",
+        message: "Download request sent. You will be notified when RDCO decides.",
       });
       onSubmitted?.();
       onClose();
@@ -50,12 +50,11 @@ export function DownloadRequestModal({
         <p className="text-[14px] text-gray-600 leading-relaxed">
           You are requesting permission to download documents for{" "}
           <span className="font-semibold text-gray-900">{recordTitle}</span>.
-          Staff will review your request. If approved, you will receive a secure download link
-          valid for 24 hours.
+          RDCO will review your request. If they approve it, you can download the paper here
+          while signed in, for a limited time.
         </p>
         <p className="text-[13px] text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
-          Downloads are for authorized use only. Do not redistribute approved files without
-          permission.
+          Every copy carries your name. Do not redistribute it without permission.
         </p>
         <div className="flex gap-2 justify-end pt-1">
           <button

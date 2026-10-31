@@ -173,6 +173,13 @@ export const recordsApi = {
    */
   versionManuscriptBlob: (id: number, version: number) =>
     apiClient.get<Blob>(`/records/${id}/versions/${version}/manuscript/`, { responseType: "blob" }),
+  /**
+   * A saved copy of the paper (IR-675, IR-676): marked with who it was made
+   * for, and refused with a 403 `code` unless the viewer is exempt or holds a
+   * live grant. Every saved copy goes through here, never the reader's bytes.
+   */
+  downloadCopy:   (id: number) =>
+    apiClient.get<Blob>(`/records/${id}/download/`, { responseType: "blob" }),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   // `dpaAccepted` is required, not optional (IR-226). The backend refuses a
   // submit without consent, and an optional flag would let a future caller

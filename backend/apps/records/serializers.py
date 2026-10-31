@@ -162,6 +162,20 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return has_record_download_file(obj)
 
+    # Where the viewer's own download stands (IR-677, ADR-048). Null for an
+    # anonymous viewer, who cannot ask.
+    download            = serializers.SerializerMethodField()
+
+    def get_download(self, obj):
+        from .download_service import download_state
+
+        viewer = self._viewer()
+        if viewer is None or not viewer.is_authenticated:
+            return None
+        state = download_state(viewer, obj)
+        expires = state["grant_expires_at"]
+        return {**state, "grant_expires_at": serializers.DateTimeField().to_representation(expires) if expires else None}
+
     ai_hook             = serializers.SerializerMethodField()
     # Paper View's byline credits the adviser by name (IR-472). It rides on
     # the record's own visibility: whoever may read the record may read this.
@@ -514,7 +528,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "id", "title", "abstract", "abstract_file",
             "year_accomplished", "year_completed", "origin", "publication_year",
             "classification", "psced", "record_type",
-            "classification_name", "record_type_name", "file_count", "has_manuscript", "ai_hook",
+            "classification_name", "record_type_name", "file_count", "has_manuscript", "download", "ai_hook",
             "adviser", "adviser_name", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",

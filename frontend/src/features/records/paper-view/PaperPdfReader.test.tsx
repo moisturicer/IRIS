@@ -6,7 +6,8 @@
  * What is under test is this component's own logic around it -- fetching
  * through `apiClient` (never a bare URL, which would 401 against the
  * authenticated manuscript endpoint), landing on the cited passage, drawing
- * regions on the right page and no other, and the zoom/download affordances.
+ * regions on the right page and no other, the zoom affordances, and the
+ * download control the caller hands it.
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
@@ -87,8 +88,8 @@ function pdfBlob() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // jsdom has no `URL.createObjectURL`/`revokeObjectURL` -- the reader uses
-  // both for the download affordance.
+  // jsdom has no `URL.createObjectURL`/`revokeObjectURL`; stubbed so
+  // nothing the reader renders trips over them.
   URL.createObjectURL = vi.fn(() => "blob:mock-url");
   URL.revokeObjectURL = vi.fn();
   manuscriptBlob.mockResolvedValue({ data: pdfBlob() });
@@ -174,9 +175,8 @@ describe("landing on a cited passage (IR-354)", () => {
   const PASSAGE_HIGH: Region[] = [{ page: 2, left: 0.1, top: 0.02, right: 0.9, bottom: 0.05 }];
 
   /**
-   * The reader's parts. The paper is found by its role and name; the toolbar
-   * and the pane have neither, so they are reached from what does -- the
-   * toolbar is what holds the Download control, the pane what holds both.
+   * The reader's parts, found by role and name; the pane has neither, so it
+   * is reached from the paper it holds.
    */
   async function openReader(contained = false) {
     const view = render(
@@ -187,7 +187,7 @@ describe("landing on a cited passage (IR-354)", () => {
     return {
       ...view,
       area,
-      toolbar: screen.getByRole("button", { name: "Download" }).parentElement as HTMLElement,
+      toolbar: screen.getByRole("toolbar", { name: "Paper tools" }),
       pane: area.parentElement as HTMLElement,
     };
   }
@@ -384,25 +384,34 @@ describe("zoom controls", () => {
   });
 });
 
-describe("downloading the paper", () => {
-  it("offers a download once the file has loaded, with no second request", async () => {
+describe("saving a copy (IR-677)", () => {
+  // The reader used to save the bytes it had fetched. Under ADR-048 every
+  // saved copy goes through the download route, which marks it (IR-676), so
+  // the reader holds the caller's control and saves nothing itself.
+  it("shows the caller's download control in its toolbar", async () => {
     render(
-      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+      <PaperPdfReader
+        recordId={7}
+        scrollToPage={null}
+        highlightRegions={[]}
+        navKey="a"
+        downloadControl={<button type="button">Request download</button>}
+      />,
     );
+    await screen.findByText("Page 1 / 3");
 
-    const button = await screen.findByRole("button", { name: /download/i });
-    await userEvent.click(button);
-
-    expect(downloadBlob).toHaveBeenCalledTimes(1);
-    expect(manuscriptBlob).toHaveBeenCalledTimes(1);
+    const toolbar = screen.getByRole("toolbar", { name: "Paper tools" });
+    expect(within(toolbar).getByRole("button", { name: "Request download" })).toBeInTheDocument();
   });
 
-  it("disables download until the file has loaded", () => {
+  it("offers no download of its own", async () => {
     render(
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
     );
+    await screen.findByText("Page 1 / 3");
 
-    expect(screen.getByRole("button", { name: /download/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /download/i })).not.toBeInTheDocument();
+    expect(downloadBlob).not.toHaveBeenCalled();
   });
 });
 
@@ -733,8 +742,8 @@ describe("find in this paper (IR-353)", () => {
     }));
   }
 
-  /** The reader's toolbar: what holds the Download control. */
-  const toolbar = () => screen.getByRole("button", { name: "Download" }).parentElement as HTMLElement;
+  /** The reader's toolbar. */
+  const toolbar = () => screen.getByRole("toolbar", { name: "Paper tools" });
 
   it("is a find of its own in the reader's toolbar, apart from the header's search", async () => {
     await openPaper();
