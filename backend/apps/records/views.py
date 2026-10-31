@@ -19,6 +19,7 @@ from core.enums import (
     PUBLICLY_VISIBLE_STATUSES,
     IPType,
     PipelineStatus,
+    RecordTypeName,
     RequestStatus,
 )
 from . import lifecycle
@@ -45,7 +46,7 @@ from .serializers import (
     DeleteRequestSerializer,
 )
 from .filters import RecordFilter
-from .services import soft_delete_record, parse_excel_import
+from .services import ImportChoices, check_import_row, soft_delete_record, parse_excel_import
 from apps.notifications.services import (
     notify_new_record,
     notify_download_request,
@@ -1095,14 +1096,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         Creates published records from each valid row and returns a plaintext log.
         Legacy imports bypass the review pipeline — staff is the implicit reviewer.
 
-        Rows are independent, and a row is saved whole or not at all: its
-        Record, primary owner and authors share one savepoint, so a failed
-        write leaves nothing of it behind (IR-637).
+        Rows are independent. A row whose values cannot be accepted is skipped
+        with every reason (`check_import_row`, IR-638), and a row is saved
+        whole or not at all: its Record, primary owner and authors share one
+        savepoint, so a failed write leaves nothing of it behind (IR-637).
         """
         from django.db import transaction
 
         from .models import Author, RecordOwner
-        from .models import RecordType, Classification, PSCEDClassification
 
         file = request.FILES.get("file")
         if not file:
@@ -1125,38 +1126,20 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         created = 0
         failed  = len(parse_errors)
+        choices = ImportChoices()
 
         for row in rows:
+            values, problems = check_import_row(row, choices)
+            if problems:
+                log_lines.append(f"Row {row['row_num']}: skipped — {'; '.join(problems)}.")
+                failed += 1
+                continue
             try:
-                record_type = RecordType.objects.filter(
-                    name__iexact=row["record_type_name"]
-                ).first()
-
-                classification = (
-                    Classification.objects.filter(name__iexact=row["classification_name"]).first()
-                    if row["classification_name"] else None
-                )
-                psced = (
-                    PSCEDClassification.objects.filter(name__iexact=row["psced_name"]).first()
-                    if row["psced_name"] else None
-                )
-
                 with transaction.atomic():
                     record = Record.objects.create(
-                        title                = row["title"],
-                        origin               = row["origin"],
-                        publication_year     = row["publication_year"],
-                        abstract             = row["abstract"],
-                        year_accomplished    = row["year_accomplished"],
-                        year_completed       = row["year_completed"],
-                        record_type          = record_type,
-                        classification       = classification,
-                        psced                = psced,
-                        is_ip                = row["is_ip"],
-                        for_commercialization= row["for_commercialization"],
-                        community_extension  = row["community_extension"],
-                        added_by             = request.user,
-                        pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
+                        **values,
+                        added_by        = request.user,
+                        pipeline_status = lifecycle.LEGACY_IMPORT_STATUS,
                     )
                     RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
                     for author_name in row["authors"]:
@@ -1242,7 +1225,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "This study proposes a tamper-proof academic credential system using distributed ledger technology.",
             2024,
             2024,
-            "Thesis/Research",
+            RecordTypeName.THESIS_RESEARCH,
             "Applied Sciences",
             "Information and Communication Technologies",
             "FALSE",
@@ -1261,7 +1244,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "Optional",
             "e.g. 2024",
             "e.g. 2024",
-            "Proposal / Thesis/Research / Project",
+            "Project, Proposal or Thesis / Research",
             "Exact name from the system",
             "Exact name from the system",
             "TRUE or FALSE",
