@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { recordsApi } from "@/api/records";
 import { Button, Skeleton } from "@/components/ui";
 import { useElementWidth } from "@/hooks/useElementWidth";
-import { cn, downloadBlob } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import {
   loadPdfDocument,
   pageSize,
@@ -23,7 +23,6 @@ import {
   READING_PANE_HEIGHT,
   READING_SPLIT_PX,
 } from "./paneLayout";
-import { CONTROL_SIZE } from "./controls";
 import {
   MAX_SCALE,
   MIN_SCALE,
@@ -187,6 +186,12 @@ export interface PaperPdfReaderProps {
    * so it never moves and the window never scrolls to it.
    */
   fill?: boolean;
+  /**
+   * The toolbar's download control (IR-677): the caller's, because only the
+   * record knows where the viewer's download stands. Absent, there is none --
+   * the bytes this reader holds are never saved as a copy (ADR-048).
+   */
+  downloadControl?: ReactNode;
 }
 
 /**
@@ -203,8 +208,8 @@ export interface PaperPdfReaderProps {
  *
  * Fetched as a blob through `apiClient`, not a plain `<a href>`: the
  * manuscript endpoint requires `IsAuthenticated`, and only a request carrying
- * the bearer token in memory can reach it. The same blob backs the
- * download/open-in-new-tab affordance below with no second request.
+ * the bearer token in memory can reach it. Saving a copy is not this blob:
+ * it goes through the download route, which marks it (`downloadControl`).
  */
 export function PaperPdfReader({
   recordId,
@@ -214,13 +219,12 @@ export function PaperPdfReader({
   navKey,
   contained = false,
   fill = false,
+  downloadControl,
 }: PaperPdfReaderProps) {
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const [pages, setPages] = useState<PdfPage[]>([]);
   const [zoom, setZoom] = useState<number | "fit" | null>(null);
-  const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-  const [downloadBytes, setDownloadBytes] = useState<Blob | null>(null);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
   const destroyRef = useRef<(() => Promise<void>) | null>(null);
   const paneRef = useRef<HTMLDivElement>(null);
@@ -289,8 +293,6 @@ export function PaperPdfReader({
         if (cancelled) return;
 
         setPages(loaded);
-        setDownloadBytes(data);
-        setDownloadUrl(URL.createObjectURL(data));
         setStatus("ready");
       } catch {
         if (!cancelled) setStatus("error");
@@ -303,12 +305,6 @@ export function PaperPdfReader({
       destroyRef.current = null;
     };
   }, [recordId, version, attempt]);
-
-  useEffect(() => {
-    return () => {
-      if (downloadUrl) URL.revokeObjectURL(downloadUrl);
-    };
-  }, [downloadUrl]);
 
   /**
    * Brings `region` of page `pageNumber` to rest just below the reader's
@@ -399,10 +395,6 @@ export function PaperPdfReader({
   const zoomIn = () => setZoom(Math.min(MAX_SCALE, +(scale + SCALE_STEP).toFixed(2)));
   const zoomOut = () => setZoom(Math.max(MIN_SCALE, +(scale - SCALE_STEP).toFixed(2)));
 
-  const handleDownload = () => {
-    if (downloadBytes) downloadBlob(downloadBytes, version == null ? `record-${recordId}.pdf` : `record-${recordId}-v${version}.pdf`);
-  };
-
   if (status === "error") {
     return (
       <div className="flex flex-col items-center gap-3 py-16 px-6 text-center rounded-2xl border border-stone-200 bg-stone-50">
@@ -437,6 +429,8 @@ export function PaperPdfReader({
     >
       <div
         ref={toolbarRef}
+        role="toolbar"
+        aria-label="Paper tools"
         className={cn(
           fill
             ? "shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-stone-100 border-b border-stone-200"
@@ -511,18 +505,7 @@ export function PaperPdfReader({
         )}
         {fill && <span aria-hidden className="flex-1" />}
 
-        <Button
-          variant="ghost"
-          size={fill ? "sm" : "icon"}
-          onClick={handleDownload}
-          disabled={!downloadBytes}
-          aria-label="Download"
-          title="Download the paper"
-          className={cn(fill && "text-stone-600", fill && CONTROL_SIZE)}
-        >
-          <i className="fas fa-download" aria-hidden />
-          {fill && <span aria-hidden className="hidden reading-split:inline">Download</span>}
-        </Button>
+        {downloadControl}
 
         {/* A row of its own inside the toolbar, so it sticks with it and a
             match lands below both. */}

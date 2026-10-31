@@ -335,6 +335,8 @@ export interface RecordDetail extends RecordListItem {
    * not read the review: not disclosed, which is not "nothing to say".
    */
   readiness?:           Readiness | null;
+  /** The viewer's own download state; null when signed out, absent on older APIs (IR-677). */
+  download?:            DownloadState | null;
   /** A server-offered claim from the viewer's office Pool; absent on older APIs. */
   review_claim?:        { assignment: number; label: string; party_label: string } | null;
   /**
@@ -880,6 +882,22 @@ export interface PSCEDClassification {
 export interface RecordType {
   id:   number;
   name: string;
+}
+
+/**
+ * Where the viewer's own download of a record stands (IR-677, ADR-048), in
+ * the server's words. The page picks its control from `state` and never
+ * decides access itself; the download route re-checks everything.
+ */
+export interface DownloadState {
+  state:            "exempt" | "granted" | "none" | "pending" | "declined" | "revoked" | "expired";
+  allowed:          boolean;
+  /** Server-authored sentence explaining the state. */
+  message:          string;
+  /** When a live grant ends; null unless `state` is "granted". */
+  grant_expires_at: string | null;
+  /** The viewer's own request this state comes from, if any. */
+  request:          number | null;
 }
 
 export interface DownloadRequest {

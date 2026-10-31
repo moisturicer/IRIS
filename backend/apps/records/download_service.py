@@ -116,11 +116,51 @@ def download_access(user, record) -> DownloadAccess:
     decided = next((r for r in requests if r.status != RequestStatus.PENDING), None)
     if decided and grant_is_live(decided):
         return DownloadAccess(allowed=True, source="grant", request=decided)
-    if any(r.status == RequestStatus.PENDING for r in requests):
-        return DownloadAccess(allowed=False, refusal="request_pending")
+    pending = next((r for r in requests if r.status == RequestStatus.PENDING), None)
+    if pending:
+        return DownloadAccess(allowed=False, refusal="request_pending", request=pending)
     if decided is None:
         return DownloadAccess(allowed=False, refusal="request_needed")
     return DownloadAccess(allowed=False, refusal=_REFUSAL_BY_STATUS[decided.status])
+
+
+#: The paper page's state for each refusal (IR-677).
+_STATE_BY_REFUSAL = {
+    "request_needed": "none",
+    "request_pending": RequestStatus.PENDING.value,
+    "request_declined": RequestStatus.DECLINED.value,
+    "request_revoked": RequestStatus.REVOKED.value,
+    "grant_expired": "expired",
+}
+
+#: What an allowed reader is told, by `DownloadAccess.source`.
+DOWNLOAD_ALLOWANCES = {
+    "exempt": "You may download a copy of this paper. It will carry your name.",
+    "grant": "RDCO approved your download request. Each copy will carry your name.",
+}
+
+
+def download_state(user, record) -> dict:
+    """
+    `download_access` for the paper page (IR-677): which control to show and
+    the server's words for it, so the browser never decides access itself.
+    Only the viewer's own request is ever named.
+    """
+    access = download_access(user, record)
+    if access.allowed:
+        state = "exempt" if access.source == "exempt" else "granted"
+        message = DOWNLOAD_ALLOWANCES[access.source]
+    else:
+        state = _STATE_BY_REFUSAL[access.refusal]
+        message = DOWNLOAD_REFUSALS[access.refusal]
+    granted = state == "granted"
+    return {
+        "state": state,
+        "allowed": access.allowed,
+        "message": message,
+        "grant_expires_at": access.request.grant_expires_at if granted else None,
+        "request": access.request.pk if access.request else None,
+    }
 
 
 def copy_identity(user, access: DownloadAccess) -> CopyIdentity:

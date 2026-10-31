@@ -69,6 +69,7 @@ import { useFragmentFocus } from "./useFragmentFocus";
 import { useCitationReference, type CitationResolution } from "./useCitationReference";
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
+import { PaperDownloadControl } from "./PaperDownloadControl";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
 // Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
@@ -580,6 +581,17 @@ export default function PaperViewPage() {
     window.setTimeout(() => setShareState("idle"), 2500);
   };
 
+  /** The viewer's download state may have moved (IR-677): re-read the record. */
+  const reloadRecord = async () => {
+    if (!id) return;
+    try {
+      const { data } = await recordsApi.detail(Number(id));
+      setRecord(data);
+    } catch {
+      // The control keeps its last state; a reload catches up.
+    }
+  };
+
   /** A document or request changed: re-read what derives from it. */
   const handleDocumentRequestChanged = async () => {
     setTrackerVersion((v) => v + 1);
@@ -742,6 +754,19 @@ export default function PaperViewPage() {
           navKey={arrivalKey.current}
           contained={onPaperTab || reviewerWorkspace || tier === "wide"}
           fill={onPaperTab || reviewerWorkspace}
+          downloadControl={
+            // An earlier version is not offered as a copy: the download route
+            // serves only the current paper, and every copy must be marked.
+            viewedVersion ? undefined : (
+              <PaperDownloadControl
+                recordId={record.id}
+                recordTitle={record.title}
+                download={record.download}
+                fill={onPaperTab || reviewerWorkspace}
+                onChanged={reloadRecord}
+              />
+            )
+          }
         />
       </Suspense>
     </>
