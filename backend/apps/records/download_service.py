@@ -14,6 +14,7 @@ from core.enums import RequestStatus
 from core.permissions import is_record_owner, is_record_participant, office_parties_of
 
 from .models import DownloadRequest
+from .watermark import CopyIdentity
 
 
 class OwnDownloadRequest(Exception):
@@ -122,6 +123,16 @@ def download_access(user, record) -> DownloadAccess:
     return DownloadAccess(allowed=False, refusal=_REFUSAL_BY_STATUS[decided.status])
 
 
+def copy_identity(user, access: DownloadAccess) -> CopyIdentity:
+    """What a copy made under `access` says about who it was made for (IR-676)."""
+    return CopyIdentity(
+        name=user.get_full_name(),
+        email=user.email,
+        date=timezone.localdate().isoformat(),
+        basis=f"request #{access.request.pk}" if access.request else access.exemption.replace("_", " "),
+    )
+
+
 def manuscript_download_name(record, stored_name: str, *, version=None) -> str:
     # The stored name is random, not the title (IR-422) -- rebuild a readable
     # download name instead of reading it back off the stored path. An earlier
@@ -151,8 +162,8 @@ def has_record_download_file(record) -> bool:
 
 def resolve_record_download_file(record):
     """
-    Pick the best available PDF for download.
-    Watermarking is not applied here — see download_service TODO when SRS requires it.
+    Pick the best available PDF for download. It comes back unmarked: the
+    download route is what marks a copy that leaves IRIS (`watermark.py`).
     """
     if record.abstract_file:
         return record.abstract_file.open("rb"), _manuscript_download_name(record)
