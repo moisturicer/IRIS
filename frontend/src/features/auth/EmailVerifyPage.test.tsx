@@ -15,7 +15,7 @@ import { Route, Routes } from "react-router-dom";
 import { authApi } from "@/api/auth";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 
 import EmailVerifyPage from "./EmailVerifyPage";
 
@@ -142,5 +142,59 @@ describe("an invalid link", () => {
     const { container } = renderVerify();
     await screen.findByRole("heading", { level: 2, name: "Verification Failed" });
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+/**
+ * The Dossier frame, without its lede (IR-710, IR-704 story 51): the result
+ * sits on the folder's sheet under the masthead, so verification reads as the
+ * same flow as sign in. The sheet already offers every way on, so the
+ * masthead carries no cross-link of its own.
+ */
+describe.each([
+  { result: "verified", title: "Email Verified", arrange: activationSucceeds },
+  { result: "failed", title: "Verification Failed", arrange: () => activationFails() },
+  {
+    result: "expired",
+    title: "Verification Failed",
+    arrange: () => activationFails("Activation link has expired."),
+  },
+])("the frame for a $result link", ({ title, arrange }) => {
+  async function renderResult() {
+    arrange();
+    const view = renderVerify();
+    await screen.findByRole("heading", { level: 2, name: title });
+    return view;
+  }
+
+  it("names IRIS and CIT-U in the masthead, the page's only top-level heading", async () => {
+    await renderResult();
+
+    const [masthead, ...others] = screen.getAllByRole("heading", { level: 1 });
+    expect(others).toEqual([]);
+    expect(masthead).toHaveAccessibleName(/IRIS/);
+    expect(masthead).toHaveAccessibleName(/Cebu Institute of Technology/);
+  });
+
+  it("labels the sheet with an Email verification tab, and draws no brand panel", async () => {
+    await renderResult();
+
+    expect(screen.getByText("Email verification")).toBeInTheDocument();
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+  });
+
+  it("shows no headline or lede sentence", async () => {
+    await renderResult();
+
+    expect(screen.queryByText(/Your research has/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^IRIS is CIT-U's system/)).not.toBeInTheDocument();
+  });
+
+  it("carries CIT-U's name in the footer, with no link in it", async () => {
+    await renderResult();
+
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveTextContent("Cebu Institute of Technology – University");
+    expect(within(footer).queryAllByRole("link")).toEqual([]);
   });
 });

@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cells import (
-    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, Call, Case, Ref, Upload, row,
+    ANON, DENY, HIDE, OK, Call, Case, Ref, Upload, row,
 
 )
 
@@ -244,14 +244,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "download-request-decline": Entry({
         "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={}),
     }),
-    # The token is the credential: no account is needed, and none is enough.
-    "download-redeem": Entry({
+    # Exempt readers and grant holders (ADR-048). `other` holds a grant on
+    # `published`; the role-less superuser holds none and is exempt from nothing.
+    "record-download": Entry({
         "GET": [
-            Case(Call(query={"token": DOWNLOAD_TOKEN}), row(OK, OK, OK, OK, OK, OK, OK, OK, OK),
-                 label="an approved request's token"),
-            Case(Call(query={"token": "forged"}),
-                 row(DENY, DENY, DENY, DENY, DENY, DENY, DENY, DENY, DENY),
-                 label="a forged token"),
+            Case(Call(kwargs={"pk": Ref("published")}), row(ANON, OK, OK, OK, OK, OK, OK, OK, DENY),
+                 label="a published record"),
+            Case(Call(kwargs=RECORD), READS_RECORD, label="a record in review"),
         ],
     }),
 

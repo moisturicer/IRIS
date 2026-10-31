@@ -8,7 +8,6 @@ import { redirectRoutes } from "./redirects";
 import LoginPage         from "@/features/auth/LoginPage";
 import SignupPage        from "@/features/auth/SignupPage";
 import EmailVerifyPage   from "@/features/auth/EmailVerifyPage";
-import DownloadTokenPage from "@/features/download/DownloadTokenPage";
 
 // App shell (sidebar + header wrapper)
 import { AppShell } from "@/components/layout/AppShell";
@@ -37,7 +36,6 @@ export const router = createBrowserRouter([
   { path: "/login",  element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
   { path: "/activate/:uidb64/:token", element: <EmailVerifyPage /> },
-  { path: "/download", element: <DownloadTokenPage /> },
 
   {
     // Every gate below comes from `lib/access.ts`, which the sidebar reads too.

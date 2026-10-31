@@ -49,6 +49,10 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-30 (project lead, IR-419): §7, §10, §12 and Security Impact.** The review discussion is read under `may_read_review` and written by participants only. §12's "404 on the review timeline" is the discussion endpoint's 404 plus `null` in the tracker. See the *Amendment* note under §10.
 
+**Amended 2026-10-31 (project lead, IR-689, spec IR-420): §7 and §8.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. Comments exist on published papers only, never on Discoverable Proposals. Only a comment's writer edits or deletes it; RDCO or a system administrator may remove any comment with a reason; readers report comments to RDCO. Decided by Hermoine Zozobrado in a design session on 2026-10-31 and transcribed by an agent. See the *Amendment* notes under §7 and §8; the original text is kept.
+
+**Amended 2026-10-31 (project lead, IR-311): §8's Discoverable consent text** gains a clause covering the Contact person's email that ADR-029's amendment of the same date adds to the match notification. Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado, transcribed by an agent. See the note under §8.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -357,6 +361,18 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 
 The review discussion remains one record-level timeline, with the same readers, writers and version tags. In Review mode it becomes the **Conversation** tab of the review pane. The timeline is followed by the server-authored **Readiness** panel and the record comment box. Changes and Threads are later phases and their tabs are absent until implemented. This adds no anchored threads, pending review submissions or new discussion channel. The author's existing surfaces remain unchanged. The regions and Readiness contract are specified in the amendment under §10.
 
+**Amendment, 2026-10-31 (project lead, IR-689; spec IR-420): the public thread is "Comments", and who may remove a comment changes.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. It replaces the public-discussion column above where they differ; the review discussion is unchanged.
+
+- **Name.** The interface calls the public thread **Comments** ("Comments (n)"). `CONTEXT.md` defines Comment, Comment report and Review discussion.
+- **Where.** Published papers only. Discoverable Proposals never get comments (see the §8 amendment). A paper that stops being public takes its comments with it; nothing is deleted.
+- **Thread.** Flat and oldest first. A reply carries `reply_to` and is shown in time order with an "In reply to" link, never nested. Plain text up to 2,000 characters, links not clickable, rate-limited. The writer's name, the date, and an **Author** badge when the writer owns the paper; no other role is shown.
+- **Edit and delete: the writer only.** An edit sets an edit time and shows "edited"; earlier wording is not kept. Deleting shows **"[deleted]"**. The paper's owners **cannot** hide or delete others' comments, which replaces "Owners … can hide a comment" above.
+- **Removal: RDCO or a system administrator,** on any comment, always with a reason. It shows **"[removed]"**, and the writer gets an in-app notice with the reason. This replaces hiding by system administrators.
+- **What a deleted or removed comment leaves.** With replies, its marker stays in place with no name and no text; without replies, it disappears. Neither can be undone. The text is kept and never shown to anyone, so a report about it can still be checked. The model therefore gains an edit time and the kind of deletion, in place of `hidden_by` and `hidden_at`.
+- **Reports.** Any reader may report someone else's comment once, with a reason (spam, harassment, off-topic, or other with a note); the report keeps a copy of the text as it was. Reports go to RDCO alone, through a Reported comments queue where RDCO removes with a reason or dismisses; RDCO is notified on a comment's first report. The reporter sees a brief "Comment reported" and nothing more. **The writer never learns of a report**, only of a removal.
+- **Notifications,** in-app only: the paper's owners on each new comment, a writer when someone replies, a writer when their comment is removed, RDCO on a first report.
+- Removals and dismissals are audited. Ask IRIS never reads comments.
+
 ### 8. Discover: research, and Discoverable Proposals
 
 **Research** lists `published` Thesis/Research and Project records. It is unchanged, and `PUBLICLY_VISIBLE_STATUSES = (PUBLISHED,)` stays.
@@ -383,7 +399,11 @@ EXT  Record  + proposal_visibility ∈ private | discoverable   (default private
 3. **Closing collaboration early** is done by switching the Proposal back to Private. There is no separate toggle.
 4. **The Discoverable control's own text is the consent:** *"Other IRIS users can see your title, abstract and names, and IRIS's AI will compare your proposal with other open proposals to suggest collaborators."* It covers both visibility and AI matching, and remains subject to IR-250's disclosure policy. The matching rules are amended in ADR-029.
 
+*Amended 2026-10-31 (IR-311; Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado):* item 4's text gains a final clause, *"…to suggest collaborators, and IRIS will share your proposal's contact person's email with the owners of a similar open proposal."* It covers the Contact person's email that ADR-029's amendment of the same date adds to the match notification. Nothing has been consented to under the old wording, because the setting is not built yet (IR-421).
+
 **ADR-029's consent is this setting.** Marking a Proposal Discoverable is the explicit, separate consent ADR-029 §3 required. It is never inferred from `dpa_accepted`. It also covers ADR-029's collaboration matching, so there is one opt-in, not two.
+
+**Amendment, 2026-10-31 (project lead, IR-689; spec IR-420): no comments on Proposals.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. "Public discussion (§7) is open on the summary" above is withdrawn: a Discoverable Proposal's summary never carries Comments, now or later. Comments exist on published papers only (§7 amendment).
 
 ### 9. Review queues: **To review · In review · Done**
 
