@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { AuthAlert } from "@/components/auth/AuthAlert";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { Button, Input } from "@/components/ui";
 import { classifyRecoveryFailure, retryMessage, useNoReferrer, useSecondsUntil } from "./recovery";
 
@@ -127,7 +127,7 @@ export default function ResetPasswordPage() {
 
   if (done) {
     return (
-      <AuthLayout variant="login">
+      <EntryFrame tabs={<EntryTab>Password recovery</EntryTab>}>
         <h2 ref={headingRef} tabIndex={-1}
           className="text-balance font-display text-display font-semibold text-stone-900 outline-none">
           Password updated
@@ -140,13 +140,13 @@ export default function ResetPasswordPage() {
         <p className="mt-6 text-[15px]">
           <Link to="/login" className="font-semibold text-brand hover:underline">Return to sign in</Link>
         </p>
-      </AuthLayout>
+      </EntryFrame>
     );
   }
 
   if (linkInvalid) {
     return (
-      <AuthLayout variant="login">
+      <EntryFrame tabs={<EntryTab>Password recovery</EntryTab>}>
         <h2 ref={headingRef} tabIndex={-1}
           className="text-balance font-display text-display font-semibold text-stone-900 outline-none">
           This link can&apos;t be used
@@ -156,14 +156,14 @@ export default function ResetPasswordPage() {
           <Link to="/password/forgot" className="font-semibold text-brand hover:underline">Request a new email</Link>
           <Link to="/login" className="font-semibold text-brand hover:underline">Back to sign in</Link>
         </div>
-      </AuthLayout>
+      </EntryFrame>
     );
   }
 
   const summary = problem ?? [errors.new_password, errors.confirm_password].filter(Boolean).join(" ");
 
   return (
-    <AuthLayout variant="login">
+    <EntryFrame tabs={<EntryTab>Password recovery</EntryTab>}>
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">
         Choose a new password
       </h2>
@@ -208,6 +208,6 @@ export default function ResetPasswordPage() {
         </Button>
         <p role="status" className="sr-only">{submitting ? "Saving your new password…" : ""}</p>
       </form>
-    </AuthLayout>
+    </EntryFrame>
   );
 }

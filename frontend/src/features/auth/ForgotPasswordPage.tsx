@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { AuthAlert } from "@/components/auth/AuthAlert";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { Button, Input } from "@/components/ui";
 import { classifyRecoveryFailure, retryMessage, useSecondsUntil } from "./recovery";
 
@@ -89,7 +89,7 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <AuthLayout variant="login">
+      <EntryFrame tabs={<EntryTab>Password recovery</EntryTab>}>
         <h2
           ref={confirmationRef}
           tabIndex={-1}
@@ -122,12 +122,12 @@ export default function ForgotPasswordPage() {
             Back to sign in
           </Link>
         </div>
-      </AuthLayout>
+      </EntryFrame>
     );
   }
 
   return (
-    <AuthLayout variant="login">
+    <EntryFrame tabs={<EntryTab>Password recovery</EntryTab>}>
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">
         Reset your password
       </h2>
@@ -157,6 +157,6 @@ export default function ForgotPasswordPage() {
       <p className="mt-6 text-[15px]">
         <Link to="/login" className="font-semibold text-brand hover:underline">Back to sign in</Link>
       </p>
-    </AuthLayout>
+    </EntryFrame>
   );
 }
