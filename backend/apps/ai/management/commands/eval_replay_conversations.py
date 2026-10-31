@@ -19,6 +19,7 @@ from apps.ai.controller import versions
 from apps.ai.evaluation.campaign_report import (CampaignRefused, require_frozen_for_held_out,
                                                 require_paid_held_out)
 from apps.ai.evaluation.conversations import check_lock, split_digests, validate_set
+from apps.ai.evaluation.faults import ToolOutage
 from apps.ai.evaluation.replay import CampaignAttempts, ResearchDiagnostics, collect_run
 from apps.ai.evaluation.runfile import eval_token, file_digest, load_json, write_run
 from apps.ai.inference.profiles import profile_for
@@ -189,7 +190,8 @@ class Command(BaseCommand):
         else:
             context = nullcontext()
             settings_context = nullcontext()
-        with context, settings_context:
+        outage = ToolOutage()
+        with context, settings_context, outage.installed():
             run = collect_run(LocalReader(client), selected, set_id=data["set_id"],
                               set_digests=split_digests(data), corpus=corpus,
                               model_ids=models, limits=caps,
@@ -199,7 +201,7 @@ class Command(BaseCommand):
                               partition_method=data.get("partition_method"),
                               retrieval=retrieval, pricing=pricing,
                               arm=arm, engine_version=engine, split=split,
-                              diagnostics=ResearchDiagnostics())
+                              diagnostics=ResearchDiagnostics(), faults=outage)
         run["manifest"]["set_sha256"] = corpus["set_sha256"]
         path = write_run(options["out"], f"IR-606-replay-{run['run_id']}", run)
         self.stdout.write(f"wrote {path} ({len(run['conversations'])} conversations)")

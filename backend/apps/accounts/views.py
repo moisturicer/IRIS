@@ -464,11 +464,14 @@ class RevokeSessionView(APIView):
 
 
 class SystemSettingView(APIView):
-    """GET or PATCH a single setting by key."""
-    def get_permissions(self):
-        if self.request.method == "PATCH":
-            return [IsAuthenticated(), IsAdmin()]
-        return [IsAuthenticated()]
+    """
+    GET or PATCH a single setting by key. RDCO alone (IR-667).
+
+    A PATCH changes an existing key and never creates one, and a change is
+    audited with its old and new value. Settings hold no secrets, so neither
+    value is masked.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request, key):
         setting = SystemSetting.objects.filter(key=key).first()
@@ -477,8 +480,19 @@ class SystemSettingView(APIView):
         return Response(SystemSettingSerializer(setting).data)
 
     def patch(self, request, key):
-        setting, _ = SystemSetting.objects.get_or_create(key=key)
-        setting.value      = request.data.get("value", setting.value)
-        setting.updated_by = request.user
-        setting.save()
+        value = request.data.get("value")
+        if not isinstance(value, str):
+            return Response({"value": ["A text value is required."]}, status=400)
+        with transaction.atomic():
+            setting = SystemSetting.objects.select_for_update().filter(key=key).first()
+            if not setting:
+                return Response({"detail": "Not found."}, status=404)
+            if setting.value != value:
+                create_audit_event(
+                    AuditEvent.SYSTEM_SETTING_CHANGED, request.user,
+                    metadata={"key": key, "old_value": setting.value, "new_value": value},
+                )
+                setting.value      = value
+                setting.updated_by = request.user
+                setting.save()
         return Response(SystemSettingSerializer(setting).data)

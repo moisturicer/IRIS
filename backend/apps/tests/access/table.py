@@ -409,7 +409,7 @@ ACCOUNTS = {
     "college-list": Entry({"GET": _case(PUBLIC)}),
     "department-list": Entry({"GET": _case(PUBLIC)}),
     "course-list": Entry({"GET": _case(PUBLIC)}),
-    "system-setting": Entry({"GET": _case(SIGNED_IN, kwargs={"key": "matrix-setting"}),
+    "system-setting": Entry({"GET": _case(RDCO_ONLY, kwargs={"key": "matrix-setting"}),
                              "PATCH": _case(RDCO_ONLY, kwargs={"key": "matrix-setting"}, data={"value": "updated"})}),
 }
 
