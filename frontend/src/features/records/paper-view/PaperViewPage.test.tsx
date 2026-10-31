@@ -41,7 +41,7 @@ import { act, fireEvent, renderScreen, screen, userEvent, waitFor, within } from
 import { useAuthStore } from "@/store/auth.store";
 import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import type { User } from "@/types/auth";
-import type { Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
+import type { PaperDetails, PaperPerson, Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
@@ -405,9 +405,24 @@ describe("Proposal lineage", () => {
 const OPEN_REVIEW = { name: "Open review" } as const;
 const RESUBMIT = { name: "Resubmit for review" } as const;
 
+const researcherCard: PaperPerson = {
+  id: OWNER_ID, name: "Rhea Owner", role: "Researcher", office: null,
+  college: null, department: null, program: null, email: "owner@cit.edu",
+};
+const adviserCard: PaperPerson = {
+  id: ASSIGNED_ADVISER_ID, name: "Ada Adviser", role: "Adviser", office: null,
+  college: "College of Computer Studies", department: "Computer Science",
+  program: null, email: "ada@cit.edu",
+};
+const sidebarDetails: PaperDetails = {
+  colleges: null, programs: null, author_flags: [], researchers: [researcherCard],
+  adviser: null, participants: [researcherCard], due_dates: [],
+};
+
 /** A Thesis/Research in office review, for the IR-259 gate tests. */
 const inReview: RecordDetail = {
   ...record,
+  paper_details: sidebarDetails,
   title: "Groundwater Recharge Mapping in Metro Cebu",
   pipeline_status: "in_review",
   owners: [{ id: 1, user: OWNER_ID, email: "owner@cit.edu", full_name: "Rhea Owner", is_primary: true }],
@@ -2157,7 +2172,9 @@ describe("the Review section (IR-412)", () => {
       partyRow("ierc", "IERC", { in_pool: true, due_at: "2026-11-04T08:00:00Z" }),
       partyRow("ktto", "KTTO", { state: "not_requested", state_label: "Not requested" }),
     ] } } as never);
+    // IR-686: person cards now come from the server projection, not adviser_name.
     shownRecord = { ...inReview, ...reviewing, adviser_name: "Ada Adviser", keywords: ["groundwater"],
+      paper_details: { ...sidebarDetails, adviser: adviserCard },
       capabilities: ["route", "add_reviewer"] };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
@@ -2168,7 +2185,7 @@ describe("the Review section (IR-412)", () => {
     expect(within(side).queryByText("KTTO")).not.toBeInTheDocument();
     expect(within(side).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
       "Reviewers · 2 parties", "Researchers", "Adviser", "Classification", "Flagged by the authors",
-      "Keywords", "Due dates", "Documents", expect.stringMatching(/participants$/),
+      "Keywords", "Version", "Due dates", "Documents", expect.stringMatching(/participants?$/),
     ]);
     const toolbar = within(side).getByRole("toolbar", { name: "Reviewer actions" });
     expect(within(toolbar).getAllByRole("button").map((b) => b.textContent?.trim()))
@@ -2188,13 +2205,91 @@ describe("the Review section (IR-412)", () => {
     workspaceAt(1600);
     vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, reviews: null, review_comments: null,
       versions: null, parties: [partyRow("itso", "ITSO", { seats: null, due_at: "2026-11-04T08:00:00Z" })] } } as never);
-    shownRecord = { ...inReview, ...reviewing, readiness: null };
+    shownRecord = { ...inReview, ...reviewing, readiness: null,
+      paper_details: { ...sidebarDetails, participants: null, due_dates: null } };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
     const side = await screen.findByRole("complementary", { name: "Review details" });
     await within(side).findByRole("heading", { name: "Reviewers · 1 party" });
     expect(within(side).queryByRole("heading", { name: "Due dates" })).not.toBeInTheDocument();
     expect(within(side).queryByRole("heading", { name: /participants?$/ })).not.toBeInTheDocument();
+  });
+
+  it.each([1600, 1100])("renders paper details from the payload at %ipx (IR-686)", async (width) => {
+    workspaceAt(width);
+    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [
+      partyRow("itso", "ITSO", { seats: [{ reviewer: 2, reviewer_name: "Ian Reviewer", state: "in_review", state_label: "In review", verdict: null, verdict_label: null }] }),
+    ] } } as never);
+    shownRecord = { ...inReview, ...reviewing, keywords: ["groundwater"], psced: "0613",
+      authors: [{ id: 999, name: "An imported author, not an owner", role: null }],
+      versions: [{ number: 1, cause: "submission", cause_label: "Submission", created_at: "2026-10-30T08:00:00Z", created_by_name: "Rhea Owner", manuscript_url: PAPER_URL }],
+      files: [{ id: 88, filename: "consent.pdf", url: "/api/v1/files/88/download/" } as RecordDetail["files"][number]],
+      paper_details: { ...sidebarDetails, colleges: ["College of Computer Studies"], programs: ["BS Computer Science"],
+        adviser: adviserCard, author_flags: [{ office: "ktto", label: "KTTO", hint: "The author flagged possible commercialisation." }],
+        due_dates: [
+          { party: "itso", label: "ITSO", due_at: "2026-10-01T08:00:00Z", original_due_at: null, is_overdue: true, clock_paused: false },
+          { party: "ierc", label: "IERC", due_at: null, original_due_at: null, is_overdue: false, clock_paused: true },
+        ],
+        participants: [researcherCard, adviserCard, { ...researcherCard, id: 2, name: "Ian Reviewer", role: "ITSO reviewer", office: "ITSO", email: null }],
+      } };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    if (width < 1200) await userEvent.click(await screen.findByRole("tab", { name: "Details" }));
+    const side = width < 1200 ? await screen.findByRole("tabpanel", { name: "Details" })
+      : await screen.findByRole("complementary", { name: "Review details" });
+    await within(side).findByRole("heading", { name: "Researchers" });
+    expect(within(side).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+      "Reviewers · 1 party", "Researchers", "Adviser", "Classification", "Flagged by the authors",
+      "Keywords", "Version", "Due dates", "Documents", "3 participants",
+    ]);
+    const section = (name: string) => within(within(side).getByRole("heading", { name }).closest("section")!);
+    expect(section("Researchers").getByRole("button", { name: "Rhea Owner" })).toBeInTheDocument();
+    expect(side).not.toHaveTextContent("An imported author, not an owner");
+    expect(section("Classification").getByText("College of Computer Studies")).toBeInTheDocument();
+    expect(section("Classification").getByText("BS Computer Science")).toBeInTheDocument();
+    expect(section("Classification").getByText("0613")).toBeInTheDocument();
+    expect(section("Flagged by the authors").getByText("KTTO")).toHaveAttribute("title", "The author flagged possible commercialisation.");
+    expect(section("Version").getByText(/^v1 ·/)).toBeInTheDocument();
+    expect(section("Due dates").getByText(/^Overdue:/)).toBeInTheDocument();
+    expect(section("Due dates").getByText("Clock paused while waiting on the submitter")).toBeInTheDocument();
+    expect(within(side).getByRole("link", { name: "consent.pdf" })).toHaveAttribute("href", "/api/v1/files/88/download/");
+    const adviser = section("Adviser").getByRole("button", { name: "Ada Adviser" });
+    await userEvent.click(adviser);
+    const profile = screen.getByRole("dialog", { name: "Ada Adviser" });
+    expect(profile).toHaveTextContent("College of Computer Studies");
+    expect(within(profile).getByRole("link", { name: "ada@cit.edu" })).toHaveAttribute("href", "mailto:ada@cit.edu");
+    expect(within(profile).queryByText("Program")).not.toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Ada Adviser" })).not.toBeInTheDocument();
+    expect(adviser).toHaveFocus();
+    await userEvent.click(adviser);
+    await userEvent.click(within(side).getByRole("heading", { name: "Classification" }));
+    expect(screen.queryByRole("dialog", { name: "Ada Adviser" })).not.toBeInTheDocument();
+    expect(adviser).toHaveFocus();
+    const reviewer = within(side).getByRole("list", { name: "Reviewing for ITSO" });
+    await userEvent.click(within(reviewer).getByRole("button", { name: "Ian Reviewer" }));
+    const minimal = screen.getByRole("dialog", { name: "Ian Reviewer" });
+    expect(minimal).toHaveTextContent("ITSO reviewer on this record");
+    expect(minimal).toHaveTextContent("ITSO");
+    expect(within(minimal).queryByText("Contact")).not.toBeInTheDocument();
+  });
+
+  it("shows withheld Classification and omits private sections from the payload (IR-686)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing, paper_details: { ...sidebarDetails, participants: null, due_dates: null } };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const side = await screen.findByRole("complementary", { name: "Review details" });
+    const classification = (await within(side).findByRole("heading", { name: "Classification" })).closest("section")!;
+    expect(within(classification).getAllByText("Not disclosed")).toHaveLength(2);
+    expect(within(side).queryByRole("heading", { name: "Due dates" })).not.toBeInTheDocument();
+    expect(within(side).queryByRole("heading", { name: /participants?$/ })).not.toBeInTheDocument();
+    const researcher = within(within(side).getByRole("heading", { name: "Researchers" }).closest("section")!);
+    await userEvent.click(researcher.getByRole("button", { name: "Rhea Owner" }));
+    const profile = screen.getByRole("dialog", { name: "Rhea Owner" });
+    expect(within(profile).getByRole("link", { name: "owner@cit.edu" })).toBeInTheDocument();
+    expect(within(profile).queryByText("College")).not.toBeInTheDocument();
+    expect(within(profile).queryByText("Program")).not.toBeInTheDocument();
   });
 
   it("takes a folded Readiness link to Details and focuses the party (IR-681)", async () => {

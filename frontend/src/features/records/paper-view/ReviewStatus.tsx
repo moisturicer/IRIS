@@ -73,8 +73,10 @@ function partyTurn(row: TrackerPartyRow): string {
 }
 
 /** The due date, in words. Only a party still reviewing has one that matters. */
-export function dueText(row: TrackerPartyRow): string | null {
-  if (row.state !== "active") return null;
+export function dueText(row: Pick<TrackerPartyRow, "due_at" | "original_due_at" | "is_overdue" | "clock_paused"> & {
+  state?: TrackerPartyState;
+}): string | null {
+  if (row.state !== undefined && row.state !== "active") return null;
   if (row.clock_paused) return "Clock paused while waiting on the submitter";
   if (!row.due_at) return null;
   const due = formatDate(row.due_at);

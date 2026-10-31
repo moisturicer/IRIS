@@ -456,6 +456,7 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
         verdict = verdicts.get(seat.reviewer_id) if seat.state == SeatState.DONE else None
         verdict_label = seat_verdict_label(verdict, assignment.party)
         rows.append({
+            "reviewer": seat.reviewer_id,
             "reviewer_name": _name(seat.reviewer),
             "state": seat.state,
             "state_label": seat.get_state_display(),
