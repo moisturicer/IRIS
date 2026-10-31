@@ -4,7 +4,9 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { useAuth } from "@/hooks/useAuth";
 import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
+import { AboutYouPanel } from "./AboutYouPanel";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
+import { Field, inputClass, Notice, Panel, readOnlyClass } from "./settingsParts";
 
 /**
  * Settings & Profile.
@@ -94,59 +96,6 @@ export default function SettingsPage() {
 }
 
 /* -------------------------------------------------------------------------- */
-/* Shared                                                                     */
-/* -------------------------------------------------------------------------- */
-
-function Panel({
-  title, caption, children,
-}: { title: string; caption: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-white rounded-xl border border-stone-200 p-5 sm:p-6">
-      <h2 className="text-[12px] font-bold uppercase tracking-wider text-stone-500">{title}</h2>
-      <p className="text-[13px] text-stone-500 mt-1">{caption}</p>
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-}
-
-function Field({
-  label, children, hint,
-}: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
-  return (
-    <label className="block">
-      <span className="block text-[12px] font-bold uppercase tracking-wider text-stone-500 mb-1.5">
-        {label}
-      </span>
-      {children}
-      {hint && <span className="block text-[12px] text-stone-500 mt-1.5">{hint}</span>}
-    </label>
-  );
-}
-
-const inputClass =
-  "w-full px-3 py-2 rounded-lg border border-stone-200 text-[14px] text-stone-900 " +
-  "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40";
-
-const readOnlyClass =
-  "w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-[14px] text-stone-500";
-
-function Notice({ tone, children }: { tone: "ok" | "error"; children: React.ReactNode }) {
-  return (
-    <p
-      role="status"
-      className={cn(
-        "text-[13px] rounded-lg px-3 py-2 border",
-        tone === "ok"
-          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-          : "bg-red-50 text-red-700 border-red-200",
-      )}
-    >
-      {children}
-    </p>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
 /* Profile                                                                    */
 /* -------------------------------------------------------------------------- */
 
@@ -205,78 +154,82 @@ function ProfileTab({ user, onSaved }: { user: NonNullable<ReturnType<typeof use
     .join(" · ");
 
   return (
-    <form onSubmit={save}>
-      <Panel
-        title="Profile — shown on records you author"
-        caption="This identity is attached to disclosures, paper citations and clearances."
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_1fr] gap-4">
-          <Field label="First name">
-            <input className={inputClass} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </Field>
-          <Field label="M.I.">
-            <input className={inputClass} value={middle} onChange={(e) => setMiddle(e.target.value)} maxLength={20} />
-          </Field>
-          <Field label="Last name">
-            <input className={inputClass} value={lastName} onChange={(e) => setLastName(e.target.value)} />
-          </Field>
-        </div>
-
-        <div className="mt-4">
-          <Field
-            label="Institutional email"
-            hint={
-              <span className="flex items-center gap-1.5">
-                <i className="fas fa-circle-check text-emerald-600 text-[12px]" aria-hidden />
-                {user.is_verified ? "Verified · " : ""}
-                Managed by CIT-U. Your email is your sign-in identity and the name attached to
-                every clearance decision, so it cannot be changed here.
-              </span>
-            }
-          >
-            <input className={readOnlyClass} value={user.email} readOnly aria-readonly />
-          </Field>
-        </div>
-
-        <div className="mt-4">
-          <Field
-            label={user.course_name ? "College · Department · Course" : "College · Department"}
-            hint="Recorded by the university. Ask RDCO if this is wrong — it is not self-service, because it determines how your disclosures are routed."
-          >
-            <input
-              className={readOnlyClass}
-              value={affiliation || "Not recorded for this account"}
-              readOnly
-              aria-readonly
-            />
-          </Field>
-        </div>
-
-        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-stone-100">
-          {ok && <Notice tone="ok">Profile saved.</Notice>}
-          {error && <Notice tone="error">{error}</Notice>}
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={reset}
-              disabled={!dirty || saving}
-              className="px-3.5 py-2 rounded-lg text-[13px] font-semibold text-stone-600
-                border border-stone-200 hover:bg-stone-50 disabled:opacity-40"
-            >
-              Discard
-            </button>
-            <button
-              type="submit"
-              disabled={!dirty || saving}
-              className="px-4 py-2 rounded-lg text-[13px] font-bold uppercase tracking-wider
-                bg-brand text-white hover:bg-brand-light disabled:opacity-40"
-            >
-              {saving ? "Saving..." : "Save changes"}
-            </button>
+    <div className="space-y-4">
+      <form onSubmit={save}>
+        <Panel
+          title="Profile — shown on records you author"
+          caption="This identity is attached to disclosures, paper citations and clearances."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_1fr] gap-4">
+            <Field label="First name">
+              <input className={inputClass} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </Field>
+            <Field label="M.I.">
+              <input className={inputClass} value={middle} onChange={(e) => setMiddle(e.target.value)} maxLength={20} />
+            </Field>
+            <Field label="Last name">
+              <input className={inputClass} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </Field>
           </div>
-        </div>
-      </Panel>
-    </form>
+
+          <div className="mt-4">
+            <Field
+              label="Institutional email"
+              hint={
+                <span className="flex items-center gap-1.5">
+                  <i className="fas fa-circle-check text-emerald-600 text-[12px]" aria-hidden />
+                  {user.is_verified ? "Verified · " : ""}
+                  Managed by CIT-U. Your email is your sign-in identity and the name attached to
+                  every clearance decision, so it cannot be changed here.
+                </span>
+              }
+            >
+              <input className={readOnlyClass} value={user.email} readOnly aria-readonly />
+            </Field>
+          </div>
+
+          <div className="mt-4">
+            <Field
+              label={user.course_name ? "College · Department · Course" : "College · Department"}
+              hint="Recorded by the university. Ask RDCO if this is wrong — it is not self-service, because it determines how your disclosures are routed."
+            >
+              <input
+                className={readOnlyClass}
+                value={affiliation || "Not recorded for this account"}
+                readOnly
+                aria-readonly
+              />
+            </Field>
+          </div>
+
+          <div className="flex items-center gap-2 mt-5 pt-4 border-t border-stone-100">
+            {ok && <Notice tone="ok">Profile saved.</Notice>}
+            {error && <Notice tone="error">{error}</Notice>}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={reset}
+                disabled={!dirty || saving}
+                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold text-stone-600
+                  border border-stone-200 hover:bg-stone-50 disabled:opacity-40"
+              >
+                Discard
+              </button>
+              <button
+                type="submit"
+                disabled={!dirty || saving}
+                className="px-4 py-2 rounded-lg text-[13px] font-bold uppercase tracking-wider
+                  bg-brand text-white hover:bg-brand-light disabled:opacity-40"
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </Panel>
+      </form>
+
+      <AboutYouPanel user={user} onSaved={onSaved} />
+    </div>
   );
 }
 

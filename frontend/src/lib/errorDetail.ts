@@ -22,3 +22,17 @@ export function errorDetail(err: unknown, fallback: string): string {
   }
   return typeof detail === "string" && detail.trim() ? detail : fallback;
 }
+
+/**
+ * The server's messages for one field of a refused form (DRF's
+ * `{field: ["message", ...]}`), joined, or `null` when it named none.
+ */
+export function fieldError(err: unknown, field: string): string | null {
+  const messages = (err as { response?: { data?: Record<string, unknown> } } | null)?.response?.data?.[field];
+  if (typeof messages === "string") return messages;
+  if (Array.isArray(messages)) {
+    const text = messages.filter((m): m is string => typeof m === "string").join(" ");
+    return text || null;
+  }
+  return null;
+}
