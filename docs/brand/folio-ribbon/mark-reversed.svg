@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" role="img" aria-label="IRIS Folio Ribbon mark, reversed"><title>IRIS Folio Ribbon mark, reversed</title><defs><mask id="fo-m" maskUnits="userSpaceOnUse" x="0" y="0" width="120" height="120">
+  <rect width="120" height="120" fill="#fff"/>
+  <path d="M8 73 C25 64 38 69 51 78" fill="none" stroke="#000" stroke-width="3.4"/>
+  <path d="M112 47 C95 56 82 51 69 42" fill="none" stroke="#000" stroke-width="3.4"/>
+</mask></defs><g mask="url(#fo-m)" fill="#FFFFFF">
+  <path d="M10 22 L50 41 L50 80 C37 82 22 89 10 100 Z"/>
+  <path d="M110 98 L70 79 L70 40 C83 38 98 31 110 20 Z"/>
+</g>
+<path d="M46 26 H74 V36 Q65 36 65 44 V76 Q65 84 74 84 V94 H46 V84 Q55 84 55 76 V44 Q55 36 46 36 Z" fill="#FFFFFF"/></svg>

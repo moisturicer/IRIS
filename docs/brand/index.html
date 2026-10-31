@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IRIS identity directions</title>
+<link rel="icon" href="aperture/mark.svg">
+<style>
+@font-face{font-family:"EB Garamond";src:url(fonts/eb-garamond-latin-600-normal.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"EB Garamond";src:url(fonts/eb-garamond-latin-500-normal.woff2) format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"Inter";src:url(fonts/inter-latin-wght-normal.woff2) format("woff2");font-weight:100 900;font-display:swap}
+:root{
+  --maroon:#6B0F12;--maroon-light:#8B1316;--maroon-dark:#4A0A0C;--wash:#fdf2f2;
+  --endpaper:#fafaf9;--white:#fff;--bar:#f5f5f4;--desk:#e7e5e4;--rule:#d6d3d1;
+  --faint:#78716c;--quiet:#57534e;--body:#44403c;--ink:#1c1917;
+  --serif:"EB Garamond",Georgia,Cambria,serif;--sans:"Inter",ui-sans-serif,system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+::selection{background:var(--maroon);color:var(--white)}
+html{background:var(--endpaper);color:var(--body);font:400 15px/24px var(--sans);-webkit-font-smoothing:antialiased}
+body{margin:0}
+a{color:var(--maroon);text-underline-offset:3px}
+code{font:600 13px/1 var(--sans);color:var(--maroon-dark);background:var(--bar);padding:2px 5px;border-radius:6px}
+:focus-visible{outline:2px solid var(--maroon);outline-offset:3px}
+
+.masthead{max-width:1680px;margin:0 auto;padding:56px 32px 32px;border-bottom:1px solid var(--rule);
+  display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:16px 48px}
+.masthead h1{font:600 clamp(36px,4.4vw,56px)/1.05 var(--serif);letter-spacing:-.02em;color:var(--maroon);margin:0;text-wrap:balance}
+.masthead p{margin:0;max-width:56ch;color:var(--quiet)}
+.masthead .tag{font:500 18px/1 var(--serif);letter-spacing:.22em;color:var(--quiet);margin-top:14px}
+
+.sheet{max-width:1680px;margin:0 auto;padding:0 32px 64px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}
+.dir{padding:32px 28px 8px;border-right:1px solid var(--rule);min-width:0}
+.dir:first-child{padding-left:0}
+.dir:last-child{border-right:0;padding-right:0}
+.dir h2{display:flex;align-items:baseline;gap:12px;margin:0;font:600 26px/1.15 var(--serif);color:var(--ink);
+  padding-bottom:14px;border-bottom:1px solid var(--rule)}
+.dir h2 .n{font:600 13px/1 var(--sans);color:var(--maroon);font-variant-numeric:tabular-nums}
+.dir h2 .new{margin-left:auto;font:600 12px/20px var(--sans);color:var(--maroon);background:var(--wash);padding:0 8px;border-radius:9999px}
+.idea{margin:14px 0 20px;color:var(--body);min-height:96px}
+
+.hero{background:var(--white);border:1px solid var(--desk);border-radius:20px;padding:20px;display:grid;place-items:center}
+.hero img{width:100%;max-width:300px;height:auto}
+
+.assets{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0 0;padding:0;list-style:none}
+.assets li{display:grid;justify-items:center;gap:8px}
+.assets .tile{width:100%;aspect-ratio:1;background:var(--white);border:1px solid var(--desk);border-radius:12px;display:grid;place-items:center}
+.assets img{width:58%;height:auto}
+.assets span{font:600 11px/16px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--quiet)}
+
+.banner{display:block;width:100%;height:auto;margin-top:16px;border-radius:12px}
+
+.h3{font:600 13px/20px var(--sans);color:var(--ink);margin:24px 0 8px}
+.sizes{display:flex;align-items:center;gap:14px;padding:12px 14px;border-radius:12px;background:var(--white);border:1px solid var(--desk)}
+.sizes.rev{background:var(--maroon);border-color:var(--maroon);margin-top:8px}
+.sizes img{display:block}
+.sizes small{margin-left:auto;font:500 12px/1 var(--sans);color:var(--faint);font-variant-numeric:tabular-nums}
+.sizes.rev small{color:var(--maroon-thread,#f9b8b9)}
+
+.ui{display:grid;gap:10px;padding:14px;border-radius:12px;background:var(--bar);border:1px solid var(--desk)}
+.search{display:flex;align-items:center;gap:10px;height:40px;padding:0 14px;background:var(--white);border:1px solid var(--rule);border-radius:12px;color:var(--faint);font-size:14px}
+.search img{width:18px;height:18px}
+.row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 16px 0 12px;border-radius:9999px;background:var(--maroon);color:var(--white);font:600 14px/1 var(--sans);border:0}
+.btn img{width:20px;height:20px}
+.side{display:flex;align-items:center;gap:8px;font:600 18px/1 var(--serif);letter-spacing:.14em;color:var(--maroon)}
+.side img{width:26px;height:26px}
+.spin{width:28px;height:28px;margin-left:auto}
+
+.notes{max-width:1680px;margin:0 auto;padding:28px 32px 72px;border-top:1px solid var(--rule);display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:32px}
+.notes h2{font:600 20px/28px var(--serif);color:var(--ink);margin:0 0 6px}
+.notes p,.notes li{margin:0;color:var(--body);max-width:62ch}
+.notes ul{margin:0;padding-left:18px}
+
+@media (max-width:1280px){
+  .sheet{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .dir{padding:32px 24px 24px}
+  .dir:nth-child(odd){padding-left:0}
+  .dir:nth-child(even){border-right:0;padding-right:0}
+  .dir:nth-child(-n+2){border-bottom:1px solid var(--rule)}
+  .notes{grid-template-columns:1fr}
+}
+@media (max-width:720px){
+  .masthead,.sheet,.notes{padding-left:16px;padding-right:16px}
+  .sheet{grid-template-columns:1fr}
+  .dir,.dir:nth-child(odd),.dir:nth-child(even){padding:28px 0;border-right:0;border-bottom:1px solid var(--rule)}
+  .idea{min-height:0}
+}
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div>
+    <h1>IRIS: four identity directions</h1>
+    <div class="tag">Research · Review · Discovery</div>
+  </div>
+  <p>Three directions from the concept sheet, redrawn as working vector marks, and a fourth added here. Each one ships a mark, lockups, a loading state, a search icon, an Ask IRIS icon and a reversed banner in the institution's maroon. Gold is decoration only: it never carries text or status.</p>
+</header>
+
+<main class="sheet">
+  <!-- one column per direction; generated SVGs live beside this file -->
+  <section class="dir" aria-labelledby="d1">
+    <h2 id="d1"><span class="n">01</span>Folio Ribbon</h2>
+    <p class="idea">An open folio whose two leaves turn like a ribbon around a serif I. It reads as a bound volume being opened, which is the system's own north star.</p>
+    <div class="hero"><img src="folio-ribbon/lockup-stacked.svg" alt="Folio Ribbon stacked lockup"></div>
+    <ul class="assets">
+      <li><div class="tile"><img src="folio-ribbon/mark.svg" alt=""></div><span>Logo</span></li>
+      <li><div class="tile"><img src="folio-ribbon/loading.svg" alt=""></div><span>Loading</span></li>
+      <li><div class="tile"><img src="folio-ribbon/icon-search.svg" alt=""></div><span>Search</span></li>
+      <li><div class="tile"><img src="folio-ribbon/icon-ask-iris.svg" alt=""></div><span>Ask IRIS</span></li>
+    </ul>
+    <img class="banner" src="folio-ribbon/banner-reversed.svg" alt="Folio Ribbon reversed banner">
+    <div class="h3">Small sizes</div>
+    <div class="sizes"><img src="folio-ribbon/mark.svg" width="16" alt=""><img src="folio-ribbon/mark.svg" width="24" alt=""><img src="folio-ribbon/mark.svg" width="32" alt=""><img src="folio-ribbon/mark.svg" width="48" alt=""><small>16 · 24 · 32 · 48</small></div>
+    <div class="sizes rev"><img src="folio-ribbon/mark-reversed.svg" width="16" alt=""><img src="folio-ribbon/mark-reversed.svg" width="24" alt=""><img src="folio-ribbon/mark-reversed.svg" width="32" alt=""><img src="folio-ribbon/mark-reversed.svg" width="48" alt=""><small>reversed</small></div>
+    <div class="h3">In the interface</div>
+    <div class="ui">
+      <div class="row"><span class="side"><img src="folio-ribbon/mark.svg" alt="">IRIS</span><img class="spin" src="folio-ribbon/loading.svg" alt="Loading"></div>
+      <div class="search"><img src="folio-ribbon/icon-search.svg" alt="">Search the catalogue</div>
+      <div class="row"><button class="btn" type="button"><img src="folio-ribbon/mark-reversed.svg" alt="">Ask IRIS</button></div>
+    </div>
+  </section>
+
+  <section class="dir" aria-labelledby="d2">
+    <h2 id="d2"><span class="n">02</span>Citation Arch</h2>
+    <p class="idea">Two halves of an arch, set like citation brackets, meet around a keyhole i. Gold page edges sit inside each half. It says that every answer opens onto a source.</p>
+    <div class="hero"><img src="citation-arch/lockup-stacked.svg" alt="Citation Arch stacked lockup"></div>
+    <ul class="assets">
+      <li><div class="tile"><img src="citation-arch/mark.svg" alt=""></div><span>Logo</span></li>
+      <li><div class="tile"><img src="citation-arch/loading.svg" alt=""></div><span>Loading</span></li>
+      <li><div class="tile"><img src="citation-arch/icon-search.svg" alt=""></div><span>Search</span></li>
+      <li><div class="tile"><img src="citation-arch/icon-ask-iris.svg" alt=""></div><span>Ask IRIS</span></li>
+    </ul>
+    <img class="banner" src="citation-arch/banner-reversed.svg" alt="Citation Arch reversed banner">
+    <div class="h3">Small sizes</div>
+    <div class="sizes"><img src="citation-arch/mark.svg" width="16" alt=""><img src="citation-arch/mark.svg" width="24" alt=""><img src="citation-arch/mark.svg" width="32" alt=""><img src="citation-arch/mark.svg" width="48" alt=""><small>16 · 24 · 32 · 48</small></div>
+    <div class="sizes rev"><img src="citation-arch/mark-reversed.svg" width="16" alt=""><img src="citation-arch/mark-reversed.svg" width="24" alt=""><img src="citation-arch/mark-reversed.svg" width="32" alt=""><img src="citation-arch/mark-reversed.svg" width="48" alt=""><small>reversed</small></div>
+    <div class="h3">In the interface</div>
+    <div class="ui">
+      <div class="row"><span class="side"><img src="citation-arch/mark.svg" alt="">IRIS</span><img class="spin" src="citation-arch/loading.svg" alt="Loading"></div>
+      <div class="search"><img src="citation-arch/icon-search.svg" alt="">Search the catalogue</div>
+      <div class="row"><button class="btn" type="button"><img src="citation-arch/mark-reversed.svg" alt="">Ask IRIS</button></div>
+    </div>
+  </section>
+
+  <section class="dir" aria-labelledby="d3">
+    <h2 id="d3"><span class="n">03</span>Index Orbit</h2>
+    <p class="idea">A solid disc cut by an i, circled by an index ring. The gold dot travels the ring, so the loader is the logo in motion rather than a separate spinner.</p>
+    <div class="hero"><img src="index-orbit/lockup-stacked.svg" alt="Index Orbit stacked lockup"></div>
+    <ul class="assets">
+      <li><div class="tile"><img src="index-orbit/mark.svg" alt=""></div><span>Logo</span></li>
+      <li><div class="tile"><img src="index-orbit/loading.svg" alt=""></div><span>Loading</span></li>
+      <li><div class="tile"><img src="index-orbit/icon-search.svg" alt=""></div><span>Search</span></li>
+      <li><div class="tile"><img src="index-orbit/icon-ask-iris.svg" alt=""></div><span>Ask IRIS</span></li>
+    </ul>
+    <img class="banner" src="index-orbit/banner-reversed.svg" alt="Index Orbit reversed banner">
+    <div class="h3">Small sizes</div>
+    <div class="sizes"><img src="index-orbit/mark.svg" width="16" alt=""><img src="index-orbit/mark.svg" width="24" alt=""><img src="index-orbit/mark.svg" width="32" alt=""><img src="index-orbit/mark.svg" width="48" alt=""><small>16 · 24 · 32 · 48</small></div>
+    <div class="sizes rev"><img src="index-orbit/mark-reversed.svg" width="16" alt=""><img src="index-orbit/mark-reversed.svg" width="24" alt=""><img src="index-orbit/mark-reversed.svg" width="32" alt=""><img src="index-orbit/mark-reversed.svg" width="48" alt=""><small>reversed</small></div>
+    <div class="h3">In the interface</div>
+    <div class="ui">
+      <div class="row"><span class="side"><img src="index-orbit/mark.svg" alt="">IRIS</span><img class="spin" src="index-orbit/loading.svg" alt="Loading"></div>
+      <div class="search"><img src="index-orbit/icon-search.svg" alt="">Search the catalogue</div>
+      <div class="row"><button class="btn" type="button"><img src="index-orbit/mark-reversed.svg" alt="">Ask IRIS</button></div>
+    </div>
+  </section>
+
+  <section class="dir" aria-labelledby="d4">
+    <h2 id="d4"><span class="n">04</span>Aperture<span class="new">New</span></h2>
+    <p class="idea">An iris diaphragm: six blades close around a hexagonal opening with a gold pupil. It takes the name literally (the eye, focus, seeing into the work), and the blades open and close as the loader.</p>
+    <div class="hero"><img src="aperture/lockup-stacked.svg" alt="Aperture stacked lockup"></div>
+    <ul class="assets">
+      <li><div class="tile"><img src="aperture/mark.svg" alt=""></div><span>Logo</span></li>
+      <li><div class="tile"><img src="aperture/loading.svg" alt=""></div><span>Loading</span></li>
+      <li><div class="tile"><img src="aperture/icon-search.svg" alt=""></div><span>Search</span></li>
+      <li><div class="tile"><img src="aperture/icon-ask-iris.svg" alt=""></div><span>Ask IRIS</span></li>
+    </ul>
+    <img class="banner" src="aperture/banner-reversed.svg" alt="Aperture reversed banner">
+    <div class="h3">Small sizes</div>
+    <div class="sizes"><img src="aperture/mark.svg" width="16" alt=""><img src="aperture/mark.svg" width="24" alt=""><img src="aperture/mark.svg" width="32" alt=""><img src="aperture/mark.svg" width="48" alt=""><small>16 · 24 · 32 · 48</small></div>
+    <div class="sizes rev"><img src="aperture/mark-reversed.svg" width="16" alt=""><img src="aperture/mark-reversed.svg" width="24" alt=""><img src="aperture/mark-reversed.svg" width="32" alt=""><img src="aperture/mark-reversed.svg" width="48" alt=""><small>reversed</small></div>
+    <div class="h3">In the interface</div>
+    <div class="ui">
+      <div class="row"><span class="side"><img src="aperture/mark.svg" alt="">IRIS</span><img class="spin" src="aperture/loading.svg" alt="Loading"></div>
+      <div class="search"><img src="aperture/icon-search.svg" alt="">Search the catalogue</div>
+      <div class="row"><button class="btn" type="button"><img src="aperture/mark-reversed.svg" alt="">Ask IRIS</button></div>
+    </div>
+  </section>
+</main>
+
+<section class="notes" aria-label="Notes">
+  <div>
+    <h2>What each direction ships</h2>
+    <ul>
+      <li><code>mark.svg</code> and <code>mark-reversed.svg</code>: the cut-outs are transparent, so either works on any ground.</li>
+      <li><code>lockup-stacked.svg</code>, <code>lockup-horizontal.svg</code> and <code>banner-reversed.svg</code>.</li>
+      <li><code>loading.svg</code>: the mark in motion. It stops when the reader asks for reduced motion.</li>
+      <li><code>icon-search.svg</code> and <code>icon-ask-iris.svg</code>.</li>
+    </ul>
+  </div>
+  <div>
+    <h2>Brand rules kept</h2>
+    <p>Maroon <code>#6B0F12</code> is the only brand colour. Gold <code>#C9973A</code> appears only as ornament (about 2.8:1 on white, so never text or status). The wordmark is EB Garamond 600, converted to outlines so no file needs a font installed.</p>
+  </div>
+  <div>
+    <h2>Not adopted yet</h2>
+    <p>These are proposals. Nothing in the application uses them. Adopting one means replacing the mark in the sidebar, sign-in panel and favicon, and recording it in <code>docs/ui-ux/01-design-system.md</code>.</p>
+  </div>
+</section>
+</body>
+</html>

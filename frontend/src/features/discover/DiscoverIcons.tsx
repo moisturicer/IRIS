@@ -1,4 +1,5 @@
 import { useId } from "react";
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 /**
  * Discover icon set.
@@ -57,24 +58,8 @@ export function DiscoverCompassIcon({ className = "w-6 h-6", title }: IconProps)
 /* ── 2. Repository search — the Discover search field ────────────────────── */
 
 export function RepositorySearchIcon({ className = "w-4 h-4", title }: IconProps) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      {...a11y(title)}
-    >
-      <circle cx="11" cy="11" r="8" />
-      <line x1="21" y1="21" x2="16.65" y2="16.65" strokeWidth="2.5" />
-      {/* Document rules inside the lens — this searches papers, not the web */}
-      <line x1="7.5" y1="10" x2="14.5" y2="10" stroke="#F59E0B" strokeWidth="1.5" />
-      <line x1="7.5" y1="13" x2="12" y2="13" stroke="#F59E0B" strokeWidth="1.5" />
-    </svg>
-  );
+  // The Folio Ribbon search glyph (IR-744): a lens cut like the folio's ribbons.
+  return <SearchGlyph className={className} title={title} />;
 }
 
 /* ── 3. KTTO commercial-ready badge ──────────────────────────────────────── */
