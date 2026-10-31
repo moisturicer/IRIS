@@ -23,7 +23,7 @@ from typing import Optional
 
 from django.utils import dateformat, timezone
 
-from core.enums import AssignmentState, DocumentRequestState, SeatState
+from core.enums import AssignmentState, DocumentRequestState, ResubmissionRequestState, SeatState
 
 from .models import RecordAssignment
 from .seats import _label, _name
@@ -106,7 +106,8 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
             party=unopened["party"], action=_action("open_review", unopened["id"]),
         ))
 
-    for request in revision.get("open") or []:
+    # The revision block lists its open requests under the request state's name.
+    for request in revision.get(ResubmissionRequestState.OPEN.value) or []:
         # Any open request blocks a Decision; an office only by its own.
         blocks = deciding or request["party"] == office
         items.append(_item(
