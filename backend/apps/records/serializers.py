@@ -210,6 +210,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # assembles it from the blocks above. A rendering hint; every action
     # endpoint re-checks its own predicate, so the server stays authoritative.
     capabilities         = serializers.SerializerMethodField()
+    # What stands between the viewer and their part of the review, in words
+    # (ADR-032 §10 Amendment, IR-679/IR-681). Read from the blocks above;
+    # `None` -- not disclosed -- to a viewer who may not read the review.
+    readiness            = serializers.SerializerMethodField()
     # The record's versions, for the header's version picker (IR-416).
     # Participants only, like `reviews`.
     versions             = serializers.SerializerMethodField()
@@ -327,6 +331,23 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             office_review=self.get_office_review(obj), revision=self.get_revision(obj),
             decision=self.get_decision(obj),
         )
+
+    def get_readiness(self, obj):
+        from apps.reviews import readiness, routing
+
+        def compute():
+            readable = self._readable(obj)
+            in_review = routing.is_in_review(obj)
+            return readiness.build_readiness(
+                user=self._viewer(), readable=readable, in_review=in_review,
+                decision=self.get_decision(obj), revision=self.get_revision(obj),
+                office_review=self.get_office_review(obj), my_seats=self.get_my_seats(obj),
+                review_claim=self.get_review_claim(obj),
+                facts=readiness.readiness_facts(obj, self._viewer())
+                if readable and in_review else {"assignments": [], "document_requests": []},
+            )
+
+        return self._once(obj, "readiness", compute)
 
     def get_reviews(self, obj):
         """
@@ -489,7 +510,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "review_claim", "is_participant", "routing",
-            "office_review", "revision", "decision", "capabilities", "keywords",
+            "office_review", "revision", "decision", "capabilities", "readiness", "keywords",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",

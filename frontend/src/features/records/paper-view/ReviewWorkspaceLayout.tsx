@@ -6,13 +6,27 @@ import { seatsApi } from "@/api/reviews";
 import { errorDetail } from "@/lib/errorDetail";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { cn } from "@/lib/utils";
+import type { RecordTracker } from "@/types/records";
 
+import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
+import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
+import { REVIEW_ACTIONS } from "./reviewActions";
 import type { ReviewWorkspaceProps } from "./ReviewWorkspace";
 import "./reviewWorkspace.css";
 
 const WIDTHS_KEY = "iris-review-cols";
+
+/**
+ * Who reviews moves to the sidebar's Reviewers (ADR-032 §10 Amendment): the
+ * existing route and add-reviewer acts, named as the contract names them.
+ * Everything else stays in the footer.
+ */
+const SIDEBAR_LABELS: Partial<Record<string, string>> = { route: "Request review…", add_reviewer: "Add a colleague…" };
+const SIDEBAR_ACTIONS = REVIEW_ACTIONS.filter((a) => a.capability in SIDEBAR_LABELS)
+  .map((a) => ({ ...a, label: SIDEBAR_LABELS[a.capability]! }));
+const FOOTER_ACTIONS = REVIEW_ACTIONS.filter((a) => !(a.capability in SIDEBAR_LABELS));
 type Widths = { mid: number | null; side: number | null };
 
 function readWidths(): Widths {
@@ -117,6 +131,30 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   );
 
   const details = <div ref={setStatusTarget} />;
+  const footer = useRef<HTMLElement>(null);
+  // A Readiness link reuses a control the page already has; a sidebar target
+  // folded into Details opens that tab first, then takes focus.
+  const goTo = (to: string) => {
+    if (folded) setTab("details");
+    requestAnimationFrame(() => document.getElementById(detailsTarget(ids, to))?.focus());
+  };
+  const onReadinessAction = (action: { kind: string; target: string | null }) => {
+    if (action.kind === "open_review") void onOpenReview?.();
+    else if (action.kind === "claim") void claim();
+    else if (action.kind === "open_documents") goTo("documents");
+    else if (action.kind === "show_party") goTo(action.target ?? "reviewers");
+    // The footer's own Withdraw asks first, as it always has.
+    else if (action.kind === "withdraw_revision") {
+      Array.from(footer.current?.querySelectorAll("button") ?? [])
+        .find((b) => b.textContent?.includes("Withdraw revision request"))?.focus();
+    }
+  };
+  const renderDetails = (tracker: RecordTracker) => (
+    <ReviewDetails record={record} tracker={tracker} ids={ids} reviewerActions={
+      <ReviewActionBar record={record} can={can} actions={SIDEBAR_ACTIONS} label="Reviewer actions"
+        primary={false} onChanged={onChanged} className="pt-1" />
+    } />
+  );
   const ownSeat = record.my_seats.find((s) => s.state === "assigned" || s.state === "in_review") ?? record.my_seats[record.my_seats.length - 1];
   const claim = async () => {
     if (!record.review_claim || claiming) return;
@@ -170,17 +208,19 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           <div className="review-pane-body">
             <div role="tabpanel" id={`${ids}-conversation`} aria-labelledby={`${ids}-tab-conversation`} hidden={tab !== "conversation"} className="p-4">
               {onAskAboutPaper && <button type="button" onClick={onAskAboutPaper} className={cn("review-control text-brand hover:underline", FOCUS_RING)}>Ask about this paper</button>}
-              <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget} />
+              <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
+                renderStatus={renderDetails}
+                beforeComment={record.readiness ? <ReadinessPanel readiness={record.readiness} onAction={onReadinessAction} /> : null} />
             </div>
             {folded && <div role="tabpanel" id={`${ids}-details`} aria-labelledby={`${ids}-tab-details`} hidden={tab !== "details"} className="p-4">{details}</div>}
           </div>
-          <footer className="review-pane-foot" aria-label="Your review">
+          <footer ref={footer} className="review-pane-foot" aria-label="Your review">
             <p className="text-small font-semibold text-stone-900"><i className="fas fa-clipboard-check mr-2" aria-hidden />Your review: {ownSeat?.verdict_label ?? ownSeat?.state_label ?? "No verdict recorded"}</p>
             {record.review_claim
               ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
               : can.has("open_review") && <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button>}
             {claimError && <p role="alert" className="text-small text-brand">{claimError}</p>}
-            <ReviewActionBar record={record} can={can} onChanged={onChanged} primary={!can.has("open_review") && !record.review_claim} />
+            <ReviewActionBar record={record} can={can} actions={FOOTER_ACTIONS} onChanged={onChanged} primary={!can.has("open_review") && !record.review_claim} />
           </footer>
         </section>
         {!folded && <aside id={`${ids}-side`} aria-label="Review details" className="review-details">

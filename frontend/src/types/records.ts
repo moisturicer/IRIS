@@ -294,6 +294,12 @@ export interface RecordDetail extends RecordListItem {
    * (ADR-032 §4, IR-415). Never anyone else's.
    */
   my_seats:             ReviewerSeat[];
+  /**
+   * What stands between the viewer and their part of the review, in the
+   * server's words (ADR-032 §10 Amendment, IR-681). Null when the viewer may
+   * not read the review: not disclosed, which is not "nothing to say".
+   */
+  readiness?:           Readiness | null;
   /** A server-offered claim from the viewer's office Pool; absent on older APIs. */
   review_claim?:        { assignment: number; label: string; party_label: string } | null;
   /**
@@ -489,6 +495,27 @@ export type SeatSource = "entry" | "claimed" | "assigned" | "nominated" | "added
 export const OPEN_SEAT_STATES: readonly SeatState[] = ["assigned", "in_review"];
 
 /** One person reviewing a record for a party. Every seat endpoint answers with this. */
+export type ReadinessVerdict = "ready" | "blocked" | "waiting_on_you" | "none";
+
+/** One fact in Readiness. The browser renders `label` and never words its own. */
+export interface ReadinessItem {
+  kind:       string;
+  severity:   "blocker" | "info";
+  label:      string;
+  party:      string | null;
+  actor_name: string | null;
+  since:      string | null;
+  /** Due dates only; null on every other item. */
+  paused:     boolean | null;
+  action:     { kind: string; target: string | null } | null;
+}
+
+export interface Readiness {
+  verdict:  ReadinessVerdict;
+  headline: string;
+  items:    ReadinessItem[];
+}
+
 export interface ReviewerSeat {
   id:            number;
   assignment:    number;

@@ -30,3 +30,8 @@
   .review-paper-foot { display: flex; justify-content: flex-end; position: absolute; bottom: 0; left: 0; right: 0; padding: 8px 16px; border-top: 1px solid theme('colors.stone.300'); background: theme('colors.stone.100'); }
   .review-paper { padding-bottom: 60px; }
 }
+.review-kv { display: grid; grid-template-columns: auto 1fr; gap: 4px 12px; font-size: 13px; }
+.review-kv dt { color: theme('colors.stone.600'); }
+.review-kv dd { color: theme('colors.stone.900'); }
+.review-tag { display: inline-flex; align-items: center; padding: 2px 8px; border: 1px solid theme('colors.stone.300'); border-radius: 999px; font-size: 12px; color: theme('colors.stone.700'); background: white; }
+.review-avatar { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 999px; font-size: 10px; font-weight: 700; color: white; background: theme('colors.stone.700'); }

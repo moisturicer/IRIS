@@ -53,11 +53,15 @@ interface Discussion {
  *
  * The host remounts it (a new `key`) when something it shows has changed.
  */
-export function ReviewTimeline({ recordId, canComment = false, statusTarget }: {
+export function ReviewTimeline({ recordId, canComment = false, statusTarget, renderStatus, beforeComment }: {
   recordId: number;
   canComment?: boolean;
-  /** Move the existing status to the workspace sidebar, sharing this tracker read. */
+  /** Move the status to the workspace sidebar, sharing this tracker read. */
   statusTarget?: HTMLElement | null;
+  /** What the sidebar draws from this read; the party status strip by default. */
+  renderStatus?: (data: RecordTracker) => ReactNode;
+  /** Between the timeline and the comment box: the workspace's Readiness (IR-681). */
+  beforeComment?: ReactNode;
 }) {
   const headingId = useId();
   const [data, setData] = useState<RecordTracker | null>(null);
@@ -99,7 +103,7 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget }: {
     <div className="space-y-6">
       {data && !failed && (statusTarget === undefined
         ? <ReviewStatus data={data} />
-        : statusTarget && createPortal(<ReviewStatus data={data} />, statusTarget))}
+        : statusTarget && createPortal(renderStatus ? renderStatus(data) : <ReviewStatus data={data} />, statusTarget))}
       <section aria-labelledby={headingId} className="space-y-3">
         <RailHeading id={headingId}>Timeline</RailHeading>
 
@@ -138,6 +142,7 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget }: {
                 ))}
               </ol>
             )}
+            {beforeComment}
             {canComment && (
               <CommentForm
                 label="Comment"

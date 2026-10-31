@@ -23,6 +23,8 @@ interface ReviewActionBarProps {
   className?: string;
   /** False when the workspace footer already offers Open review or Claim. */
   primary?: boolean;
+  /** The toolbar's name, when a page holds more than one (IR-681). */
+  label?: string;
 }
 
 /** The controls the arrow keys move between: enabled buttons and links. */
@@ -48,6 +50,7 @@ export function ReviewActionBar({
   onChanged,
   className,
   primary = true,
+  label = "Review actions",
 }: ReviewActionBarProps) {
   const ids = useId();
   const [openDialog, setOpenDialog] = useState<ReviewAction | null>(null);
@@ -113,7 +116,7 @@ export function ReviewActionBar({
       <div className={className}>
         <div
           role="toolbar"
-          aria-label="Review actions"
+          aria-label={label}
           onKeyDown={onKeyDown}
           className="flex flex-wrap items-center gap-2"
         >

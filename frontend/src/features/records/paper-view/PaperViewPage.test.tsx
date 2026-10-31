@@ -41,7 +41,7 @@ import { act, fireEvent, renderScreen, screen, userEvent, waitFor, within } from
 import { useAuthStore } from "@/store/auth.store";
 import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
 import type { User } from "@/types/auth";
-import type { RecordDetail, ReviewerSeat } from "@/types/records";
+import type { Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
@@ -2070,7 +2070,7 @@ describe("the Review section (IR-412)", () => {
     renderPaper(`/records/${RECORD_ID}?section=review`);
     await userEvent.type(await screen.findByRole("textbox", { name: "Comment" }), "Keep this draft");
     await userEvent.click(screen.getByRole("tab", { name: "Details" }));
-    expect(screen.getByRole("heading", { name: "Where it stands" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^Reviewers ·/ })).toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "Review details" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Conversation" }));
     expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Keep this draft");
@@ -2099,9 +2099,115 @@ describe("the Review section (IR-412)", () => {
       .toHaveAttribute("aria-valuenow", "320");
     expect(screen.getByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
     expect(await within(screen.getByRole("complementary", { name: "Review details" }))
-      .findByRole("heading", { name: "Where it stands" })).toBeInTheDocument();
+      .findByRole("heading", { name: /^Reviewers ·/ })).toBeInTheDocument();
     expect(recordsApi.tracker).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
+  });
+
+  const partyRow = (party: string, label: string, extra: object = {}) => ({
+    party, label, state: "active", state_label: "Active", started: true, outcome: null, outcome_label: null,
+    at: "2026-09-02T08:00:00Z", preserved: false, carryover: null, carryover_version: null, carryover_label: null,
+    awaiting_document: false, outcome_earlier: false, changes_requested: false, in_pool: false, seats: [],
+    due_at: null, original_due_at: null, is_overdue: false, clock_paused: false, extensions: [], can_extend: false,
+    withdrawn_by_decision: null, ...extra,
+  });
+  const readinessFor = (items: Partial<ReadinessItem>[]): Readiness => ({
+    verdict: "blocked", headline: "You can't decide yet.",
+    items: items.map((i) => ({ party: null, actor_name: null, since: null, paused: null, action: null, ...i }) as ReadinessItem),
+  });
+
+  it("puts Readiness between the timeline and the comment box, in the server's words (IR-681)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["comment_review", "open_review"],
+      my_seats: [{ ...reviewingSeat, state: "assigned", state_label: "Assigned", opened_at: null }], readiness: readinessFor([
+      { kind: "open_review", severity: "blocker", label: "Open the review first.", action: { kind: "open_review", target: "78" } },
+      { kind: "party_reviewing", severity: "info", label: "IERC is reviewing.", actor_name: "Ina Ierc", since: "2026-09-03T08:00:00Z" },
+    ]) };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const panel = (await screen.findByRole("heading", { name: "Readiness" })).closest("section")!;
+    expect(within(panel).getByRole("status")).toHaveTextContent("You can't decide yet.");
+    const facts = within(panel).getAllByRole("listitem");
+    expect(facts[0]).toHaveTextContent("Blocker: Open the review first.");
+    expect(facts[1]).toHaveTextContent("IERC is reviewing.");
+    expect(facts[1]).toHaveTextContent("Ina Ierc");
+    expect(facts[1]).not.toHaveTextContent("Blocker");
+    // Timeline, then Readiness, then the comment box.
+    const timeline = screen.getByRole("list", { name: "Review timeline" });
+    const comment = screen.getByRole("textbox", { name: "Comment" });
+    expect(timeline.compareDocumentPosition(panel) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(panel.compareDocumentPosition(comment) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    await userEvent.click(within(panel).getByRole("button", { name: "Open review" }));
+    expect(seatsApi.open).toHaveBeenCalledWith(78);
+  });
+
+  it("shows no Readiness when the server does not disclose it (IR-681)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing, readiness: null };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    await screen.findByRole("list", { name: "Review timeline" });
+    expect(screen.queryByRole("heading", { name: "Readiness" })).not.toBeInTheDocument();
+  });
+
+  it("lists reviewers by party in the sidebar, with an unclaimed pool as an office (IR-681)", async () => {
+    workspaceAt(1600);
+    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [
+      partyRow("itso", "ITSO", { seats: [{ reviewer_name: "ITSO Reviewer", state: "in_review", state_label: "In review", verdict: null, verdict_label: null }] }),
+      partyRow("ierc", "IERC", { in_pool: true, due_at: "2026-11-04T08:00:00Z" }),
+      partyRow("ktto", "KTTO", { state: "not_requested", state_label: "Not requested" }),
+    ] } } as never);
+    shownRecord = { ...inReview, ...reviewing, adviser_name: "Ada Adviser", keywords: ["groundwater"],
+      capabilities: ["route", "add_reviewer"] };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const side = await screen.findByRole("complementary", { name: "Review details" });
+    expect(await within(side).findByRole("heading", { name: "Reviewers · 2 parties" })).toBeInTheDocument();
+    expect(within(side).getByRole("list", { name: "Reviewing for ITSO" })).toHaveTextContent("ITSO Reviewer");
+    expect(within(side).getByText(/IERC review pool · Nobody has claimed it/)).toBeInTheDocument();
+    expect(within(side).queryByText("KTTO")).not.toBeInTheDocument();
+    expect(within(side).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
+      "Reviewers · 2 parties", "Researchers", "Adviser", "Classification", "Flagged by the authors",
+      "Keywords", "Due dates", "Documents", expect.stringMatching(/participants$/),
+    ]);
+    const toolbar = within(side).getByRole("toolbar", { name: "Reviewer actions" });
+    expect(within(toolbar).getAllByRole("button").map((b) => b.textContent?.trim()))
+      .toEqual(["Add a colleague…", "Request review…"]);
+    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).queryByRole("button", { name: /Route to office/ }))
+      .not.toBeInTheDocument();
+
+    const adviser = within(side).getAllByRole("button", { name: /Ada Adviser/ })[0];
+    await userEvent.click(adviser);
+    expect(screen.getByRole("dialog", { name: "Ada Adviser" })).toHaveTextContent("Adviser on this record");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Ada Adviser" })).not.toBeInTheDocument();
+    expect(adviser).toHaveFocus();
+  });
+
+  it("withholds who reviews, due dates and participants when the review is not readable (IR-681)", async () => {
+    workspaceAt(1600);
+    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, reviews: null, review_comments: null,
+      versions: null, parties: [partyRow("itso", "ITSO", { seats: null, due_at: "2026-11-04T08:00:00Z" })] } } as never);
+    shownRecord = { ...inReview, ...reviewing, readiness: null };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const side = await screen.findByRole("complementary", { name: "Review details" });
+    await within(side).findByRole("heading", { name: "Reviewers · 1 party" });
+    expect(within(side).queryByRole("heading", { name: "Due dates" })).not.toBeInTheDocument();
+    expect(within(side).queryByRole("heading", { name: /participants?$/ })).not.toBeInTheDocument();
+  });
+
+  it("takes a folded Readiness link to Details and focuses the party (IR-681)", async () => {
+    workspaceAt(1100);
+    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [partyRow("ierc", "IERC")] } } as never);
+    shownRecord = { ...inReview, ...reviewing, readiness: readinessFor([
+      { kind: "party_reviewing", severity: "info", label: "IERC is reviewing.", party: "ierc", action: { kind: "show_party", target: "ierc" } },
+    ]) };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    await userEvent.click(await screen.findByRole("button", { name: "Show reviewers" }));
+    expect(screen.getByRole("tab", { name: "Details", selected: true })).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement).toHaveTextContent(/^IERC/));
   });
 
   it("puts the paper beside the timeline, from the tracker", async () => {
