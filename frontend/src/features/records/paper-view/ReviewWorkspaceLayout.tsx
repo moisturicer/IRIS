@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from "react";
+import { createPortal } from "react-dom";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
@@ -12,7 +13,7 @@ import { ReadinessPanel, ReadinessSummary } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
-import { REVIEW_ACTIONS } from "./reviewActions";
+import { REVIEW_ACTIONS, type DialogReviewAction } from "./reviewActions";
 import type { ReviewWorkspaceProps } from "./ReviewWorkspace";
 import "./reviewWorkspace.css";
 
@@ -20,13 +21,13 @@ const WIDTHS_KEY = "iris-review-cols";
 
 /**
  * Who reviews moves to the sidebar's Reviewers (ADR-032 §10 Amendment): the
- * existing route and add-reviewer acts, named as the contract names them.
+ * existing route and add-reviewer acts, as two separate controls (IR-685).
  * Everything else stays in the footer.
  */
-const SIDEBAR_LABELS: Partial<Record<string, string>> = { route: "Request review…", add_reviewer: "Add a colleague…" };
-const SIDEBAR_ACTIONS = REVIEW_ACTIONS.filter((a) => a.capability in SIDEBAR_LABELS)
-  .map((a) => ({ ...a, label: SIDEBAR_LABELS[a.capability]! }));
-const FOOTER_ACTIONS = REVIEW_ACTIONS.filter((a) => !(a.capability in SIDEBAR_LABELS));
+const ADD_COLLEAGUE = REVIEW_ACTIONS.filter((a) => a.capability === "add_reviewer")
+  .map((a) => ({ ...a, label: "Add a colleague…" }));
+const ROUTE = REVIEW_ACTIONS.find((a): a is DialogReviewAction => a.capability === "route" && a.kind === "dialog");
+const FOOTER_ACTIONS = REVIEW_ACTIONS.filter((a) => a.capability !== "route" && a.capability !== "add_reviewer");
 type Widths = { mid: number | null; side: number | null };
 
 function readWidths(): Widths {
@@ -58,6 +59,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const [open, setOpen] = useState(true);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
+  const [requesting, setRequesting] = useState(false);
+  const [routed, setRouted] = useState("");
   const pane = useRef<HTMLElement>(null);
   const launcher = useRef<HTMLButtonElement>(null);
   const ids = useId();
@@ -149,12 +152,17 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
         .find((b) => b.textContent?.includes("Withdraw revision request"))?.focus();
     }
   };
+  // Request review offers exactly the routing flags' targets, never a table
+  // of our own, so a change to the party graph needs no change here.
+  const targets = record.routing.targets;
+  const mayRequest = can.has("route") && targets.length > 0 && ROUTE !== undefined;
   const renderDetails = (tracker: RecordTracker) => (
-    <ReviewDetails record={record} tracker={tracker} ids={ids} reviewerActions={
-      <ReviewActionBar record={record} can={can} actions={SIDEBAR_ACTIONS} label="Reviewer actions"
-        primary={false} onChanged={onChanged} className="pt-1" />
-    } />
+    <ReviewDetails record={record} tracker={tracker} ids={ids}
+      requestReview={mayRequest ? { targets: targets.map((t) => t.label), onOpen: () => { setRouted(""); setRequesting(true); } } : undefined}
+      addColleague={<ReviewActionBar record={record} can={can} actions={ADD_COLLEAGUE} label="Reviewer actions"
+        primary={false} onChanged={onChanged} className="pt-1" />} />
   );
+  const RouteDialog = ROUTE?.Dialog;
   const ownSeat = record.my_seats.find((s) => s.state === "assigned" || s.state === "in_review") ?? record.my_seats[record.my_seats.length - 1];
   const claim = async () => {
     if (!record.review_claim || claiming) return;
@@ -244,6 +252,14 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           <h2 className="font-display text-xl font-semibold text-stone-900 mb-4">People &amp; details</h2>
           {details}
         </aside>}
+        <p role="status" aria-live="polite" className="sr-only">{routed}</p>
+        {/* Into <body>, as the action bar mounts its dialogs, so no sticky
+            column's stacking context draws it under the page. */}
+        {requesting && RouteDialog && createPortal(
+          <RouteDialog record={record} onClose={() => setRequesting(false)}
+            onDone={(outcome) => { setRequesting(false); setRouted(outcome); onChanged(); }} />,
+          document.body,
+        )}
         {drawer && <div className="review-paper-foot"><button ref={launcher} type="button" className={cn("review-control text-brand font-semibold", FOCUS_RING)} onClick={() => setOpen(true)}>Open review pane</button></div>}
       </div>
     </div>

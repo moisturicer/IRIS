@@ -459,7 +459,11 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
             "reviewer": seat.reviewer_id,
             "reviewer_name": _name(seat.reviewer),
             "state": seat.state,
-            "state_label": seat.get_state_display(),
+            # Every withdrawn seat here is one a Decision cut short (above).
+            "state_label": (
+                "Closed by the Decision" if seat.state == SeatState.WITHDRAWN
+                else seat.get_state_display()
+            ),
             "verdict": verdict.status if verdict else None,
             "verdict_label": verdict_label,
         })

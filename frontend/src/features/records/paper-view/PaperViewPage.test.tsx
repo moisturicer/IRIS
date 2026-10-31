@@ -105,7 +105,7 @@ const record: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
-  routing: { accept_and_route: false, route_as: null },
+  routing: { accept_and_route: false, route_as: null, targets: [] },
   office_review: { party: null, label: null, blocked: null, assignment: null },
   revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
@@ -162,7 +162,7 @@ const approvedProposal: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
-  routing: { accept_and_route: false, route_as: null },
+  routing: { accept_and_route: false, route_as: null, targets: [] },
   office_review: { party: null, label: null, blocked: null, assignment: null },
   revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
@@ -199,6 +199,13 @@ vi.mock("@/api/records", () => ({
     // Request documents, from the Review section's action bar (IR-412).
     documentRequestSlots:  vi.fn(() => Promise.resolve({ data: [{ id: 3, name: "Ethics Clearance" }] })),
     createDocumentRequest: vi.fn(() => Promise.resolve({ data: { id: 1 } })),
+    // Request review, from the sidebar's Reviewers (IR-685); the dialog's own
+    // behaviour is `RouteDialog.test.tsx`'s.
+    routeOptions:     vi.fn(() => Promise.resolve({ data: {
+      from_party: "itso", from_label: "ITSO", accept: false,
+      targets: [{ party: "ierc", label: "IERC", members: [], already_holds: false, author_hint: null }],
+    } })),
+    route:            vi.fn(() => Promise.resolve({ data: {} })),
     updateTags:       vi.fn(),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
@@ -439,7 +446,7 @@ const inReview: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
-  routing: { accept_and_route: false, route_as: null },
+  routing: { accept_and_route: false, route_as: null, targets: [] },
   office_review: { party: null, label: null, blocked: null, assignment: null },
   revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
@@ -2093,7 +2100,7 @@ describe("the Review section (IR-412)", () => {
     renderPaper(`/records/${RECORD_ID}?section=review`);
     await userEvent.type(await screen.findByRole("textbox", { name: "Comment" }), "Keep this draft");
     await userEvent.click(screen.getByRole("tab", { name: "Details" }));
-    expect(screen.getByRole("heading", { name: /^Reviewers ·/ })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Reviewers" })).toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "Review details" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("tab", { name: "Conversation" }));
     expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Keep this draft");
@@ -2122,7 +2129,7 @@ describe("the Review section (IR-412)", () => {
       .toHaveAttribute("aria-valuenow", "320");
     expect(screen.getByRole("tab", { name: "Conversation", selected: true })).toBeInTheDocument();
     expect(await within(screen.getByRole("complementary", { name: "Review details" }))
-      .findByRole("heading", { name: /^Reviewers ·/ })).toBeInTheDocument();
+      .findByRole("heading", { name: "Reviewers" })).toBeInTheDocument();
     expect(recordsApi.tracker).toHaveBeenCalledTimes(1);
     vi.unstubAllGlobals();
   });
@@ -2173,33 +2180,47 @@ describe("the Review section (IR-412)", () => {
     expect(screen.queryByRole("heading", { name: "Readiness" })).not.toBeInTheDocument();
   });
 
-  it("lists reviewers by party in the sidebar, with an unclaimed pool as an office (IR-681)", async () => {
+  // IR-685 supersedes IR-681's version of this test on purpose: every party is
+  // listed now, uninvolved ones in the tracker's words, and the Pool and
+  // Request review read as the ticket words them.
+  it("lists every party with its people, an unclaimed Pool as the office (IR-685)", async () => {
     workspaceAt(1600);
     vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [
-      partyRow("itso", "ITSO", { seats: [{ reviewer_name: "ITSO Reviewer", state: "in_review", state_label: "In review", verdict: null, verdict_label: null }] }),
+      partyRow("itso", "ITSO", { seats: [
+        { reviewer_name: "ITSO Reviewer", state: "in_review", state_label: "In review", verdict: null, verdict_label: null },
+        { reviewer_name: "Cleared Colleague", state: "done", state_label: "Done", verdict: "approved", verdict_label: "Cleared" },
+      ] }),
       partyRow("ierc", "IERC", { in_pool: true, due_at: "2026-11-04T08:00:00Z" }),
       partyRow("ktto", "KTTO", { state: "not_requested", state_label: "Not requested" }),
+      partyRow("rdco", "RDCO", { state: "awaiting", state_label: "Waiting" }),
     ] } } as never);
     // IR-686: person cards now come from the server projection, not adviser_name.
+    // No route or add_reviewer capability: this test asserts neither control shows.
     shownRecord = { ...inReview, ...reviewing, adviser_name: "Ada Adviser", keywords: ["groundwater"],
-      paper_details: { ...sidebarDetails, adviser: adviserCard },
-      capabilities: ["route", "add_reviewer"] };
+      paper_details: { ...sidebarDetails, adviser: adviserCard } };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
     const side = await screen.findByRole("complementary", { name: "Review details" });
-    expect(await within(side).findByRole("heading", { name: "Reviewers · 2 parties" })).toBeInTheDocument();
-    expect(within(side).getByRole("list", { name: "Reviewing for ITSO" })).toHaveTextContent("ITSO Reviewer");
-    expect(within(side).getByText(/IERC review pool · Nobody has claimed it/)).toBeInTheDocument();
-    expect(within(side).queryByText("KTTO")).not.toBeInTheDocument();
+    expect(await within(side).findByRole("heading", { name: "Reviewers" })).toBeInTheDocument();
+
+    const itso = within(side).getByRole("list", { name: "Reviewing for ITSO" });
+    expect(within(itso).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      expect.stringMatching(/ITSO Reviewer.*In review/), expect.stringMatching(/Cleared Colleague.*Cleared/),
+    ]);
+
+    // The Pool is the office, not a person: no person card to open.
+    const pool = within(side).getByText("Nobody has claimed this yet").closest("li")!;
+    expect(pool).toHaveTextContent(/^IERC/);
+    expect(within(pool).queryByRole("button")).not.toBeInTheDocument();
+
+    expect(within(side).getByText("KTTO").closest("li")).toHaveTextContent("Not requested");
+    expect(within(side).getByText("RDCO").closest("li")).toHaveTextContent("Waiting");
+    expect(screen.queryByRole("button", { name: "Request review" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Add a colleague/ })).not.toBeInTheDocument();
     expect(within(side).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
-      "Reviewers · 2 parties", "Researchers", "Adviser", "Classification", "Flagged by the authors",
+      "Reviewers", "Researchers", "Adviser", "Classification", "Flagged by the authors",
       "Keywords", "Version", "Due dates", "Documents", expect.stringMatching(/participants?$/),
     ]);
-    const toolbar = within(side).getByRole("toolbar", { name: "Reviewer actions" });
-    expect(within(toolbar).getAllByRole("button").map((b) => b.textContent?.trim()))
-      .toEqual(["Add a colleague…", "Request review…"]);
-    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).queryByRole("button", { name: /Route to office/ }))
-      .not.toBeInTheDocument();
 
     const adviser = within(side).getAllByRole("button", { name: /Ada Adviser/ })[0];
     await userEvent.click(adviser);
@@ -2207,6 +2228,42 @@ describe("the Review section (IR-412)", () => {
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Ada Adviser" })).not.toBeInTheDocument();
     expect(adviser).toHaveFocus();
+  });
+
+  it("offers Request review with exactly the routing flags' targets, and refreshes once routed (IR-685)", async () => {
+    workspaceAt(1600);
+    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [partyRow("itso", "ITSO")] } } as never);
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["route"],
+      routing: { accept_and_route: false, route_as: "itso", targets: [{ party: "ierc", label: "IERC" }, { party: "ktto", label: "KTTO" }] } };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const side = await screen.findByRole("complementary", { name: "Review details" });
+    const request = await within(side).findByRole("button", { name: "Request review" });
+    expect(request).toHaveAccessibleDescription("Can be sent to IERC and KTTO");
+    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).queryByRole("button", { name: /Route to office/ }))
+      .not.toBeInTheDocument();
+
+    const reads = vi.mocked(recordsApi.tracker).mock.calls.length;
+    await userEvent.click(request);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "IERC" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Human participants.");
+    await userEvent.click(screen.getByRole("button", { name: "Route" }));
+    expect(recordsApi.route).toHaveBeenCalledWith(RECORD_ID, expect.objectContaining({ to: [{ party: "ierc" }] }));
+    await waitFor(() => expect(vi.mocked(recordsApi.tracker).mock.calls.length).toBeGreaterThan(reads));
+  });
+
+  it("offers no Request review without targets, and Add a colleague only with add_reviewer (IR-685)", async () => {
+    workspaceAt(1600);
+    vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [partyRow("itso", "ITSO")] } } as never);
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["route", "add_reviewer"],
+      routing: { accept_and_route: false, route_as: "itso", targets: [] } };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const side = await screen.findByRole("complementary", { name: "Review details" });
+    await within(side).findByRole("heading", { name: "Reviewers" });
+    expect(within(side).queryByRole("button", { name: "Request review" })).not.toBeInTheDocument();
+    // A separate control from Request review, under the parties.
+    expect(within(side).getByRole("button", { name: /Add a colleague/ })).toBeInTheDocument();
   });
 
   it("withholds who reviews, due dates and participants when the review is not readable (IR-681)", async () => {
@@ -2218,7 +2275,10 @@ describe("the Review section (IR-412)", () => {
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
     const side = await screen.findByRole("complementary", { name: "Review details" });
-    await within(side).findByRole("heading", { name: "Reviewers · 1 party" });
+    await within(side).findByRole("heading", { name: "Reviewers" });
+    // Whose seat it is, and how far each has got, are review content.
+    expect(within(side).queryByRole("list", { name: "Reviewing for ITSO" })).not.toBeInTheDocument();
+    expect(within(side).getByText("ITSO").closest("li")).toHaveTextContent("Active");
     expect(within(side).queryByRole("heading", { name: "Due dates" })).not.toBeInTheDocument();
     expect(within(side).queryByRole("heading", { name: /participants?$/ })).not.toBeInTheDocument();
   });
@@ -2247,7 +2307,8 @@ describe("the Review section (IR-412)", () => {
       : await screen.findByRole("complementary", { name: "Review details" });
     await within(side).findByRole("heading", { name: "Researchers" });
     expect(within(side).getAllByRole("heading", { level: 3 }).map((h) => h.textContent)).toEqual([
-      "Reviewers · 1 party", "Researchers", "Adviser", "Classification", "Flagged by the authors",
+      // IR-685: the heading no longer counts parties; every party is listed.
+      "Reviewers", "Researchers", "Adviser", "Classification", "Flagged by the authors",
       "Keywords", "Version", "Due dates", "Documents", "3 participants",
     ]);
     const section = (name: string) => within(within(side).getByRole("heading", { name }).closest("section")!);
