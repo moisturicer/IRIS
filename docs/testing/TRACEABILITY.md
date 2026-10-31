@@ -90,6 +90,56 @@ from `frontend/` passes after adding the local config; before it, the same scan
 reported `border-accent-on-rounded` at line 134. This is a source regex check,
 not a rendered-page accessibility check.
 
+## IR-704 / IR-707 · Register in three steps
+
+`SignupPage` moves onto `EntryFrame` under the headline "Begin with your
+research identity.", and the one long form becomes three steps: Identity (role,
+names, CIT-U email), Affiliation (college, then program or department) and
+Security & agreement (passwords, IR-540's unchanged notice and consent, What
+happens next, Register). "Create an Account" stays the h2; each step's h3 reads
+"Step N of 3 · Name" and takes focus on every step change. The folder's tabs are
+`components/auth/EntrySteps.tsx`, a stepper in a `nav` named "Registration
+steps": a completed tab is a link with a check and a solid outline, the current
+one carries `aria-current="step"`, and one not started is dashed, `aria-disabled`,
+has no `href` and is out of the Tab order. Each tab's name is its text plus its
+state ("Affiliation, not started"). Completion is worked out from the answers on
+every render, never stored, and a tab counts as completed only when every step
+before it is too, so a role or college change that reopens Affiliation also
+closes the way to a finished Security. Answers stay in component memory across
+Back, the tabs and Continue; the URL does not change. The role tile reads
+"Adviser". Validation messages, the college → program/department filtering and
+its states, and the register request are unchanged. The confirmation shows
+inside the frame with three completed tabs as plain labels; its copy is
+IR-709's. The step panel cross-fades in 150 ms, opacity only, behind
+`motion-safe:`.
+
+**Deliberate changes to existing behaviour:** a server error on an Identity or
+Affiliation field (for example an email already registered) is now also said in
+the alert on Security, because its field is no longer on screen; it stays on
+the field too. Taking the registrant to that step is IR-708. The options-load
+failure now shows on Affiliation, where the selects are, not at the top of the
+whole form.
+
+**Verification (2026-10-31):** `SignupPage.test.tsx` was rewritten to walk the
+steps through the accessible tree (33 cases): the frame and tab states, empty
+fields with no placeholder, required marks per step, field order per step,
+Continue checking only its own step with today's messages, answers kept across
+Back and tabs with the router location unchanged, not-started tabs unreachable
+by mouse and keyboard, no jump past a reopened step, role and college changes
+clearing the dependent field and reopening Affiliation with the role note,
+filtering, arrow keys, password words and toggles, consent's own error, the
+notice by keyboard, the Student and Adviser payloads with key order, "Creating
+account…" with a single send, nothing written to localStorage or sessionStorage,
+the confirmation, five refusal cases and the options-load retry, with axe on
+every step. Removed on purpose: "puts a server field error on its field" (now
+the earlier-step refusal case, which expects the new alert) and a case that
+jumped from a broken Identity to a completed Security tab, which the tabs no
+longer allow. `entryTokens.test.ts` reads `EntrySteps.tsx` and gains a guard
+that every `animate-` utility on an entry screen sits behind `motion-safe:`,
+seen failing with the prefix removed. The auth and auth-component suites pass
+(192), with `tsc --noEmit` and eslint clean. **No browser evidence recorded yet**
+for the steps; it is owed before IR-704 closes.
+
 ## IR-538 · Announced email verification in the shared entry frame
 
 `EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains
@@ -1920,3 +1970,13 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 **Browser card geometry and interaction.** [Measurements](evidence/IR-686/browser-check.json) and [1600 px](evidence/IR-686/profile-1600.png), [1100 px](evidence/IR-686/profile-1100.png), [375 px](evidence/IR-686/profile-375.png) screenshots use the real ReviewDetails component and styles on a synthetic isolated fixture. At every viewport, the final participant's card stays inside the viewport, Escape and outside click close it, and focus returns. This checks the card, not the full review page; the actual page's wide/sidebar and folded Details-tab behavior is covered by the 1600/1100 px page tests.
 
 **Final backend regression result (2026-10-31).** `python -m pytest apps/records apps/reviews apps/documents core` (invoked through `pytest.main` with the isolated test database name `test_ir686_sidebar`) completed: **996 passed, 3 skipped, 400 subtests passed**, exit 0. This includes the nine new paper-details API tests and the existing tracker, review-privacy, document-authorization, deadline and readiness tests. Runtime was 17m48s on the local Docker database. Warnings include absent local staticfiles and existing unordered supplementary-file pagination. No migration or live-data mutation is part of this change. PR: [IR-686 #384](https://github.com/moisturicer/IRIS/pull/384).
+
+## IR-682 — Readiness: verdict and Revision request blockers
+
+**Basis and scope.** ADR-032 §10 Amendment (Readiness contract). IR-681 built the `readiness` builder (`apps/reviews/readiness.py`) and the Conversation tab's Readiness panel; IR-682 adds the evidence its acceptance criteria ask for and one presentational fix: information items now carry an icon beside their words, as blockers already did. No payload, rule or permission changes.
+
+**Divergence from the ticket, recorded rather than reconciled.** The first criterion names the Adviser, but an Adviser cannot decide once the record has gone to an office, and IERC never holds it before then. The test uses RDCO, the party that decides there. The ticket's shape names the action `withdraw_request`; the builder sends `withdraw_revision`. ADR-032 types `action.kind` as a plain string, so the ADR does not settle it and neither was changed.
+
+**Tests.** `apps/reviews/test_readiness.py`: `test_an_open_ierc_revision_request_blocks_the_decider_and_names_who_asked_and_when` (one `revision_request` blocker naming IERC, the requester and the request's time, with no Withdraw offered to RDCO) and `ReadinessExplainsEveryRefusalTests` (seven states through the real services and `decide/`: accepted exactly when `ready`; every refusal is the `decision.blocked` reason the payload already named, and is explained by a blocker of its own kind, not only the generic `refusal` fallback; the refused states are named). `PaperViewPage.test.tsx`: "offers Withdraw request only on the Revision request whose action allows it (IR-682)".
+
+**Executed evidence (2026-10-31).** Backend, in the `iris-backend` image against the compose Postgres: `apps/reviews/test_readiness.py` 9 passed on the first version of the property test. The tightened version (shared invariant helper, refusal-reason equality, named refused set) has **not yet run**: Docker Desktop stopped responding under memory pressure before it could. Frontend: `tsc --noEmit` clean; eslint clean on the changed test; the four Readiness page tests pass. A full `npm test` and a one-worker Paper View run both hit Node out-of-memory on this machine (17 of 21 Paper View files completed, 367 tests passed, 0 failed); the full suites are left to CI.
