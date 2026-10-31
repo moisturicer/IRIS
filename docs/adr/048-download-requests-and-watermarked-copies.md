@@ -2,7 +2,9 @@
 
 ## Status
 
-**Proposed** — 2026-10-30 (IR-673, spec IR-672). Drafted as ADR-047 and renumbered the same day: ADR-047 on `main` is the RDCO routing proposal. The decisions come from two design sessions on 2026-10-30: the first by a team member, the second by Hermoine Zozobrado, which phased the watermark and added notes, cancelling, revoking and a My Library view. Both are transcribed here by an agent. **Not accepted**: Lee Jasmin Adolfo, the project lead, accepts this record. IR-675, IR-676, IR-677 and IR-688 stay `not-ready` until then. IR-674 (only RDCO approves) restores IR-165's existing intent and does not wait for this ADR.
+**Accepted** — 2026-10-31, by Lee Jasmin Adolfo, the project lead, in a comment on IR-673 ("I accept ADR-048").
+
+Proposed 2026-10-30 (IR-673, spec IR-672). Drafted as ADR-047 and renumbered the same day: ADR-047 on `main` is the RDCO routing proposal. The decisions come from two design sessions on 2026-10-30: the first by a team member, the second by Hermoine Zozobrado, which phased the watermark and added notes, cancelling, revoking and a My Library view. Both were transcribed by an agent. IR-674 (only RDCO approves) restores IR-165's existing intent and did not wait for this ADR.
 
 ## Context
 
@@ -12,7 +14,7 @@ Observed on `main`, 2026-10-30:
 - **No page renders `DownloadRequestModal`**, so a reader has no way to ask. A second, unrouted RDCO page, `AccessRequestsPage`, still copies the bearer link to the clipboard.
 - A request carries only the record: the reader gives no reason, and a decline records none.
 - The Paper reader (`GET /records/<id>/manuscript/`, inline, IR-335) serves the full manuscript to anyone `visible_to` admits. Its own download button (`PaperPdfReader.handleDownload`) saves those bytes. So downloading is effectively ungated today.
-- Approval rights disagree. `partial_update` and the UI admit RDCO only, as IR-165 intended, while the `approve` and `decline` actions admit any of the four offices (`IsStaff`). A new request notifies every KTTO and RDCO account.
+- Approval is already RDCO-only on every route. The `approve` and `decline` actions declare `IsStaff`, but the viewset's `get_permissions` overrides that (corrected 2026-10-31 under IR-674; this line previously said any office could approve). RDCO could decide their own request, the `PATCH` route did not notify the requester, and a new request notified every KTTO and RDCO account.
 - No PDF-editing library is installed. PyMuPDF was removed with the prototype extractors (ADR-016).
 
 ## Decision

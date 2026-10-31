@@ -239,3 +239,17 @@ _Avoid_: Access (the audit log's word for one opening), hit, read, reader count.
 **Trending**:
 Published papers ordered by the [[View]]s they gained in the last 30 days, then by all-time views, then newest first. Distinct from Most Viewed, which orders by all-time views alone.
 _Avoid_: Popular, hot, most viewed.
+
+### Accounts
+
+**Sign in**:
+Entering IRIS with an existing account's CIT-U email and password.
+_Avoid_: Login, log in, sign on.
+
+**Register**:
+Asking for an IRIS account as a Student or an [[Adviser]]. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request.
+_Avoid_: Sign up, signup, create account (the screen's title, not the act).
+
+**Adviser**:
+The role of the person who reviews their advisees' Records first and routes them onward. It is a role someone asks for when they register, not a job title.
+_Avoid_: Faculty, faculty adviser, professor.

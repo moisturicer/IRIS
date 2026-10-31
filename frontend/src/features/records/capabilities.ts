@@ -29,6 +29,7 @@ type CapabilityInputs = Pick<
   | "is_participant"
   | "abstract_file"
   | "files"
+  | "review_claim"
 >;
 
 /** Whether the viewer owns the record: the adapter's one client-side input. */
@@ -52,7 +53,7 @@ export function isReviewing(record: CapabilityInputs, viewer: Viewer | null): bo
  * and a pool member who is about to claim.
  */
 export function isParticipant(record: CapabilityInputs, viewer: Viewer | null): boolean {
-  return viewer != null && (record.is_participant || isOwner(record, viewer) || isReviewing(record, viewer));
+  return viewer != null && (record.is_participant || isOwner(record, viewer) || isReviewing(record, viewer) || record.review_claim != null);
 }
 
 /**

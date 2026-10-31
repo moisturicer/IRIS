@@ -195,10 +195,16 @@ def routing_flags(record, user) -> dict:
     endpoints re-check both.
     """
     if user is None or not getattr(user, "is_authenticated", False):
-        return {"accept_and_route": False, "route_as": None}
+        return {"accept_and_route": False, "route_as": None, "targets": []}
+    route_as = _route_as(record, user)
     return {
         "accept_and_route": _may_accept_and_route(record, user),
-        "route_as": _route_as(record, user),
+        "route_as": route_as,
+        # Where *Request review* may send it (IR-685): the sidebar lists these
+        # and keeps no table of its own, so a new party graph needs no release.
+        "targets": [
+            {"party": party, "label": _label(party)} for party in ROUTE_TARGETS[route_as]
+        ] if route_as is not None else [],
     }
 
 
