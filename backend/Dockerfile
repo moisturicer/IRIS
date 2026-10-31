@@ -73,9 +73,10 @@ USER appuser
 # Do NOT "simplify" this by restoring defaults in settings. The whole point of
 # IR-154 is that a deployment missing a real credential fails loudly instead of
 # connecting to something it guessed.
-# The original build set is SECRET_KEY, DB_NAME, DB_USER and DB_PASSWORD from
-# base.py, plus ALLOWED_HOSTS and CORS_ALLOWED_ORIGINS from production.py.
-# Recovery additionally requires its keys and frontend/SMTP configuration.
+# The original set is SECRET_KEY, DB_NAME, DB_USER and DB_PASSWORD from base.py,
+# plus ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS and TRUSTED_PROXY_COUNT, which
+# production.py adds. Recovery (IR-642) additionally requires its keys and
+# frontend/SMTP configuration.
 # Every one is a throwaway that lives only for this RUN. Enumerating them keeps
 # the image built against the *real* production settings path rather than
 # quietly switching to development settings for the build -- and the static
@@ -93,6 +94,7 @@ RUN SECRET_KEY=build-time-only \
     DB_PASSWORD=build-time-only \
     ALLOWED_HOSTS=localhost \
     CORS_ALLOWED_ORIGINS=http://localhost \
+    TRUSTED_PROXY_COUNT=1 \
     python manage.py collectstatic --noinput
 
 EXPOSE 8000

@@ -194,6 +194,20 @@ _Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision r
 A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
 _Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).
 
+**Review discussion**:
+The private conversation on a submitted Record between its owners and everyone who has held a [[Seat]] on it, shown in its review timeline. Never mixed with [[Comment]]s.
+_Avoid_: Comments (the public thread), notes, chat.
+
+### Comments
+
+**Comment**:
+A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or a system administrator may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
+_Avoid_: Public discussion (the ADR's name for the thread), post, review comment.
+
+**Comment report**:
+A reader telling RDCO that a [[Comment]] needs attention, with a reason. Only RDCO sees reports; the Comment's writer never learns one was made.
+_Avoid_: Flag, complaint.
+
 ### Library
 
 **Library**:
@@ -215,3 +229,55 @@ _Avoid_: Collection, list, tag.
 **Reading history**:
 The papers recently opened in this browser. It is not part of the [[Library]], never leaves the browser, and is cleared on sign-out.
 _Avoid_: Recently viewed, activity, reading log.
+
+### People
+
+**Profile**:
+A page about one account that any signed-in user can open: their name, affiliation and role, the photo, bio, research interests and ORCID iD they chose to add, the published papers they own or advised, and their [[Collaborator]]s. It never shows their email address.
+_Avoid_: Account (the sign-in identity), user page, bio.
+
+**Collaborator**:
+Another account that shared a published paper with this person, as a co-owner, as its Adviser, or as an advisee. Byline authors without an account are not collaborators.
+_Avoid_: Co-author (a byline name, not an account), team member.
+
+**Contact person**:
+The one owner of a Record whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; the owners can choose another. Their email is shown only where a decision says so, never on their Profile.
+_Avoid_: Representative, group leader, primary author (authors are byline names, not accounts).
+
+### Downloads
+
+**Download**:
+Saving a copy of a published paper's [[Manuscript]] to take out of IRIS. Distinct from reading it inside IRIS, which stays open to every reader who can see the paper.
+_Avoid_: Export, access, view.
+
+**Download request**:
+A reader asking RDCO to [[Download]] one published paper, always with a note saying why. RDCO alone approves or declines it, and a decline always carries a note. A reader holds at most one pending request per paper; a declined or expired one may be made again. The paper's owners, its Adviser, office staff and its assigned reviewers download without one.
+_Avoid_: Access request (the old page's name), download link.
+
+**Download grant**:
+What an approved [[Download request]] gives its reader: they may download that paper while signed in, as often as they like, until the grant expires or RDCO revokes it with a note. It is never a link, and nothing emailed works on its own.
+_Avoid_: Download link, token, download permission.
+
+### Discover
+
+**View**:
+One account's first opening of a published paper. A paper's views are the number of distinct accounts that have opened it since it was published: opening it again never adds one, and its owners never count. Which accounts viewed a paper is used only to count them and is never shown.
+_Avoid_: Access (the audit log's word for one opening), hit, read, reader count.
+
+**Trending**:
+Published papers ordered by the [[View]]s they gained in the last 30 days, then by all-time views, then newest first. Distinct from Most Viewed, which orders by all-time views alone.
+_Avoid_: Popular, hot, most viewed.
+
+### Accounts
+
+**Sign in**:
+Entering IRIS with an existing account's CIT-U email and password.
+_Avoid_: Login, log in, sign on.
+
+**Register**:
+Asking for an IRIS account as a Student or an [[Adviser]]. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request.
+_Avoid_: Sign up, signup, create account (the screen's title, not the act).
+
+**Adviser**:
+The role of the person who reviews their advisees' Records first and routes them onward. It is a role someone asks for when they register, not a job title.
+_Avoid_: Faculty, faculty adviser, professor.

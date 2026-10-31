@@ -9,6 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from core.permissions import IsAdmin
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
+from apps.audit.models import AuditEvent
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
@@ -17,7 +18,10 @@ from .serializers import (
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
 from .credentials import set_password_and_invalidate
-from .sessions import end_session, start_session
+from .sessions import (
+    end_all_sessions, end_session, start_session, require_eligible_account, refuse_if_ended,
+    revoke_token,
+)
 from .lockout import LOCKED_BY_ADMIN
 
 
@@ -47,6 +51,7 @@ class RegisterView(generics.CreateAPIView):
 class LoginView(APIView):
     permission_classes = [AllowAny]
 
+    @transaction.atomic
     def post(self, request):
         from django.contrib.auth import authenticate
         email    = request.data.get("email")
@@ -57,6 +62,14 @@ class LoginView(APIView):
         # locked account was told "Invalid credentials." even with the right
         # password, and no 429 was ever sent (IR-555).
         user = authenticate(request._request, username=email, password=password)
+        if user:
+            # A password change or account lock may have committed since
+            # authenticate read the credentials. Serialize that check and
+            # token issuance with those actions on the account row.
+            verified_hash = user.password
+            user = User.objects.select_for_update().get(pk=user.pk)
+            if user.password != verified_hash or not user.is_active:
+                user = None
         if not user:
             create_audit_event("FAILED_LOGIN", None, metadata={"email": email})
             return Response({"detail": "Invalid credentials."}, status=status.HTTP_401_UNAUTHORIZED)
@@ -126,13 +139,18 @@ class ChangePasswordView(APIView):
         # this one included, and so does any outstanding reset link.
         with transaction.atomic():
             user = User.objects.select_for_update().get(pk=request.user.pk)
+            require_eligible_account(user)
             if user.credential_version != request.user.credential_version:
                 from .authentication import CredentialsChanged
                 raise CredentialsChanged()
+            sid = request.auth.get("sid") if request.auth else None
+            if sid:
+                refuse_if_ended(sid)
             request.user = user
             serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
             serializer.is_valid(raise_exception=True)
             set_password_and_invalidate(user, serializer.validated_data["new_password"], timezone.now())
+            create_audit_event(AuditEvent.PASSWORD_CHANGED, user)
         return Response({"detail": "Password changed. Sign in again with your new password.",
                          "code": SessionEndReason.PASSWORD_CHANGED})
 
@@ -272,13 +290,16 @@ class LockUserView(APIView):
     """PATCH /users/<id>/lock/ -- lock or unlock an account."""
     permission_classes = [IsAuthenticated, IsAdmin]
 
+    @transaction.atomic
     def patch(self, request, pk):
-        user      = User.objects.get(pk=pk)
+        user      = User.objects.select_for_update().get(pk=pk)
         is_locked = request.data.get("is_locked")
         if is_locked is None:
             return Response({"detail": "is_locked is required."}, status=400)
         user.is_locked = bool(is_locked)
         user.save(update_fields=["is_locked"])
+        if user.is_locked:
+            end_all_sessions(user, SessionEndReason.LOCKED)
         event_type = "ACCOUNT_LOCKED" if user.is_locked else "ACCOUNT_UNLOCKED"
 
         create_audit_event(
@@ -437,34 +458,36 @@ class ActiveSessionsView(APIView):
 class RevokeSessionView(APIView):
     """
     DELETE /users/sessions/<jti>/
-    Blacklists a specific JWT by its JTI (JWT ID), forcing that session to
-    log out on the next request.  Admin only.
+    Ends the session of a specific JWT, found by its JTI (JWT ID), so its access
+    and refresh tokens are both refused on their next use.  Admin only.
     """
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def delete(self, request, jti):
-        from rest_framework_simplejwt.token_blacklist.models import (
-            OutstandingToken, BlacklistedToken,
-        )
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
         try:
             token = OutstandingToken.objects.get(jti=jti)
         except OutstandingToken.DoesNotExist:
             return Response({"detail": "Session not found."}, status=404)
 
-        BlacklistedToken.objects.get_or_create(token=token)
+        revoke_token(token)
         create_audit_event(
             "SESSION_REVOKE", request.user,
-            metadata={"revoked_jti": jti},
+            metadata={"revoked_jti": jti, "user_id": token.user_id},
         )
         return Response({"detail": "Session revoked."})
 
 
 class SystemSettingView(APIView):
-    """GET or PATCH a single setting by key."""
-    def get_permissions(self):
-        if self.request.method == "PATCH":
-            return [IsAuthenticated(), IsAdmin()]
-        return [IsAuthenticated()]
+    """
+    GET or PATCH a single setting by key. RDCO alone (IR-667).
+
+    A PATCH changes an existing key and never creates one, and a change is
+    audited with its old and new value. Settings hold no secrets, so neither
+    value is masked.
+    """
+    permission_classes = [IsAuthenticated, IsAdmin]
 
     def get(self, request, key):
         setting = SystemSetting.objects.filter(key=key).first()
@@ -473,8 +496,19 @@ class SystemSettingView(APIView):
         return Response(SystemSettingSerializer(setting).data)
 
     def patch(self, request, key):
-        setting, _ = SystemSetting.objects.get_or_create(key=key)
-        setting.value      = request.data.get("value", setting.value)
-        setting.updated_by = request.user
-        setting.save()
+        value = request.data.get("value")
+        if not isinstance(value, str):
+            return Response({"value": ["A text value is required."]}, status=400)
+        with transaction.atomic():
+            setting = SystemSetting.objects.select_for_update().filter(key=key).first()
+            if not setting:
+                return Response({"detail": "Not found."}, status=404)
+            if setting.value != value:
+                create_audit_event(
+                    AuditEvent.SYSTEM_SETTING_CHANGED, request.user,
+                    metadata={"key": key, "old_value": setting.value, "new_value": value},
+                )
+                setting.value      = value
+                setting.updated_by = request.user
+                setting.save()
         return Response(SystemSettingSerializer(setting).data)

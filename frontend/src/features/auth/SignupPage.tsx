@@ -1,11 +1,13 @@
-import { useState, useEffect, useId, useRef, useCallback } from "react";
+import { useState, useEffect, useId, useRef, useCallback, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { accountsApi } from "@/api/accounts";
 import { AuthAlert } from "@/components/auth/AuthAlert";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { EntryFrame } from "@/components/auth/EntryFrame";
+import { EntrySteps, type EntryStep } from "@/components/auth/EntrySteps";
 import { Button, ButtonLink, Input, Select } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { cn } from "@/lib/utils";
 import { DataNotice } from "./DataNotice";
 
 // ── Types ──────────────────────────────────────────────────────────────────
@@ -27,7 +29,8 @@ interface FormState {
   dept_id:        string;
 }
 
-type FieldErrors = Partial<Record<keyof FormState, string>>;
+type FieldName   = keyof FormState;
+type FieldErrors = Partial<Record<FieldName, string>>;
 
 const EMPTY: FormState = {
   first_name: "", last_name: "", middle_initial: "",
@@ -36,13 +39,21 @@ const EMPTY: FormState = {
   college_id: "", course_id: "", dept_id: "",
 };
 
+/** The three steps, in order, and the fields each one owns (IR-704). */
+const STEPS: { name: string; shortName?: string; fields: FieldName[] }[] = [
+  { name: "Identity",             fields: ["first_name", "last_name", "middle_initial", "email"] },
+  { name: "Affiliation",          fields: ["college_id", "course_id", "dept_id"] },
+  { name: "Security & agreement", shortName: "Security", fields: ["password", "password2"] },
+];
+const LAST_STEP = STEPS.length - 1;
+
 /**
  * The register serializer's error keys, onto the fields they mean (IR-540). Two
  * are named differently on the server; `consent_given` belongs to the consent
  * box. Anything else -- `non_field_errors`, `detail`, `role_name` -- is shown
  * as an alert, because no field here can own it.
  */
-const SERVER_FIELD: Record<string, keyof FormState> = {
+const SERVER_FIELD: Record<string, FieldName> = {
   email:            "email",
   first_name:       "first_name",
   last_name:        "last_name",
@@ -70,10 +81,15 @@ const allMessages = (val: unknown) => (Array.isArray(val) ? val.map(String).join
 /** The consent box's own error, shown on it when a submit arrives without it (IR-540). */
 const CONSENT_REQUIRED = "Agree to the data notice to register.";
 
-const ROLES: { value: Role; label: string }[] = [
-  { value: "Student", label: "Student" },
-  { value: "Adviser", label: "Faculty / Adviser" },
-];
+/** "Adviser", not "Faculty / Adviser": the role's name, not a job title (CONTEXT.md). */
+const ROLES: Role[] = ["Student", "Adviser"];
+
+const LEDE = {
+  headline: <>Begin with your <span className="text-brand">research identity.</span></>,
+  sentence: "Register once with your CIT-U email. You verify the address, then RDCO reviews the role you ask for.",
+};
+
+const CROSS_LINK = { prompt: "Already have an account?", label: "Sign in", to: "/login" };
 
 // ── Validation ─────────────────────────────────────────────────────────────
 function validateAll(f: FormState, role: Role): FieldErrors {
@@ -112,16 +128,29 @@ function validateLive(f: FormState, role: Role): FieldErrors {
   return e;
 }
 
+/** Only the errors on one step's fields. */
+function stepErrors(all: FieldErrors, step: number): FieldErrors {
+  const e: FieldErrors = {};
+  for (const name of STEPS[step].fields) if (all[name]) e[name] = all[name];
+  return e;
+}
+
+const hasAny = (e: FieldErrors) => Object.values(e).some(Boolean);
+
 // ── Component ──────────────────────────────────────────────────────────────
 export default function SignupPage() {
 
   const [role, setRole]             = useState<Role>("Student");
   const [form, setForm]             = useState<FormState>(EMPTY);
+  const [step, setStep]             = useState(0);
   const [errors, setErrors]         = useState<FieldErrors>({});
-  const [touched, setTouched]       = useState<Partial<Record<keyof FormState, boolean>>>({});
+  const [touched, setTouched]       = useState<Partial<Record<FieldName, boolean>>>({});
   const [consented, setConsented]   = useState(false);
   const [consentError, setConsentError] = useState<string>();
   const [formAlert, setFormAlert]   = useState<FormAlert | null>(null);
+  // Set when the role changes after an affiliation was chosen, and said on
+  // Affiliation until the new program or department is picked (IR-704 story 28).
+  const [roleChangedTo, setRoleChangedTo] = useState<Role | null>(null);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const noticeTriggerId = useId();
   const noticeId        = useId();
@@ -131,6 +160,10 @@ export default function SignupPage() {
   // leaving on a toast (IR-540), naming the address exactly as it was entered.
   const [registered, setRegistered] = useState<{ email: string; role: Role } | null>(null);
   const confirmationRef = useRef<HTMLHeadingElement>(null);
+  const stepHeadingRef  = useRef<HTMLHeadingElement>(null);
+  // Focus follows a step change, never the first render: arriving on the page
+  // must not pull focus past the masthead.
+  const stepChanged = useRef(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword]   = useState(false);
@@ -166,6 +199,21 @@ export default function SignupPage() {
   useEffect(() => {
     if (registered) confirmationRef.current?.focus();
   }, [registered]);
+  useEffect(() => {
+    if (stepChanged.current) stepHeadingRef.current?.focus();
+  }, [step]);
+
+  const goTo = (next: number) => {
+    stepChanged.current = true;
+    setStep(next);
+  };
+
+  // Completion is derived from the answers every render, never stored, so a
+  // change that invalidates a step reopens it at once (IR-704).
+  const allErrors = validateAll(form, role);
+  const complete = STEPS.map((_, i) =>
+    !hasAny(stepErrors(allErrors, i)) && (i !== LAST_STEP || consented),
+  );
 
   const collegeNum = Number(form.college_id);
   const filteredDepts = allDepts.filter((d) => d.college === collegeNum);
@@ -185,9 +233,10 @@ export default function SignupPage() {
     }
   }
 
-  const handleChange = (name: keyof FormState, value: string) => {
+  const handleChange = (name: FieldName, value: string) => {
     const next = { ...form, [name]: value };
     if (name === "college_id") { next.course_id = ""; next.dept_id = ""; }
+    if ((name === "course_id" || name === "dept_id") && value) setRoleChangedTo(null);
     setForm(next);
     setTouched((prev) => ({ ...prev, [name]: true }));
     const liveErrs = validateLive(next, role);
@@ -196,22 +245,43 @@ export default function SignupPage() {
     setErrors((prev) => ({ ...prev, ...patch }));
   };
 
-  const handleBlur = (name: keyof FormState) => {
+  const handleBlur = (name: FieldName) => {
     setTouched((prev) => ({ ...prev, [name]: true }));
     const errs = validateAll(form, role);
     setErrors((prev) => ({ ...prev, [name]: errs[name] }));
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const allKeys = Object.keys(EMPTY) as (keyof FormState)[];
-    setTouched(allKeys.reduce((acc, k) => ({ ...acc, [k]: true }), {}));
+  /** Shows one step's errors, as Continue and Register do. */
+  const revealStep = (i: number, errs: FieldErrors) => {
+    const fields = STEPS[i].fields;
+    setTouched((prev) => ({ ...prev, ...Object.fromEntries(fields.map((k) => [k, true])) }));
+    setErrors((prev) => ({ ...prev, ...Object.fromEntries(fields.map((k) => [k, errs[k]])) }));
+  };
+
+  /** Continue checks the step on screen and nothing after it (IR-704 story 18). */
+  const handleContinue = () => {
     const errs = validateAll(form, role);
-    setErrors(errs);
+    revealStep(step, errs);
+    if (hasAny(stepErrors(errs, step))) return;
+    goTo(step + 1);
+  };
+
+  const handleRegister = async () => {
+    const errs = validateAll(form, role);
     // Consent is checked with the fields, not after them, so one press of
     // Register shows everything that is missing at once (IR-540).
     setConsentError(consented ? undefined : CONSENT_REQUIRED);
-    if (Object.values(errs).some(Boolean) || !consented) return;
+    revealStep(LAST_STEP, errs);
+    // The tabs never reach Security past an incomplete step, so this is a
+    // guard: whatever got here, an incomplete form is never sent, and the
+    // registrant is taken to the earliest step that needs them.
+    const earliest = STEPS.findIndex((_, i) => hasAny(stepErrors(errs, i)));
+    if (earliest !== -1 && earliest < LAST_STEP) {
+      revealStep(earliest, errs);
+      goTo(earliest);
+      return;
+    }
+    if (earliest !== -1 || !consented) return;
 
     setFormAlert(null);
     setSubmitting(true);
@@ -243,17 +313,31 @@ export default function SignupPage() {
       const elsewhere: string[] = [];
       for (const [key, val] of Object.entries(data as Record<string, unknown>)) {
         if (key === "consent_given") setConsentError(firstMessage(val));
-        else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = allMessages(val);
+        else if (SERVER_FIELD[key]) {
+          const name = SERVER_FIELD[key];
+          onFields[name] = allMessages(val);
+          // A field on an earlier step is not on screen, so its message is
+          // said here too, never lost. IR-708 takes the registrant to it.
+          if (!STEPS[LAST_STEP].fields.includes(name)) elsewhere.push(onFields[name]);
+        }
         else elsewhere.push(firstMessage(val));
       }
       setErrors((prev) => ({ ...prev, ...onFields }));
+      setTouched((prev) => ({ ...prev, ...Object.fromEntries(Object.keys(onFields).map((k) => [k, true])) }));
       if (elsewhere.length) setFormAlert({ title: "Registration failed", message: elsewhere.join(" ") });
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (step < LAST_STEP) handleContinue();
+    else void handleRegister();
+  };
+
   const switchRole = (r: Role) => {
+    if (form.college_id || form.course_id || form.dept_id) setRoleChangedTo(r);
     setRole(r);
     setForm((prev) => ({ ...prev, course_id: "", dept_id: "" }));
     setErrors((prev) => { const n = { ...prev }; delete n.course_id; delete n.dept_id; return n; });
@@ -262,7 +346,7 @@ export default function SignupPage() {
 
   // An error shows once its field has been touched, as before IR-539; the
   // primitives then make it the field's description and mark it invalid.
-  const field = (name: keyof FormState) => ({
+  const field = (name: FieldName) => ({
     value:    form[name],
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
       handleChange(name, e.target.value),
@@ -282,258 +366,348 @@ export default function SignupPage() {
 
   if (registered) {
     return (
-      <AuthLayout variant="signup" wide>
-        <h2
-          ref={confirmationRef}
-          tabIndex={-1}
-          className="text-balance font-display text-display font-semibold text-stone-900 outline-none"
-        >
-          Check your email
-        </h2>
-        <p className="mt-3 text-pretty text-body text-stone-700">
-          Your account was created. We sent a verification link to{" "}
-          <strong className="font-semibold text-stone-900">{registered.email}</strong>.
-        </p>
-        <ol className="mt-section list-decimal space-y-2 pl-5 text-body text-stone-700">
-          <li>Open the link in that email to verify your address.</li>
-          <li>
-            RDCO reviews your request to join as {registered.role === "Adviser" ? "an Adviser" : "a Student"}, and
-            emails you when they decide.
-          </li>
-        </ol>
-        {/* Not "contact RDCO": an email is read-only to every IRIS screen,
-            RDCO's included, so the only fix IRIS offers is a fresh registration. */}
-        <p className="mt-section text-small text-stone-600">
-          If that address is wrong, register again with the right one.
-        </p>
-        <ButtonLink
-          to="/login"
-          size="full"
-          className="mt-section-lg"
-        >
-          Go to sign in
-        </ButtonLink>
-      </AuthLayout>
+      <EntryFrame
+        crossLink={CROSS_LINK}
+        lede={LEDE}
+        wide
+        tabs={<EntrySteps steps={STEPS.map(({ name, shortName }) => ({ name, shortName, state: "completed" }))} />}
+      >
+        <div className="max-w-2xl">
+          <h2
+            ref={confirmationRef}
+            tabIndex={-1}
+            className="text-balance font-display text-display font-semibold text-stone-900 outline-none"
+          >
+            Check your email
+          </h2>
+          <p className="mt-3 text-pretty text-body text-stone-700">
+            Your account was created. We sent a verification link to{" "}
+            <strong className="font-semibold text-stone-900">{registered.email}</strong>.
+          </p>
+          <ol className="mt-section list-decimal space-y-2 pl-5 text-body text-stone-700">
+            <li>Open the link in that email to verify your address.</li>
+            <li>
+              RDCO reviews your request to join as {registered.role === "Adviser" ? "an Adviser" : "a Student"}, and
+              emails you when they decide.
+            </li>
+          </ol>
+          {/* Not "contact RDCO": an email is read-only to every IRIS screen,
+              RDCO's included, so the only fix IRIS offers is a fresh registration. */}
+          <p className="mt-section text-small text-stone-600">
+            If that address is wrong, register again with the right one.
+          </p>
+          <ButtonLink to="/login" size="full" className="mt-section-lg">
+            Go to sign in
+          </ButtonLink>
+        </div>
+      </EntryFrame>
     );
   }
 
+  // A step counts as completed only when every step before it is too: a later
+  // step finished earlier cannot be reached past one an answer has reopened
+  // (IR-704 story 17).
+  const tabs: EntryStep[] = STEPS.map(({ name, shortName }, i) => ({
+    name,
+    shortName,
+    state: i === step ? "current" : complete.slice(0, i + 1).every(Boolean) ? "completed" : "not-started",
+  }));
+
+  const roleArticle = role === "Adviser" ? "an Adviser" : "a Student";
+  const fullName = [form.first_name.trim(), form.middle_initial.trim(), form.last_name.trim()]
+    .filter(Boolean).join(" ");
+
+  // What sits under the step heading in the left column, beside the fields.
+  const aside: ReactNode = [
+    <>Use the email you were given by CIT-U. We send a verification link to it.</>,
+    <>
+      Registering as <strong className="font-semibold text-stone-900">{roleArticle}</strong>
+      {fullName && <>: {fullName}</>}{form.email.trim() && <>, {form.email.trim()}</>}.
+    </>,
+    null,
+  ][step];
+
   return (
-    <AuthLayout variant="signup" wide>
-      <h2 className="text-balance font-display text-display font-semibold text-stone-900">
-        Create an Account
-      </h2>
-      <p className="mt-2 mb-section text-body text-stone-600">
-        Enter your details to register for IRIS.
-      </p>
-
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5" noValidate>
-        {loadFailed && (
-          <AuthAlert variant="error" title="Some of this form didn't load">
-            IRIS couldn&apos;t load the colleges, programs and departments to choose from.
-            <div className="mt-3">
-              <Button type="button" variant="outline" size="full" onClick={loadOptions}>
-                Try again
-              </Button>
-            </div>
-          </AuthAlert>
-        )}
-
-        {/* A real radio group (IR-539): it announces its question, both
-            choices and which one is chosen, and the arrow keys move between
-            them. The two buttons it replaces announced no state at all. */}
-        <fieldset role="radiogroup">
-          <legend className="mb-1 text-sm font-medium text-stone-700">I am registering as</legend>
-          <div className="grid grid-cols-2 gap-2">
-            {ROLES.map(({ value, label }) => (
-              <label
-                key={value}
-                className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-4 py-2.5
-                  text-sm font-semibold transition-colors
-                  ${role === value
-                    ? "border-brand bg-brand-50 text-brand"
-                    : "border-stone-300 bg-surface text-stone-700 hover:border-stone-400"}`}
-              >
-                <input
-                  type="radio"
-                  name="register-role"
-                  value={value}
-                  checked={role === value}
-                  onChange={() => switchRole(value)}
-                  className="h-4 w-4 shrink-0 cursor-pointer accent-brand"
-                />
-                {label}
-              </label>
-            ))}
-          </div>
-        </fieldset>
-
-        <div className="grid gap-5 sm:grid-cols-5 sm:gap-3">
-          <div className="sm:col-span-2">
-            <Input id="signup-first-name" label="First Name" required placeholder="Juan"
-              autoComplete="given-name" {...field("first_name")} />
-          </div>
-          <div className="sm:col-span-2">
-            <Input id="signup-last-name" label="Last Name" required placeholder="Dela Cruz"
-              autoComplete="family-name" {...field("last_name")} />
-          </div>
-          <Input id="signup-middle-initial" label="M.I." placeholder="S." maxLength={10}
-            {...field("middle_initial")} />
-        </div>
-
-        <Input id="signup-email" label="CIT-U Email" required type="email" placeholder="you@cit.edu"
-          autoComplete="email" {...field("email")} />
-
-        <Select id="signup-college" label="College" required disabled={loadingRef} {...field("college_id")}>
-          <option value="">{loadingRef ? "Loading…" : "Select college"}</option>
-          {colleges.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </Select>
-
-        {role === "Student" && (
-          <Select id="signup-program" label="Program" required disabled={!form.college_id} {...field("course_id")}>
-            <option value="">
-              {!form.college_id ? "Select college first" : filteredCourses.length === 0 ? "No programs available" : "Select program"}
-            </option>
-            {courseGroups.map(({ deptName, courses }) => (
-              <optgroup key={deptName} label={deptName}>
-                {courses.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </optgroup>
-            ))}
-          </Select>
-        )}
-
-        {role === "Adviser" && (
-          <Select id="signup-department" label="Department" required disabled={!form.college_id} {...field("dept_id")}>
-            <option value="">
-              {!form.college_id ? "Select college first" : filteredDepts.length === 0 ? "No departments available" : "Select department"}
-            </option>
-            {filteredDepts.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
-          </Select>
-        )}
-
-        <Input
-          id="signup-password"
-          label="Password"
-          required
-          type={showPassword ? "text" : "password"}
-          autoComplete="new-password"
-          // No placeholder: the hint below already says it, and says it while typing.
-          hint={passwordHint}
-          {...field("password")}
-          trailing={
-            <PasswordToggle
-              shown={showPassword}
-              onToggle={() => setShowPassword((v) => !v)}
-              what="password"
-            />
-          }
-        />
-
-        <Input
-          id="signup-password2"
-          label="Confirm Password"
-          required
-          type={showPassword2 ? "text" : "password"}
-          autoComplete="new-password"
-          placeholder="Re-enter password"
-          hint={password2Hint}
-          {...field("password2")}
-          trailing={
-            <PasswordToggle
-              shown={showPassword2}
-              onToggle={() => setShowPassword2((v) => !v)}
-              what="confirmed password"
-            />
-          }
-        />
-
-        {/* Consent against a notice on this page (IR-540), in place of links to
-            a Terms of Service and a Data Privacy Policy that do not exist yet
-            (IR-214). The notice opens in place, so reading it clears nothing. */}
-        <div className="pt-1">
-          <div className="flex items-start gap-2.5">
-            <input
-              type="checkbox"
-              id="signup-consent"
-              checked={consented}
-              onChange={(e) => {
-                setConsented(e.target.checked);
-                if (e.target.checked) setConsentError(undefined);
-              }}
-              aria-invalid={consentError ? true : undefined}
-              aria-describedby={consentError ? consentErrorId : undefined}
-              className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
-            />
-            <label htmlFor="signup-consent" className="flex min-h-11 items-center cursor-pointer text-small text-stone-600">
-              I have read the data notice and agree to IRIS using my details as it describes.
-            </label>
-          </div>
-          {consentError && (
-            <p id={consentErrorId} className="mt-1.5 flex items-start gap-1.5 text-small text-brand">
-              <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
-              {consentError}
+    <EntryFrame
+      crossLink={CROSS_LINK}
+      lede={LEDE}
+      wide
+      tabs={<EntrySteps steps={tabs} onSelect={goTo} />}
+    >
+      <form onSubmit={handleSubmit} noValidate className="grid gap-section lg:grid-cols-5 lg:gap-12">
+        <div className="lg:col-span-2">
+          <h2 className="text-balance font-display text-display font-semibold text-stone-900">
+            Create an Account
+          </h2>
+          <h3
+            ref={stepHeadingRef}
+            tabIndex={-1}
+            className="mt-1 text-small font-semibold text-brand outline-none"
+          >
+            Step {step + 1} of {STEPS.length} · {STEPS[step].name}
+          </h3>
+          {aside && (
+            <p className="mt-section border-t border-stone-200 pt-section text-body text-stone-700">
+              {aside}
             </p>
           )}
-          <button
-            type="button"
-            id={noticeTriggerId}
-            aria-expanded={noticeOpen}
-            aria-controls={noticeId}
-            onClick={() => setNoticeOpen((v) => !v)}
-            // 44px tall, as sign-in's "Forgot password?" is (2.5.5).
-            className={`mt-1 inline-flex min-h-11 items-center gap-1.5 rounded text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
-          >
-            <i className={`fas ${noticeOpen ? "fa-chevron-up" : "fa-chevron-down"} text-label`} aria-hidden />
-            Read the data notice
-          </button>
-          {noticeOpen && (
-            <div
-              id={noticeId}
-              role="region"
-              aria-labelledby={noticeTriggerId}
-              className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3"
-            >
-              <DataNotice />
-            </div>
+        </div>
+
+        <div key={step} className="flex flex-col gap-5 motion-safe:animate-step-fade lg:col-span-3">
+          {loadFailed && step === 1 && (
+            <AuthAlert variant="error" title="Some of this form didn't load">
+              IRIS couldn&apos;t load the colleges, programs and departments to choose from.
+              <div className="mt-3">
+                <Button type="button" variant="outline" size="full" onClick={loadOptions}>
+                  Try again
+                </Button>
+              </div>
+            </AuthAlert>
           )}
+
+          {step === 0 && (
+            <>
+              {/* A real radio group (IR-539): it announces its question, both
+                  choices and which one is chosen, and the arrow keys move
+                  between them. */}
+              <fieldset role="radiogroup">
+                <legend className="mb-1 text-sm font-medium text-stone-700">I am registering as</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {ROLES.map((value) => (
+                    <label
+                      key={value}
+                      className={`flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border px-4 py-2.5
+                        text-sm font-semibold transition-colors
+                        ${role === value
+                          ? "border-brand bg-brand-50 text-brand"
+                          : "border-stone-300 bg-surface text-stone-700 hover:border-stone-400"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="register-role"
+                        value={value}
+                        checked={role === value}
+                        onChange={() => switchRole(value)}
+                        className="h-4 w-4 shrink-0 cursor-pointer accent-brand"
+                      />
+                      {value}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              <div className="grid gap-5 sm:grid-cols-5 sm:gap-3">
+                <div className="sm:col-span-2">
+                  <Input id="signup-first-name" label="First Name" required
+                    autoComplete="given-name" {...field("first_name")} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Input id="signup-last-name" label="Last Name" required
+                    autoComplete="family-name" {...field("last_name")} />
+                </div>
+                <Input id="signup-middle-initial" label="M.I." maxLength={10}
+                  {...field("middle_initial")} />
+              </div>
+
+              <Input id="signup-email" label="CIT-U Email" required type="email"
+                autoComplete="email" {...field("email")} />
+            </>
+          )}
+
+          {step === 1 && (
+            <>
+              {roleChangedTo && (
+                <div role="status" className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 text-stone-800">
+                  <p className="font-semibold">Your role changed to {roleChangedTo}</p>
+                  <p className="mt-1 text-small">
+                    Your college is kept. Choose a {roleChangedTo === "Adviser" ? "department" : "program"} instead
+                    of a {roleChangedTo === "Adviser" ? "program" : "department"}.
+                  </p>
+                </div>
+              )}
+
+              <Select id="signup-college" label="College" required disabled={loadingRef} {...field("college_id")}>
+                <option value="">{loadingRef ? "Loading…" : "Select college"}</option>
+                {colleges.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </Select>
+
+              {role === "Student" && (
+                <Select id="signup-program" label="Program" required disabled={!form.college_id} {...field("course_id")}>
+                  <option value="">
+                    {!form.college_id ? "Select college first" : filteredCourses.length === 0 ? "No programs available" : "Select program"}
+                  </option>
+                  {courseGroups.map(({ deptName, courses }) => (
+                    <optgroup key={deptName} label={deptName}>
+                      {courses.map((c) => (
+                        <option key={c.id} value={c.id}>{c.name}</option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </Select>
+              )}
+
+              {role === "Adviser" && (
+                <Select id="signup-department" label="Department" required disabled={!form.college_id} {...field("dept_id")}>
+                  <option value="">
+                    {!form.college_id ? "Select college first" : filteredDepts.length === 0 ? "No departments available" : "Select department"}
+                  </option>
+                  {filteredDepts.map((d) => (
+                    <option key={d.id} value={d.id}>{d.name}</option>
+                  ))}
+                </Select>
+              )}
+            </>
+          )}
+
+          {step === LAST_STEP && (
+            <>
+              <Input
+                id="signup-password"
+                label="Password"
+                required
+                type={showPassword ? "text" : "password"}
+                autoComplete="new-password"
+                // No placeholder: the hint below already says it, and says it while typing.
+                hint={passwordHint}
+                {...field("password")}
+                trailing={
+                  <PasswordToggle
+                    shown={showPassword}
+                    onToggle={() => setShowPassword((v) => !v)}
+                    what="password"
+                  />
+                }
+              />
+
+              <Input
+                id="signup-password2"
+                label="Confirm Password"
+                required
+                type={showPassword2 ? "text" : "password"}
+                autoComplete="new-password"
+                hint={password2Hint}
+                {...field("password2")}
+                trailing={
+                  <PasswordToggle
+                    shown={showPassword2}
+                    onToggle={() => setShowPassword2((v) => !v)}
+                    what="confirmed password"
+                  />
+                }
+              />
+
+              {/* Consent against a notice on this page (IR-540), in place of
+                  links to a Terms of Service and a Data Privacy Policy that do
+                  not exist yet (IR-214). The notice opens in place, so reading
+                  it clears nothing. */}
+              <div className="border-t border-stone-200 pt-5">
+                <div className="flex items-start gap-2.5">
+                  <input
+                    type="checkbox"
+                    id="signup-consent"
+                    checked={consented}
+                    onChange={(e) => {
+                      setConsented(e.target.checked);
+                      if (e.target.checked) setConsentError(undefined);
+                    }}
+                    aria-invalid={consentError ? true : undefined}
+                    aria-describedby={consentError ? consentErrorId : undefined}
+                    className="mt-0.5 h-4 w-4 shrink-0 cursor-pointer accent-brand"
+                  />
+                  <label htmlFor="signup-consent" className="flex min-h-11 items-center cursor-pointer text-small text-stone-600">
+                    I have read the data notice and agree to IRIS using my details as it describes.
+                  </label>
+                </div>
+                {consentError && (
+                  <p id={consentErrorId} className="mt-1.5 flex items-start gap-1.5 text-small text-brand">
+                    <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+                    {consentError}
+                  </p>
+                )}
+                <button
+                  type="button"
+                  id={noticeTriggerId}
+                  aria-expanded={noticeOpen}
+                  aria-controls={noticeId}
+                  onClick={() => setNoticeOpen((v) => !v)}
+                  // 44px tall, as sign-in's "Forgot password?" is (2.5.5).
+                  className={`mt-1 inline-flex min-h-11 items-center gap-1.5 rounded text-small font-semibold text-brand hover:underline ${FOCUS_RING}`}
+                >
+                  <i className={`fas ${noticeOpen ? "fa-chevron-up" : "fa-chevron-down"} text-label`} aria-hidden />
+                  Read the data notice
+                </button>
+                {noticeOpen && (
+                  <div
+                    id={noticeId}
+                    role="region"
+                    aria-labelledby={noticeTriggerId}
+                    className="rounded-lg border border-stone-200 bg-stone-50 px-4 py-3"
+                  >
+                    <DataNotice />
+                  </div>
+                )}
+              </div>
+
+              {formAlert && (
+                <AuthAlert variant="error" title={formAlert.title}>
+                  {formAlert.message}
+                </AuthAlert>
+              )}
+
+              {/* Said before anything is sent, so the wait after it surprises no one (IR-533). */}
+              <div>
+                <p id={nextStepsId} className="text-small font-semibold text-stone-700">What happens next</p>
+                <ol aria-labelledby={nextStepsId} className="mt-1 list-decimal space-y-0.5 pl-5 text-small text-stone-600">
+                  <li>You verify your email with the link we send you.</li>
+                  <li>RDCO reviews your request, and emails you when they decide.</li>
+                </ol>
+              </div>
+            </>
+          )}
+
+          {/* The forward action first in the source, so a phone reads it
+              first; from `sm` up Back sits on its left. `size="full"` carries
+              the 44px step. */}
+          <div className="flex flex-col gap-3 sm:flex-row-reverse">
+            <div className="sm:flex-1">
+              {step < LAST_STEP ? (
+                <Button type="submit" variant="primary" size="full">
+                  {step === 0 ? "Continue to affiliation" : "Continue to security"}
+                </Button>
+              ) : (
+                <Button type="submit" variant="primary" size="full" loading={submitting}>
+                  {submitting ? "Creating account…" : "Register"}
+                </Button>
+              )}
+            </div>
+            {step > 0 && (
+              <div className="sm:w-28 sm:shrink-0">
+                <Button type="button" variant="outline" size="full" onClick={() => goTo(step - 1)}>
+                  Back
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
-
-        {formAlert && (
-          <AuthAlert variant="error" title={formAlert.title}>
-            {formAlert.message}
-          </AuthAlert>
-        )}
-
-        {/* Said before anything is sent, so the wait after it surprises no one (IR-533). */}
-        <div>
-          <p id={nextStepsId} className="text-small font-semibold text-stone-700">What happens next</p>
-          <ol aria-labelledby={nextStepsId} className="mt-1 list-decimal space-y-0.5 pl-5 text-small text-stone-600">
-            <li>You verify your email with the link we send you.</li>
-            <li>RDCO reviews your request, and emails you when they decide.</li>
-          </ol>
-        </div>
-
-        {/* `size="full"` carries the width and the 44px step. Maroon under
-            white is 12.3:1 at rest and 9.5:1 on hover; gold was 2.76:1. */}
-        <Button type="submit" variant="primary" size="full" loading={submitting}>
-          {submitting ? "Creating account…" : "Register"}
-        </Button>
       </form>
 
       <div className="mt-section-lg border-t border-stone-200 pt-section">
         <p className="text-center text-sm text-stone-600">
           Already have an account?{" "}
-          <Link to="/login" className="inline-flex min-h-11 min-w-11 items-center justify-center font-semibold text-brand hover:underline">
+          <Link
+            to="/login"
+            className={cn(
+              "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand hover:underline",
+              FOCUS_RING,
+            )}
+          >
             Sign in
           </Link>
         </p>
       </div>
-    </AuthLayout>
+    </EntryFrame>
   );
 }
 

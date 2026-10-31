@@ -228,6 +228,9 @@ SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
 
+# How long an approved download request lets its requester download (ADR-048).
+DOWNLOAD_GRANT_DAYS = config("DOWNLOAD_GRANT_DAYS", default=30, cast=int)
+
 # An explicit allowlist, always — there is no "allow all" switch in any
 # settings module, and production.py refuses to start if one reappears.
 # CORS_ALLOW_CREDENTIALS below is why: with credentials enabled, a wildcard
@@ -1199,7 +1202,11 @@ CELERY_BEAT_SCHEDULE["recovery-dispatch"]["schedule"] = float(RECOVERY_DISPATCH_
 # ---- Axes (brute force protection) --------------------------------------
 
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)
-AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+# How many proxies sit in front of Django, nginx included. Zero trusts no
+# forwarded address, which is development talking to Django directly (IR-656).
+TRUSTED_PROXY_COUNT = config("TRUSTED_PROXY_COUNT", default=0, cast=int)
+AXES_CLIENT_IP_CALLABLE = "apps.accounts.client_address.client_address"
 # The key axes reads the username from. It defaults to the user model's
 # USERNAME_FIELD (`email`), but LoginView authenticates with `username=`, so
 # axes found none and recorded every failure against no user at all (IR-555).

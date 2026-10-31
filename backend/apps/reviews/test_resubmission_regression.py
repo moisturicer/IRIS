@@ -39,6 +39,7 @@ from django.test import override_settings
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
+from apps.documents.testing import real_pdf_bytes
 from apps.documents.models import UploadSlot
 from apps.records.models import Record, RecordOwner, RecordType
 from core.enums import PipelineStatus, RecordTypeName, RoleName
@@ -173,7 +174,7 @@ class ResubmissionRegressionTests(APITestCase):
                         "record": record.pk,
                         "slot": slot.pk,
                         "file": SimpleUploadedFile(
-                            "consent.pdf", b"%PDF-1.4 consent", content_type="application/pdf"
+                            "consent.pdf", real_pdf_bytes(b"consent"), content_type="application/pdf"
                         ),
                     },
                     format="multipart",

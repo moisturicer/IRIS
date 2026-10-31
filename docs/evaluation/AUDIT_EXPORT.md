@@ -53,6 +53,8 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 ### Research metadata corrections (IR-563, ADR-046)
 
+`SYSTEM_SETTING_CHANGED` is an administrative event, excluded from workflow metrics. The actor is the RDCO account that changed the setting. Metadata contains `key`, `old_value` and `new_value`. Writing the value a setting already holds records nothing.
+
 `RESEARCH_METADATA_CORRECTED` is an administrative metadata event, excluded from workflow metrics. The actor is the active superuser named by the correction command. Metadata contains `reason`, per-record `evidence`, and `before`/`after` objects with `origin`, nullable `publication_year`, and ordered `authors`. Corrections and audit rows share one transaction: failure rolls back the entire manifest. Dry runs produce no audit rows.
 
 ### Assignment deadlines (IR-619, ADR-043)

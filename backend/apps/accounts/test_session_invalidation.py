@@ -1,0 +1,243 @@
+"""Account security changes enforced through real sign-in, request and refresh."""
+
+from concurrent.futures import ThreadPoolExecutor
+from time import monotonic, sleep
+
+from django.core.cache import cache
+from django.db import connection, transaction
+from rest_framework.test import APIClient, APITransactionTestCase
+from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
+from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
+from apps.accounts.models import Role, User
+from apps.accounts.test_sessions import LOGIN, PASSWORD, REFRESH, SessionTestBase
+
+
+class AccountSessionTestBase(SessionTestBase):
+    def setUp(self):
+        super().setUp()
+        # Login budgets live in the cache, outside APITestCase's DB rollback.
+        # Each scenario owns its budget and must leave it empty for the next.
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.admin = User.objects.create_user(
+            email="session-admin@cit.edu", password=PASSWORD, is_verified=True,
+            role=Role.objects.get(name="RDCO"),
+        )
+        response = self.client.post(
+            LOGIN, {"email": self.admin.email, "password": PASSWORD}, format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.admin_headers = {"HTTP_AUTHORIZATION": f"Bearer {response.data['access']}"}
+
+    def lock(self, value):
+        response = self.client.patch(
+            f"/api/v1/users/{self.user.pk}/lock/", {"is_locked": value},
+            format="json", **self.admin_headers,
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+
+    def assert_refused(self, access, refresh, code):
+        response = self.get_me(access=access)
+        self.assertEqual(response.status_code, 401, response.content)
+        self.assertEqual(response.data["code"], code)
+        response = self.client.post(REFRESH, {"refresh": refresh}, format="json")
+        self.assertEqual(response.status_code, 401, response.content)
+        self.assertEqual(response.data["code"], code)
+
+    def audit_events(self, event_type):
+        response = self.client.get(
+            "/api/v1/audit/", {"event_type": event_type}, **self.admin_headers,
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        return response.data["results"]
+
+
+class LockingEndsSessionsTests(AccountSessionTestBase):
+    def test_lock_ends_all_sessions_and_unlock_does_not_revive_them(self):
+        self.sign_in()
+        first = self.access, self.refresh
+        self.sign_in()
+        second = self.access, self.refresh
+        self.lock(True)
+        for tokens in (first, second):
+            self.assert_refused(*tokens, "account_locked")
+        response = self.client.get("/api/v1/users/sessions/", **self.admin_headers)
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertNotIn(self.user.pk, [row["user_id"] for row in response.data])
+        self.lock(False)
+        for tokens in (first, second):
+            self.assert_refused(*tokens, "account_locked")
+        self.sign_in()
+        self.assertEqual(self.get_me().status_code, 200)
+        self.assertEqual(self.refresh_tokens().status_code, 200)
+        for event_type in ("ACCOUNT_LOCKED", "ACCOUNT_UNLOCKED"):
+            events = self.audit_events(event_type)
+            self.assertEqual(len(events), 1)
+            self.assertEqual(events[0]["user"], self.admin.pk)
+            self.assertEqual(events[0]["metadata"], {"target_user": self.user.email})
+
+    def test_direct_lock_is_enforced_on_requests_and_refresh(self):
+        self.sign_in()
+        User.objects.filter(pk=self.user.pk).update(is_locked=True)
+        self.assert_refused(self.access, self.refresh, "account_locked")
+
+    def test_deactivation_is_enforced_on_requests_and_refresh(self):
+        self.sign_in()
+        User.objects.filter(pk=self.user.pk).update(is_active=False)
+        self.assert_refused(self.access, self.refresh, "account_locked")
+
+    def test_a_locked_account_cannot_use_an_access_token_without_sid(self):
+        self.sign_in()
+        access = str(AccessToken.for_user(self.user))
+        self.lock(True)
+        response = self.get_me(access=access)
+        self.assertEqual(response.status_code, 401, response.content)
+        self.assertEqual(response.data["code"], "account_locked")
+
+    def test_an_unrelated_accounts_tokens_still_work(self):
+        self.sign_in()
+        self.lock(True)
+        response = self.client.get("/api/v1/users/me/", **self.admin_headers)
+        self.assertEqual(response.status_code, 200, response.content)
+
+
+NEW_PASSWORD = "Fresh-Kingfisher-739!"
+
+
+class PasswordChangeEndsEverySessionTests(AccountSessionTestBase):
+    """ADR-045 §4: a change shares the reset's primitive, so every session ends.
+
+    IR-646 originally spared the requesting device; these tests were revised
+    deliberately when IR-642 merged, because ADR-045 is the authority.
+    """
+
+    def change_password(self, *, access=None, old_password=PASSWORD):
+        return self.client.post(
+            "/api/v1/auth/password/change/",
+            {"old_password": old_password, "new_password": NEW_PASSWORD}, format="json",
+            HTTP_AUTHORIZATION=f"Bearer {access or self.access}",
+        )
+
+    def test_password_change_ends_this_device_and_the_other_device(self):
+        self.sign_in()
+        other = self.access, self.refresh
+        self.sign_in()
+        this = self.access, self.refresh
+        response = self.change_password()
+        self.assertEqual(response.status_code, 200, response.content)
+        for tokens in (this, other):
+            self.assert_refused(*tokens, "session_ended_password_changed")
+        response = self.client.post(
+            LOGIN, {"email": self.user.email, "password": PASSWORD}, format="json",
+        )
+        self.assertEqual(response.status_code, 401, response.content)
+        response = self.client.post(
+            LOGIN, {"email": self.user.email, "password": NEW_PASSWORD}, format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        events = self.audit_events("PASSWORD_CHANGED")
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]["user"], self.user.pk)
+        self.assertEqual(events[0]["metadata"], {})
+
+    def test_wrong_old_password_ends_no_session_and_writes_no_event(self):
+        self.sign_in()
+        other = self.access, self.refresh
+        self.sign_in()
+        response = self.change_password(old_password="incorrect")
+        self.assertEqual(response.status_code, 400, response.content)
+        self.assertEqual(self.get_me().status_code, 200)
+        self.assertEqual(self.refresh_tokens().status_code, 200)
+        self.assertEqual(self.get_me(access=other[0]).status_code, 200)
+        response = self.client.post(REFRESH, {"refresh": other[1]}, format="json")
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(self.audit_events("PASSWORD_CHANGED"), [])
+
+    def test_a_token_without_sid_cannot_change_the_password(self):
+        self.sign_in()
+        response = self.change_password(access=str(AccessToken.for_user(self.user)))
+        self.assertEqual(response.status_code, 401, response.content)
+        self.assertEqual(self.get_me().status_code, 200)
+        self.assertEqual(self.audit_events("PASSWORD_CHANGED"), [])
+
+    def test_a_rotated_refresh_is_refused_after_the_change(self):
+        self.sign_in()
+        other = self.access, self.refresh
+        self.sign_in()
+        response = self.refresh_tokens()
+        self.assertEqual(response.status_code, 200, response.content)
+        self.access, self.refresh = response.data["access"], response.data["refresh"]
+        self.assertEqual(self.change_password().status_code, 200)
+        for tokens in ((self.access, self.refresh), other):
+            self.assert_refused(*tokens, "session_ended_password_changed")
+
+    def test_preexisting_stored_tokens_without_sid_are_refused_too(self):
+        self.sign_in()
+        other = self.access, self.refresh
+        self.sign_in()
+        this = self.access, self.refresh
+        # Fixture for the stored payload before IR-646: for_user persisted it
+        # before sid was added to the JWT sent to the browser. Observe only HTTP.
+        for raw in (other[1], this[1]):
+            stored = RefreshToken(raw)
+            del stored["sid"]
+            OutstandingToken.objects.filter(jti=stored["jti"]).update(token=str(stored))
+        self.assertEqual(self.change_password().status_code, 200)
+        for tokens in (this, other):
+            self.assert_refused(*tokens, "session_ended_password_changed")
+
+
+class ConcurrentPasswordChangeTests(APITransactionTestCase):
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+        self.addCleanup(cache.clear)
+
+    def test_an_old_password_login_cannot_create_a_session_after_password_change(self):
+        user = User.objects.create_user(
+            email="concurrent-session@cit.edu", password=PASSWORD, is_verified=True,
+        )
+        credentials = {"email": user.email, "password": PASSWORD}
+        response = self.client.post(LOGIN, credentials, format="json")
+        self.assertEqual(response.status_code, 200, response.content)
+        access = response.data["access"]
+
+        def sign_in_on_another_connection():
+            try:
+                with connection.cursor() as cursor:
+                    cursor.execute("SET application_name = 'ir644_login_race'")
+                    cursor.execute("SET lock_timeout = '15s'")
+                return APIClient().post(LOGIN, credentials, format="json")
+            finally:
+                connection.close()
+
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            with transaction.atomic():
+                # Hold the account while another HTTP login validates the old
+                # password and reaches its next account write/row lock. The
+                # lock observation coordinates the race; all outcomes are HTTP.
+                User.objects.select_for_update().get(pk=user.pk)
+                pending = pool.submit(sign_in_on_another_connection)
+                deadline = monotonic() + 10
+                waiting = False
+                while monotonic() < deadline and not pending.done():
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT pg_stat_clear_snapshot()")
+                        cursor.execute(
+                            "SELECT EXISTS (SELECT 1 FROM pg_stat_activity "
+                            "WHERE application_name = 'ir644_login_race' AND wait_event_type = 'Lock')"
+                        )
+                        waiting = cursor.fetchone()[0]
+                    if waiting:
+                        break
+                    sleep(0.02)
+                self.assertTrue(waiting, "Concurrent login did not reach the held account")
+                response = self.client.post(
+                    "/api/v1/auth/password/change/",
+                    {"old_password": PASSWORD, "new_password": NEW_PASSWORD}, format="json",
+                    HTTP_AUTHORIZATION=f"Bearer {access}",
+                )
+                self.assertEqual(response.status_code, 200, response.content)
+            response = pending.result(timeout=10)
+        self.assertEqual(response.status_code, 401, response.content)

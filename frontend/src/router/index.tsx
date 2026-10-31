@@ -10,7 +10,6 @@ import SignupPage        from "@/features/auth/SignupPage";
 import EmailVerifyPage   from "@/features/auth/EmailVerifyPage";
 import ForgotPasswordPage from "@/features/auth/ForgotPasswordPage";
 import ResetPasswordPage  from "@/features/auth/ResetPasswordPage";
-import DownloadTokenPage from "@/features/download/DownloadTokenPage";
 
 // App shell (sidebar + header wrapper)
 import { AppShell } from "@/components/layout/AppShell";
@@ -42,7 +41,6 @@ export const router = createBrowserRouter([
   // ADR-045 (IR-642). Public: recovery must never require signing in.
   { path: "/password/forgot", element: <ForgotPasswordPage /> },
   { path: "/password/reset",  element: <ResetPasswordPage /> },
-  { path: "/download", element: <DownloadTokenPage /> },
 
   {
     // Every gate below comes from `lib/access.ts`, which the sidebar reads too.

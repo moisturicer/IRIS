@@ -11,10 +11,9 @@ interface AuthLayoutProps {
 }
 
 /**
- * The shared frame of the entry screens: sign in and register today, email
- * verification and pending approval once they adopt it (IR-538, IR-537). The
- * brand panel already has their variants, so adopting the frame is all those
- * tickets do to it.
+ * The split entry frame, now used by register alone: sign in (IR-706), email
+ * verification and the pending screen (IR-710) moved to `EntryFrame`, and
+ * IR-711 retires this one with the brand panel once register follows.
  *
  * It owns the one `<h1>` (IR-211); each screen's own title ("Welcome Back",
  * "Create an Account") is the `<h2>` beneath it. The heading is `sr-only`

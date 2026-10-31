@@ -21,7 +21,10 @@ from .common import (
     readable_records, scoped_ids, visible_record_ids,
 )
 from .passages import RECALL_DEPTH, RECORD_HANDLES, chunk_set_hashes
-from .records import rank_record_candidates
+from .records import rank_with_passages
+
+#: Top shown papers that also carry their best-matching passage (IR-703).
+BEST_PASSAGES = 3
 
 
 def _version(run: ToolRun) -> str:
@@ -72,7 +75,7 @@ def search_research(run: ToolRun, args: dict) -> ToolResult:
 
 
 def _papers(run: ToolRun, args: dict, requested):
-    fused, degraded, signals = rank_record_candidates(run, {"topic": args["query"], **{
+    fused, degraded, signals, passages = rank_with_passages(run, {"topic": args["query"], **{
         name: args[name] for name in FILTER_PROPERTIES if name in args}})
     if requested is not None:
         fused = [pk for pk in fused if pk in requested]
@@ -81,18 +84,32 @@ def _papers(run: ToolRun, args: dict, requested):
     # A paper named exactly by the query leads, apart from related candidates.
     key = title_key(args["query"])
     ordered.sort(key=lambda r: title_key(r.title) != key)
+    best = {}
+    for passage in passages:
+        best.setdefault(passage.record_id, passage)
+    hashes = chunk_set_hashes(p.chunk_id for p in best.values())
 
     def issue(position: int):
         record = ordered[position]
         item = collect_record(run.ledger, record)
-        return {
+        shown = {
             "record": item.handle, "title": record.title, "rank": position + 1,
             "match_kind": "exact_title" if title_key(record.title) == key else "related",
             "matched_by": [name for name, ids in signals.items() if record.pk in ids],
             "year": record.year_completed,
             "area": record.classification.name if record.classification else None,
             "type": record.record_type.name if record.record_type else None,
-        }, (item,)
+        }
+        passage = best.get(record.pk) if position < BEST_PASSAGES else None
+        if passage is None or passage.chunk_id not in hashes:
+            return shown, (item,)
+        quoted = run.ledger.add_passage(
+            record_id=record.pk, chunk_id=passage.chunk_id,
+            chunk_set_hash=hashes[passage.chunk_id], record_title=record.title,
+            text=passage.content, page=passage.source_page,
+            context_path=tuple(passage.context_path), score=passage.score,
+        )
+        return {**shown, "ref": quoted.handle}, (item, quoted)
 
     return len(ordered), degraded, issue
 

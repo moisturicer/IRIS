@@ -4,6 +4,10 @@ Prepared 2026-10-30 against task baseline `9f52887`. **Pending CIT-U DPO / legal
 review.** This is an engineering inventory for review, not institutional approval
 or a claim that existing consent covers the processing below.
 
+Updated 2026-10-31: [Planned processing](#planned-processing-designed-not-yet-built)
+adds features designed on 2026-10-30 and 2026-10-31 that will process personal
+data once built.
+
 ## Finding and correction
 
 `frontend/src/lib/dpaTerms.ts` said that data was not shared outside CIT-U.
@@ -56,6 +60,41 @@ DPO review of the notice remains a separate requirement.
   deletion/retention wording against current soft deletion and backup behavior.
 - [ ] Record completed re-collection evidence and a deployment decision before
   claiming the full issue is resolved or collecting real pilot consent.
+
+## Planned processing (designed, not yet built)
+
+These features are specified in Jira but have no code yet, except where a row
+says so. They add personal-data processing that the notice above does not
+describe. The notice is **not** changed now, because it describes what IRIS does
+today. Each feature updates `dpaTerms.ts` and this inventory when it ships, and
+the DPO review should cover them.
+
+| Feature | Personal data, and who sees it | Jira |
+| --- | --- | --- |
+| Public profiles and people search | For every approved account: name, affiliation (college, department, course) and a role label, shown to every signed-in user and searchable by name, interests, college, department and role. Optional, entered by the person: a photo (JPEG or PNG, up to 2 MB), a bio (up to 500 characters), up to 10 research interests, and a self-declared ORCID iD. Derived: the published papers the person owns or advised, and the accounts that shared a published paper with them. The email address is never shown. A suspended account's profile is hidden. | IR-694 |
+| Account suspension | RDCO's reason for suspending an account, emailed to the person and kept in the audit event; a second email when the suspension is lifted. | Same spec |
+| View counting | A server-side record of which accounts opened which published paper, kept only to count each account once and never shown or exposed by any API, deleted with the account or the paper; and at most one `ACCESS` audit event per account, paper and 24 hours. **Already in production today:** an `ACCESS` audit event naming the account on every opening of a paper (`RecordViewSet.increment_access`), which the inventory above does not list. | IR-369 |
+| Comments on published papers | The comment, the writer's name and an Author badge, shown to every signed-in user. A deleted or removed comment's text is kept and shown to no one. A report keeps a copy of the reported text, the reporter and the reason, visible to RDCO only. A removal reason is sent to the writer. | IR-420 |
+| Download requests | The reader's note on each request, RDCO's decline and revocation notes, the grant's dates, and an audit event per download naming the downloader. Once IR-676 lands, each downloaded copy carries the downloader's name and email in its footer and metadata. A request flow already exists without notes or grants. | IR-672, IR-676 |
+| Collaboration matching | When two Discoverable Proposals are similar, every owner of each is notified with the other's title, owners' names, and its Contact person's name and email. Only the owners of the matched Proposal see that email; it stays in their notification after either Proposal closes. The AI compares title and abstract only; no email is sent to a vendor. Consent is the Discoverable setting's text. Decided in ADR-029's 2026-10-31 amendment, accepted by the project lead. | IR-311, IR-421 |
+
+Decisions these features add:
+
+- [ ] The DPO confirms the lawful basis and notice wording for showing every
+  account's name, affiliation and role to all signed-in users, and for making
+  them searchable.
+- [ ] Decide whether a profile photo needs separate consent, and how it is
+  removed on request or when the account is deleted.
+- [ ] Set retention for deleted and removed comment text, comment reports,
+  per-account view records, download notes and download audit events. None is
+  set yet.
+- [ ] Confirm that printing a downloader's name and email in each copy (IR-676)
+  is acceptable.
+- [ ] Confirm that the Discoverable consent text covers sharing a Proposal's
+  Contact person's email with matched proposers, and that the email may stay
+  in a notification after either Proposal closes (IR-311).
+- [ ] Update `dpaTerms.ts` and this inventory as each feature ships. As above,
+  editing the notice does not re-collect consent.
 
 No new consent version, forced re-consent flow, backend transmission gate,
 withdrawal workflow or data migration is implemented here. Existing

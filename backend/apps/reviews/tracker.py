@@ -442,10 +442,11 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
     cut short, and the tracker keeps that history (IR-270). A seat a
     coordinator withdrew stays out. A finished seat carries its own verdict.
     """
+    from .seats import seat_verdict_label
+
     verdicts = {
         r.reviewed_by_id: r for r in reviews if r.assignment_id == assignment.pk
     }  # oldest first, so a later verdict by the same reviewer wins
-    clearing = assignment.party in _CLEARING_OFFICES
     rows = []
     for seat in (
         ReviewerSeat.objects.filter(assignment=assignment)
@@ -453,14 +454,16 @@ def _seat_rows(assignment, reviews: list) -> list[dict]:
         .select_related("reviewer").order_by("assigned_at", "pk")
     ):
         verdict = verdicts.get(seat.reviewer_id) if seat.state == SeatState.DONE else None
-        verdict_label = verdict.get_status_display() if verdict else None
-        if verdict and clearing and verdict.status == ReviewDecision.APPROVED:
-            # An office clears its own question; it does not approve the record.
-            verdict_label = str(ClearanceStatus.CLEARED.label)
+        verdict_label = seat_verdict_label(verdict, assignment.party)
         rows.append({
+            "reviewer": seat.reviewer_id,
             "reviewer_name": _name(seat.reviewer),
             "state": seat.state,
-            "state_label": seat.get_state_display(),
+            # Every withdrawn seat here is one a Decision cut short (above).
+            "state_label": (
+                "Closed by the Decision" if seat.state == SeatState.WITHDRAWN
+                else seat.get_state_display()
+            ),
             "verdict": verdict.status if verdict else None,
             "verdict_label": verdict_label,
         })

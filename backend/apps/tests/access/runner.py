@@ -32,7 +32,7 @@ def _send(client, route: Route, method: str, call: Call, world: World, user, mis
             return uuid.UUID(int=MISSING_PK) if isinstance(value, uuid.UUID) else MISSING_PK
         return world.value(ref.name, ref.attr)
 
-    kwargs = resolve_value(call.kwargs, lookup, world.download_token)
+    kwargs = resolve_value(call.kwargs, lookup)
     url = reverse(route.name, kwargs=kwargs)
     match = resolve(url)
     if view_class(match.func) is not view_class(route.view):
@@ -40,10 +40,10 @@ def _send(client, route: Route, method: str, call: Call, world: World, user, mis
             f"reverse({route.name!r}) reached {match.view_name}, not {route}: "
             "the table cannot fire this route by name"
         )
-    query = resolve_value(call.query, lookup, world.download_token)
+    query = resolve_value(call.query, lookup)
     if query:
         url = f"{url}?{urlencode(query)}"
-    data = resolve_value(call.data, lookup, world.download_token) if call.data is not None else None
+    data = resolve_value(call.data, lookup) if call.data is not None else None
 
     client.force_authenticate(user)
     cache.clear()

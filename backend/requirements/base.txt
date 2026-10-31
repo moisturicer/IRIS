@@ -58,3 +58,7 @@ whitenoise>=6.6
 
 # IR-608: reject entities in scenario JUnit XML before reading evaluation evidence.
 defusedxml>=0.7.1,<0.8
+# pypdf: an upload must open as a PDF (IR-665); also what ADR-048's watermark uses
+pypdf>=6.0,<7
+# reportlab: draws the watermark overlay that pypdf merges (ADR-048, IR-676). BSD-licensed
+reportlab>=5.0,<6

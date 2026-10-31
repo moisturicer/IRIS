@@ -1,6 +1,6 @@
 """
-JWT authentication and refresh that honour the inactivity rule (IR-166) and
-the credential version (ADR-045 §4, IR-642).
+JWT authentication and refresh enforcing account eligibility (IR-646), the
+inactivity rule (IR-166) and the credential version (ADR-045 §4, IR-642).
 
 `apps.accounts.sessions` holds the inactivity rule; these two are where every
 request and every refresh pass through it. Both also compare the token's `cv`
@@ -11,6 +11,7 @@ refuses every token minted before it, from the very next request.
 from django.db import transaction
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from rest_framework_simplejwt.exceptions import AuthenticationFailed as JWTAuthenticationFailed
 from rest_framework_simplejwt.exceptions import InvalidToken, TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
@@ -38,9 +39,43 @@ def current(token, user) -> bool:
     return token.get("sid") is not None and token.get("cv") == user.credential_version
 
 
+def refuse_stale(token) -> None:
+    """Refuse a token that is not `current`, naming why when it can.
+
+    A password change or reset ends the token's session as it bumps the
+    version, so an ended session answers with its own reason first
+    (``session_ended_password_changed``, IR-646) and only a token with no
+    ended session to explain it falls back to ``credentials_changed``.
+    """
+    sid = token.get("sid")
+    if sid:
+        sessions.refuse_if_ended(sid)
+    raise CredentialsChanged()
+
+
 class IdleAwareJWTAuthentication(JWTAuthentication):
-    """simplejwt's authentication, refusing a session idle past the limit or
-    a token from before the account's last password change."""
+    """simplejwt's authentication, refusing an ineligible account, a session
+    idle past the limit, or a token from before the account's last password
+    change.
+
+    Account state is checked first, so a locked account answers
+    ``account_locked`` even for a token with no ``sid``. Any other token with
+    no ``sid`` or ``cv`` is then refused (ADR-045 §4).
+    """
+
+    def get_user(self, validated_token):
+        # Check account state here, before simplejwt can answer inactive with
+        # a different code. Tracked sessions are our revocation mechanism.
+        try:
+            user_id = validated_token[api_settings.USER_ID_CLAIM]
+        except KeyError as exc:
+            raise InvalidToken("Token contained no recognizable user identification") from exc
+        try:
+            user = self.user_model.objects.get(**{api_settings.USER_ID_FIELD: user_id})
+        except self.user_model.DoesNotExist as exc:
+            raise JWTAuthenticationFailed("User not found", code="user_not_found") from exc
+        sessions.require_eligible_account(user)
+        return user
 
     def authenticate(self, request):
         result = super().authenticate(request)
@@ -48,7 +83,7 @@ class IdleAwareJWTAuthentication(JWTAuthentication):
             return None
         user, token = result
         if not current(token, user):
-            raise CredentialsChanged()
+            refuse_stale(token)
         sessions.touch(token["sid"], request)
         return user, token
 
@@ -67,14 +102,19 @@ class IdleAwareTokenRefreshSerializer(TokenRefreshSerializer):
             return super().validate(attrs)
         if token.get(api_settings.TOKEN_TYPE_CLAIM) != RefreshToken.token_type:
             return super().validate(attrs)
+        # Reuse the request rule before blacklist/session checks so an account
+        # deactivated or locked outside the API is refused immediately too.
+        IdleAwareJWTAuthentication().get_user(token)
         sid = token.get("sid")
         if not sid:
             raise InvalidToken("This sign-in predates session tracking. Sign in again.")
         # Reset and refresh both lock the account before issuing credentials.
         with transaction.atomic():
             user = User.objects.select_for_update().filter(pk=token.get("user_id")).first()
-            if user is None or not current(token, user):
+            if user is None:
                 raise CredentialsChanged()
+            if not current(token, user):
+                refuse_stale(token)
             sessions.refuse_if_ended(sid)
             data = super().validate(attrs)
             sessions.touch(sid, self.context["request"])

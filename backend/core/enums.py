@@ -384,12 +384,14 @@ class RequestStatus(models.TextChoices):
     `DownloadRequest.status`, `DeleteRequest.status`, `RoleRequest.status`.
 
     One enum for all three because it is genuinely one concept -- asked,
-    granted, refused -- not three that happen to share strings.
+    granted, refused -- not three that happen to share strings. `REVOKED` is a
+    grant withdrawn early, which only a download request has (ADR-048).
     """
 
     PENDING = "pending", "Pending"
     APPROVED = "approved", "Approved"
     DECLINED = "declined", "Declined"
+    REVOKED = "revoked", "Revoked"
 
 
 class SessionEndReason(models.TextChoices):
@@ -406,6 +408,7 @@ class SessionEndReason(models.TextChoices):
     IDLE = "idle", "Inactive too long"
     LOCKED = "locked", "Account locked"
     PASSWORD_CHANGED = "password_changed", "Password changed"
+    REVOKED = "revoked", "Revoked by an administrator"
 
 
 class IPType(models.TextChoices):

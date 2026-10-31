@@ -71,7 +71,11 @@ export const SESSION_END_MESSAGES = {
   },
   session_ended_password_changed: {
     title: "Password Changed",
-    text: "You were signed out because your password was changed. Please sign in with your new password.",
+    text: "You were signed out because your password was changed on another device. Please sign in with your new password.",
+  },
+  session_ended_revoked: {
+    title: "Session Ended",
+    text: "An administrator ended this session. Please sign in again, or contact an administrator if you did not expect this.",
   },
 } as const;
 

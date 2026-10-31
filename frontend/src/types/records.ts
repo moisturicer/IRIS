@@ -239,7 +239,42 @@ export interface MetadataSuggestions {
   source:      "pdf_structure";
 }
 
+/** Server-filtered fields: null means withheld or not recorded. */
+export interface PaperPerson {
+  id: number;
+  name: string;
+  role: string;
+  office: string | null;
+  college: string | null;
+  department: string | null;
+  program: string | null;
+  email: string | null;
+}
+
+export interface PaperDueDate {
+  party: Party;
+  label: string;
+  due_at: string | null;
+  original_due_at: string | null;
+  is_overdue: boolean;
+  clock_paused: boolean;
+}
+
+export interface PaperDetails {
+  /** Null when the viewer may not read every owner's registration affiliation. */
+  colleges: string[] | null;
+  programs: string[] | null;
+  author_flags: { office: Party; label: string; hint: string }[];
+  researchers: PaperPerson[];
+  adviser: PaperPerson | null;
+  /** Review content: null means not disclosed, not an empty review. */
+  participants: PaperPerson[] | null;
+  due_dates: PaperDueDate[] | null;
+}
+
 export interface RecordDetail extends RecordListItem {
+  /** Added in IR-686; absent only when using an older API. */
+  paper_details?: PaperDetails;
   lineage?: {
     derived_from: { id: number; title: string; record_type_name: string | null } | null;
     continued_as: { id: number; title: string; record_type_name: string | null } | null;
@@ -294,6 +329,14 @@ export interface RecordDetail extends RecordListItem {
    * (ADR-032 §4, IR-415). Never anyone else's.
    */
   my_seats:             ReviewerSeat[];
+  /**
+   * What stands between the viewer and their part of the review, in the
+   * server's words (ADR-032 §10 Amendment, IR-681). Null when the viewer may
+   * not read the review: not disclosed, which is not "nothing to say".
+   */
+  readiness?:           Readiness | null;
+  /** A server-offered claim from the viewer's office Pool; absent on older APIs. */
+  review_claim?:        { assignment: number; label: string; party_label: string } | null;
   /**
    * ADR-032's `is_record_participant`: an owner, or anyone who has ever held
    * a seat here -- so a reviewer whose part is done keeps Review and Files.
@@ -448,6 +491,12 @@ export interface AddReviewerOptions {
 export interface RoutingFlags {
   accept_and_route: boolean;
   route_as:         Party | null;
+  /**
+   * Where onward *Route* may send this record, as the server's party graph
+   * has it (IR-685): *Request review* lists exactly these. Empty when the
+   * viewer cannot route.
+   */
+  targets:          { party: Party; label: string }[];
 }
 
 /** One office the routing dialog offers (`GET /records/<id>/route-options/`). */
@@ -487,6 +536,27 @@ export type SeatSource = "entry" | "claimed" | "assigned" | "nominated" | "added
 export const OPEN_SEAT_STATES: readonly SeatState[] = ["assigned", "in_review"];
 
 /** One person reviewing a record for a party. Every seat endpoint answers with this. */
+export type ReadinessVerdict = "ready" | "blocked" | "waiting_on_you" | "none";
+
+/** One fact in Readiness. The browser renders `label` and never words its own. */
+export interface ReadinessItem {
+  kind:       string;
+  severity:   "blocker" | "info";
+  label:      string;
+  party:      string | null;
+  actor_name: string | null;
+  since:      string | null;
+  /** Due dates only; null on every other item. */
+  paused:     boolean | null;
+  action:     { kind: string; target: string | null } | null;
+}
+
+export interface Readiness {
+  verdict:  ReadinessVerdict;
+  headline: string;
+  items:    ReadinessItem[];
+}
+
 export interface ReviewerSeat {
   id:            number;
   assignment:    number;
@@ -497,6 +567,8 @@ export interface ReviewerSeat {
   reviewer_name: string | null;
   state:         SeatState;
   state_label:   string;
+  /** The viewer's own recorded verdict in the server's words; on my_seats. */
+  verdict_label?: string | null;
   source:        SeatSource;
   assigned_by:   number | null;
   assigned_at:   string | null;
@@ -661,6 +733,8 @@ export interface AssignmentExtension {
 }
 
 export interface TrackerSeat {
+  /** Stable identity for a server-projected profile card (IR-686). */
+  reviewer?: number | null;
   reviewer_name: string | null;
   state:         SeatState;
   state_label:   string;
@@ -815,9 +889,10 @@ export interface DownloadRequest {
   requested_by:        number;
   requested_by_name:   string | null;
   requested_by_email:  string | null;
-  status:              "pending" | "approved" | "declined";
+  status:              "pending" | "approved" | "declined" | "revoked";
   reviewed_by:         number | null;
   reviewed_at:         string | null;
+  grant_expires_at:    string | null;
   created_at:          string;
 }
 

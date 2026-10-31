@@ -18,6 +18,10 @@ from .validation import production_problems, recovery_transport_problems
 
 DEBUG = False
 
+# TLS ends in a proxy in front of nginx, so Django only ever sees plain HTTP and
+# would redirect every request to HTTPS, forever, without this (IR-662). nginx
+# sets the header on every proxied request; see frontend/nginx.conf.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -34,6 +38,14 @@ ALLOWED_HOSTS = required("ALLOWED_HOSTS", cast=csv_list)
 # falling back to FRONTEND_URL's http://localhost:5173 would put a dead
 # localhost entry in a production allowlist.
 CORS_ALLOWED_ORIGINS = required("CORS_ALLOWED_ORIGINS", cast=csv_list)
+
+# How many proxies a client passes through is a per-deployment fact too. Wrong,
+# the sign-in lockout counts the wrong address (IR-656), so nothing guesses it.
+TRUSTED_PROXY_COUNT = required("TRUSTED_PROXY_COUNT", cast=int)
+if TRUSTED_PROXY_COUNT < 1:
+    raise ImproperlyConfigured(
+        "TRUSTED_PROXY_COUNT must be at least 1: production always runs behind nginx."
+    )
 
 # ---- Startup checks ------------------------------------------------------
 
