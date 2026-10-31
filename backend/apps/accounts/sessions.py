@@ -93,6 +93,7 @@ _REFUSALS = {
         "session_ended_password_changed",
         "You were signed out because your password was changed.",
     ),
+    SessionEndReason.REVOKED: ("session_ended_revoked", "An administrator ended this session."),
 }
 
 
@@ -141,6 +142,19 @@ def end_all_sessions(user, reason: SessionEndReason, *, except_sid=None) -> None
             if sid is None or str(sid) == str(except_sid):
                 continue
         BlacklistedToken.objects.get_or_create(token=token)
+
+
+@transaction.atomic
+def revoke_token(token: OutstandingToken) -> None:
+    """End the session a stored refresh token belongs to, and blacklist it (IR-657).
+
+    Blacklisting alone leaves the access token working until it expires. A stored
+    payload with no sid predates that being kept, and only the blacklisting applies.
+    """
+    sid = UntypedToken(token.token, verify=False).get("sid")
+    if sid:
+        end_session(sid, SessionEndReason.REVOKED)
+    BlacklistedToken.objects.get_or_create(token=token)
 
 
 def refuse_if_ended(sid) -> None:

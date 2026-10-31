@@ -18,6 +18,7 @@ from .serializers import (
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
 from .sessions import (
     end_all_sessions, end_session, start_session, require_eligible_account, refuse_if_ended,
+    revoke_token,
 )
 from .lockout import LOCKED_BY_ADMIN
 
@@ -441,24 +442,23 @@ class ActiveSessionsView(APIView):
 class RevokeSessionView(APIView):
     """
     DELETE /users/sessions/<jti>/
-    Blacklists a specific JWT by its JTI (JWT ID), forcing that session to
-    log out on the next request.  Admin only.
+    Ends the session of a specific JWT, found by its JTI (JWT ID), so its access
+    and refresh tokens are both refused on their next use.  Admin only.
     """
     permission_classes = [IsAuthenticated, IsAdmin]
 
     def delete(self, request, jti):
-        from rest_framework_simplejwt.token_blacklist.models import (
-            OutstandingToken, BlacklistedToken,
-        )
+        from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
+
         try:
             token = OutstandingToken.objects.get(jti=jti)
         except OutstandingToken.DoesNotExist:
             return Response({"detail": "Session not found."}, status=404)
 
-        BlacklistedToken.objects.get_or_create(token=token)
+        revoke_token(token)
         create_audit_event(
             "SESSION_REVOKE", request.user,
-            metadata={"revoked_jti": jti},
+            metadata={"revoked_jti": jti, "user_id": token.user_id},
         )
         return Response({"detail": "Session revoked."})
 
