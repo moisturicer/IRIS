@@ -18,6 +18,7 @@ coordinator who is seated nowhere.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
@@ -26,7 +27,6 @@ from apps.accounts.models import Role, User
 from apps.documents.models import RecordFile, RecordUpload, UploadSlot, UploadStatus
 from apps.documents.testing import real_pdf_bytes
 from apps.documents.requests import ItemSpec, create_request, requesting_party
-from apps.records.download_tokens import make_download_token
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
 from apps.records.models import DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
@@ -63,8 +63,6 @@ def pdf(name="paper.pdf") -> SimpleUploadedFile:
 class World:
     users: dict[str, User | None]
     objects: dict[str, object] = field(default_factory=dict)
-    #: The JWT a redeem link carries, for the approved download request.
-    download_token: str = ""
 
     def value(self, name: str, attr: str = "pk"):
         return getattr(self.objects[name], attr)
@@ -230,12 +228,9 @@ def build_world() -> World:
     o["download_request"] = DownloadRequest.objects.create(
         record=published, requested_by=other,
     )
-    approved = DownloadRequest.objects.create(
-        record=published, requested_by=other,
-        status=RequestStatus.APPROVED,
-    )
-    world.download_token = make_download_token(
-        download_request_id=approved.pk, record_id=published.pk, user_id=other.pk,
+    DownloadRequest.objects.create(
+        record=published, requested_by=other, status=RequestStatus.APPROVED,
+        grant_expires_at=timezone.now() + timedelta(days=30),
     )
     pending = _record(
         "Matrix: a Thesis its owner asked to delete", owner, users["adviser"],
@@ -244,7 +239,6 @@ def build_world() -> World:
     o["delete_request"] = DeleteRequest.objects.create(
         record=pending, requested_by=owner, previous_pipeline_status=PipelineStatus.PUBLISHED,
     )
-    from datetime import timedelta
     from apps.accounts.models import RoleRequest, SystemSetting
     from apps.ai.models import AskRun, Conversation, ResearchRun, Turn
     from apps.notifications.models import Notification, NotificationType
