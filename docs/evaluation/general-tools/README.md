@@ -30,13 +30,13 @@ Fixture validation and local fake runs are free and authorized by IR-589. Paid m
 
 ## IR-598 conversation set, scorer and pilot documents
 
-- [`conversation_set_v1.json`](conversation_set_v1.json): 105 draft conversations over the 40-paper arXiv proxy corpus (not CIT-U research), all of A01–A15, seven per family, split 62 development and 43 held out by paper and topic. **`label_status` is `draft_unreviewed` and `labelled_by` is empty**: an AI agent drafted every label and a named person must review them before any score counts.
-- [`conversation_set_v1.lock.json`](conversation_set_v1.lock.json): one SHA-256 per split. Rewrite it after label review.
+- [`conversation_set_v1.json`](conversation_set_v1.json): 105 conversations over the 40-paper arXiv proxy corpus (not CIT-U research), all of A01–A15, seven per family, split 62 development and 43 held out by paper and topic. An AI agent drafted the labels; **Jive Tyler I. Revalde reviewed every one on 2026-10-31** (`human_reviewed`; 89 confirmed, 16 corrected) in [`review/label_review.json`](review/label_review.json). Category names, counts and every page and quote were checked against the dev database. Counts assume a database holding only the 40 proxy papers; the dev database also publishes 8 seed_demo records, which must be absent or unpublished for a run.
+- [`conversation_set_v1.lock.json`](conversation_set_v1.lock.json): one SHA-256 per split plus the corpus, rubric version and label-review digest, locked 2026-10-31. Any later edit to the set makes it stale.
 - Command: `python manage.py eval_conversations --set ../docs/evaluation/general-tools/conversation_set_v1.json --validate [--lock ...]` from `backend/`. It is free. `--score` reads collected runs and human reviews and calls no model; it requires `--lock`, refuses draft labels without `--allow-draft` and needs run manifests (see the pilot report §3).
 - [`pilot-report.md`](pilot-report.md): what was and was not measured, denominators, proposed (unapproved) targets and open gates.
 - [`rollout-runbook.md`](rollout-runbook.md): cohort reading, rollback, monitoring and the separate approvals. It records one conflict with the ticket wording for a human to settle.
 
-Nothing in this section is a quality result. No arm was run and no person has reviewed anything.
+Nothing in this section is a quality result. The labels are reviewed; no arm was run and no answer has been reviewed.
 
 ## IR-606 development replay
 
@@ -44,7 +44,11 @@ The [development replay command](replay.md) collects a selected case through the
 
 ## IR-607 review and counted scoring
 
-[Label review, reviewer packets, double review with adjudication, and counted scoring](review.md). The draft set is not yet reviewed, its A09 cases are untagged, and its lock predates corpus and rubric pinning, so it cannot be locked or counted yet.
+[Label review, reviewer packets, double review with adjudication, and counted scoring](review.md). The set is label-reviewed and locked (IR-702); five A09 cases carry `a09_case` tags covering all three outcomes. `scripts/label_review.py prep` builds a worksheet with machine checks against `proxy_starter.json`, pre-filled with AI-suggested verdicts (`review/label_review_ai_draft.json`) that the reviewer accepts or changes one by one; `finalize` turns the exported verdicts into the label-review file and refuses any draft left untouched.
+
+## A09 tool outage during replay
+
+`eval_replay_conversations` runs Ask IRIS in-process, so it can cause the outage A09 expects instead of waiting for one. On a turn whose `intended_task` is `partial_answer_after_tool_failure`, the first paper read (`read_papers` or `extract_evidence`) succeeds and every later read raises inside the tool, so the registry's real failure path returns `tool_unavailable` (`evaluation/faults.py`). Nothing is reachable over HTTP and no reader route changes. The manifest records `fault_injection`, and the turn records `fault` with `fired`. A turn whose controller read at most once, or the legacy engine, which never calls the general tools, shows `fired: false`: the outage did not happen, and the reviewer should not judge that turn as an outage.
 
 ## IR-608 safety and recovery
 
