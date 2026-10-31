@@ -1,8 +1,11 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 
+import { documentsApi } from "@/api/documents";
+import { recordsApi } from "@/api/records";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { cn, formatDate } from "@/lib/utils";
-import type { RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState } from "@/types/records";
+import { cn, downloadBlob, formatDate } from "@/lib/utils";
+import type { PaperPerson, RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState } from "@/types/records";
 
 import { dueText } from "./ReviewStatus";
 
@@ -17,14 +20,6 @@ const STATE_ICON: Partial<Record<TrackerPartyState, string>> = {
   awaiting: "fa-clock",
 };
 
-/** The flags an author set on submission, in the submission form's terms. */
-const AUTHOR_FLAGS: [keyof RecordDetail, string][] = [
-  ["is_ip", "Possible IP"],
-  ["requires_ethics_review", "Human participants"],
-  ["for_commercialization", "Commercial potential"],
-  ["community_extension", "Community extension"],
-];
-
 /** Where a Readiness link lands: a party's reviewers, or Documents. */
 export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`;
 
@@ -33,7 +28,7 @@ export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`
  * Reviewers by party, then Researchers, Adviser, Classification, Flagged by
  * the authors, Keywords, Version, Due dates, Documents and Participants.
  *
- * Built from record detail and the tracker read the timeline already made.
+ * Built from record detail's permission-filtered paper_details and the tracker.
  * Who is reviewing, due dates and participants are review content: the
  * tracker sends seats and reviews as null to a viewer who may not read the
  * review (IR-479), and then those sections are withheld, not shown empty.
@@ -48,84 +43,86 @@ export function ReviewDetails({ record, tracker, ids, reviewerActions }: {
 }) {
   const readable = tracker.reviews !== null;
   const asked = tracker.parties.filter((p) => !UNASKED.has(p.state));
-  const authors = record.authors.map((a) => a.name);
-  const dues = readable ? asked.map((row) => [row, dueText(row)] as const).filter(([, d]) => d) : [];
-  const flags = AUTHOR_FLAGS.filter(([key]) => record[key] === true).map(([, label]) => label);
+  const details = record.paper_details;
+  const researchers = details?.researchers ?? [];
+  const dues = readable ? details?.due_dates : null;
+  const flags = details?.author_flags ?? [];
   const versions = record.versions ?? [];
   const latest = versions[versions.length - 1];
   const openRequests = (tracker.document_requests ?? []).filter((r) => r.state === "open");
-  const participants = readable
-    ? [...new Set([
-      ...authors,
-      ...(record.adviser_name ? [record.adviser_name] : []),
-      ...asked.flatMap((row) => (row.seats ?? []).map((s) => s.reviewer_name).filter((n): n is string => !!n)),
-    ])]
-    : [];
-  const roleOf = (name: string) => authors.includes(name) ? "Researcher" : name === record.adviser_name ? "Adviser"
-    : asked.find((row) => row.seats?.some((s) => s.reviewer_name === name))?.label ?? null;
+  const participants = readable ? details?.participants : null;
 
   return (
     <div className="space-y-5">
       <Section id={detailsTarget(ids, "reviewers")} title={`Reviewers · ${asked.length} ${asked.length === 1 ? "party" : "parties"}`}>
         {asked.length === 0 ? <p className="text-small text-stone-600">No party has been asked yet.</p> : (
           <ul className="space-y-3">
-            {asked.map((row) => <PartyReviewers key={row.party} row={row} ids={ids} readable={readable} />)}
+            {asked.map((row) => <PartyReviewers key={row.party} row={row} ids={ids} readable={readable} people={participants ?? []} />)}
           </ul>
         )}
         {reviewerActions}
       </Section>
       <Section title="Researchers">
-        {authors.length ? <ul className="space-y-1">{authors.map((n) => <li key={n}><Person name={n} role="Researcher" /></li>)}</ul>
+        {researchers.length ? <ul className="space-y-1">{researchers.map((p) => <li key={p.id}><Person person={p} /></li>)}</ul>
           : <p className="text-small text-stone-600">None listed</p>}
       </Section>
       <Section title="Adviser">
-        {record.adviser_name ? <Person name={record.adviser_name} role="Adviser" /> : <p className="text-small text-stone-600">None named</p>}
+        {details?.adviser ? <Person person={details.adviser} /> : <p className="text-small text-stone-600">None named</p>}
       </Section>
       <Section title="Classification">
         <dl className="review-kv">
           {[["Type", record.record_type_name], ["Area", record.classification_name], ["PSCED", record.psced]]
             .filter(([, v]) => v).map(([k, v]) => <Fact key={k} k={k!} v={v!} />)}
+          <Fact k="College" v={affiliationText(details?.colleges)} />
+          <Fact k="Program" v={affiliationText(details?.programs)} />
         </dl>
       </Section>
       <Section title="Flagged by the authors">
         {flags.length ? (
           <ul className="flex flex-wrap gap-1.5">
             {flags.map((f) => (
-              <li key={f} className="review-tag"><i className="fas fa-check text-2xs mr-1" aria-hidden />{f}</li>
+              <li key={f.office} title={f.hint} className="review-tag"><i className="fas fa-check text-2xs mr-1" aria-hidden />{f.label}</li>
             ))}
           </ul>
         ) : <p className="text-small text-stone-600">Nothing flagged</p>}
       </Section>
-      {(record.keywords?.length ?? 0) > 0 && (
-        <Section title="Keywords">
+      <Section title="Keywords">
+        {(record.keywords?.length ?? 0) > 0 ? (
           <ul className="flex flex-wrap gap-1.5">{record.keywords!.map((k) => <li key={k} className="review-tag">{k}</li>)}</ul>
-        </Section>
-      )}
-      {latest && (
-        <Section title="Version">
+        ) : <p className="text-small text-stone-600">None listed</p>}
+      </Section>
+      <Section title="Version">
+        {latest ? (
           <dl className="review-kv">
             <Fact k="Current" v={`v${latest.number} · ${formatDate(latest.created_at)}`} />
             <Fact k="First submitted" v={formatDate(versions[0].created_at)} />
             <Fact k="History" v={`${versions.length} ${versions.length === 1 ? "version" : "versions"}`} />
           </dl>
-        </Section>
-      )}
-      {readable && (
+        ) : <p className="text-small text-stone-600">{record.versions === null ? "Not disclosed" : "No version recorded"}</p>}
+      </Section>
+      {dues != null && (
         <Section title="Due dates">
           {dues.length ? (
             <dl className="review-kv">
-              {dues.map(([row, due]) => <Fact key={row.party} k={row.label} v={due!} strong={row.is_overdue} />)}
+              {dues.map((due) => <Fact key={due.party} k={due.label} v={dueText(due) ?? "No due date recorded"} strong={due.is_overdue} />)}
             </dl>
           ) : <p className="text-small text-stone-600">None running</p>}
         </Section>
       )}
       <Section id={detailsTarget(ids, "documents")} title="Documents">
         <ul className="space-y-1.5 text-small">
-          <li><i className="fas fa-file-lines mr-2 text-stone-500" aria-hidden />Manuscript{latest ? ` · v${latest.number}` : ""} <span className="text-2xs text-stone-600">· open in the paper pane</span></li>
+          <li><i className="fas fa-file-lines mr-2 text-stone-500" aria-hidden />
+            {(latest?.manuscript_url ?? record.abstract_file)
+              ? <DocumentDownload name={`Manuscript${latest ? ` · v${latest.number}` : ""}`} filename="manuscript.pdf"
+                fetch={() => latest?.manuscript_url
+                  ? recordsApi.versionManuscriptBlob(record.id, latest.number)
+                  : recordsApi.manuscriptBlob(record.id)} />
+              : "No manuscript recorded"}
+          </li>
           {record.files.map((f) => (
             <li key={f.id}>
               <i className="fas fa-paperclip mr-2 text-stone-500" aria-hidden />
-              {f.url ? <a href={f.url} className={cn("text-brand hover:underline", FOCUS_RING)}>{f.filename}</a> : f.filename}
+              {f.url ? <DocumentDownload name={f.filename} filename={f.filename} fetch={() => documentsApi.downloadFile(f.id)} /> : f.filename}
             </li>
           ))}
           {openRequests.map((r) => (
@@ -136,11 +133,11 @@ export function ReviewDetails({ record, tracker, ids, reviewerActions }: {
           ))}
         </ul>
       </Section>
-      {readable && participants.length > 0 && (
+      {participants != null && (
         <Section title={`${participants.length} ${participants.length === 1 ? "participant" : "participants"}`}>
-          <ul className="flex flex-wrap gap-1.5">
-            {participants.map((n) => <li key={n}><Person name={n} role={roleOf(n)} compact /></li>)}
-          </ul>
+          {participants.length ? <ul className="flex flex-wrap gap-1.5">
+            {participants.map((p) => <li key={p.id}><Person person={p} compact /></li>)}
+          </ul> : <p className="text-small text-stone-600">None listed</p>}
         </Section>
       )}
     </div>
@@ -161,7 +158,38 @@ function Fact({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   return <><dt>{k}</dt><dd className={cn(strong && "font-semibold text-brand")}>{v}</dd></>;
 }
 
-function PartyReviewers({ row, ids, readable }: { row: TrackerPartyRow; ids: string; readable: boolean }) {
+/** Protected files need the API client's bearer header before a blob download. */
+function DocumentDownload({ name, filename, fetch }: {
+  name: string; filename: string; fetch: () => Promise<{ data: Blob }>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    setError(false);
+    try {
+      const { data } = await fetch();
+      downloadBlob(data, filename);
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <>
+    <button type="button" disabled={busy} aria-busy={busy} onClick={download}
+      className={cn("review-control text-left text-brand hover:underline disabled:opacity-60", FOCUS_RING)}>
+      {name}{busy && <span className="sr-only"> · Downloading</span>}
+    </button>
+    {error && <span role="alert" className="block text-small text-brand">Could not download {name}. Please try again.</span>}
+  </>;
+}
+
+function affiliationText(values: string[] | null | undefined): string {
+  return values == null ? "Not disclosed" : values.length ? values.join("; ") : "Not recorded";
+}
+
+function PartyReviewers({ row, ids, readable, people }: { row: TrackerPartyRow; ids: string; readable: boolean; people: PaperPerson[] }) {
   const seats = (row.seats ?? []).filter((s) => s.state !== "withdrawn");
   const outcome = row.outcome && row.outcome !== "pending" ? row.outcome_label : null;
   return (
@@ -181,7 +209,8 @@ function PartyReviewers({ row, ids, readable }: { row: TrackerPartyRow; ids: str
         <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-1">
           {seats.map((seat, i) => (
             <li key={i} className="flex items-center justify-between gap-2">
-              <Person name={seat.reviewer_name ?? "A reviewer"} role={row.label} />
+              <Person name={seat.reviewer_name ?? "A reviewer"} role={`${row.label} reviewer`}
+                person={people.find((p) => p.id === seat.reviewer)} />
               <span className="text-2xs text-stone-600">{seat.verdict_label ?? seat.state_label}</span>
             </li>
           ))}
@@ -192,30 +221,56 @@ function PartyReviewers({ row, ids, readable }: { row: TrackerPartyRow; ids: str
 }
 
 /**
- * A person, opening a card with only what this page already shows of them:
- * their name and their part in this record. Escape or a click outside closes
- * it and returns focus.
+ * The server decides which card fields are readable. Never reconstruct an
+ * affiliation from classification or another person's card.
  */
-function Person({ name, role, compact }: { name: string; role: string | null; compact?: boolean }) {
+function Person({ person, name = person?.name ?? "A reviewer", role = person?.role ?? null, compact }: {
+  person?: PaperPerson; name?: string; role?: string | null; compact?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const button = useRef<HTMLButtonElement>(null);
   const card = useRef<HTMLDivElement>(null);
   const cardId = useId();
+  const [position, setPosition] = useState({ left: 16, top: 16 });
   const initials = name.split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]!.toUpperCase()).join("");
+
+  // The sidebar scrolls and participants wrap. Keep the card out of its
+  // clipping ancestor and inside the viewport, including the last avatar.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const anchor = button.current?.getBoundingClientRect();
+      const bounds = card.current?.getBoundingClientRect();
+      if (!anchor || !bounds) return;
+      const below = anchor.bottom + 4;
+      setPosition({
+        left: Math.max(16, Math.min(anchor.left, window.innerWidth - bounds.width - 16)),
+        top: Math.max(16, Math.min(below, window.innerHeight - bounds.height - 16)),
+      });
+    };
+    place();
+    window.addEventListener("resize", place);
+    document.addEventListener("scroll", place, true);
+    return () => {
+      window.removeEventListener("resize", place);
+      document.removeEventListener("scroll", place, true);
+    };
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
     card.current?.focus();
     const close = () => { setOpen(false); button.current?.focus(); };
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") { e.preventDefault(); close(); } };
-    const onDown = (e: MouseEvent) => {
+    // Restore focus after the outside click's normal focus movement.
+    const onClick = (e: MouseEvent) => {
       if (!card.current?.contains(e.target as Node) && !button.current?.contains(e.target as Node)) close();
     };
     document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onDown);
+    document.addEventListener("click", onClick);
     return () => {
       document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("click", onClick);
     };
   }, [open]);
 
@@ -230,12 +285,21 @@ function Person({ name, role, compact }: { name: string; role: string | null; co
         <span aria-hidden className="review-avatar">{initials}</span>
         {!compact && name}
       </button>
-      {open && (
+      {open && createPortal(
         <div ref={card} id={cardId} role="dialog" aria-label={name} tabIndex={-1}
-          className={cn("absolute left-0 top-full z-30 mt-1 w-56 rounded-lg border border-stone-300 bg-white p-3 shadow-sm", FOCUS_RING)}>
+          style={position}
+          className={cn("fixed z-50 w-56 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-stone-300 bg-overlay p-3 shadow-sm", FOCUS_RING)}>
           <p className="font-display text-base font-semibold text-stone-900">{name}</p>
           {role && <p className="text-small text-stone-600">{role} on this record</p>}
-        </div>
+          {person && <dl className="mt-2 space-y-1 break-words text-small text-stone-700">
+            {(["office", "college", "department", "program"] as const).map((key) => person[key] && (
+              <div key={key}><dt className="font-semibold capitalize">{key}</dt><dd>{person[key]}</dd></div>
+            ))}
+            {person.email && <div><dt className="font-semibold">Contact</dt><dd>
+              <a href={`mailto:${person.email}`} className={cn("text-brand hover:underline", FOCUS_RING)}>{person.email}</a>
+            </dd></div>}
+          </dl>}
+        </div>, document.body,
       )}
     </span>
   );
