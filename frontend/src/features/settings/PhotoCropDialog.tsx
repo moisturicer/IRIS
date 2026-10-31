@@ -2,13 +2,15 @@ import { useEffect, useRef, useState } from "react";
 
 import { profileApi } from "@/api/profile";
 import { Modal } from "@/components/ui/Modal";
-import { fieldError, errorDetail } from "@/lib/errorDetail";
+import { FieldError } from "@/components/ui/FieldError";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { errorDetail, fieldError } from "@/lib/errorDetail";
+import { cn } from "@/lib/utils";
 import {
-  centredView, cropFromView, MAX_ZOOM, MIN_ZOOM, panView, zoomView,
+  centredView, cropFromView, MAX_ZOOM, MIN_ZOOM, panView, scaleFor, zoomView,
   type CropView, type ImageSize,
 } from "@/lib/photoCrop";
-
-import { primaryButtonClass, secondaryButtonClass } from "./settingsParts";
 
 /** The square the photo is framed in, in screen pixels. */
 const STAGE = 256;
@@ -39,7 +41,7 @@ export function PhotoCropDialog({
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  const scale = image ? (STAGE / Math.min(image.width, image.height)) * view.zoom : 1;
+  const scale = image ? scaleFor(image, STAGE, view.zoom) : 1;
 
   const pan = (dx: number, dy: number) => {
     if (image) setView((v) => panView(image, STAGE, v, dx, dy));
@@ -65,8 +67,7 @@ export function PhotoCropDialog({
       onUploaded(data.photo_url);
     } catch (err) {
       setError(
-        fieldError(err, "photo") ??
-          fieldError(err, "crop_size") ??
+        fieldError(err, "photo", "crop_x", "crop_y", "crop_size") ??
           errorDetail(err, "Could not upload your photo. Please try again."),
       );
       setUploading(false);
@@ -81,8 +82,8 @@ export function PhotoCropDialog({
       size="max-w-sm"
       footer={
         <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose} className={secondaryButtonClass}>Cancel</button>
-          <button type="button" onClick={upload} disabled={!image || uploading} className={primaryButtonClass}>
+          <button type="button" onClick={onClose} className={cn(PILL_SECONDARY, FOCUS_RING)}>Cancel</button>
+          <button type="button" onClick={upload} disabled={!image || uploading} className={cn(PILL_PRIMARY, FOCUS_RING)}>
             {uploading ? "Uploading..." : "Use photo"}
           </button>
         </div>
@@ -105,8 +106,10 @@ export function PhotoCropDialog({
           }}
           onPointerUp={() => { drag.current = null; }}
           onPointerCancel={() => { drag.current = null; }}
-          className="relative overflow-hidden rounded-lg bg-stone-900 cursor-grab active:cursor-grabbing
-            touch-none select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/60"
+          className={cn(
+            "relative overflow-hidden rounded-lg bg-stone-900 cursor-grab active:cursor-grabbing touch-none select-none",
+            FOCUS_RING,
+          )}
           style={{ width: STAGE, height: STAGE }}
         >
           {src && (
@@ -136,8 +139,8 @@ export function PhotoCropDialog({
           />
         </div>
 
-        <label className="w-full flex items-center gap-3 text-[13px] text-stone-600">
-          <i className="fas fa-magnifying-glass-minus text-[12px]" aria-hidden />
+        <label className="w-full flex items-center gap-3 text-small text-stone-600">
+          <i className="fas fa-magnifying-glass-minus text-label" aria-hidden />
           <span className="sr-only">Zoom</span>
           <input
             type="range"
@@ -147,12 +150,12 @@ export function PhotoCropDialog({
             value={view.zoom}
             disabled={!image}
             onChange={(e) => { if (image) setView((v) => zoomView(image, STAGE, v, Number(e.target.value))); }}
-            className="flex-1 accent-brand"
+            className={cn("flex-1 accent-brand rounded", FOCUS_RING)}
           />
-          <i className="fas fa-magnifying-glass-plus text-[12px]" aria-hidden />
+          <i className="fas fa-magnifying-glass-plus text-label" aria-hidden />
         </label>
 
-        {error && <p role="alert" className="text-[13px] text-red-700 self-start">{error}</p>}
+        {error && <div role="alert" className="self-start"><FieldError>{error}</FieldError></div>}
       </div>
     </Modal>
   );

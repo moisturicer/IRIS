@@ -6,7 +6,7 @@ import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
 import { AboutYouPanel } from "./AboutYouPanel";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
-import { Field, inputClass, Notice, Panel, readOnlyClass } from "./settingsParts";
+import { Panel } from "./settingsParts";
 
 /**
  * Settings & Profile.
@@ -92,6 +92,47 @@ export default function SettingsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Shared                                                                     */
+/* -------------------------------------------------------------------------- */
+
+function Field({
+  label, children, hint,
+}: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="block text-[12px] font-bold uppercase tracking-wider text-stone-500 mb-1.5">
+        {label}
+      </span>
+      {children}
+      {hint && <span className="block text-[12px] text-stone-500 mt-1.5">{hint}</span>}
+    </label>
+  );
+}
+
+const inputClass =
+  "w-full px-3 py-2 rounded-lg border border-stone-200 text-[14px] text-stone-900 " +
+  "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40";
+
+const readOnlyClass =
+  "w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-[14px] text-stone-500";
+
+function Notice({ tone, children }: { tone: "ok" | "error"; children: React.ReactNode }) {
+  return (
+    <p
+      role="status"
+      className={cn(
+        "text-[13px] rounded-lg px-3 py-2 border",
+        tone === "ok"
+          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
+          : "bg-red-50 text-red-700 border-red-200",
+      )}
+    >
+      {children}
+    </p>
   );
 }
 

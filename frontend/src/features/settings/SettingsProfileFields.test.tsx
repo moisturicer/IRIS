@@ -146,9 +146,30 @@ describe("saving", () => {
     await user.type(screen.getByLabelText("Bio"), "x");
     await user.click(within(aboutYou()).getByRole("button", { name: "Save" }));
 
-    expect(await within(aboutYou()).findByRole("status")).toHaveTextContent(
+    expect(await within(aboutYou()).findByRole("alert")).toHaveTextContent(
       "Keep each interest to 40 characters or fewer.",
     );
+  });
+
+  it("says every field the server refused, including a list's per-item message", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(profileApi, "updateFields").mockRejectedValue({
+      response: {
+        status: 400,
+        data: {
+          bio: ["Keep your bio to 500 characters or fewer."],
+          research_interests: { 0: ["Keep each interest to 40 characters or fewer."] },
+        },
+      },
+    });
+    renderScreen(<SettingsPage />, { route: "/settings" });
+
+    await user.type(screen.getByLabelText("Bio"), "x");
+    await user.click(within(aboutYou()).getByRole("button", { name: "Save" }));
+
+    const alert = await within(aboutYou()).findByRole("alert");
+    expect(alert).toHaveTextContent("Keep your bio to 500 characters or fewer.");
+    expect(alert).toHaveTextContent("Keep each interest to 40 characters or fewer.");
   });
 });
 

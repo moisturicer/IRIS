@@ -19,14 +19,20 @@ export interface CropRect { x: number; y: number; size: number; }
 export const MIN_ZOOM = 1;
 export const MAX_ZOOM = 3;
 
-function scaleOf(image: ImageSize, stage: number, zoom: number): number {
+/** `zoom` kept within what the slider offers. */
+export function clampZoom(zoom: number): number {
+  return Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom));
+}
+
+/** Screen pixels per photo pixel at `zoom`. */
+export function scaleFor(image: ImageSize, stage: number, zoom: number): number {
   return (stage / Math.min(image.width, image.height)) * zoom;
 }
 
 /** Keep `view` inside the photo, so no part of the stage is ever left empty. */
 export function clampView(image: ImageSize, stage: number, view: CropView): CropView {
-  const zoom = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, view.zoom));
-  const scale = scaleOf(image, stage, zoom);
+  const zoom = clampZoom(view.zoom);
+  const scale = scaleFor(image, stage, zoom);
   const minX = stage - image.width * scale;
   const minY = stage - image.height * scale;
   return {
@@ -38,7 +44,7 @@ export function clampView(image: ImageSize, stage: number, view: CropView): Crop
 
 /** The photo centred in the stage at `zoom`. */
 export function centredView(image: ImageSize, stage: number, zoom: number): CropView {
-  const scale = scaleOf(image, stage, zoom);
+  const scale = scaleFor(image, stage, zoom);
   return clampView(image, stage, {
     zoom,
     offsetX: (stage - image.width * scale) / 2,
@@ -56,8 +62,8 @@ export function panView(image: ImageSize, stage: number, view: CropView, dx: num
  * photo, so zooming feels like moving closer rather than sliding sideways.
  */
 export function zoomView(image: ImageSize, stage: number, view: CropView, zoom: number): CropView {
-  const from = scaleOf(image, stage, view.zoom);
-  const to = scaleOf(image, stage, Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoom)));
+  const from = scaleFor(image, stage, view.zoom);
+  const to = scaleFor(image, stage, clampZoom(zoom));
   const centreX = (stage / 2 - view.offsetX) / from;
   const centreY = (stage / 2 - view.offsetY) / from;
   return clampView(image, stage, {
@@ -70,7 +76,7 @@ export function zoomView(image: ImageSize, stage: number, view: CropView, zoom: 
 /** The square the person framed, in whole pixels of the original photo. */
 export function cropFromView(image: ImageSize, stage: number, view: CropView): CropRect {
   const v = clampView(image, stage, view);
-  const scale = scaleOf(image, stage, v.zoom);
+  const scale = scaleFor(image, stage, v.zoom);
   const size = Math.min(Math.round(stage / scale), image.width, image.height);
   const x = Math.min(Math.max(0, Math.round(-v.offsetX / scale)), image.width - size);
   const y = Math.min(Math.max(0, Math.round(-v.offsetY / scale)), image.height - size);

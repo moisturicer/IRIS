@@ -1,13 +1,16 @@
 import { useEffect, useId, useState } from "react";
 
 import { profileApi } from "@/api/profile";
+import { FieldError } from "@/components/ui/FieldError";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { errorDetail } from "@/lib/errorDetail";
+import { cn } from "@/lib/utils";
 import type { User } from "@/types/auth";
 
 import { PhotoCropDialog } from "./PhotoCropDialog";
-import { secondaryButtonClass } from "./settingsParts";
 
-export const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
+const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const PHOTO_TYPES = ["image/jpeg", "image/png"];
 
 /**
@@ -20,7 +23,7 @@ export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) =
   const [chosen, setChosen] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [removing, setRemoving] = useState(false);
-  const shown = useAuthedImage(user.photo_url ?? null);
+  const photoSrc = useAuthedImage(user.photo_url ?? null);
 
   const choose = (file: File | undefined) => {
     setError(null);
@@ -49,16 +52,16 @@ export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) =
 
   return (
     <div className="flex items-center gap-4 flex-wrap">
-      {shown ? (
+      {photoSrc ? (
         <img
-          src={shown}
+          src={photoSrc}
           alt="Your profile photo"
-          className="w-20 h-20 rounded-full object-cover border border-stone-200"
+          className="w-20 h-20 rounded-full object-cover ring-1 ring-stone-200"
         />
       ) : (
         <span
           aria-hidden
-          className="w-20 h-20 rounded-full grid place-items-center bg-brand-50 text-brand text-[22px] font-bold"
+          className="w-20 h-20 rounded-full grid place-items-center bg-brand-50 text-brand text-title font-semibold"
         >
           {initials}
         </span>
@@ -77,18 +80,21 @@ export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) =
           />
           <label
             htmlFor={inputId}
-            className={`${secondaryButtonClass} cursor-pointer peer-focus-visible:ring-2 peer-focus-visible:ring-brand/40`}
+            className={cn(
+              PILL_SECONDARY, "cursor-pointer",
+              "peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2",
+            )}
           >
             {user.photo_url ? "Change photo" : "Upload photo"}
           </label>
           {user.photo_url && (
-            <button type="button" onClick={remove} disabled={removing} className={secondaryButtonClass}>
+            <button type="button" onClick={remove} disabled={removing} className={cn(PILL_SECONDARY, FOCUS_RING)}>
               {removing ? "Removing..." : "Remove photo"}
             </button>
           )}
         </div>
-        <span className="text-[12px] text-stone-500">JPEG or PNG, up to 2 MB. Saved as soon as you crop it.</span>
-        {error && <span role="alert" className="text-[12px] text-red-700">{error}</span>}
+        <p className="text-small text-stone-600">JPEG or PNG, up to 2 MB. Saved as soon as you crop it.</p>
+        {error && <div role="alert"><FieldError>{error}</FieldError></div>}
       </div>
 
       {chosen && (
@@ -112,16 +118,16 @@ function useAuthedImage(photoUrl: string | null): string | null {
     setSrc(null);
     if (!photoUrl) return;
     let objectUrl: string | null = null;
-    let live = true;
+    let current = true;
     profileApi.photo(photoUrl)
       .then(({ data }) => {
-        if (!live) return;
+        if (!current) return;
         objectUrl = URL.createObjectURL(data);
         setSrc(objectUrl);
       })
-      .catch(() => { if (live) setSrc(null); });
+      .catch(() => { if (current) setSrc(null); });
     return () => {
-      live = false;
+      current = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [photoUrl]);
