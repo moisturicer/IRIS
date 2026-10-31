@@ -17,6 +17,35 @@ regression cases. Final command results are recorded in the PR.
 re-collection remain outstanding. Existing consent stamps are not renewed.
 See [the processing inventory and review checklist](../compliance/IR-123-processing-review.md).
 
+## IR-704 / IR-706 · Sign in opens in the Dossier frame
+
+`LoginPage` uses the new `EntryFrame` (`components/auth/EntryFrame.tsx`), built
+beside `AuthLayout`: register, verify and pending stay on the split frame until
+IR-707 and IR-710 move them. The masthead is the one visible h1 (both logos at
+natural proportions, the CIT-U logo's alt text naming the university), with a
+Register link at every width. "Welcome Back" stays the h2. The lede's
+sentence follows the folder on a phone. The footer carries no policy link (IR-214).
+Every IR-236/536/555/645 sign-in behaviour is unchanged; the link under the form
+reads "Register" (was "Sign up").
+
+**Verification (2026-10-31):** `LoginPage.test.tsx` adds six frame cases: one h1
+naming IRIS and CIT-U, two Register links and no "Sign up", a non-interactive
+Sign in tab, the lede, a link-free footer, and a failed sign-in with exactly one
+live region and the fields marked invalid with no description. All 49 cases
+pass, the 43 existing ones unchanged. `entryTokens.test.ts` now reads
+`EntryFrame.tsx`; it, `entryHeadings.test.tsx` and `palette.test.ts` pass.
+
+**Browser evidence (headless Chrome, 2026-10-31):** 320×640, 360×640, 390×844,
+768×1024, 1024×768, 1280×720, 1440×900 and 1745×980: no horizontal overflow and
+exactly one visible h1 at every size. The email field's bottom edge sits at
+464 px (of 640) at 360×640 and at 544 px (of 720) at 1280×720. The masthead
+Register link is 52×44 px at every width. Contrast: Sign In 12.34:1, the tab
+12.34:1, the lede sentence 9.84:1 on the canvas. At 360 px Tab runs masthead
+Register → email → password → Show → Forgot password? → Sign In → Register,
+each with a visible maroon ring or outline. The folder's computed animation is
+`sheet-settle 0.28s` with motion allowed and `none` under
+`prefers-reduced-motion: reduce`.
+
 ## IR-538 · Announced email verification in the shared entry frame
 
 `EmailVerifyPage` uses `AuthLayout`'s verify variant. A status region remains

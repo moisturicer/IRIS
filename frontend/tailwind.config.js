@@ -309,8 +309,15 @@ export default {
           "0%":   { opacity: "0", transform: "translateX(-1.5rem)" },
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
+        // The entry folder's sheet settles once on load (IR-704). Opacity and
+        // transform only, and only through `motion-safe:`.
+        "sheet-settle": {
+          "0%":   { opacity: "0", transform: "translateY(0.5rem)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
+        "sheet-settle": "sheet-settle 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "panel-in": "panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "panel-in-start": "panel-in-start 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "fade-in-up": "fade-in-up 0.3s ease-out",

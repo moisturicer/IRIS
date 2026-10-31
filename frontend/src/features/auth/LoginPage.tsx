@@ -4,7 +4,7 @@ import { Link, useLocation, useNavigate, useSearchParams } from "react-router-do
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthAlert } from "@/components/auth/AuthAlert";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { EntryFrame, FolderTab } from "@/components/auth/EntryFrame";
 import { AccountLockedModal } from "@/components/auth/AccountLockedModal";
 import { LoginForm, type LoginFormValues } from "@/components/auth/LoginForm";
 import {
@@ -192,8 +192,14 @@ export default function LoginPage() {
   const attemptsLeft = LOGIN_FAILURE_LIMIT - failedAttempts;
 
   return (
-    <AuthLayout
-      variant="login"
+    <EntryFrame
+      crossLink={{ prompt: "New to IRIS?", label: "Register", to: "/signup" }}
+      lede={{
+        headline: <>Your research has <span className="text-brand">a place.</span></>,
+        sentence:
+          "IRIS is CIT-U's system for submitting, reviewing and reading theses, projects and proposals. Work goes to an adviser and the university's offices; what clears review is published.",
+      }}
+      tabs={<FolderTab>Sign in</FolderTab>}
       before={
         <AccountLockedModal
           open={lockoutOpen}
@@ -266,9 +272,9 @@ export default function LoginPage() {
       <p className="mt-5 text-center text-sm text-stone-600">
         No account?{" "}
         <Link to="/signup" className="inline-flex min-h-11 min-w-11 items-center justify-center text-brand font-semibold hover:underline">
-          Sign up
+          Register
         </Link>
       </p>
-    </AuthLayout>
+    </EntryFrame>
   );
 }
