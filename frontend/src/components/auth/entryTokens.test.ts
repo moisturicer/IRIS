@@ -8,15 +8,14 @@
  * cream) and the cream canvas. This guard reads the entry frame's files as text
  * and fails naming each one.
  *
- * Tickets IR-537 to IR-540 add their screens here as they adopt the frame, and
- * IR-706 adds the Dossier frame (`EntryFrame`) that replaces it, and IR-707 its
- * stepper (`EntrySteps`).
+ * Tickets IR-537 to IR-540 added their screens here as they adopted the frame,
+ * IR-706 the Dossier frame (`EntryFrame`) that replaced it, and IR-707 its
+ * stepper (`EntrySteps`). IR-711 deleted the split frame (`AuthLayout`,
+ * `AuthBrandPanel`), so only the Dossier frame and its screens remain.
  */
 import { describe, expect, it } from "vitest";
 
 const ENTRY_FRAME = [
-  "src/components/auth/AuthBrandPanel.tsx",
-  "src/components/auth/AuthLayout.tsx",
   "src/components/auth/EntryFrame.tsx",
   "src/components/auth/EntrySteps.tsx",
   "src/features/auth/DataNotice.tsx",

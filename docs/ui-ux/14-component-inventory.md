@@ -84,12 +84,11 @@ A component library exists. Roughly a tenth of the product uses it.
 | Component | Lines | Verdict | Note |
 |---|---|---|---|
 | `ProtectedRoute` | 70 | **KEEP** | Its docstring is already correct: *"client-side RBAC (UX only)"* |
-| `AuthBrandPanel` | 200 | **KEEP** | Largest presentational component; login only. Not on the workflow spine, so leave it alone |
 | `LoginForm` | 127 | **FIX** | Errors must associate with fields |
 | `AccountLockedModal` | 76 | **KEEP** | |
 | `ForbiddenScreen` | 52 | **KEEP** | Needed by the *"reached a forbidden route by URL"* rule ([03](03-navigation.md) §4) |
 | `AuthAlert` | 51 | **KEEP** | |
-| `AuthLayout`, `AuthBootstrap` | 55 | **KEEP** | |
+| `EntryFrame`, `EntrySteps`, `AuthBootstrap` | — | **KEEP** | The entry screens' Dossier frame and register's stepper (IR-704). `AuthLayout` and `AuthBrandPanel` were deleted in IR-711 |
 | `DpaConsentModal` / `DpaConsentGate` | 153 | **KEEP** | FR-M6-02. Consent text must be readable, not click-through ([05](05-submission.md)) |
 | `DownloadRequestModal` | 81 | **DEFER** | The download-token flow is broken at import (`records/views.py:535–579`) |
 

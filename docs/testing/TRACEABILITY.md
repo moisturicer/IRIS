@@ -17,6 +17,51 @@ regression cases. Final command results are recorded in the PR.
 re-collection remain outstanding. Existing consent stamps are not renewed.
 See [the processing inventory and review checklist](../compliance/IR-123-processing-review.md).
 
+## IR-704 / IR-711 · The split frame is retired
+
+Every entry screen now renders on `EntryFrame`, so the split frame is deleted:
+`AuthLayout`, `AuthBrandPanel` (with `AuthFormBrandMark` and the
+`AuthPanelVariant` type) and `AuthBrandPanel.test.tsx`, their exports from
+`components/auth/index.ts`, the IR-586 shelf's `shelfRise` Tailwind plugin, the
+`short` screen and the `text-spine` utility, none of which anything else used.
+`entryTokens.test.ts` no longer lists the two deleted files. The design record
+follows: `docs/ui-ux/01-design-system.md` gains an IR-704 amendment for the
+Dossier frame and marks the IR-535 entry-panel, IR-586 shelf and `text-spine`
+rows superseded; `DESIGN.md` and `.impeccable/design.json` describe the frame;
+the component inventory drops the two deleted components.
+
+**Deliberate change found by the browser evidence:** at 320 and 360 px the
+three register tabs needed 365 px and the page scrolled sideways on every step
+(scroll width 365). Below 390 px (a new `narrow` screen in `tailwind.config.js`,
+because the token guard refuses an arbitrary breakpoint) the tabs other than the
+current one now show only their mark, a check or a number; the name stays in
+the accessible name, so the tests that find each tab by name and state are
+unchanged.
+
+**Verification (2026-10-31):** `tsc --noEmit` and eslint on `components/auth`
+are clean. The suites under `components/auth` and `features/auth` and
+`palette.test.ts` pass (203), the entry-frame token guard among them; the
+deleted `AuthBrandPanel.test.tsx` cases are gone with the component. Full lint,
+suite and build are CI's, recorded on the PR.
+
+**Browser evidence (headless Chrome against `vite` with the API mocked,
+2026-10-31):** sign in, register steps 1, 2 and 3, and the register
+confirmation at 320×640, 360×640, 390×844, 768×1024, 1024×768, 1280×720,
+1440×900 and 1745×980, 40 captures: no horizontal overflow (scroll width equals
+the viewport at every size), exactly one visible h1, and no shelf or spine
+element anywhere. Every register tab ends inside the sheet. At 320 px the
+current tab is 104–116×46, the mark-only tabs 50×46, and the rightmost tab ends
+by 256 px on a sheet ending at 304. At 390 px all three show their names and the
+last ends at 365 of 374. On the confirmation below 390 px the three completed
+tabs are three 50×45 checks. Sign in's email field ends at 464 px of 640 at
+360×640 and at 544 of 720 at 1280×720, as IR-706 recorded. This is the browser
+evidence IR-707 and IR-709 recorded as owed for the steps and the confirmation.
+All 40 were retaken after IR-708 merged, so step 3 shows its summary: from
+1024 px the summary and the passwords sit in two columns, with no overflow. Tap targets, contrast, Tab order and reduced motion
+were not re-measured here; IR-706 and IR-710 record them for sign in and the
+other entry screens. Screenshots and the capture script were kept locally; the
+PR records the check and CI results.
+
 ## IR-704 / IR-710 · Verification, pending and declined move into the Dossier frame
 
 `EmailVerifyPage` and `PendingApprovalPage` render on `EntryFrame` without the
