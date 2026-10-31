@@ -355,7 +355,7 @@ EXT  Record  + derived_from (FK Record, nullable, unique)
 
 **Amendment, proposed 2026-10-30, accepted 2026-10-31 (IR-679): the Conversation tab.** Accepted by **Lee Jasmin Adolfo** (project lead), who instructed "resolve conflicted prs and merge" after the implementation and proposal were prepared for review. The acceptance is also recorded on [PR #363](https://github.com/moisturicer/IRIS/pull/363).
 
-The review discussion remains one record-level timeline, with the same readers, writers and version tags. In Review mode it becomes the **Conversation** tab of the review pane. The timeline is followed by the server-authored **Readiness** panel and the record comment box. Changes and Threads are later phases and their tabs are absent until implemented. This adds no anchored threads, pending review submissions or new discussion channel. The author's existing surfaces remain unchanged. The regions and Readiness contract are specified in the proposed amendment under §10.
+The review discussion remains one record-level timeline, with the same readers, writers and version tags. In Review mode it becomes the **Conversation** tab of the review pane. The timeline is followed by the server-authored **Readiness** panel and the record comment box. Changes and Threads are later phases and their tabs are absent until implemented. This adds no anchored threads, pending review submissions or new discussion channel. The author's existing surfaces remain unchanged. The regions and Readiness contract are specified in the amendment under §10.
 
 ### 8. Discover: research, and Discoverable Proposals
 
