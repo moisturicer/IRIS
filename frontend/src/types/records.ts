@@ -889,9 +889,10 @@ export interface DownloadRequest {
   requested_by:        number;
   requested_by_name:   string | null;
   requested_by_email:  string | null;
-  status:              "pending" | "approved" | "declined";
+  status:              "pending" | "approved" | "declined" | "revoked";
   reviewed_by:         number | null;
   reviewed_at:         string | null;
+  grant_expires_at:    string | null;
   created_at:          string;
 }
 

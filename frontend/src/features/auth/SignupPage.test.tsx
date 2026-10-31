@@ -700,13 +700,55 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     expect(screen.getByText(/RDCO reviews your request to join as a Student/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
 
+    // The folder is closed (IR-709): every tab is a plain label, never a link or a button.
     const nav = steps();
     expect(within(nav).queryAllByRole("link")).toEqual([]);
+    expect(within(nav).queryAllByRole("button")).toEqual([]);
+    expect(within(nav).getAllByRole("listitem")).toHaveLength(3);
     expect(nav).toHaveTextContent(/Identity, completed.*Affiliation, completed.*Security & agreement, completed/);
 
     // The form is gone: the confirmation replaces it rather than sitting under it.
     expect(screen.queryByRole("textbox", { name: "First Name" })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it("says what happens next, how sign in works meanwhile, and what to do about a wrong address (IR-709)", async () => {
+    const user = userEvent.setup();
+    acceptRegistration();
+    const { container } = renderSignup();
+    await submit(user);
+    await screen.findByRole("heading", { level: 2, name: "Check your email" });
+
+    const next = screen.getByRole("list", { name: "What happens next" });
+    const [verify, review] = within(next).getAllByRole("listitem");
+    expect(verify).toHaveTextContent("Open the link in that email to verify your address.");
+    expect(review).toHaveTextContent(
+      "RDCO reviews your request to join as a Student, and emails you when they decide.",
+    );
+
+    expect(screen.getByText(
+      "You can sign in once it is verified. Signing in shows that your request is waiting.",
+    )).toBeInTheDocument();
+    expect(screen.getByText(
+      "If that address is wrong, register again with the right one. "
+      + "Your first request stays pending until RDCO declines it.",
+    )).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("shows no password anywhere on the confirmation (IR-709)", async () => {
+    const user = userEvent.setup();
+    acceptRegistration();
+    const { container } = renderSignup();
+    await submit(user);
+    await screen.findByRole("heading", { level: 2, name: "Check your email" });
+
+    expect(container).not.toHaveTextContent("IrisDemo123!");
+    expect(screen.queryByLabelText(/password/i)).not.toBeInTheDocument();
+    for (const role of ["textbox", "checkbox", "combobox", "radio"] as const) {
+      expect(screen.queryAllByRole(role)).toEqual([]);
+    }
   });
 });
 

@@ -1,16 +1,17 @@
 /**
  * Where the link in a registration email lands (IR-538).
  *
- * It renders through the shared entry frame, so it carries no brand panel of
- * its own. The result changes inside one polite live region, title and reason
- * together, so a screen-reader user hears how the check ended rather than
+ * It renders on the Dossier frame's sheet under an "Email verification" tab,
+ * without the editorial lede and without a masthead cross-link: the sheet
+ * already offers every way on (IR-710). The result changes inside one polite
+ * live region, title and reason together, so a screen-reader user hears how the check ended rather than
  * being left on "Verifying Email". A verified email does not open the account:
  * RDCO approves it next, and the success copy says so.
  */
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { ButtonLink } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/utils";
@@ -72,7 +73,7 @@ export default function EmailVerifyPage() {
   }, [uidb64, token]);
 
   return (
-    <AuthLayout variant="verify">
+    <EntryFrame tabs={<EntryTab>Email verification</EntryTab>}>
       <StatusMark status={status} />
 
       {/* Present from the first render, so the change to a result is announced. */}
@@ -95,6 +96,6 @@ export default function EmailVerifyPage() {
           <ButtonLink to="/login" variant="outline" size="full">Sign in</ButtonLink>
         </div>
       )}
-    </AuthLayout>
+    </EntryFrame>
   );
 }
