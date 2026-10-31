@@ -127,9 +127,9 @@ def download_access(user, record) -> DownloadAccess:
 #: The paper page's state for each refusal (IR-677).
 _STATE_BY_REFUSAL = {
     "request_needed": "none",
-    "request_pending": "pending",
-    "request_declined": "declined",
-    "request_revoked": "revoked",
+    "request_pending": RequestStatus.PENDING.value,
+    "request_declined": RequestStatus.DECLINED.value,
+    "request_revoked": RequestStatus.REVOKED.value,
     "grant_expired": "expired",
 }
 
