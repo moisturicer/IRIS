@@ -2024,6 +2024,9 @@ describe("the Review section (IR-412)", () => {
     renderPaper(`/records/${RECORD_ID}?section=review`);
     const mid = await screen.findByRole("separator", { name: "Resize the review pane" });
     const side = screen.getByRole("separator", { name: "Resize the details sidebar" });
+    // The separator renders before the container is measured; until then the
+    // layout uses its 1600px fallback, and a drag would capture those sizes.
+    await waitFor(() => expect(mid).toHaveAttribute("aria-valuenow", "360"));
     fireEvent.pointerDown(mid, { button: 0, pointerId: 1, clientX: 600 });
     fireEvent.pointerMove(mid, { pointerId: 1, clientX: -1000 });
     fireEvent.pointerUp(mid, { pointerId: 1 });
