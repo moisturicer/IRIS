@@ -44,6 +44,8 @@ import type { User } from "@/types/auth";
 import type { PaperDetails, PaperPerson, Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
+import { documentsApi } from "@/api/documents";
+import * as utils from "@/lib/utils";
 import { seatsApi } from "@/api/reviews";
 
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
@@ -181,6 +183,8 @@ const documentRequests = vi.fn(() => Promise.resolve({ data: [] as unknown[] }))
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
+    manuscriptBlob: vi.fn(() => Promise.resolve({ data: new Blob(["pdf"]) })),
+    versionManuscriptBlob: vi.fn(() => Promise.resolve({ data: new Blob(["pdf"]) })),
     detail:           vi.fn(() => Promise.resolve({ data: shownRecord })),
     incrementAccess:  vi.fn(() => Promise.resolve({ data: {} })),
     similar:          vi.fn(() => Promise.resolve({ data: { results: [] } })),
@@ -206,6 +210,7 @@ vi.mock("@/api/records", () => ({
 // The Files section loads itself; its behaviour is `FilesSection.test.tsx`'s.
 vi.mock("@/api/documents", () => ({
   documentsApi: {
+    downloadFile: vi.fn(() => Promise.resolve({ data: new Blob(["attachment"]) })),
     slotsForRecord: vi.fn(() => Promise.resolve({ data: [] })),
     files:          vi.fn(() => Promise.resolve({ data: [] })),
   },
@@ -2252,7 +2257,14 @@ describe("the Review section (IR-412)", () => {
     expect(section("Version").getByText(/^v1 ·/)).toBeInTheDocument();
     expect(section("Due dates").getByText(/^Overdue:/)).toBeInTheDocument();
     expect(section("Due dates").getByText("Clock paused while waiting on the submitter")).toBeInTheDocument();
-    expect(within(side).getByRole("link", { name: "consent.pdf" })).toHaveAttribute("href", "/api/v1/files/88/download/");
+    const saved = vi.spyOn(utils, "downloadBlob").mockImplementation(() => {});
+    vi.mocked(recordsApi.versionManuscriptBlob).mockResolvedValueOnce({ data: new Blob(["manuscript"]) } as never);
+    await userEvent.click(within(side).getByRole("button", { name: "consent.pdf" }));
+    expect(documentsApi.downloadFile).toHaveBeenCalledWith(88);
+    expect(saved).toHaveBeenCalledWith(expect.any(Blob), "consent.pdf");
+    await userEvent.click(within(side).getByRole("button", { name: "Manuscript · v1" }));
+    expect(recordsApi.versionManuscriptBlob).toHaveBeenCalledWith(RECORD_ID, 1);
+    expect(saved).toHaveBeenCalledWith(expect.any(Blob), "manuscript.pdf");
     const adviser = section("Adviser").getByRole("button", { name: "Ada Adviser" });
     await userEvent.click(adviser);
     const profile = screen.getByRole("dialog", { name: "Ada Adviser" });
@@ -2290,6 +2302,24 @@ describe("the Review section (IR-412)", () => {
     expect(within(profile).getByRole("link", { name: "owner@cit.edu" })).toBeInTheDocument();
     expect(within(profile).queryByText("College")).not.toBeInTheDocument();
     expect(within(profile).queryByText("Program")).not.toBeInTheDocument();
+  });
+
+  it("reports an authenticated document download failure and allows retry (IR-686)", async () => {
+    workspaceAt(1600);
+    shownRecord = { ...inReview, ...reviewing };
+    vi.mocked(recordsApi.manuscriptBlob).mockRejectedValueOnce(new Error("unavailable"));
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+    const side = await screen.findByRole("complementary", { name: "Review details" });
+    const manuscript = await within(side).findByRole("button", { name: "Manuscript" });
+    await userEvent.click(manuscript);
+    expect(await within(side).findByRole("alert")).toHaveTextContent("Could not download Manuscript. Please try again.");
+    expect(manuscript).toBeEnabled();
+    const saved = vi.spyOn(utils, "downloadBlob").mockImplementation(() => {});
+    vi.mocked(recordsApi.manuscriptBlob).mockResolvedValueOnce({ data: new Blob(["pdf"]) } as never);
+    await userEvent.click(manuscript);
+    expect(saved).toHaveBeenCalledWith(expect.any(Blob), "manuscript.pdf");
+    expect(within(side).queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("takes a folded Readiness link to Details and focuses the party (IR-681)", async () => {

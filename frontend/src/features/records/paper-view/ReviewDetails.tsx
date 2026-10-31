@@ -1,8 +1,10 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 
+import { documentsApi } from "@/api/documents";
+import { recordsApi } from "@/api/records";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { cn, formatDate } from "@/lib/utils";
+import { cn, downloadBlob, formatDate } from "@/lib/utils";
 import type { PaperPerson, RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState } from "@/types/records";
 
 import { dueText } from "./ReviewStatus";
@@ -111,13 +113,16 @@ export function ReviewDetails({ record, tracker, ids, reviewerActions }: {
         <ul className="space-y-1.5 text-small">
           <li><i className="fas fa-file-lines mr-2 text-stone-500" aria-hidden />
             {(latest?.manuscript_url ?? record.abstract_file)
-              ? <a href={(latest?.manuscript_url ?? record.abstract_file)!} className={cn("text-brand hover:underline", FOCUS_RING)}>Manuscript{latest ? ` · v${latest.number}` : ""}</a>
+              ? <DocumentDownload name={`Manuscript${latest ? ` · v${latest.number}` : ""}`} filename="manuscript.pdf"
+                fetch={() => latest?.manuscript_url
+                  ? recordsApi.versionManuscriptBlob(record.id, latest.number)
+                  : recordsApi.manuscriptBlob(record.id)} />
               : "No manuscript recorded"}
           </li>
           {record.files.map((f) => (
             <li key={f.id}>
               <i className="fas fa-paperclip mr-2 text-stone-500" aria-hidden />
-              {f.url ? <a href={f.url} className={cn("text-brand hover:underline", FOCUS_RING)}>{f.filename}</a> : f.filename}
+              {f.url ? <DocumentDownload name={f.filename} filename={f.filename} fetch={() => documentsApi.downloadFile(f.id)} /> : f.filename}
             </li>
           ))}
           {openRequests.map((r) => (
@@ -151,6 +156,33 @@ function Section({ id, title, children }: { id?: string; title: string; children
 
 function Fact({ k, v, strong }: { k: string; v: string; strong?: boolean }) {
   return <><dt>{k}</dt><dd className={cn(strong && "font-semibold text-brand")}>{v}</dd></>;
+}
+
+/** Protected files need the API client's bearer header before a blob download. */
+function DocumentDownload({ name, filename, fetch }: {
+  name: string; filename: string; fetch: () => Promise<{ data: Blob }>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(false);
+  const download = async () => {
+    setBusy(true);
+    setError(false);
+    try {
+      const { data } = await fetch();
+      downloadBlob(data, filename);
+    } catch {
+      setError(true);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return <>
+    <button type="button" disabled={busy} aria-busy={busy} onClick={download}
+      className={cn("review-control text-left text-brand hover:underline disabled:opacity-60", FOCUS_RING)}>
+      {name}{busy && <span className="sr-only"> · Downloading</span>}
+    </button>
+    {error && <span role="alert" className="block text-small text-brand">Could not download {name}. Please try again.</span>}
+  </>;
 }
 
 function affiliationText(values: string[] | null | undefined): string {
@@ -256,7 +288,7 @@ function Person({ person, name = person?.name ?? "A reviewer", role = person?.ro
       {open && createPortal(
         <div ref={card} id={cardId} role="dialog" aria-label={name} tabIndex={-1}
           style={position}
-          className={cn("fixed z-50 w-56 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-stone-300 bg-white p-3 shadow-sm", FOCUS_RING)}>
+          className={cn("fixed z-50 w-56 max-h-[calc(100dvh-2rem)] overflow-y-auto rounded-lg border border-stone-300 bg-overlay p-3 shadow-sm", FOCUS_RING)}>
           <p className="font-display text-base font-semibold text-stone-900">{name}</p>
           {role && <p className="text-small text-stone-600">{role} on this record</p>}
           {person && <dl className="mt-2 space-y-1 break-words text-small text-stone-700">
