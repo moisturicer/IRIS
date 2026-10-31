@@ -22,3 +22,23 @@ export function errorDetail(err: unknown, fallback: string): string {
   }
   return typeof detail === "string" && detail.trim() ? detail : fallback;
 }
+
+/** Every string inside a DRF error value: a message, a list, or a list's per-item object. */
+function messagesIn(value: unknown): string[] {
+  if (typeof value === "string") return value.trim() ? [value] : [];
+  if (Array.isArray(value)) return value.flatMap(messagesIn);
+  if (value && typeof value === "object") return Object.values(value).flatMap(messagesIn);
+  return [];
+}
+
+/**
+ * The server's messages for the named fields of a refused form (DRF's
+ * `{field: ["message", ...]}`), in field order and joined, or `null` when it
+ * named none of them. A list field's per-item errors (`{"0": [...]}`) count.
+ */
+export function fieldError(err: unknown, ...fields: string[]): string | null {
+  const data = (err as { response?: { data?: Record<string, unknown> } } | null)?.response?.data;
+  if (!data || typeof data !== "object") return null;
+  const text = fields.flatMap((field) => messagesIn(data[field])).join(" ");
+  return text || null;
+}
