@@ -39,6 +39,14 @@ ALLOWED_HOSTS = required("ALLOWED_HOSTS", cast=csv_list)
 # localhost entry in a production allowlist.
 CORS_ALLOWED_ORIGINS = required("CORS_ALLOWED_ORIGINS", cast=csv_list)
 
+# How many proxies a client passes through is a per-deployment fact too. Wrong,
+# the sign-in lockout counts the wrong address (IR-656), so nothing guesses it.
+TRUSTED_PROXY_COUNT = required("TRUSTED_PROXY_COUNT", cast=int)
+if TRUSTED_PROXY_COUNT < 1:
+    raise ImproperlyConfigured(
+        "TRUSTED_PROXY_COUNT must be at least 1: production always runs behind nginx."
+    )
+
 # ---- Startup checks ------------------------------------------------------
 
 _problems = production_problems(
