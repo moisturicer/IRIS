@@ -216,6 +216,16 @@ _Avoid_: Collection, list, tag.
 The papers recently opened in this browser. It is not part of the [[Library]], never leaves the browser, and is cleared on sign-out.
 _Avoid_: Recently viewed, activity, reading log.
 
+### People
+
+**Profile**:
+A page about one account that any signed-in user can open: their name, affiliation and role, the photo, bio, research interests and ORCID iD they chose to add, the published papers they own or advised, and their [[Collaborator]]s. It never shows their email address.
+_Avoid_: Account (the sign-in identity), user page, bio.
+
+**Collaborator**:
+Another account that shared a published paper with this person, as a co-owner, as its Adviser, or as an advisee. Byline authors without an account are not collaborators.
+_Avoid_: Co-author (a byline name, not an account), team member.
+
 ### Downloads
 
 **Download**:
