@@ -17,7 +17,7 @@ A named person checks every conversation against the frozen corpus snapshot: cat
 
 `status` is `confirmed`, `corrected` or `not_reviewed`. Every check must be `true` or `not_applicable`. The reviewer must appear in the set's `labelled_by`, and the digests and corpus must match the set as it is now, so a later edit makes the review stale.
 
-Every A09 conversation carries `a09_case`: `missing_field`, `no_match` or `outage`. While the set has A09 cases but lacks one of the three, `--write-lock` refuses. The draft set has none tagged yet.
+Every A09 conversation carries `a09_case`: `missing_field`, `no_match` or `outage`. While the set has A09 cases but lacks one of the three, `--write-lock` refuses. The set tags five A09 cases; the two off-topic A09 conversations carry none.
 
 ```powershell
 python manage.py eval_conversations --set s.json --validate --label-review labels.json --write-lock s.lock.json
