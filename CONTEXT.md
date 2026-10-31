@@ -240,6 +240,10 @@ _Avoid_: Account (the sign-in identity), user page, bio.
 Another account that shared a published paper with this person, as a co-owner, as its Adviser, or as an advisee. Byline authors without an account are not collaborators.
 _Avoid_: Co-author (a byline name, not an account), team member.
 
+**Contact person**:
+The one owner of a Record whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; the owners can choose another. Their email is shown only where a decision says so, never on their Profile.
+_Avoid_: Representative, group leader, primary author (authors are byline names, not accounts).
+
 ### Downloads
 
 **Download**:

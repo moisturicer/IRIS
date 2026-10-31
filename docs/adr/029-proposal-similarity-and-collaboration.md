@@ -10,6 +10,8 @@
 
 > **Amended 2026-09-26 (project lead, IR-374 design session).** It follows ADR-032 §8 as amended, and it replaces the parts of §3, §4 and §6 noted below. See *Amendment, 2026-09-26* at the end of §7.
 
+> **Amendment proposed 2026-10-31 (IR-311): the notification names each Proposal's Contact person and their email.** See *Amendment, 2026-10-31* after the 2026-09-26 one. Not yet accepted.
+
 **Accepted** — 2026-09-19.
 
 **Depends on** IR-281 for record-level vectors. Nothing here can be built before those exist.
@@ -105,6 +107,19 @@ Settled by the project lead, in the IR-374 design session. The plan in one line:
 8. **Adviser duplicate view (kept, re-scoped from intake).** When an Adviser reviews a Proposal, they see similar Proposals **institution-wide, including private and accepted ones**. Staff may already read them, so this discloses nothing new. It never notifies students.
 9. **Novelty check (kept, §2).** It is shown on the owner's own Proposal as **"Related published research"**, and reads only published work. Its priority stays below collaboration matching.
 
+### Amendment, 2026-10-31: the notification names a Contact person and their email
+
+**Proposed** — decided by Hermoine Zozobrado in a design session on 2026-10-31 (IR-311), transcribed by an agent. It takes effect when Lee Jasmin Adolfo, the project lead, accepts it.
+
+The 2026-09-26 notification gives names but no way to reach them. IRIS shows no email address on a Profile (IR-694) and has no messaging, so "the students take it from there" left a matched student knowing *who* but not *how*.
+
+1. **Each Proposal has one Contact person:** one of its owners. By default it is the owner who submitted it (the existing `RecordOwner.is_primary` flag, set at submission). The owners may choose another owner.
+2. **The notification names them (replaces item 4's text).** *"Your proposal is similar to \<title\> by \<names\>. Contact: \<Contact person's name\>, \<email\>."* Each side's notification carries the other side's Contact person. Every owner of both Proposals receives it, as before.
+3. **Only the Contact person's email is shared,** never every owner's and never the Adviser's.
+4. **The email is written into the notification and stays there.** A later switch back to Private, an acceptance or a rejection stops new matches but does not withdraw an email already sent. This was chosen over showing it only on the live "Similar open proposals" list, which would hide it once either Proposal closed, because it is simpler and the address is an institutional one the owners agreed to share.
+5. **The consent covers it.** ADR-032 §8's Discoverable text gains a clause naming the email (see ADR-032's amendment of the same date). No existing consent is affected: the Discoverable setting is not built yet (IR-421).
+6. **AI decides only that two Proposals are similar.** Looking up the Contact person and their email is ordinary application code; no email address is sent to any vendor or model.
+
 ## Alternatives Considered
 
 **Reusing `dpa_accepted` as collaboration consent.** Rejected — one flag doing two jobs, where the second job is disclosing unsubmitted research.
@@ -155,6 +170,8 @@ The Novelty check discloses nothing at all: it reads only completed work already
 
 The failure to guard against is scope creep in the notification. "It would be more useful with the title in it" is true and is a different decision, requiring a different consent.
 
+*Both amendments made exactly that kind of decision, each with its consent.* The 2026-09-26 one added the title and names, covered by ADR-032's Discoverable text. The proposed 2026-10-31 one adds one email address, the Contact person's, shown only to the owners of a matched Discoverable Proposal and covered by the amended Discoverable text. It is personal data shared with another person and is listed in `docs/compliance/IR-123-processing-review.md`.
+
 ## Deployment Impact
 
 None. No new services.
@@ -169,4 +186,4 @@ FR-M4 — stable label only, per the frozen-SRS rule.
 
 ## Related Tasks
 
-IR-281 (record vectors — blocks this), IR-285 (deletes the module the existing endpoint calls), IR-278 (the corpus that would settle the record-versus-chunk question), IR-282 (chunk vectors, for the follow-up).
+IR-281 (record vectors — blocks this), IR-285 (deletes the module the existing endpoint calls), IR-278 (the corpus that would settle the record-versus-chunk question), IR-282 (chunk vectors, for the follow-up). IR-307 (the spec), IR-311 (notifications and the owner's match list; the 2026-10-31 amendment), IR-421 (the Discoverable setting and its consent text).

@@ -51,6 +51,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-31 (project lead, IR-689, spec IR-420): §7 and §8.** Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. Comments exist on published papers only, never on Discoverable Proposals. Only a comment's writer edits or deletes it; RDCO or a system administrator may remove any comment with a reason; readers report comments to RDCO. Decided by Hermoine Zozobrado in a design session on 2026-10-31 and transcribed by an agent. See the *Amendment* notes under §7 and §8; the original text is kept.
 
+**Amendment proposed 2026-10-31 (IR-311): §8's Discoverable consent text** gains a clause covering the Contact person's email that ADR-029's amendment of the same date adds to the match notification. Decided by Hermoine Zozobrado, transcribed by an agent; not yet accepted. See the note under §8.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -396,6 +398,8 @@ EXT  Record  + proposal_visibility ∈ private | discoverable   (default private
 2. **No `collaboration_note`.** The "Looking for" field is dropped from the model, Publish, Edit details and the summary. The summary is title, abstract, classification, authors' names and the *Proposal · In development* label.
 3. **Closing collaboration early** is done by switching the Proposal back to Private. There is no separate toggle.
 4. **The Discoverable control's own text is the consent:** *"Other IRIS users can see your title, abstract and names, and IRIS's AI will compare your proposal with other open proposals to suggest collaborators."* It covers both visibility and AI matching, and remains subject to IR-250's disclosure policy. The matching rules are amended in ADR-029.
+
+*Proposed 2026-10-31 (IR-311), not yet accepted:* item 4's text gains a final clause, *"…to suggest collaborators, and IRIS will share your proposal's contact person's email with the owners of a similar open proposal."* It covers the Contact person's email that ADR-029's amendment of the same date adds to the match notification. Nothing has been consented to under the old wording, because the setting is not built yet (IR-421).
 
 **ADR-029's consent is this setting.** Marking a Proposal Discoverable is the explicit, separate consent ADR-029 §3 required. It is never inferred from `dpa_accepted`. It also covers ADR-029's collaboration matching, so there is one opt-in, not two.
 
