@@ -103,7 +103,7 @@ def _ids(rows: list[dict], key: str) -> list[int]:
 
 def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None = None,
                  diagnostics=None, clock=time.monotonic, before_turn=None,
-                 observe=None) -> dict:
+                 observe=None, faults=None) -> dict:
     """A fresh saved Conversation, then ordered turns and a final public reopen."""
     limits = limits or {}
     created = reader.post(CONVERSATIONS, {"title": f"Evaluation {case['id']}"})
@@ -130,6 +130,8 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
             break
         if before_turn:
             before_turn(number, conversation_id)
+        if faults is not None:
+            faults.plan(source)
         cursor = attempts.snapshot() if attempts else None
         turn_start = clock()
         answer = None
@@ -169,7 +171,9 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
             runs = [r for r in diagnostics.for_conversation(conversation_id)
                     if r["id"] not in traced]
             traced.update(r["id"] for r in runs)
+        fault = faults.report() if faults is not None else None
         recorded.append({
+            **({"fault": fault} if fault else {}),
             "number": number, "question": source["user"], "outcome": outcome,
             "public_answer": answer, "public_events": events, "citation_record_ids": _ids(citations, "record_id"),
             "source_ids": _ids(sources, "id"), "saved_turn": saved,
@@ -202,7 +206,8 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
                 cache: str, attempts=None, approval_id=None, model_profiles=None,
                 partition_method=None, retrieval=None, pricing=None,
                 arm="controller", engine_version=CONTROLLER_ENGINE,
-                diagnostics=None, clock=time.monotonic, split="development") -> dict:
+                diagnostics=None, clock=time.monotonic, split="development",
+                faults=None) -> dict:
     """One scorer-readable run; only supplied, approved manifest fields enter it."""
     run_id = str(uuid.uuid4())
     rows = []
@@ -211,7 +216,7 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
             raise ValueError(f"this collection is restricted to the {split} split")
         try:
             row = collect_case(reader, case, attempts=attempts, limits=limits,
-                               diagnostics=diagnostics, clock=clock)
+                               diagnostics=diagnostics, clock=clock, faults=faults)
         except (TimeoutError, httpx.TimeoutException, KeyboardInterrupt) as exc:
             row = _unfinished(case, "cancellation" if isinstance(exc, KeyboardInterrupt) else "timeout")
         except (OSError, ConnectionError, httpx.TransportError, ValueError):
@@ -245,6 +250,7 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
         "cache_state": cache, "attempted_physical_calls": len(physical),
         "physical_attempts": physical, "campaign_approval_id": approval_id,
         "rubric_version": 1,
+        "fault_injection": faults.describe() if faults is not None else None,
     }
     return {"schema_version": SCHEMA_VERSION, "run_id": run_id, "arm": arm,
             "providers": "real" if attempts else "fake", "manifest": manifest,

@@ -43,4 +43,4 @@ A proxy corpus result is not CIT-U research and the report says so. Targets are 
 
 ## Status
 
-Built and tested with hand-authored fixtures (`apps/ai/evaluation/tests/test_campaign_report.py`, `test_campaign_command.py`). **No campaign has been run**: the set is still draft-labelled, no person has reviewed an arm, no paid approval is recorded, and only the controller arm has a pinned implementation in this checkout.
+Built and tested with hand-authored fixtures (`apps/ai/evaluation/tests/test_campaign_report.py`, `test_campaign_command.py`). **No campaign has been run**: the set is label-reviewed and locked (IR-702), but no person has reviewed an arm, no paid approval is recorded, and only the controller arm has a pinned implementation in this checkout.
