@@ -50,6 +50,7 @@ import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
 import { citationNavigationState } from "@/lib/citedPage";
+import { formatDate } from "@/lib/utils";
 
 const RECORD_ID = 7;
 const PAPER_URL = "https://iris.test/media/manuscripts/thesis.pdf";
@@ -2156,7 +2157,7 @@ describe("the Review section (IR-412)", () => {
     const [ierc, itso] = within(panel).getAllByRole("listitem");
     expect(ierc).toHaveTextContent("Blocker: IERC asked the author for a revision.");
     expect(ierc).toHaveTextContent("Ina Ierc");
-    expect(ierc).toHaveTextContent(/since/);
+    expect(ierc).toHaveTextContent(`since ${formatDate("2026-09-03T08:00:00Z")}`);
     expect(itso).toHaveTextContent("ITSO asked the author for a revision.");
     expect(itso).not.toHaveTextContent("Blocker");
     expect(within(itso).queryByRole("button")).not.toBeInTheDocument();

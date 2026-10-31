@@ -70,7 +70,7 @@ export function ReadinessPanel({ readiness, onAction, id }: {
                     Blocker:
                   </span>
                 )}
-                {item.severity === "blocker" && " "}
+                {item.severity === "blocker" ? " " : <i className="fas fa-circle-info mr-1.5 text-2xs text-stone-500" aria-hidden />}
                 {item.label}
               </p>
               {(item.actor_name || item.since || item.paused || item.action) && (
