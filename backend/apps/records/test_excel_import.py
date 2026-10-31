@@ -239,7 +239,7 @@ class ImportRefusesValuesItCannotAcceptTests(ImportTestCase):
         )
 
         self.assertEqual((response.data["created"], response.data["skipped"]), (1, 2), response.data["log"])
-        self.assertIn(f'Row 3: skipped — Year Accomplished "2_024" is not a year', response.data["log"])
+        self.assertIn('Row 3: skipped — Year Accomplished "2_024" is not a year', response.data["log"])
         self.assertIn(
             f'Row 2: skipped — Year Accomplished "20O4" is not a year from 1900 to {self.next_year}.',
             response.data["log"],
