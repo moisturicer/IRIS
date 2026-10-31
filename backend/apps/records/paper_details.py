@@ -85,7 +85,7 @@ def _adviser(record, viewer):
     if user is None:
         return None
     public = ("email", "college", "department") if _listed_adviser(user) else ()
-    return card(user, viewer, role="Adviser", public=public)
+    return card(user, viewer, role=str(RoleName.ADVISER.label), public=public)
 
 
 def _participants(record, viewer, owners) -> list[dict]:
@@ -133,15 +133,17 @@ def paper_details(record, viewer, *, readable: bool, deadlines: list[dict]) -> d
     # (IR-540). Do not present a partial affiliation list as the whole record's.
     affiliations_readable = all(_reads_everything(viewer, u) for u in owners)
     facts = [_profile(u) for u in owners] if affiliations_readable else []
-    return {
-        "colleges": _distinct(f["college"] for f in facts) if affiliations_readable else None,
-        "programs": _distinct(f["program"] for f in facts) if affiliations_readable else None,
-        "author_flags": [
+    # Keyword arguments, not string keys: these are response field names, and
+    # "adviser" would otherwise read as a bare workflow value (test_enum_vocabulary).
+    return dict(
+        colleges=_distinct(f["college"] for f in facts) if affiliations_readable else None,
+        programs=_distinct(f["program"] for f in facts) if affiliations_readable else None,
+        author_flags=[
             {"office": office, "label": str(Party(office).label), "hint": _HINT_TEXT[office]}
             for office, field in _HINT_FIELD.items() if getattr(record, field, False)
         ],
-        "researchers": [_researcher(u, viewer) for u in owners],
-        "adviser": _adviser(record, viewer),
-        "participants": _participants(record, viewer, owners) if readable else None,
-        "due_dates": _due_dates(deadlines) if readable else None,
-    }
+        researchers=[_researcher(u, viewer) for u in owners],
+        adviser=_adviser(record, viewer),
+        participants=_participants(record, viewer, owners) if readable else None,
+        due_dates=_due_dates(deadlines) if readable else None,
+    )
