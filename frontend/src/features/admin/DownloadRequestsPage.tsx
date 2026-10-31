@@ -22,6 +22,7 @@ const STATUS_STYLES: Record<DownloadRequest["status"], string> = {
   pending:  "bg-amber-50  text-amber-700  border-amber-200",
   approved: "bg-green-50  text-green-700  border-green-200",
   declined: "bg-red-50    text-red-700    border-red-200",
+  revoked:  "bg-red-50    text-red-700    border-red-200",
 };
 
 export default function DownloadRequestsPage() {

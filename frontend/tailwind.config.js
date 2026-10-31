@@ -315,9 +315,16 @@ export default {
           "0%":   { opacity: "0", transform: "translateY(0.5rem)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        // Register's steps cross-fade on change (IR-707). Opacity only, and
+        // only through `motion-safe:`.
+        "step-fade": {
+          "0%":   { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
       },
       animation: {
         "sheet-settle": "sheet-settle 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
+        "step-fade": "step-fade 150ms ease-out backwards",
         "panel-in": "panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "panel-in-start": "panel-in-start 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "fade-in-up": "fade-in-up 0.3s ease-out",

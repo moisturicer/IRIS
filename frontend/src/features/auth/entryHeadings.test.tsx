@@ -21,12 +21,28 @@ import { Route, Routes } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
 import { authApi } from "@/api/auth";
+import { useAuthStore } from "@/store/auth.store";
+import type { OwnRoleRequest } from "@/types/auth";
+
+import { makeUser } from "@/test/authFixtures";
 
 import { renderScreen, screen } from "@/test/render";
 
 import EmailVerifyPage from "./EmailVerifyPage";
 import LoginPage from "./LoginPage";
+import { PendingApprovalPage } from "./PendingApprovalPage";
 import SignupPage from "./SignupPage";
+
+/** The pending screen is shown only to a signed-in applicant (IR-537). */
+function renderStanding(roleRequest: OwnRoleRequest) {
+  useAuthStore.setState({
+    user: makeUser({ role: null, role_name: null, role_request: roleRequest }),
+    accessToken: "access",
+    refreshToken: "refresh",
+    isAuthenticated: true,
+  });
+  renderScreen(<PendingApprovalPage />);
+}
 
 const EMPTY_PAGE = { data: { count: 0, next: null, previous: null, results: [] } };
 
@@ -67,6 +83,16 @@ const SCREENS: EntryScreen[] = [
     },
     title: "Email Verified",
   },
+  {
+    name: "pending approval",
+    render: () => renderStanding({ status: "pending", requested_role: "Student" }),
+    title: "Waiting for approval",
+  },
+  {
+    name: "declined",
+    render: () => renderStanding({ status: "declined", requested_role: "Student" }),
+    title: "Request not approved",
+  },
 ];
 
 /**
@@ -100,6 +126,7 @@ function headingLevel(heading: HTMLElement): number {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  useAuthStore.setState({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
 });
 
 describe.each(SCREENS)("the $name screen", ({ render, title }) => {

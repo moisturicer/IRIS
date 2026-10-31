@@ -18,14 +18,20 @@ interface EntryLede {
 }
 
 interface EntryFrameProps {
-  /** The masthead's link to the other entry screen; never hidden at any width. */
-  crossLink: CrossLink;
+  /**
+   * The masthead's link to the other entry screen; never hidden at any width.
+   * Sign in and register only: verification's sheet already offers every way
+   * on, and the pending screen's reader is signed in (IR-710).
+   */
+  crossLink?: CrossLink;
   /** Headline and plain sentence, on sign in and register only (IR-704). */
   lede?: EntryLede;
   /** The folder's index tabs, sitting on the sheet's top edge. */
   tabs: ReactNode;
   /** Rendered before the frame, for a dialog that must not sit inside it. */
   before?: ReactNode;
+  /** A wider sheet, for register's two columns (IR-707). */
+  wide?: boolean;
   children: ReactNode;
 }
 
@@ -34,9 +40,10 @@ interface EntryFrameProps {
  * optional lede, a folder whose tabs sit on a white sheet, and the CIT-U
  * footer.
  *
- * Built beside `AuthLayout` (IR-706): sign in uses it first, and the other
- * entry screens move across in IR-707 and IR-710 before IR-711 retires the
- * split frame.
+ * Built beside `AuthLayout` (IR-706): sign in uses it first, register moved
+ * across in IR-707, and email verification and the pending and declined
+ * screens follow without the lede (IR-710) before IR-711 retires the split
+ * frame.
  *
  * The masthead is the page's one `<h1>`, and it is visible at every width, so
  * no breakpoint can take it out of the accessibility tree as IR-211 found the
@@ -51,7 +58,7 @@ interface EntryFrameProps {
  *
  * The footer carries no policy link until IR-214's documents are approved.
  */
-export function EntryFrame({ crossLink, lede, tabs, before, children }: EntryFrameProps) {
+export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: EntryFrameProps) {
   return (
     <div className="flex min-h-screen flex-col bg-canvas font-sans">
       {before}
@@ -71,18 +78,20 @@ export function EntryFrame({ crossLink, lede, tabs, before, children }: EntryFra
               className="h-6 w-auto min-w-0 object-contain sm:h-9"
             />
           </h1>
-          <p className="shrink-0 text-small text-stone-600">
-            <span className="hidden sm:inline">{crossLink.prompt} </span>
-            <Link
-              to={crossLink.to}
-              className={cn(
-                "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
-                FOCUS_RING,
-              )}
-            >
-              {crossLink.label}
-            </Link>
-          </p>
+          {crossLink && (
+            <p className="shrink-0 text-small text-stone-600">
+              <span className="hidden sm:inline">{crossLink.prompt} </span>
+              <Link
+                to={crossLink.to}
+                className={cn(
+                  "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
+                  FOCUS_RING,
+                )}
+              >
+                {crossLink.label}
+              </Link>
+            </p>
+          )}
         </div>
       </header>
 
@@ -100,7 +109,12 @@ export function EntryFrame({ crossLink, lede, tabs, before, children }: EntryFra
 
         {/* `isolate` keeps the second sheet behind the first without sending
             it under the page's own background. */}
-        <div className="relative isolate order-2 mt-section w-full max-w-xl motion-safe:animate-sheet-settle md:order-3 md:mt-section-lg">
+        <div
+          className={cn(
+            "relative isolate order-2 mt-section w-full motion-safe:animate-sheet-settle md:order-3 md:mt-section-lg",
+            wide ? "max-w-5xl" : "max-w-xl",
+          )}
+        >
           <div className="relative z-10 flex gap-1 pl-4 sm:pl-5">{tabs}</div>
           <div
             className="absolute inset-x-0 bottom-0 top-11 -z-10 translate-x-2 translate-y-2 rounded-xl border border-stone-200 bg-stone-100"
@@ -123,11 +137,12 @@ export function EntryFrame({ crossLink, lede, tabs, before, children }: EntryFra
 }
 
 /**
- * A tab on the entry folder that only labels the sheet: sign in's one tab.
+ * A tab on the entry folder that only labels the sheet: the one tab of sign
+ * in, email verification and the pending screen.
  * Not named for the domain's Folder, which is a reader's group of Saved
  * Records (CONTEXT.md). It is not a
- * control, so it is neither a link nor a tab role. Register's stepper (IR-707)
- * brings the interactive tabs.
+ * control, so it is neither a link nor a tab role. Register's stepper is
+ * `EntrySteps` (IR-707).
  */
 export function EntryTab({ children }: { children: ReactNode }) {
   return (

@@ -43,6 +43,11 @@ def _action(kind, target=None) -> dict:
     return {"kind": kind, "target": None if target is None else str(target)}
 
 
+def _closing_suffix(party, closing) -> str:
+    """The words telling a decider that deciding now ends `party`'s review."""
+    return " A Decision now closes its review." if party in closing else ""
+
+
 def _day(value) -> str:
     return dateformat.format(timezone.localtime(value), "D j M")
 
@@ -134,23 +139,29 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
             action=_action("open_documents", request["id"]),
         ))
 
+    # Who is still reviewing and whose Pool waits are information: a Decision
+    # closes them rather than being refused by them (IR-683). The decider is
+    # told so in words, read from `decision.closes`; nobody else is.
+    if not deciding:
+        closing = set()
+
     for assignment in facts["assignments"]:
         party, label = assignment["party"], assignment["label"]
         if any(s["reviewer"] == viewer for s in assignment["seats"]):
             continue  # the viewer's own turn is the verdict, not a fact beside it
         if not assignment["seats"]:
+            # Claim only to a member of that office: `review_claim` is the
+            # viewer's own Pool offer, which `claim/` re-checks.
             claimable = review_claim and review_claim["assignment"] == assignment["id"]
             items.append(_item(
-                "pool_unclaimed", INFO, f"Nobody at {label} has claimed this review yet.",
+                "pool_unclaimed", INFO,
+                f"Nobody at {label} has claimed this review yet.{_closing_suffix(party, closing)}",
                 party=party, since=assignment["opened_at"],
                 action=_action("claim", assignment["id"]) if claimable else _action("show_party", party),
             ))
             continue
-        label_text = f"{label} is reviewing."
-        if deciding and party in closing:
-            label_text = f"{label} is reviewing. A Decision now closes its review."
         items.append(_item(
-            "party_reviewing", INFO, label_text, party=party,
+            "party_reviewing", INFO, f"{label} is reviewing.{_closing_suffix(party, closing)}", party=party,
             actor_name=", ".join(s["name"] for s in assignment["seats"] if s["name"]) or None,
             since=assignment["opened_at"], action=_action("show_party", party),
         ))
