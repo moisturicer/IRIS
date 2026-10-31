@@ -29,7 +29,12 @@ from core.permissions import (
     IsRecordOwner,
     IsStaff,
 )
-from .download_service import file_response_for_record
+from .download_service import (
+    DownloadRequestAlreadyDecided,
+    OwnDownloadRequest,
+    decide_download_request,
+    file_response_for_record,
+)
 from .download_tokens import make_download_token, verify_download_token
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
 # .models: IR-153 added it to this line while IR-135 moved the definition into
@@ -1316,10 +1321,11 @@ class MyRecordsViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
 
 class DownloadRequestViewSet(viewsets.ModelViewSet):
     """
-    GET    /download-requests/                    -- staff: all requests
+    GET    /download-requests/                    -- RDCO: all requests
     POST   /download-requests/                    -- authenticated user requests download
-    POST   /download-requests/<id>/approve/       -- staff: approve, email requester
-    POST   /download-requests/<id>/decline/       -- staff: decline, in-app notify requester
+    POST   /download-requests/<id>/approve/       -- RDCO: approve, email requester
+    POST   /download-requests/<id>/decline/       -- RDCO: decline, in-app notify requester
+    PATCH  /download-requests/<id>/               -- RDCO: the same decision, by `action`
     """
     serializer_class = DownloadRequestSerializer
     queryset         = DownloadRequest.objects.select_related("record", "requested_by")
@@ -1361,18 +1367,9 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
                 {"detail": "Provide action: 'approve' or 'decline'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if instance.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": "This request has already been reviewed."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        instance.reviewed_by = request.user
-        instance.reviewed_at = timezone.now()
-        instance.status = (
-            RequestStatus.APPROVED if action == "approve" else RequestStatus.DECLINED
-        )
-        instance.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+        response = self._decide(request, instance, approved=action == "approve")
+        if response is not None:
+            return response
 
         data = self.get_serializer(instance).data
         if action == "approve":
@@ -1384,37 +1381,31 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
             data["download_url"] = f"{settings.FRONTEND_URL.rstrip('/')}/download?token={token}"
         return Response(data)
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
+    @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         """POST /download-requests/<id>/approve/ — set approved, notify requester with email."""
-        dr = self.get_object()
-        if dr.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        dr.status      = RequestStatus.APPROVED
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        notify_download_reviewed(dr, reviewed_by=request.user, approved=True)
-        return Response({"detail": "Download request approved. The requester has been notified."})
+        response = self._decide(request, self.get_object(), approved=True)
+        return response or Response(
+            {"detail": "Download request approved. The requester has been notified."}
+        )
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
+    @action(detail=True, methods=["post"])
     def decline(self, request, pk=None):
         """POST /download-requests/<id>/decline/ — set declined, notify requester in-app."""
-        dr = self.get_object()
-        if dr.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        dr.status      = RequestStatus.DECLINED
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        notify_download_reviewed(dr, reviewed_by=request.user, approved=False)
-        return Response({"detail": "Download request declined. The requester has been notified."})
+        response = self._decide(request, self.get_object(), approved=False)
+        return response or Response(
+            {"detail": "Download request declined. The requester has been notified."}
+        )
+
+    def _decide(self, request, download_request, *, approved):
+        """The refusal for this decision as a Response, or None once it is made."""
+        try:
+            decide_download_request(download_request, request.user, approved=approved)
+        except OwnDownloadRequest as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except DownloadRequestAlreadyDecided as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return None
 
 
 class DownloadRedeemView(APIView):
