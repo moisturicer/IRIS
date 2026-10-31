@@ -56,8 +56,8 @@ last ends at 365 of 374. On the confirmation below 390 px the three completed
 tabs are three 50×45 checks. Sign in's email field ends at 464 px of 640 at
 360×640 and at 544 of 720 at 1280×720, as IR-706 recorded. This is the browser
 evidence IR-707 and IR-709 recorded as owed for the steps and the confirmation.
-**Step 3 was captured before IR-708's summary landed**, so its captures must be
-retaken once IR-708 merges. Tap targets, contrast, Tab order and reduced motion
+All 40 were retaken after IR-708 merged, so step 3 shows its summary: from
+1024 px the summary and the passwords sit in two columns, with no overflow. Tap targets, contrast, Tab order and reduced motion
 were not re-measured here; IR-706 and IR-710 record them for sign in and the
 other entry screens. Screenshots and the capture script were kept locally; the
 PR records the check and CI results.
