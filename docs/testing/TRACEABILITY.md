@@ -17,6 +17,40 @@ regression cases. Final command results are recorded in the PR.
 re-collection remain outstanding. Existing consent stamps are not renewed.
 See [the processing inventory and review checklist](../compliance/IR-123-processing-review.md).
 
+## IR-704 / IR-710 · Verification, pending and declined move into the Dossier frame
+
+`EmailVerifyPage` and `PendingApprovalPage` render on `EntryFrame` without the
+lede (IR-704 stories 51–53): the masthead is the one visible h1, the sheet
+carries one non-interactive tab ("Email verification", "Account status"), and
+the footer has no link. `EntryFrame`'s `crossLink` is now optional and these
+screens pass none: verification's sheet already offers Sign in and Register
+again, and the pending screen's reader is signed in. Every title, message,
+button, link and branch (IR-537, IR-538) is unchanged.
+
+**Verification (2026-10-31):** `EmailVerifyPage.test.tsx` adds 12 frame cases
+(verified, failed and expired: one h1 naming IRIS and CIT-U, the tab and no
+brand panel, no lede, a link-free footer); its 15 existing cases are
+unchanged. `PendingApprovalPage.test.tsx` adds 12 frame cases for pending,
+declined and no request. **Two of its tests change deliberately:** "the shared
+entry frame" asserted the split frame's `sr-only` h1 and brand panel, which this
+ticket removes, and is replaced by the frame cases; "does not let the brand panel
+promise the account will open" becomes "promises nowhere that the account will
+open", the same refusal checked across the whole screen. `entryHeadings.test.tsx`
+adds the pending and declined screens. axe passes on every screen. All 204
+tests under `features/auth` and `components/auth` pass.
+
+**Browser evidence (headless Chrome against `vite` with the API mocked,
+2026-10-31):** verified, failed, expired, pending and declined at 320×640,
+360×640, 390×844, 768×1024, 1024×768, 1280×720, 1440×900 and 1745×980: no
+horizontal overflow, exactly one visible h1, headings h1 then h2, no lede and no
+brand panel at every size. Tap targets at 360 px: Sign in 286×52 (verified),
+Register again 286×52 and Sign in 286×54 (failed, expired), Sign out 286×54
+(pending, declined). Contrast: the tab 12.34:1, Register again and verified's
+Sign in 12.34:1, the outline Sign in and Sign out 10.27:1. At 360 px Tab reaches
+each control in reading order with a visible focus ring, and the masthead holds
+no focusable element. The sheet animates `sheet-settle 0.28s` with motion
+allowed and `none` under `prefers-reduced-motion: reduce`.
+
 ## IR-704 / IR-706 · Sign in opens in the Dossier frame
 
 `LoginPage` uses the new `EntryFrame` (`components/auth/EntryFrame.tsx`), built
