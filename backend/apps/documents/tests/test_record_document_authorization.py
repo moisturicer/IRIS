@@ -38,6 +38,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.documents.models import RecordFile, RecordUpload, UploadSlot
+from apps.documents.testing import real_pdf_bytes
 from apps.records.models import Record, RecordOwner, RecordType
 
 
@@ -98,7 +99,7 @@ class RecordDocumentAuthorizationTests(APITestCase):
     # --- helpers ---------------------------------------------------------
 
     def _pdf(self):
-        return SimpleUploadedFile("new.pdf", b"%PDF-1.4 x", content_type="application/pdf")
+        return SimpleUploadedFile("new.pdf", real_pdf_bytes(), content_type="application/pdf")
 
     def _submit(self):
         # Patch the Celery dispatch: the broker is not running under test, and
@@ -116,6 +117,21 @@ class RecordDocumentAuthorizationTests(APITestCase):
             {"record": self.record.pk, "slot": self.slot.pk, "file": self._pdf()},
             format="multipart",
         )
+
+    def test_neither_upload_route_stores_a_file_that_is_no_pdf(self):
+        """`uploads/create/` used to skip the shared validator altogether (IR-665)."""
+        self.client.force_authenticate(self.owner)
+        before = RecordUpload.objects.count()
+        for url in ("/api/v1/documents/submit/", "/api/v1/documents/uploads/create/"):
+            with self.subTest(url=url), mock.patch("apps.documents.tasks.extract_pdf_text.delay") as extract:
+                renamed = SimpleUploadedFile("paper.pdf", b"MZ not a pdf", content_type="application/pdf")
+                response = self.client.post(
+                    url, {"record": self.record.pk, "slot": self.slot.pk, "file": renamed}, format="multipart",
+                )
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertEqual(response.data["detail"], "This file is not a readable PDF.")
+                extract.assert_not_called()
+        self.assertEqual(RecordUpload.objects.count(), before)
 
     def _slots(self):
         return self.client.get(f"/api/v1/documents/records/{self.record.pk}/slots/")

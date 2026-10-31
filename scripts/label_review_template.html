@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Label Review Worksheet</title>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--ink:#1b1b1b;--mute:#666;--line:#e3e1dc;--accent:#7a1f2b;--ok:#1f7a4d;--warn:#9a6400;--bad:#b3261e;--chip:#f0eeea}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#151514;--card:#1e1e1d;--ink:#ecebe8;--mute:#a09d97;--line:#34322f;--accent:#d9808c;--ok:#5cc28f;--warn:#e0a84a;--bad:#ef7a72;--chip:#2a2927}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--line);padding:12px 16px}
+.bar{max-width:980px;margin:0 auto;display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+h1{font-size:17px;margin:0 12px 0 0}
+.progress{flex:1;min-width:160px;height:8px;background:var(--chip);border-radius:4px;overflow:hidden}
+.progress i{display:block;height:100%;background:var(--ok);width:0}
+input[type=text],select,textarea{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:6px;padding:6px 10px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--card)}
+main{max-width:980px;margin:0 auto;padding:16px}
+.help{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin-bottom:16px}
+.help summary{cursor:pointer;font-weight:600}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.card.done{border-left:4px solid var(--ok)}
+.card.todo{border-left:4px solid var(--warn)}
+.head{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline}
+.head b{font-size:16px}
+.chip{display:inline-block;background:var(--chip);border-radius:999px;padding:1px 8px;font-size:12.5px;color:var(--mute)}
+.flags{margin:8px 0;padding:8px 10px;border-radius:6px;background:color-mix(in srgb,var(--warn) 12%,transparent);color:var(--ink);font-size:14px}
+.flags li{margin-left:-14px}
+.turn{border-top:1px dashed var(--line);padding:8px 0}
+.turn q{display:block;font-style:italic;quotes:none}
+.meta{font-size:13.5px;color:var(--mute)}
+.ev{font-size:13.5px;margin:2px 0}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.warn{color:var(--warn)}
+.checks{display:grid;grid-template-columns:minmax(150px,1fr) auto;gap:6px 12px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--line)}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{border:0;border-radius:0;padding:4px 10px;font-size:13.5px}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button.on.y{background:var(--ok);color:var(--card)}.seg button.on.n{background:var(--bad);color:var(--card)}.seg button.on.na{background:var(--mute);color:var(--card)}
+.seg button.on.s{background:var(--accent);color:var(--card)}
+.hint{font-size:12px;color:var(--mute)}
+.chip.draft{background:color-mix(in srgb,var(--warn) 22%,transparent);color:var(--ink)}
+button.accept{padding:2px 10px;font-size:13px;border-color:var(--ok);color:var(--ok)}
+textarea{width:100%;min-height:38px;margin-top:8px}
+.ref{columns:2;font-size:13.5px}
+@media (max-width:640px){.ref{columns:1}.checks{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<header><div class="bar">
+  <h1>Label review</h1>
+  <input type="text" id="reviewer" placeholder="Your full name" aria-label="Reviewer full name">
+  <select id="filter" aria-label="Filter">
+    <option value="all">All</option><option value="todo">To do</option>
+    <option value="attention">Needs you (AI corrected the label)</option>
+    <option value="flagged">Machine flags</option><option value="done">Done</option>
+  </select>
+  <select id="family" aria-label="Family"><option value="">All families</option></select>
+  <div class="progress" role="progressbar" aria-label="Progress"><i id="prog"></i></div>
+  <span id="count" class="meta"></span>
+  <button id="import">Import</button>
+  <button class="primary" id="export">Export verdicts</button>
+  <input type="file" id="file" accept=".json" hidden>
+</div></header>
+<main>
+<details class="help" open><summary>How to review</summary>
+<p>For each conversation, judge the <b>labels</b> (not a model answer) against the 40-paper proxy corpus. Mark each check:</p>
+<ul>
+<li><b>Category names</b>: every category the turns name or assume exists as named, and a "missing category" question names one that really is missing.</li>
+<li><b>Exact counts</b>: every expected count is right for the loaded corpus. A semantic topic count is a classified subset; check the listed papers are about the topic.</li>
+<li><b>Paper/page facts</b>: every named paper exists, and each page and quote supports the turn. <span class="ok">matches</span> means it matches <code>proxy_starter.json</code>; you still judge whether it supports the task.</li>
+<li><b>Supported &amp; unambiguous</b>: the draft flag is right. True means one clear correct behaviour; true conversations form the 90% completion denominator.</li>
+</ul>
+<p><b>Yes</b> or <b>N/A</b> passes; <b>No</b> means fix the label in the set JSON first, then mark the conversation <b>Corrected</b>. Then set the status. Your work saves in this browser; export when you're done (or to keep a backup).</p>
+<p><b>AI draft.</b> Every card starts pre-filled with an AI suggestion and its reasoning in the notes. It stays <i>AI draft, not yet yours</i> until you click <b>Accept AI draft</b> or change anything; finalize refuses untouched drafts. Ten cards were corrected by the AI in the set JSON (filter <b>Needs you</b>); check each edit before accepting.</p>
+<p class="meta">Machine checks read only <code>proxy_starter.json</code>; nothing here was checked against the live database. Suggested N/A appears where a check has nothing to judge.</p>
+</details>
+<details class="help"><summary>Reference: the 40 papers and the set's topic groups</summary>
+<div id="refs"></div>
+</details>
+<div id="list"></div>
+</main>
+<script>
+const DATA = /*DATA*/null;
+const KEY = "label-review:" + DATA.set_id;
+const LABELS = {category_names:"Category names", exact_counts:"Exact counts", paper_page_facts:"Paper/page facts", supported_unambiguous:"Supported & unambiguous"};
+let state = {reviewer:"", conversations:{}};
+try { const s = JSON.parse(localStorage.getItem(KEY)); if (s) state = s; } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const blank = e => !e || (e.status === "not_reviewed" && !Object.keys(e.checks || {}).length && !e.notes);
+for (const [id, d] of Object.entries(DATA.drafts || {}))
+  if (blank(state.conversations[id]) || state.conversations[id].source === "ai_draft") state.conversations[id] = {...structuredClone(d), source: "ai_draft"};
+const entry = id => state.conversations[id] ??= {status:"not_reviewed", checks:{}, notes:""};
+const touch = id => { delete entry(id).source; };
+const passes = v => v === true || v === "not_applicable";
+const isDone = id => { const e = state.conversations[id]; return !!e && !e.source && e.status !== "not_reviewed" && DATA.checks.every(k => passes(e.checks[k])); };
+
+document.getElementById("reviewer").value = state.reviewer || "";
+document.getElementById("reviewer").oninput = e => { state.reviewer = e.target.value; save(); };
+const fam = document.getElementById("family");
+[...new Set(DATA.conversations.map(c => c.family))].forEach(f => fam.insertAdjacentHTML("beforeend", `<option>${f}</option>`));
+
+document.getElementById("refs").innerHTML =
+  `<h4>Papers (${DATA.titles.length})</h4><ol class="ref">${DATA.titles.map(t => `<li>${esc(t)}</li>`).join("")}</ol>` +
+  `<h4>Topic groups used in the set</h4>${Object.entries(DATA.topics).map(([t, ps]) => `<p><b>${esc(t)}</b> (${ps.length})<br><span class="meta">${ps.map(esc).join(" · ")}</span></p>`).join("")}`;
+
+function seg(id, name, value, options) {
+  return `<span class="seg" role="group" aria-label="${esc(name)}">` + options.map(([v, label, cls]) =>
+    `<button type="button" class="${cls}${value === v ? " on" : ""}" aria-pressed="${value === v}" data-id="${id}" data-k="${name}" data-v='${JSON.stringify(v)}'>${label}</button>`).join("") + `</span>`;
+}
+
+function card(c) {
+  const m = c.machine, e = entry(c.id);
+  const turns = c.turns.map((t, i) => {
+    const ev = m.evidence.filter(x => x.turn === i + 1).map(x =>
+      x.result === "matches" ? `<div class="ev ok">✓ ${esc(x.title)}, p.${x.page}: “${esc(x.quote)}”</div>` :
+      x.result === "mismatch" ? `<div class="ev bad">✗ ${esc(x.title)}, p.${x.page}: “${esc(x.quote)}” (not in proxy_starter)</div>` :
+      `<div class="ev warn">○ ${esc(x.title)}: no page or quote</div>`).join("");
+    const pair = (t.expected_pair || []).length ? `<div class="meta">Expected pair: ${t.expected_pair.map(esc).join(" · ")}</div>` : "";
+    return `<div class="turn"><span class="chip">Turn ${i + 1} · ${esc(t.intended_task)}</span>${t.clarification_necessary ? ' <span class="chip">clarify</span>' : ""}
+      <q>${esc(t.user)}</q>${pair}${ev}${t.acceptable_uncertainty ? `<div class="meta">Tolerance: ${esc(t.acceptable_uncertainty)}</div>` : ""}</div>`;
+  }).join("");
+  const checks = DATA.checks.map(k => {
+    const hint = m.suggest_na[k] ? `<span class="hint">suggested N/A</span>` : "";
+    return `<div>${LABELS[k]} ${hint}</div>${seg(c.id, "check:" + k, e.checks[k], [[true, "Yes", "y"], ["not_applicable", "N/A", "na"], [false, "No", "n"]])}`;
+  }).join("");
+  const flags = m.flags.length ? `<ul class="flags">${m.flags.map(f => `<li>${esc(f)}</li>`).join("")}</ul>` : "";
+  const papers = (c.papers || []).length ? `<div class="meta">Papers: ${c.papers.map(esc).join(" · ")}</div>` : "";
+  return `<article class="card ${isDone(c.id) ? "done" : "todo"}" id="c-${c.id}">
+    <div class="head"><b>${c.id}</b><span class="chip">${c.split}</span><span class="chip">${esc(c.topic)}</span>
+      <span class="chip">supported_unambiguous: ${c.supported_unambiguous}</span>${c.a09_case ? `<span class="chip">a09_case: ${c.a09_case}</span>` : ""}${c.revision ? '<span class="chip">revised 2026-10-16</span>' : ""}
+      ${e.source === "ai_draft" ? `<span class="chip draft">AI draft, not yet yours</span><button type="button" class="accept" data-accept="${c.id}">Accept AI draft</button>` : ""}</div>
+    ${papers}${flags}${c.note ? `<div class="meta">Note: ${esc(c.note)}</div>` : ""}${turns}
+    <div class="checks">${checks}<div><b>Status</b></div>${seg(c.id, "status", e.status, [["not_reviewed", "Not reviewed", "s"], ["confirmed", "Confirmed", "s"], ["corrected", "Corrected", "s"]])}</div>
+    <textarea data-id="${c.id}" placeholder="Notes (what you corrected, doubts)" aria-label="Notes for ${c.id}">${esc(e.notes)}</textarea>
+  </article>`;
+}
+
+function render() {
+  const f = document.getElementById("filter").value, fm = fam.value;
+  const rows = DATA.conversations.filter(c => (!fm || c.family === fm) &&
+    (f === "all" || (f === "todo" && !isDone(c.id)) || (f === "done" && isDone(c.id)) || (f === "flagged" && c.machine.flags.length) ||
+     (f === "attention" && (DATA.drafts || {})[c.id]?.status === "corrected")));
+  document.getElementById("list").innerHTML = rows.map(card).join("") || `<p class="meta">Nothing here.</p>`;
+  progress();
+}
+function progress() {
+  const n = DATA.conversations.filter(c => isDone(c.id)).length, t = DATA.conversations.length;
+  document.getElementById("prog").style.width = (100 * n / t) + "%";
+  document.getElementById("count").textContent = `${n} / ${t} done`;
+}
+
+document.getElementById("list").addEventListener("click", ev => {
+  const a = ev.target.closest("button[data-accept]");
+  const b = a || ev.target.closest("button[data-k]"); if (!b) return;
+  const id = a ? a.dataset.accept : b.dataset.id;
+  touch(id);
+  if (!a) {
+    const e = entry(id), v = JSON.parse(b.dataset.v);
+    if (b.dataset.k === "status") e.status = v; else e.checks[b.dataset.k.slice(6)] = v;
+  }
+  save();
+  document.getElementById("c-" + id).outerHTML = card(DATA.conversations.find(c => c.id === id));
+  progress();
+});
+document.getElementById("list").addEventListener("input", ev => {
+  if (ev.target.tagName === "TEXTAREA") { const id = ev.target.dataset.id; touch(id); entry(id).notes = ev.target.value; save(); }
+});
+document.getElementById("filter").onchange = render;
+fam.onchange = render;
+
+document.getElementById("export").onclick = () => {
+  const blob = new Blob([JSON.stringify({set_id: DATA.set_id, digests_at_review: DATA.digests, ...state}, null, 2)], {type: "application/json"});
+  const a = Object.assign(document.createElement("a"), {href: URL.createObjectURL(blob), download: "label_review_verdicts.json"});
+  a.click(); URL.revokeObjectURL(a.href);
+};
+document.getElementById("import").onclick = () => document.getElementById("file").click();
+document.getElementById("file").onchange = async ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  const s = JSON.parse(await f.text());
+  if (s.set_id !== DATA.set_id) return alert("That file is for another set.");
+  state = {reviewer: s.reviewer || "", conversations: s.conversations || {}};
+  document.getElementById("reviewer").value = state.reviewer;
+  save(); render();
+};
+render();
+</script>
+</body>
+</html>
