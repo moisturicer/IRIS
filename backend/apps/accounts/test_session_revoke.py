@@ -12,7 +12,6 @@ up to 30 minutes. Revoking now ends the session, which every token carrying its
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.accounts.test_session_invalidation import AccountSessionTestBase
-from apps.accounts.test_sessions import REFRESH
 
 REVOKED = "session_ended_revoked"
 
