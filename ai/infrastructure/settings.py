@@ -41,6 +41,16 @@ class Settings(BaseSettings):
     RUNS_MAX_INPUT_TOKENS: int | None = None
     RUNS_MAX_OUTPUT_TOKENS: int | None = None
     RUNS_MAX_COST_USD: float | None = None
+    # Dispatch (IR-723); also required, none approved.
+    RUNS_DEEP_DEADLINE_SECONDS: int | None = None
+    RUNS_MAX_QUEUED: int | None = None
+    RUNS_MAX_ACTIVE_PER_READER: int | None = None
+    RUNS_MAX_RUNNING_PER_READER: int | None = None
+    RUNS_DEEP_CONCURRENCY: int | None = None
+    RUNS_WORKER_CONCURRENCY: int | None = None
+    RUNS_POLL_SECONDS: float | None = None
+    # Worker wakeups only; empty means workers poll PostgreSQL.
+    RUNS_REDIS_URL: str = ""
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
