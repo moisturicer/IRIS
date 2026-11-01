@@ -160,10 +160,19 @@ class ExecutiveReviewTests(APITestCase):
         self.assertEqual(self.record.abstract_file.name, "abstracts/submitted.pdf")
         self.assertEqual(self.record.versions.count(), 1)
 
-    def test_adviser_still_waits_for_revision_before_publishing(self):
+    def test_adviser_may_never_publish(self):
+        detail = self.detail(self.adviser)
+        self.assertNotIn("accept_publish", detail["capabilities"])
+        response = self.post("decide", self.adviser, {"outcome": "publish", "token": detail["decision"]["token"]})
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("RDCO", response.data["detail"])
+
+    def test_adviser_still_waits_for_revision_before_sending_or_rejecting(self):
         self.post("request-revision", self.adviser, {"reason": "Revise methods"})
         detail = self.detail(self.adviser)
-        response = self.post("decide", self.adviser, {"outcome": "publish", "token": detail["decision"]["token"]})
+        response = self.post("decide", self.adviser, {"outcome": "reject", "comment": "Out of scope.", "token": detail["decision"]["token"]})
+        self.assertEqual(response.status_code, 400)
+        response = self.post("accept-and-route", self.adviser, {"to": [{"party": "rdco"}], "reason": "Institutional review"})
         self.assertEqual(response.status_code, 400)
 
     def test_specialist_cannot_route_to_rdco(self):

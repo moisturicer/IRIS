@@ -23,7 +23,7 @@ from typing import Optional
 
 from django.utils import dateformat, timezone
 
-from core.enums import AssignmentState, DocumentRequestState, ResubmissionRequestState, SeatState
+from core.enums import AssignmentState, DocumentRequestState, Party, ResubmissionRequestState, SeatState
 
 from .models import RecordAssignment
 from .seats import _label, _name
@@ -194,7 +194,12 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
     items.sort(key=lambda i: i["severity"] != BLOCKER)
     if deciding:
         verdict = "blocked" if blocked else "ready"
-        headline = "You can't decide yet." if blocked else "Ready for your Decision."
+        headline = (
+            "You can't decide yet." if blocked
+            # RDCO need not wait for the offices (ADR-047 §5).
+            else "RDCO can decide at any time." if decision.get("party") == Party.RDCO
+            else "Ready for your Decision."
+        )
     elif office:
         verdict = "blocked" if blocked else "waiting_on_you"
         headline = (f"{office_review['label']} can't finish yet." if blocked

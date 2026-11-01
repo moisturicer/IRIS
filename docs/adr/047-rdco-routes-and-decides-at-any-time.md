@@ -6,7 +6,7 @@
 
 **Amended 2026-11-01, before anything was built,** by Hermoine Zozobrado in a design session, from how CIT-U publishes a paper. **Only RDCO publishes a Thesis/Research or Project,** so the Adviser's *Accept & publish* is gone. The accepted text kept it as a default to confirm. Its other default stands: RDCO may decide over an open Revision request.
 
-**Not built on `main` yet:** IR-767 implements it, and until that merges the code still follows ADR-032's routing.
+**Built by IR-767** ([PR #410](https://github.com/moisturicer/IRIS/pull/410)), including the amendment: the Adviser has no publish outcome.
 
 **Supersedes, in part, [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md):**
 

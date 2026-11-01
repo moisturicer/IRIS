@@ -266,15 +266,15 @@ class DecisionTests(AuditTestBase):
     def test_publish_writes_the_decision_and_published(self):
         record = self.at_adviser()
 
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
 
         self.assertEqual(
             {k: self.final(record)["metadata"][k] for k in ("party", "outcome", "final", "version")},
-            {"party": Party.ADVISER, "outcome": "publish", "final": True, "version": 1},
+            {"party": Party.RDCO, "outcome": "publish", "final": True, "version": 1},
         )
         published = self.one(record, AuditEvent.PUBLISHED)
-        self.assertEqual(published["user"], self.adviser.pk)
-        self.assertEqual(published["metadata"], {"party": Party.ADVISER, "version": 1})
+        self.assertEqual(published["user"], self.rdco.pk)
+        self.assertEqual(published["metadata"], {"party": Party.RDCO, "version": 1})
 
     def test_keep_unlisted_writes_the_decision_only(self):
         record = self.at_rdco()
@@ -605,7 +605,7 @@ class TransactionTests(AuditTestBase):
         with self.captureOnCommitCallbacks(execute=True):
             with self.assertRaisesRegex(RuntimeError, "outer rollback"):
                 with transaction.atomic():
-                    self.decided(record, self.adviser, "publish")
+                    self.publish_via_rdco(record)
                     self.assertIn("PUBLISHED", self.types(record))
                     raise RuntimeError("outer rollback")
 

@@ -277,13 +277,27 @@ class RdcoAssignmentLifetimeTests(OfficeReviewTestBase):
         self.assertEqual(self.active(record), {Party.RDCO, Party.KTTO})
         self.assertTrue(self.rdco_assignments(record).exists())
 
-    def test_no_rdco_on_a_record_no_office_was_routed_to(self):
+    def test_rdco_is_awaited_while_the_adviser_holds_a_thesis(self):
+        """Only RDCO publishes one (ADR-047 §5), so it is never "not required" in review."""
         record = self.new_model()
 
         self.assertFalse(self.rdco_assignments(record).exists())
         row = self.rows(self.tracker(record))[Party.RDCO]
+        self.assertEqual(row["state"], TrackerPartyState.AWAITING)
+
+    def test_rdco_is_not_required_once_the_adviser_rejects(self):
+        record = self.new_model()
+        seats.open_review(self.assignment(record, Party.ADVISER).seats.get(), self.adviser)
+        self.client.force_authenticate(self.adviser)
+        token = self.client.get(reverse("record-detail", args=[record.pk])).data["decision"]["token"]
+        response = self.post(
+            reverse("record-decide", args=[record.pk]), self.adviser,
+            {"outcome": "reject", "comment": "Out of scope.", "token": token},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        row = self.rows(self.tracker(record))[Party.RDCO]
         self.assertEqual(row["state"], TrackerPartyState.NOT_REQUIRED)
-        self.assertEqual(row["state_label"], "Not required")
 
     def test_never_on_a_proposal(self):
         """

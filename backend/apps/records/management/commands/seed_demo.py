@@ -279,11 +279,13 @@ class Command(BaseCommand):
     # -- phase 3: the Discover catalogue -----------------------------------
 
     def _seed_catalogue(self, users):
-        """Published records reached through an Adviser's decision."""
+        """Published records: the Adviser sends each to RDCO, which publishes it (ADR-047)."""
         from apps.reviews import seats
         from apps.reviews.decisions import PUBLISH, decide, decision_token
+        from apps.reviews.models import RecordAssignment
+        from apps.reviews.routing import accept_and_route
 
-        adviser = users[RoleName.ADVISER]
+        adviser, rdco = users[RoleName.ADVISER], users[RoleName.RDCO]
         for (title, classification_name, type_name, year, is_ip, ip_type,
              commercial, extension, college_code, author_names) in CATALOGUE:
 
@@ -315,7 +317,13 @@ class Command(BaseCommand):
 
             entry = self._submit(record, owner)
             seats.open_review(entry.seats.get(), adviser)
-            decide(record, adviser, outcome=PUBLISH, token=decision_token(record))
+            accept_and_route(
+                record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}],
+                reason="Ready for publication.",
+            )
+            rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+            seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+            decide(record, rdco, outcome=PUBLISH, token=decision_token(record))
             self._done(record)
 
     # -- phase 4: one record per workflow state ----------------------------

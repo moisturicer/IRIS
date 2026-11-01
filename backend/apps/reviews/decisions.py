@@ -9,14 +9,14 @@ on who decides:
   *Accepted*, its resting state) or *reject*. RDCO has no Proposal role, and a
   Proposal is never routed, so the Adviser's seat is the only one it has.
 - **A Thesis/Research or Project, by its Adviser**, while their own seat is
-  open (no specialist path): *publish* or *reject*. RDCO is never involved.
-- **A Thesis/Research or Project, by RDCO**, on the specialist path, holding
-  the hand-back's seat: *publish*, *keep unlisted* (`completed`) or *reject*.
+  open: *reject* only. The Adviser accepts by sending it to RDCO (ADR-047 §1).
+- **A Thesis/Research or Project, by RDCO**, holding RDCO's seat: *publish*,
+  *keep unlisted* (`completed`) or *reject*. Only RDCO publishes (ADR-047 §5).
 
 *Reject* is the same act on every record: `rejected`, shown as *Archived*,
 terminal.
 
-Accept & route (IR-261) is not a Decision. It is an acceptance that closes
+Accept & send to RDCO is not a Decision. It is an acceptance that closes
 nothing; it shares only the rule that it is refused while a revision request
 is open (`revisions.decision_blocked_reason`).
 
@@ -82,6 +82,7 @@ from core.enums import (
     Party,
     PipelineStatus,
     RecordTypeName,
+    ResubmissionRequestState,
     ReviewDecision,
     RoleName,
     SeatState,
@@ -109,9 +110,9 @@ OUTCOMES = {
 DECIDABLE_TYPES = (RecordTypeName.PROPOSAL, *routing.ROUTABLE_TYPES)
 
 #: Who may take which outcome on a Thesis/Research or Project, in the order
-#: the action bar offers them. RDCO alone keeps a record unlisted (§3).
+#: the action bar offers them. Only RDCO publishes or keeps one unlisted (ADR-047 §5).
 OUTCOMES_FOR = {
-    str(Party.ADVISER): (PUBLISH, REJECT),
+    str(Party.ADVISER): (REJECT,),
     str(Party.RDCO): (PUBLISH, KEEP_UNLISTED, REJECT),
 }
 
@@ -203,8 +204,8 @@ def _refusal(record, user) -> str:
         if proposal:
             return "This proposal is no longer in your review, so there is nothing to decide."
         return (
-            "You have already accepted this record and sent it for specialist "
-            "review, so RDCO decides it now."
+            "You have already accepted this record and sent it to RDCO, "
+            "so RDCO decides it now."
         )
     if proposal:
         return "Only the proposal's Adviser decides it (ADR-032 §2)."
@@ -336,7 +337,7 @@ def decision_flags(record, user) -> dict:
     """
     `decision` on record detail (IR-270): the outcomes the viewer may take, why
     not yet, what deciding would close, the staleness token, and -- for the
-    Adviser -- the author's hints the publish confirmation shows. A rendering
+    Adviser -- the author's hints the send-to-RDCO dialog shows. A rendering
     hint; `decide/` re-checks all of it.
     """
     empty = {
@@ -350,7 +351,7 @@ def decision_flags(record, user) -> dict:
         return empty
     seat = _decider_seat(record, user, party)
     # The hints say which offices the author thought were needed: a question
-    # for the Adviser deciding whether to route, which a Proposal never is.
+    # for the Adviser sending it to RDCO, which a Proposal never is.
     routable = type_name_of(record) in routing.ROUTABLE_TYPES
     return {
         "party": party,
@@ -407,10 +408,11 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         if outcome == ACCEPT:
             raise DecisionError(
                 "A Thesis or Project is accepted by publishing it, keeping it unlisted "
-                "or routing it, never left merely accepted."
+                "or sending it to RDCO, never left merely accepted."
             )
         raise DecisionError(
-            "Only RDCO may accept a record and keep it unlisted, after specialist review."
+            "Only RDCO publishes a Thesis/Research or Project or keeps it unlisted. "
+            "Accept it by sending it to RDCO (ADR-047)."
         )
     comment = comment.strip() if isinstance(comment, str) else ""
     if outcome == REJECT and not comment:
@@ -468,7 +470,7 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
 
     closed_revisions = list(revisions.open_requests(record).select_for_update())
     for request in closed_revisions:
-        request.state = "withdrawn"
+        request.state = ResubmissionRequestState.WITHDRAWN
         request.resolved_at = now
         request.resolved_by = actor
         request.closed_by_decision = review

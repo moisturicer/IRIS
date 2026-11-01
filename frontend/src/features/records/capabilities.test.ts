@@ -311,13 +311,13 @@ const ROWS: Row[] = [
     sections: ["overview", "paper", "review", "files"],
   },
   {
-    name: "the record's Adviser may accept & publish or reject, beside accept & route (IR-270)",
+    name: "the record's Adviser may send to RDCO or reject, never publish (ADR-047)",
     record: record({
       pipeline_status: "in_review",
       workflow_state: "in_review",
       is_participant: true,
       routing: { send_to_rdco: true, route_as: null, targets: [] },
-      decision: { ...NO_DECISION, party: "adviser", outcomes: ["publish", "reject"], token: "t" },
+      decision: { ...NO_DECISION, party: "adviser", outcomes: ["reject"], token: "t" },
     }),
     viewer: adviser,
     sections: ["overview", "paper", "review", "files"],

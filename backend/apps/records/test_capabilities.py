@@ -99,7 +99,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
 
     def published(self):
         record = self.at_adviser()
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
         return record
 
     def proposal_with_adviser(self):
@@ -251,7 +251,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # routing and ITSO after clearing.
     TAKES_PART = {"cite", "comment_review"}
     ADVISER_AT_ENTRY = {
-        "cite", "open_review", "send_to_rdco", "accept_publish", "reject",
+        "cite", "open_review", "send_to_rdco", "reject",
         "request_document", "request_revision", "comment_review",
     }
     ITSO_SEATED = {
@@ -306,7 +306,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         "published": {
             "owner": {"cite", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": {"cite"},
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review"}, "stranger": {"cite"},
         },
         # A Proposal's Adviser accepts it or rejects it; it is never routed.
         "proposal_with_adviser": {

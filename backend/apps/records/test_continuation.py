@@ -260,7 +260,7 @@ class WhoMayContinueTests(ContinuationTestBase):
 
     def test_a_thesis_is_not_a_proposal(self):
         thesis = self.at_adviser()
-        self.decided(thesis, self.adviser, "publish")
+        self.publish_via_rdco(thesis)
 
         self.assert_refused(
             self.continue_as(thesis, self.owner), status.HTTP_400_BAD_REQUEST,

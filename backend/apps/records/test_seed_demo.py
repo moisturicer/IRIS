@@ -237,7 +237,8 @@ class SeedDemoRecordTests(TestCase):
                 record.reviews.count(), 1,
                 f"{record.title} is published with no review history behind it",
             )
-            self.assertEqual(record.reviews.first().stage, "adviser")
+            # Only RDCO publishes (ADR-047 §5).
+            self.assertTrue(record.reviews.filter(stage="rdco", status="approved").exists())
 
     def test_submitted_records_carry_dpa_consent(self):
         """The seed must not manufacture records that skipped the consent gate.

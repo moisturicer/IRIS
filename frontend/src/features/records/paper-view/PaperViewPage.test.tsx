@@ -2029,7 +2029,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it.each([
-    { role: "Adviser", party: "adviser", capabilities: ["accept_publish", "send_to_rdco", "reject"], primary: "Accept & publish…" },
+    { role: "Adviser", party: "adviser", capabilities: ["send_to_rdco", "reject"], primary: "Accept & send to RDCO…" },
     { role: "ITSO", party: "itso", capabilities: ["office_review", "request_revision", "route"], primary: "Clear…" },
     { role: "RDCO", party: "rdco", capabilities: ["accept_publish", "keep_unlisted", "reject"], primary: "Accept & publish…" },
   ] as const)("keeps one filled footer action for $role from its granted actions (IR-681)", async ({ role, party, capabilities, primary }) => {
@@ -2314,14 +2314,14 @@ describe("the Review section (IR-412)", () => {
     const side = await screen.findByRole("complementary", { name: "Review details" });
     const request = await within(side).findByRole("button", { name: "Request review" });
     expect(request).toHaveAccessibleDescription("Can be sent to IERC and KTTO");
-    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).queryByRole("button", { name: /Route to office/ }))
+    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).queryByRole("button", { name: "Request review…" }))
       .not.toBeInTheDocument();
 
     const reads = vi.mocked(recordsApi.tracker).mock.calls.length;
     await userEvent.click(request);
     await userEvent.click(await screen.findByRole("checkbox", { name: "IERC" }));
-    await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Human participants.");
-    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Request review" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Why? (required)" }), "Human participants.");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Send request" }));
     expect(recordsApi.route).toHaveBeenCalledWith(RECORD_ID, expect.objectContaining({ to: [{ party: "ierc" }] }));
     await waitFor(() => expect(vi.mocked(recordsApi.tracker).mock.calls.length).toBeGreaterThan(reads));
   });

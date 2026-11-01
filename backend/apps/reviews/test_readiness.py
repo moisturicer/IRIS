@@ -67,7 +67,13 @@ class ReadinessTests(ReadinessTestBase):
         readiness = self.readiness(record, self.adviser)
         self.assertEqual(readiness["verdict"], "ready")
         self.assertEqual(self.kinds(readiness, "blocker"), [])
-        self.decided(record, self.adviser, "publish", COMMENT)
+        self.publish_via_rdco(record, COMMENT)
+
+    def test_rdco_is_told_it_can_decide_at_any_time(self):
+        record = self.at_rdco()
+        readiness = self.readiness(record, self.rdco)
+        self.assertEqual(readiness["verdict"], "ready")
+        self.assertEqual(readiness["headline"], "RDCO can decide at any time.")
 
     def test_an_unopened_seat_is_a_blocker_that_offers_open_review(self):
         record = self.new_model()
@@ -241,7 +247,9 @@ class ReadinessExplainsEveryRefusalTests(ReadinessTestBase):
     def readiness_then_decide(self, record, viewer):
         blocked = self.detail(record, viewer)["decision"]["blocked"]
         readiness = self.readiness(record, viewer)
-        response = self.decide(record, viewer, "publish", COMMENT)
+        # Only RDCO publishes (ADR-047 §5); the Adviser's one Decision is reject.
+        outcome = "reject" if viewer == self.adviser else "publish"
+        response = self.decide(record, viewer, outcome, COMMENT)
         return blocked, readiness, response
 
     def states(self):

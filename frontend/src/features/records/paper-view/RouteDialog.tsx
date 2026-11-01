@@ -4,12 +4,15 @@ import { recordsApi } from "@/api/records";
 import { Button, Modal, Skeleton } from "@/components/ui";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
+import { joinLabels } from "@/lib/utils";
 import type { Party, RouteOptions, RouteRequest } from "@/types/records";
 
 interface RouteDialogProps {
   recordId: number;
-  /** *Accept & route* (the Adviser) or onward *Route* (an office seat holder). */
+  /** *Accept & send to RDCO* (the Adviser) or a request to another office (an office seat holder). */
   mode: "accept" | "route";
+  /** The offices the author flagged, shown beside the Adviser's suggestions. */
+  authorHints?: string[];
   onClose: () => void;
   /** Routed: the offices it went to, for the bar to announce. */
   onRouted: (officeLabels: string[]) => void;
@@ -22,18 +25,19 @@ interface Choice {
 }
 
 /**
- * Route a record to one or more offices (ADR-032 §3–§4, IR-261).
+ * Send a record to RDCO, or request another office's review (ADR-047 §1–§3).
  *
  * The offices, their members and the author's hints come from the server
- * (`route-options`), which also decides who may route at all. Nothing is
- * pre-ticked, even where the author flagged an office: the hint is shown, and
- * the decision stays the router's (ADR-032 §3). An office that already holds
- * the record can only gain a nominee, so its picker has no "leave in pool".
+ * (`route-options`), which also decides who may route at all. The Adviser's
+ * only target is RDCO, so it comes ticked; the offices they tick are
+ * suggestions RDCO reads, never requests. An office's request ticks nothing,
+ * even where the author flagged an office. An office that already holds the
+ * record can only gain a nominee, so its picker has no "leave in pool".
  *
  * Adding a colleague from your own office is a different act (ADR-032 §4) and
  * is not here.
  */
-export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogProps) {
+export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRouted }: RouteDialogProps) {
   const ids = useId();
   const [options, setOptions] = useState<RouteOptions | null>(null);
   const [loadFailed, setLoadFailed] = useState<string | null>(null);
@@ -48,7 +52,12 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
     recordsApi
       .routeOptions(recordId)
       .then(({ data }) => {
-        if (!cancelled) setOptions(data);
+        if (cancelled) return;
+        setOptions(data);
+        // The Adviser sends to RDCO alone: nothing to choose but whom.
+        if (data.accept && data.targets.length === 1) {
+          setChoices({ [data.targets[0].party]: { ticked: true, nominees: [] } });
+        }
       })
       .catch((err) => {
         if (!cancelled) setLoadFailed(errorDetail(err, "The offices could not be loaded."));
@@ -59,7 +68,7 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
   }, [recordId]);
 
   const accepting = mode === "accept";
-  const title = accepting ? "Accept & send to RDCO" : "Request office review";
+  const title = accepting ? "Accept & send to RDCO" : "Request review";
   const choiceFor = (party: Party): Choice => choices[party] ?? { ticked: false, nominees: [] };
   const setChoice = (party: Party, change: Partial<Choice>) =>
     setChoices((prev) => ({ ...prev, [party]: { ...choiceFor(party), ...change } }));
@@ -107,7 +116,7 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
             Cancel
           </Button>
           <Button type="submit" form={formId} disabled={!ready} loading={sending}>
-            {accepting ? "Accept & send to RDCO" : "Request review"}
+            {accepting ? "Accept & send to RDCO" : "Send request"}
           </Button>
         </div>
       }
@@ -115,8 +124,8 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
         <p className="text-[14px] text-stone-700 leading-relaxed">
           {accepting
-            ? "You accept this work and send it to RDCO. RDCO may decide immediately or ask specialist offices to review. The record stays in review."
-            : `${options?.from_label ?? "Your office"} keeps reviewing this record. The offices you choose review it as well.`}
+            ? "This accepts the work at your stage and sends it to RDCO. RDCO decides, and asks the offices it needs. Only RDCO publishes."
+            : "Ask another office, as a whole or specific officers in it. Your own review carries on."}
         </p>
 
         {loadFailed ? (
@@ -172,9 +181,8 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
 
                     {choice.ticked && (
                       <div className="mt-2.5 pl-6">
-                        <p className={LABEL}>Officers at {target.label}</p>
-                        <p className="text-small text-stone-600 mb-2">
-                          {target.already_holds ? "Choose officers to add." : `Leave everyone unchecked for ${target.label}'s pool, or choose specific officers.`}
+                        <p className={LABEL}>
+                          {target.already_holds ? `Add officers to ${target.label}'s review` : `Who at ${target.label}?`}
                         </p>
                         <fieldset id={pickId} aria-label={`Officers at ${target.label}`}
                           aria-describedby={needsNominee ? `${pickId}-why` : undefined} className="space-y-2">
@@ -187,9 +195,15 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
                             </label>
                           ))}
                         </fieldset>
-                        {needsNominee && (
+                        {needsNominee ? (
                           <p id={`${pickId}-why`} className="mt-1 text-[13px] text-brand">
                             {target.label} already has this record. Choose someone to add.
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[13px] text-stone-600">
+                            {choice.nominees.length
+                              ? `${joinLabels(target.members.filter((m) => choice.nominees.includes(m.id)).map((m) => m.name))} ${choice.nominees.length > 1 ? "are" : "is"} asked directly and told now.`
+                              : `Nobody picked: it goes to ${target.label}'s pool, and anyone there can claim it.`}
                           </p>
                         )}
                       </div>
@@ -203,17 +217,20 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
 
         {accepting && <fieldset className="space-y-2">
           <legend className={LABEL}>Suggested specialist offices (optional)</legend>
-          <p className="text-small text-stone-600">These are suggestions for RDCO; they do not request a review.</p>
+          <p className="text-small text-stone-600">RDCO sees these and decides which offices to ask. A suggestion requests nothing.</p>
+          {authorHints.length > 0 && <p className="text-small text-stone-700">
+            <i className="fas fa-flag mr-1.5 text-[11px]" aria-hidden />The author flagged: {authorHints.join("; ")}
+          </p>}
           {["itso", "ierc", "ktto"].map((p) => <label key={p} className="flex items-center gap-2 text-small">
             <input type="checkbox" className={CHECKBOX} checked={suggested.includes(p)} onChange={(e) => setSuggested(e.target.checked ? [...suggested, p] : suggested.filter((v) => v !== p))} />{p.toUpperCase()}
           </label>)}
         </fieldset>}
         {!accepting && !!options?.suggested_offices?.length && <p className="text-small text-stone-700">
-          The Adviser suggested: {options.suggested_offices.map((p) => p.toUpperCase()).join(", ")}. Only the offices you select are requested.
+          The Adviser suggested {joinLabels(options.suggested_offices.map((p) => p.toUpperCase()))}. Only the offices you tick are asked.
         </p>}
         <div>
           <label htmlFor={`${ids}-reason`} className={LABEL}>
-            Reason
+            Why? (required)
           </label>
           <textarea
             id={`${ids}-reason`}
@@ -222,10 +239,11 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             aria-describedby={`${ids}-reason-help`}
+            placeholder="What should they look at? Point to the section."
             className={fieldClasses(false)}
           />
           <p id={`${ids}-reason-help`} className="mt-1 text-[13px] text-stone-600">
-            The offices see this with the record.
+            {accepting ? "RDCO sees this with the record." : "The offices see this with the record."}
           </p>
         </div>
 

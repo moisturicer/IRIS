@@ -345,9 +345,9 @@ export interface RecordDetail extends RecordListItem {
    */
   is_participant:       boolean;
   /**
-   * What the action bar may offer for routing (ADR-032 §4, IR-261): *Accept &
-   * route…* for the record's Adviser, and the office party *Route to office…*
-   * acts as for a seat holder. A rendering hint; the endpoints re-check it.
+   * What the action bar may offer for routing (ADR-047 §1–§3): *Accept & send
+   * to RDCO…* for the record's Adviser, and *Request review…* for an office
+   * seat holder. A rendering hint; the endpoints re-check it.
    */
   routing:              RoutingFlags;
   /**
@@ -416,7 +416,7 @@ export interface DecisionFlags {
   closes:       DecisionCloses | null;
   /** Echoed to `decide/`: a record that moved since is refused with a 409. */
   token:        string | null;
-  /** The author's flags, for the Adviser's *Publish without specialist review?* */
+  /** The author's flags, shown in the Adviser's *Accept & send to RDCO* dialog. */
   author_hints: string[];
 }
 

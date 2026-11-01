@@ -1,6 +1,6 @@
 /**
- * The three Decisions (IR-270, ADR-032 §3): *Accept & publish*, *Keep
- * unlisted* and *Reject*, with IR-143's two carried criteria -- a stale
+ * The three Decisions (IR-270, ADR-047 §5): *Accept & publish* and *Keep
+ * unlisted* by RDCO alone, and *Reject*, with IR-143's two carried criteria -- a stale
  * submit shows a notice, keeps the typed comment and never decides into the
  * changed record, and closing the dialog to read a document loses nothing.
  * Every query goes through the accessible tree, by role and accessible name.
@@ -25,7 +25,7 @@ vi.mock("@/api/records", () => ({
 
 const ADVISER: DecisionFlags = {
   party: "adviser",
-  outcomes: ["publish", "reject"],
+  outcomes: ["reject"],
   blocked: null,
   closes: { assignments: [], document_requests: 0 },
   token: "t1",
@@ -48,7 +48,10 @@ function recordWith(decision: DecisionFlags, type = "Thesis / Research"): Record
   return { id: 7, record_type_name: type, decision } as unknown as RecordDetail;
 }
 
-function open(outcome: DecisionOutcome, decision: DecisionFlags = ADVISER, type?: string) {
+/** RDCO with nothing open: only RDCO publishes (ADR-047 §5). */
+const RDCO_ALONE: DecisionFlags = { ...RDCO, closes: { assignments: [], document_requests: 0 } };
+
+function open(outcome: DecisionOutcome, decision: DecisionFlags = RDCO_ALONE, type?: string) {
   const onClose = vi.fn();
   const onDone = vi.fn();
   const view = renderScreen(
@@ -63,14 +66,12 @@ beforeEach(() => {
 });
 
 describe("DecisionDialog", () => {
-  it("asks the Adviser to publish without specialist review, showing the author's flags", async () => {
+  it("asks RDCO to publish, with no executive warning when nothing is open", async () => {
     const { onDone, view } = open("publish");
 
-    const dialog = screen.getByRole("dialog", { name: "Publish without specialist review?" });
-    expect(dialog).toHaveTextContent("This publishes the thesis to Discover. No office will review it.");
-    expect(within(dialog).getByRole("list", { name: "The author flagged" })).toHaveTextContent(
-      "The author flagged possible intellectual property.",
-    );
+    const dialog = screen.getByRole("dialog", { name: "Publish this thesis?" });
+    expect(dialog).toHaveTextContent("This publishes it to Discover");
+    expect(dialog).not.toHaveTextContent("executive Decision");
     expect(screen.getByRole("textbox", { name: "Comment (optional)" })).not.toBeRequired();
     await expectNoBlockingA11yViolations(view.container);
 
@@ -80,15 +81,20 @@ describe("DecisionDialog", () => {
     expect(decide).toHaveBeenCalledWith(7, { outcome: "publish", comment: "", token: "t1" });
   });
 
-  it("names a project as a project", () => {
-    open("publish", ADVISER, "Project");
-    expect(screen.getByRole("dialog")).toHaveTextContent("This publishes the project to Discover.");
+  it("names a project as a project, and the Adviser's author flags stay in the send dialog", () => {
+    open("reject", ADVISER, "Project");
+    const dialog = screen.getByRole("dialog", { name: "Reject and archive?" });
+    expect(dialog).toHaveTextContent("This archives the project.");
+    expect(dialog).not.toHaveTextContent("The author flagged");
   });
 
   it("tells RDCO what deciding closes", () => {
     open("publish", RDCO);
 
     const dialog = screen.getByRole("dialog", { name: "Publish this thesis?" });
+    expect(dialog).toHaveTextContent(
+      "This is RDCO's executive Decision. RDCO doesn't have to wait. IERC's open review closes",
+    );
     const closes = within(dialog).getByRole("list", { name: "This also closes" });
     expect(closes).toHaveTextContent("IERC's review in progress (Elena Reyes)");
     expect(closes).toHaveTextContent("1 open document request");
@@ -207,7 +213,7 @@ it("RDCO sees the revision requests and findings its executive Decision supersed
     findings: [{ party: "itso", label: "ITSO", comment: "Patent filing should precede publication" }],
   } };
   const { onDone } = open("publish", flags);
-  expect(screen.getByText(/RDCO may decide now/)).toBeInTheDocument();
+  expect(screen.getByText(/This is RDCO.s executive Decision/)).toHaveTextContent("Open revision requests are withdrawn.");
   expect(screen.getByText("Revision request #12 from IERC: Missing consent")).toBeInTheDocument();
   expect(screen.getByRole("region", { name: "Recorded findings" })).toHaveTextContent("Patent filing should precede publication");
   await userEvent.click(screen.getByRole("button", { name: "Publish" }));

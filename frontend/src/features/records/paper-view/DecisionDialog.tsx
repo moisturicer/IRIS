@@ -4,6 +4,7 @@ import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
+import { joinLabels } from "@/lib/utils";
 import type { DecisionCloses, DecisionFlags, DecisionOutcome, RecordDetail } from "@/types/records";
 
 import { clearDecisionDrafts, readDecisionDraft, writeDecisionDraft } from "./decisionDraft";
@@ -26,9 +27,9 @@ const CONFIRM: Record<DecisionOutcome, { label: string; done: string }> = {
 
 /**
  * The title and the consequence, stated before anyone commits to it
- * (ui-ux/16 §4; spec §7.3 item 1 for the Adviser's publish).
+ * (ui-ux/16 §4). Only RDCO publishes a Thesis or Project (ADR-047 §5).
  */
-function wording(outcome: DecisionOutcome, adviser: boolean, kind: string) {
+function wording(outcome: DecisionOutcome, kind: string) {
   if (outcome === "accept") {
     // IR-271: promises nothing about continuing it as a Thesis or Project,
     // which IRIS does not offer yet (IR-417).
@@ -43,12 +44,6 @@ function wording(outcome: DecisionOutcome, adviser: boolean, kind: string) {
     return {
       title: "Reject and archive?",
       body: "This archives the proposal. The student will need to submit a new one.",
-    };
-  }
-  if (outcome === "publish" && adviser) {
-    return {
-      title: "Publish without specialist review?",
-      body: `This publishes the ${kind} to Discover. No office will review it.`,
     };
   }
   if (outcome === "publish") {
@@ -91,10 +86,10 @@ function closingLines(closes: DecisionCloses | null): string[] {
 }
 
 /**
- * *Accept & publish*, *Keep unlisted* or *Reject* (ADR-032 §3, IR-270): the
- * Adviser on a record no office was asked to review, or RDCO's reviewer on
- * the specialist path. On a Proposal, *Accept* or *Reject*, by its Adviser
- * alone (ADR-032 §2, IR-271).
+ *Accept & publish*, *Keep unlisted* or *Reject* by RDCO's reviewer, at any
+ * time (ADR-047 §5); *Reject* by a Thesis or Project's Adviser, who accepts
+ * by sending it to RDCO instead. On a Proposal, *Accept* or *Reject*, by its
+ * Adviser alone (ADR-032 §2, IR-271).
  *
  * It says what follows and what it closes -- every other review still open,
  * and every open document request -- before anyone commits. A rejection
@@ -124,7 +119,9 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
       : record.record_type_name === "Proposal"
         ? "proposal"
         : "thesis";
-  const { title, body } = wording(outcome, flags.party === "adviser", kind);
+  const { title, body } = wording(outcome, kind);
+  const stillReviewing = (flags.closes?.assignments ?? []).map((a) => a.label);
+  const withdrawsRevisions = (flags.closes?.revision_requests ?? []).length > 0;
   const closing = closingLines(flags.closes);
 
   const change = (value: string) => {
@@ -155,7 +152,6 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
   const formId = `${ids}-form`;
   const textId = `${ids}-text`;
   const helpId = `${textId}-help`;
-  const hintsId = `${ids}-hints`;
   const closesId = `${ids}-closes`;
 
   return (
@@ -184,22 +180,15 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
         <p className="text-[14px] text-stone-700 leading-relaxed">{body}</p>
 
-        {flags.author_hints.length > 0 && (
-          <div>
-            <p id={hintsId} className="text-[13px] font-semibold text-stone-900">
-              The author flagged
-            </p>
-            <ul aria-labelledby={hintsId} className="mt-1 list-disc pl-5 text-[13px] text-stone-700">
-              {flags.author_hints.map((hint) => (
-                <li key={hint}>{hint}</li>
-              ))}
-            </ul>
-          </div>
+        {flags.party === "rdco" && (stillReviewing.length > 0 || withdrawsRevisions) && (
+          <p className="rounded-lg border border-brand/30 bg-brand/5 p-3 text-small text-brand">
+            <i className="fas fa-triangle-exclamation mr-1.5" aria-hidden />
+            This is RDCO's executive Decision. RDCO doesn't have to wait.
+            {stillReviewing.length > 0 &&
+              ` ${joinLabels(stillReviewing)}'s open review${stillReviewing.length > 1 ? "s close" : " closes"}, marked "closed by RDCO's Decision"; their comments and findings stay in the history.`}
+            {withdrawsRevisions && " Open revision requests are withdrawn."}
+          </p>
         )}
-
-        {flags.party === "rdco" && closing.length > 0 && <p className="rounded-lg border border-brand/30 bg-brand/5 p-3 text-small text-brand">
-          RDCO may decide now. This Decision closes the open reviews and withdraws the requests listed below. Their history is kept.
-        </p>}
         {!!flags.closes?.findings?.length && <section aria-label="Recorded findings">
           <h3 className="text-small font-semibold">Recorded findings</h3>
           {flags.closes.findings.map((f, i) => <p key={i} className="text-small text-stone-700">{f.label}: {f.comment}</p>)}
