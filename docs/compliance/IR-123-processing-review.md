@@ -81,6 +81,8 @@ the DPO review should cover them.
 | Account deletion | A request to delete an account, with its decision and any rejection reason, seen by the person and the System Admin. On confirmation: name, email, profile and private data are removed, and the person shows as "Former user" in comments and review history. **Kept:** their name as an Author or as Adviser on a published paper, and audit events naming them, which can't be edited. Proposed in ADR-051. | IR-779 |
 | Personal data download | A file of the person's own data, including Ask IRIS conversations, delivered only to them. Each download writes an audit event. Proposed in ADR-051. | IR-786 |
 | Consent versions and withdrawal | Which notice version each person accepted and when, kept as a history. RDCO or the System Admin publishes each new version by pasting it, naming who published it. Every published version stays stored and can't be edited. Any owner can withdraw consent on a paper, and the other owners are told who withdrew. Withdrawal removes the paper's stored passages, vectors and AI Overview from IRIS, though text already sent to vendors can't be recalled. Proposed in ADR-051. | IR-789, IR-791, IR-792 |
+| Unverified signups | The name, email, affiliation and role request of someone who registered and never verified. No office sees them, and they're deleted after 30 days or when the address registers again. The verification email carries the registrant's name to whatever address was typed, which may be a stranger's. Proposed in ADR-051. | IR-705 |
+| Contact person on every paper | Any owner can name any co-owner, who is told in-app. The Contact person receives the paper's review emails, and on a Discoverable Proposal their email is shared under the row above. Proposed in ADR-051. | IR-801 |
 | Audit Log access | The System Admin alone would read the Audit Log, which names who did what across IRIS. RDCO reads it today. Proposed in ADR-051. | IR-781 |
 
 Decisions these features add:
@@ -104,6 +106,10 @@ Decisions these features add:
   submission notice changes (ADR-051).
 - [ ] Decide who approves a notice before it is published. Under ADR-051 RDCO or
   the System Admin can publish one alone, and IRIS doesn't check for approval.
+- [ ] Confirm that a co-owner may be named Contact person without accepting first,
+  given that their email can then reach other proposers (ADR-051, IR-311).
+- [ ] Confirm that a verification email may name the registrant when the address
+  turns out to be a stranger's (ADR-051, IR-705).
 - [ ] Confirm that printing a downloader's name and email in each copy (IR-676)
   is acceptable.
 - [ ] Confirm that the Discoverable consent text covers sharing a Proposal's

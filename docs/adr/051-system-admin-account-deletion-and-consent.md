@@ -4,7 +4,7 @@
 
 **Proposed** — 2026-11-01 (IR-780, spec IR-779), awaiting acceptance by Lee Jasmin Adolfo, the project lead. The decisions come from a design session with Hermoine Zozobrado on 2026-11-01.
 
-It would reverse IR-165's choice that `admin@cit.edu` holds no application role, though not IR-165's rule that `is_superuser` grants nothing in the API. It would change [ADR-050](050-calls-for-papers-and-rdco-confirmation.md) decision 15, and give "system administrator" in [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) a meaning.
+It would reverse IR-165's choice that `admin@cit.edu` holds no application role, though not IR-165's rule that `is_superuser` grants nothing in the API. It would change [ADR-050](050-calls-for-papers-and-rdco-confirmation.md) decision 15, give "system administrator" in [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) a meaning, widen [ADR-029](029-proposal-similarity-and-collaboration.md)'s choice of Contact person from Proposals to every paper, and answer IR-705's open decision.
 
 The data protection officer's review under IR-123 can change the wording of any notice, the retention periods and the withdrawal rule. Nothing here is legal advice.
 
@@ -20,6 +20,8 @@ Observed on `main`, 2026-11-01:
 - **Nothing erases old data.** `CELERY_BEAT_SCHEDULE` holds only deadline notifications and recovery dispatch, and the compliance review's retention checklist is open.
 - **RDCO isn't told about role requests.** `notify_role_request` exists, but nothing calls it. `accounts/tasks.py` holds two functions containing only a TODO.
 - **Some work can't change hands.** Nobody can replace a paper's Adviser, and `owner_emails` works on drafts only. An office coordinator can already withdraw a reviewer's seat and seat someone else.
+- **Signups aren't checked.** Registration accepts any email address. RDCO's lists show unverified accounts, RDCO can approve one, and an owner can add one as a co-owner. A mistyped address leaves an account that nothing ever removes (IR-705).
+- **The Contact person can't be changed.** Decisions, revision requests and document requests email only that owner, while every owner gets the in-app notice. `set_primary_owner` has no callers.
 
 ## Decision
 
@@ -59,7 +61,7 @@ Observed on `main`, 2026-11-01:
    |---|---|
    | A draft nobody else is waiting on | Deleted with the account |
    | A paper in review with no other owner | Withdrawn, or given another owner, first |
-   | A paper with another owner | That owner carries on, and becomes Contact person if needed |
+   | A paper with another owner | That owner carries on (decision 28 covers the Contact person) |
    | Open reviews as an Adviser or office reviewer | Reassigned first |
 
 10. **RDCO gains three acts on any paper,** so every blocker can be cleared: replace its Adviser, add an owner to a paper in review, and withdraw a paper in review with a required reason.
@@ -86,13 +88,24 @@ Observed on `main`, 2026-11-01:
 18. **Withdrawing Submission consent stops AI use of that paper and removes its stored passages, vectors and AI Overview from IRIS.** The paper stays in its workflow, and the original acceptance stays on record beside the withdrawal. One owner's withdrawal applies to the whole paper until that owner accepts again. Withdrawing Signup consent means account deletion. The notice must say that text already sent to vendors can't be recalled.
 19. **One scheduled job erases old personal data by type,** using a retention period the System Admin enters after the data protection officer approves it. All start blank, and a blank period erases nothing. No default exists in the code, and audit rows are exempt.
 
-### Role requests
+### Role requests and unverified signups
 
 20. **RDCO gets the existing in-app notification once the person has verified their email,** so a mistyped address alerts nobody (IR-705). Both empty email tasks are deleted. Verification emails are sent directly and keep working.
+21. **Registration accepts only the configured email domain,** `cit.edu` here. Existing accounts and accounts made by server commands aren't affected.
+22. **RDCO sees verified accounts only,** on the role request list, the Users page and the user detail view. An unverified account's role request can't be approved.
+23. **Only a verified account can be a co-owner.**
+24. **An account still unverified after 30 days is deleted outright,** with its role request. The period is a setting, not a retention period, because this removes data sooner and shouldn't wait for the officer. Unlike decision 11, the row goes: the account never signed in, and decision 23 leaves nothing depending on it.
+25. **Registering again on an unverified address replaces the abandoned signup.** The earlier link stops working and a fresh one goes out, within [ADR-045](045-account-recovery-contract.md)'s send limits. A verified address still says "already registered".
+26. **The verification email names who registered,** and says to ignore it if that wasn't them, because the account is deleted in 30 days.
+
+### Contact person
+
+27. **Any owner can name any co-owner as Contact person,** from one dropdown, on every paper, at any time until the paper is deleted. Both people are told in-app, and the change is audited. RDCO has no say. The choice decides who gets the review emails and, on a Discoverable Proposal, whose email is shared.
+28. **If the Contact person's account is deleted, the longest-standing remaining owner takes over** and is told.
 
 ### Timing
 
-21. **All of this is built now, before deployment,** rather than holding the personal-data work until real people sign up.
+29. **All of this is built now, before deployment,** rather than holding the personal-data work until real people sign up.
 
 ## Alternatives Considered
 
@@ -113,6 +126,13 @@ Observed on `main`, 2026-11-01:
 - **Build the cleanup later.** Less work now. Rejected: real data may exist by then.
 - **Set retention periods in code.** Simple. Rejected: nobody on the team can decide a legal period, and the System Admin must be able to change one.
 - **Email RDCO about each role request.** Reaches them sooner. Rejected: more mail for each registration, and the in-app notifier already exists.
+- **Accept any email address.** Alumni and outside advisers could register themselves. Rejected: RDCO would have to judge each one, and it contradicts what the glossary already says.
+- **Delete unverified accounts after 7 days.** Frees a blocked address sooner. Rejected by Hermoine Zozobrado in favour of 30 days, which gives slow registrants longer. Decision 25 frees the address anyway.
+- **Let RDCO remove unverified accounts from the Users page.** Helps someone who calls. Rejected: that page should show verified accounts only, and decision 25 needs no RDCO work.
+- **Make the real owner of a mistyped address wait out the 30 days.** Nothing to build. Rejected: they'd be blocked for up to a month, or end up verifying an account with someone else's name on it.
+- **Add a "This wasn't me" link to the email.** Deletes the account at once. Rejected: more to build, and a mail scanner opening links could delete real signups.
+- **Require the named Contact person to accept first.** Nobody's email is shared without their say. Rejected: it adds a waiting state, and a co-owner who never answers blocks the change.
+- **Let people only claim the Contact person role for themselves.** Also protects the email. Rejected: a Contact person couldn't hand it to someone who doesn't act.
 - **Hold the personal-data work until real signups.** Validation with demo accounts would start sooner. Rejected by Hermoine Zozobrado in favour of building it now.
 
 ## Decision Rationale
@@ -135,6 +155,11 @@ Publishing notices from IRIS lets the university's own text go live without a de
 - **A typo fix makes everyone accept again,** so a publish interrupts all active users, including whoever published it.
 - **A pasted notice can drift from what IRIS does.** Today's text was checked against the code, and pasted text isn't.
 - **Notices lose headings, bold text and clickable links.**
+- **Alumni and outside advisers can't register themselves,** and someone would have to create those accounts another way.
+- **The domain check doesn't catch a typo inside a CIT-U address.** `mraia@cit.edu` still gets through, which is why decisions 24 to 26 exist.
+- **RDCO can't look up someone who hasn't verified.** It tells them to resend the link or register again.
+- **Someone who waits over 30 days registers again.**
+- **A co-owner's email can reach other proposers before they react,** if they're named Contact person on a Discoverable Proposal.
 - **A lone System Admin's own request can't be decided** until a developer creates a second account.
 - **Nothing is erased until the officer approves periods.**
 - **Text already sent to vendors stays with them,** subject to their terms.
@@ -144,11 +169,11 @@ Publishing notices from IRIS lets the university's own text go live without a de
 
 ## MVP Impact
 
-All of it is `mvp-required` and lands before deployment (decision 21). That adds 20 subtasks ahead of MVP validation, so validation starts later than it otherwise would. `IR-668` should restrict `/django-admin/`, and the deployment specs still to come should assume these addresses.
+All of it is `mvp-required` and lands before deployment (decision 29). That adds IR-779's 20 subtasks, IR-705 and IR-801 ahead of MVP validation, so validation starts later than it otherwise would. `IR-668` should restrict `/django-admin/`, and the deployment specs still to come should assume these addresses.
 
 ## SaaS Impact
 
-The split maps to any institution: an IT administrator and a research office. Notice versions and retention periods are per deployment today, and would become per institution under multi-tenancy.
+The split maps to any institution: an IT administrator and a research office. Notice versions, retention periods and the registration domain are per deployment today, and would become per institution under multi-tenancy.
 
 ## Security Impact
 
@@ -158,9 +183,11 @@ IRIS still has no MFA (IR-652), which matters more for a role that confirms irre
 
 A compromised RDCO or System Admin account can put text in front of every user and make them all accept again. Plain text with no links limits what that text can do, and an audit event names who published it. Reading the current notice has to work without signing in, because registrants need it, so it exposes only the notice text.
 
+Decision 25 widens a risk that already exists. Someone could replace a real person's pending signup with their own name and password. If that person clicks the new link, their address is verified on an account the other person can sign in to. Today this can happen only to an address that hasn't registered yet. The email names who registered, and RDCO still has to approve the role. Ashlee reviews this before IR-705 merges. Decisions 21 to 23 narrow who can reach RDCO or become an owner.
+
 ## Deployment Impact
 
-nginx proxies `/django-admin/` and lets `/admin/` and `/rdco/` reach the app (IR-782). The runbook needs the command that creates the first System Admin, and the Beat schedule gains the daily job (IR-794). Dropping the old Django address breaks any bookmark to it, which matters only for developers today.
+nginx proxies `/django-admin/` and lets `/admin/` and `/rdco/` reach the app (IR-782). The runbook needs the command that creates the first System Admin, and the Beat schedule gains the daily jobs (IR-794, IR-705). Registration needs its domain set. Dropping the old Django address breaks any bookmark to it, which matters only for developers today.
 
 ## Research Impact
 
@@ -172,4 +199,4 @@ The workflow's clearance rules don't change, and neither does clearance-aware re
 
 ## Related Tasks
 
-IR-779 (spec), IR-780 to IR-795 and IR-797 to IR-800 (subtasks). Touches IR-123, IR-165, IR-214, IR-311, IR-420, IR-655, IR-667, IR-668, IR-691, IR-693, IR-705, IR-721, IR-763 and IR-765.
+IR-779 (spec), IR-780 to IR-795 and IR-797 to IR-800 (subtasks), IR-705 (unverified signups), IR-801 (Contact person). Touches IR-123, IR-165, IR-214, IR-311, IR-420, IR-643, IR-655, IR-667, IR-668, IR-691, IR-693, IR-721, IR-763 and IR-765.

@@ -241,7 +241,7 @@ Another account that shared a published paper with this person, as a co-owner, a
 _Avoid_: Co-author (a byline name, not an account), team member.
 
 **Contact person**:
-The one owner of a Record whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; the owners can choose another. Their email is shown only where a decision says so, never on their Profile.
+The one owner of a Record who gets its review emails, and whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; any owner can choose another. Their email is shown only where a decision says so, never on their Profile.
 _Avoid_: Representative, group leader, primary author (authors are byline names, not accounts).
 
 ### Downloads
@@ -289,7 +289,7 @@ Entering IRIS with an existing account's CIT-U email and password.
 _Avoid_: Login, log in, sign on.
 
 **Register**:
-Asking for an IRIS account as a Student or an [[Adviser]]. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request.
+Asking for an IRIS account as a Student or an [[Adviser]], with a CIT-U email address. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request. A registration nobody verifies is eventually deleted, and registering again replaces it.
 _Avoid_: Sign up, signup, create account (the screen's title, not the act).
 
 **Adviser**:
