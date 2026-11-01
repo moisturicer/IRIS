@@ -284,7 +284,7 @@ describe("the account menu", () => {
     renderAt("/records/mine");
 
     const trigger = await screen.findByRole("button", { name: /account menu/ });
-    expect(trigger).toHaveAccessibleName(/^Ana Adviser, \S[^,]*, account menu$/);
+    expect(trigger).toHaveAccessibleName("Ana Adviser, Student, account menu");
     expect(trigger).not.toHaveAttribute("aria-label");
   });
 

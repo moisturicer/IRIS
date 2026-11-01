@@ -86,9 +86,7 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         aria-controls={menuId}
         // No aria-label: the name is computed from the text below -- the
         // visible name and role, in order, then a hidden "account menu" -- so
-        // it always begins with what a speech-input user sees (WCAG 2.5.3,
-        // IR-778). A separate label drifted from it: axe read the two visible
-        // lines as "Ana AdviserStudent", which the label did not contain.
+        // it always begins with what a speech-input user sees (WCAG 2.5.3).
         title={collapsed ? fullName : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn(
