@@ -123,12 +123,8 @@ ITSO, IERC or KTTO: an office a Record is routed to for a question only it can a
 _Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
 
 **Specialist path**:
-A Thesis/Research or Project that its Adviser forwarded to at least one [[Specialist office]] as well as RDCO. Otherwise it goes to RDCO alone.
+A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
 _Avoid_: Full review, RDCO path.
-
-**Forward**:
-An Adviser accepting a Thesis/Research or Project and sending it on: always to RDCO, and to any [[Specialist office]]s they think it should go to, all at once. It is not a [[Decision]].
-_Avoid_: Route (what offices do), send to RDCO, Accept & route (the retired act).
 
 **Pool**:
 An office holding a Record that nobody in it is reviewing yet: the office's shared work, until a member claims it, a coordinator assigns someone, or whoever routed it nominated someone.
@@ -151,7 +147,7 @@ A [[Specialist office]]'s outcome on a Record, *Cleared* or *Not cleared*, settl
 _Avoid_: Approval (an office clears its own question; it does not approve the Record), office decision.
 
 **Hand-back**:
-A retired step: IRIS opening RDCO's [[Pool]] on a Record when the last active specialist office finished. RDCO now holds the Record from the Adviser's [[Forward]], and an office finishing only notifies RDCO.
+A retired step: IRIS opening RDCO's [[Pool]] on a Record when the last active specialist office finished. RDCO now holds the Record from the moment its Adviser sends it, and an office finishing only notifies RDCO.
 _Avoid_: Route to RDCO, escalation, final routing.
 
 **Review round**:
@@ -179,7 +175,7 @@ One party asking a Record's owners to revise the Record itself, made against one
 _Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
 
 **Decision**:
-An act that ends a Record's review: on a Thesis/Research or Project, accept & publish or keep [[Unlisted]] by RDCO alone, or reject by RDCO or the Adviser; on a Proposal, its Adviser's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. An Adviser's Decision is refused while any [[Revision request]] is open; RDCO's withdraws them. A [[Forward]] is not a Decision: it closes nothing, and is refused while a Revision request is open.
+An act that ends a Record's review: on a Thesis/Research or Project, accept & publish or keep [[Unlisted]] by RDCO alone, or reject by RDCO or the Adviser; on a Proposal, its Adviser's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. An Adviser's Decision is refused while any [[Revision request]] is open; RDCO's withdraws them. Accept & send to RDCO is not a Decision: it is how an Adviser accepts a Thesis/Research or Project, it closes nothing, and it is refused while a Revision request is open.
 _Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which a Decision also records).
 
 **Accepted**:

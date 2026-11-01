@@ -6,7 +6,7 @@
 
 "System administrator" names no role in the code today. [ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01 and not built yet, makes it the System Admin role, and also lets RDCO replace an Adviser, add an owner to a paper in review and withdraw one.
 
-[ADR-047](047-rdco-routes-and-decides-at-any-time.md), Accepted and amended 2026-11-01 and not built yet (IR-767), partly supersedes §3, §4, §5 and §12: only RDCO publishes a Thesis/Research or Project, the Adviser forwards to RDCO and any offices they choose, there is no hand-back, and RDCO may decide at any time. The Adviser's Accept & publish goes.
+[ADR-047](047-rdco-routes-and-decides-at-any-time.md), Accepted and amended 2026-11-01 and not built yet (IR-767), partly supersedes §3, §4, §5 and §12: only RDCO publishes a Thesis/Research or Project, the Adviser sends to RDCO, which picks the offices, there is no hand-back, and RDCO may decide at any time. The Adviser's Accept & publish goes.
 
 **The five design defaults are confirmed as part of acceptance.** They were marked as defaults in the Proposed draft; they are now decisions:
 

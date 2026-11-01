@@ -1,13 +1,10 @@
-# ADR-047: The Adviser forwards to the offices they choose, only RDCO publishes, and RDCO decides at any time
+# ADR-047: The Adviser sends to RDCO, offices request offices, only RDCO publishes, and RDCO decides at any time
 
 ## Status
 
 **Accepted** — 2026-11-01 by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Proposed 2026-10-30, drafted from the review-workspace design session ([`../review_workspace_roadmap.md`](../review_workspace_roadmap.md) §5a and §7 #7).
 
-**Amended 2026-11-01, before anything was built,** by Hermoine Zozobrado in a design session, from how CIT-U publishes a paper. Two rules in the accepted text changed:
-
-- **Only RDCO publishes a Thesis/Research or Project.** The Adviser's *Accept & publish* is gone. The accepted text kept it as a default to confirm.
-- **The Adviser picks the offices.** The accepted text had the Adviser send to RDCO alone, with RDCO picking the offices and the Adviser only suggesting them.
+**Amended 2026-11-01, before anything was built,** by Hermoine Zozobrado in a design session, from how CIT-U publishes a paper. **Only RDCO publishes a Thesis/Research or Project,** so the Adviser's *Accept & publish* is gone. The accepted text kept it as a default to confirm. Its other default stands: RDCO may decide over an open Revision request.
 
 **Not built on `main` yet:** IR-767 implements it, and until that merges the code still follows ADR-032's routing.
 
@@ -21,7 +18,7 @@
 
 **Amends:**
 
-- [ADR-043](043-review-turnaround-reminders-and-escalation.md) §1: RDCO's clock starts when the Adviser forwards the Record, not at the hand-back.
+- [ADR-043](043-review-turnaround-reminders-and-escalation.md) §1: RDCO's clock starts when the Adviser sends the Record, not at the hand-back.
 
 **Unchanged:**
 
@@ -38,16 +35,16 @@ CIT-U's process, as Hermoine Zozobrado described it on 2026-11-01:
 
 1. A person submits a Thesis/Research or Project, and it goes to the Adviser first.
 2. The Adviser reviews it, with back and forth until it is satisfactory.
-3. The Adviser forwards it to the offices they think it should go to, several at once if needed.
-4. The offices review it. Back and forth, such as missing documents, goes to the submitter, who provides them.
+3. The Adviser sends it to RDCO, and RDCO decides what happens next.
+4. Any offices RDCO asks review it. Back and forth, such as missing documents, goes to the submitter, who provides them.
 5. **Only RDCO publishes.**
 
 Walking through the review workspace prototype added two more rules:
 
-- **Offices can request offices.** RDCO, ITSO, IERC and KTTO may ask for review. A request names the office as a whole (its Pool) or specific officers in it.
+- **Only offices request offices.** RDCO, ITSO, IERC and KTTO may ask one another for review. A request names the office as a whole (its Pool) or specific officers in it.
 - **RDCO has executive authority.** It does not wait for the other offices to finish before it decides.
 
-ADR-032's central claim, "the person who has read the paper decides whether anyone else needs to", holds: the Adviser picks the offices. What changes is that no accepted Thesis/Research or Project can skip RDCO.
+ADR-032's central claim, "the person who has read the paper decides whether anyone else needs to", now holds only for the first question. The Adviser decides whether the Record is ready to go further. Which offices it needs is RDCO's call, as the institutional office whose job that is. The Adviser's reading still reaches RDCO through the send's reason and suggested offices (§1).
 
 Built today, and touched by this decision:
 
@@ -58,28 +55,26 @@ Built today, and touched by this decision:
 
 ## Decision
 
-### 1. The Adviser accepts and forwards
+### 1. The Adviser accepts and sends to RDCO
 
-For a Thesis/Research or Project, the Adviser's academic choices stay *request revision · reject · accept*. **Accept & forward** is the only way to accept. It replaces both *Accept & publish* and *Accept & route*.
+For a Thesis/Research or Project, the Adviser's academic choices stay *request revision · reject · accept*. **Accept & send to RDCO** is the only way to accept. It replaces both *Accept & publish* and *Accept & route*. It opens RDCO's assignment in its Pool with the Adviser's required reason. The Adviser's assignment completes and the Record stays `in_review`.
 
-- **RDCO is always included.** Only RDCO can publish, so the Adviser cannot leave it out. A forward that names no other office goes to RDCO alone.
-- **The Adviser adds any of ITSO, IERC and KTTO** they think it should go to. Each opens in parallel with RDCO and with each other.
-- **It is the same request an office makes** (§3): a required reason, and for each office either its Pool or named officers. The author's ADR-018 hints are shown beside the choice.
-- The Adviser's assignment completes, and the Record stays `in_review`.
-- **Accept & forward is not a Decision.** Like *Accept & route* before it, it closes nothing, and it is refused while a Revision request is open.
+- **The send may nominate RDCO officers**, one or several, as any request may (§3). With no nominee it lands in RDCO's Pool.
+- **The send may suggest specialist offices.** The Adviser can tick ITSO, IERC or KTTO as *suggested*, alongside the author's ADR-018 hints. A suggestion routes nothing. RDCO sees both, labelled by who made them, and decides the routing. This keeps the reader's judgement in front of the router.
+- **Accept & send to RDCO is not a Decision.** Like *Accept & route* before it, it closes nothing, and it is refused while a Revision request is open.
 - **The Adviser's only Decision on a Thesis/Research or Project is reject.**
-- **Proposals are unchanged.** The Adviser alone decides them, and they are never forwarded or published (ADR-032 §2).
+- **Proposals are unchanged.** The Adviser alone decides them, and they are never sent or published (ADR-032 §2).
 
 ### 2. The routing graph
 
 | From | May request review from |
 |---|---|
-| `adviser` (on accept) | `rdco`, always, and any of `itso`, `ierc`, `ktto` |
+| `adviser` (on accept) | `rdco` only |
 | `rdco` | `itso`, `ierc`, `ktto` |
 | `itso` / `ierc` / `ktto` | the other two specialist offices |
 
 - Nothing requests the Adviser.
-- Only the Adviser's forward reaches RDCO. A specialist office tells RDCO by finishing (§4), never by routing to it.
+- Only the Adviser's send reaches RDCO. A specialist office tells RDCO by finishing (§4), never by routing to it.
 - The other rules of ADR-032 §4 hold:
   - routing to an office that already holds the Record opens nothing new
   - a cleared clearance is never reset by routing
@@ -87,23 +82,23 @@ For a Thesis/Research or Project, the Adviser's academic choices stay *request r
 
 ### 3. A request names an office, or officers in it
 
-Every request between offices, and the Adviser's forward, carries a **required reason** and one of these targets:
+Every request between offices, and the Adviser's send, carries a **required reason** and one of these targets:
 
 - **The office**: an assignment in its Pool, as today.
 - **Specific officers**: one or more members of that office, each given a nominated Seat. Today a router may nominate one member per office; this ADR allows several.
 
 Further rules:
 
-- One request may name several offices, each with or without officers.
+- One request may name several offices, each with or without officers, so RDCO can start several reviews in parallel.
 - **An office already holding the Record may be named only with officers.** Naming its Pool again would open nothing (§2). This is today's nominee requirement, kept.
 - *Add a colleague* (ADR-032 §4's *Add a reviewer*) stays a separate act, within one's own office. The UI never merges it with a request to another office.
 
 ### 4. There is no hand-back
 
-RDCO holds the Record from the Adviser's forward onward. When a specialist office completes, IRIS records its Clearance as today and **notifies RDCO** that the office is done (the existing office-completed notice). It opens nothing.
+RDCO holds the Record from the Adviser's send onward. When a specialist office completes, IRIS records its Clearance as today and **notifies RDCO** that the office is done (the existing office-completed notice). It opens nothing.
 
 - `_hand_back` and its `RoutingEvent` with `actor = None` are retired. History rows already written by it stay as they are.
-- The RDCO row on the party tracker reads *Waiting* from the forward onward, until RDCO decides.
+- The RDCO row on the party tracker reads *Waiting* from the send onward, until RDCO decides.
 
 ### 5. Only RDCO publishes, and it decides at any time
 
@@ -126,7 +121,7 @@ The party tracker shows which offices are still reviewing, and the Decision dial
 
 ### 6. Capabilities and acts
 
-- **`accept_route` becomes `accept_forward`.** The act is the existing route endpoint, which reads its targets from the graph in §2. No second endpoint is added.
+- **`accept_route` becomes `send_to_rdco`.** The act is the existing route endpoint, which reads its targets from the graph in §2. No second endpoint is added.
 - **`accept_publish` is RDCO's alone** on a Thesis/Research or Project. The Adviser's allowed outcomes on one become `reject`.
 - **`route` stays the key for office-to-office requests.**
 - **`decision.blocked` stops returning the open-Revision-request reason for an RDCO viewer.** `decision.closes` gains the Revision requests a Decision would withdraw. The table-driven capabilities test (ADR-032 §12) covers both.
@@ -136,7 +131,7 @@ The party tracker shows which offices are still reviewing, and the Decision dial
 A one-off data migration, in the same change as the code:
 
 - **A Thesis/Research or Project that is `in_review`, has passed its Adviser, and has no active RDCO assignment** gets one opened in RDCO's Pool. The reason is *"Opened when RDCO began holding every routed Record (ADR-047)"*, and the `RoutingEvent` carries `actor = None`, as the hand-back's did. Its offices continue as they are.
-- **Records with RDCO already active, and records still with their Adviser,** are untouched. An Adviser still holding one uses *Accept & forward* from then on.
+- **Records with RDCO already active, and records still with their Adviser,** are untouched. An Adviser still holding one uses *Accept & send to RDCO* from then on.
 - **A paper an Adviser already published stays published.** IRIS is not deployed, so this concerns only demo and proxy data.
 - The migration writes no `Review`, changes no Clearance, and is reversible: reversing it removes only the assignments it opened.
 - *Rejected: keeping the hand-back for Records routed before cutover.* Two rules would then live in the code for the life of those Records, which is the brittleness ADR-032 §13 avoided.
@@ -145,9 +140,8 @@ A one-off data migration, in the same change as the code:
 
 At the REST seam, replacing ADR-032 §12's two hand-back tests:
 
-- An Adviser's accept & forward naming IERC and ITSO opens RDCO, IERC and ITSO in parallel.
-- An Adviser's accept & forward naming no office opens RDCO alone.
-- A forward cannot leave RDCO out: RDCO opens whichever offices are named.
+- An Adviser's accept & send opens an RDCO assignment immediately, and no specialist assignment.
+- An Adviser asking for `itso`, `ierc` or `ktto` is refused (400), naming the allowed target.
 - An Adviser publishing a Thesis/Research or Project is refused, and their capabilities offer no such act. Rejecting still works.
 - A specialist office routing to `rdco` is refused.
 - RDCO routes to ITSO with two named officers: two nominated Seats and no Pool-only assignment.
@@ -155,31 +149,29 @@ At the REST seam, replacing ADR-032 §12's two hand-back tests:
 - The last office completing opens nothing and notifies RDCO.
 - RDCO publishes while IERC is still reviewing: IERC's assignment and Seats are withdrawn with `closed_by_decision`, and ITSO's completed Clearance stands.
 - RDCO rejects while IERC's Revision request is open: the request is withdrawn with `closed_by_decision`, and the owners' notice names it.
-- The Adviser's accept & forward and rejection are still refused while a Revision request is open.
+- The Adviser's accept & send and rejection are still refused while a Revision request is open.
 - The cutover migration opens exactly one RDCO assignment for an in-flight specialist Record and none for an Adviser-stage or RDCO-held one.
 - Clearance-aware: unchanged. IERC requests a revision after ITSO cleared, and the new Version resets IERC only.
 
 ## Alternatives Considered
 
-**The Adviser sends to RDCO alone, and RDCO picks the offices.** The text Adolfo accepted, and what PR #410 was built to. One office would own all routing. Rejected by the amendment: the Adviser has read the paper and knows which offices it needs, and suggestions would only add a step.
-
 **Keep the Adviser's Accept & publish.** RDCO would handle only papers that need it, and it is already built. Rejected: only RDCO publishes at CIT-U.
 
-**RDCO enters only after the last office finishes (ADR-032's hand-back).** Offices would always finish first. Rejected: one slow office would hold up the paper, and RDCO could not see it until then.
+**The Adviser picks the offices, with RDCO always included.** Offices would start sooner, and the person who read the paper would choose. It was decided and then withdrawn in the same design session on 2026-11-01. Rejected: RDCO decides what happens next, and it can catch a wrong office before any review starts. The Adviser's suggested offices (§1) keep their reading in front of RDCO.
 
-**Let the Adviser choose whether to include RDCO.** It treats RDCO like any other office. Rejected: forgetting it would leave a paper nobody can publish.
+**RDCO enters only after the last office finishes (ADR-032's hand-back).** Offices would always finish first. Rejected: one slow office would hold up the paper, and RDCO could not see it until then.
 
 **Office-to-RDCO requests.** A specialist office asking RDCO "please look now" would duplicate the completion notice (§4), and RDCO already holds the Record.
 
 ## Decision Rationale
 
-IRIS should publish the way CIT-U does: the person who read the paper decides which offices need it, and one institutional office has the last word. Keeping RDCO on every accepted Record from the forward onward removes the hand-back, the one transition no person performs, and gives RDCO sight of the review as it happens.
+IRIS should publish the way CIT-U does, with one institutional office holding each accepted Record and having the last word. Making RDCO the router too, and letting it decide when it judges enough is known, removes the hand-back, the one transition no person performs. It also removes the confusion this ADR started from: a reviewer can no longer ask "who sends it to RDCO?", because the Adviser always does.
 
 ## Consequences
 
 **Positive:**
 
-- One rule for every accepted Thesis/Research or Project: nothing reaches Discover without RDCO.
+- One path for every accepted Thesis/Research or Project, taken by a person with a reason: nothing reaches Discover without RDCO.
 - The hand-back's actorless event goes.
 - RDCO can stop work that no longer matters (a Record it will reject anyway) without waiting for every office.
 - Requests to named officers, several at once, match how offices actually ask for help.
@@ -187,6 +179,8 @@ IRIS should publish the way CIT-U does: the person who read the paper decides wh
 **Negative:**
 
 - **RDCO handles every accepted Thesis/Research or Project, including ordinary capstones.** Its workload rises, its Turnaround (ADR-043) runs while offices review, and publication can wait on RDCO alone. This is the cost ADR-032 avoided.
+- **Every review that needs an office starts one step later,** because RDCO has to request it.
+- **The router is not the person who read the paper.** This is mitigated, not removed, by the send's reason and suggested offices.
 - **It reverses a choice the project lead made in ADR-032.**
 - **RDCO can publish while an office is still reviewing.** The tracker and dialog show it, and nothing stops it.
 - **RDCO can override an office's open Revision request** (§5). An office's request becomes advisory to RDCO, though still binding on the Adviser. This must be visible in the tracker and in the owners' notice, or the office will not know why its request disappeared.
@@ -198,7 +192,7 @@ ADR-003's contribution is unaffected. Clearance-aware resubmission still resets 
 ADR-004's comparison changes in three ways, identically in both arms:
 
 - **Every accepted Thesis/Research or Project now includes RDCO's time.** No Record skips it through the Adviser.
-- **Turnaround now includes RDCO's parallel time.** An RDCO-held Record measures from the forward, not the hand-back.
+- **Turnaround now includes RDCO's parallel time.** An RDCO-held Record measures from the send, not the hand-back.
 - **A Revision request RDCO overrides ends a resubmission cycle early.** IR-144's workflow events must record it as `closed_by_decision`, so the analysis can exclude or report those cycles rather than count them as answered.
 
 Records that crossed the cutover (§7) are tagged by their migration reason and should be reported separately.
@@ -206,6 +200,6 @@ Records that crossed the cutover (§7) are tagged by their migration reason and 
 ## Related
 
 - [`../review_workspace_roadmap.md`](../review_workspace_roadmap.md) §5a and §7 #7
-- [`../ui-ux/prototypes/review-workspace.html`](../ui-ux/prototypes/review-workspace.html): the routing, request and Decision flows, clickable. It shows the text before this amendment.
+- [`../ui-ux/prototypes/review-workspace.html`](../ui-ux/prototypes/review-workspace.html): the routing, request and Decision flows, clickable. It still shows the Adviser's *Accept & publish*.
 - [IR-678](https://citiris.atlassian.net/browse/IR-678): the review workspace's first phase. It reads request targets from the server's routing flags.
-- `CONTEXT.md`: *Forward* is added, *Hand-back* is retired, and *Specialist path*, *Finding*, *Decision* and *Revision request* follow this ADR.
+- `CONTEXT.md`: *Hand-back* is retired, and *Specialist path*, *Finding*, *Decision* and *Revision request* follow this ADR.
