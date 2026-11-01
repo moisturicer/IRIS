@@ -94,16 +94,6 @@ class ConferenceLevel(models.Model):
     def __str__(self): return self.name
 
 
-class BudgetType(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    def __str__(self): return self.name
-
-
-class CollaborationType(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    def __str__(self): return self.name
-
-
 def abstract_file_path(instance, filename: str) -> str:
     # Ignores the filename beyond its extension -- a long title overflowed
     # the old max_length here (IR-422); a random name sidesteps that.
@@ -441,20 +431,6 @@ class Conference(models.Model):
     date   = models.DateField(null=True, blank=True)
     venue  = models.CharField(max_length=300, blank=True)
     level  = models.ForeignKey(ConferenceLevel, on_delete=models.SET_NULL, null=True, blank=True)
-
-
-class Budget(models.Model):
-    record          = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="budgets")
-    allocation      = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
-    funding_source  = models.CharField(max_length=300, blank=True)
-    budget_type     = models.ForeignKey(BudgetType, on_delete=models.SET_NULL, null=True, blank=True)
-
-
-class Collaboration(models.Model):
-    record         = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="collaborations")
-    industry       = models.CharField(max_length=300, blank=True)
-    institution    = models.CharField(max_length=300, blank=True)
-    collab_type    = models.ForeignKey(CollaborationType, on_delete=models.SET_NULL, null=True, blank=True)
 
 
 # ---- Download / Delete requests -----------------------------------------

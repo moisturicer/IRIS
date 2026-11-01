@@ -282,8 +282,6 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "psced": Entry({"GET": _case(SIGNED_IN)}),
     "record-types": Entry({"GET": _case(SIGNED_IN)}),
     "dashboard-stats": Entry({"GET": _case(SIGNED_IN)}),
-    "chart-classifications": Entry({"GET": _case(SIGNED_IN)}),
-    "chart-psced": Entry({"GET": _case(SIGNED_IN)}),
 }
 
 
