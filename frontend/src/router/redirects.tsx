@@ -3,7 +3,8 @@
  *
  * Bookmarks, notification links and emails already sent point at these paths,
  * so a removed screen redirects rather than 404s. One entry per URL, and
- * `redirects.test.tsx` follows every entry. F1 adds the rest of the table.
+ * `redirects.test.tsx` follows every entry. The table is complete for §4.1's
+ * six (IR-534); IR-783 adds its own.
  *
  * A `:param` in `path` carries into the same `:param` in `to`, so an old link
  * to a record's documents lands on that record.
@@ -22,6 +23,16 @@ export const REDIRECTS: ReadonlyArray<{ path: string; to: string; why: string }>
     path: "records/:id/edit",
     to: "/records/:id?edit=details",
     why: "The edit page became Paper View's Edit details dialog (IR-411)",
+  },
+  {
+    path: "review/:id/evaluate",
+    to: "/records/:id?section=review",
+    why: "The evaluation page became Paper View's Review section (IR-411)",
+  },
+  {
+    path: "review/approved-proposals",
+    to: "/review",
+    why: "ADR-032 retired the Proposal complete act, and with it the Approved Proposals page (IR-534)",
   },
 ];
 

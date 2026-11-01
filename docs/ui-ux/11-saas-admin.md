@@ -41,7 +41,7 @@ If the next customer calls IERC "the Research Ethics Committee", calls a submiss
 | `lib/utils.ts` | `PIPELINE_LABELS` — the stage vocabulary |
 | `components/shared/StatusBadge.tsx` | 13 statuses → colours, **including a stale `ktto_review` key** |
 | `features/review/EvaluationPage.tsx` | Its **own** `stageLabel` map of five stages |
-| `lib/roleDisplay.ts`, `lib/roleDashboard.ts`, `hooks/useRole.ts` | Role vocabulary |
+| `lib/roleDisplay.ts`, `lib/landing.ts`, `hooks/useRole.ts` | Role vocabulary |
 | `lib/constants.ts` | `AUDIT_LOG_ROLES` and friends |
 | `router/index.tsx` | Route guards keyed to role names |
 
