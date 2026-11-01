@@ -23,7 +23,12 @@ from apps.ai.models.chunk import ChunkSet, DocumentChunk  # noqa: E402
 from apps.records.models import Record, RecordOwner  # noqa: E402
 from core.enums import PipelineStatus  # noqa: E402
 from .corpus import make_user  # noqa: E402
-from .test_ai_runtime_runs_db import api, as_reader, runtime, service, submit  # noqa: E402,F401
+from . import test_ai_runtime_runs_db as runs_db  # noqa: E402
+from .test_ai_runtime_runs_db import as_reader, service, submit  # noqa: E402
+
+# The run suite's fixtures, shared by name.
+api = runs_db.api
+runtime = runs_db.runtime
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -118,8 +123,8 @@ def test_a_reader_finds_a_paper_and_opens_its_passage_at_the_exact_revision(rese
         found = await tools.search("neural network flooding catchment")
         passage = found.passages[0]
         opened = await tools.open_passage(passage.handle)
-        page = await tools.read_page(found.records[0].handle, 4)
-        outline = await tools.outline(found.records[0].handle)
+        await tools.read_page(found.records[0].handle, 4)
+        await tools.outline(found.records[0].handle)
         return Result(answer="Floods.", citations=(
             Citation(record_id=opened.passages[0].record_id, quote=opened.passages[0].text,
                      page=opened.passages[0].page, revision=opened.passages[0].source.revision),))
