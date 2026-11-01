@@ -6,6 +6,8 @@
 
 "System administrator" names no role in the code today. [ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01 and not built yet, makes it the System Admin role, and also lets RDCO replace an Adviser, add an owner to a paper in review and withdraw one.
 
+[ADR-047](047-rdco-routes-and-decides-at-any-time.md), Accepted 2026-11-01 and not built yet (IR-767), partly supersedes §3, §4, §5 and §12: the Adviser sends to RDCO, there is no hand-back, and RDCO may decide at any time.
+
 **The five design defaults are confirmed as part of acceptance.** They were marked as defaults in the Proposed draft; they are now decisions:
 
 1. the record's Adviser must not be one of its owners (§1);
@@ -510,7 +512,7 @@ readiness: null | {
 
 **Verification.** Record-detail endpoint tests use real workflow services to check verdict/Decision parity, coverage of blockers, server text and privacy. Page tests render payload fixtures and exercise the controls, single primary action, container breakpoints, keyboard clamps, reset and unavailable storage. The visual layout is checked against the prototype. This supporting UX changes no workflow contribution. Under ADR-004 it must be present in both comparison arms or absent from both.
 
-**Separate work.** ADR-047 remains Proposed and is not a dependency: this UI follows today's server flags without implementing its routing graph, hand-back removal or Revision override. Version diffs, anchored threads, resolution, suggested wording and notification subscriptions remain later phases. Acceptance of this amendment does not accept ADR-047.
+**Separate work.** ADR-047 is not a dependency: this UI follows today's server flags without implementing its routing graph, hand-back removal or Revision override. Version diffs, anchored threads, resolution, suggested wording and notification subscriptions remain later phases. Acceptance of this amendment did not accept ADR-047, which was accepted separately on 2026-11-01.
 
 **Amendment, 2026-10-06 (project lead, IR-411): two more capabilities.** The list above is examples, not a closed set; these two are named so the capabilities payload (IR-418) sends them and the frontend never derives them itself once it does:
 

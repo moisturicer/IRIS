@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed — 2026-10-30.** Awaiting the project lead (Lee Jasmin Adolfo). Drafted from the review-workspace design session ([`../review_workspace_roadmap.md`](../review_workspace_roadmap.md) §5a and §7 #7). No code may change routing, the hand-back or the Decision rules until this ADR is accepted.
+**Accepted** — 2026-11-01 by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado, with both defaults below confirmed. Proposed 2026-10-30, drafted from the review-workspace design session ([`../review_workspace_roadmap.md`](../review_workspace_roadmap.md) §5a and §7 #7). **Not built on `main` yet:** IR-767 implements it, and until that merges the code still follows ADR-032's routing.
 
 **Supersedes, in part, [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md):**
 
@@ -22,7 +22,7 @@
 - Versions and lineage (§5–§6)
 - [ADR-003](003-clearance-aware-resubmission.md)'s clearance-aware resubmission, and [ADR-004](004-restart-all-comparison-mode.md)'s comparison policy
 
-Two points are marked **Default, confirm at acceptance**. Each can be overturned without reopening the rest.
+Two points are marked **Default, confirm at acceptance**. Both were confirmed when this ADR was accepted.
 
 ## Context
 

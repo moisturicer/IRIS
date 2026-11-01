@@ -5,7 +5,7 @@
 **Does not own.** Any accepted decision: each phase below names the ADR it needs, and that ADR is the authority once accepted. Screen structure stays in [`ui-ux/16-paper-view-and-review.md`](ui-ux/16-paper-view-and-review.md); vocabulary in [`../CONTEXT.md`](../CONTEXT.md).
 **Update when.** A phase is accepted, built or dropped, or an open decision is settled.
 
-> **Status: Proposed (2026-10-30).** Nothing here is decided. The thesis contribution — type-differentiated routing, parallel multi-office clearance and clearance-aware resubmission — is unchanged by every phase: this is a layer over Versions, Seats and Revision requests, never a replacement for them.
+> **Status: Proposed (2026-10-30).** Nothing here is decided except the routing change in §5a, which ADR-047 accepted on 2026-11-01. The thesis contribution — type-differentiated routing, parallel multi-office clearance and clearance-aware resubmission — is unchanged by every phase: this is a layer over Versions, Seats and Revision requests, never a replacement for them.
 
 ---
 
@@ -229,7 +229,7 @@ P1 and P2 can be built in parallel by different people once P0 confirms the orde
 3. **Is *Comment* a recorded verdict?** If yes, `ReviewDecision` gains a value and every consumer that reads `Review.status` must handle it. If no, a comment-only submission writes no `Review` row.
 4. **Version text retention.** Keep every Version's text for the Record's life, or only while the Record is under review.
 5. **Where suggested wording ends.** Accept/decline only, or also a check that the next Version contains the accepted text.
-7. **The routing change in §5a needs its own ADR before any code.** Drafted as [ADR-047](adr/047-rdco-routes-and-decides-at-any-time.md) (Proposed, 2026-10-30). Its two defaults answer the questions below, pending the project lead. It reverses ADR-032 §3 ("Nobody routes to RDCO by hand"; the Adviser's *Accept & route* to specialist offices; RDCO entering only by hand-back) and changes `ROUTE_TARGETS` in `apps/reviews/routing.py` (adviser → `rdco` only; `rdco` gains the record before any office). It also moves the *Specialist path* and *Hand-back* entries in `CONTEXT.md`. Open within it: whether RDCO's executive Decision may also override an open Revision request, as the prototype lets it (ADR-032 today refuses every Decision while one is open), and whether the Adviser keeps *Accept & publish* with no RDCO involvement.
+7. **The routing change in §5a needs its own ADR before any code.** Recorded as [ADR-047](adr/047-rdco-routes-and-decides-at-any-time.md), accepted 2026-11-01 by Lee Jasmin Adolfo and not built yet (IR-767). It reverses ADR-032 §3 ("Nobody routes to RDCO by hand"; the Adviser's *Accept & route* to specialist offices; RDCO entering only by hand-back) and changes `ROUTE_TARGETS` in `apps/reviews/routing.py` (adviser → `rdco` only; `rdco` gains the record before any office). It also moves the *Specialist path* and *Hand-back* entries in `CONTEXT.md`. Both questions left open within it are settled: RDCO's executive Decision may override an open Revision request, and the Adviser keeps *Accept & publish* with no RDCO involvement.
 6. **Evaluation.** Whether P2–P4 ship before or after ADR-004's comparison runs, since they change reviewer time under both policies.
 
 ---

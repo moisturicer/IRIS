@@ -96,7 +96,7 @@ Reviewers replaces the separate status strip in Review mode. People show an icon
 
 **Resizing and narrow workspaces.** Breakpoints measure the workspace container. Clamp the review pane to 320px–half that width; clamp the sidebar to 220–420px and at least 40px narrower than the pane; cap the pane so the paper retains 480px. Below 1200px, Details becomes a tab in the review pane. Below 900px, the pane becomes a drawer over the paper with **Back to paper**, and resize edges are hidden. Edges are keyboard-focusable separators with their current width, arrow keys move 24px, and double click restores that column's default. One browser-storage key remembers widths, with safe defaults if storage is unavailable. Use maroon/stone/white/ink, Garamond headings, hairlines, and 36px pointer/44px touch controls.
 
-Read mode, Ask IRIS's entry point and the author's existing view stay unchanged. The [prototype](prototypes/review-workspace.html) also illustrates later phases, which are excluded here: Changes, Threads, review submissions, resolution, suggested wording and notification subscriptions. ADR-047's proposed routing change is separate and is not implemented by this amendment.
+Read mode, Ask IRIS's entry point and the author's existing view stay unchanged. The [prototype](prototypes/review-workspace.html) also illustrates later phases, which are excluded here: Changes, Threads, review submissions, resolution, suggested wording and notification subscriptions. ADR-047's routing change, accepted 2026-11-01, is separate and is not implemented by this amendment.
 
 **Existing layout, retained until the accepted amendment is implemented:**
 
