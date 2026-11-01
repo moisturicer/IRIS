@@ -79,12 +79,12 @@ def disclosure_permits(record) -> bool:
 @dataclass(frozen=True)
 class Authorization:
     permitted: frozenset
-    withheld: frozenset = frozenset()
+    denied: frozenset = frozenset()
     provider_refused: bool = False
 
     @property
     def allowed(self) -> bool:
-        return not self.withheld and not self.provider_refused
+        return not self.denied and not self.provider_refused
 
     def __bool__(self) -> bool:
         return self.allowed

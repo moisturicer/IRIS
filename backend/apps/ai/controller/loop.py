@@ -73,7 +73,7 @@ class _Gathered:
     facts: set = field(default_factory=set)
     revoked: bool = False
     malformed: int = 0
-    withheld: int = 0
+    refusals: int = 0
     stalls: int = 0
     history_ids: Optional[frozenset] = None
     context_changed: bool = False
@@ -170,9 +170,9 @@ class Controller:
                 return prompts.Decision(), str(exc)
             except Withheld as refused:
                 # Nothing was sent. Rebuild without what lost permission, once.
-                audit.append(Step("plan", "withheld"))
-                gathered.withheld += 1
-                if gathered.withheld >= 2:
+                audit.append(Step("plan", "refused"))
+                gathered.refusals += 1
+                if gathered.refusals >= 2:
                     return prompts.Decision(), "source_unavailable"
                 gathered.envelopes[:] = refused.authorization.retain(
                     gathered.envelopes, lambda e: _envelope_dependencies(run, (e,)))

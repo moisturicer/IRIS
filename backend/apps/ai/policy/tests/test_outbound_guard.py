@@ -54,13 +54,13 @@ def test_a_source_that_may_not_be_disclosed_is_withheld_and_the_rest_stays_usabl
         [passage(flood), passage(pond)], model=MODEL)
     assert not result.allowed
     assert result.permitted == {passage(flood)}
-    assert result.withheld == {passage(pond)}
+    assert result.denied == {passage(pond)}
 
 
 def test_a_source_the_reader_can_no_longer_read_is_withheld(reader):
     flood = paper("Flood")
     Record.objects.filter(pk=flood.pk).update(pipeline_status=PipelineStatus.DRAFT)
-    assert guard(reader).authorize([passage(flood)], model=MODEL).withheld == {passage(flood)}
+    assert guard(reader).authorize([passage(flood)], model=MODEL).denied == {passage(flood)}
 
 
 def test_reading_permission_alone_never_permits_transmission(reader):
@@ -80,7 +80,7 @@ def test_a_passage_whose_paper_was_rechunked_since_it_was_read_is_withheld(reade
     flood = paper("Flood")
     read = passage(flood)
     ChunkSet.objects.filter(record=flood, is_active=True).update(content_hash="replaced")
-    assert guard(reader).authorize([read], model=MODEL).withheld == {read}
+    assert guard(reader).authorize([read], model=MODEL).denied == {read}
 
 
 def test_an_abstract_changed_since_it_was_read_is_withheld(reader):
@@ -88,7 +88,7 @@ def test_an_abstract_changed_since_it_was_read_is_withheld(reader):
     read = Dependency.abstract(flood.pk, flood.title, flood.abstract)
     assert guard(reader).authorize([read], model=MODEL).allowed
     Record.objects.filter(pk=flood.pk).update(abstract="Rewritten.")
-    assert guard(reader).authorize([read], model=MODEL).withheld == {read}
+    assert guard(reader).authorize([read], model=MODEL).denied == {read}
 
 
 @pytest.mark.parametrize("model", ["unlisted-model", None])
@@ -105,7 +105,7 @@ def test_by_default_unknown_disclosure_facts_refuse_transmission(reader, setting
     flood = paper("Flood")
     result = OutboundGuard(principal=reader, provider_permits=lambda model: True).authorize(
         [passage(flood)], model=MODEL)
-    assert result.withheld == {passage(flood)}
+    assert result.denied == {passage(flood)}
 
 
 def test_the_default_provider_policy_knows_only_configured_no_training_models(settings):
@@ -176,13 +176,13 @@ def test_an_embargo_answered_after_a_read_withholds_only_that_paper(reader, sett
     record_answer(pond, EmbargoAnswer(until=timezone.localdate() + timedelta(days=30)), actor=None)
     result = real_gate(reader, settings).authorize(read, model=MODEL)
     assert result.permitted == {passage(flood)}
-    assert result.withheld == {passage(pond)}
+    assert result.denied == {passage(pond)}
 
 
 def test_an_unanswered_paper_the_reader_owns_is_readable_but_never_sent(reader, settings):
     draft = paper("Own draft", status=PipelineStatus.DRAFT, owner=reader)
     result = real_gate(reader, settings).authorize([passage(draft)], model=MODEL)
-    assert result.withheld == {passage(draft)}
+    assert result.denied == {passage(draft)}
 
 
 @pytest.mark.parametrize("change", [{"dpa_accepted_at": None}, {"is_ip": True}])
@@ -191,4 +191,4 @@ def test_withdrawn_consent_or_an_ip_mark_withholds_a_paper_read_earlier(reader, 
     read = passage(flood)
     assert real_gate(reader, settings).authorize([read], model=MODEL).allowed
     Record.objects.filter(pk=flood.pk).update(**change)
-    assert real_gate(reader, settings).authorize([read], model=MODEL).withheld == {read}
+    assert real_gate(reader, settings).authorize([read], model=MODEL).denied == {read}
