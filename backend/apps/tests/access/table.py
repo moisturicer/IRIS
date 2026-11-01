@@ -282,8 +282,6 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "psced": Entry({"GET": _case(SIGNED_IN)}),
     "record-types": Entry({"GET": _case(SIGNED_IN)}),
     "dashboard-stats": Entry({"GET": _case(SIGNED_IN)}),
-    "chart-classifications": Entry({"GET": _case(SIGNED_IN)}),
-    "chart-psced": Entry({"GET": _case(SIGNED_IN)}),
 }
 
 
@@ -501,6 +499,17 @@ OPPORTUNITIES = {
     "opportunity-calendar": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")})}),
     "api-root": Shadowed(by="opportunity-list", why="The empty-prefix list matches before the router root."),
 }
+LIBRARY = {
+    # IR-566, ADR-044 §3-§5: the owner is the caller, so the list is anyone's
+    # own. Saving rechecks `visible_to()`, so an unreadable Record is the same
+    # 404 as a missing one; unsaving deletes only one's own row and answers 204
+    # for hidden or missing ids alike.
+    "library-saves": Entry({"GET": _case(SIGNED_IN)}),
+    "library-save": Entry({
+        "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),
+        "DELETE": _case(SIGNED_IN, kwargs={"record_id": Ref("record")}),
+    }),
+}
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "records": RECORDS, "documents": DOCUMENTS_APP, "accounts": ACCOUNTS,
     "reviews": REVIEWS, "ai": AI, "notifications": NOTIFICATIONS,
@@ -509,5 +518,6 @@ TABLE: dict[str, dict[str, Entry | Shadowed]] = {
         "audit-export": Entry({"GET": _case(RDCO_ONLY)}),
     },
     "opportunities": OPPORTUNITIES,
+    "library": LIBRARY,
 }
 DECLARED = TABLE

@@ -93,20 +93,20 @@ describe("the frame sign in opens in", () => {
     vi.restoreAllMocks();
   });
 
-  it("names IRIS and CIT-U in the masthead, the page's only top-level heading", () => {
+  it("names IRIS and the pilot institution in the masthead, the page's only top-level heading", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const [masthead, ...others] = screen.getAllByRole("heading", { level: 1 });
     expect(others).toEqual([]);
     expect(masthead).toHaveAccessibleName(/IRIS/);
     expect(masthead).toHaveAccessibleName(/Cebu Institute of Technology/);
-    expect(screen.getByRole("heading", { level: 2, name: "Welcome Back" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Welcome back" })).toBeInTheDocument();
   });
 
-  it("offers Register in the masthead and under the form, and no longer says 'Sign up'", () => {
+  it("offers Create an account in the masthead and under the form, and no longer says 'Sign up'", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
-    const links = screen.getAllByRole("link", { name: "Register" });
+    const links = screen.getAllByRole("link", { name: "Create an account" });
     expect(links).toHaveLength(2);
     links.forEach((link) => expect(link).toHaveAttribute("href", "/signup"));
     expect(screen.queryByRole("link", { name: /sign up/i })).not.toBeInTheDocument();
@@ -120,18 +120,20 @@ describe("the frame sign in opens in", () => {
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
   });
 
-  it("says what IRIS is in one plain sentence under the headline", () => {
+  it("says what IRIS is in one plain sentence under the headline, naming no institution (IR-768)", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     expect(screen.getByText(/Your research has/)).toHaveTextContent("Your research has a place.");
-    expect(screen.getByText(/^IRIS is CIT-U's system for submitting/)).toBeInTheDocument();
+    expect(screen.getByText(/^IRIS brings research submission, review, approval, and discovery/)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/CIT-U/);
   });
 
-  it("carries CIT-U's name in the footer and no policy link until IR-214", () => {
+  it("names IRIS and its pilot institution in the footer, and no policy link until IR-214", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const footer = screen.getByRole("contentinfo");
-    expect(footer).toHaveTextContent("Cebu Institute of Technology – University");
+    expect(footer).toHaveTextContent("© 2026 IRIS · Research and IP disclosure");
+    expect(footer).toHaveTextContent("Pilot institution: Cebu Institute of Technology – University");
     expect(within(footer).queryAllByRole("link")).toEqual([]);
   });
 
@@ -546,14 +548,14 @@ describe("what a failed sign-in says", () => {
       expect(dialog).toHaveTextContent(/try again in 1:(29|30)/i);
     });
 
-    it("names RDCO and shows no countdown for an account RDCO locked", async () => {
+    it("says an administrator locked it and shows no countdown for an admin lock", async () => {
       failSignInWith(serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" }));
       renderScreen(<LoginPage />, { route: "/login" });
 
       await signIn();
 
       const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
-      expect(dialog).toHaveTextContent(/RDCO/);
+      expect(dialog).toHaveTextContent(/An administrator has locked this account/);
       expect(dialog).not.toHaveTextContent(/try again in|\d+:\d\d/i);
     });
 

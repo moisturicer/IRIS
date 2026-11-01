@@ -62,7 +62,7 @@ export function LoginForm({
                 size="lg"
                 type="email"
                 autoComplete="email"
-                placeholder="iris-student@cit.edu"
+                placeholder="name@university.edu"
                 disabled={disabled}
                 error={shownError("identifier")}
                 // A rejected sign-in is explained by the alert above the form,

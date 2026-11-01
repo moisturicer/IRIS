@@ -6,9 +6,11 @@
  * tree, by role and accessible name.
  */
 import userEvent from "@testing-library/user-event";
+import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { pretendLaidOut } from "@/test/layout";
 import { renderScreen, screen, waitFor } from "@/test/render";
 
 import { RequestDocumentDialog } from "./RequestDocumentDialog";
@@ -142,6 +144,77 @@ describe("RequestDocumentDialog", () => {
     await user.click(screen.getByRole("button", { name: "Cancel" }));
 
     expect(onClose).toHaveBeenCalled();
+  });
+
+  // Found by IR-414's browser pre-pass: the dialog opened with focus left on
+  // the button behind it, so Tab walked the page underneath (WCAG 2.4.3).
+  describe("keyboard", () => {
+    function Opener() {
+      const [shown, setShown] = useState(false);
+      return (
+        <>
+          <button type="button" onClick={() => setShown(true)}>Open the dialog</button>
+          {shown && (
+            <RequestDocumentDialog
+              recordId={RECORD_ID}
+              parties={["ierc"]}
+              partyLabels={{ ierc: "IERC" }}
+              onClose={() => setShown(false)}
+              onCreated={() => {}}
+            />
+          )}
+        </>
+      );
+    }
+
+    it("moves focus into the dialog when it opens", async () => {
+      const user = userEvent.setup();
+      renderScreen(<Opener />);
+
+      await user.click(screen.getByRole("button", { name: "Open the dialog" }));
+
+      expect(screen.getByRole("dialog", { name: "Request documents" })).toContainElement(
+        document.activeElement as HTMLElement,
+      );
+    });
+
+    it("keeps Tab inside the dialog, wrapping both ways", async () => {
+      // jsdom lays nothing out, so the trap would see no tabbable element.
+      const layout = pretendLaidOut();
+      try {
+        const user = userEvent.setup();
+        renderScreen(<Opener />);
+        await user.click(screen.getByRole("button", { name: "Open the dialog" }));
+        const first = await screen.findByRole("checkbox", { name: "Ethics Clearance" });
+        const last = screen.getByRole("button", { name: "Send request" });
+        const dialog = screen.getByRole("dialog", { name: "Request documents" });
+
+        // Ethics Clearance, Patent Draft, Other, message, Cancel, Send request.
+        for (let i = 0; i < 12; i++) {
+          await user.tab();
+          expect(dialog).toContainElement(document.activeElement as HTMLElement);
+        }
+        last.focus();
+        await user.tab();
+        expect(first).toHaveFocus();
+        await user.tab({ shift: true });
+        expect(last).toHaveFocus();
+      } finally {
+        layout.mockRestore();
+      }
+    });
+
+    it("returns focus to the opener when Escape closes it", async () => {
+      const user = userEvent.setup();
+      renderScreen(<Opener />);
+      const opener = screen.getByRole("button", { name: "Open the dialog" });
+      await user.click(opener);
+
+      await user.keyboard("{Escape}");
+
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(opener).toHaveFocus();
+    });
   });
 
   it("has no blocking accessibility violations", async () => {

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-10-30 by Lee Jasmin Adolfo (IR-566, under IR-553). Proposed 2026-10-15.
+**Accepted** — 2026-10-30 by Lee Jasmin Adolfo (IR-566, under IR-553). Proposed 2026-10-15. Q3 (Calls & Conferences saves) would be replaced by [ADR-050](050-calls-for-papers-and-rdco-confirmation.md), Proposed 2026-11-01: saved Calls follow the account and appear in My Library.
 
 IR-566 listed four things to settle before it is ready for an agent: how saves are stored and owned (§Decision), and three product decisions — Likes, reading history and Calls & Conferences saves. The team answered all three on 2026-10-30; they are recorded in §Product decisions with the options that were weighed.
 
@@ -74,7 +74,7 @@ The Star button is removed and Save covers it. Existing stars in `iris_starred_r
 | **B. Retired (chosen)** | One gesture; less to build and explain; IR-553 adds no public popularity count, so a Like has no other use | Readers lose a quick mark with no folder; stars survive only through IR-579 |
 | C. Browser-only and labelled | Nothing to build | Keeps the shared-PC leak IR-553 says to end |
 
-### Q2 — Reading history: **browser-only, cleared on sign-out**
+### Q2 — Reading history: **browser-only, cleared on sign-out** (reversed by §Amendment — 2026-11-01)
 
 History stays in `iris_reading_history`, labelled browser-only, and IR-566 clears it on sign-out and on an account switch, which ends its shared-PC leak. Moving between devices is served by account-backed Reading status here and by IR-573's per-Record position, not by a history log.
 
@@ -88,6 +88,21 @@ History stays in `iris_reading_history`, labelled browser-only, and IR-566 clear
 They stay in `lib/opportunityLibrary.ts`, labelled browser-only, and keep their shared-PC leak until a follow-up ticket moves them. A Calls save reveals far less about a reader than a paper library does, and including them would add a second model and API to this slice.
 
 ### Q4 — Who accepts this ADR: **Lee Jasmin Adolfo**, 2026-10-30.
+
+## Amendment — 2026-11-01 (IR-756): reading history follows the account
+
+**Accepted** 2026-11-01 by Lee Jasmin Adolfo.
+
+**What this supersedes.** Q2 above chose browser-only history, cleared on sign-out. **That choice is reversed.** A paper a reader opens on a lab PC without saving it should be findable at home. Reading status and IR-573's position do not cover that case, because readers rarely save what they open. The privacy cost Q2 named is accepted under the rules below. Q2's sign-out clearing still ships in IR-566 and closes the shared-PC leak until IR-756 lands.
+
+1. **History lives in `apps/library`**, one row per owner and Record. A revisit updates `viewed_at`. Only the 50 most recent are kept per owner. Owner and Record cascade.
+2. **Only the reader can see it.** The owner always comes from authentication. There is no staff endpoint, no Django admin registration and no `AuditEvent`.
+3. **A visit is recorded only by an explicit, idempotent `PUT /api/v1/library/history/<record_id>/`** sent by the paper view. It is never a side effect of `GET /records/<id>/`, so reviewers, the AI Overview and prefetches record nothing. A Record the reader cannot see is refused with a 404, as in §4.
+4. **Reads go through `visible_to`.** A visit to a Record the reader can no longer read shows only as unavailable. No title is copied into the browser.
+5. **Clear history deletes the rows**, not just hides them.
+6. **History is never a discovery signal.** No For you, ranking or count reads it, as IR-557 promised. A guard test fails if a recommender reads the model.
+7. **The reader can pause history.** `LibraryPreferences.keep_history` defaults to on and is created lazily. It is toggled in the History view beside a notice that history is stored on the account and only the reader sees it. Pausing stops new entries and keeps existing ones. The server enforces it: the `PUT` returns 204 and records nothing.
+8. **Existing browser history is never uploaded automatically.** IR-579 offers it for import with saves and stars, for the same reason as §7.
 
 ## Alternatives Considered
 

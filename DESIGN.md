@@ -257,6 +257,10 @@ Quiet and exact.
 - **Ghost** (Copy on the AI Overview, Close): no outline, Faint Ink, a Bar Stone wash and Ink text on hover.
 - **Focus:** a 2 px Binding Maroon ring with an offset on every interactive element (`FOCUS_RING` in `frontend/src/components/ui/interaction.ts`). That file also defines `COLOUR_TRANSITION` for the 150 ms hover/focus fade.
 
+### Save menu (IR-566)
+
+One bookmark control, an outlined icon on a Discover card and a pill on the Record page, filled once the paper is saved. Its menu has three sections divided by Rule Stone lines: **Reading status** (Want to read, Reading, Completed; choosing the checked one clears it but keeps the save), **Save to My Library / Remove from My Library**, and **Your folders**, which closes with one stone-500 line saying that saves follow the account and folders stay in this browser. A failed save or removal returns the previous state and says so in a `role="alert"` line where the reader acted, never silently. There is no Star: Save covers it.
+
 ### Section tabs
 The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone track in the record bar, with a Binding Maroon thumb that slides to the current one over 300 ms. The current label is white; the others are Quiet Ink and turn maroon on hover.
 

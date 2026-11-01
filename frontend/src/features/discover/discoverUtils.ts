@@ -174,25 +174,6 @@ export function metaBadges(
   return badges;
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
- * Per-browser starred papers and collections
- *
- * Owned by `lib/recordLibrary` and re-exported here so the Discover save
- * dropdown and My Library read and write exactly the same state. There is no
- * server-side bookmark endpoint — see that module for why.
- * ──────────────────────────────────────────────────────────────────────────*/
-
-export {
-  DEFAULT_COLLECTIONS,
-  getStarredIds,
-  isStarred,
-  toggleStarred,
-  getCollections,
-  saveCollections,
-  toggleRecordInCollection,
-  addCollection,
-} from "@/lib/recordLibrary";
-export type { Collection } from "@/lib/recordLibrary";
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Citation building

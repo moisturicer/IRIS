@@ -92,7 +92,7 @@ describe("the forgot-password screen", () => {
     const heading = await screen.findByRole("heading", { name: "Check your email" });
     expect(heading).toHaveFocus();
     expect(screen.getByText(RECEIVED.detail)).toBeInTheDocument();
-    expect(screen.getByText(/Check spam, try again after 60 seconds, or contact RDCO or your department administrator\./))
+    expect(screen.getByText(/Check spam, try again after 60 seconds, or contact an administrator\./))
       .toBeInTheDocument();
     const again = screen.getByRole("button", { name: /send another email/i });
     expect(again).toBeDisabled();

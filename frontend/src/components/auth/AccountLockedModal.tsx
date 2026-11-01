@@ -78,13 +78,13 @@ export function AccountLockedModal({ open, onClose, lock, returnTo }: AccountLoc
         <p id={descriptionId} className="mt-3 text-body text-stone-600 leading-relaxed">
           {lock.by === "admin" ? (
             <>
-              RDCO has locked this account, and it stays locked until they unlock it, so trying
-              again won&apos;t help. Contact RDCO or your department administrator.
+              An administrator has locked this account, and it stays locked until they unlock it, so
+              trying again won&apos;t help. Contact an administrator to have it unlocked.
             </>
           ) : endAt === null ? (
             <>
               Too many failed sign-in attempts, so sign-in is paused for this account. Try again
-              later, or contact RDCO or your department administrator if it stays locked.
+              later, or contact an administrator if it stays locked.
             </>
           ) : (
             <>

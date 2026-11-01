@@ -8,12 +8,6 @@ export interface DashboardStats {
   total_published: number;
 }
 
-export interface ClassificationChartRow {
-  classification__name: string | null;
-  count:                number;
-}
-
 export const dashboardApi = {
-  stats:           () => apiClient.get<DashboardStats>("/dashboard/stats/"),
-  classifications: () => apiClient.get<ClassificationChartRow[]>("/dashboard/charts/classifications/"),
+  stats: () => apiClient.get<DashboardStats>("/dashboard/stats/"),
 };

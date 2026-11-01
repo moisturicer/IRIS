@@ -87,7 +87,7 @@ const ROLES: Role[] = ["Student", "Adviser"];
 
 const LEDE = {
   headline: <>Begin with your <span className="text-brand">research identity.</span></>,
-  sentence: "Register once with your CIT-U email. You verify the address, then RDCO reviews the role you ask for.",
+  sentence: "Register once with your institutional email. You verify the address, then an administrator reviews the role you ask for.",
 };
 
 const CROSS_LINK = { prompt: "Already have an account?", label: "Sign in", to: "/login" };
@@ -428,7 +428,7 @@ export default function SignupPage() {
           <ol aria-labelledby={nextStepsId} className="mt-1 list-decimal space-y-2 pl-5 text-body text-stone-700">
             <li>Open the link in that email to verify your address.</li>
             <li>
-              RDCO reviews your request to join as {registered.role === "Adviser" ? "an Adviser" : "a Student"}, and
+              An administrator reviews your request to join as {registered.role === "Adviser" ? "an Adviser" : "a Student"}, and
               emails you when they decide.
             </li>
           </ol>
@@ -441,7 +441,7 @@ export default function SignupPage() {
               Correcting it in place is IR-705. */}
           <p className="mt-section text-pretty text-small text-stone-600">
             If that address is wrong, register again with the right one. Your first request stays pending until
-            RDCO declines it.
+            an administrator declines it.
           </p>
           <ButtonLink to="/login" size="full" className="mt-section-lg">
             Go to sign in
@@ -468,7 +468,7 @@ export default function SignupPage() {
 
   // What sits under the step heading in the left column, beside the fields.
   const aside: ReactNode = [
-    <>Use the email you were given by CIT-U. We send a verification link to it.</>,
+    <>Use the email your institution gave you. We send a verification link to it.</>,
     <>
       Registering as <strong className="font-semibold text-stone-900">{roleArticle}</strong>
       {fullName && <>: {fullName}</>}{form.email.trim() && <>, {form.email.trim()}</>}.
@@ -613,7 +613,7 @@ export default function SignupPage() {
                   {...field("middle_initial")} />
               </div>
 
-              <Input id="signup-email" label="CIT-U Email" required type="email"
+              <Input id="signup-email" label="Institutional email" required type="email"
                 autoComplete="email" {...field("email")} />
             </>
           )}
@@ -765,7 +765,7 @@ export default function SignupPage() {
                 <p id={nextStepsId} className="text-small font-semibold text-stone-700">What happens next</p>
                 <ol aria-labelledby={nextStepsId} className="mt-1 list-decimal space-y-0.5 pl-5 text-small text-stone-600">
                   <li>You verify your email with the link we send you.</li>
-                  <li>RDCO reviews your request, and emails you when they decide.</li>
+                  <li>An administrator reviews your request, and emails you when they decide.</li>
                 </ol>
               </div>
             </>

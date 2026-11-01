@@ -1,166 +1,90 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 import { EmptyState } from "@/components/shared/EmptyState";
-import { ResearchCard } from "@/components/shared/ResearchCard";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
-import { TONES } from "@/components/ui/statusTones";
-import { cn, formatDate } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
-import { waitingHref } from "@/features/records/waitingOnYou";
-import { ContinueProposal } from "@/features/records/ContinueProposal";
-
-import { groupResearch, type ResearchSection } from "./researchSections";
-import { SearchGlyph } from "@/components/brand/IrisBrand";
-
-const CHIP = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold";
+import { FilterChips } from "./FilterChips";
+import {
+  RESEARCH_FILTERS,
+  groupByFilter,
+  type FilterGroup,
+  type ResearchFilter,
+} from "./researchSections";
+import { SubmissionPanel, SubmissionRow } from "./SubmissionRow";
 
 /**
- * Which offices have cleared it. A clearance kept through a resubmission
- * says so; that is clearance-aware resubmission (ADR-003), shown where the
- * owner works. Who is reviewing now is the server's status line.
+ * One filter's records, folded like a chapter: a summary line with the
+ * group's name and what it means, and the ruled rows under it.
  */
-function ClearedChips({ item }: { item: MyResearchItem }) {
-  // Spans, not a list: the card's status slot is a phrasing context.
+function Group({ group, open }: { group: FilterGroup; open: boolean }) {
+  const titleId = `research-${group.id}`;
+  const waiting = group.id === "waiting";
   return (
-    <>
-      {item.cleared_offices.map((office) => (
-        <span key={office.office} className={cn(CHIP, TONES.settled)}>
-          <i className="fas fa-check" aria-hidden />
-          {office.label} cleared{office.preserved && <span className="font-normal"> · kept</span>}
-        </span>
-      ))}
-    </>
-  );
-}
-
-function ResearchItem({ item }: { item: MyResearchItem }) {
-  const byline = [
-    item.authors.map((author) => author.name).join(", "),
-    item.adviser_name && `Adviser: ${item.adviser_name}`,
-  ].filter(Boolean).join(" · ");
-
-  // One link per open request, straight to the act on Paper View (IR-625).
-  const waiting = item.submitter_status.waiting_on_you;
-  const action = item.pipeline_status === "draft"
-    ? <Link to={`/?publish=${item.id}`} className={cn(PILL_SECONDARY, FOCUS_RING)}>Continue</Link>
-    : waiting.length > 0
-      ? (
-        <>
-          {waiting.map((request, i) => (
-            <Link
-              key={`${request.kind}-${request.party}`}
-              to={waitingHref(item.id, request)}
-              className={cn(i === 0 ? PILL_PRIMARY : PILL_SECONDARY, FOCUS_RING)}
-            >
-              {request.action_label}{" "}
-              <span className="sr-only">({request.label})</span>
-            </Link>
-          ))}
-        </>
-      )
-      : undefined;
-
-  return (
-    <li>
-      <ResearchCard
-        href={`/records/${item.id}`}
-        title={item.title}
-        headingLevel={3}
-        compact
-        eyebrow={item.record_type_name ?? "Research"}
-        meta={`Updated ${formatDate(item.updated_at)}`}
-        byline={byline || undefined}
-        status={
-          <>
-            <StatusBadge state={item.workflow_state} label={item.submitter_status.line} />
-            <ClearedChips item={item} />
-          </>
-        }
-        actions={item.can_continue ? <ContinueProposal recordId={item.id} /> : action}
-      />
-    </li>
-  );
-}
-
-function Section({ section }: { section: ResearchSection }) {
-  const titleId = `research-${section.id}`;
-  const waiting = section.id === "waiting";
-  const body = (
-    <>
-      <div className="mb-3">
-        <h2 id={titleId} className={cn("font-display text-title font-semibold", waiting ? "text-brand" : "text-stone-900")}>
-          {section.title}
+    <details open={open} className="group/fold">
+      <summary className={cn("grid cursor-pointer list-none grid-cols-[0.75rem_minmax(0,1fr)] items-start gap-x-3 rounded-lg py-1 [&::-webkit-details-marker]:hidden", FOCUS_RING)}>
+        <i
+          className="fas fa-chevron-right row-span-2 mt-2 w-3 text-label text-stone-500 transition-transform duration-200 group-open/fold:rotate-90 motion-reduce:transition-none"
+          aria-hidden
+        />
+        <h2 id={titleId} className={cn("inline-flex items-center gap-2 font-display text-title font-semibold", waiting ? "text-brand" : "text-stone-900")}>
+          {waiting && <i className="fas fa-circle-exclamation text-small" aria-hidden />}
+          {group.title}
         </h2>
-        {section.note && <p className="text-small text-stone-600">{section.note}</p>}
+        <span className="col-start-2 text-small text-stone-600">{group.note}</span>
+      </summary>
+      <div className="mt-3">
+        <SubmissionPanel tone={waiting ? "waiting" : "plain"}>
+          {group.items.map((item) => <SubmissionRow key={item.id} item={item} />)}
+        </SubmissionPanel>
       </div>
-      <ul className="space-y-3">
-        {section.items.map((item) => <ResearchItem key={item.id} item={item} />)}
-      </ul>
-    </>
-  );
-
-  if (section.id === "archived") {
-    return (
-      <details className="group rounded-2xl border border-stone-200 bg-surface p-card-compact md:p-card">
-        <summary className={cn("cursor-pointer list-none rounded-sm", FOCUS_RING)}>
-          <span className="inline-flex items-center gap-2 font-display text-title font-semibold text-stone-900">
-            <i className="fas fa-chevron-right text-label text-stone-500 transition-transform duration-150 group-open:rotate-90 motion-reduce:transition-none" aria-hidden />
-            Archived
-          </span>
-          <span className="block text-small text-stone-600">{section.note}</span>
-        </summary>
-        <ul className="mt-4 space-y-3">
-          {section.items.map((item) => <ResearchItem key={item.id} item={item} />)}
-        </ul>
-      </details>
-    );
-  }
-
-  return (
-    <section
-      aria-labelledby={titleId}
-      className={cn(waiting && "rounded-2xl border border-brand-100 bg-brand-50 p-card-compact md:p-card")}
-    >
-      {body}
-    </section>
+    </details>
   );
 }
 
 interface MyResearchListProps {
-  items:   MyResearchItem[];
-  loading: boolean;
-  failed:  boolean;
-  onRetry: () => void;
+  items:    MyResearchItem[];
+  loading:  boolean;
+  failed:   boolean;
+  onRetry:  () => void;
+  filter:   ResearchFilter;
+  onFilterChange: (filter: ResearchFilter) => void;
 }
 
 /**
- * The owner's research, grouped by who has each record now (IR-410; spec
- * §4.9 as amended 2026-10-11): what waits on the owner first, then the review
- * path, then drafts and finished work. No counts are shown anywhere.
+ * My submissions (IR-410; spec §4.9 as amended 2026-10-11): the owner's
+ * records filed under the filters (Needs your action, In review, Drafts,
+ * Finished), what waits on the owner first. Each group folds; Finished
+ * starts folded. Picking a filter shows that group alone, open. Who has a
+ * record now is on its own row, in the server's words. No counts.
  */
-export function MyResearchList({ items, loading, failed, onRetry }: MyResearchListProps) {
+export function MyResearchList({ items, loading, failed, onRetry, filter, onFilterChange }: MyResearchListProps) {
   const [query, setQuery] = useState("");
 
-  const sections = useMemo(() => {
+  const all = useMemo(() => groupByFilter(items), [items]);
+  const groups = useMemo(() => {
     const needle = query.trim().toLowerCase();
     const matched = needle
       ? items.filter((item) =>
           item.title.toLowerCase().includes(needle) ||
           item.authors.some((author) => author.name.toLowerCase().includes(needle)))
       : items;
-    return groupResearch(matched);
-  }, [items, query]);
+    return groupByFilter(matched).filter((group) => filter === "all" || group.id === filter);
+  }, [items, query, filter]);
+
+  // Offer only the filters that would show something, plus All.
+  const filters = RESEARCH_FILTERS.filter((f) => f.value === "all" || f.value === filter || all.some((g) => g.id === f.value));
 
   if (loading) {
     return (
       <div className="space-y-3" role="status">
         <span className="sr-only">Loading your research…</span>
         {[0, 1, 2].map((i) => (
-          <div key={i} className="h-32 rounded-xl border border-stone-200 bg-white motion-safe:animate-pulse" aria-hidden />
+          <div key={i} className="h-28 rounded-2xl border border-stone-200 bg-white motion-safe:animate-pulse" aria-hidden />
         ))}
       </div>
     );
@@ -193,28 +117,36 @@ export function MyResearchList({ items, loading, failed, onRetry }: MyResearchLi
 
   return (
     <div>
-      <label className="relative mb-section block">
-        <span className="sr-only">Search your research</span>
-        <SearchGlyph className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-500" />
-        <input
-          type="search"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by title or author"
-          className="w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-body placeholder:text-stone-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-        />
-      </label>
+      <div className="mb-section rounded-2xl border border-stone-200 bg-white p-card-compact md:p-card">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <label className="relative block lg:w-80">
+            <span className="sr-only">Search your research</span>
+            <SearchGlyph className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-500" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search by title or author"
+              className="w-full rounded-lg border border-stone-300 bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+            />
+          </label>
+          <FilterChips label="Show" options={filters} value={filter} onChange={onFilterChange} />
+        </div>
+      </div>
 
-      {sections.length === 0 ? (
+      {groups.length === 0 ? (
         <EmptyState
           framed
           icon="fa-magnifying-glass"
-          title={`Nothing matches “${query.trim()}”`}
-          message="Search looks at titles and author names."
+          title={query.trim() ? `Nothing matches “${query.trim()}”` : "Nothing here right now"}
+          message={query.trim() ? "Search looks at titles and author names." : "Choose All to see every record."}
         />
       ) : (
         <div className="space-y-section-lg">
-          {sections.map((section) => <Section key={section.id} section={section} />)}
+          {groups.map((group) => (
+            // Keyed on the filter so a group re-opens when it is picked alone.
+            <Group key={`${filter}-${group.id}`} group={group} open={filter !== "all" || group.id !== "finished"} />
+          ))}
         </div>
       )}
     </div>
