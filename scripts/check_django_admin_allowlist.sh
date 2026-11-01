@@ -9,6 +9,8 @@ root=$(pwd -W 2>/dev/null || pwd)
 image=nginxinc/nginx-unprivileged:1.25-alpine
 name=iris-django-admin-check
 html=$(mktemp -d)
+# mktemp makes it private, and the container's nginx is another user.
+chmod 755 "$html"
 echo '<!doctype html><title>IRIS</title>' > "$html/index.html"
 html_mount=$(cd "$html" && { pwd -W 2>/dev/null || pwd; })
 failed=0
@@ -61,6 +63,7 @@ echo "== nothing configured"
 start || fail "nginx did not start with no allowlist"
 expect "the default is deny" 403 /django-admin/
 expect "the default denies deeper paths" 403 /django-admin/login/
+expect "the refusal's own address is not reachable" 404 /django-admin-refused
 expect "a forwarded address buys nothing" 403 /django-admin/ 127.0.0.1
 headers=$(docker exec "$name" curl -s -D - -o /dev/null http://127.0.0.1:8080/django-admin/)
 case "$(printf '%s' "$headers" | tr 'A-Z' 'a-z')" in
