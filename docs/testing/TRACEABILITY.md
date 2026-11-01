@@ -370,6 +370,14 @@ The frontend's unread-notifications store is module state shared by the whole ta
 
 **Evidence:** run locally 2026-11-01, single files: the two files above, 8 passed; every test file touching the auth store or API client (22 files), 506 passed after `login` started bumping the epoch. `tsc --noEmit` clean; eslint clean on the changed files. The full suite is left to CI.
 
+## IR-370 one unread-notifications fetch per page, however many bells
+
+Up to three bells are mounted at once (sidebar, phone bar, Ask IRIS's toolbar) and each fetched `/notifications/?unread=true` on mount, making it the most-called endpoint. The fetch moves to one owner, `useUnreadNotificationsFetch` in `AppShell`; `useNotifications` and every bell only read the shared store. The owner refetches on each new `sessionEpoch`, so a sign-in over another account fetches again while the shell stays mounted, and IR-746's late-response guard is kept. Marking read and the Notifications page are unchanged.
+
+**Tests:** `frontend/src/components/layout/AppShell.test.tsx` — with the sidebar's, the phone bar's and a page's bell mounted, one request (failed with three before the change). `NotificationBell.test.tsx` — a bell alone fetches nothing; three bells show one count and all move on mark-read and mark-all-read with no refetch; nothing is fetched signed out, once per new session, and again on sign-in over another account. IR-746's cases are unchanged except that `renderBell` now mounts the fetch owner beside the bell, since a bell no longer fetches.
+
+**Evidence:** run locally 2026-11-01, single files: `components/layout/` and the notifications store test, 41 passed; DiscoverPage, NotificationsPage and `features/ai`, 214 passed. `tsc --noEmit` clean; eslint clean on the changed files. The full suite is left to CI.
+
 ## IR-473 the document-access PIN ceremony is removed (NFR-S4)
 
 Verifying a PIN unlocked nothing: no permission, download or view read it. `POST /reviews/pin/generate/` and `/pin/verify/` are gone (404), and so are `RecordAuthPinViewSet`, the `RecordAuthPin` model (`reviews/0020` drops the table), `core.utils.generate_pin`, both access-matrix rows and `reviewsApi.generatePin`/`verifyPin`. **The audit types `PIN_GENERATED` and `PIN_VERIFIED` are kept as `AuditEvent` choices**, and kept in `frontend/src/types/audit.ts`, so rows written before the removal still display. Nothing writes them any more.

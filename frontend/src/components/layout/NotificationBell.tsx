@@ -18,8 +18,8 @@ const PREVIEW_LIMIT = 5;
  * answers "is there anything new right now?" without leaving the current
  * screen.
  *
- * Reads from the shared `useNotificationsStore`, which the sidebar's unread
- * badge already uses -- deliberately NOT its own fetch. An earlier version
+ * Reads from the shared `useNotificationsStore` -- deliberately NOT its own
+ * fetch. `AppShell` fetches once for every bell on screen (IR-370). An earlier version
  * fetched independently and the two counters immediately disagreed: marking
  * all read in the bell cleared the bell but left the sidebar showing the old
  * count until a page refresh. One source of truth, two surfaces.
@@ -37,7 +37,7 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ align = "end" }: NotificationBellProps) {
-  // Shares the mount-time fetch the sidebar already performs.
+  // AppShell owns the fetch (IR-370); the bell only reads the store.
   const { unreadCount } = useNotifications();
   const items = useNotificationsStore((s) => s.items);
   const markReadInStore = useNotificationsStore((s) => s.markRead);
@@ -72,7 +72,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
     try {
       await notificationsApi.markAllRead();
     } catch {
-      /* left cleared locally; the next mount-time fetch re-syncs */
+      /* left cleared locally; the next page load's fetch re-syncs */
     }
   };
 
