@@ -109,11 +109,25 @@ describe("a reader who must ask", () => {
     await userEvent.click(screen.getByRole("button", { name: "Request download" }));
     const dialog = await screen.findByRole("dialog", { name: "Request download access" });
     expect(dialog).toHaveTextContent("A published thesis");
+    await expectNoBlockingA11yViolations(dialog);
 
-    await userEvent.click(screen.getByRole("button", { name: "Submit request" }));
+    // A request says why (IR-688): nothing is sent without a note.
+    const submit = screen.getByRole("button", { name: "Submit request" });
+    expect(submit).toBeDisabled();
+    await userEvent.type(screen.getByRole("textbox", { name: "Why do you need a copy?" }), "  For my thesis.  ");
+    await userEvent.click(submit);
 
-    await waitFor(() => expect(requestDownload).toHaveBeenCalledWith(7));
+    await waitFor(() => expect(requestDownload).toHaveBeenCalledWith(7, "For my thesis."));
     expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("keeps the note to 500 characters", async () => {
+    renderControl(state({ state: "none" }));
+    await userEvent.click(screen.getByRole("button", { name: "Request download" }));
+    const note = await screen.findByRole("textbox", { name: "Why do you need a copy?" });
+
+    expect(note).toHaveAttribute("maxLength", "500");
+    expect(note).toHaveAccessibleDescription(/500 characters/);
   });
 
   it("shows a pending request and offers nothing to click", () => {

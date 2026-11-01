@@ -13,6 +13,8 @@ urlpatterns = [
         path("<int:pk>/", DownloadRequestViewSet.as_view({"get": "retrieve", "patch": "partial_update"}), name="download-request-detail"),
         path("<int:pk>/approve/", DownloadRequestViewSet.as_view({"post": "approve"}), name="download-request-approve"),
         path("<int:pk>/decline/", DownloadRequestViewSet.as_view({"post": "decline"}), name="download-request-decline"),
+        path("<int:pk>/revoke/", DownloadRequestViewSet.as_view({"post": "revoke"}), name="download-request-revoke"),
+        path("<int:pk>/cancel/", DownloadRequestViewSet.as_view({"post": "cancel"}), name="download-request-cancel"),
     ])),
     path("delete-requests/", include([
         # Read and decided only: a request is raised by DELETE /records/<id>/ (IR-496).

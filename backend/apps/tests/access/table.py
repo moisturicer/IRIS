@@ -230,19 +230,32 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # -- download requests ------------------------------------------------
     "download-requests": Entry({
         "GET": _case(RDCO_ONLY),
-        "POST": _case(SIGNED_IN, data={"record": Ref("published")}),
+        "POST": _case(SIGNED_IN, data={"record": Ref("published"), "note": "For my thesis."}),
     }),
     "download-request-detail": Entry({
         "GET": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}),
         "PATCH": _case(
-            RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={"action": "decline"},
+            RDCO_ONLY, kwargs={"pk": Ref("download_request")},
+            data={"action": "decline", "note": "Not now."},
         ),
     }),
     "download-request-approve": Entry({
         "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={}),
     }),
     "download-request-decline": Entry({
-        "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={}),
+        "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={"note": "Not now."}),
+    }),
+    # IR-688: RDCO ends `other`'s live grant, with a note.
+    "download-request-revoke": Entry({
+        "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_grant")}, data={"note": "Misused."}),
+    }),
+    # IR-688: only the requester (`other`) cancels their own pending request;
+    # everyone else's lookup is narrowed to their own, so it is hidden.
+    "download-request-cancel": Entry({
+        "POST": _case(
+            row(ANON, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+            kwargs={"pk": Ref("download_request")}, data={},
+        ),
     }),
     # Exempt readers and grant holders (ADR-048). `other` holds a grant on
     # `published`; the role-less superuser holds none and is exempt from nothing.

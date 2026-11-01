@@ -272,7 +272,7 @@ class RequestingAgainTests(Fixtures):
 
     def post(self):
         self.client.force_authenticate(self.reader)
-        return self.client.post(DOWNLOAD_REQUESTS, {"record": self.record.pk}, format="json")
+        return self.client.post(DOWNLOAD_REQUESTS, {"record": self.record.pk, "note": "For my thesis."}, format="json")
 
     def test_an_ended_request_may_be_made_again(self):
         cases = {
@@ -299,7 +299,7 @@ class RequestingAgainTests(Fixtures):
         self.client.force_authenticate(self.reader)
         response = self.client.post(
             DOWNLOAD_REQUESTS,
-            {"record": self.record.pk, "grant_expires_at": "2099-01-01T00:00:00Z"},
+            {"record": self.record.pk, "note": "For my thesis.", "grant_expires_at": "2099-01-01T00:00:00Z"},
             format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)

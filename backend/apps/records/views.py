@@ -30,8 +30,12 @@ from core.permissions import (
 )
 from .download_service import (
     DownloadRequestAlreadyDecided,
+    GrantNotLive,
+    NoteRequired,
     OwnDownloadRequest,
+    cancel_download_request,
     decide_download_request,
+    revoke_download_grant,
 )
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
 # .models: IR-153 added it to this line while IR-135 moved the definition into
@@ -1362,8 +1366,10 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     GET    /download-requests/                    -- RDCO: all requests
     POST   /download-requests/                    -- authenticated user requests download
     POST   /download-requests/<id>/approve/       -- RDCO: grant, email requester
-    POST   /download-requests/<id>/decline/       -- RDCO: decline, in-app notify requester
+    POST   /download-requests/<id>/decline/       -- RDCO: decline with a `note`, notify requester
     PATCH  /download-requests/<id>/               -- RDCO: the same decision, by `action`
+    POST   /download-requests/<id>/revoke/        -- RDCO: end a live grant with a `note` (IR-688)
+    POST   /download-requests/<id>/cancel/        -- the requester: withdraw their own pending request
     """
     serializer_class = DownloadRequestSerializer
     queryset         = DownloadRequest.objects.select_related("record", "requested_by")
@@ -1373,12 +1379,16 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         # Anyone may *request* a download; only RDCO acts on the queue. This was
         # IsStaff, which is all four offices -- so ITSO or IERC could approve
         # release of a document from a record routed to neither of them (IR-165).
-        if self.action == "create":
+        if self.action in ("create", "cancel"):
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdmin()]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if self.action == "cancel":
+            # Only one's own request, whatever one's role: anyone else's is a
+            # 404 identical to a missing one (IR-688).
+            qs = qs.filter(requested_by=self.request.user)
         status_filter = self.request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
@@ -1412,7 +1422,10 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
                 {"detail": "Provide action: 'approve' or 'decline'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        response = self._decide(request, instance, approved=action == "approve")
+        response = self._refusal(
+            decide_download_request, instance, request.user,
+            approved=action == "approve", note=request.data.get("note"),
+        )
         if response is not None:
             return response
         return Response(self.get_serializer(instance).data)
@@ -1420,26 +1433,48 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         """POST /download-requests/<id>/approve/ — set approved, notify requester with email."""
-        response = self._decide(request, self.get_object(), approved=True)
+        response = self._refusal(decide_download_request, self.get_object(), request.user, approved=True)
         return response or Response(
             {"detail": "Download request approved. The requester has been notified."}
         )
 
     @action(detail=True, methods=["post"])
     def decline(self, request, pk=None):
-        """POST /download-requests/<id>/decline/ — set declined, notify requester in-app."""
-        response = self._decide(request, self.get_object(), approved=False)
+        """POST /download-requests/<id>/decline/ {note} — set declined, notify requester."""
+        response = self._refusal(
+            decide_download_request, self.get_object(), request.user,
+            approved=False, note=request.data.get("note"),
+        )
         return response or Response(
             {"detail": "Download request declined. The requester has been notified."}
         )
 
-    def _decide(self, request, download_request, *, approved):
-        """The refusal for this decision as a Response, or None once it is made."""
+    @action(detail=True, methods=["post"])
+    def revoke(self, request, pk=None):
+        """POST /download-requests/<id>/revoke/ {note} — end a live grant, notify the reader."""
+        download_request = self.get_object()
+        response = self._refusal(
+            revoke_download_grant, download_request, request.user, note=request.data.get("note"),
+        )
+        return response or Response(self.get_serializer(download_request).data)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        """POST /download-requests/<id>/cancel/ — the requester withdraws a pending request."""
+        download_request = self.get_object()
+        response = self._refusal(cancel_download_request, download_request, request.user)
+        return response or Response(self.get_serializer(download_request).data)
+
+    @staticmethod
+    def _refusal(act, download_request, user, **kwargs):
+        """Run `act`; its refusal as a Response, or None once it is done."""
         try:
-            decide_download_request(download_request, request.user, approved=approved)
+            act(download_request, user, **kwargs)
         except OwnDownloadRequest as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
-        except DownloadRequestAlreadyDecided as exc:
+        except NoteRequired as exc:
+            return Response({"note": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
+        except (DownloadRequestAlreadyDecided, GrantNotLive) as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return None
 
