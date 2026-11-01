@@ -15,7 +15,7 @@ import asyncpg
 from ai.research.tools import ResearchTools
 from ai.runs import config as runs_config
 from ai.runs.dispatch import Notifier, PollingNotifier
-from ai.runs.executor import Executor
+from ai.runs.executor import Executor, Unavailable
 from ai.runs.store import Claim, Fenced, RunStore
 
 log = logging.getLogger(__name__)
@@ -31,10 +31,14 @@ class RunService:
         self.worker = f"worker-{uuid.uuid4().hex[:12]}"
 
     def pinned(self) -> dict:
-        return {
+        pinned = {
             "executor": self.executor.name, "executor_version": self.executor.version,
             "protocol": runs_config.PROTOCOL, "schema": runs_config.SCHEMA,
         }
+        pin = getattr(self.executor, "pin", None)
+        if pin is not None:
+            pinned["agent"] = pin.as_dict()
+        return pinned
 
     async def submit(self, grant, *, key, question, conversation_id, base_revision,
                      depth="ordinary"):
@@ -70,9 +74,19 @@ class RunService:
     async def execute(self, claim: Claim) -> None:
         """The run's tools read under the reader's stored grant (IR-719)."""
         run_id = claim.run_id
+        if (claim.pinned or {}).get("agent") != self.pinned().get("agent"):
+            # Never continue a run under another AGENT pin (IR-727).
+            log.info("run %s unavailable: pin_changed", run_id)
+            await self.store.fail(run_id, claim.fence, "unavailable")
+            return
         try:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id)
             result = await self.executor.answer(claim.question, tools)
+        except Unavailable as refused:
+            # Operators get the code; readers only see `unavailable`.
+            log.info("run %s unavailable: %s", run_id, refused.code)
+            await self.store.fail(run_id, claim.fence, "unavailable")
+            return
         except Exception:
             await self.store.fail(run_id, claim.fence, "executor_failed")
             return

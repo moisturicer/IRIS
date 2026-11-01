@@ -83,6 +83,8 @@ class _Raced(Exception):
 class Claim:
     fence: int
     question: str
+    #: The pin persisted at admission (IR-727).
+    pinned: dict | None = None
     #: The Conversation's Paper Chat scope, if any (IR-719).
     scope_record_id: int | None = None
     run_id: uuid.UUID | None = None
@@ -287,7 +289,7 @@ class RunStore:
                 WHERE r.id = $1 AND c.id = r.conversation_id AND c.deleted_at IS NULL
                   AND r.state IN ('queued', 'running') AND r.deadline_at > now()
                   AND (r.lease_expires_at IS NULL OR r.lease_expires_at <= now())
-            RETURNING r.fence, r.question, r.allowance, r.reader_grant, c.scope_record_id""",
+            RETURNING r.fence, r.question, r.allowance, r.pinned, r.reader_grant, c.scope_record_id""",
             run_id, worker, float(lease_seconds),
         )
         if row is None:
@@ -311,7 +313,7 @@ class RunStore:
             run_id, row["fence"], executor, reserved_units,
         )
         await self._journal(conn, run_id, "started", {"attempt": used + 1})
-        return Claim(fence=row["fence"], question=row["question"],
+        return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"],
                      scope_record_id=row["scope_record_id"], run_id=run_id,
                      grant=row["reader_grant"])
 
@@ -539,8 +541,9 @@ class RunStore:
                 if revision is None:
                     raise NotFound
                 turns = await conn.fetch(
-                    """SELECT id, run_id, ordinal, question, answer, created_at FROM iris_ai.turn
-                        WHERE conversation_id = $1 ORDER BY ordinal""",
+                    """SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.created_at, r.pinned
+                         FROM iris_ai.turn t JOIN iris_ai.ask_run r ON r.id = t.run_id
+                        WHERE t.conversation_id = $1 ORDER BY t.ordinal""",
                     conversation_id,
                 )
                 citations = await conn.fetch(
@@ -562,6 +565,7 @@ class RunStore:
                 "id": str(t["id"]), "run_id": str(t["run_id"]), "ordinal": t["ordinal"],
                 "question": t["question"], "answer": t["answer"],
                 "created_at": t["created_at"].isoformat(),
+                "pinned": t["pinned"],
                 "citations": by_turn.get(t["id"], []),
             } for t in turns],
         }
