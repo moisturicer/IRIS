@@ -67,7 +67,9 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements/development.txt
+        # ai/requirements.txt too: test_ai_runtime_runs_db.py drives the
+        # gateway's run routes against this job's PostgreSQL (IR-722).
+        run: pip install -r requirements/development.txt -r ../ai/requirements.txt
 
       - name: Static check for undefined names
         # Catches the class of defect that currently stops the app importing.

@@ -84,4 +84,7 @@ async def root():
 
 from ai.api.chat import router as chat_router  # noqa: E402  (router import after app)
 
+from ai.api.runs import router as runs_router  # noqa: E402
+
 app.include_router(chat_router, prefix="/api/v1/ai", tags=["ai"])
+app.include_router(runs_router, prefix="/api/v1/ai", tags=["runs"])

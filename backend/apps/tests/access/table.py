@@ -472,6 +472,7 @@ AI = {
     "ai-ask-run-retry": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant-renew": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
+    "ai-runtime-grant": Entry({"POST": _case(SIGNED_IN, data={})}),
     "ai-embed-record": Entry({"POST": _case(OFFICE_ONLY, kwargs=RECORD, data={})}),
     "ai-embed-all": Entry({"POST": _case(OFFICE_ONLY, data={})}),
     "ai-embed-jobs": Entry({"GET": _case(OFFICE_ONLY)}),

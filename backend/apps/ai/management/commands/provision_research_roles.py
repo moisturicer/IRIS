@@ -28,6 +28,7 @@ DEFINER_FUNCTIONS = (
     "current_reader()",
     "begin_research(text, text)",
     "research_record_ids()",
+    "reader_status(bigint)",
 )
 HELPER_FUNCTIONS = ("hmac_sha256(bytea, bytea)", "b64url_encode(bytea)", "b64url_decode(text)")
 RUNTIME_FUNCTIONS = (
@@ -196,6 +197,10 @@ class Command(BaseCommand):
         for role in RUNTIME_ROLES:
             for table in PROTECTED_TABLES:
                 cursor.execute(f"GRANT SELECT ON public.{table} TO {role}")
+        # The AI runtime fences a departed reader's runs (IR-722).
+        cursor.execute(
+            "GRANT EXECUTE ON FUNCTION iris_authz.reader_status(bigint) TO iris_ai_runtime"
+        )
         # Django renews grants, so it alone may ask whether one verifies.
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.verify_research_grant(text, text) TO iris_django_runtime"
