@@ -37,6 +37,7 @@ from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.retrieval.scan_depth import scan_depth
 from apps.records.models import Record
 from core.enums import PUBLICLY_VISIBLE_STATUSES, RecordTypeName
+from apps.ai.grants.reads import research_records
 
 #: What the related-works panel shows. Three, because it sits beside a paper
 #: rather than being the page; a caller wanting more passes more.
@@ -76,7 +77,7 @@ def similar_records(
     if seed is None:
         # Nothing to compare *from*. Not an error — see the module docstring.
         return []
-    return _nearest(seed, Record.objects.visible_to(user), limit=limit)
+    return _nearest(seed, research_records(user), limit=limit)
 
 
 def related_published_research(record: Record, user) -> Optional[list[SimilarRecord]]:
@@ -106,7 +107,7 @@ def related_published_research(record: Record, user) -> Optional[list[SimilarRec
     if seed is None:
         return None
     completed = (
-        Record.objects.visible_to(user)
+        research_records(user)
         .filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
         .exclude(record_type__name=RecordTypeName.PROPOSAL)
     )

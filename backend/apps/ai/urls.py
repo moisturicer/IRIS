@@ -1,6 +1,7 @@
 from django.urls import path
 from .views.research import ResearchRunDetailView
 from .views.brief import PaperBriefView
+from .views.grants import RunGrantRenewView, RunGrantView
 
 from .views import (
     AIStatusView,
@@ -29,6 +30,8 @@ urlpatterns = [
     path("ask/runs/<uuid:pk>/stream/", RunStreamView.as_view(), name="ai-ask-run-stream"),
     path("ask/runs/<uuid:pk>/cancel/", RunCancelView.as_view(), name="ai-ask-run-cancel"),
     path("ask/runs/<uuid:pk>/retry/", RunRetryView.as_view(), name="ai-ask-run-retry"),
+    path("ask/runs/<uuid:pk>/grant/", RunGrantView.as_view(), name="ai-ask-run-grant"),
+    path("ask/runs/<uuid:pk>/grant/renew/", RunGrantRenewView.as_view(), name="ai-ask-run-grant-renew"),
     path("search/", SemanticSearchView.as_view(), name="ai-search"),
     path("status/", AIStatusView.as_view(),       name="ai-status"),
     path("records/<int:pk>/overview/", RecordOverviewView.as_view(),

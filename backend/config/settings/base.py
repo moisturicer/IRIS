@@ -625,6 +625,33 @@ AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
 AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
 # Added to an attempt's own timeout to make its lease. Not a spending limit.
 AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
+# IR-717 (ADR-049 §6-7): Django-signed research grants, verified inside
+# PostgreSQL. Off by default; when on, every key below is required and
+# Django refuses to start without it. KEYS is kid:base64url-secret pairs
+# (32+ bytes each); ACTIVE_KEY signs, the others only verify while retiring.
+AI_RESEARCH_GRANTS = config("AI_RESEARCH_GRANTS", default=False, cast=bool)
+AI_RESEARCH_GRANT_KEYS = config("AI_RESEARCH_GRANT_KEYS", default="")
+AI_RESEARCH_GRANT_ACTIVE_KEY = config("AI_RESEARCH_GRANT_ACTIVE_KEY", default="")
+AI_RESEARCH_GRANT_AUDIENCE = config("AI_RESEARCH_GRANT_AUDIENCE", default="")
+AI_RESEARCH_GRANT_DEPLOYMENT = config("AI_RESEARCH_GRANT_DEPLOYMENT", default="")
+AI_RESEARCH_GRANT_TTL_SECONDS = config("AI_RESEARCH_GRANT_TTL_SECONDS", default=300, cast=int)
+# Who decides research reads (IR-718): `application` (visible_to) or
+# `database` (row policy over a restricted login). Off until cutover.
+AI_RESEARCH_READ_POLICY = config("AI_RESEARCH_READ_POLICY", default="application")
+AI_RESEARCH_DB_USER = config("AI_RESEARCH_DB_USER", default="")
+AI_RESEARCH_DB_PASSWORD = config("AI_RESEARCH_DB_PASSWORD", default="")
+# The restricted research login, as its own alias (like `admission`).
+if AI_RESEARCH_READ_POLICY == "database":
+    DATABASES["research"] = {
+        **DATABASES["default"],
+        "USER": AI_RESEARCH_DB_USER,
+        "PASSWORD": AI_RESEARCH_DB_PASSWORD,
+        "OPTIONS": {
+            **DATABASES["default"].get("OPTIONS", {}),
+            "connect_timeout": 5,
+            "application_name": "iris-research-read",
+        },
+    }
 AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
 AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
 AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)

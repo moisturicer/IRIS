@@ -26,6 +26,7 @@ from apps.ai.overview.assembly import whole_paper
 from apps.records.models import Record
 
 from .reading import PROMPT_VERSION, SYSTEM, combine, prompt, reading_sections, verify_fields
+from apps.ai.grants.reads import research_records
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,7 @@ def _authorized(record_id, user_id):
     user = get_user_model().objects.filter(pk=user_id, is_active=True).first()
     if user is None:
         return None
-    record = Record.objects.visible_to(user).filter(pk=record_id).first()
+    record = research_records(user).filter(pk=record_id).first()
     if record is None or not composition_root().vendor_permits()(record):
         return None
     return record

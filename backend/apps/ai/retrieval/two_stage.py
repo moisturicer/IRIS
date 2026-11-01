@@ -35,6 +35,7 @@ from apps.records.models import Record
 
 from .ports import VECTOR, RetrievalResult, RetrievedChunk, Retriever
 from .scan_depth import scan_depth
+from apps.ai.grants.reads import research_records
 
 #: Stage 1 keeps this many records. ADR-013's sizing: a few dozen records is
 #: roughly a thousand chunks, which is a cheap stage-2 search.
@@ -91,7 +92,7 @@ class TwoStageRetriever(Retriever):
         # Both stages and their row reads share one scan depth (IR-440).
         with scan_depth():
             # -- Stage 1: candidate records, visibility-filtered before scoring --
-            visible_records = Record.objects.visible_to(user)
+            visible_records = research_records(user)
             if self._record is not None:
                 # Scoped to one Record (IR-298): still through `visible_to`, not
                 # instead of it -- a Conversation's Record may have stopped being
