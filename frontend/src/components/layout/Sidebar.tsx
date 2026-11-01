@@ -167,7 +167,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
   const [needsAction, setNeedsAction] = useState(false);
-  const { pathname } = useLocation();
+  const { pathname, search } = useLocation();
 
   // Every nav decision comes from lib/access.ts, the same map the router gates
   // on, and My Reviews from the same `review_access` flag its route reads.
@@ -182,8 +182,9 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   }, [roleName]);
 
   // My Library's dot: some record of the user's waits on them -- a revision or
-  // a document was asked for (B2, `needs_action_mine`). Asked again on each
-  // move between pages, so answering the request clears it without a reload.
+  // a document was asked for (B2, `needs_action_mine`). Asked again whenever
+  // the address changes, query string included -- Paper View's sections are
+  // `?section=` -- so answering the request clears it without a reload.
   // A failed read shows no dot rather than a stale one.
   useEffect(() => {
     let live = true;
@@ -192,7 +193,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       .then(({ data }) => { if (live) setNeedsAction((data.needs_action_mine ?? 0) > 0); })
       .catch(() => { if (live) setNeedsAction(false); });
     return () => { live = false; };
-  }, [pathname]);
+  }, [pathname, search]);
 
   // Badges are the only per-item state the map does not carry: the map answers
   // "may this role open it", never "how many are waiting". Role requests are
