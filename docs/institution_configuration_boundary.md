@@ -4,6 +4,8 @@
 
 **Settled, cited here and not re-argued:** [ADR-002](adr/002-workflow-transition-table.md) (the transition table and its 2026-09-09 amendment), [ADR-005](adr/005-instance-per-tenant.md) (instance-per-tenant), [ADR-009](adr/009-authorization-model.md) (the authorization model), [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md) and [ADR-047](adr/047-rdco-routes-and-decides-at-any-time.md) (how review is routed and decided today).
 
+*Notation:* "ADR-002 §Amendment N" means numbered item N of ADR-002's single 2026-09-09 Amendment.
+
 ---
 
 ## 0 · Why this document exists
@@ -34,7 +36,7 @@ Configuration is **per instance and set at deployment time** (ADR-005). There is
 |---|---|---|---|---|
 | C1 | **Office labels** — what each office is called | CIT-U's "IERC" becomes "Research Ethics Board" | Labels of `Office`, `ReviewStage` (`core/enums.py`), serialized by the API | **CURRENT** as enum labels (a one-line backend edit per label). **PROPOSED:** settings override per ADR-002 §Amendment 4, so a relabel needs no code at all |
 | C2 | **Which offices exist, and how many** | A fourth clearance office | The office vocabulary — see §4 for the exact seams | **CURRENT** as code in a short, named list of places. Making the roster itself configuration is **not decided** (ADR-002 §Amendment 3) |
-| C3 | **Who decides each record type** | Proposals decided by the Adviser; theses by the coordinating office | `DECIDING_PARTIES` in `apps/records/lifecycle.py` | **CURRENT**, as a CIT-U default in code |
+| C3 | **Who decides each record type** | Proposals decided by the Adviser or RDCO; everything else by RDCO alone | `DECIDING_PARTIES` in `apps/records/lifecycle.py` | **CURRENT**, as a CIT-U default in code |
 | C4 | **Record-owned workflow edges** | Who may restore a record whose deletion was declined | `TRANSITIONS`, overridable through `settings.WORKFLOW_TABLE["TRANSITIONS"]` (`lifecycle.load_table()`) | **CURRENT** |
 | C5 | **Resubmission policy** | `clearance_aware` (production) or `restart_all` (evaluation only) | `settings.WORKFLOW_TABLE["RESUBMISSION_POLICY"]`, validated at startup | **CURRENT**. ADR-004 restricts `restart_all` to dedicated evaluation instances, never a customer's production one |
 | C6 | **Record types** | Adding "Capstone Project" | `RecordType` table rows | **CURRENT** as data. *Behaviour* that turns on a type name (e.g. "a Proposal is never routed") is product, keyed by `RecordTypeName` |
@@ -165,7 +167,7 @@ A Northbridge record in review, asked of all four offices, with the ethics board
 }
 ```
 
-*(Illustrative shape. `current_holders` and `cleared_offices` exist today; the field names inside `current_holders` and the `terminology` object are the contract's direction, not a promise of exact names.)*
+*(Illustrative shape, merged from two payloads: `current_holders` is on the record detail serializer and `cleared_offices` on the list serializer — both exist today; the field names inside `current_holders` and the `terminology` object are the contract's direction, not a promise of exact names.)*
 
 Northbridge's keys can stay `itso`, `ierc`, `ktto` — a key is never shown, so there is no reason to rename it. `dpo` is new.
 
@@ -182,25 +184,44 @@ Northbridge's keys can stay `itso`, `ierc`, `ktto` — a key is never shown, so 
 
 **Clearance-aware resubmission is unchanged.** When the Research Ethics Board's revisions arrive, only its clearance resets; the Technology Review Office's and the Innovation & Licensing Office's clearances above are kept (`preserved: true`). That is the product (P1) behaving identically at Northbridge — no configuration was needed to get it.
 
-**Backend: the fourth office is a bounded code change, not configuration — and the ADR says so.** ADR-002 §Amendment 3 states that "adding a fourth office requires no code change" **is not satisfiable** under the current design, because the table *references* offices but does not *define* them. Checked against `main` today, adding `dpo` touches:
+**Backend: the fourth office is a bounded code change, not configuration — and the ADR says so.** ADR-002's amendment (item 3, in the "What this does NOT achieve" paragraph) states that "adding a fourth office requires no code change" **is not satisfiable** under the current design, because the table *references* offices but does not *define* them.
+
+Re-derived against `main` on 2026-11-02 with:
+
+```bash
+cd backend
+grep -rnE "Office\.(ITSO|IERC|KTTO)|Party\.(ITSO|IERC|KTTO)|ReviewStage\.(ITSO|IERC|KTTO)|RoleName\.(ITSO|IERC|KTTO)|choices=(Office|ReviewStage|Party)" \
+  --include=*.py apps core config | grep -vE "test|migrations/|seed_demo"
+```
+
+adding `dpo` touches:
 
 | Seam | File | Change |
 |---|---|---|
 | The office vocabulary | `core/enums.py` — `Office`, `ReviewStage` (`Party`), `RoleName` | One member each |
+| Fields bound to those choices | `apps/reviews/models.py:40,88`, `apps/documents/models.py:225,256` | Generated `AlterField` migrations — no hand-written change |
 | The seeded role | a data migration | One `Role` row ("DPO") |
-| Role → party map | `apps/reviews/tracker.py` — `ROLE_TO_PARTIES`, `TRACKER_ORDER` | One entry each |
-| The submitter's routing hint | `apps/records/models.py` — `requested_itso/ierc/ktto` booleans | A `requested_dpo` column and migration |
+| Role → party maps | `apps/reviews/tracker.py` (`ROLE_TO_PARTIES`, `TRACKER_ORDER`), `core/permissions.py:219-221` | One entry each |
 | Role sets | `core/permissions.py` — `REVIEWER_ROLES`, `STAFF_ROLES` | Add the role |
+| **The clearing-office set** | `apps/reviews/clearance_state.py:28` — `CLEARANCE_OFFICES` | Add `dpo`. **Miss this and the new office does not get clearance-aware resubmission** — this set is the one ADR-002 says the research contribution lives in |
+| Specialist-party sets | `apps/reviews/office_review.py:60` (`SPECIALIST_PARTIES`), `apps/reviews/my_reviews.py:75` (`SPECIALIST_STAGES`), `apps/reviews/revisions.py:64` | Add `dpo` |
+| Onward routing | `apps/reviews/routing.py:64-71` — who may request whom, `ONWARD_PARTIES` | One row, plus `dpo` in every other office's row |
+| Author flags → office | `apps/reviews/routing.py:82-87` | Only if a submitter flag should suggest the DPO |
+| Author flags → office (again) | `apps/records/models.py` — `requested_itso/ierc/ktto` | **Nothing.** ADR-018's IR-767 correction: the form never wrote these and no hint reads them. They are dead columns, serialized but unused, so `dpo` needs no counterpart |
 
-That is five places, all on the backend, and none of them is one of the eighteen scattered call sites ADR-002 set out to eliminate. **It is the honest version of the SaaS seam:** a fourth office is a small, reviewable, enumerated change on the server and no change at all on the frontend.
+**This is not small, and should not be described as small.** It is about a dozen backend sites across ten modules, one of which carries the thesis contribution. What keeps it a *seam* rather than a fork is that every site is a declared set or map of offices, findable by the command above, and none is a branch on an office's name in a view. It is still a backend code change, and no frontend change at all once §5's logic files are retired.
 
-The `requested_<office>` booleans are a seam ADR-002's amendment does not list (they arrived with ADR-018 later). They are the one place where the *data model* names an office, and a future per-office relation would remove it. Recorded here as a finding; not decided here.
+**Better than the ADR's own list, worse than its hope.** ADR-002's seam list names `ROLE_TO_OFFICE` in `reviews/services.py`, which no longer exists (its role is now `ROLE_TO_PARTIES` and `core/permissions.py`'s map), and predates the sets in `clearance_state.py`, `office_review.py`, `my_reviews.py`, `revisions.py` and `routing.py`, which arrived with ADR-032 and ADR-047. Collapsing those parallel sets into one declared office registry would bring the change back toward the ADR's "one enum, one role map and the table". Recorded here as a finding; not decided here.
+
+The `requested_<office>` booleans are the one place where the *data model* names an office. ADR-018 (as corrected by IR-767) keeps them and reads none of them; removing them is a data-model change for its own ticket. Also a finding, not a decision.
 
 ### 4c · A contradiction this document records rather than reconciles
 
 The Jira card's acceptance criterion reads *"a worked example shows a four-office institution needing no code change"*, and its testing requirement asks to *"assert the transition table can express a four-office institution without a code change."* **ADR-002 §Amendment 3 says this is not satisfiable as written**, and ADR-002 outranks Jira (CLAUDE.md §Source-of-truth hierarchy).
 
-This document therefore satisfies the criterion in the form ADR-002 permits: **no frontend change, and a backend change confined to the seams in §4b.** The Jira card's wording should be corrected to match. Making the office roster itself configuration (database-backed offices) is a separate, larger decision that has not been taken; this document does not take it.
+This document therefore satisfies the criterion in the form ADR-002 permits: **no frontend change, and a backend change confined to the seams in §4b.** The Jira card's wording should be corrected to match.
+
+**No test was written for the card's testing requirement**, and none could pass: the assertion it asks for is false today, by ADR-002's own account and by §4b's list. A test that *could* be written is the opposite one — that every office-set literal in §4b agrees with `Office` — and that belongs to whichever ticket collapses those sets, not to this documentation card. Making the office roster itself configuration (database-backed offices) is a separate, larger decision that has not been taken; this document does not take it.
 
 ---
 
@@ -208,7 +229,7 @@ This document therefore satisfies the criterion in the form ADR-002 permits: **n
 
 ### 5a · How the count was derived
 
-The figure in 11 §2 ("twenty files") and in the Jira card is stale, and so is the "34" figure in the agent brief that preceded this document. Re-derived on 2026-11-02 against `origin/main` at `820d3d69`, with:
+The figure in 11 §2 ("twenty files") and in the Jira card is stale, and so is a "34" figure quoted when this card was briefed. Re-derived on 2026-11-02 against `origin/main` at `820d3d69`, with:
 
 ```bash
 cd frontend/src
@@ -245,7 +266,7 @@ Two plans, named so a card can cite them:
 | `lib/access.ts` | Route-access arrays: `COORDINATOR = [RDCO]`, `OFFICES = [RDCO, ITSO, IERC, KTTO]` | **R1** — server-supplied capabilities per user. Remains UX only either way (ADR-009 §5) |
 | `hooks/useRole.ts` | `isKTTO`, `isRDCO`, `isITSO`, `isIERC` booleans | **R1** — replace with capability checks; retire alongside `access.ts` |
 | `types/auth.ts` | `offices: ("itso" \| "ierc" \| "ktto" \| "rdco")[]` | **R1** — widen to `string`; the label arrives with the key |
-| `types/records.ts` | Office unions on clearances and declines; `Party`; `requested_itso/ierc/ktto`; `send_to_rdco`; `rdco_note` | **R1** for the office unions and `Party` (widen to `string`). `requested_*` follows the backend data-model change in §4b. `send_to_rdco` and `rdco_note` are API keys, not labels — they may stay |
+| `types/records.ts` | Office unions on clearances and declines; `Party`; `requested_itso/ierc/ktto`; `send_to_rdco`; `rdco_note` | **R1** for the office unions and `Party` (widen to `string`). `requested_*` are dead fields (§4b) and go if the backend drops them. `send_to_rdco` and `rdco_note` are API keys, not labels — they may stay |
 | `types/reviews.ts` | `MyReviewsParty` union | **R1** — widen to `string` with `types/records.ts` |
 | `features/records/paper-view/RouteDialog.tsx` | `["itso", "ierc", "ktto"].map(...)` — the offices a decider may ask; "Accept & send to RDCO" copy | **R1** — the server sends the askable offices with labels (it already sends routing state). The clearest single blocker for a fourth office |
 | `features/records/paper-view/reviewActions.tsx` | `OFFICE_PARTIES = ["itso", "ierc", "ktto", "rdco"]`; "Accept & send to RDCO…" label | **R1** — server sends which parties take an added colleague; label from the capability payload |
