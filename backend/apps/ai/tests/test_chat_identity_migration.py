@@ -1,5 +1,6 @@
 """The additive identity migration preserves existing conversation history."""
 import pytest
+from django.core.management import call_command
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 
@@ -32,4 +33,7 @@ def test_existing_multiple_conversations_and_turns_survive():
         saved = apps.get_model("ai", "Turn").objects.get(pk=turn.pk)
         assert saved.conversation_id == first.pk and saved.answer == "Existing answer"
     finally:
-        MigrationExecutor(connection).migrate([new])
+        # Back to the latest, not to `new`: stopping there leaves every later
+        # migration unapplied, including the `iris_authz` schema, for whatever
+        # runs next in this process.
+        call_command("migrate", verbosity=0)
