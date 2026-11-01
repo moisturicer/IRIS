@@ -109,7 +109,7 @@ describe("RouteDialog", () => {
   it("says where an unnamed request goes and who is told when officers are named", async () => {
     open("accept", ["The author flagged possible intellectual property."]);
     expect(await screen.findByText("Nobody picked: it goes to RDCO's pool, and anyone there can claim it.")).toBeInTheDocument();
-    expect(screen.getByText(/The author flagged: The author flagged possible intellectual property./)).toBeInTheDocument();
+    expect(screen.getByText("The author flagged possible intellectual property.")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("checkbox", { name: "Rhea Director" }));
     expect(screen.getByText("Rhea Director is asked directly and told now.")).toBeInTheDocument();
   });

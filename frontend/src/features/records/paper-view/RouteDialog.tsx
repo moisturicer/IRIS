@@ -218,9 +218,9 @@ export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRoute
         {accepting && <fieldset className="space-y-2">
           <legend className={LABEL}>Suggested specialist offices (optional)</legend>
           <p className="text-small text-stone-600">RDCO sees these and decides which offices to ask. A suggestion requests nothing.</p>
-          {authorHints.length > 0 && <p className="text-small text-stone-700">
-            <i className="fas fa-flag mr-1.5 text-[11px]" aria-hidden />The author flagged: {authorHints.join("; ")}
-          </p>}
+          {authorHints.map((hint) => <p key={hint} className="text-small text-stone-700">
+            <i className="fas fa-flag mr-1.5 text-[11px]" aria-hidden />{hint}
+          </p>)}
           {["itso", "ierc", "ktto"].map((p) => <label key={p} className="flex items-center gap-2 text-small">
             <input type="checkbox" className={CHECKBOX} checked={suggested.includes(p)} onChange={(e) => setSuggested(e.target.checked ? [...suggested, p] : suggested.filter((v) => v !== p))} />{p.toUpperCase()}
           </label>)}
