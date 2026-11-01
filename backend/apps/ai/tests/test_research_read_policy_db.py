@@ -329,3 +329,23 @@ def test_the_migration_refuses_to_run_as_a_runtime_login(grant_db, group):
                 conn.cursor() as cursor:
             cursor.execute(migration.REFUSE_RUNTIME_LOGIN)
         conn.rollback()
+
+
+def test_an_authenticated_django_read_agrees_with_the_ai_side_read(world, client_for):
+    from django.urls import reverse
+
+    records = world["records"]
+    missing = 10**9
+    with probe_login("iris_ai_runtime") as conn:
+        for name, user in world["users"].items():
+            allowed = read_as(conn, issue.reader_grant(user, owned_run(user)).token, "reader_run")
+            client = client_for(user)
+            for record in records.values():
+                status = client.get(reverse("record-detail", args=[record.pk])).status_code
+                assert status == (200 if record.pk in allowed else 404), (name, record.title)
+            denied = [r.pk for r in records.values() if r.pk not in allowed]
+            if denied:
+                hidden = client.get(reverse("record-detail", args=[denied[0]]))
+                absent = client.get(reverse("record-detail", args=[missing]))
+                assert hidden.status_code == absent.status_code == 404
+                assert hidden.json() == absent.json(), name
