@@ -334,6 +334,21 @@ cd backend && python -m pytest apps/reviews -v
 cd backend && python -m pytest apps/ai apps/documents   # the RAG pipeline suites
 ```
 
+**Backend CI (IR-810)** runs the complete pytest collection across four isolated
+runners/PostgreSQL services. Whole test modules stay together, assigned by test
+count; tests within a shard retain collection order. This avoids sharing the
+database roles and migration state that integration tests mutate. The required
+`Backend` check passes only when all four shards succeed. Each shard retains
+its JUnit report as a `backend-tests-N` artifact and logs its slowest 25 tests.
+Static/configuration/migration checks and `IRIS_REQUIRE_DB=1` remain enabled.
+PR updates cancel that PR's obsolete run; main push runs remain independent.
+
+The optional plugin is loaded only in CI (ordinary local pytest remains serial).
+The shard regression tests execute actual pytest subprocesses and verify that
+their union runs every collected test once, preserving module order. Shard
+balance currently uses counts; use the reports to judge elapsed time before
+claiming a speedup or changing the partition policy.
+
 **Frontend still has no test runner** — `npm test` is not wired up, deliberately deferred (P3). `npm run lint` and `npm run build` (`tsc && vite build`) are the only automated frontend checks.
 
 Rules: **never modify a test to make it pass**; if the test is wrong, fix it deliberately and say so in the PR. A requirement is not satisfied because code exists — only when a test demonstrates it and the evidence is recorded.
