@@ -97,3 +97,18 @@ def test_renewal_rechecks_the_reader_and_never_extends_the_run(grant_keys, clien
     refused = renew(client_for(reader), run.pk, first)
     assert refused.status_code == 403
     assert refused.json() == {"status": "unauthorized"}
+
+
+def test_an_unknown_refusal_code_is_a_safe_outcome(grant_keys, client_for, monkeypatch):
+    from apps.ai.grants import issue
+
+    reader = make_user("http-grant-unknown@cit.edu")
+    run = owned_run(reader)
+
+    def refuse(user, run_):
+        raise issue.GrantRefused("not_a_known_code")
+
+    monkeypatch.setattr(issue, "reader_grant", refuse)
+    response = open_session(client_for(reader), run.pk)
+    assert response.status_code == 200
+    assert response.json() == {"status": "unavailable"}

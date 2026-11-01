@@ -1,7 +1,6 @@
 """The grant wire format: `irg1.<kid>.<b64url claims>.<b64url HMAC-SHA256>`.
 
-Signing happens only here, in Django. PostgreSQL verifies the same bytes
-(`iris_authz.verify_research_grant`).
+Django signs; PostgreSQL verifies (`iris_authz.verify_research_grant`).
 """
 
 from __future__ import annotations

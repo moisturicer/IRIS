@@ -1,7 +1,6 @@
 """Research-grant settings, read and checked (IR-717, ADR-049 §6).
 
-Off by default. When `AI_RESEARCH_GRANTS` is on, every key setting is
-required and Django refuses to start without it.
+Off by default; when on, every setting is required at startup.
 """
 
 from __future__ import annotations
@@ -48,7 +47,8 @@ def _decode(secret: str) -> bytes:
     return base64.urlsafe_b64decode(padded.encode())
 
 
-def problems() -> list[str]:
+def _parse_keys() -> tuple[dict[str, bytes], list[str]]:
+    """`AI_RESEARCH_GRANT_KEYS` as {kid: secret}, and what is wrong with it."""
     found: list[str] = []
     keys: dict[str, bytes] = {}
     for entry in str(getattr(settings, "AI_RESEARCH_GRANT_KEYS", "") or "").split(","):
@@ -69,6 +69,11 @@ def problems() -> list[str]:
         if kid in keys:
             found.append(f"AI_RESEARCH_GRANT_KEYS names {kid} twice")
         keys[kid] = raw
+    return keys, found
+
+
+def problems() -> list[str]:
+    keys, found = _parse_keys()
     if not keys:
         found.append("AI_RESEARCH_GRANT_KEYS is required")
     active = str(getattr(settings, "AI_RESEARCH_GRANT_ACTIVE_KEY", "") or "").strip()
@@ -90,11 +95,7 @@ def problems() -> list[str]:
 def read() -> GrantConfig:
     if not enabled() or problems():
         raise GrantsUnavailable
-    keys = {}
-    for entry in settings.AI_RESEARCH_GRANT_KEYS.split(","):
-        if entry.strip():
-            kid, _, secret = entry.strip().partition(":")
-            keys[kid] = _decode(secret.strip())
+    keys, _ = _parse_keys()
     return GrantConfig(
         keys=keys,
         active_kid=settings.AI_RESEARCH_GRANT_ACTIVE_KEY.strip(),

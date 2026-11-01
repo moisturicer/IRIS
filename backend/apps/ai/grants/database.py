@@ -1,8 +1,6 @@
 """Verified identity inside PostgreSQL (IR-717, ADR-049 §7).
 
-`research_identity` opens a short transaction and binds a grant to it with
-`iris_authz.begin_research`; the binding ends at commit or rollback, so a
-pooled connection never carries it into the next transaction.
+A grant binds to one transaction; it ends at commit or rollback.
 """
 
 from __future__ import annotations

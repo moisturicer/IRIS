@@ -1,10 +1,8 @@
 """Install the configured research-grant keys into the verifier (IR-717).
 
-Run with maintenance credentials whenever AI_RESEARCH_GRANT_KEYS changes.
-The active key signs and verifies with no end date. Every other configured
-key only verifies, and only for one grant lifetime from the first install
-that found it inactive: that is the bounded rotation overlap. A key no
-longer configured is removed at once.
+Run with maintenance credentials when AI_RESEARCH_GRANT_KEYS changes.
+The active key never retires; others verify for one grant lifetime;
+unconfigured keys are removed.
 """
 
 from django.core.management.base import BaseCommand, CommandError
