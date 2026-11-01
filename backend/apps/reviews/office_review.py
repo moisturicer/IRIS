@@ -30,21 +30,16 @@ last verdict or by a coordinator withdrawing the last unfinished seat --
    again replaces its earlier outcome only when its new round completes.
    `reviewed_by` and `comment` stay empty: each seat's verdict is its own
    `Review`.
-2. **The hand-back.** When no specialist office is still active, IRIS opens an
-   RDCO assignment in RDCO's pool, unless RDCO already holds the record. It
-   is recorded as a `RoutingEvent` with no actor, because nobody routed it.
+2. **RDCO is notified.** It already holds the record; completing an office
+   opens no assignment (ADR-047).
 3. **Notifications**, after commit (`notify_office_completed`).
 """
 
 from __future__ import annotations
 
-import uuid
-
 from django.db import transaction
-from django.utils import timezone
 
 from apps.audit import workflow as audit
-from apps.records.lifecycle import type_name_of
 from apps.records.versions import latest_version
 
 from core.enums import (
@@ -59,7 +54,7 @@ from core.enums import (
 from core.permissions import holds_seat
 
 from . import revisions, routing, seats
-from .models import RecordAssignment, RecordClearance, Review, ReviewerSeat, RoutingEvent
+from .models import RecordAssignment, RecordClearance, Review, ReviewerSeat
 
 #: The specialist offices (ADR-032 §3): the only parties that clear.
 SPECIALIST_PARTIES = (str(Party.ITSO), str(Party.IERC), str(Party.KTTO))
@@ -73,9 +68,6 @@ OUTCOMES = {
     CLEARED: ReviewDecision.APPROVED,
     FINDING: ReviewDecision.NEGATIVE_FINDING,
 }
-
-#: The hand-back's routing reason. Nobody routed it, so IRIS states why.
-HAND_BACK_REASON = "Specialist review complete."
 
 _label = seats._label
 
@@ -201,8 +193,8 @@ def record_office_review(record, actor, *, outcome, comment=""):
 def office_completed(assignment, actor) -> None:
     """
     `assignment` has just completed (`seats._close_if_complete`). For a
-    specialist office: settle its clearance, hand back to RDCO when it was the
-    last one active, and notify. Any other party completing changes nothing
+    specialist office: settle its clearance and notify RDCO, which already
+    holds the record (ADR-047). Any other party completing changes nothing
     here -- the Adviser's completion is accept & route's (IR-261).
     """
     party = str(assignment.party)
@@ -222,59 +214,26 @@ def office_completed(assignment, actor) -> None:
     clearance.comment = ""
     clearance.save(update_fields=["status", "reviewed_by", "comment", "updated_at"])
 
-    rdco = _hand_back(record, party)
+    rdco = RecordAssignment.objects.filter(
+        record=record, party=Party.RDCO, state=AssignmentState.ACTIVE,
+    ).first()
     _notify(record, actor, party, outcome, rdco)
-
-
-def _hand_back(record, from_party):
-    """
-    Open RDCO's pool when no specialist office is still active (ADR-032 §3).
-
-    Returns `("opened", assignment)` when it opened one, `("holding",
-    assignment)` when RDCO already holds the record, or None while another
-    office is still reviewing. Only the record types the Adviser may route
-    reach an office, so a Proposal never gets here; the check stays so a
-    hand-back can never be the way RDCO enters a Proposal.
-    """
-    if type_name_of(record) not in routing.ROUTABLE_TYPES:
-        return None
-    active = RecordAssignment.objects.filter(record=record, state=AssignmentState.ACTIVE)
-    if active.filter(party__in=SPECIALIST_PARTIES).exists():
-        return None
-    held = active.filter(party=Party.RDCO).first()
-    if held is not None:
-        return ("holding", held)
-    now = timezone.now()
-    opened = RecordAssignment.objects.create(
-        record=record, party=Party.RDCO, opened_at=now, reason=HAND_BACK_REASON,
-    )
-    group = uuid.uuid4()
-    RoutingEvent.objects.create(
-        record=record, actor=None, from_party=from_party, to_party=Party.RDCO,
-        reason=HAND_BACK_REASON, group_id=group, created_at=now,
-    )
-    audit.routed(
-        record, None, from_party=from_party, to_party=Party.RDCO, opened=True,
-        group=group, hand_back=True,
-    )
-    return ("opened", opened)
 
 
 def _notify(record, actor, party, outcome, rdco):
     from apps.notifications.services import notify_office_completed
 
     rdco_holders = []
-    if rdco is not None and rdco[0] == "holding":
+    if rdco is not None:
         rdco_holders = list(
-            rdco[1].seats.filter(state__in=OPEN_SEAT_STATES).select_related("reviewer")
+            rdco.seats.filter(state__in=OPEN_SEAT_STATES).select_related("reviewer")
         )
-        rdco_holders = [s.reviewer for s in rdco_holders]
+        rdco_holders = [s.reviewer for s in rdco_holders if s.reviewer is not None]
     transaction.on_commit(lambda: notify_office_completed(
         record,
         actor=actor,
         office_label=_label(party),
         outcome_label=str(ClearanceStatus(outcome).label),
-        handed_back=rdco is not None and rdco[0] == "opened",
-        rdco_holding=rdco is not None and rdco[0] == "holding",
+        rdco_holding=rdco is not None,
         rdco_holders=rdco_holders,
     ))

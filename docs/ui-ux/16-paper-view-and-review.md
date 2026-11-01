@@ -82,6 +82,9 @@ Choosing an older version swaps the manuscript and shows a banner: *"You are vie
 
 ## 4 · Review mode
 
+**Routing amendment, 2026-11-01 (IR-767, ADR-047):** The Adviser’s *Accept & route* becomes *Accept & send to RDCO* (`send_to_rdco`). Its only target is RDCO, either its Pool or selected officers. Suggested specialist offices are labelled as suggestions and route nothing. Office requests offer whole offices or multiple named officers, with a reason. RDCO’s confirmation lists open office reviews, document and Revision requests and recorded Findings; RDCO may decide now and the closed work retains its history.
+
+
 **Amendment, proposed 2026-10-30, accepted 2026-10-31 by Lee Jasmin Adolfo (IR-679): Phase 1 review workspace.** Acceptance is recorded in [ADR-032 §7 and §10](../adr/032-adviser-first-review-and-office-reviewer-pools.md) and on [PR #363](https://github.com/moisturicer/IRIS/pull/363). Until implemented, the two-column description below remains the current behavior. The following replaces the Review mode regions, party status placement and action-bar placement; existing acts and dialogs remain.
 
 | Region | Phase 1 content |

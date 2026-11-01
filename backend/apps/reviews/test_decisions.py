@@ -88,7 +88,7 @@ class DecisionTestBase(RevisionTestBase):
         rdco = RecordAssignment.objects.get(
             record=record, party=Party.RDCO, state=AssignmentState.ACTIVE,
         )
-        seat = seats.claim(rdco, self.rdco)
+        seat = rdco.seats.get(reviewer=self.rdco)
         seats.open_review(seat, self.rdco)
         return record
 
@@ -403,17 +403,14 @@ class OpenWorkClosesTests(DecisionTestBase):
 
 class RevisionOpenTests(DecisionTestBase):
 
-    def test_deciding_with_an_open_revision_request_is_refused_and_explained(self):
+    def test_rdco_can_decide_over_its_own_open_revision_request(self):
         record = self.at_rdco()
-        self.asked(record, self.rdco)
-
-        for outcome, comment in (("publish", ""), ("keep_unlisted", ""), ("reject", REASON)):
-            with self.subTest(outcome=outcome):
-                response = self.decide(record, self.rdco, outcome, comment)
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-                self.assertIn("Waiting on the author", response.data["detail"])
-        record.refresh_from_db()
-        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+        request = self.asked(record, self.rdco)
+        response = self.decide(record, self.rdco, "publish")
+        self.assertEqual(response.status_code, 200, response.data)
+        request.refresh_from_db()
+        self.assertEqual(request.state, "withdrawn")
+        self.assertIsNotNone(request.closed_by_decision_id)
 
 
 # --- AC: refusals ------------------------------------------------------------------------
@@ -555,7 +552,7 @@ class DetailFlagTests(DecisionTestBase):
         self.assertEqual(flag["party"], Party.ADVISER)
         self.assertIsNone(flag["blocked"])
         self.assertTrue(flag["token"])
-        self.assertEqual(flag["closes"], {"assignments": [], "document_requests": 0})
+        self.assertEqual(flag["closes"], {"assignments": [], "document_requests": 0, "revision_requests": [], "findings": []})
         self.assertEqual(flag["author_hints"], ["The author flagged possible intellectual property."])
 
     def test_rdco_is_offered_all_three_and_told_what_closes(self):
@@ -591,7 +588,7 @@ class DetailFlagTests(DecisionTestBase):
     def test_nobody_else_is_offered_a_decision(self):
         record = self.routed(Party.ITSO)
         self.opened_seat(record, Party.ITSO, self.itso)
-        for user in (self.owner, self.itso, self.adviser, self.rdco):
+        for user in (self.owner, self.itso, self.adviser):
             with self.subTest(user=user.email):
                 flag = self.flag(record, user)
                 self.assertEqual(flag["outcomes"], [])

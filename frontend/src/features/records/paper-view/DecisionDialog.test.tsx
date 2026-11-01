@@ -200,3 +200,16 @@ describe("DecisionDialog", () => {
     expect(readDecisionDraft(7, "reject")).toBe("");
   });
 });
+
+it("RDCO sees the revision requests and findings its executive Decision supersedes", async () => {
+  const flags: DecisionFlags = { ...RDCO, closes: { ...RDCO.closes!,
+    revision_requests: [{ id: 12, party: "ierc", label: "IERC", reason: "Missing consent" }],
+    findings: [{ party: "itso", label: "ITSO", comment: "Patent filing should precede publication" }],
+  } };
+  const { onDone } = open("publish", flags);
+  expect(screen.getByText(/RDCO may decide now/)).toBeInTheDocument();
+  expect(screen.getByText("Revision request #12 from IERC: Missing consent")).toBeInTheDocument();
+  expect(screen.getByRole("region", { name: "Recorded findings" })).toHaveTextContent("Patent filing should precede publication");
+  await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+  await waitFor(() => expect(onDone).toHaveBeenCalled());
+});

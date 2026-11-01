@@ -655,6 +655,7 @@ def _routing_history(record, *, staff: bool, readable: bool) -> list[dict]:
                 # went is not.
                 "actor": _name(event.actor) if readable else None,
                 "reason": event.reason if readable else None,
+                "suggested_offices": event.suggested_offices if readable else None,
                 "at": _iso(event.created_at),
             }
         group["to"].append(event.to_party)
@@ -696,9 +697,10 @@ def _resubmissions(record, *, staff: bool, readable: bool) -> list[dict]:
             "resolved_at": _iso(r.resolved_at),
             # Who resubmitted, or withdrew, and so closed it.
             "resolved_by": _name(r.resolved_by) if readable else None,
+            "withdrawn_by_decision": withdrawn_by_label(r.closed_by_decision) if readable and r.closed_by_decision_id else None,
         }
         for r in ResubmissionRequest.objects.filter(record=record)
-        .select_related("requested_by", "resolved_by", "review__version")
+        .select_related("requested_by", "resolved_by", "review__version", "closed_by_decision__record")
         .order_by("created_at", "pk")
     ]
 

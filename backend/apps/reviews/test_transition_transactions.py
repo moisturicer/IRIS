@@ -30,7 +30,7 @@ class TransitionTransactionTests(DecisionTestBase):
             with self.captureOnCommitCallbacks(execute=True) as callbacks:
                 with self.assertRaisesRegex(RuntimeError, "outer rollback"):
                     with transaction.atomic():
-                        response = self.accept(record, [{"party": Party.ITSO}])
+                        response = self.accept(record, [{"party": Party.RDCO}])
                         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
                         self.assertEqual(Notification.objects.filter(record=record).count(), before[-1])
                         raise RuntimeError("outer rollback")

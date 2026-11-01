@@ -254,7 +254,7 @@ class VersionDeadlineTests(NewVersionTestBase):
         before = itso.due_at
         self.opened_seat(record, Party.IERC, self.ierc)
         with patch("django.utils.timezone.now", return_value=at(29)):
-            response = self.route(record, self.ierc, [{"party": "itso", "nominee": self.itso.pk}])
+            response = self.route(record, self.ierc, [{"party": "itso", "nominees": [self.itso.pk]}])
             self.assertEqual(response.status_code, 200, response.data)
             itso.refresh_from_db()
             self.assertEqual(itso.due_at, before)

@@ -133,9 +133,9 @@ class HolderTests(MyResearchListTestBase):
         row = self.mine()[record.pk]
 
         self.assertEqual(
-            [h["party"] for h in row["holders"]], [Party.IERC, Party.KTTO],
+            [h["party"] for h in row["holders"]], [Party.IERC, Party.KTTO, Party.RDCO],
         )
-        self.assertEqual([h["label"] for h in row["holders"]], ["IERC", "KTTO"])
+        self.assertEqual([h["label"] for h in row["holders"]], ["IERC", "KTTO", Party.RDCO.label])
         self.assertEqual(
             row["cleared_offices"],
             [{"office": "itso", "label": "ITSO", "preserved": False}],

@@ -235,8 +235,8 @@ class BlockedWhileOpenTests(RevisionTestBase):
 
         self.assertEqual(self.clearance(record, Party.ITSO), ClearanceStatus.CLEARED)
         self.assertEqual(self.clearance(record, Party.KTTO), ClearanceStatus.NOT_CLEARED)
-        # IERC is still waiting on its revision, so RDCO has not opened.
-        self.assertFalse(self.rdco_assignments(record).exists())
+        # RDCO holds the record while IERC waits on its revision.
+        self.assertTrue(self.rdco_assignments(record).exists())
 
     def test_routing_and_document_requests_still_work(self):
         record = self.routed(Party.ITSO)

@@ -93,8 +93,8 @@ function RequestDocumentAction({ record, onClose, onDone }: ReviewActionDialogPr
   );
 }
 
-/** The Adviser accepts the work and routes it to offices (ADR-032 §3, IR-261). */
-function AcceptAndRouteAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+/** The Adviser accepts the work and sends it to RDCO (ADR-047). */
+function SendToRdcoAction({ record, onClose, onDone }: ReviewActionDialogProps) {
   return (
     <RouteDialog
       recordId={record.id}
@@ -233,12 +233,12 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
   },
   {
     kind: "dialog",
-    capability: "accept_route",
-    label: "Accept & route…",
+    capability: "send_to_rdco",
+    label: "Accept & send to RDCO…",
     icon: "fa-share-from-square",
     // Accepting is a decision: refused while a revision request is open (IR-272).
     blockedReason: (record) => record.revision.decision_blocked,
-    Dialog: AcceptAndRouteAction,
+    Dialog: SendToRdcoAction,
   },
   {
     kind: "dialog",

@@ -96,7 +96,7 @@ class MigratedApiJourneys(DecisionTestBase):
         self.opened_seat(record, "ktto", self.ktto)
         self.cleared(record, self.ktto)
         assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
-        seats.open_review(seats.claim(assignment, self.rdco), self.rdco)
+        seats.open_review(assignment.seats.get(reviewer=self.rdco), self.rdco)
         self.decided(record, self.rdco, "keep_unlisted")
         self.assertEqual(record.pipeline_status, "completed")
 

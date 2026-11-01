@@ -123,7 +123,7 @@ ITSO, IERC or KTTO: an office a Record is routed to for a question only it can a
 _Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
 
 **Specialist path**:
-A Thesis/Research or Project that its Adviser accepted and routed to at least one [[Specialist office]]. The only path on which RDCO takes part; the alternative is the Adviser's accept & publish, where RDCO is never involved.
+A Thesis/Research or Project its Adviser accepted and sent to RDCO for institutional review. RDCO decides whether to request any [[Specialist office]]. The alternative is the Adviser’s accept & publish, where RDCO is never involved.
 _Avoid_: Full review, RDCO path.
 
 **Pool**:
@@ -139,7 +139,7 @@ One person's part in an office's review of a Record: "this member is reviewing i
 _Avoid_: Assignment (the office holding the Record, not a person), reviewer slot.
 
 **Finding**:
-A [[Seat]] holder's recorded negative verdict on a Record, always with a written reason. A Finding never rejects and never sends the Record back: specialist offices cannot do either. It travels to RDCO, which decides.
+A [[Seat]] holder's recorded negative verdict on a Record, always with a written reason. A Finding never rejects and never sends the Record back: specialist offices cannot do either. RDCO sees it and decides.
 _Avoid_: Rejection, decline, negative review, Not cleared (an office's outcome, not one reviewer's verdict).
 
 **Clearance**:
@@ -147,7 +147,7 @@ A [[Specialist office]]'s outcome on a Record, *Cleared* or *Not cleared*, settl
 _Avoid_: Approval (an office clears its own question; it does not approve the Record), office decision.
 
 **Hand-back**:
-IRIS opening RDCO's [[Pool]] on a Record when the last active specialist office finishes. Happens only on the [[Specialist path]]; nobody routes to RDCO by hand.
+A historical step: IRIS opened RDCO’s [[Pool]] when the last specialist office finished. Retired by ADR-047. RDCO now holds the Record from the Adviser’s send; office completion only notifies RDCO.
 _Avoid_: Route to RDCO, escalation, final routing.
 
 **Review round**:
@@ -175,7 +175,7 @@ One party asking a Record's owners to revise the Record itself, made against one
 _Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
 
 **Decision**:
-An act that ends a Record's review: accept & publish, keep [[Unlisted]] or reject, made by the Adviser or by RDCO, and a Proposal's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. It is refused while any [[Revision request]] is open. Accept & route is not a Decision: it is an acceptance that sends the Record on to [[Specialist office]]s, closes nothing, and is refused while a Revision request is open, as a Decision is.
+An act that ends a Record's review: accept & publish, keep [[Unlisted]] or reject, made by the Adviser or by RDCO, and a Proposal's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. An Adviser’s Decision is refused while any [[Revision request]] is open. RDCO may decide at any time, withdrawing open Revision requests and identifying its Decision as the reason. Accept & send to RDCO is not a Decision: it completes the Adviser’s turn and asks RDCO for institutional review; it is refused while any Revision request is open.
 _Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which a Decision also records).
 
 **Accepted**:

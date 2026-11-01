@@ -6,6 +6,8 @@
 
 Amends ADR-032 by adding a time dimension to its assignments. It changes no ADR-032 decision: no act, state, routing edge or visibility rule.
 
+**Amended 2026-11-01 (IR-767, ADR-047):** RDCO's turnaround starts when the Adviser sends the record. RDCO's clock runs alongside specialist-office clocks. The hand-back no longer opens an assignment. Cutover assignments start a new clock at cutover and are identifiable by the migration reason.
+
 ## Context
 
 ADR-032's routing is largely built: adviser-first entry, office Pools and Seats, coordinator assignment, Versions and clearance-aware resubmission. None of it has a time dimension. No review carries a due date, nothing reminds a reviewer, and a Record left in a Pool stays there with nobody told. `apps/reviews`, `apps/records` and `apps/notifications` hold no due, deadline or overdue field or logic, and `backend/config` defines no Celery beat schedule.

@@ -92,6 +92,8 @@ The **unbuilt** subtasks were written against ADR-021 and need re-planning befor
 
 §14 maps each one.
 
+**Partially superseded for implementation, 2026-11-01 (IR-767): [ADR-047](047-rdco-routes-and-decides-at-any-time.md).** For Thesis/Research and Project, the Adviser sends only to RDCO; offices request specialist offices or several named officers; RDCO holds the record from the send and may decide while office reviews or Revision requests remain open. There is no automatic hand-back. The historical text below is retained; ADR-047 owns these changed rules. Proposals and the Adviser's direct publication path remain.
+
 ## Context
 
 ADR-021 put every Thesis/Research and Project through an **Intake & Triage** step run by RDCO staff, and made RDCO the mandatory decider for both types. Two things were wrong with that as a description of CIT-U.

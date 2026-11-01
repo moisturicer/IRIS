@@ -86,6 +86,7 @@ function closingLines(closes: DecisionCloses | null): string[] {
         : `${closes.document_requests} open document requests`,
     );
   }
+  for (const r of closes.revision_requests ?? []) lines.push(`Revision request #${r.id} from ${r.label}: ${r.reason}`);
   return lines;
 }
 
@@ -196,6 +197,13 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
           </div>
         )}
 
+        {flags.party === "rdco" && closing.length > 0 && <p className="rounded-lg border border-brand/30 bg-brand/5 p-3 text-small text-brand">
+          RDCO may decide now. This Decision closes the open reviews and withdraws the requests listed below. Their history is kept.
+        </p>}
+        {!!flags.closes?.findings?.length && <section aria-label="Recorded findings">
+          <h3 className="text-small font-semibold">Recorded findings</h3>
+          {flags.closes.findings.map((f, i) => <p key={i} className="text-small text-stone-700">{f.label}: {f.comment}</p>)}
+        </section>}
         {closing.length > 0 && (
           <div>
             <p id={closesId} className="text-[13px] font-semibold text-stone-900">

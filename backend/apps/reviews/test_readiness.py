@@ -98,12 +98,12 @@ class ReadinessTests(ReadinessTestBase):
         self.assertEqual((item["severity"], item["action"]), ("info", None))
         self.assertIn("party_reviewing", self.kinds(other, "info"))
 
-    def test_a_blocked_rdco_decision_names_every_refusal(self):
+    def test_rdco_may_override_its_own_revision_request(self):
         record = self.at_rdco()
         self.assertEqual(self.ask(record, self.rdco).status_code, 200)
         readiness = self.readiness(record, self.rdco)
-        self.assertEqual(readiness["verdict"], "blocked")
-        self.assertIn("revision_request", self.kinds(readiness, "blocker"))
+        self.assertEqual(readiness["verdict"], "ready")
+        self.assertIn("revision_request", self.kinds(readiness, "info"))
 
     def test_an_office_own_document_request_blocks_it_and_informs_the_others(self):
         record = self.routed(Party.ITSO, Party.IERC)
@@ -140,15 +140,15 @@ class ReadinessTests(ReadinessTestBase):
                 self.assertEqual(readiness is None, not readable)
         self.assertIsNone(self.readiness(record, self.ktto))
 
-    def test_an_open_ierc_revision_request_blocks_the_decider_and_names_who_asked_and_when(self):
+    def test_an_open_ierc_revision_request_informs_rdco_and_names_who_asked_and_when(self):
         # IR-682's first criterion names the Adviser, but an Adviser can no
         # longer decide once the record has gone to an office, and IERC never
         # holds it before then. RDCO is the party that decides here.
         record, request = self.rdco_with_ierc_asking()
         readiness = self.readiness(record, self.rdco)
 
-        self.assertEqual(readiness["verdict"], "blocked")
-        blockers = [i for i in readiness["items"] if i["severity"] == "blocker"]
+        self.assertEqual(readiness["verdict"], "ready")
+        blockers = [i for i in readiness["items"] if i["kind"] == "revision_request"]
         self.assertEqual([i["kind"] for i in blockers], ["revision_request"])
         item = blockers[0]
         self.assertEqual(item["party"], Party.IERC)
@@ -297,8 +297,7 @@ class ReadinessExplainsEveryRefusalTests(ReadinessTestBase):
     #: The states above a Decision is refused in. A state moving in or out of
     #: this set is a change to the workflow, not to readiness.
     REFUSED = {
-        "unopened adviser", "rdco asked for a revision", "ierc asked for a revision",
-        "unopened second rdco seat", "itso reviewing, ierc unclaimed, rdco asked",
+        "unopened adviser", "unopened second rdco seat",
     }
 
     def test_a_refused_decision_is_always_explained_by_a_blocker_already_shown(self):

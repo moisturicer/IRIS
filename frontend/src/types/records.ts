@@ -204,7 +204,7 @@ export type Capability =
   | "request_revision"
   | "withdraw_revision"
   | "route"
-  | "accept_route"
+  | "send_to_rdco"
   | "accept_publish"
   | "accept_proposal"
   | "keep_unlisted"
@@ -425,6 +425,8 @@ export interface DecisionCloses {
   assignments:       { party: Party; label: string; holders: string[] }[];
   /** How many open document requests it would withdraw. */
   document_requests: number;
+  revision_requests?: { id: number; party: Party; label: string; reason: string }[];
+  findings?: { party: Party; label: string; comment: string }[];
 }
 
 export interface OfficeReviewFlags {
@@ -491,7 +493,7 @@ export interface AddReviewerOptions {
 }
 
 export interface RoutingFlags {
-  accept_and_route: boolean;
+  send_to_rdco: boolean;
   route_as:         Party | null;
   /**
    * Where onward *Route* may send this record, as the server's party graph
@@ -516,14 +518,16 @@ export interface RouteTarget {
 export interface RouteOptions {
   from_party: Party;
   from_label: string;
-  /** True for the Adviser's *Accept & route*, false for onward routing. */
+  /** True for the Adviser's *Accept & send to RDCO*, false for onward routing. */
   accept:     boolean;
   targets:    RouteTarget[];
+  suggested_offices?: string[];
 }
 
-/** A routing request: one reason for the decision, at most one nominee per office. */
+/** A routing request: one reason for the decision, zero or several nominees per office. */
 export interface RouteRequest {
-  to:     { party: Party; nominee?: number }[];
+  to:     { party: Party; nominees?: number[] }[];
+  suggested_offices?: string[];
   reason: string;
 }
 
@@ -759,6 +763,7 @@ export interface TrackerRoutingGroup {
 }
 
 export interface TrackerResubmission {
+  withdrawn_by_decision?: string | null;
   id:           number;
   party:        Party;
   label:        string;

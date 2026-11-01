@@ -2237,3 +2237,16 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 **Not done here.** Database mode decides the authorized Record population through the restricted login, but dependent content is still read afterwards over the owner connection, filtered by those ids; running every content read under the restricted role is IR-719's Evidence interface. Each database-mode decision opens one short connection (no pool). The FastAPI runtime does not yet read; the AI-side read is demonstrated by tests under `iris_ai_runtime`. Disabled accounts are refused by the policy, while `visible_to` itself does not check `is_active` (authentication refuses them first). Switching Django to the restricted login and forcing row security are deployment steps not taken.
 
 **Status.** Implemented; awaiting review.
+
+
+## IR-767 · RDCO owns routed review and may decide at any time (ADR-047)
+
+**Basis.** The user authorized implementation of ADR-047 on 2026-11-01 in the originating design chat. The implementation retains both proposal defaults: the Adviser keeps direct publication, and RDCO may override open Revision requests. This does not attribute approval to another named person; human PR review remains required.
+
+**Behavior.** The Adviser’s send opens only RDCO’s assignment. RDCO and specialist offices request whole specialist offices or multiple named officers with a reason. Adviser suggestions route nothing. Office completion settles its Clearance and notifies the existing RDCO holder; no hand-back opens a turn. RDCO’s Decision withdraws open reviews, documents and Revision requests with its identity as the reason. Owners are told which Revision requests it withdrew. Readiness reads the Decision’s closure facts, and the confirmation and history expose the override. An uploaded but unsubmitted manuscript is restored to the last submitted Version before deciding. Staleness includes revision requests, named reviewers and recorded Findings.
+
+**Migration.** `reviews/0022` adds suggestions and Decision provenance; `0023` opens an RDCO Pool only for eligible in-flight Thesis/Research and Project records. Re-running opens no duplicate. Reversal refuses once a cutover turn acquires review, extension, document-request, revision-request or reminder history.
+
+**Test seams.** `apps/reviews/test_rdco_executive.py` drives the public record endpoints and real workflow services: target restrictions, multiple officers, malformed/duplicate nominations, office completion without hand-back, executive publication with a preserved Clearance, overrides and owner notices, stale confirmation, manuscript restoration, former reviewer accounts, and cutover forward/reverse behavior. Existing review, privacy, capabilities, tracker, deadline, seeding and audit tests use Adviser → RDCO → specialist fixtures. The routing dialog tests cover whole offices, multiple officers, separate Adviser suggestions, refusal recovery and accessibility; Decision and timeline tests cover override confirmation and provenance.
+
+**Executed verification.** Final command results are recorded on the implementation PR. No production data migration or deployment is performed by these tests.

@@ -172,7 +172,7 @@ class EntryAndRoutingTests(AuditTestBase):
 
         self.assertEqual(
             self.types(record)[1:],  # after SUBMITTED
-            ["DECISION_RECORDED", "ASSIGNMENT_CLOSED", "ROUTED", "ROUTED"],
+            ["DECISION_RECORDED", "ASSIGNMENT_CLOSED", "SEAT_NOMINATED", "ROUTED", "ROUTED", "ROUTED"],
         )
         decision = self.one(record, AuditEvent.DECISION_RECORDED)
         self.assertEqual(decision["user"], self.adviser.pk)
@@ -185,22 +185,22 @@ class EntryAndRoutingTests(AuditTestBase):
         routed = [row["metadata"] for row in self.events(record, AuditEvent.ROUTED)]
         self.assertEqual(
             sorted((m["from_party"], m["to_party"], m["opened"], m["hand_back"]) for m in routed),
-            [(Party.ADVISER, Party.IERC, True, False), (Party.ADVISER, Party.ITSO, True, False)],
+            [(Party.ADVISER, Party.RDCO, True, False), (Party.RDCO, Party.IERC, True, False), (Party.RDCO, Party.ITSO, True, False)],
         )
-        self.assertEqual(len({m["group"] for m in routed}), 1, "one movement, one group")
+        self.assertEqual(len({m["group"] for m in routed}), 2, "Adviser send and RDCO routing are distinct movements")
 
     def test_a_nominee_is_named_on_the_route_and_seated_as_nominated(self):
         record = self.new_model()
         self.adviser_seat(record)
 
-        self.ok(self.accept(record, [{"party": Party.ITSO, "nominee": self.itso.pk}]))
+        self.ok(self.accept(record, [{"party": Party.RDCO, "nominees": [self.rdco.pk]}]))
 
-        self.assertEqual(self.one(record, AuditEvent.ROUTED)["metadata"]["nominee"], self.itso.pk)
+        self.assertEqual(self.one(record, AuditEvent.ROUTED)["metadata"]["nominees"], [self.rdco.pk])
         nominated = self.one(record, AuditEvent.SEAT_NOMINATED)
         self.assertEqual(nominated["user"], self.adviser.pk)
         self.assertEqual(
             (nominated["metadata"]["party"], nominated["metadata"]["reviewer"]),
-            (Party.ITSO, self.itso.pk),
+            (Party.RDCO, self.rdco.pk),
         )
 
     def test_routing_to_a_party_already_holding_the_record_starts_no_clock(self):
@@ -208,7 +208,7 @@ class EntryAndRoutingTests(AuditTestBase):
         self.claimed_and_opened(record, Party.ITSO, self.itso)
         self.ok(self.route(record, self.itso, [{"party": Party.IERC}]))
 
-        self.ok(self.route(record, self.itso, [{"party": Party.IERC, "nominee": self.ierc.pk}]))
+        self.ok(self.route(record, self.itso, [{"party": Party.IERC, "nominees": [self.ierc.pk]}]))
 
         to_ierc = [
             row["metadata"]["opened"] for row in self.events(record, AuditEvent.ROUTED)
@@ -216,18 +216,13 @@ class EntryAndRoutingTests(AuditTestBase):
         ]
         self.assertEqual(to_ierc, [True, False])
 
-    def test_the_hand_back_to_rdco_is_a_routing_movement_nobody_made(self):
+    def test_office_completion_creates_no_routing_or_hand_back_event(self):
         record = self.routed(Party.ITSO)
         self.claimed_and_opened(record, Party.ITSO, self.itso)
-
+        before = self.events(record, AuditEvent.ROUTED)
         self.cleared(record, self.itso)
-
-        hand_back = self.events(record, AuditEvent.ROUTED)[-1]
-        self.assertIsNone(hand_back["user"])
-        self.assertEqual(
-            {k: hand_back["metadata"][k] for k in ("from_party", "to_party", "opened", "hand_back")},
-            {"from_party": Party.ITSO, "to_party": Party.RDCO, "opened": True, "hand_back": True},
-        )
+        self.assertEqual(self.events(record, AuditEvent.ROUTED), before)
+        self.assertFalse(any(e["metadata"]["hand_back"] for e in before))
 
 
 class OfficeVerdictTests(AuditTestBase):

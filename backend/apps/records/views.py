@@ -763,8 +763,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews.tracker import tracker_payload
 
         record = self.get_object()
+        extra = {"suggested_offices": request.data.get("suggested_offices")} if self.action == "accept_and_route" else {}
         _, refused = self._routing_refusal(lambda: act(
             record, request.user, to=request.data.get("to"), reason=request.data.get("reason"),
+            **extra,
         ))
         if refused is not None:
             return refused
@@ -775,10 +777,11 @@ class RecordViewSet(viewsets.ModelViewSet):
     def accept_and_route(self, request, pk=None):
         """
         POST /records/<id>/accept-and-route/
-        `{"to": [{"party": "itso", "nominee"?: user_id}, ...], "reason": str}`
+        `{"to": [{"party": "rdco", "nominees"?: [user_id, ...]}], "reason": str}`
 
-        The record's Adviser accepts a Thesis/Research or Project and routes it
-        to ITSO, IERC and/or KTTO (ADR-032 §3). Answers with the tracker.
+        The Adviser sends a Thesis/Research or Project to RDCO (ADR-047).
+        Optional suggested_offices are hints, never specialist requests.
+        Answers with the tracker.
         """
         from apps.reviews import routing
 

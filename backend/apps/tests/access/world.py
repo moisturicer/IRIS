@@ -31,7 +31,7 @@ from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNT
 from apps.records.models import DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
 from apps.reviews.models import ReviewComment, ReviewerSeat
-from apps.reviews.routing import accept_and_route, enter_at_adviser
+from apps.reviews.routing import accept_and_route, enter_at_adviser, route
 from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName
 
 #: The matrix's columns, in the order every table row lists them.
@@ -165,10 +165,11 @@ def _at_itso(title, users) -> Record:
     )
     entry = enter_at_adviser(record, owner)
     seats.open_review(entry.seats.get(), adviser)
-    accept_and_route(
-        record, adviser, to=[{"party": Party.ITSO, "nominee": itso.pk}],
-        reason="The method may be patentable.",
-    )
+    rdco = users["rdco"]
+    accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="Institutional review.")
+    rdco_seat = ReviewerSeat.objects.get(assignment__record=record, assignment__party="rdco", reviewer=rdco)
+    seats.open_review(rdco_seat, rdco)
+    route(record, rdco, to=[{"party": Party.ITSO, "nominees": [itso.pk]}], reason="The method may be patentable.")
     seat = ReviewerSeat.objects.get(
         assignment__record=record, assignment__party=Party.ITSO, reviewer=itso,
     )

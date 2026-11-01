@@ -297,7 +297,7 @@ class OwnershipMatrixTests(APITestCase):
         assignment.
         """
         record = self.in_review()
-        body = {"to": [{"party": "itso"}], "reason": "Possible IP."}
+        body = {"to": [{"party": "rdco"}], "reason": "Possible IP."}
         for user, who in (
             (self.other_adv, "an unrelated Adviser"), (self.itso, "ITSO"),
             (self.ierc, "IERC"), (self.rdco, "RDCO"), (self.owner, "the owner"),
@@ -337,7 +337,8 @@ class OwnershipMatrixTests(APITestCase):
         record = self.in_review()
         adviser_seat = RecordAssignment.objects.get(record=record, party="adviser").seats.get()
         seats.open_review(adviser_seat, self.adviser)
-        routing.accept_and_route(record, self.adviser, to=[{"party": "itso"}], reason="Possible IP.")
+        routing.accept_and_route(record, self.adviser, to=[{"party": "rdco", "nominees": [self.rdco.pk]}], reason="Possible IP.")
+        routing.route(record, self.rdco, to=[{"party": "itso"}], reason="Possible IP.")
         itso_seat = seats.claim(RecordAssignment.objects.get(record=record, party="itso"), self.itso)
         seats.open_review(itso_seat, self.itso)
 

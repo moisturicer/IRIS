@@ -233,6 +233,8 @@ def _blocked_reason(record, seat) -> Optional[str]:
     """Why the seated decider cannot decide yet, or None."""
     if seat is not None and seat.state == SeatState.ASSIGNED:
         return "Open the review first."
+    if seat is not None and seat.assignment.party == Party.RDCO:
+        return None
     return revisions.decision_blocked_reason(record)
 
 
@@ -272,7 +274,8 @@ def closes_payload(record, decider_seat) -> dict:
     assignments = []
     for assignment, open_seats in _closing(record):
         holders = [
-            s.reviewer.get_full_name() for s in open_seats if s.pk != decider_seat.pk
+            (s.reviewer.get_full_name() or s.reviewer.email) if s.reviewer else "Former reviewer"
+            for s in open_seats if s.pk != decider_seat.pk
         ]
         if assignment.pk == decider_seat.assignment_id and not holders:
             continue  # the decider's own turn, with nobody else on it, simply completes
@@ -282,6 +285,14 @@ def closes_payload(record, decider_seat) -> dict:
     return {
         "assignments": assignments,
         "document_requests": _open_document_requests(record).count(),
+        "revision_requests": [
+            {"id": r.pk, "party": r.party, "label": _label(r.party), "reason": r.reason}
+            for r in revisions.open_requests(record)
+        ] if decider_seat.assignment.party == Party.RDCO else [],
+        "findings": [
+            {"party": r.stage, "label": _label(r.stage), "comment": r.comment}
+            for r in record.reviews.filter(status=ReviewDecision.NEGATIVE_FINDING)
+        ],
     }
 
 
@@ -301,10 +312,12 @@ def decision_token(record) -> str:
         ReviewerSeat.objects.filter(
             assignment__record=record, assignment__state=AssignmentState.ACTIVE,
             state__in=OPEN_SEAT_STATES,
-        ).values_list("pk", "state")
+        ).values_list("pk", "state", "reviewer_id")
     )
     requests = sorted(_open_document_requests(record).values_list("pk", flat=True))
-    facts = f"{version.pk if version else 0}|{active}|{open_seats}|{requests}"
+    revision_requests = list(revisions.open_requests(record).values_list("pk", "reason"))
+    findings = list(record.reviews.filter(status=ReviewDecision.NEGATIVE_FINDING).order_by("pk").values_list("pk", "comment"))
+    facts = f"{version.pk if version else 0}|{active}|{open_seats}|{requests}|{revision_requests}|{findings}"
     return hashlib.sha256(facts.encode()).hexdigest()[:16]
 
 
@@ -434,7 +447,7 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         ReviewerSeat.objects.filter(pk__in=[s.pk for s in others]).update(
             state=SeatState.WITHDRAWN, closed_by_decision=review,
         )
-        cut_off.extend(s.reviewer for s in others)
+        cut_off.extend(s.reviewer for s in others if s.reviewer is not None)
         _close_assignment(
             assignment, actor, now, review,
             AssignmentState.COMPLETED if own else AssignmentState.WITHDRAWN,
@@ -453,13 +466,27 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         request.save(update_fields=["state", "closed_at", "closed_by_decision"])
         audit.document_request_withdrawn(request, actor, closed_by=audit.BY_DECISION)
 
+    closed_revisions = list(revisions.open_requests(record).select_for_update())
+    for request in closed_revisions:
+        request.state = "withdrawn"
+        request.resolved_at = now
+        request.resolved_by = actor
+        request.closed_by_decision = review
+        request.save(update_fields=["state", "resolved_at", "resolved_by", "closed_by_decision"])
+        audit.revision_request_withdrawn(request, actor, closed_by=audit.BY_DECISION)
+    if closed_revisions:
+        from apps.records.versions import restore_submitted_manuscript
+
+        restore_submitted_manuscript(record)
+
     # The one status write of a Decision (module note, point 4).
     record.pipeline_status = new_status
     record.save(update_fields=["pipeline_status", "updated_at"])
     if new_status in PUBLICLY_VISIBLE_STATUSES:
         audit.published(record, actor, party=party)
 
-    _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off)
+    _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off,
+            closed_revisions=[{"id": r.pk, "label": _label(r.party)} for r in closed_revisions])
     return review
 
 
@@ -479,7 +506,7 @@ def withdrawn_by_label(review) -> str:
     return f"{DECIDER_NAME[str(review.stage)]} {OUTCOME_PHRASE[outcome]}"
 
 
-def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off):
+def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off, closed_revisions):
     from apps.notifications.services import notify_decided
 
     transaction.on_commit(lambda: notify_decided(
@@ -490,4 +517,5 @@ def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off):
         reason=review.comment,
         closed_requests=closed_requests,
         cut_off=cut_off,
+        closed_revisions=closed_revisions,
     ))

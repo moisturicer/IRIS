@@ -53,7 +53,7 @@ def _record(owner, pipeline_status=PipelineStatus.IN_REVIEW):
     record = Record.objects.create(
         title="IR-256 tables",
         abstract="A" * 40,
-        record_type=RecordType.objects.get(name=RecordTypeName.THESIS_RESEARCH),
+        record_type=RecordType.objects.get_or_create(name=RecordTypeName.THESIS_RESEARCH)[0],
         added_by=owner,
         pipeline_status=pipeline_status,
         requested_ierc=True,

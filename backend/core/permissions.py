@@ -341,8 +341,8 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
     # A seat still to work is a review to open (IR-274 retired `can_act`).
     if any(seat["state"] in OPEN_SEAT_STATES for seat in my_seats):
         offered.append("open_review")
-    if routing["accept_and_route"]:
-        offered.append("accept_route")
+    if routing["send_to_rdco"]:
+        offered.append("send_to_rdco")
     if routing["route_as"] is not None:
         offered.append("route")
     offered.extend(DECISION_CAPABILITY[outcome] for outcome in decision["outcomes"])

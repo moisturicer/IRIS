@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed — 2026-10-30.** Awaiting the project lead (Lee Jasmin Adolfo). Drafted from the review-workspace design session ([`../review_workspace_roadmap.md`](../review_workspace_roadmap.md) §5a and §7 #7). No code may change routing, the hand-back or the Decision rules until this ADR is accepted.
+**Accepted for implementation — 2026-11-01**, by the user’s explicit “implement the proposal” instruction in the originating design chat, tracked as [IR-767](https://citiris.atlassian.net/browse/IR-767). Originally proposed 2026-10-30 from the review-workspace design session ([`../review_workspace_roadmap.md`](../review_workspace_roadmap.md) §5a and §7 #7). This records the user’s authorization; it does not attribute approval to Lee Jasmin Adolfo. The implementation still requires human PR review before merge.
 
 **Supersedes, in part, [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md):**
 
@@ -22,7 +22,7 @@
 - Versions and lineage (§5–§6)
 - [ADR-003](003-clearance-aware-resubmission.md)'s clearance-aware resubmission, and [ADR-004](004-restart-all-comparison-mode.md)'s comparison policy
 
-Two points are marked **Default, confirm at acceptance**. Each can be overturned without reopening the rest.
+The implementation retains both written defaults under that authorization: the Adviser keeps *Accept & publish*, and RDCO may decide over open Revision requests.
 
 ## Context
 
@@ -51,12 +51,12 @@ For a Thesis/Research or Project, the Adviser's academic choices stay *request r
 
 | Choice | Result |
 |---|---|
-| **Accept & publish** | Unchanged from ADR-032 §3: `published`, and RDCO is never involved. **Default, confirm at acceptance.** |
+| **Accept & publish** | Unchanged from ADR-032 §3: `published`, and RDCO is never involved. **Confirmed for implementation, 2026-11-01.** |
 | **Accept & send to RDCO** | Replaces *Accept & route*. Opens RDCO's assignment in its Pool with the Adviser's required reason. The Adviser's assignment completes and the Record stays `in_review`. |
 
 - **The send may nominate RDCO officers**, one or several, as any request may (§3). With no nominee it lands in RDCO's Pool.
 - **The send may suggest specialist offices.** The Adviser can tick ITSO, IERC or KTTO as *suggested*, alongside the author's ADR-018 hints. A suggestion routes nothing. RDCO sees both, labelled by who made them, and decides the routing. This keeps the reader's judgement in front of the router, which was ADR-032's reason for making the Adviser the router.
-- **Accept & send to RDCO is not a Decision.** Like *Accept & route* before it, it closes nothing, and it is refused while a Revision request is open.
+- **Accept & send to RDCO is not a Decision.** Like *Accept & route* before it, it completes only the Adviser’s turn, and it is refused while a Revision request is open.
 - **Proposals are unchanged.** The Adviser alone decides them, and they are never sent or routed (ADR-032 §2).
 - *Why keep Accept & publish:* ADR-032 considered "RDCO decides every Thesis/Project" and the project lead did not choose it. An ordinary capstone with no institutional question should not cost RDCO a hand-off. Removing *Accept & publish* would reverse that decision too, and the user did not ask for it.
 
@@ -95,7 +95,7 @@ RDCO holds the Record from the Adviser's send onward. When a specialist office c
 - `_hand_back` and its `RoutingEvent` with `actor = None` are retired. History rows already written by it stay as they are.
 - The RDCO row on the party tracker reads:
   - *Not required* when the Adviser published the Record directly
-  - *Waiting* from the send onward, until RDCO decides
+  - its actual Pool or Seat state from the send onward, until RDCO decides
 
 ### 5. RDCO decides at any time
 
@@ -108,7 +108,7 @@ An RDCO Seat holder may make any Decision (*accept & publish*, *keep unlisted*, 
 
 The Decision dialog names every office still reviewing, and each Finding already recorded, before RDCO confirms.
 
-**RDCO may also decide over an open Revision request. Default, confirm at acceptance.**
+**RDCO may also decide over an open Revision request (confirmed for implementation, 2026-11-01).**
 
 - An RDCO Decision withdraws every open Revision request, its own included. It records the Decision as the reason, through a new nullable `ResubmissionRequest.closed_by_decision` (the same shape as the IR-270 links on Seats, assignments and document requests).
 - The owners' Decision notice names each request it withdrew and which party asked.
@@ -128,7 +128,7 @@ A one-off data migration, in the same change as the code:
 
 - **A Thesis/Research or Project that is `in_review`, has passed its Adviser, and has no active RDCO assignment** gets one opened in RDCO's Pool. The reason is *"Opened when RDCO began holding every routed Record (ADR-047)"*, and the `RoutingEvent` carries `actor = None`, as the hand-back's did. Its offices continue as they are.
 - **Records with RDCO already active, and records still with their Adviser,** are untouched.
-- The migration writes no `Review`, changes no Clearance, and is reversible: reversing it removes only the assignments it opened.
+- The migration writes no `Review`, changes no Clearance, and is reversible: reversing it removes only the assignments it opened, and refuses if any has acquired Seats, Reviews or Extensions so their history cannot be erased.
 - *Rejected: keeping the hand-back for Records routed before cutover.* Two rules would then live in the code for the life of those Records, which is the brittleness ADR-032 §13 avoided.
 
 ### 8. Tests that pin the decisions

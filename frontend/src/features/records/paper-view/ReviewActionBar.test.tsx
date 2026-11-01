@@ -259,10 +259,10 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
   // IR-261: the Adviser's filled action is Accept & route; an office keeps
   // Request documents filled, with Route to office beside it.
   it("orders the routing actions so each viewer's primary is the right one", async () => {
-    const { unmount } = renderBar(["accept_route", "request_document"]);
+    const { unmount } = renderBar(["send_to_rdco", "request_document"]);
     let bar = screen.getByRole("toolbar", { name: "Review actions" });
     expect(within(bar).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
-      "Accept & route…",
+      "Accept & send to RDCO…",
       "Request documents",
     ]);
     unmount();
@@ -275,7 +275,7 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     ]);
 
     await userEvent.click(within(bar).getByRole("button", { name: "Route to office…" }));
-    expect(screen.getByRole("dialog", { name: "Route to office" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Request office review" })).toBeInTheDocument();
   });
 
   // IR-272: accepting is a decision, so an open revision request disables it
@@ -293,15 +293,15 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     renderScreen(
       <ReviewActionBar
         record={asked}
-        can={new Set<Capability>(["accept_route", "withdraw_revision"])}
+        can={new Set<Capability>(["send_to_rdco", "withdraw_revision"])}
         onChanged={onChanged}
       />,
     );
 
-    const accept = screen.getByRole("button", { name: "Accept & route…" });
+    const accept = screen.getByRole("button", { name: "Accept & send to RDCO…" });
     expect(accept).toBeDisabled();
     expect(accept).toHaveAccessibleDescription("Waiting on the author: IERC asked for a revision.");
-    expect(buttonNames()).toEqual(["Accept & route…", "Withdraw revision request"]);
+    expect(buttonNames()).toEqual(["Accept & send to RDCO…", "Withdraw revision request"]);
 
     await userEvent.click(screen.getByRole("button", { name: "Withdraw revision request" }));
     const confirm = screen.getByRole("dialog", { name: "Withdraw the revision request?" });
@@ -315,9 +315,9 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
   // IR-270: a decider's primary is Accept & publish, and Reject is the last
   // of the dialogs; an open revision request holds all three Decisions.
   it("orders the Decisions so publishing is primary and rejecting comes last", async () => {
-    const { unmount } = renderBar(["reject", "request_document", "accept_route", "request_revision", "accept_publish"]);
+    const { unmount } = renderBar(["reject", "request_document", "send_to_rdco", "request_revision", "accept_publish"]);
     expect(buttonNames()).toEqual([
-      "Accept & publish…", "Accept & route…", "Request Revision…", "Request documents", "Reject…",
+      "Accept & publish…", "Accept & send to RDCO…", "Request Revision…", "Request documents", "Reject…",
     ]);
     unmount();
 
