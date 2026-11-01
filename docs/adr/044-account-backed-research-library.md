@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-10-30 by Lee Jasmin Adolfo (IR-566, under IR-553). Proposed 2026-10-15.
+**Accepted** — 2026-10-30 by Lee Jasmin Adolfo (IR-566, under IR-553). Proposed 2026-10-15. Q3 (Calls & Conferences saves) would be replaced by [ADR-050](050-calls-for-papers-and-rdco-confirmation.md), Proposed 2026-11-01: saved Calls follow the account and appear in My Library.
 
 IR-566 listed four things to settle before it is ready for an agent: how saves are stored and owned (§Decision), and three product decisions — Likes, reading history and Calls & Conferences saves. The team answered all three on 2026-10-30; they are recorded in §Product decisions with the options that were weighed.
 

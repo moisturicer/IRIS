@@ -211,7 +211,7 @@ _Avoid_: Flag, complaint.
 ### Library
 
 **Library**:
-A reader's private collection of [[Saved Record]]s. It belongs to the reader's account, and nobody else can see it.
+A reader's private collection of [[Saved Record]]s and [[Saved Call]]s. It belongs to the reader's account, and nobody else can see it.
 _Avoid_: Repository, catalogue (that is Discover), collection, bookshelf.
 
 **Saved Record**:
@@ -271,8 +271,16 @@ _Avoid_: Popular, hot, most viewed.
 ### Calls & Conferences
 
 **Call**:
-A dated research opportunity on the Calls & Conferences board: an internal call, a conference deadline, a funding window or an institutional grant. RDCO or an Adviser posts it. An Adviser changes only the Calls they posted; RDCO can change any.
+An invitation to submit papers on the Calls & Conferences board, to a conference, congress, symposium, workshop, journal or book. It has a paper deadline, one or more [[Area]]s and, when there is an event, the event's dates. RDCO or an Adviser posts it. An Adviser changes only the Calls they posted; RDCO can change any.
 _Avoid_: Opportunity (the code's name, which readers never see), announcement, posting.
+
+**Call request**:
+An Adviser's [[Call]] waiting for RDCO to confirm or reject it. Only that Adviser and RDCO can see it, and it becomes public only once confirmed.
+_Avoid_: Post request, pending post, submission (that is a Record's).
+
+**Saved Call**:
+A [[Call]] a reader has kept in their [[Library]]. A reader saves a Call at most once, and it stays saved after the Call is over, until the reader removes it or RDCO deletes the Call.
+_Avoid_: Bookmark, reminder.
 
 ### Accounts
 
