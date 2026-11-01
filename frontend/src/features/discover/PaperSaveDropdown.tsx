@@ -121,7 +121,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
       </button>
 
       {failure && !open && (
-        <p role="alert" className="absolute top-full mt-1.5 right-0 w-60 z-40 rounded-lg border border-red-200 bg-white px-3 py-2 text-2xs text-red-700 shadow-card-md">
+        <p role="alert" className="absolute top-full mt-1.5 right-0 w-60 z-40 rounded-lg border border-brand-200 bg-white px-3 py-2 text-2xs text-brand shadow-card-md">
           {failure.message}
         </p>
       )}
@@ -133,7 +133,7 @@ export function PaperSaveDropdown({ record, variant = "icon", emphasis = "second
           className={cn("absolute top-full mt-1.5 w-64", variant === "pill" ? "left-0" : "right-0", "bg-white rounded-lg shadow-card-md border border-stone-200/90 py-1.5 z-40")}
         >
           {failure && (
-            <p role="alert" className="mx-3 mb-1.5 rounded-md bg-red-50 px-2 py-1.5 text-2xs text-red-700">
+            <p role="alert" className="mx-3 mb-1.5 rounded-md bg-brand-50 px-2 py-1.5 text-2xs text-brand">
               {failure.message}
             </p>
           )}
