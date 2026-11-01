@@ -232,6 +232,8 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "GET": _case(RDCO_ONLY),
         "POST": _case(SIGNED_IN, data={"record": Ref("published"), "note": "For my thesis."}),
     }),
+    # IR-743: every reader's own requests; anyone else's are never listed.
+    "download-requests-mine": Entry({"GET": _case(SIGNED_IN)}),
     "download-request-detail": Entry({
         "GET": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}),
         "PATCH": _case(

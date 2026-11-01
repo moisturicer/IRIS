@@ -241,6 +241,57 @@ def download_state(user, record) -> dict:
     }
 
 
+def reader_request_rows(user) -> list[dict]:
+    """
+    The reader's own download requests for My Library (IR-743), newest first,
+    each with its state and what the reader may do about it -- worked out here
+    so the browser never decides access itself. Cancelled requests are left
+    out (withdrawn, as if never made), and so is any request on a record the
+    reader can no longer read: the one visibility predicate (IR-153).
+    """
+    from .models import Record
+
+    requests = (
+        DownloadRequest.objects.filter(requested_by=user, record__in=Record.objects.visible_to(user))
+        .exclude(status=RequestStatus.CANCELLED)
+        .select_related("record")
+        .order_by("-created_at", "-pk")
+    )
+    rows, counted = [], set()
+    for request in requests:
+        # Only a record's newest request is the one the reader can act on.
+        newest = request.record_id not in counted
+        counted.add(request.record_id)
+        state = _reader_state(request)
+        rows.append({
+            "id": request.pk,
+            "record": request.record_id,
+            "record_title": request.record.title,
+            "note": request.note,
+            "created_at": request.created_at,
+            "state": state,
+            "grant_expires_at": request.grant_expires_at if state == "granted" else None,
+            "rdco_note": request.rdco_note if state in ("declined", "revoked") else "",
+            "actions": _READER_ACTIONS[state] if newest else [],
+        })
+    return rows
+
+
+def _reader_state(request) -> str:
+    if request.status == RequestStatus.APPROVED:
+        return "granted" if grant_is_live(request) else "expired"
+    return request.status  # pending, declined or revoked
+
+
+_READER_ACTIONS = {
+    "pending": ["cancel"],
+    "granted": ["download"],
+    "declined": ["request_again"],
+    "revoked": ["request_again"],
+    "expired": ["request_again"],
+}
+
+
 def copy_identity(user, access: DownloadAccess) -> CopyIdentity:
     """What a copy made under `access` says about who it was made for (IR-676)."""
     return CopyIdentity(

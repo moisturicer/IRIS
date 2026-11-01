@@ -2,7 +2,7 @@ import { apiClient } from "./client";
 import type {
   RecordListItem, RecordDetail, RecordFormData, MyResearchItem,
   Classification, PSCEDClassification, RecordType,
-  DownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
+  DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
   DiscoverInterests, ForYouPage, MetadataSuggestions,
@@ -215,6 +215,9 @@ export const recordsApi = {
     apiClient.post<DownloadRequest>(`/records/download-requests/${id}/revoke/`, { note }),
   cancelDownloadRequest:   (id: number) =>
     apiClient.post<DownloadRequest>(`/records/download-requests/${id}/cancel/`),
+  /** The signed-in reader's own requests, newest first (IR-743). */
+  myDownloadRequests:      () =>
+    apiClient.get<ReaderDownloadRequest[]>("/records/download-requests/mine/"),
 
   // Delete requests: raised by `delete` above (DELETE /records/<id>/), then only
   // read and decided here. The queue has no create or update route (IR-496).
