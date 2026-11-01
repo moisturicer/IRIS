@@ -2325,3 +2325,11 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 **Tests:** `apps/library/tests.py` covers idempotence, one status at a time, ownership in every direction, the 404 for unreadable Records, the unavailable listing, cascade on delete, two devices, and two accounts on one client. `apps/tests/test_enum_vocabulary.py` adds `ReadingStatus`. `store/library.store.test.ts` covers optimistic success, rollback, no storage writes, dropped answers after an account switch or sign-out, and only the newest write applying. `MyLibraryPage.test.tsx` covers account saves by status, unavailable saves and removing them, a visible rollback, two accounts on one browser (saves and history), and legacy keys left untouched. `DiscoverPage.test.tsx` deliberately rewrites three IR-576 tests against the account library and asserts there is no Star. `PaperViewPage.test.tsx` follows the renamed Save control. These ran locally: the four frontend files, 235 passed. The backend suite, `tsc`, lint, build and `makemigrations --check` are left to CI (no local Python environment).
 
 **Status:** Implemented; awaiting review.
+
+## IR-668 — Production /django-admin/ is closed except to allowlisted networks (ASVS 4.3.1)
+
+`frontend/nginx.conf` answers 403 on `/django-admin/` unless the client is in `DJANGO_ADMIN_ALLOWED_NETWORKS`, which `docker-entrypoint.d/40-iris-django-admin.sh` turns into nginx config at start. No allowlist allows nobody. The client address follows `TRUSTED_PROXY_COUNT`, as IR-656's does.
+
+`scripts/check_django_admin_allowlist.sh`, in CI's Docker Compose job, runs the real nginx and proves the default deny, a listed client, an unlisted one, forged `X-Forwarded-For` values, refused bad settings, and that `/admin/users`, `/admin/role-requests` and `/admin/audit` are not refused.
+
+**PARTIAL:** Django's admin stays at `/admin/`, unrestricted, until IR-782 moves it. Until then the 403 guards a path Django does not serve.
