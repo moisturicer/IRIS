@@ -62,6 +62,21 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
+/**
+ * Node's `process`, where an unhandled rejection is reported. Vitest runs
+ * these tests in Node, but `tsconfig.json` loads no Node types (the app ships
+ * to a browser), so only the two methods this file needs are declared.
+ */
+type RejectionListener = (reason: unknown) => void;
+const nodeProcess = (
+  globalThis as unknown as {
+    process: {
+      on: (event: "unhandledRejection", listener: RejectionListener) => void;
+      off: (event: "unhandledRejection", listener: RejectionListener) => void;
+    };
+  }
+).process;
+
 function signIn(id: number) {
   act(() => useAuthStore.getState().login(makeUser({ id }), validToken({ user_id: id }), "refresh"));
 }
@@ -186,7 +201,7 @@ describe("NotificationBell across a change of account in one tab", () => {
 
   it("shows nothing of the previous account when the next account's fetch fails", async () => {
     const unhandled = vi.fn();
-    process.on("unhandledRejection", unhandled);
+    nodeProcess.on("unhandledRejection", unhandled);
     try {
       vi.mocked(notificationsApi.list).mockResolvedValueOnce(
         page([notification(1, "Account A's manuscript was returned", 41)]),
@@ -210,7 +225,7 @@ describe("NotificationBell across a change of account in one tab", () => {
       await new Promise((resolve) => setTimeout(resolve, 0));
       expect(unhandled).not.toHaveBeenCalled();
     } finally {
-      process.off("unhandledRejection", unhandled);
+      nodeProcess.off("unhandledRejection", unhandled);
     }
   });
 });
