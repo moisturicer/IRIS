@@ -169,10 +169,11 @@ export default function LoginPage() {
         return;
       }
 
-      // Neither of these judged the password, so neither counts towards the
-      // lock: an unverified account is not a wrong guess, and a server that
-      // could not be reached rejected nothing (IR-536).
-      if (failure.kind === "unverified" || failure.kind === "unreachable") {
+      // None of these judged the password, so none counts towards the lock: an
+      // unverified account is not a wrong guess, a server that could not be
+      // reached rejected nothing (IR-536), and a rate limit counts the address
+      // a whole campus may share (IR-661).
+      if (failure.kind === "unverified" || failure.kind === "unreachable" || failure.kind === "throttled") {
         setLoginAlert(failure);
         return;
       }
@@ -265,6 +266,12 @@ export default function LoginPage() {
       {loginAlert?.kind === "unverified" && (
         <AuthAlert variant="warning" title="Email not verified">
           Check your inbox for the verification link, or register again if it expired.
+        </AuthAlert>
+      )}
+
+      {loginAlert?.kind === "throttled" && (
+        <AuthAlert variant="error" title="Unable to sign in">
+          {loginAlert.message}
         </AuthAlert>
       )}
 

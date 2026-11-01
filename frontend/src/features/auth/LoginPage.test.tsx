@@ -483,16 +483,46 @@ describe("what a failed sign-in says", () => {
   });
 
   it("says 'Unable to sign in' with the server's detail for anything else", async () => {
-    failSignInWith(
-      serverReplied(429, { detail: "Request was throttled. Expected available in 30 seconds." }),
-    );
+    failSignInWith(serverReplied(400, { detail: "This sign-in could not be read." }));
     renderScreen(<LoginPage />, { route: "/login" });
 
     await signIn();
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Unable to sign in");
-    expect(alert).toHaveTextContent("Request was throttled. Expected available in 30 seconds.");
+    expect(alert).toHaveTextContent("This sign-in could not be read.");
+  });
+
+  it("says how long to wait when the rate limit answers (IR-661)", async () => {
+    failSignInWith(
+      serverReplied(429, { detail: "Request was throttled. Expected available in 1800 seconds." }),
+    );
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Too many requests");
+    expect(alert).toHaveTextContent("about 30 minutes");
+    expect(alert).not.toHaveTextContent("throttled");
+  });
+
+  it("never locks the account because the rate limit answered (IR-661)", async () => {
+    // A campus shares one address, so a throttle says nothing about this password.
+    const throttled = () => serverReplied(429, { detail: "Request was throttled. Expected available in 30 seconds." });
+    failSignInWith(throttled(), throttled(), throttled());
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const user = await signIn();
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+
+    await waitFor(() => {
+      expect(authApi.login).toHaveBeenCalledTimes(3);
+    });
+    expect(screen.queryByRole("dialog", { name: "Account Locked" })).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Too many requests");
   });
 
   it("has no serious or critical accessibility violations while an error shows", async () => {

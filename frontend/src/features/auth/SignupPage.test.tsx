@@ -761,6 +761,18 @@ describe("a refused registration", { timeout: 30_000 }, () => {
   const refuse = (data: unknown, status = 400) =>
     vi.spyOn(authApi, "register").mockRejectedValue({ response: { status, data } });
 
+  it("says how long to wait when the rate limit answers, keeping the form (IR-661)", async () => {
+    const user = userEvent.setup();
+    refuse({ detail: "Request was throttled. Expected available in 1800 seconds." }, 429);
+    renderSignup();
+    await submit(user);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("about 30 minutes");
+    expect(alert).not.toHaveTextContent("throttled");
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  });
+
   it("shows every reason the server refused a password, not just the first (IR-647)", async () => {
     const user = userEvent.setup();
     refuse({ password: ["This password is too common.", "This password is entirely numeric."] });

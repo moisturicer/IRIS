@@ -7,6 +7,7 @@ import { EntryFrame } from "@/components/auth/EntryFrame";
 import { EntrySteps, type EntryStep } from "@/components/auth/EntrySteps";
 import { Button, ButtonLink, Input, Select } from "@/components/ui";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { errorDetail } from "@/lib/errorDetail";
 import { cn } from "@/lib/utils";
 import { DataNotice } from "./DataNotice";
 
@@ -341,6 +342,10 @@ export default function SignupPage() {
       const data = response?.data;
       if (!response || (response.status ?? 0) >= 500 || !data || typeof data !== "object") {
         setFormAlert(UNREACHABLE);
+        return;
+      }
+      if (response.status === 429) {
+        setFormAlert({ title: "Registration failed", message: errorDetail(err, "") });
         return;
       }
       const onFields: FieldErrors = {};

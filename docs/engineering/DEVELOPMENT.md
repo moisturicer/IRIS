@@ -46,6 +46,12 @@ keys into your local `backend/.env` and restart backend processes to use them.
 also work). Invalid values stop startup and name the offending key.
 The separate AI overview budget is unchanged.
 
+Login and registration have budgets of their own (IR-661): `API_THROTTLE_LOGIN`
+(`300/hour`) and `API_THROTTLE_REGISTER` (`60/hour`), same format. They count per
+client address, read as `TRUSTED_PROXY_COUNT` says, and do not spend the anonymous
+budget. A refusal is a 429 with `Retry-After`. The axes lockout is separate and
+still answers per account and address.
+
 A 429 recovers after its `Retry-After` window. **Production must wait out
 that window.** Locally, after changing a limit, old counters can still lock
 an account out. Open `docker compose exec backend python manage.py shell`

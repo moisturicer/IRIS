@@ -23,11 +23,13 @@ from .sessions import (
     revoke_token,
 )
 from .lockout import LOCKED_BY_ADMIN
+from .throttles import LoginThrottle, RegisterThrottle
 
 
 class RegisterView(generics.CreateAPIView):
     serializer_class   = RegisterSerializer
     permission_classes = [AllowAny]
+    throttle_classes   = [RegisterThrottle]
 
     def perform_create(self, serializer):
         from django.db import transaction
@@ -50,6 +52,7 @@ class RegisterView(generics.CreateAPIView):
 
 class LoginView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [LoginThrottle]
 
     @transaction.atomic
     def post(self, request):

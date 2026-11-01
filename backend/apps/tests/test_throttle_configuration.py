@@ -9,7 +9,14 @@ import sys
 import pytest
 
 
-RATE_KEYS = ("API_THROTTLE_ANON", "API_THROTTLE_USER", "API_THROTTLE_AI_QUERY")
+RATE_KEYS = (
+    "API_THROTTLE_ANON", "API_THROTTLE_USER", "API_THROTTLE_AI_QUERY",
+    "API_THROTTLE_LOGIN", "API_THROTTLE_REGISTER",
+)
+DEFAULT_RATES = {
+    "anon": "100/day", "user": "1000/day", "ai_query": "60/hour",
+    "ai_overview": "600/hour", "auth_login": "300/hour", "auth_register": "60/hour",
+}
 
 
 def boot_settings(module="base", **overrides):
@@ -31,26 +38,21 @@ def boot_settings(module="base", **overrides):
 def test_unset_rates_keep_existing_defaults_even_in_debug(debug, module):
     result = boot_settings(module, DEBUG=debug)
     assert result.returncode == 0, result.stderr
-    assert json.loads(result.stdout) == {
-        "anon": "100/day", "user": "1000/day", "ai_query": "60/hour",
-        "ai_overview": "600/hour",
-    }
+    assert json.loads(result.stdout) == DEFAULT_RATES
 
 
 @pytest.mark.parametrize("key,scope,value", [
     ("API_THROTTLE_ANON", "anon", "10000/day"),
     ("API_THROTTLE_USER", "user", "100000/day"),
     ("API_THROTTLE_AI_QUERY", "ai_query", "6000/hour"),
+    ("API_THROTTLE_LOGIN", "auth_login", "9000/hour"),
+    ("API_THROTTLE_REGISTER", "auth_register", "900/hour"),
 ])
 @pytest.mark.parametrize("module", ["base", "development"])
 def test_each_rate_can_be_overridden_independently(key, scope, value, module):
     result = boot_settings(module, **{key: value})
     assert result.returncode == 0, result.stderr
-    expected = {
-        "anon": "100/day", "user": "1000/day", "ai_query": "60/hour",
-        "ai_overview": "600/hour",
-    }
-    expected[scope] = value
+    expected = {**DEFAULT_RATES, scope: value}
     assert json.loads(result.stdout) == expected
 
 
