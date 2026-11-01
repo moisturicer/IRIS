@@ -340,6 +340,9 @@ export default function PaperViewPage() {
   const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
   /** Bumped when a document request changes, so the tracker reloads. */
   const [trackerVersion, setTrackerVersion] = useState(0);
+  // The author's Review tab action bar, stuck over the bottom of the screen
+  // below `reading-wide`: the reader lands citations above it (IR-477).
+  const [reviewBarInset, setReviewBarInset] = useState(0);
   // A My Library link names the request it answers as `#fragment` (IR-625).
   useFragmentFocus(location.hash, record != null);
 
@@ -744,6 +747,7 @@ export default function PaperViewPage() {
           navKey={arrivalKey.current}
           contained={onPaperTab || reviewerWorkspace || tier === "wide"}
           fill={onPaperTab || reviewerWorkspace}
+          bottomInset={onReviewTab ? reviewBarInset : 0}
           downloadControl={
             // An earlier version is not offered as a copy: the download route
             // serves only the current paper, and every copy must be marked.
@@ -1226,6 +1230,7 @@ export default function PaperViewPage() {
                 record={record}
                 authorView={userIsOwner}
                 onOpenReview={openReview}
+                onBarInset={setReviewBarInset}
                 can={can}
                 reader={sections.includes("paper") ? reader() : null}
                 timelineVersion={trackerVersion}
