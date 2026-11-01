@@ -198,13 +198,13 @@ class AuthorizationMatrixTests(APITestCase):
 
     def test_opportunity_posting_matches_its_declared_roles(self):
         """
-        `OPPORTUNITY_POSTER_ROLES = {RDCO, KTTO, Adviser}` is the one role set in
+        `OPPORTUNITY_POSTER_ROLES = {RDCO, Adviser}` is the one role set in
         `core/permissions.py` that carries a written rationale for its
         membership. Pinned here so the is_staff removal does not widen or narrow
         it by accident.
         """
         self.assert_only(
-            ["RDCO", "KTTO", "Adviser"], "post",
+            ["RDCO", "Adviser"], "post",
             reverse("opportunity-list"),
             {"title": "A call", "kind": "conference"},
         )

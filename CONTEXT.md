@@ -268,6 +268,12 @@ _Avoid_: Access (the audit log's word for one opening), hit, read, reader count.
 Published papers ordered by the [[View]]s they gained in the last 30 days, then by all-time views, then newest first. Distinct from Most Viewed, which orders by all-time views alone.
 _Avoid_: Popular, hot, most viewed.
 
+### Calls & Conferences
+
+**Call**:
+A dated research opportunity on the Calls & Conferences board: an internal call, a conference deadline, a funding window or an institutional grant. RDCO or an Adviser posts it. An Adviser changes only the Calls they posted; RDCO can change any.
+_Avoid_: Opportunity (the code's name, which readers never see), announcement, posting.
+
 ### Accounts
 
 **Sign in**:

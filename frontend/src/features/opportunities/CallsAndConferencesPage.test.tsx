@@ -240,7 +240,7 @@ describe("states", () => {
   it("tells a reader who posts calls, and offers no post button", async () => {
     serve([], false);
     await renderBoard();
-    expect(screen.getByText(/RDCO, KTTO and advisers post calls here/)).toBeInTheDocument();
+    expect(screen.getByText(/RDCO and advisers post calls here/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Post a call" })).toBeNull();
   });
 
