@@ -1422,8 +1422,9 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
                 {"detail": "Provide action: 'approve' or 'decline'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        response = self._decide(
-            request, instance, approved=action == "approve", note=request.data.get("note"),
+        response = self._refusal(
+            decide_download_request, instance, request.user,
+            approved=action == "approve", note=request.data.get("note"),
         )
         if response is not None:
             return response
@@ -1432,7 +1433,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         """POST /download-requests/<id>/approve/ — set approved, notify requester with email."""
-        response = self._decide(request, self.get_object(), approved=True)
+        response = self._refusal(decide_download_request, self.get_object(), request.user, approved=True)
         return response or Response(
             {"detail": "Download request approved. The requester has been notified."}
         )
@@ -1440,8 +1441,9 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def decline(self, request, pk=None):
         """POST /download-requests/<id>/decline/ {note} — set declined, notify requester."""
-        response = self._decide(
-            request, self.get_object(), approved=False, note=request.data.get("note"),
+        response = self._refusal(
+            decide_download_request, self.get_object(), request.user,
+            approved=False, note=request.data.get("note"),
         )
         return response or Response(
             {"detail": "Download request declined. The requester has been notified."}
@@ -1462,12 +1464,6 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         download_request = self.get_object()
         response = self._refusal(cancel_download_request, download_request, request.user)
         return response or Response(self.get_serializer(download_request).data)
-
-    def _decide(self, request, download_request, *, approved, note=None):
-        """The refusal for this decision as a Response, or None once it is made."""
-        return self._refusal(
-            decide_download_request, download_request, request.user, approved=approved, note=note,
-        )
 
     @staticmethod
     def _refusal(act, download_request, user, **kwargs):

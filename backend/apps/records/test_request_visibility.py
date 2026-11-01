@@ -195,7 +195,7 @@ class DeleteRequestWriteRouteTests(RequestVisibilityFixtures):
                 self.client.force_authenticate(user)
                 response = self.client.patch(
                     f"{DELETE_REQUESTS}{pending.pk}/",
-                    {"record": self.published_thesis.pk, "status": RequestStatus.APPROVED, **NOTE},
+                    {"record": self.published_thesis.pk, "status": RequestStatus.APPROVED},
                     format="json",
                 )
 

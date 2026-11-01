@@ -15,6 +15,7 @@ from apps.notifications.services import notify_download_reviewed, notify_downloa
 from core.enums import RequestStatus
 from core.permissions import is_record_owner, is_record_participant, office_parties_of
 
+from .models import DOWNLOAD_NOTE_MAX_LENGTH as NOTE_MAX_LENGTH
 from .models import DownloadRequest
 from .watermark import CopyIdentity
 
@@ -33,10 +34,6 @@ class GrantNotLive(Exception):
 
 class NoteRequired(Exception):
     """A decline or a revocation says why (ADR-048, decision 4)."""
-
-
-#: The longest note a reader or RDCO may leave (IR-688).
-NOTE_MAX_LENGTH = 500
 
 
 def _clean_note(note) -> str:

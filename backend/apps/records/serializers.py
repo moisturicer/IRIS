@@ -6,7 +6,7 @@ from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, record_versions, resubmission_payload
 
 from .models import (
-    Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
+    DOWNLOAD_NOTE_MAX_LENGTH, Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
     Classification, PSCEDClassification, RecordType,
 )
 
@@ -727,7 +727,9 @@ class DownloadRequestSerializer(serializers.ModelSerializer):
     requested_by_name    = serializers.SerializerMethodField()
     requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
     # Why the reader asks (IR-688): required, plain text, at most 500 characters.
-    note                 = serializers.CharField(max_length=500, allow_blank=False, trim_whitespace=True)
+    note                 = serializers.CharField(
+        max_length=DOWNLOAD_NOTE_MAX_LENGTH, allow_blank=False, trim_whitespace=True,
+    )
     # Whether RDCO may still revoke it: approved and not yet expired. Worked
     # out here so the queue never decides expiry itself.
     grant_live           = serializers.SerializerMethodField()
