@@ -44,7 +44,7 @@ export function PaperDownloadControl({
   // Cancelled, or decided since the page loaded: either way, re-read.
   const { cancelling, cancel } = useCancelDownloadRequest(onChanged);
   const describedBy = useId();
-  const noteId = useId();
+  const rdcoNoteId = useId();
 
   if (!download) return null;
 
@@ -108,12 +108,12 @@ export function PaperDownloadControl({
   const rdcoNote = endedByRdco && download.rdco_note !== undefined
     ? `RDCO's note: ${download.rdco_note.trim() || "No note recorded"}`
     : null;
-  const descriptions = [ended && describedBy, rdcoNote && noteId].filter(Boolean).join(" ");
+  const descriptions = [ended && describedBy, rdcoNote && rdcoNoteId].filter(Boolean).join(" ");
   return (
     <span className="inline-flex items-center gap-2">
       {ended && note(ended)}
       {rdcoNote && (
-        <span id={noteId} className="max-w-xs text-xs text-stone-600 line-clamp-2" title={rdcoNote}>
+        <span id={rdcoNoteId} className="max-w-xs text-xs text-stone-600 line-clamp-2" title={rdcoNote}>
           {rdcoNote}
         </span>
       )}

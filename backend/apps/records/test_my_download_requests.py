@@ -161,6 +161,29 @@ class MyDownloadRequestsTests(APITestCase):
         self.assertEqual([row["id"] for row in rows], [declined.pk])
         self.assertEqual(rows[0]["actions"], ["request_again"])
 
+    def test_a_live_grant_keeps_its_download_beside_a_newer_pending_request(self):
+        # As on the paper page: a pending request does not end a live grant.
+        grant = self.granted(expires_in_days=5, days_ago=3)
+        pending = self.ask(days_ago=1)
+
+        rows = {row["id"]: row for row in self.mine()}
+
+        self.assertEqual((rows[grant.pk]["state"], rows[grant.pk]["actions"]), ("granted", ["download"]))
+        self.assertEqual((rows[pending.pk]["state"], rows[pending.pk]["actions"]), ("pending", ["cancel"]))
+
+    def test_an_approval_superseded_by_a_revocation_no_longer_reads_as_granted(self):
+        older = self.granted(expires_in_days=5, days_ago=5)
+        revoked = self.granted(expires_in_days=5, days_ago=2)
+        DownloadRequest.objects.filter(pk=revoked.pk).update(
+            status=RequestStatus.REVOKED, revoked_at=timezone.now(), rdco_note="Misused.",
+        )
+
+        rows = {row["id"]: row for row in self.mine()}
+
+        self.assertEqual((rows[revoked.pk]["state"], rows[revoked.pk]["actions"]), ("revoked", ["request_again"]))
+        self.assertEqual((rows[older.pk]["state"], rows[older.pk]["actions"]), ("expired", []))
+        self.assertIsNone(rows[older.pk]["grant_expires_at"])
+
     def test_anonymous_is_refused(self):
         self.assertIn(
             self.client.get(MINE).status_code,
