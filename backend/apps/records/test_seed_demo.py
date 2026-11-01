@@ -343,7 +343,7 @@ class SeedDemoRecordTests(TestCase):
         self.assertEqual(
             record.routing_events.get(to_party="rdco").suggested_offices, ["itso", "ierc"],
         )
-        self.assertTrue(record.requested_ktto)
+        self.assertTrue(record.for_commercialization)
 
     def test_rdco_can_decide_one_project_with_offices_still_reviewing(self):
         """ADR-047 §3 and §5: a whole office, two officers and a finding, before RDCO decides."""

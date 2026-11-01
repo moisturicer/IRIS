@@ -424,7 +424,7 @@ class Command(BaseCommand):
         )
         record = self._make(
             "Project kept unlisted after KTTO", RecordTypeName.PROJECT, student,
-            adviser=adviser, requested_ktto=True,
+            adviser=adviser, for_commercialization=True,
         )
         if record:
             entry = self._submit(record, student)
@@ -476,7 +476,7 @@ class Command(BaseCommand):
         student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
         record = self._make(
             title, RecordTypeName.PROJECT, student, adviser=adviser,
-            requested_itso=True, requested_ierc=True, requested_ktto=True,
+            requires_ethics_review=True, for_commercialization=True,
         )
         if not record:
             return None
@@ -494,10 +494,10 @@ class Command(BaseCommand):
                 (Office.IERC, RoleName.IERC),
                 (Office.KTTO, RoleName.KTTO),
             )],
-            reason="The project needs prior-art, ethics and commercialisation review.",
+            reason="The project needs technical, ethics and commercialisation review.",
         )
         for office, role, comment in (
-            (Office.ITSO, RoleName.ITSO, "Prior-art search complete; no conflict."),
+            (Office.ITSO, RoleName.ITSO, "Technical review complete; no issues found."),
             (Office.KTTO, RoleName.KTTO, "Commercialisation potential noted."),
         ):
             reviewer = users[role]
@@ -588,7 +588,7 @@ class Command(BaseCommand):
 
         record = self._make(
             NEW_MODEL_TITLE, RecordTypeName.THESIS_RESEARCH, users[RoleName.STUDENT],
-            adviser=users[RoleName.ADVISER], requested_itso=True,
+            adviser=users[RoleName.ADVISER], is_ip=True,
         )
         if record:
             record.dpa_accepted_at = timezone.now()
@@ -636,7 +636,7 @@ class Command(BaseCommand):
         )
         record = self._make(
             AT_RDCO_TITLE, RecordTypeName.THESIS_RESEARCH, student,
-            adviser=adviser, requested_itso=True,
+            adviser=adviser,
         )
         if not record:
             return
@@ -646,17 +646,17 @@ class Command(BaseCommand):
         entry = enter_at_adviser(record, student)
         seats.open_review(entry.seats.get(), adviser)
         rdco = users[RoleName.RDCO]
-        accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="The sensor fusion method may be patentable.")
+        accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="The sensor fusion method needs technical review.")
         rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
         seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
-        route(record, rdco, to=[{"party": "itso", "nominees": [itso.pk]}], reason="Assess prior art.")
+        route(record, rdco, to=[{"party": "itso", "nominees": [itso.pk]}], reason="Review the sensor fusion method.")
         seat = ReviewerSeat.objects.get(
             assignment__record=record, assignment__party="itso", reviewer=itso,
         )
         seats.open_review(seat, itso)
         record_office_review(
             record, itso, outcome=CLEARED,
-            comment="No prior art found; no filing needed before publication.",
+            comment="Technical review complete; no issues found.",
         )
         self._done(record)
 
@@ -674,14 +674,14 @@ class Command(BaseCommand):
         student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
         record = self._make(
             IN_RDCO_POOL_TITLE, RecordTypeName.THESIS_RESEARCH, student,
-            adviser=adviser, requested_ktto=True,
+            adviser=adviser, for_commercialization=True,
         )
         if record:
             entry = self._submit(record, student)
             seats.open_review(entry.seats.get(), adviser)
             accept_and_route(
                 record, adviser, to=[{"party": "rdco"}],
-                reason="The method may be patentable, and the study involved human participants.",
+                reason="The method needs technical review, and the study involved human participants.",
                 suggested_offices=["itso", "ierc"],
             )
             self._done(record)
@@ -705,7 +705,7 @@ class Command(BaseCommand):
         )
         record = self._make(
             RDCO_DECIDES_EARLY_TITLE, RecordTypeName.PROJECT, student, adviser=adviser,
-            requested_itso=True, requested_ierc=True, requested_ktto=True,
+            requires_ethics_review=True, for_commercialization=True,
         )
         if not record:
             return
@@ -725,13 +725,13 @@ class Command(BaseCommand):
                 {"party": "ierc"},
                 {"party": "ktto", "nominees": [ktto.pk, ktto_coordinator.pk]},
             ],
-            reason="The project needs prior-art, ethics and commercialisation review.",
+            reason="The project needs technical, ethics and commercialisation review.",
         )
         itso_assignment = RecordAssignment.objects.get(record=record, party="itso", state="active")
         seats.open_review(itso_assignment.seats.get(reviewer=itso), itso)
         record_office_review(
             record, itso, outcome=FINDING,
-            comment="An existing patent may cover part of the claimed method.",
+            comment="The reported results could not be reproduced from the method described.",
         )
         self._done(record)
 

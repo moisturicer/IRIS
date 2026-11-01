@@ -119,8 +119,18 @@ _Avoid_: Duplicate detection (that is about two Proposals overlapping with each 
 ### Review workflow
 
 **Specialist office**:
-ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (IP, ethics, commercialisation). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
+ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (technical review, ethics compliance, the commercial potential of IP). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
 _Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
+
+**ITSO**:
+The Innovation & Technology Support Office, which handles technical review of research outputs. Questions about IP go to [[KTTO]].
+_Avoid_: IP office.
+
+**IERC**:
+The Institutional Ethics Review Committee, responsible for ethics compliance review of research submissions.
+
+**KTTO**:
+The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions.
 
 **Specialist path**:
 A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
@@ -301,7 +311,7 @@ The role of the person who reviews their advisees' Records first and routes them
 _Avoid_: Faculty, faculty adviser, professor.
 
 **RDCO**:
-The highest office staff role. It runs the research workflow: it approves roles, manages accounts and office coordinators, and answers download and delete requests. It is not the [[System Admin]].
+The Research and Development Coordinating Office, responsible for final approval and archiving of all research and IP submissions. It is the highest office staff role and runs the research workflow: it approves roles, manages accounts and office coordinators, and answers download and delete requests. It is not the [[System Admin]].
 _Avoid_: Admin, administrator.
 
 **System Admin**:
