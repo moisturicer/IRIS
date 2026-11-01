@@ -115,7 +115,7 @@ Read mode, Ask IRIS's entry point and the author's existing view stay unchanged.
 │                              │  ↩ Revision requested (Adviser)      │
 │                              │  ◦ v2 submitted                      │
 │                              │  ✓ Adviser accepted · routed to      │
-│                              │    ITSO, IERC — "possible IP"        │
+│                              │    ITSO, IERC — "tech review"        │
 │                              │  💬 comment box                      │
 ├──────────────────────────────┴──────────────────────────────────────┤
 │ ACTION BAR — only the capabilities this user has                    │
