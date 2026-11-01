@@ -39,13 +39,15 @@ arrow-key check is n/a because only one action is enabled before *Open review*.
 
 ## Failures, verified in a second targeted probe
 
-| # | Finding | Measured | Where | WCAG |
-|---|---|---|---|---|
-| 1 | `stone-500` (#78716c) text on `stone-100` (#f5f5f4) | **4.39 : 1**; 4.5 : 1 needed at 11–13 px | Paper View record bar (*Back*, version, breadcrumb, zoom %), My Reviews tab counts, Review workspace labels, at every viewport | 1.4.3 |
-| 2 | `stone-400` (#a8a29e) text on white or `#fdf2f2` | **2.30–2.52 : 1** | Ask IRIS: turn timestamps, the *Ask IRIS* label, the "Enter to send" hint | 1.4.3 |
-| 3 | The *Refresh* button runs off the page | **68 px** horizontal scroll at 360 | Download requests (RDCO) | 1.4.10 |
-| 4 | A textarea with no accessible name | axe *critical* | Import records, every viewport | 4.1.2 / 1.3.1 |
-| 5 | Scrolling regions keyboard users cannot reach | axe *serious* | Workflow analytics' two `overflow-x-auto` tables at 360; the office Review pane (`.review-pane-body`) at 200 % | 2.1.1 |
+Each is filed as a subtask of IR-374.
+
+| # | Finding | Measured | Where | WCAG | Filed |
+|---|---|---|---|---|---|
+| 1 | `stone-500` (#78716c) text on `stone-100` (#f5f5f4) | **4.39 : 1**; 4.5 : 1 needed at 11–13 px | Paper View record bar (*Back*, version, breadcrumb, zoom %), My Reviews tab counts, Review workspace labels, at every viewport | 1.4.3 | IR-770 |
+| 2 | `stone-400` (#a8a29e) text on white or `#fdf2f2` | **2.30–2.52 : 1** | Ask IRIS: turn timestamps, the *Ask IRIS* label, the "Enter to send" hint | 1.4.3 | IR-771 |
+| 3 | The *Refresh* button runs off the page | **68 px** horizontal scroll at 360 | Download requests (RDCO) | 1.4.10 | IR-772 |
+| 4 | A textarea with no accessible name | axe *critical* | Import records, every viewport | 4.1.2 / 1.3.1 | IR-773 |
+| 5 | Scrolling regions keyboard users cannot reach | axe *serious* | Workflow analytics' two `overflow-x-auto` tables at 360; the office Review pane (`.review-pane-body`) at 200 % | 2.1.1 | IR-774 |
 
 **Fixed on this branch:** the *Request documents* dialog opened with focus left
 on the button behind it, so Tab moved around the page underneath (WCAG 2.4.3).
