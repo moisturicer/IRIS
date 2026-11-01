@@ -26,11 +26,11 @@ REFUSED_STATUS = {issue.Refusal.ENDED: 409, issue.Refusal.UNAUTHORIZED: 403}
 UNAVAILABLE = {"status": "unavailable"}
 
 
-def _outcome(make):
+def _outcome(make, purpose=issue.READER_RUN):
     try:
         grant = make()
         # Never hand out a grant the verifier would refuse.
-        if database.verify(grant.token, issue.READER_RUN) is None:
+        if database.verify(grant.token, purpose) is None:
             raise config.GrantsUnavailable
     except config.GrantsUnavailable:
         return Response(UNAVAILABLE, status=200)
@@ -41,10 +41,10 @@ def _outcome(make):
         if status is None:
             return Response(UNAVAILABLE, status=200)
         return Response({"status": issue.Refusal(refused.code).value}, status=status)
-    return Response({
-        "status": "granted", "run_id": grant.claims["run"], "grant": grant.token,
-        "expires_at": grant.expires_at.isoformat(),
-    }, status=201)
+    body = {"status": "granted", "grant": grant.token, "expires_at": grant.expires_at.isoformat()}
+    if purpose == issue.READER_RUN:
+        body["run_id"] = grant.claims["run"]
+    return Response(body, status=201)
 
 
 class RunGrantView(APIView):
@@ -68,3 +68,12 @@ class RunGrantRenewView(APIView):
         if not isinstance(token, str) or not token:
             return Response({"status": "invalid"}, status=400)
         return _outcome(lambda: issue.renew_reader_grant(request.user, run, token))
+
+
+class ReaderSessionGrantView(APIView):
+    """POST /api/v1/ai/runtime/grant/ -- the signed-in reader, no run (IR-722)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        return _outcome(lambda: issue.reader_session_grant(request.user), issue.READER_SESSION)
