@@ -201,7 +201,7 @@ _Avoid_: Comments (the public thread), notes, chat.
 ### Comments
 
 **Comment**:
-A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or a system administrator may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
+A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or the [[System Admin]] may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
 _Avoid_: Public discussion (the ADR's name for the thread), post, review comment.
 
 **Comment report**:
@@ -295,3 +295,27 @@ _Avoid_: Sign up, signup, create account (the screen's title, not the act).
 **Adviser**:
 The role of the person who reviews their advisees' Records first and routes them onward. It is a role someone asks for when they register, not a job title.
 _Avoid_: Faculty, faculty adviser, professor.
+
+**RDCO**:
+The highest office staff role. It runs the research workflow: it approves roles, manages accounts and office coordinators, and answers download and delete requests. It is not the [[System Admin]].
+_Avoid_: Admin, administrator.
+
+**System Admin**:
+The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments with RDCO. Nobody can ask for it; developers set up the first one.
+_Avoid_: Admin (on its own), administrator, superuser.
+
+**Account deletion**:
+Removing a person from IRIS at their own request, once the System Admin confirms it and nobody is waiting on them. Their personal details go and they can't sign in. A published paper keeps their name as an Author or as Adviser, and elsewhere they show as "Former user".
+_Avoid_: Closure, close account, deactivate.
+
+**Signup consent**:
+A person's acceptance of IRIS's data notice for having an account. Withdrawing it means Account deletion.
+_Avoid_: Consent (on its own), terms.
+
+**Submission consent**:
+An owner's acceptance of the notice that lets AI features use one paper. Any one owner can withdraw it, which stops AI use of the whole paper and leaves its review untouched.
+_Avoid_: Consent (on its own), DPA acceptance, Discoverable (a separate decision).
+
+**Retention period**:
+How long IRIS keeps one kind of personal data before erasing it for good. The System Admin enters it once the data protection officer approves it, and a blank period erases nothing.
+_Avoid_: Expiry, TTL.
