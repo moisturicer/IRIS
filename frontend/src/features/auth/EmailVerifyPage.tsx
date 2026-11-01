@@ -25,7 +25,7 @@ const TITLES: Record<Status, string> = {
 };
 
 const SUCCESS_MESSAGE =
-  "Your email address is verified. RDCO now reviews your account and emails you when they decide. " +
+  "Your email address is verified. An administrator now reviews your account and emails you when they decide. " +
   "Until then, signing in shows that your account is waiting for approval.";
 
 const FALLBACK_FAILURE = "This verification link is invalid or has already been used.";

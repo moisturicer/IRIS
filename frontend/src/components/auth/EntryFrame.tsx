@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
-import citLogo from "@/assets/images/cit-logo.png";
 import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { INSTITUTION } from "@/config/institution";
 import { cn } from "@/lib/utils";
 
 interface CrossLink {
@@ -37,8 +37,8 @@ interface EntryFrameProps {
 
 /**
  * The editorial entry frame, the Dossier Folder (IR-704): a masthead, an
- * optional lede, a folder whose tabs sit on a white sheet, and the CIT-U
- * footer.
+ * optional lede, a folder whose tabs sit on a white sheet, and the
+ * footer naming IRIS and its pilot institution (IR-768).
  *
  * Sign in moved onto it first (IR-706), register in IR-707, and email
  * verification and the pending and declined screens without the lede in
@@ -48,8 +48,8 @@ interface EntryFrameProps {
  * The masthead is the page's one `<h1>`, and it is visible at every width, so
  * no breakpoint can take it out of the accessibility tree as IR-211 found the
  * brand panel did. Its name is the logos' own: "IRIS" from the wordmark, the
- * university from the CIT-U logo's alt text. Both logos keep their natural
- * proportions; on a phone they are only set smaller.
+ * institution from its logo's alt text, read from `config/institution`
+ * (IR-768). Both logos keep their natural proportions; on a phone they are only set smaller.
  *
  * On a phone the lede's sentence follows the folder, so the email field stays
  * in the first screenful at 360x640 (IR-704 story 1). The sentence is plain
@@ -74,8 +74,8 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
             </span>
             <span className="h-7 shrink-0 border-l border-stone-200 sm:h-9" aria-hidden />
             <img
-              src={citLogo}
-              alt="Cebu Institute of Technology – University"
+              src={INSTITUTION.logo}
+              alt={INSTITUTION.name}
               className="h-6 w-auto min-w-0 object-contain sm:h-9"
             />
           </h1>
@@ -129,8 +129,8 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
 
       <footer className="border-t border-stone-200">
         <div className="mx-auto flex max-w-page flex-col gap-1 px-4 py-6 text-small text-stone-600 sm:flex-row sm:justify-between sm:px-8 lg:px-12">
-          <p>© 2026 Cebu Institute of Technology – University</p>
-          <p>IRIS · Research and IP disclosure</p>
+          <p>© 2026 IRIS · Research and IP disclosure</p>
+          <p>Pilot institution: {INSTITUTION.name}</p>
         </div>
       </footer>
     </div>

@@ -57,7 +57,7 @@ const SCREENS: EntryScreen[] = [
   {
     name: "login",
     render: () => renderScreen(<LoginPage />, { route: "/login" }),
-    title: "Welcome Back",
+    title: "Welcome back",
   },
   {
     name: "signup",
