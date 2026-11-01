@@ -84,8 +84,11 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         type="button"
         aria-expanded={open}
         aria-controls={menuId}
-        // The visible name and role, in order, then what the button does.
-        aria-label={[fullName, subtitle, "account menu"].filter(Boolean).join(", ")}
+        // No aria-label: the name is computed from the text below -- the
+        // visible name and role, in order, then a hidden "account menu" -- so
+        // it always begins with what a speech-input user sees (WCAG 2.5.3,
+        // IR-778). A separate label drifted from it: axe read the two visible
+        // lines as "Ana AdviserStudent", which the label did not contain.
         title={collapsed ? fullName : undefined}
         onClick={() => setOpen((o) => !o)}
         className={cn(
@@ -104,8 +107,16 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
         </span>
         <span className={cn("min-w-0 flex-1", collapsed && "md:sr-only")}>
           <span className="block truncate text-xs font-semibold text-stone-900">{fullName}</span>
-          <span className="block truncate text-2xs text-stone-500">{subtitle}</span>
+          {subtitle && (
+            <>
+              <span className="sr-only">,</span>{" "}
+              <span className="block truncate text-2xs text-stone-500">{subtitle}</span>
+            </>
+          )}
         </span>
+        {/* Outside the name-and-role wrapper, which is itself screen-reader-only
+            on the collapsed rail: the purpose is announced in both states. */}
+        <span className="sr-only">, account menu</span>
         <i
           aria-hidden
           className={cn(
