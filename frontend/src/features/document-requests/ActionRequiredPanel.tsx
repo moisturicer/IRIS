@@ -2,7 +2,8 @@ import { forwardRef, useCallback, useEffect, useId, useRef, useState } from "rea
 
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
-import { FOCUS_RING } from "@/components/ui/interaction";
+import { ProgressBar, toPercent } from "@/components/shared/ProgressBar";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatDate } from "@/lib/utils";
 import { errorDetail } from "@/lib/errorDetail";
@@ -44,12 +45,17 @@ interface ActionRequiredPanelProps {
  * An upload the requesting party rejected is back to missing, with the
  * reviewer's reason beside it and the upload control offered again (ADR-022
  * §3.4). A list that fails to load says so: an empty panel would read as
- * "nothing required", which is exactly the wrong thing to tell an owner.
+ * "nothing required", which is exactly the wrong thing to tell an owner. A
+ * refresh that fails after an upload keeps the list on screen and says so
+ * inside the panel, so another item's upload in progress is not lost (IR-471).
  */
 export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredPanelProps) {
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  /** A refresh that failed after a list was shown: reported inside the panel, never instead of it. */
+  const [refreshFailed, setRefreshFailed] = useState<string | null>(null);
+  const hasList = useRef(false);
   /** Ids of requests seen open since this panel mounted. */
   const seenOpen = useRef<Set<number>>(new Set());
 
@@ -59,10 +65,20 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
         .documentRequests(recordId)
         .then(({ data }) => {
           data.filter((r) => r.state === "open").forEach((r) => seenOpen.current.add(r.id));
+          hasList.current = true;
           setRequests(data);
           setFailed(null);
+          setRefreshFailed(null);
         })
-        .catch((error: unknown) => setFailed(errorDetail(error, "Could not load the documents reviewers asked for. Reload the page to try again."))),
+        .catch((error: unknown) => {
+          // Before any list arrives, the panel has nothing to show but the failure.
+          if (!hasList.current) {
+            setFailed(errorDetail(error, "Could not load the documents reviewers asked for. Reload the page to try again."));
+            return;
+          }
+          // After one has, keep it, so an upload still running in another row stays in view.
+          setRefreshFailed(errorDetail(error, "Could not refresh the documents reviewers asked for. Reload the page to see the latest."));
+        }),
     [recordId],
   );
 
@@ -103,6 +119,11 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
         <i className="fas fa-file-circle-exclamation text-xs" aria-hidden />
         {anyOpen ? "Action required" : "Requested documents"}
       </h2>
+      {refreshFailed && (
+        <p role="alert" className="text-xs text-brand-dark">
+          {refreshFailed}
+        </p>
+      )}
       {shown.map((r) => (
         <RequestEntry key={r.id} recordId={recordId} request={r} onUploaded={uploaded} />
       ))}
@@ -260,7 +281,12 @@ function ItemRow({
           {item.state === "missing" && !uploading && (
             <label
               htmlFor={inputId}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light focus-within:ring-2 focus-within:ring-brand/40"
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light",
+                COLOUR_TRANSITION,
+                // FOCUS_RING's ring, on the label: the focused element is its hidden input.
+                "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand has-[:focus-visible]:ring-offset-2",
+              )}
             >
               <i className="fas fa-upload text-2xs" aria-hidden />
               Upload
@@ -311,28 +337,17 @@ function ItemRow({
  */
 const CompactProgress = forwardRef<HTMLSpanElement, { fileName: string; progress: number }>(
   function CompactProgress({ fileName, progress }, ref) {
-    const percent = Math.min(100, Math.max(0, Math.round(progress)));
     return (
       <span className="inline-flex items-center gap-2">
-        <span
+        <ProgressBar
           ref={ref}
-          // Focusable from script only, so keyboard focus has somewhere to land.
-          tabIndex={-1}
-          role="progressbar"
-          aria-label={`Uploading ${fileName}`}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-valuenow={percent}
-          className={cn("block h-1.5 w-20 rounded-full bg-brand-100 overflow-hidden", FOCUS_RING)}
-        >
-          {/* Moved by transform, not width, as UploadDropzone's bar is. */}
-          <span
-            className="block h-full w-full origin-left rounded-full bg-brand transition-transform duration-200 motion-reduce:transition-none"
-            style={{ transform: `scaleX(${percent / 100})` }}
-          />
-        </span>
+          focusable
+          label={`Uploading ${fileName}`}
+          progress={progress}
+          className={cn("h-1.5 w-20 bg-brand-100", FOCUS_RING)}
+        />
         <span className="text-2xs font-semibold text-stone-600 tabular-nums" aria-hidden>
-          {percent}%
+          {toPercent(progress)}%
         </span>
       </span>
     );

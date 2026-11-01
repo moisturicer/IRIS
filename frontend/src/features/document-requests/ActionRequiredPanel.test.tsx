@@ -203,6 +203,34 @@ describe("ActionRequiredPanel", () => {
     expect(within(data).getByRole("alert")).toHaveTextContent("Too large.");
   });
 
+  it("keeps the panel, and any upload still running, when the refresh after an upload fails", async () => {
+    const user = userEvent.setup();
+    const both = request({
+      items: [request().items[0], { ...request().items[0], id: 13, label: "Data sheet" }],
+    });
+    documentRequests
+      .mockResolvedValueOnce({ data: [both] })
+      .mockRejectedValueOnce(new Error("Network Error"));
+    const settle: Record<number, (v: unknown) => void> = {};
+    uploadForRequestItem.mockImplementation(
+      (_r, itemId: number) => new Promise((ok) => { settle[itemId] = ok; }),
+    );
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const [ethics, data] = await screen.findAllByRole("listitem");
+    await user.upload(within(ethics).getByLabelText("Upload Ethics Clearance"),
+      new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" }));
+    await user.upload(within(data).getByLabelText("Upload Data sheet"),
+      new File(["%PDF-1.4"], "data.pdf", { type: "application/pdf" }));
+
+    await act(async () => settle[11]({ data: {} }));
+
+    const panel = screen.getByRole("region", { name: "Action required" });
+    expect(await within(panel).findByRole("alert")).toHaveTextContent(/could not refresh/i);
+    expect(within(ethics).getByRole("status")).toHaveTextContent("ethics.pdf uploaded");
+    expect(within(data).getByRole("progressbar", { name: "Uploading data.pdf" })).toBeInTheDocument();
+  });
+
   it("shows the request as fulfilled once the last item is uploaded", async () => {
     const user = userEvent.setup();
     const single = request({ items: [request().items[0]] });
