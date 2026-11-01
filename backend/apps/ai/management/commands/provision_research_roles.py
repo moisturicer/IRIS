@@ -13,6 +13,8 @@ members. `--check` reports problems and changes nothing.
 from django.core.management.base import BaseCommand, CommandError
 from django.db import connection, transaction
 
+from apps.ai.grants.policy import PROTECTED_TABLES
+
 VERIFIER = "iris_authz_verifier"
 RUNTIME_ROLES = ("iris_ai_runtime", "iris_django_runtime")
 ROLE_FLAGS = "NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"
@@ -23,12 +25,20 @@ DEFINER_FUNCTIONS = (
     "current_research_claims()",
     "current_reader()",
     "begin_research(text, text)",
+    "research_record_ids()",
 )
 HELPER_FUNCTIONS = ("hmac_sha256(bytea, bytea)", "b64url_encode(bytea)", "b64url_decode(text)")
-RUNTIME_FUNCTIONS = ("begin_research(text, text)", "current_research_claims()", "current_reader()")
+RUNTIME_FUNCTIONS = (
+    "begin_research(text, text)", "current_research_claims()", "current_reader()",
+    # Row policies call it as the invoker (IR-718).
+    "research_record_ids()",
+)
 #: Columns the verifier reads, and nothing else (no password hashes).
 VERIFIER_COLUMNS = {
-    "accounts_user": "id, is_active, is_locked, credential_version",
+    "accounts_user": "id, is_active, is_locked, credential_version, role_id",
+    "accounts_role": "id, name",
+    "records_record": "id, is_deleted, pipeline_status, adviser_id",
+    "records_recordowner": "record_id, user_id",
     "ai_askrun": "id, state, deadline_at, user_id, conversation_id",
     "ai_conversation": "id, user_id, record_id",
     "ai_ingestionjob": "id, record_id, extraction_hash",
@@ -130,6 +140,9 @@ class Command(BaseCommand):
             cursor.execute(f"GRANT USAGE ON SCHEMA iris_authz TO {role}")
             for fn in RUNTIME_FUNCTIONS:
                 cursor.execute(f"GRANT EXECUTE ON FUNCTION iris_authz.{fn} TO {role}")
+        for role in RUNTIME_ROLES:
+            for table in PROTECTED_TABLES:
+                cursor.execute(f"GRANT SELECT ON public.{table} TO {role}")
         # Django renews grants, so it alone may ask whether one verifies.
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.verify_research_grant(text, text) TO iris_django_runtime"
