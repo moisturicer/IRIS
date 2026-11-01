@@ -88,6 +88,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.ContentSecurityPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -228,6 +229,37 @@ SIMPLE_JWT = {
 # the token lifetimes above (IR-166, apps/accounts/sessions.py). The interface
 # signs itself out on the same figure: frontend/src/lib/activity.ts.
 SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30, cast=int)
+
+# ---- Browser security headers (IR-663, ASVS 14.4.3/4/6/7) ----------------
+#
+# Every response Django serves: the API, the admin, and WhiteNoise's static
+# files. The single-page app itself is served by nginx, which sends its own
+# copy from frontend/security-headers.conf. The first three are Django's
+# defaults, set here so a change to them is a visible decision.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+# Browsers ignore frame-ancestors in a report-only CSP, so this is what denies
+# framing until the CSP is enforced.
+X_FRAME_OPTIONS = "DENY"
+
+# Django renders no page but the admin, which loads only its own static files.
+# JSON is never rendered, so `default-src 'none'` costs the API nothing.
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'none'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+# Report-only until the manual walk-through in docs/testing/TRACEABILITY.md
+# (IR-663) shows no violation. Enforcing is a reviewed change to this line,
+# and to frontend/security-headers.conf, never an environment variable.
+CONTENT_SECURITY_POLICY_REPORT_ONLY = True
 
 # ---- CORS ---------------------------------------------------------------
 
@@ -1003,17 +1035,17 @@ AI_EVIDENCE_AREA_TERMS = config(
 # ---- The development disclosure bypass (IR-317, ADR-015) -----------------
 #
 # Stands beside ADR-015's disclosure gate — it does not replace it and it
-# encodes no policy. The gate refuses every record because `Record` carries no
-# embargo field (IR-250), so with this off nothing can be indexed and Ask IRIS
-# answers "no readable sources" to every question; turning it on is how the
-# feature is clicked through in a browser while CIT-U decides what an embargo
-# is. Deliberately named for what it is: a rule that merely sounds defensible
+# encodes no policy. The gate refuses a record with no embargo answer (ADR-052),
+# and seeded and loaded records carry none until IR-815 gives them one, so with
+# this off they cannot be indexed and Ask IRIS answers "no readable sources";
+# turning it on is how the feature is clicked through in a browser meanwhile.
+# Deliberately named for what it is: a rule that merely sounds defensible
 # ("published records are not embargoed") would read as somebody's decision,
 # and this cannot.
 #
 # `apps.ai.policy.bypass` raises `ImproperlyConfigured` at startup when this is
 # set while DEBUG is off, so it takes the service down rather than quietly
-# disabling a control. IR-250 deletes it.
+# disabling a control. IR-815 deletes it.
 AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = config(
     "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", default=False, cast=bool
 )

@@ -166,6 +166,29 @@ services:
         limits:
           memory: 1g
 
+  # Research workers for AI-owned runs (IR-723). Opt-in: `--profile runs`.
+  # Interactive and deep runs only; ingestion stays on the celery workers.
+  ai-runs-worker:
+    build:
+      context: ./ai
+      dockerfile: Dockerfile
+    profiles: [ "runs" ]
+    restart: unless-stopped
+    command: python -m ai.runs.worker
+    env_file:
+      - ./ai/.env
+    environment:
+      - RUNS_REDIS_URL=redis://redis:6379/2
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
   # Celery workers
   celery-default:
     build:

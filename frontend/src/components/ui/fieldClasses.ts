@@ -23,6 +23,9 @@ export const LABEL = "block text-[14px] font-medium text-stone-700 mb-1";
  */
 export const CHECKBOX = "w-4 h-4 rounded border-stone-300 text-brand accent-brand focus:ring-brand";
 
-/** The load-failure notice at the top of a step: maroon, with a glyph. */
-export const LOAD_ERROR =
+/** A warning notice: maroon, with a glyph supplied by the caller. */
+export const WARNING_NOTICE =
   "flex items-start gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-[14px] text-brand";
+
+/** Load failures use the same attention tone as warnings. */
+export const LOAD_ERROR = WARNING_NOTICE;

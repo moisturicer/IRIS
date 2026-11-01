@@ -17,7 +17,6 @@ import { PaperFind } from "./PaperFind";
 import {
   PANE_TOP_PX,
   READER_TOOLBAR_TOP,
-  READER_TOOLBAR_TOP_PX,
   READING_PANE_HEIGHT,
   READING_SPLIT_PX,
 } from "./paneLayout";
@@ -29,6 +28,7 @@ import {
   fitScale,
   liveWindow,
   regionInView,
+  windowReadingBand,
   type RegionBand,
 } from "./readerGeometry";
 import { usePaperFind } from "./usePaperFind";
@@ -226,6 +226,13 @@ export interface PaperPdfReaderProps {
    * the bytes this reader holds are never saved as a copy (ADR-048).
    */
   downloadControl?: ReactNode;
+  /**
+   * How much of the window's bottom, in px, the caller keeps covered below
+   * `reading-wide` -- the Review tab's sticky action bar (IR-477). A citation
+   * lands, and find counts a match in view, only above it. Ignored when
+   * `contained`: there the caller's chrome sits beside the pane, not over it.
+   */
+  bottomInset?: number;
 }
 
 /**
@@ -264,6 +271,7 @@ function PaperPdfReaderSource({
   contained = false,
   fill = false,
   downloadControl,
+  bottomInset = 0,
 }: PaperPdfReaderProps) {
   const [attempt, setAttempt] = useState(0);
   const { status, pageCount, pages, pageProxy, prioritize } = usePdfDocument({
@@ -376,7 +384,7 @@ function PaperPdfReaderSource({
       // The window scrolls, under a toolbar that sticks below the header.
       // Where it rests once stuck is what counts, not where it is now: a
       // reader at the top of the record has it well below that.
-      const view = { top: READER_TOOLBAR_TOP_PX + toolbarRect.height, bottom: window.innerHeight };
+      const view = windowReadingBand(toolbarRect.height, window.innerHeight, bottomInset);
       if (onlyIfHidden && region && regionInView(pageBox, region, view)) return true;
       window.scrollBy({ top: citationLandingDelta(pageBox, region, view), behavior });
     }

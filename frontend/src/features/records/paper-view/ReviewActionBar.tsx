@@ -1,4 +1,4 @@
-import { useId, useState, type KeyboardEvent } from "react";
+import { useId, useState, type KeyboardEvent, type Ref } from "react";
 import { createPortal } from "react-dom";
 
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
@@ -21,6 +21,8 @@ interface ReviewActionBarProps {
   onChanged: () => void;
   /** The bar's own box, where the host places it; drawn only when there is a bar. */
   className?: string;
+  /** The bar's own box, for a host that measures it (IR-477). */
+  boxRef?: Ref<HTMLDivElement>;
   /** False when the workspace footer already offers Open review or Claim. */
   primary?: boolean;
   /** The toolbar's name, when a page holds more than one (IR-681). */
@@ -49,6 +51,7 @@ export function ReviewActionBar({
   actions = REVIEW_ACTIONS,
   onChanged,
   className,
+  boxRef,
   primary = true,
   label = "Review actions",
 }: ReviewActionBarProps) {
@@ -113,7 +116,7 @@ export function ReviewActionBar({
 
   return (
     <>
-      <div className={className}>
+      <div ref={boxRef} className={className}>
         <div
           role="toolbar"
           aria-label={label}

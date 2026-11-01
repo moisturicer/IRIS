@@ -38,12 +38,11 @@ DEFAULT_RECALL_LIMIT = 100
 def disclosure_permits(record: Record) -> bool:
     """Whether this record's content may be sent to a commercial vendor.
 
-    The default predicate, and a deliberately injectable one. ``Record``
-    carries no embargo field yet (IR-250), so ``inputs_for_record`` reports
-    ``EmbargoUnknown`` and this refuses **everything** -- correct for a gate,
-    and currently total. Injecting the predicate is how a test exercises the
-    allowing path without patching a module or faking a dataclass, and how a
-    caller with a different notion of disclosure supplies one.
+    The default predicate, and a deliberately injectable one. It refuses a
+    record with no embargo answer (ADR-052 §3), which is correct for a gate.
+    Injecting the predicate is how a test exercises the allowing path without
+    patching a module or faking a dataclass, and how a caller with a different
+    notion of disclosure supplies one.
     """
     return decision_for_record(record).allowed
 

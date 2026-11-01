@@ -71,9 +71,17 @@ class RunGrantRenewView(APIView):
 
 
 class ReaderSessionGrantView(APIView):
-    """POST /api/v1/ai/runtime/grant/ -- the signed-in reader, no run (IR-722)."""
+    """POST /api/v1/ai/runtime/grant/ -- the signed-in reader, no run (IR-722).
+
+    Optional `record_id` is a Paper Chat scope (IR-719); unreadable reads nothing.
+    """
 
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        return _outcome(lambda: issue.reader_session_grant(request.user), issue.READER_SESSION)
+        record_id = request.data.get("record_id")
+        if record_id is not None and (
+                type(record_id) is not int or record_id < 1):
+            return Response({"status": "invalid"}, status=400)
+        return _outcome(
+            lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)

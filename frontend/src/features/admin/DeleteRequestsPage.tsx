@@ -16,16 +16,13 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
+import { Button }      from "@/components/ui/Button";
+import { LOAD_ERROR, WARNING_NOTICE }  from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
 import { EmptyState }  from "@/components/shared/EmptyState";
+import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { formatDate }  from "@/lib/utils";
 import type { DeleteRequest } from "@/types/records";
-
-const STATUS_STYLES: Record<DeleteRequest["status"], string> = {
-  pending:  "bg-amber-50  text-amber-700  border-amber-200",
-  approved: "bg-green-50  text-green-700  border-green-200",
-  declined: "bg-red-50    text-red-700    border-red-200",
-};
 
 export default function DeleteRequestsPage() {
   const [requests,     setRequests]     = useState<DeleteRequest[]>([]);
@@ -72,7 +69,7 @@ export default function DeleteRequestsPage() {
       />
 
       {/* Danger notice */}
-      <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[14px] text-red-700 flex items-start gap-2">
+      <div className={`mb-4 ${WARNING_NOTICE}`}>
         <i className="fas fa-exclamation-triangle mt-0.5 flex-shrink-0" aria-hidden />
         <span>
           Approving a deletion <strong>permanently removes</strong> the record from the system.
@@ -82,34 +79,35 @@ export default function DeleteRequestsPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         {(["pending", "approved", ""] as const).map((s) => (
-          <button
+          <Button
             key={s}
             type="button"
             onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-lg text-[13px] font-semibold border transition-colors ${
-              filterStatus === s
-                ? "bg-[#6B0F12] text-white border-[#6B0F12]"
-                : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
-            }`}
+            aria-pressed={filterStatus === s}
+            variant="ghost"
+            size="sm"
           >
             {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
           type="button"
           onClick={load}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-gray-500 border border-gray-200 rounded-lg bg-white hover:bg-gray-50 disabled:opacity-50"
+          variant="outline"
+          size="sm"
+          className="ml-auto"
         >
           <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {error && (
-        <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-[14px] text-red-700">
+        <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
+          <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
           {error}
         </div>
       )}
@@ -123,9 +121,9 @@ export default function DeleteRequestsPage() {
           message={filterStatus === "pending" ? "No deletions are pending approval." : "No requests match this filter."}
         />
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100">
-            <span className="text-[13px] text-gray-500 font-medium">
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+          <div className="px-4 py-3 border-b border-stone-100">
+            <span className="text-[13px] text-stone-500 font-medium">
               {requests.length} request{requests.length !== 1 ? "s" : ""}
             </span>
           </div>
@@ -133,62 +131,57 @@ export default function DeleteRequestsPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-[14px]">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200 text-left">
-                  <th className="px-4 py-3 font-semibold text-gray-600">Record</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Requested By</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Reason</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Date</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600">Status</th>
-                  <th className="px-4 py-3 font-semibold text-gray-600 text-right">Action</th>
+                <tr className="bg-stone-50 border-b border-stone-200 text-left">
+                  <th className="px-4 py-3 font-semibold text-stone-600">Record</th>
+                  <th className="px-4 py-3 font-semibold text-stone-600">Requested By</th>
+                  <th className="px-4 py-3 font-semibold text-stone-600">Reason</th>
+                  <th className="px-4 py-3 font-semibold text-stone-600">Date</th>
+                  <th className="px-4 py-3 font-semibold text-stone-600">Status</th>
+                  <th className="px-4 py-3 font-semibold text-stone-600 text-right">Action</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-stone-100">
                 {requests.map((req) => (
-                  <tr key={req.id} className="hover:bg-gray-50 transition-colors">
+                  <tr key={req.id} className="hover:bg-stone-50 transition-colors">
                     <td className="px-4 py-3 max-w-[200px]">
                       {/* Record may already be soft-deleted; link still works for detail if accessible */}
                       <Link
                         to={`/records/${req.record}`}
-                        className="text-[#6B0F12] font-medium hover:underline line-clamp-2 leading-snug"
+                        className="text-brand font-medium hover:underline line-clamp-2 leading-snug"
                       >
                         {req.record_title}
                       </Link>
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-medium text-gray-800">{req.requested_by_name ?? "—"}</p>
-                      <p className="text-[12px] text-gray-500">{req.requested_by_email}</p>
+                      <p className="font-medium text-stone-800">{req.requested_by_name ?? "—"}</p>
+                      <p className="text-[12px] text-stone-500">{req.requested_by_email}</p>
                     </td>
                     <td className="px-4 py-3 max-w-[180px]">
                       {req.reason ? (
-                        <p className="text-gray-600 line-clamp-2 text-[13px]">{req.reason}</p>
+                        <p className="text-stone-600 line-clamp-2 text-[13px]">{req.reason}</p>
                       ) : (
-                        <span className="text-gray-500 italic text-[13px]">No reason given</span>
+                        <span className="text-stone-500 italic text-[13px]">No reason given</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                    <td className="px-4 py-3 text-stone-500 whitespace-nowrap">
                       {formatDate(req.created_at)}
                     </td>
                     <td className="px-4 py-3">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[12px] font-semibold border ${STATUS_STYLES[req.status]}`}>
-                        {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                      </span>
+                      <RequestStatusChip state={req.status} />
                     </td>
                     <td className="px-4 py-3 text-right">
                       {req.status === "pending" ? (
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="danger"
                           onClick={() => handleApprove(req)}
-                          disabled={approving === req.id}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 text-[13px] font-medium
-                            text-red-600 border border-red-200 rounded-lg hover:bg-red-50
-                            disabled:opacity-50 transition-colors"
+                          loading={approving === req.id}
                         >
-                          {approving === req.id
-                            ? <><Spinner size="sm" /> Deleting…</>
-                            : <><i className="fas fa-trash-alt" aria-hidden /> Approve Deletion</>}
-                        </button>
+                          {approving === req.id ? "Deleting…" : "Approve Deletion"}
+                        </Button>
                       ) : (
-                        <span className="text-[13px] text-gray-500 italic">
+                        <span className="text-[13px] text-stone-500 italic">
                           {req.reviewed_at ? formatDate(req.reviewed_at) : "Processed"}
                         </span>
                       )}

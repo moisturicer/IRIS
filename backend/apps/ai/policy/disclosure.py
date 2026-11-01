@@ -1,4 +1,4 @@
-"""May this record's content leave the deployment? (IR-127)
+"""May this record's content leave the deployment? (IR-127, ADR-052)
 
 [ADR-015] §Security Impact puts a gate in front of every outbound call to a
 commercial AI vendor, and this is it. Anything refused here is **not sent to
@@ -10,52 +10,18 @@ PostgreSQL full-text path a vendor outage degrades to.
 Three inputs, kept independent because ADR-015 names them independently and a
 single combined flag is how a case goes missing: IP status, embargo, consent.
 
-Pure -- no database, no network, no clock. ``today`` is passed in rather than
-read, so an embargo boundary is testable without freezing time. The decision
-is a value, not a side effect; enforcing it is the caller's job (D and E).
+Pure -- no database, no network, no clock. **It reads an embargo's state and
+never its date** (ADR-052 §9): text sent to a vendor cannot be recalled, so a
+date passing must not be what sends it. The decision is a value, not a side
+effect; enforcing it is the caller's job (D and E).
 """
 
 from __future__ import annotations
 
 import enum
 from dataclasses import dataclass
-from datetime import date
-from typing import Union
 
-
-class _EmbargoUnknown:
-    """Sentinel: nobody knows whether this record is under embargo.
-
-    Distinct from ``None`` (which means *known* not to be embargoed) because
-    the two must not behave alike. ``Record`` carries no embargo field today,
-    so its adapter has nothing truthful to pass, and reading a missing value
-    as "not embargoed" would send unpublished work to a vendor on the strength
-    of a field that was never implemented. Unknown refuses.
-    """
-
-    _instance = None
-
-    def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
-
-    def __repr__(self) -> str:  # pragma: no cover - debugging aid
-        return "EmbargoUnknown"
-
-    def __bool__(self) -> bool:
-        # Refuses to be truthiness-tested into meaning "no embargo".
-        raise TypeError(
-            "EmbargoUnknown has no truth value -- an unknown embargo must be "
-            "handled explicitly, not treated as absent."
-        )
-
-
-#: The single instance. Compare with ``is``.
-EmbargoUnknown = _EmbargoUnknown()
-
-#: ``None`` means known-not-embargoed; a date means embargoed until that day.
-Embargo = Union[date, None, _EmbargoUnknown]
+from core.enums import EmbargoState
 
 
 class Reason(enum.Enum):
@@ -92,9 +58,8 @@ class DisclosureInputs:
     """
 
     is_ip: bool
-    embargoed_until: Embargo
+    embargo: EmbargoState
     consent_given: bool
-    today: date
 
 
 @dataclass(frozen=True)
@@ -114,13 +79,14 @@ class Decision:
         return f"disclosure refused: {causes}"
 
 
-def _embargo_reason(embargo: Embargo, today: date) -> Reason | None:
-    if embargo is EmbargoUnknown:
-        return Reason.EMBARGO_UNKNOWN
-    if embargo is None:
+def _embargo_reason(embargo: EmbargoState) -> Reason | None:
+    """ADR-052 §3. Only the two named states allow, so anything unrecognised
+    refuses as unknown rather than reading as permission."""
+    if embargo in (EmbargoState.NONE, EmbargoState.RELEASED):
         return None
-    # The embargo runs *until* its date, so on the day itself it is spent.
-    return Reason.EMBARGOED if embargo > today else None
+    if embargo == EmbargoState.ACTIVE:
+        return Reason.EMBARGOED
+    return Reason.EMBARGO_UNKNOWN
 
 
 def may_disclose(inputs: DisclosureInputs) -> Decision:
@@ -134,7 +100,7 @@ def may_disclose(inputs: DisclosureInputs) -> Decision:
     if inputs.is_ip:
         reasons.append(Reason.UNRELEASED_IP)
 
-    embargo_reason = _embargo_reason(inputs.embargoed_until, inputs.today)
+    embargo_reason = _embargo_reason(inputs.embargo)
     if embargo_reason is not None:
         reasons.append(embargo_reason)
 

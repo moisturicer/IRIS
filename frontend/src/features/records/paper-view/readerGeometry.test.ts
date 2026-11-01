@@ -20,6 +20,7 @@ import {
   liveWindow,
   readingAnchor,
   regionInView,
+  windowReadingBand,
 } from "./readerGeometry";
 
 describe("fitScale", () => {
@@ -203,5 +204,17 @@ describe("liveWindow", () => {
 
   it("is empty for a paper with no pages", () => {
     expect(liveWindow(1, 1, 0, [])).toEqual([]);
+  });
+});
+
+describe("windowReadingBand (IR-477)", () => {
+  // A 360x740 phone: the toolbar sticks at 64px (8px under the 56px header)
+  // and is 104px tall, two rows of controls.
+  it("runs from under the stuck toolbar to the bottom of the window", () => {
+    expect(windowReadingBand(104, 740)).toEqual({ top: 168, bottom: 740 });
+  });
+
+  it("stops above whatever covers the bottom of the window, such as the Review tab's action bar", () => {
+    expect(windowReadingBand(104, 740, 112)).toEqual({ top: 168, bottom: 628 });
   });
 });

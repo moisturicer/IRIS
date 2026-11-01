@@ -33,9 +33,11 @@ from .management.commands.seed_demo import (
     AT_RDCO_TITLE,
     COORDINATOR_ACCOUNTS,
     FLAGSHIP_TITLE,
+    IN_RDCO_POOL_TITLE,
     NEW_MODEL_TITLE,
     PASSWORD,
     PROPOSAL_AT_ADVISER_TITLE,
+    RDCO_DECIDES_EARLY_TITLE,
     RESUBMITTED_TITLE,
     ROLE_ACCOUNTS,
     _PREFIX,
@@ -306,8 +308,8 @@ class SeedDemoRecordTests(TestCase):
 
     def test_one_specialist_path_thesis_has_rdcos_review_open(self):
         """
-        IR-270: reached through the real acts -- the Adviser's accept & route,
-        ITSO's clearance and the hand-back -- so RDCO's decisions can be demoed.
+        IR-270: reached through the real acts -- the Adviser's send to RDCO,
+        RDCO's request and ITSO's clearance -- so RDCO's decisions can be demoed.
         """
         from apps.reviews.models import RecordAssignment, Review
 
@@ -327,6 +329,45 @@ class SeedDemoRecordTests(TestCase):
             set(Review.objects.filter(record=record).values_list("stage", "status")),
             {("adviser", "approved"), ("itso", "approved")},
         )
+
+    def test_one_thesis_waits_in_rdcos_pool_with_the_advisers_suggestions(self):
+        """ADR-047 §1: nobody at RDCO is seated, and a suggestion requests no office."""
+        record = Record.objects.get(title=IN_RDCO_POOL_TITLE)
+        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+        self.assertEqual(
+            set(RecordAssignment.objects.filter(record=record).values_list("party", "state")),
+            {("adviser", "completed"), ("rdco", "active")},
+        )
+        rdco = RecordAssignment.objects.get(record=record, party="rdco")
+        self.assertFalse(rdco.seats.exists())
+        self.assertEqual(
+            record.routing_events.get(to_party="rdco").suggested_offices, ["itso", "ierc"],
+        )
+        self.assertTrue(record.for_commercialization)
+
+    def test_rdco_can_decide_one_project_with_offices_still_reviewing(self):
+        """ADR-047 §3 and §5: a whole office, two officers and a finding, before RDCO decides."""
+        from apps.reviews.decisions import decision_flags
+
+        record = Record.objects.get(title=RDCO_DECIDES_EARLY_TITLE)
+        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+        self.assertEqual(
+            set(RecordAssignment.objects.filter(record=record).values_list("party", "state")),
+            {
+                ("adviser", "completed"), ("rdco", "active"), ("itso", "completed"),
+                ("ierc", "active"), ("ktto", "active"),
+            },
+        )
+        ierc = RecordAssignment.objects.get(record=record, party="ierc")
+        ktto = RecordAssignment.objects.get(record=record, party="ktto")
+        self.assertFalse(ierc.seats.exists())
+        self.assertEqual(ktto.seats.count(), 2)
+
+        flags = decision_flags(record, User.objects.get(email="rdco@cit.edu"))
+        self.assertEqual(flags["party"], "rdco")
+        self.assertIsNone(flags["blocked"])
+        self.assertEqual({row["party"] for row in flags["closes"]["assignments"]}, {"ierc", "ktto"})
+        self.assertEqual([f["party"] for f in flags["closes"]["findings"]], ["itso"])
 
     def test_the_flagship_awaits_revision_with_two_offices_cleared(self):
         record = Record.objects.get(title=FLAGSHIP_TITLE)

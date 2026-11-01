@@ -365,7 +365,7 @@ export interface RecordDetail extends RecordListItem {
   revision:             RevisionFlags;
   /**
    * Decisions (IR-270): what the viewer may decide this record as -- the
-   * Adviser's *Accept & publish* or *Reject*, RDCO's three -- why not yet,
+   * Adviser's *Reject*, a Proposal Adviser's two, RDCO's three -- why not yet,
    * what deciding would close, and the token `decide/` checks so a stale
    * dialog never decides into a changed record. A rendering hint; the
    * endpoint re-checks it.

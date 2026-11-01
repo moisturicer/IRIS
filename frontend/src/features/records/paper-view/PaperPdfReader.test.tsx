@@ -263,6 +263,24 @@ describe("landing on a cited passage (IR-354)", () => {
       );
     });
 
+    it("ends a tall passage above a bar stuck over the window's bottom, giving up context first (IR-477)", async () => {
+      vi.stubGlobal("innerHeight", 740);
+      const { rerender } = await openAt();
+      // 500px of passage from 1500 + 100 = 1600. The band runs from under the
+      // toolbar (READER_TOOLBAR_TOP_PX + 44 = 108) to the bar's top, 740 - 112 =
+      // 628: 520px. With 48px of context its end would be 28px under the bar,
+      // so it keeps only the 20px that fit.
+      const TALL: Region[] = [{ page: 2, left: 0.1, top: 0.1, right: 0.9, bottom: 0.6 }];
+      rerender(
+        <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={TALL} navKey="followed" bottomInset={112} />,
+      );
+
+      const bandTop = READER_TOOLBAR_TOP_PX + 44;
+      await waitFor(() =>
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1600 - bandTop - 20, behavior: "smooth" }),
+      );
+    });
+
     it("lands again when the same citation is followed a second time", async () => {
       const { rerender } = await openAt();
       follow(rerender, PASSAGE_LOW, "first");
@@ -729,9 +747,9 @@ describe("find in this paper (IR-353)", () => {
     [line("A robot arm, and another ROBOT.", 0.5)],
   ];
 
-  async function openPaper() {
+  async function openPaper(bottomInset?: number) {
     paperText = PAPER;
-    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" bottomInset={bottomInset} />);
     await screen.findByText("Page 1 / 3");
   }
 
@@ -908,6 +926,28 @@ describe("find in this paper (IR-353)", () => {
     await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 1"));
 
     expect(scrollBy).not.toHaveBeenCalled();
+  });
+
+  it("treats a match under a bar stuck over the window's bottom as out of view, and scrolls to it (IR-477)", async () => {
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    vi.stubGlobal("innerHeight", 740);
+    // The Review tab's action bar covers the bottom 112px of a 740px window.
+    await openPaper(112);
+    const input = await openFind();
+    // Page 1's first line is at 600 + 100 = 700px: inside the window, under the bar.
+    placePages([
+      { top: 600, height: 1000 },
+      { top: 1616, height: 1000 },
+      { top: 2632, height: 1000 },
+    ]);
+    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(READER_TOOLBAR_TOP_PX, 96));
+
+    await userEvent.type(input, "vision");
+
+    await waitFor(() =>
+      expect(scrollBy).toHaveBeenCalledWith({ top: 700 - (READER_TOOLBAR_TOP_PX + 96) - 48, behavior: "auto" }),
+    );
   });
 
   it("closes on Esc, clearing its highlights and returning focus", async () => {

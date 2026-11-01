@@ -416,9 +416,9 @@ const PEOPLE = {
   'Maria Lopez': { role: 'Researcher · lead author', unit: 'BS Computer Engineering, 4th year', college: 'Engineering and Architecture', bio: 'Builds embedded sensing systems. This is her undergraduate thesis.', records: 'This thesis, and the Proposal it grew from' },
   'Ken Villanueva': { role: 'Researcher · co-author', unit: 'BS Computer Engineering, 4th year', college: 'Engineering and Architecture', bio: 'Wrote the LoRa gateway firmware and the risk-map pipeline.', records: 'This thesis' },
   'Prof. R. Santos': { role: 'Adviser', unit: 'Department of Computer Engineering', college: 'Engineering and Architecture', bio: 'Embedded systems and environmental IoT.' },
-  'Engr. L. Tan': { role: 'ITSO · IP specialist', unit: 'Innovation and Technology Support Office', bio: 'Patent searches and invention disclosures for engineering work.' },
-  'Atty. J. Ramos': { role: 'ITSO · legal counsel', unit: 'Innovation and Technology Support Office', bio: 'Licensing and IP agreements.' },
-  'Engr. P. Uy': { role: 'ITSO · technology officer', unit: 'Innovation and Technology Support Office', bio: 'Prior-art review for hardware.' },
+  'Engr. L. Tan': { role: 'ITSO · technical reviewer', unit: 'Innovation and Technology Support Office', bio: 'Technical review of engineering work.' },
+  'Atty. J. Ramos': { role: 'ITSO · technical reviewer', unit: 'Innovation and Technology Support Office', bio: 'Technical review of research methods.' },
+  'Engr. P. Uy': { role: 'ITSO · technology officer', unit: 'Innovation and Technology Support Office', bio: 'Technical review of hardware.' },
   'Dr. A. Cruz': { role: 'IERC · chair', unit: 'Institutional Ethics Review Committee', bio: 'Research ethics for studies involving people and communities.' },
   'Dr. M. Lim': { role: 'IERC · member', unit: 'Institutional Ethics Review Committee', bio: 'Data privacy in field research.' },
   'Prof. C. Go': { role: 'IERC · member', unit: 'Institutional Ethics Review Committee', bio: 'Community-engaged research.' },
@@ -431,7 +431,7 @@ const AUTHOR = 'Maria Lopez', AUTHORS = ['Maria Lopez', 'Ken Villanueva'], ADVIS
 const PARTY = {
   adviser: { name: 'Adviser', q: 'first review', me: ADVISER, members: [ADVISER] },
   rdco: { name: 'RDCO', q: 'decides', me: 'Dr. E. Navarro', members: ['Dr. E. Navarro', 'Ms. G. Ong'] },
-  itso: { name: 'ITSO', q: 'intellectual property', me: 'Engr. L. Tan', members: ['Engr. L. Tan', 'Atty. J. Ramos', 'Engr. P. Uy'] },
+  itso: { name: 'ITSO', q: 'technical review', me: 'Engr. L. Tan', members: ['Engr. L. Tan', 'Atty. J. Ramos', 'Engr. P. Uy'] },
   ierc: { name: 'IERC', q: 'research ethics', me: 'Dr. A. Cruz', members: ['Dr. A. Cruz', 'Dr. M. Lim', 'Prof. C. Go'] },
   ktto: { name: 'KTTO', q: 'commercialisation', me: 'Ms. D. Yap', members: ['Ms. D. Yap', 'Mr. R. Sy'] },
 };
@@ -503,7 +503,7 @@ function setStage(stage, role, fresh) {
     { id: 't6', party: 'itso', by: 'Engr. L. Tan', v: 3, sec: 's3', page: 6, quote: 'a galvanised bracket of our own design', body: 'Your team designed this bracket? Then keep its drawings out of the published paper until ITSO advises on a disclosure. Who made each part of the design?', answer: null, resolved: false },
     { id: 't7', party: 'ierc', by: 'Dr. A. Cruz', v: 3, sec: 's4', page: 7, quote: 'manual measurements taken by barangay staff', body: 'Were the staff told their readings would be used in research? I’ve asked for their signed consent forms.', answer: null, resolved: false });
   Object.assign(S.parties.rdco, { state: 'review', routedBy: ADVISER, from: 'adviser', at: 'Oct 30', reason: 'Ready for RDCO. Possible IP in the bracket (§3.1); calibration used barangay staff (§3.2).', due: 'Fri 14 Nov', seats: [{ who: 'Dr. E. Navarro', st: 'reviewing' }] });
-  Object.assign(S.parties.itso, { state: 'review', routedBy: 'Dr. E. Navarro', from: 'rdco', at: 'Oct 30', reason: 'Possible patentable sensor bracket (§3.1).', due: 'Thu 13 Nov', seats: [{ who: 'Engr. L. Tan', st: 'reviewing' }] });
+  Object.assign(S.parties.itso, { state: 'review', routedBy: 'Dr. E. Navarro', from: 'rdco', at: 'Oct 30', reason: 'Check the sensor bracket design (§3.1).', due: 'Thu 13 Nov', seats: [{ who: 'Engr. L. Tan', st: 'reviewing' }] });
   Object.assign(S.parties.ierc, { state: 'review', routedBy: 'Dr. E. Navarro', from: 'rdco', at: 'Oct 30', reason: 'Calibration used readings collected by barangay staff (§3.2).', due: 'Fri 14 Nov', paused: true, docReq: 'Signed consent forms from barangay staff', seats: [{ who: 'Dr. A. Cruz', st: 'reviewing' }] });
   Object.assign(S.parties.ktto, { state: 'pool', routedBy: 'Engr. L. Tan', from: 'itso', at: 'Oct 31', reason: 'The bracket and enclosure may be licensable to local governments (§5).', due: 'Tue 18 Nov' });
 }
@@ -661,7 +661,7 @@ function conversation() {
   if (S.stage === 'offices') {
     h += ev('ink', 'route', `<b>${ADVISER}</b> accepted v3 and sent it to <b>RDCO</b>`, S.fresh ? 'just now' : 'Oct 30', box([esc(S.parties.rdco.reason)]));
     if (!S.fresh) h += `${ev('', 'hand', `<b>Dr. E. Navarro</b> claimed it for RDCO`, 'Oct 30')}
-      ${ev('ink', 'route', `<b>Dr. E. Navarro</b> (RDCO) asked <b>ITSO</b> and <b>IERC</b> to review`, 'Oct 30', box(['Possible patentable sensor bracket (§3.1); calibration used readings collected by barangay staff (§3.2).']))}
+      ${ev('ink', 'route', `<b>Dr. E. Navarro</b> (RDCO) asked <b>ITSO</b> and <b>IERC</b> to review`, 'Oct 30', box(['Check the sensor bracket design (§3.1); calibration used readings collected by barangay staff (§3.2).']))}
       ${ev('', 'hand', `<b>Engr. L. Tan</b> claimed it for ITSO`, 'Oct 30')}
       ${ev('ink', 'route', `<b>Engr. L. Tan</b> (ITSO) asked <b>KTTO</b> to review`, 'Oct 31', box(['The bracket and enclosure may be licensable to local governments (§5). Left to KTTO’s pool.']))}
       ${ev('', 'file', `<b>Dr. A. Cruz</b> (IERC) requested a document: signed consent forms`, 'Oct 31')}`;

@@ -40,7 +40,7 @@ def create_audit_event(
         fixes their metadata keys.
     user       : accounts.User or None
         The acting user.  Passing None is allowed (anonymous access, or an
-        act IRIS took itself, such as the hand-back to RDCO).
+        act IRIS took itself, such as moving a due date after a document request).
     record     : records.Record or None
         The record this event relates to, if any.
     metadata   : dict or None

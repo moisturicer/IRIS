@@ -21,7 +21,7 @@ which is not `[]` -- to a viewer `may_read_review` refuses.
 from typing import Optional
 
 from apps.reviews.models import ReviewerSeat
-from apps.reviews.routing import _HINT_FIELD, _HINT_TEXT
+from apps.reviews.routing import author_hints_by_office
 from core.enums import Party, RoleName, SeatState
 from core.permissions import ADMIN_ROLES, get_role_name
 
@@ -139,8 +139,8 @@ def paper_details(record, viewer, *, readable: bool, deadlines: list[dict]) -> d
         colleges=_distinct(f["college"] for f in facts) if affiliations_readable else None,
         programs=_distinct(f["program"] for f in facts) if affiliations_readable else None,
         author_flags=[
-            {"office": office, "label": str(Party(office).label), "hint": _HINT_TEXT[office]}
-            for office, field in _HINT_FIELD.items() if getattr(record, field, False)
+            {"office": office, "label": str(Party(office).label), "hint": hint}
+            for office, hint in author_hints_by_office(record).items()
         ],
         researchers=[_researcher(u, viewer) for u in owners],
         adviser=_adviser(record, viewer),
