@@ -23,6 +23,10 @@ FROM nginxinc/nginx-unprivileged:1.25-alpine
 # The unprivileged image runs as non-root by default.
 USER root
 RUN rm /etc/nginx/conf.d/default.conf
+# Writes the /django-admin/ allowlist nginx.conf includes (IR-668). The image's
+# entrypoint runs this directory when the command is nginx.
+COPY docker-entrypoint.d/40-iris-django-admin.sh /docker-entrypoint.d/40-iris-django-admin.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.d/40-iris-django-admin.sh && chmod 755 /docker-entrypoint.d/40-iris-django-admin.sh
 USER nginx
 
 # Our custom config -- handles SPA routing (all routes fall back to index.html)

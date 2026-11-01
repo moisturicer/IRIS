@@ -324,6 +324,7 @@ jobs:
           image=nginxinc/nginx-unprivileged:1.25-alpine
           mounts="-v $PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
                   -v $PWD/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
+                  -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
                   -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"
           docker run --rm --add-host backend:127.0.0.1 $mounts "$image" nginx -t
           docker run -d --name iris-nginx --add-host backend:127.0.0.1 -p 8080:8080 $mounts "$image"
@@ -351,6 +352,11 @@ jobs:
             *) echo "::error::the pdf.js worker (.mjs) is served as '$type'"; status=1 ;;
           esac
           exit $status
+
+      # IR-668: the default is deny, the allowlist reads the real client, and
+      # IRIS's own /admin/... pages are not refused.
+      - name: nginx closes /django-admin/ unless allowlisted
+        run: sh scripts/check_django_admin_allowlist.sh
 
       # IR-620: beat's only job is ADR-043's hourly deadline task. Booting it
       # proves the service starts and loads that entry; validating the file
