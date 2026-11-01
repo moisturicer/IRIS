@@ -1,7 +1,7 @@
 """What answers a run (IR-722). Called with no database transaction open.
 
 Only a deterministic executor exists: it proves the run contract, never
-paid capacity or answer quality.
+paid capacity or answer quality. `tools` is `ai.research.tools.ResearchTools`.
 """
 
 from __future__ import annotations
@@ -15,6 +15,8 @@ class Citation:
     record_id: int
     quote: str
     page: int | None = None
+    #: The Manuscript revision the quote was read from (IR-719).
+    revision: str | None = None
 
 
 @dataclass(frozen=True)
@@ -39,7 +41,7 @@ class Executor(Protocol):
     #: Units reserved before the attempt starts.
     reserved_units: int
 
-    async def answer(self, question: str) -> Result: ...
+    async def answer(self, question: str, tools) -> Result: ...
 
 
 class DeterministicExecutor:
@@ -47,5 +49,5 @@ class DeterministicExecutor:
     version = "1"
     reserved_units = 0
 
-    async def answer(self, question: str) -> Result:
+    async def answer(self, question: str, tools) -> Result:
         return Result(answer=f"Deterministic answer: {question.strip()}")

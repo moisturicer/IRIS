@@ -10,7 +10,7 @@ from dataclasses import dataclass
 
 EXECUTORS = ("deterministic",)
 PROTOCOL = "runs-1"
-SCHEMA = "0001_runs.sql"
+SCHEMA = "0002_research.sql"
 
 LIMIT_NAMES = (
     "RUNS_DEADLINE_SECONDS", "RUNS_LEASE_SECONDS", "RUNS_MAX_ATTEMPTS",

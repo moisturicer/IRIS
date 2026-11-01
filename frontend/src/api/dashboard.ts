@@ -5,6 +5,8 @@ export interface DashboardStats {
   pending_mine:    number;
   approved_mine:   number;
   declined_mine:   number;
+  /** The user's records waiting on them: a revision or document asked for (IR-534, B2). */
+  needs_action_mine: number;
   total_published: number;
 }
 

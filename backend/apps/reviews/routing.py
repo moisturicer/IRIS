@@ -414,7 +414,7 @@ def _notify(record, actor, plan, opened, *, accepted):
 def _locked(record):
     """
     Re-read `record` under a row lock, so routing requests on it run one after
-    the other: a double-clicked *Accept & route*, or two offices routing to the
+    the other: a double-clicked *Accept & send to RDCO*, or two offices routing to the
     same third one at once, then refuse cleanly instead of racing.
     """
     from apps.records.models import Record

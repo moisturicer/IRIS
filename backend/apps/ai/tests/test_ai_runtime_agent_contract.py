@@ -15,6 +15,7 @@ if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
 from ai.agent.dialect import ChatCompletions  # noqa: E402
+from ai.runs import config as runs_config  # noqa: E402
 from ai.agent.protocol import (  # noqa: E402
     AgentRequest, Pin, StopReason, ToolCall, ToolGroup, ToolResult, User,
 )
@@ -22,8 +23,8 @@ from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: 
 
 PIN = Pin(
     model="scripted-model", endpoint="scripted", adapter="recording", dialect=ChatCompletions.name,
-    prompt_version="agent-direct-1", tool_version="none-1", public_version="runs-1",
-    state_version="0001_runs.sql", data_policy="no-training", requires=("tools", "continuation"),
+    prompt_version="agent-direct-1", tool_version="none-1", public_version=runs_config.PROTOCOL,
+    state_version=runs_config.SCHEMA, data_policy="no-training", requires=("tools", "continuation"),
 )
 
 

@@ -13,6 +13,7 @@ import pytest
 from . import test_ai_runtime_runs_db as runs_db
 from .test_ai_runtime_runs_db import LIMITS, as_reader, service, session, submit
 from ai.agent.dialect import ChatCompletions  # noqa: E402
+from ai.runs import config as runs_config  # noqa: E402
 from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.agent.protocol import Pin  # noqa: E402
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
@@ -27,8 +28,8 @@ api = runs_db.api
 
 PIN = Pin(
     model="scripted-model", endpoint="scripted", adapter="recording", dialect=ChatCompletions.name,
-    prompt_version="agent-direct-1", tool_version="none-1", public_version="runs-1",
-    state_version="0001_runs.sql", data_policy="no-training", requires=("continuation",),
+    prompt_version="agent-direct-1", tool_version="none-1", public_version=runs_config.PROTOCOL,
+    state_version=runs_config.SCHEMA, data_policy="no-training", requires=("continuation",),
 )
 SECRET = "opaque-SECRET-payload"
 
@@ -94,7 +95,7 @@ def test_a_run_is_never_continued_under_another_pin(runtime):
     upgraded = Pin(**{**PIN.as_dict(), "requires": PIN.requires, "prompt_version": "agent-direct-2"})
     provider = recording(reply("Would be the wrong interpretation."))
     worker = service(runtime, AgentExecutor(provider, upgraded))
-    asyncio_run(worker.execute(row["id"]))
+    asyncio_run(worker.execute(row["id"], session(reader)))
     status = asyncio_run(RunStore(runtime).status(session(reader), row["id"]))
     assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
     assert status["pinned"]["agent"] == PIN.as_dict()

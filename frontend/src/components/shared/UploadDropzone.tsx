@@ -21,6 +21,7 @@
  */
 import { forwardRef, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 
+import { ProgressBar, toPercent } from "@/components/shared/ProgressBar";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatBytes } from "@/lib/utils";
@@ -267,7 +268,7 @@ const ProgressPanel = forwardRef<HTMLDivElement, ProgressPanelProps>(function Pr
   { fileName, progress },
   ref,
 ) {
-  const percent = Math.min(100, Math.max(0, Math.round(progress)));
+  const percent = toPercent(progress);
   const name = `Uploading ${fileName}`;
   return (
     <div
@@ -281,20 +282,7 @@ const ProgressPanel = forwardRef<HTMLDivElement, ProgressPanelProps>(function Pr
         <span className="font-medium text-stone-800 truncate">{name}</span>
         <span className="text-stone-600 tabular-nums">{percent}%</span>
       </div>
-      <div
-        role="progressbar"
-        aria-label={name}
-        aria-valuemin={0}
-        aria-valuemax={100}
-        aria-valuenow={percent}
-        className="mt-2 h-1.5 rounded-full bg-stone-100 overflow-hidden"
-      >
-        {/* Moved by transform, not width (01-design-system §0, motion). */}
-        <div
-          className="h-full w-full origin-left rounded-full bg-brand transition-transform duration-200 motion-reduce:transition-none"
-          style={{ transform: `scaleX(${percent / 100})` }}
-        />
-      </div>
+      <ProgressBar label={name} progress={progress} className="mt-2 h-1.5 bg-stone-100" />
     </div>
   );
 });

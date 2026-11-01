@@ -1,6 +1,6 @@
 """Answer a direct question through the pinned AGENT contract (IR-727).
 
-One model turn, no tools: the tool loop is IR-728. The pin is checked
+One model turn; `tools` is accepted and unused until the tool loop (IR-728). The pin is checked
 against what this code and the provider support before anything is sent;
 a mismatch is `unavailable`, never a substitute model or dialect.
 """
@@ -39,7 +39,7 @@ class AgentExecutor:
         return (all(getattr(self.pin, k) == v for k, v in SUPPORTED.items())
                 and self.provider.accepts(self.pin))
 
-    async def answer(self, question: str) -> Result:
+    async def answer(self, question: str, tools=None) -> Result:
         if not self.supported():
             raise Unavailable("unsupported_pin")
         request = AgentRequest(pin=self.pin, instructions=INSTRUCTIONS, history=(User(question),))

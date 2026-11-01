@@ -182,6 +182,10 @@ _Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which
 A Proposal its Adviser accepted: its resting state. It is not published, and nothing further is decided on it.
 _Avoid_: Approved (the stored name), ongoing, completed (the state of the retired *complete* act).
 
+**Continuation**:
+The Thesis/Research or Project a researcher starts from their own [[Accepted]] Proposal, carrying it forward into a manuscript submission with its own [[Manuscript]] and its own review. A Proposal has at most one Continuation, and each names the other; a reader is shown that link only when they may open the Record it names.
+_Avoid_: Child record, child manuscript, derived record, fork, follow-up.
+
 **Unlisted**:
 A Thesis/Research or Project that RDCO accepted but kept out of Discover and Ask IRIS, for example ahead of a patent filing. Its owners and reviewers can still open it.
 _Avoid_: Completed (the code's status name), embargoed, hidden.

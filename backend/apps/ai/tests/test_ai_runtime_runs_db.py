@@ -37,7 +37,7 @@ LIMITS = runs_config.RunLimits(
     deadline_seconds=120, lease_seconds=30, max_attempts=2,
     max_input_tokens=1000, max_output_tokens=500, max_cost_usd=0.5,
 )
-IRIS_AI_TABLES = "iris_ai.citation, iris_ai.run_event, iris_ai.turn, iris_ai.ask_run," \
+IRIS_AI_TABLES = "iris_ai.research_handle, iris_ai.citation,iris_ai.run_event, iris_ai.turn, iris_ai.ask_run," \
                  " iris_ai.conversation, iris_ai.attempt_accounting"
 
 
@@ -76,7 +76,7 @@ class ScriptedExecutor:
         self.probe = probe
         self.calls = 0
 
-    async def answer(self, question):
+    async def answer(self, question, tools):
         self.calls += 1
         if self.probe:
             await self.probe()
@@ -148,7 +148,7 @@ def test_the_original_deadline_allowance_and_versions_are_persisted(api):
     assert run_["allowance"] == LIMITS.allowance()
     assert run_["pinned"] == {
         "executor": "deterministic", "executor_version": "1",
-        "protocol": "runs-1", "schema": "0001_runs.sql",
+        "protocol": "runs-1", "schema": "0002_research.sql",
     }
     assert run_["version"] >= 1
     created = run_["created_at"]
@@ -326,7 +326,8 @@ def test_turn_citations_revision_and_journal_commit_together(runtime):
     reopened = run(RunStore(runtime).reopen(grant, run_["conversation_id"]))
     assert reopened["revision"] == 1
     assert reopened["turns"][0]["citations"] == [
-        {"record_id": 11, "page": 3, "quote": "a"}, {"record_id": 12, "page": None, "quote": "b"},
+        {"record_id": 11, "page": 3, "quote": "a", "revision": None},
+        {"record_id": 12, "page": None, "quote": "b", "revision": None},
     ]
 
     # The second citation violates a constraint after the Turn row is written.

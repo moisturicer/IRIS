@@ -153,11 +153,12 @@ export const HELP_SECTIONS: HelpSection[] = [
           or rejects it, and an accepted Proposal is not published.
         </p>
         <p>
-          For a Thesis / Research or Project, the Adviser can accept and publish it, or accept it
-          and route it to the specialist offices whose questions it raises: ITSO for intellectual
-          property, IERC for ethics and KTTO for commercialisation. Those offices review it at the
-          same time, and each settles its own clearance. When the last one finishes, the record goes
-          to RDCO, which decides: publish it, keep it unlisted, or reject it.
+          For a Thesis / Research or Project, the Adviser can request a revision, reject it, or
+          accept it and send it to RDCO, suggesting which offices should look at it. RDCO decides
+          what happens next. It can ask ITSO about intellectual property, IERC about ethics or KTTO
+          about commercialisation, and those offices review at the same time, each settling its own
+          clearance. Only RDCO can publish a paper or keep it unlisted. It can do that, or reject
+          the paper, at any time, even while offices are still reviewing.
         </p>
         <p>
           Any reviewer may ask the owners for a revision. The owners answer with a new version, and

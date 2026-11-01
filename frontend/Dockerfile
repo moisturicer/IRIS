@@ -27,6 +27,9 @@ USER nginx
 
 # Our custom config -- handles SPA routing (all routes fall back to index.html)
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Browser security headers (IR-663). Outside conf.d, which nginx includes at
+# http level on its own; nginx.conf includes this per location instead.
+COPY security-headers.conf /etc/nginx/iris/security-headers.conf
 
 # Copy built assets from builder
 COPY --from=builder /app/dist /usr/share/nginx/html

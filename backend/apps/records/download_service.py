@@ -241,6 +241,88 @@ def download_state(user, record) -> dict:
     }
 
 
+def reader_request_rows(user) -> list[dict]:
+    """
+    The reader's own download requests for My Library (IR-743), newest first,
+    each with its state and what the reader may do about it -- worked out here
+    so the browser never decides access itself. Cancelled requests are left
+    out (withdrawn, as if never made), and so is any request on a record the
+    reader can no longer read: the one visibility predicate (IR-153).
+
+    Which request counts comes from `download_access`, the same answer the
+    paper page gives, so the two screens cannot disagree. The counted request
+    carries the paper page's state and its action; every other row is history.
+    A pending request may always be withdrawn.
+    """
+    from .models import Record
+
+    requests = list(
+        DownloadRequest.objects.filter(requested_by=user, record__in=Record.objects.visible_to(user))
+        .exclude(status=RequestStatus.CANCELLED)
+        .select_related("record")
+        .order_by("-created_at", "-pk")
+    )
+    access_by_record = {}
+    for request in requests:
+        if request.record_id not in access_by_record:
+            access_by_record[request.record_id] = download_access(user, request.record)
+
+    rows = []
+    for request in requests:
+        access = access_by_record[request.record_id]
+        counted = access.request is not None and access.request.pk == request.pk
+        state = _counted_state(access) if counted else _history_state(request)
+        if request.status == RequestStatus.PENDING:
+            actions = ["cancel"]
+        elif counted:
+            actions = _READER_ACTIONS[state]
+        else:
+            actions = []
+        rows.append({
+            "id": request.pk,
+            "record": request.record_id,
+            "record_title": request.record.title,
+            "note": request.note,
+            "created_at": request.created_at,
+            "state": state,
+            "grant_expires_at": request.grant_expires_at if state == _GRANTED else None,
+            "rdco_note": request.rdco_note if state in _ENDED_BY_RDCO else "",
+            "actions": actions,
+        })
+    return rows
+
+
+_GRANTED = "granted"
+_EXPIRED = "expired"
+_ENDED_BY_RDCO = (RequestStatus.DECLINED.value, RequestStatus.REVOKED.value)
+
+
+def _counted_state(access: DownloadAccess) -> str:
+    """The paper page's state for the request `download_access` counts."""
+    if access.allowed:
+        return _GRANTED  # a counted request is only ever allowed as a grant
+    return _STATE_BY_REFUSAL[access.refusal]
+
+
+def _history_state(request) -> str:
+    """
+    A request that no longer decides access. A superseded approval reads as
+    expired even before its date: a newer decision ended it.
+    """
+    if request.status == RequestStatus.APPROVED:
+        return _EXPIRED
+    return request.status  # pending, declined or revoked
+
+
+_READER_ACTIONS = {
+    RequestStatus.PENDING.value: ["cancel"],
+    _GRANTED: ["download"],
+    RequestStatus.DECLINED.value: ["request_again"],
+    RequestStatus.REVOKED.value: ["request_again"],
+    _EXPIRED: ["request_again"],
+}
+
+
 def copy_identity(user, access: DownloadAccess) -> CopyIdentity:
     """What a copy made under `access` says about who it was made for (IR-676)."""
     return CopyIdentity(

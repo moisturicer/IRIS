@@ -88,6 +88,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.ContentSecurityPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -198,6 +199,10 @@ REST_FRAMEWORK = {
         "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
         "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
         "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
+        # Per client address (IR-661). A campus shares one, so these allow a
+        # class signing in together; the lockout still answers per account and address.
+        "auth_login": throttle_rate("API_THROTTLE_LOGIN", "300/hour"),
+        "auth_register": throttle_rate("API_THROTTLE_REGISTER", "60/hour"),
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
         "ai_overview": "600/hour",
@@ -224,6 +229,37 @@ SIMPLE_JWT = {
 # the token lifetimes above (IR-166, apps/accounts/sessions.py). The interface
 # signs itself out on the same figure: frontend/src/lib/activity.ts.
 SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30, cast=int)
+
+# ---- Browser security headers (IR-663, ASVS 14.4.3/4/6/7) ----------------
+#
+# Every response Django serves: the API, the admin, and WhiteNoise's static
+# files. The single-page app itself is served by nginx, which sends its own
+# copy from frontend/security-headers.conf. The first three are Django's
+# defaults, set here so a change to them is a visible decision.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+# Browsers ignore frame-ancestors in a report-only CSP, so this is what denies
+# framing until the CSP is enforced.
+X_FRAME_OPTIONS = "DENY"
+
+# Django renders no page but the admin, which loads only its own static files.
+# JSON is never rendered, so `default-src 'none'` costs the API nothing.
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'none'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+# Report-only until the manual walk-through in docs/testing/TRACEABILITY.md
+# (IR-663) shows no violation. Enforcing is a reviewed change to this line,
+# and to frontend/security-headers.conf, never an environment variable.
+CONTENT_SECURITY_POLICY_REPORT_ONLY = True
 
 # ---- CORS ---------------------------------------------------------------
 
