@@ -634,6 +634,11 @@ AI_RESEARCH_GRANT_ACTIVE_KEY = config("AI_RESEARCH_GRANT_ACTIVE_KEY", default=""
 AI_RESEARCH_GRANT_AUDIENCE = config("AI_RESEARCH_GRANT_AUDIENCE", default="")
 AI_RESEARCH_GRANT_DEPLOYMENT = config("AI_RESEARCH_GRANT_DEPLOYMENT", default="")
 AI_RESEARCH_GRANT_TTL_SECONDS = config("AI_RESEARCH_GRANT_TTL_SECONDS", default=300, cast=int)
+# Who decides research reads (IR-718): `application` (visible_to) or
+# `database` (row policy over a restricted login). Off until cutover.
+AI_RESEARCH_READ_POLICY = config("AI_RESEARCH_READ_POLICY", default="application")
+AI_RESEARCH_DB_USER = config("AI_RESEARCH_DB_USER", default="")
+AI_RESEARCH_DB_PASSWORD = config("AI_RESEARCH_DB_PASSWORD", default="")
 AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
 AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
 AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)

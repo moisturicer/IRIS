@@ -32,12 +32,14 @@ class AiConfig(AppConfig):
         from apps.ai.comparison_configuration import verify_comparison_configuration
         from apps.ai.controller.budget import verify_controller_configuration
         from apps.ai.grants.config import verify_grant_configuration
+        from apps.ai.grants.reads import verify_research_read_configuration
 
         verify_research_configuration()
         verify_controller_configuration()
         verify_comparison_configuration()
         verify_admission_configuration()
         verify_grant_configuration()
+        verify_research_read_configuration()
         verify_bypass_configuration()
         verify_inference_configuration()
         verify_evidence_configuration()

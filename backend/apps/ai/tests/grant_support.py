@@ -39,23 +39,33 @@ def require_role_privileges():
 
 
 @contextmanager
-def probe_login(group="iris_ai_runtime"):
-    """A throwaway LOGIN role that is only a member of `group`, and a raw connection as it."""
+def probe_credentials(group="iris_ai_runtime", flags=""):
+    """A throwaway LOGIN role that is only a member of `group`: (name, password)."""
     name = f"iris_probe_{uuid.uuid4().hex[:10]}"
     password = secrets.token_urlsafe(16)
     with connection.cursor() as cursor:
-        cursor.execute(f'CREATE ROLE "{name}" LOGIN PASSWORD %s IN ROLE {group}', [password])
-    params = connection.settings_dict
-    conn = psycopg2.connect(
-        host=params["HOST"] or "localhost", port=params["PORT"] or "5432",
-        dbname=params["NAME"], user=name, password=password,
-    )
+        cursor.execute(f'CREATE ROLE "{name}" LOGIN {flags} PASSWORD %s IN ROLE {group}', [password])
     try:
-        yield conn
+        yield name, password
     finally:
-        conn.close()
         with connection.cursor() as cursor:
+            cursor.execute(f'DROP OWNED BY "{name}"')
             cursor.execute(f'DROP ROLE IF EXISTS "{name}"')
+
+
+@contextmanager
+def probe_login(group="iris_ai_runtime"):
+    """A throwaway LOGIN role that is only a member of `group`, and a raw connection as it."""
+    with probe_credentials(group) as (name, password):
+        params = connection.settings_dict
+        conn = psycopg2.connect(
+            host=params["HOST"] or "localhost", port=params["PORT"] or "5432",
+            dbname=params["NAME"], user=name, password=password,
+        )
+        try:
+            yield conn
+        finally:
+            conn.close()
 
 
 @pytest.fixture
