@@ -2238,6 +2238,12 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 
 **Status.** Implemented; awaiting review.
 
+## IR-768 — Sign-in and registration present IRIS as the platform, CIT-U as its pilot institution
+
+`frontend/src/config/institution.ts` is the one place the interface reads the institution's name, logo and email domain from (ADR-005 §Amendment 2026-11-01, Proposed). `EntryFrame` takes the masthead logo, its alt text and the footer's "Pilot institution: {name}" from it; the footer's other line is "© 2026 IRIS · Research and IP disclosure". Sign in carries the institution-neutral lede, "Welcome back", "Sign in to access your research workspace.", the `name@university.edu` placeholder and "New to IRIS? Create an account" in both places. Register asks for an "Institutional email". Register, verification, forgot password, the pending/declined screens and the account-locked dialog say "an administrator" where they named RDCO. `DataNotice` and `dpaTerms.ts` are unchanged: they are legal text pending the DPO's review.
+
+**Verification (2026-11-01):** `npx vitest run` on `LoginPage`, `SignupPage`, `EmailVerifyPage`, `ForgotPasswordPage`, `PendingApprovalPage`, `entryHeadings` and `AccountLockedModal`: 7 files, 168 tests pass. The assertions on the old copy were changed deliberately to the new strings; `LoginPage.test.tsx` also asserts that the sign-in page's text names no "CIT-U".
+
 ## IR-566 Saved Records and Reading status follow the reader's account
 
 **Design:** [ADR-044](../adr/044-account-backed-research-library.md), accepted 2026-10-30, with its §Amendment of 2026-11-01 (reading history moves to the account in IR-756, not here).

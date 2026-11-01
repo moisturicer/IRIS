@@ -31,7 +31,7 @@ describe("the locked-account dialog", () => {
     await user.click(trigger);
     const dialog = screen.getByRole("dialog", { name: "Account Locked" });
     const close = within(dialog).getByRole("button", { name: "Close" });
-    expect(dialog).toHaveAccessibleDescription(/RDCO has locked this account/);
+    expect(dialog).toHaveAccessibleDescription(/An administrator has locked this account/);
     expect(close).toHaveFocus();
     await user.tab();
     expect(close).toHaveFocus();

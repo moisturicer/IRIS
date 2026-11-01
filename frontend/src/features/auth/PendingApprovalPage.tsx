@@ -30,20 +30,20 @@ function standingOf(request: OwnRoleRequest | null | undefined, email: string): 
   if (request?.status === "pending") {
     return {
       title: "Waiting for approval",
-      message: `RDCO is reviewing your request to join as ${withArticle(request.requested_role)}. You'll get an email at ${email} when they decide.`,
+      message: `An administrator is reviewing your request to join as ${withArticle(request.requested_role)}. You'll get an email at ${email} when they decide.`,
     };
   }
   if (request?.status === "declined") {
     return {
       title: "Request not approved",
-      message: `Your request to join as ${withArticle(request.requested_role)} was not approved. Contact RDCO or your department administrator if you think this is a mistake.`,
+      message: `Your request to join as ${withArticle(request.requested_role)} was not approved. Contact an administrator if you think this is a mistake.`,
     };
   }
   // No request: registered without a role, or approved and the role later
   // taken away. Neither "reviewing" nor "declined" would be true.
   return {
     title: "No role assigned",
-    message: "Your account doesn't have a role yet, so there is nothing for IRIS to open. Contact RDCO or your department administrator to have one assigned.",
+    message: "Your account doesn't have a role yet, so there is nothing for IRIS to open. Contact an administrator to have one assigned.",
   };
 }
 

@@ -66,7 +66,7 @@ const stepHeading = () => screen.getByRole("heading", { level: 3, name: /^Step \
 const firstName = () => screen.getByRole("textbox", { name: "First Name" });
 const lastName  = () => screen.getByRole("textbox", { name: "Last Name" });
 const initial   = () => screen.getByRole("textbox", { name: "M.I." });
-const email     = () => screen.getByRole("textbox", { name: "CIT-U Email" });
+const email     = () => screen.getByRole("textbox", { name: "Institutional email" });
 const college   = () => screen.getByRole("combobox", { name: "College" });
 const program   = () => screen.getByRole("combobox", { name: "Program" });
 const department = () => screen.getByRole("combobox", { name: "Department" });
@@ -451,7 +451,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     const next = within(screen.getByRole("list", { name: "What happens next" })).getAllByRole("listitem");
     expect(next.map((s) => s.textContent)).toEqual([
       expect.stringMatching(/verify your email/i),
-      expect.stringMatching(/RDCO/),
+      expect.stringMatching(/An administrator reviews/),
     ]);
   });
 
@@ -697,7 +697,7 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     expect(register).toHaveBeenCalledTimes(1);
     expect(confirmation).toHaveFocus();
     expect(screen.getByText("juan@cit.edu")).toBeInTheDocument();
-    expect(screen.getByText(/RDCO reviews your request to join as a Student/)).toBeInTheDocument();
+    expect(screen.getByText(/An administrator reviews your request to join as a Student/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
 
     // The folder is closed (IR-709): every tab is a plain label, never a link or a button.
@@ -723,7 +723,7 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     const [verify, review] = within(next).getAllByRole("listitem");
     expect(verify).toHaveTextContent("Open the link in that email to verify your address.");
     expect(review).toHaveTextContent(
-      "RDCO reviews your request to join as a Student, and emails you when they decide.",
+      "An administrator reviews your request to join as a Student, and emails you when they decide.",
     );
 
     expect(screen.getByText(
@@ -731,7 +731,7 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     )).toBeInTheDocument();
     expect(screen.getByText(
       "If that address is wrong, register again with the right one. "
-      + "Your first request stays pending until RDCO declines it.",
+      + "Your first request stays pending until an administrator declines it.",
     )).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
     await expectNoBlockingA11yViolations(container);
