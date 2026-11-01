@@ -80,7 +80,7 @@ the DPO review should cover them.
 | Calls & Conferences changes | Each Call shows its poster's name to every signed-in user, as it does today. New: RDCO's reason for rejecting or removing an Adviser's Call, sent to that Adviser and kept in the audit event; audit events naming who posted, edited, deleted, confirmed, rejected or removed a Call, with a copy of a deleted Call; and which Calls each account saved, visible only to that reader and never audited. Proposed in ADR-050, to be built after the MVP. | IR-758 |
 | Account deletion | A request to delete an account, with its decision and any rejection reason, seen by the person and the System Admin. On confirmation: name, email, profile and private data are removed, and the person shows as "Former user" in comments and review history. **Kept:** their name as an Author or as Adviser on a published paper, and audit events naming them, which can't be edited. Proposed in ADR-051. | IR-779 |
 | Personal data download | A file of the person's own data, including Ask IRIS conversations, delivered only to them. Each download writes an audit event. Proposed in ADR-051. | IR-786 |
-| Consent versions and withdrawal | Which notice version each person accepted and when, kept as a history. Any owner can withdraw consent on a paper, and the other owners are told who withdrew. Withdrawal removes the paper's stored passages, vectors and AI Overview from IRIS, though text already sent to vendors can't be recalled. Proposed in ADR-051. | IR-789, IR-791, IR-792 |
+| Consent versions and withdrawal | Which notice version each person accepted and when, kept as a history. RDCO or the System Admin publishes each new version by pasting it, naming who published it. Every published version stays stored and can't be edited. Any owner can withdraw consent on a paper, and the other owners are told who withdrew. Withdrawal removes the paper's stored passages, vectors and AI Overview from IRIS, though text already sent to vendors can't be recalled. Proposed in ADR-051. | IR-789, IR-791, IR-792 |
 | Audit Log access | The System Admin alone would read the Audit Log, which names who did what across IRIS. RDCO reads it today. Proposed in ADR-051. | IR-781 |
 
 Decisions these features add:
@@ -102,6 +102,8 @@ Decisions these features add:
   whole paper, and existing vendor copies can't be recalled (ADR-051).
 - [ ] Decide how papers submitted under an older notice are treated when the
   submission notice changes (ADR-051).
+- [ ] Decide who approves a notice before it is published. Under ADR-051 RDCO or
+  the System Admin can publish one alone, and IRIS doesn't check for approval.
 - [ ] Confirm that printing a downloader's name and email in each copy (IR-676)
   is acceptable.
 - [ ] Confirm that the Discoverable consent text covers sharing a Proposal's

@@ -301,19 +301,23 @@ The highest office staff role. It runs the research workflow: it approves roles,
 _Avoid_: Admin, administrator.
 
 **System Admin**:
-The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments with RDCO. Nobody can ask for it; developers set up the first one.
+The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments and publishing [[Notice]]s with RDCO. Nobody can ask for it; developers set up the first one.
 _Avoid_: Admin (on its own), administrator, superuser.
 
 **Account deletion**:
 Removing a person from IRIS at their own request, once the System Admin confirms it and nobody is waiting on them. Their personal details go and they can't sign in. A published paper keeps their name as an Author or as Adviser, and elsewhere they show as "Former user".
 _Avoid_: Closure, close account, deactivate.
 
+**Notice**:
+The text a person accepts to give Signup consent or Submission consent. RDCO or the System Admin publishes each new version by pasting it, and a published version never changes.
+_Avoid_: Terms, DPA terms, privacy policy (a document the university writes).
+
 **Signup consent**:
-A person's acceptance of IRIS's data notice for having an account. Withdrawing it means Account deletion.
+A person's acceptance of the signup Notice, which having an account requires. Withdrawing it means Account deletion.
 _Avoid_: Consent (on its own), terms.
 
 **Submission consent**:
-An owner's acceptance of the notice that lets AI features use one paper. Any one owner can withdraw it, which stops AI use of the whole paper and leaves its review untouched.
+An owner's acceptance of the submission Notice, which lets AI features use one paper. Any one owner can withdraw it, which stops AI use of the whole paper and leaves its review untouched.
 _Avoid_: Consent (on its own), DPA acceptance, Discoverable (a separate decision).
 
 **Retention period**:
