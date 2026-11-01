@@ -1,0 +1,136 @@
+"""Create the restricted research roles and hand the verifier to its own owner (IR-717).
+
+Run with maintenance credentials (CREATEROLE or superuser), after migrate.
+Idempotent. Roles are NOLOGIN groups; a deployment adds its own LOGIN
+members. `--check` reports problems and changes nothing.
+
+- `iris_authz_verifier` owns the verifier functions and may read only the
+  key table and the columns verification needs.
+- `iris_ai_runtime` and `iris_django_runtime` may bind and read a verified
+  identity; neither may read keys, own tables or bypass row security.
+"""
+
+from django.core.management.base import BaseCommand, CommandError
+from django.db import connection, transaction
+
+VERIFIER = "iris_authz_verifier"
+RUNTIME_ROLES = ("iris_ai_runtime", "iris_django_runtime")
+ROLE_FLAGS = "NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"
+
+DEFINER_FUNCTIONS = (
+    "verify_research_grant(text, text)",
+    "binding_tag(text, text)",
+    "current_research_claims()",
+    "current_reader()",
+    "begin_research(text, text)",
+)
+HELPER_FUNCTIONS = ("hmac_sha256(bytea, bytea)", "b64url_encode(bytea)", "b64url_decode(text)")
+RUNTIME_FUNCTIONS = ("begin_research(text, text)", "current_research_claims()", "current_reader()")
+#: Columns the verifier reads, and nothing else (no password hashes).
+VERIFIER_COLUMNS = {
+    "accounts_user": "id, is_active, is_locked, credential_version",
+    "ai_askrun": "id, state, deadline_at, user_id, conversation_id",
+    "ai_conversation": "id, user_id, record_id",
+    "ai_ingestionjob": "id, record_id, extraction_hash",
+}
+
+
+def problems(cursor) -> list[str]:
+    found = []
+    for role in (VERIFIER, *RUNTIME_ROLES):
+        cursor.execute(
+            "SELECT rolsuper, rolbypassrls, rolcreaterole, rolcanlogin FROM pg_roles WHERE rolname = %s",
+            [role],
+        )
+        row = cursor.fetchone()
+        if row is None:
+            found.append(f"role {role} does not exist")
+        elif any(row):
+            found.append(f"role {role} must be NOSUPERUSER NOBYPASSRLS NOCREATEROLE NOLOGIN")
+    cursor.execute(
+        """SELECT r.rolname, c.relname FROM pg_class c JOIN pg_roles r ON r.oid = c.relowner
+            WHERE r.rolname = ANY(%s) AND c.relkind IN ('r', 'p', 'v', 'm')""",
+        [list((VERIFIER, *RUNTIME_ROLES))],
+    )
+    found += [f"role {role} owns {rel}" for role, rel in cursor.fetchall()]
+    for role in RUNTIME_ROLES:
+        cursor.execute(
+            "SELECT 1 FROM pg_roles WHERE rolname = %s", [role]
+        )
+        if cursor.fetchone() is None:
+            continue
+        cursor.execute(
+            "SELECT has_table_privilege(%s, 'iris_authz.grant_key', 'SELECT')", [role]
+        )
+        if cursor.fetchone()[0]:
+            found.append(f"role {role} can read iris_authz.grant_key")
+    cursor.execute(
+        """SELECT p.proname FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
+            JOIN pg_roles r ON r.oid = p.proowner
+            WHERE n.nspname = 'iris_authz' AND p.prosecdef AND r.rolname <> %s""",
+        [VERIFIER],
+    )
+    found += [f"function iris_authz.{name} is not owned by {VERIFIER}" for (name,) in cursor.fetchall()]
+    return found
+
+
+class Command(BaseCommand):
+    help = "Create the restricted research database roles (IR-717)."
+
+    def add_arguments(self, parser):
+        parser.add_argument("--check", action="store_true", help="Report problems; change nothing.")
+
+    def handle(self, *args, check=False, **options):
+        with connection.cursor() as cursor:
+            if check:
+                found = problems(cursor)
+                for line in found:
+                    self.stdout.write(f"PROBLEM: {line}")
+                if found:
+                    raise CommandError(f"{len(found)} problem(s)")
+                self.stdout.write("research roles: ok")
+                return
+            cursor.execute(
+                "SELECT rolsuper, rolcreaterole FROM pg_roles WHERE rolname = current_user"
+            )
+            superuser, createrole = cursor.fetchone()
+            if not (superuser or createrole):
+                raise CommandError("needs maintenance credentials with CREATEROLE (IR-717)")
+            with transaction.atomic():
+                self._provision(cursor, superuser)
+            found = problems(cursor)
+            if found:
+                raise CommandError("; ".join(found))
+        self.stdout.write("research roles provisioned")
+
+    def _provision(self, cursor, superuser):
+        for role in (VERIFIER, *RUNTIME_ROLES):
+            cursor.execute(
+                f"""DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '{role}') THEN
+                        CREATE ROLE {role} {ROLE_FLAGS};
+                    END IF;
+                END $$"""
+            )
+            cursor.execute(f"ALTER ROLE {role} {ROLE_FLAGS}")
+        if not superuser:
+            # Owner privileges are needed to hand the functions over.
+            cursor.execute(f"GRANT {VERIFIER} TO current_user")
+        cursor.execute(f"GRANT USAGE ON SCHEMA iris_authz, public TO {VERIFIER}")
+        cursor.execute(f"GRANT SELECT ON iris_authz.grant_key TO {VERIFIER}")
+        for table, columns in VERIFIER_COLUMNS.items():
+            cursor.execute(f"GRANT SELECT ({columns}) ON public.{table} TO {VERIFIER}")
+        for fn in HELPER_FUNCTIONS:
+            cursor.execute(f"GRANT EXECUTE ON FUNCTION iris_authz.{fn} TO {VERIFIER}")
+        for fn in DEFINER_FUNCTIONS:
+            cursor.execute(f"ALTER FUNCTION iris_authz.{fn} OWNER TO {VERIFIER}")
+            cursor.execute(f"REVOKE ALL ON FUNCTION iris_authz.{fn} FROM PUBLIC")
+        for role in RUNTIME_ROLES:
+            cursor.execute(f"REVOKE ALL ON iris_authz.grant_key FROM {role}")
+            cursor.execute(f"GRANT USAGE ON SCHEMA iris_authz TO {role}")
+            for fn in RUNTIME_FUNCTIONS:
+                cursor.execute(f"GRANT EXECUTE ON FUNCTION iris_authz.{fn} TO {role}")
+        # Django renews grants, so it alone may ask whether one verifies.
+        cursor.execute(
+            "GRANT EXECUTE ON FUNCTION iris_authz.verify_research_grant(text, text) TO iris_django_runtime"
+        )
