@@ -6,6 +6,8 @@
 
 This is the feature's first ADR. It replaces IR-121's decisions on types, posting and saving, and ADR-044's Q3 on saves.
 
+[ADR-051](051-system-admin-account-deletion-and-consent.md), Proposed 2026-11-01, would change two things here: the System Admin rather than RDCO would read these events in the Audit Log (decision 15), and the Call Requests page would sit at `/rdco/call-requests`, in a nav section named RDCO.
+
 ## Context
 
 Observed on `main`, 2026-11-01:

@@ -201,7 +201,7 @@ _Avoid_: Comments (the public thread), notes, chat.
 ### Comments
 
 **Comment**:
-A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or a system administrator may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
+A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or the [[System Admin]] may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
 _Avoid_: Public discussion (the ADR's name for the thread), post, review comment.
 
 **Comment report**:
@@ -241,7 +241,7 @@ Another account that shared a published paper with this person, as a co-owner, a
 _Avoid_: Co-author (a byline name, not an account), team member.
 
 **Contact person**:
-The one owner of a Record whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; the owners can choose another. Their email is shown only where a decision says so, never on their Profile.
+The one owner of a Record who gets its review emails, and whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; any owner can choose another. Their email is shown only where a decision says so, never on their Profile.
 _Avoid_: Representative, group leader, primary author (authors are byline names, not accounts).
 
 ### Downloads
@@ -289,9 +289,37 @@ Entering IRIS with an existing account's CIT-U email and password.
 _Avoid_: Login, log in, sign on.
 
 **Register**:
-Asking for an IRIS account as a Student or an [[Adviser]]. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request.
+Asking for an IRIS account as a Student or an [[Adviser]], with a CIT-U email address. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request. A registration nobody verifies is eventually deleted, and registering again replaces it.
 _Avoid_: Sign up, signup, create account (the screen's title, not the act).
 
 **Adviser**:
 The role of the person who reviews their advisees' Records first and routes them onward. It is a role someone asks for when they register, not a job title.
 _Avoid_: Faculty, faculty adviser, professor.
+
+**RDCO**:
+The highest office staff role. It runs the research workflow: it approves roles, manages accounts and office coordinators, and answers download and delete requests. It is not the [[System Admin]].
+_Avoid_: Admin, administrator.
+
+**System Admin**:
+The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments and publishing [[Notice]]s with RDCO. Nobody can ask for it; developers set up the first one.
+_Avoid_: Admin (on its own), administrator, superuser.
+
+**Account deletion**:
+Removing a person from IRIS at their own request, once the System Admin confirms it and nobody is waiting on them. Their personal details go and they can't sign in. A published paper keeps their name as an Author or as Adviser, and elsewhere they show as "Former user".
+_Avoid_: Closure, close account, deactivate.
+
+**Notice**:
+The text a person accepts to give Signup consent or Submission consent. RDCO or the System Admin publishes each new version by pasting it, and a published version never changes.
+_Avoid_: Terms, DPA terms, privacy policy (a document the university writes).
+
+**Signup consent**:
+A person's acceptance of the signup Notice, which having an account requires. Withdrawing it means Account deletion.
+_Avoid_: Consent (on its own), terms.
+
+**Submission consent**:
+An owner's acceptance of the submission Notice, which lets AI features use one paper. Any one owner can withdraw it, which stops AI use of the whole paper and leaves its review untouched.
+_Avoid_: Consent (on its own), DPA acceptance, Discoverable (a separate decision).
+
+**Retention period**:
+How long IRIS keeps one kind of personal data before erasing it for good. The System Admin enters it once the data protection officer approves it, and a blank period erases nothing.
+_Avoid_: Expiry, TTL.
