@@ -182,11 +182,11 @@ def _checked_space(provider: EmbeddingProvider, space_id: Optional[int] = None):
 def default_permits(record) -> Decision:
     """The real gate: ADR-015 §Security Impact, and the default everywhere here.
 
-    **Today it refuses every record**, because ``Record`` carries no embargo
-    field and an undetermined embargo is treated as an embargo — that is
-    IR-250, and it is the correct failure direction for a gate whose purpose
-    is to stop content leaving. Nothing in this module works around it: the way
-    around a fail-closed gate is to supply the missing fact.
+    **It refuses a record nobody has answered for**, because an undetermined
+    embargo is treated as an embargo (ADR-052 §3) — the correct failure direction
+    for a gate whose purpose is to stop content leaving. Nothing in this module
+    works around it: the way around a fail-closed gate is to supply the missing
+    fact.
 
     A named function rather than an inline import, so the default in both
     signatures below reads as "the gate" instead of as a lambda.

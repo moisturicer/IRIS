@@ -342,8 +342,8 @@ class Command(BaseCommand):
                     self.style.WARNING(
                         f"{report.config.label}: retrieval returned passages but "
                         f"the model would receive none. That is the disclosure "
-                        f"gate refusing every record — `Record` carries no "
-                        f"embargo field yet (IR-250). Use "
+                        f"gate refusing every record, usually because they carry "
+                        f"no embargo answer (ADR-052). Use "
                         f"AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT to measure "
                         f"meanwhile."
                     )

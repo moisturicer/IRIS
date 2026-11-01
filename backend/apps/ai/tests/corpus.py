@@ -168,11 +168,12 @@ class _SilentCutOffLLM(LLMProvider):
 def root_with(embedder=None, llm=None, resolver=None):
     """A root whose vendors are fakes and whose disclosure gate allows.
 
-    The gate is opened deliberately and explicitly. `Record` carries no
-    embargo field yet (IR-250), so the real predicate refuses everything, and
-    a test running under it would pass while asserting nothing — every
-    assertion about what comes back would be satisfied by an empty list. The
-    gate's own refusing behaviour is asserted in `apps/ai/policy/tests/`.
+    The gate is opened deliberately and explicitly. These records carry no
+    embargo answer (ADR-052), so the real predicate refuses them, and a test
+    running under it would pass while asserting nothing — every assertion about
+    what comes back would be satisfied by an empty list. The gate's own refusing
+    behaviour is asserted in `apps/ai/policy/tests/` and in
+    `test_embargo_every_way_out.py`.
 
     `resolver` defaults to `None`, which is *not* "no resolution" — it falls
     through to `CompositionRoot`'s own settings-driven default, exactly as an

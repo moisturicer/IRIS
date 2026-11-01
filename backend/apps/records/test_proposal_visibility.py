@@ -30,10 +30,10 @@ fixture, **including both Proposals**, gets a record vector and one chunk
 with its own vector, so what is actually being tested is the *visibility*
 predicate keeping a chunked, embedded Proposal out -- not merely that an
 unindexed one was never a candidate. The disclosure gate is opened for these
-requests (`root_with`, below): `Record` carries no embargo field yet
-(IR-250), so the real gate refuses every record and these tests would pass
-vacuously against an empty response otherwise. The gate's own refusal is
-exercised in `apps/ai/policy/tests/`.
+requests (`root_with`, below): these records carry no embargo answer (ADR-052),
+so the real gate would refuse them and these tests would pass vacuously against
+an empty response otherwise. The gate's own refusal is exercised in
+`apps/ai/policy/tests/`.
 """
 
 from django.core.cache import cache

@@ -127,8 +127,8 @@ def test_the_two_measures_are_not_the_same_number(corpus, reader, embedder):
 
 
 def test_the_disclosure_gate_shows_up_in_the_final_set_measure(corpus, reader, embedder):
-    """A gate refusing every record is the shipped configuration today (IR-250),
-    and it must be visible as a final-set number rather than as a silent zero."""
+    """A gate refusing every record is what a corpus with no embargo answers gets
+    (ADR-052), and it must be visible as a final-set number, not a silent zero."""
     report = run(
         _root(embedder, permits=lambda record: False),
         load_question_set(SYNTHETIC_SET),

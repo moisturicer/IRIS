@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Not built yet.
+**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it). The form, the acts, the reminders and the bypass's removal are still to come.
 
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
@@ -65,6 +65,10 @@ Development runs through IR-317's bypass, which refuses to start with `DEBUG` of
 15. **The migration leaves existing rows Unknown.** IRIS isn't deployed, so only demo and test papers exist, and no real paper is cleared by a default. Real papers imported later, under IR-278, stay Unknown until someone answers.
 16. **Test data answers the question itself.** `seed_demo` answers "no" for most papers and gives one demo paper a future date. `load_corpus` takes the same answer. The development database's 40 proxy papers are marked once.
 17. **IR-317's bypass is deleted in the same change:** the setting, its startup check, `index_with_disclosure_bypass` and the status flag, as ADR-015 requires.
+
+### Who can see it
+
+18. **Owners, the Adviser and office staff see an embargo's state and date on the record.** Other readers of a published paper don't, because that a paper is under an agreement isn't theirs to learn from it.
 
 ## Alternatives Considered
 

@@ -437,6 +437,21 @@ class IPType(models.TextChoices):
     UTILITY_MODEL = "utility_model", "Utility Model"
 
 
+class EmbargoState(models.TextChoices):
+    """
+    Where a paper's embargo stands (ADR-052 §3). `Record.embargo_state`.
+
+    Derived from the answer stored on the record, never stored itself, and read
+    by the disclosure gate. Only `NONE` and `RELEASED` let text reach an AI
+    company. A date never moves a paper out of `ACTIVE`: a person does (§9).
+    """
+
+    UNKNOWN = "unknown", "Not answered"
+    NONE = "none", "No embargo"
+    ACTIVE = "active", "Under embargo"
+    RELEASED = "released", "Embargo released"
+
+
 class RoleName(models.TextChoices):
     """
     Canonical `Role.name` values.
