@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
+import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
 import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip } from "./itemStatus";
@@ -31,6 +32,11 @@ interface ActionRequiredPanelProps {
  * tracker's document-request history. A withdrawn request is never shown: the
  * reviewer no longer needs it (IR-263).
  *
+ * An item's upload stays a compact button (spec §4.10 as amended
+ * 2026-10-06), not an `UploadDropzone`, yet behaves like one (IR-471): a
+ * progress bar while it runs, Retry with the same file after a failure, and
+ * one live region for the panel that announces each start and finish.
+ *
  * Each item reads in spec §4.10's one vocabulary (`itemStatus`): Requested,
  * Uploaded · awaiting review, Accepted, Replacement needed.
  *
@@ -43,6 +49,8 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  /** What the live region last said: an upload starting or finishing. */
+  const [announcement, setAnnouncement] = useState("");
   /** Ids of requests seen open since this panel mounted. */
   const seenOpen = useRef<Set<number>>(new Set());
 
@@ -96,8 +104,18 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
         <i className="fas fa-file-circle-exclamation text-xs" aria-hidden />
         {anyOpen ? "Action required" : "Requested documents"}
       </h2>
+      {/* Mounted with the panel, so the first announcement is heard (as UploadDropzone's is). */}
+      <span role="status" className="sr-only">
+        {announcement}
+      </span>
       {shown.map((r) => (
-        <RequestEntry key={r.id} recordId={recordId} request={r} onUploaded={uploaded} />
+        <RequestEntry
+          key={r.id}
+          recordId={recordId}
+          request={r}
+          onUploaded={uploaded}
+          announce={setAnnouncement}
+        />
       ))}
     </section>
   );
@@ -107,10 +125,12 @@ function RequestEntry({
   recordId,
   request,
   onUploaded,
+  announce,
 }: {
   recordId: number;
   request: DocumentRequest;
   onUploaded: () => Promise<void>;
+  announce: (message: string) => void;
 }) {
   const listId = useId();
   return (
@@ -143,6 +163,7 @@ function RequestEntry({
             item={item}
             asker={request.label}
             onUploaded={onUploaded}
+            announce={announce}
           />
         ))}
       </ul>
@@ -150,63 +171,108 @@ function RequestEntry({
   );
 }
 
+/** One row's upload, if any: under way, or failed and holding the file for Retry. */
+type RowUpload =
+  | { status: "uploading"; fileName: string; progress: number }
+  | { status: "failed"; file: File; error: string };
+
 function ItemRow({
   recordId,
   item,
   asker,
   onUploaded,
+  announce,
 }: {
   recordId: number;
   item: DocumentRequestItem;
   /** Who asked, as the server words it. */
   asker: string;
   onUploaded: () => Promise<void>;
+  announce: (message: string) => void;
 }) {
   const inputId = useId();
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [upload, setUpload] = useState<RowUpload | null>(null);
+  const uploading = upload?.status === "uploading";
 
-  const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    setError(null);
-    setUploading(true);
+  const rowRef = useRef<HTMLLIElement>(null);
+  const progressRef = useRef<HTMLSpanElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
+  /** Whether keyboard focus was in this row when the upload control was swapped out. */
+  const carryFocus = useRef(false);
+
+  const send = async (file: File) => {
+    const active = typeof document === "undefined" ? null : document.activeElement;
+    carryFocus.current = active != null && (rowRef.current?.contains(active) ?? false);
+    setUpload({ status: "uploading", fileName: file.name, progress: 0 });
+    announce(`Uploading ${file.name}`);
     try {
-      await documentsApi.uploadForRequestItem(recordId, item.id, file);
-      await onUploaded();
+      await documentsApi.uploadForRequestItem(recordId, item.id, file, {
+        onProgress: (progress) =>
+          setUpload((u) => (u?.status === "uploading" ? { ...u, progress } : u)),
+      });
     } catch (err) {
-      setError(errorDetail(err, "The upload failed. Please try again."));
-    } finally {
-      setUploading(false);
+      // The failure is announced by its own alert; saying it here too would say it twice.
+      announce("");
+      setUpload({
+        status: "failed",
+        file,
+        error: errorDetail(err, "The upload failed. Please try again."),
+      });
+      return;
     }
+    setUpload(null);
+    announce(`${file.name} uploaded`);
+    // Outside the try: the file is already sent, so a failed refresh must never offer Retry.
+    await onUploaded();
+  };
+
+  // Carry keyboard focus across each swap, as UploadDropzone does, instead of
+  // letting it fall to the page when the focused control leaves it.
+  const status = upload?.status;
+  useEffect(() => {
+    if (!carryFocus.current) return;
+    if (status === "uploading") progressRef.current?.focus();
+    else if (status === "failed") retryRef.current?.focus();
+    else {
+      rowRef.current?.focus();
+      carryFocus.current = false;
+    }
+  }, [status]);
+
+  const onFile = (file: File | undefined) => {
+    if (file) void send(file);
   };
 
   return (
-    <li className="py-2 first:pt-0 last:pb-0">
+    <li ref={rowRef} tabIndex={-1} className="py-2 first:pt-0 last:pb-0 focus:outline-none">
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <span className="text-sm font-semibold text-stone-800 min-w-0 break-words">
           {item.label}
         </span>
         <span className="flex items-center gap-2">
           <ItemStatusChip item={item} />
-          {item.state === "missing" && (
+          {item.state === "missing" && uploading && (
+            <CompactProgress
+              ref={progressRef}
+              fileName={upload.fileName}
+              progress={upload.progress}
+            />
+          )}
+          {item.state === "missing" && !uploading && (
             <label
               htmlFor={inputId}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light focus-within:ring-2 focus-within:ring-brand/40",
-                uploading && "opacity-60 pointer-events-none",
-              )}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light focus-within:ring-2 focus-within:ring-brand/40"
             >
               <i className="fas fa-upload text-2xs" aria-hidden />
-              {uploading ? "Uploading…" : "Upload"}
+              Upload
               <span className="sr-only"> {item.label}</span>
               <input
                 id={inputId}
                 type="file"
                 accept="application/pdf,.pdf"
                 className="sr-only"
-                disabled={uploading}
                 onChange={(e) => {
-                  void onFile(e.target.files?.[0]);
+                  onFile(e.target.files?.[0]);
                   e.target.value = "";
                 }}
               />
@@ -219,11 +285,60 @@ function ItemRow({
           {asker} did not accept your last upload: “{item.rejection_reason}”
         </p>
       )}
-      {error && (
-        <p role="alert" className="text-xs text-brand mt-1">
-          {error}
-        </p>
+      {upload?.status === "failed" && (
+        <div role="alert" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand">
+          <span className="break-words min-w-0">
+            {upload.file.name} could not be uploaded. {upload.error}
+          </span>
+          <button
+            ref={retryRef}
+            type="button"
+            onClick={() => void send(upload.file)}
+            aria-label={`Retry uploading ${upload.file.name}`}
+            className={cn(
+              "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg ring-1 ring-brand-200 font-bold hover:bg-brand-50",
+              FOCUS_RING,
+            )}
+          >
+            <i className="fas fa-rotate-right text-2xs" aria-hidden />
+            Retry
+          </button>
+        </div>
       )}
     </li>
   );
 }
+
+/**
+ * The row's progress, as compact as the button it replaces (spec §4.10 as
+ * amended 2026-10-06): a short bar and a percentage, not `UploadDropzone`'s panel.
+ */
+const CompactProgress = forwardRef<HTMLSpanElement, { fileName: string; progress: number }>(
+  function CompactProgress({ fileName, progress }, ref) {
+    const percent = Math.min(100, Math.max(0, Math.round(progress)));
+    return (
+      <span className="inline-flex items-center gap-2">
+        <span
+          ref={ref}
+          // Focusable from script only, so keyboard focus has somewhere to land.
+          tabIndex={-1}
+          role="progressbar"
+          aria-label={`Uploading ${fileName}`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={percent}
+          className={cn("block h-1.5 w-20 rounded-full bg-brand-100 overflow-hidden", FOCUS_RING)}
+        >
+          {/* Moved by transform, not width, as UploadDropzone's bar is. */}
+          <span
+            className="block h-full w-full origin-left rounded-full bg-brand transition-transform duration-200 motion-reduce:transition-none"
+            style={{ transform: `scaleX(${percent / 100})` }}
+          />
+        </span>
+        <span className="text-2xs font-semibold text-stone-600 tabular-nums" aria-hidden>
+          {percent}%
+        </span>
+      </span>
+    );
+  },
+);

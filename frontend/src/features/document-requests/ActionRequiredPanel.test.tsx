@@ -10,7 +10,8 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, waitFor, within } from "@/test/render";
+import { act } from "react";
+import { fireEvent, renderScreen, screen, waitFor, within } from "@/test/render";
 import type { DocumentRequest } from "@/types/records";
 
 import { ActionRequiredPanel } from "./ActionRequiredPanel";
@@ -23,8 +24,9 @@ vi.mock("@/api/records", () => ({
 }));
 vi.mock("@/api/documents", () => ({
   documentsApi: {
-    uploadForRequestItem: (recordId: number, itemId: number, file: File) =>
-      uploadForRequestItem(recordId, itemId, file),
+    uploadForRequestItem: (
+      recordId: number, itemId: number, file: File, options?: { onProgress?: (p: number) => void },
+    ) => uploadForRequestItem(recordId, itemId, file, options),
   },
 }));
 
@@ -102,12 +104,73 @@ describe("ActionRequiredPanel", () => {
     const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
     await user.upload(await screen.findByLabelText("Upload Ethics Clearance"), file);
 
-    await waitFor(() => expect(uploadForRequestItem).toHaveBeenCalledWith(RECORD_ID, 11, file));
+    await waitFor(() => expect(uploadForRequestItem).toHaveBeenCalledWith(RECORD_ID, 11, file, expect.anything()));
     await waitFor(() =>
       expect(screen.queryByLabelText("Upload Ethics Clearance")).not.toBeInTheDocument(),
     );
     const items = screen.getByRole("list", { name: /documents requested by IERC/i });
     expect(within(items).getAllByRole("listitem")[0]).toHaveTextContent("Uploaded");
+  });
+
+  it("shows an item's progress while it uploads, and offers no second upload", async () => {
+    const user = userEvent.setup();
+    documentRequests.mockResolvedValue({ data: [request()] });
+    let progress: ((percent: number) => void) | undefined;
+    let finish: (value: unknown) => void = () => {};
+    uploadForRequestItem.mockImplementation((_r, _i, _f, options) => {
+      progress = options?.onProgress;
+      return new Promise((resolve) => { finish = resolve; });
+    });
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
+    await user.upload(await screen.findByLabelText("Upload Ethics Clearance"), file);
+
+    const bar = await screen.findByRole("progressbar", { name: "Uploading ethics.pdf" });
+    expect(bar).toHaveAttribute("aria-valuenow", "0");
+    act(() => progress?.(42.4));
+    expect(bar).toHaveAttribute("aria-valuenow", "42");
+    // The row cannot start a second upload while this one runs.
+    expect(screen.queryByLabelText("Upload Ethics Clearance")).not.toBeInTheDocument();
+
+    await act(async () => finish({ data: {} }));
+    await waitFor(() =>
+      expect(screen.queryByRole("progressbar")).not.toBeInTheDocument(),
+    );
+  });
+
+  it("announces the start and the end of an upload", async () => {
+    const user = userEvent.setup();
+    documentRequests.mockResolvedValue({ data: [request()] });
+    let finish: (value: unknown) => void = () => {};
+    uploadForRequestItem.mockImplementation(
+      () => new Promise((resolve) => { finish = resolve; }),
+    );
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const status = await screen.findByRole("status");
+    expect(status).toBeEmptyDOMElement();
+
+    const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("Upload Ethics Clearance"), file);
+    await waitFor(() => expect(status).toHaveTextContent("Uploading ethics.pdf"));
+
+    await act(async () => finish({ data: {} }));
+    await waitFor(() => expect(status).toHaveTextContent("ethics.pdf uploaded"));
+  });
+
+  it("leaves a failure to its alert, rather than announcing it twice", async () => {
+    const user = userEvent.setup();
+    documentRequests.mockResolvedValue({ data: [request()] });
+    uploadForRequestItem.mockRejectedValue({ response: { data: { detail: "Too large." } } });
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const status = await screen.findByRole("status");
+    const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("Upload Ethics Clearance"), file);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Too large.");
+    expect(status).toBeEmptyDOMElement();
   });
 
   it("shows the request as fulfilled once the last item is uploaded", async () => {
@@ -146,6 +209,47 @@ describe("ActionRequiredPanel", () => {
     await user.upload(await screen.findByLabelText("Upload Ethics Clearance"), file);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Only PDF files are accepted.");
+  });
+
+  it("retries a failed upload with the same file, without choosing it again", async () => {
+    const user = userEvent.setup();
+    documentRequests.mockResolvedValue({ data: [request()] });
+    uploadForRequestItem
+      .mockRejectedValueOnce({ response: { data: { detail: "The server is busy." } } })
+      .mockResolvedValueOnce({ data: {} });
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
+    await user.upload(await screen.findByLabelText("Upload Ethics Clearance"), file);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("ethics.pdf could not be uploaded. The server is busy.");
+    await user.click(within(alert).getByRole("button", { name: "Retry uploading ethics.pdf" }));
+
+    await waitFor(() => expect(uploadForRequestItem).toHaveBeenCalledTimes(2));
+    expect(uploadForRequestItem.mock.calls[1].slice(0, 3)).toEqual([RECORD_ID, 11, file]);
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+  });
+
+  it("keeps keyboard focus in the row as the upload control gives way to progress and back", async () => {
+    documentRequests.mockResolvedValue({ data: [request()] });
+    let fail: (reason: unknown) => void = () => {};
+    uploadForRequestItem.mockImplementation(
+      () => new Promise((_resolve, reject) => { fail = reject; }),
+    );
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const input = await screen.findByLabelText("Upload Ethics Clearance");
+    const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
+    // A browser leaves focus on the input once its file chooser closes, which
+    // is the case this covers. user.upload blurs it to stand in for the
+    // chooser, so the change is fired on the focused input directly.
+    input.focus();
+    fireEvent.change(input, { target: { files: [file] } });
+
+    expect(await screen.findByRole("progressbar")).toHaveFocus();
+    await act(async () => fail({ response: { data: { detail: "Too large." } } }));
+    expect(await screen.findByRole("button", { name: "Retry uploading ethics.pdf" })).toHaveFocus();
   });
 
   it("renders the message as text, never as markup", async () => {
