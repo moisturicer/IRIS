@@ -2,31 +2,35 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
-import {
-  isStatusFolder,
-  STATUS_FOLDER_ICONS,
-  type Collection,
-  type ReadingVisit,
-  type StatusFolderId,
-} from "@/lib/recordLibrary";
+import type { ReadingStatus } from "@/api/library";
+import type { Collection, ReadingVisit } from "@/lib/recordLibrary";
+import { READING_STATUSES } from "@/store/library.store";
 import { cn, formatDate } from "@/lib/utils";
 
 /**
  * Which part of My Library the main column shows. `research` is the owner's
- * own records; the rest are this browser's saved reading. "folder" covers the
- * three reading-status folders and the reader's own folders alike: they
- * differ in how a record enters them, not in how they are read.
+ * own records. `saved` and `status` are the account's saves (IR-566,
+ * ADR-044); `folder` is one of the reader's own folders and `history` this
+ * browser's history, both still browser-only.
  */
 export type LibraryView =
   | { kind: "research" }
+  | { kind: "saved" }
+  | { kind: "status"; status: ReadingStatus }
   | { kind: "folder"; id: string }
-  | { kind: "starred" }
   | { kind: "history" };
 
 export function isSameView(a: LibraryView, b: LibraryView): boolean {
   if (a.kind !== b.kind) return false;
   if (a.kind === "folder" && b.kind === "folder") return a.id === b.id;
+  if (a.kind === "status" && b.kind === "status") return a.status === b.status;
   return true;
+}
+
+export function viewKey(view: LibraryView): string {
+  if (view.kind === "folder") return `folder:${view.id}`;
+  if (view.kind === "status") return `status:${view.status}`;
+  return view.kind;
 }
 
 interface ReadingPanelProps {
@@ -41,10 +45,11 @@ interface ReadingPanelProps {
 const RECENT = 3;
 
 /**
- * "Your reading": saved folders, liked papers and history, all stored in this
- * browser (IR-410). It stays beside the owner's research rather than behind a
- * tab, so saved reading is never hidden. Renaming and deleting a folder
- * happen in the folder's own view, not on hover here.
+ * "Your reading": saved papers by Reading status (account-backed, IR-566),
+ * the reader's own folders and history (still this browser's). It stays
+ * beside the owner's research rather than behind a tab, so saved reading is
+ * never hidden. Renaming and deleting a folder happen in the folder's own
+ * view, not on hover here.
  */
 export function ReadingPanel({ collections, history, view, onViewChange, onCreate }: ReadingPanelProps) {
   const [creating, setCreating] = useState(false);
@@ -65,7 +70,7 @@ export function ReadingPanel({ collections, history, view, onViewChange, onCreat
   const item = (target: LibraryView, label: string, icon: string) => {
     const active = isSameView(view, target);
     return (
-      <li key={target.kind === "folder" ? target.id : target.kind}>
+      <li key={viewKey(target)}>
         <button
           type="button"
           onClick={() => onViewChange(target)}
@@ -84,8 +89,6 @@ export function ReadingPanel({ collections, history, view, onViewChange, onCreat
     );
   };
 
-  const statusFolders = collections.filter((c) => isStatusFolder(c.id));
-  const ownFolders = collections.filter((c) => !isStatusFolder(c.id));
 
   return (
     <section
@@ -96,14 +99,16 @@ export function ReadingPanel({ collections, history, view, onViewChange, onCreat
       <h2 id="your-reading-title" className="font-display text-title font-semibold text-stone-900">
         Your reading
       </h2>
-      <p className="mt-0.5 text-small text-stone-600">Saved in this browser only.</p>
+      <p className="mt-0.5 text-small text-stone-600">Saved papers follow your account.</p>
 
-      <ul className="mt-4 space-y-0.5" aria-label="Saved folders">
-        {statusFolders.map((c) =>
-          item({ kind: "folder", id: c.id }, c.name, STATUS_FOLDER_ICONS[c.id as StatusFolderId] ?? "fa-folder"),
-        )}
-        {ownFolders.map((c) => item({ kind: "folder", id: c.id }, c.name, "fa-folder"))}
-        {item({ kind: "starred" }, "Liked papers", "fa-star")}
+      <ul className="mt-4 space-y-0.5" aria-label="Saved papers">
+        {item({ kind: "saved" }, "All saved", "fa-bookmark")}
+        {READING_STATUSES.map((s) => item({ kind: "status", status: s.value }, s.label, s.icon))}
+      </ul>
+
+      <h3 className="mt-4 px-3 text-label font-semibold text-stone-600">In this browser only</h3>
+      <ul className="mt-1 space-y-0.5" aria-label="Folders and history in this browser">
+        {collections.map((c) => item({ kind: "folder", id: c.id }, c.name, "fa-folder"))}
         {item({ kind: "history" }, "History", "fa-clock-rotate-left")}
       </ul>
 

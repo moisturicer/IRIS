@@ -7,6 +7,7 @@ import {
   setStoredRefreshToken,
 } from "@/lib/authStorage";
 import { __resetRefreshState, refreshOnce } from "@/lib/tokenRefresh";
+import { clearReadingHistory } from "@/lib/recordLibrary";
 import { REVIEWER_ROLES, STAFF_ROLES, type RoleName } from "@/lib/constants";
 
 interface AuthState {
@@ -45,6 +46,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   login: (user, access, refresh) => {
     setStoredRefreshToken(refresh);
+    // Reading history is this browser's, not the account's (ADR-044 Q2). A
+    // sign-in may follow someone who closed the tab without signing out, so
+    // their history must not greet the next person.
+    clearReadingHistory();
     // A sign-in is a new session even with no sign-out before it: `/login` has
     // no guard, so a signed-in account can open it and sign in as someone else
     // (IR-746). Anything still in flight for the session it replaces -- a token
@@ -66,6 +71,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     // sessionEpoch is what lets that caller notice and discard its result.
     __resetRefreshState();
     clearAuthSession();
+    clearReadingHistory();
     set((s) => ({
       user: null,
       accessToken: null,
@@ -89,6 +95,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   clearTokens: () => {
     __resetRefreshState();
     clearAuthSession();
+    clearReadingHistory();
     set((s) => ({
       accessToken: null,
       refreshToken: null,

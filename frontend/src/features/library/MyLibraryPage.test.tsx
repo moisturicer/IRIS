@@ -1,9 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { libraryApi, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
 import { recordsApi } from "@/api/records";
 import { useAuthStore } from "@/store/auth.store";
+import { useLibraryStore } from "@/store/library.store";
+import type { User } from "@/types/auth";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
-import type { MyResearchItem } from "@/types/records";
+import type { MyResearchItem, RecordListItem } from "@/types/records";
 import MyLibraryPage from "./MyLibraryPage";
 
 vi.mock("@/api/records", () => ({
@@ -12,6 +15,35 @@ vi.mock("@/api/records", () => ({
     list: vi.fn().mockResolvedValue({ data: { results: [] } }),
   },
 }));
+
+vi.mock("@/api/library", () => ({
+  libraryApi: {
+    saves: vi.fn(),
+    save: vi.fn(),
+    unsave: vi.fn(),
+  },
+}));
+
+type SavesResponse = Awaited<ReturnType<typeof libraryApi.saves>>;
+
+const paper = (id: number, title: string): RecordListItem => ({
+  id, title, abstract: "An abstract.", year_accomplished: 2026, classification_name: "Applied Research",
+  record_type_name: "Thesis/Research", pipeline_status: "published", is_ip: false, ip_type: "",
+  for_commercialization: false, community_extension: false, access_count: 0, file_count: 0,
+  created_at: "2026-09-01T08:00:00Z", authors: [{ id: 1, name: "Mateo Villanueva", role: null }],
+});
+
+const savedEntry = (record: RecordListItem, reading_status: ReadingStatus | null = null, saved_at = "2026-10-30T08:00:00Z"): SavedRecordEntry => ({
+  record_id: record.id, available: true, reading_status, saved_at, updated_at: saved_at, record,
+});
+
+const saves = (entries: SavedRecordEntry[]) =>
+  vi.mocked(libraryApi.saves).mockResolvedValue({ data: { results: entries } } as SavesResponse);
+
+/** A sign-in as `login` does it: a new session, so a new epoch. */
+function signIn(id: number, role = "Student") {
+  useAuthStore.getState().login({ id, email: `reader${id}@cit.edu`, role_name: role } as unknown as User, "access", "refresh");
+}
 
 type MineResponse = Awaited<ReturnType<typeof recordsApi.mine>>;
 
@@ -40,9 +72,12 @@ const section = (name: string) =>
 
 beforeEach(() => {
   localStorage.clear();
+  sessionStorage.clear();
   vi.clearAllMocks();
   mine([]);
-  useAuthStore.setState({ user: { role_name: "Student" } as NonNullable<ReturnType<typeof useAuthStore.getState>["user"]> });
+  saves([]);
+  vi.mocked(libraryApi.unsave).mockResolvedValue({ status: 204 } as Awaited<ReturnType<typeof libraryApi.unsave>>);
+  signIn(9);
 });
 
 describe("My Library: an author's research", () => {
@@ -160,25 +195,28 @@ describe("My Library: an author's research", () => {
 });
 
 describe("My Library: reading", () => {
-  it("keeps the reading panel beside the research, says it is this browser only, and opens a folder", async () => {
+  it("keeps the reading panel beside the research, says what follows the account, and opens a status", async () => {
     mine([ownRecord({})]);
     renderScreen(<MyLibraryPage />);
 
     await screen.findByRole("link", { name: "Community Water Monitoring" });
     const reading = screen.getByRole("region", { name: "Your reading" });
-    expect(within(reading).getByText("Saved in this browser only.")).toBeInTheDocument();
+    expect(within(reading).getByText("Saved papers follow your account.")).toBeInTheDocument();
+    expect(within(reading).getByRole("heading", { name: "In this browser only" })).toBeInTheDocument();
+    expect(within(reading).queryByText(/saved in this browser only/i)).not.toBeInTheDocument();
+    expect(within(reading).queryByRole("button", { name: /liked/i })).not.toBeInTheDocument();
 
     await userEvent.click(within(reading).getByRole("button", { name: "Want to read" }));
-    expect(screen.getByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Back to your research" }));
     expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
   });
 
-  it("defaults a non-author to Want to read and never fetches owned research", async () => {
-    useAuthStore.setState({ user: { role_name: "RDCO" } as NonNullable<ReturnType<typeof useAuthStore.getState>["user"]> });
+  it("defaults a non-author to All saved and never fetches owned research", async () => {
+    signIn(10, "RDCO");
     const { container } = renderScreen(<MyLibraryPage />);
 
-    expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Back to your research" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
@@ -188,6 +226,82 @@ describe("My Library: reading", () => {
   it("opens Saved directly from ?section=saved", async () => {
     renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
 
+    expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
+  });
+});
+
+describe("My Library: saves follow the account (IR-566)", () => {
+  const water = paper(41, "Rainwater Harvesting Survey");
+  const rice = paper(42, "Rice Husk Insulation Panels");
+
+  it("lists the account's saves, newest first, and files each under its Reading status", async () => {
+    saves([savedEntry(rice, "reading", "2026-10-31T08:00:00Z"), savedEntry(water, null, "2026-10-30T08:00:00Z")]);
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+
+    const links = await screen.findAllByRole("link", { name: /Rainwater|Rice Husk/ });
+    expect(links.map((l) => l.textContent)).toEqual([rice.title, water.title]);
+    expect(recordsApi.list).not.toHaveBeenCalled();
+
+    await userEvent.click(within(screen.getByRole("region", { name: "Your reading" })).getByRole("button", { name: "Reading" }));
+    expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
+  });
+
+  it("shows a save the reader can no longer read as unavailable, discloses nothing, and lets them remove it", async () => {
+    saves([savedEntry(water), { record_id: 77, available: false }]);
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+
+    expect(await screen.findByText(/1 saved paper is no longer available to you/)).toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /Rainwater/ })).toHaveLength(1);
+
+    await userEvent.click(screen.getByRole("button", { name: "Remove it" }));
+
+    expect(libraryApi.unsave).toHaveBeenCalledWith(77);
+    await waitFor(() => expect(screen.queryByText(/no longer available/)).not.toBeInTheDocument());
+  });
+
+  it("rolls a failed removal back where the reader can see it", async () => {
+    saves([savedEntry(water)]);
+    vi.mocked(libraryApi.unsave).mockRejectedValueOnce(new Error("offline"));
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+
+    await userEvent.click(await screen.findByRole("button", { name: `Remove from library: ${water.title}` }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(/could not remove this paper/i);
+    expect(screen.getByRole("link", { name: water.title })).toBeInTheDocument();
+  });
+
+  it("never shows one account's saves or history to the next account on the same browser", async () => {
+    saves([savedEntry(water, "want_to_read")]);
+    localStorage.setItem("iris_reading_history", JSON.stringify([{ recordId: water.id, title: water.title, viewedAt: "2026-10-31T08:00:00Z" }]));
+    const first = renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+    expect(await screen.findByRole("link", { name: water.title })).toBeInTheDocument();
+    first.unmount();
+
+    useAuthStore.getState().logout();
+    expect(useLibraryStore.getState().items).toEqual({});
+    expect(localStorage.getItem("iris_reading_history")).toBeNull();
+
+    saves([savedEntry(rice)]);
+    signIn(11);
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+
+    expect(await screen.findByRole("link", { name: rice.title })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: water.title })).not.toBeInTheDocument();
+    expect(screen.queryByText("Recently opened")).not.toBeInTheDocument();
+  });
+
+  it("leaves the old browser saves and stars untouched for the import (IR-579)", async () => {
+    const legacy = JSON.stringify([{ id: "want-to-read", name: "Want to read", recordIds: [water.id] }]);
+    localStorage.setItem("iris_record_collections", legacy);
+    localStorage.setItem("iris_starred_records", JSON.stringify([rice.id]));
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+
+    expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
+    await userEvent.click(within(screen.getByRole("region", { name: "Your reading" })).getByRole("button", { name: "Want to read" }));
+
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
+    expect(localStorage.getItem("iris_record_collections")).toBe(legacy);
+    expect(localStorage.getItem("iris_starred_records")).toBe(JSON.stringify([rice.id]));
   });
 });
