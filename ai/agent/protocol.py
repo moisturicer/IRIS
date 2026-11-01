@@ -123,6 +123,8 @@ class AgentRequest:
     instructions: str
     history: tuple[Entry, ...]
     tools: tuple[ToolSpec, ...] = ()
+    #: The completion cap sent, which admission reserved (IR-725).
+    max_output_tokens: int | None = None
 
 
 class IncompatibleContinuation(Exception):
