@@ -8,6 +8,11 @@ members. `--check` reports problems and changes nothing.
   key table and the columns verification needs.
 - `iris_ai_runtime` and `iris_django_runtime` may bind and read a verified
   identity; neither may read keys, own tables or bypass row security.
+  Both may SELECT the research tables of `apps.ai.grants.policy` and
+  nothing else in `public`; row security decides which rows (IR-718).
+
+`--force-row-security` is the cutover step: it FORCEs row security on
+those tables, so even their owner is filtered.
 """
 
 from django.core.management.base import BaseCommand, CommandError
@@ -81,6 +86,41 @@ def problems(cursor) -> list[str]:
         [VERIFIER],
     )
     found += [f"function iris_authz.{name} is not owned by {VERIFIER}" for (name,) in cursor.fetchall()]
+    found += _policy_problems(cursor)
+    return found
+
+
+def _policy_problems(cursor) -> list[str]:
+    """IR-718: every protected table is row-secured and read-only to runtime roles."""
+    found = []
+    cursor.execute(
+        """SELECT c.relname, c.relrowsecurity,
+                  EXISTS (SELECT 1 FROM pg_policy p
+                           WHERE p.polrelid = c.oid AND p.polname = 'iris_research_read')
+             FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace
+            WHERE n.nspname = 'public' AND c.relname = ANY(%s)""",
+        [list(PROTECTED_TABLES)],
+    )
+    rows = {name: (secured, policy) for name, secured, policy in cursor.fetchall()}
+    for table in PROTECTED_TABLES:
+        secured, policy = rows.get(table, (False, False))
+        if not secured:
+            found.append(f"{table} has no row security")
+        if not policy:
+            found.append(f"{table} has no iris_research_read policy")
+    for role in RUNTIME_ROLES:
+        cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = %s", [role])
+        if cursor.fetchone() is None:
+            continue
+        for table in PROTECTED_TABLES:
+            if table not in rows:
+                continue
+            cursor.execute(
+                "SELECT has_table_privilege(%s, %s, 'INSERT, UPDATE, DELETE, TRUNCATE')",
+                [role, f"public.{table}"],
+            )
+            if cursor.fetchone()[0]:
+                found.append(f"role {role} can write {table}")
     return found
 
 
@@ -89,8 +129,13 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--check", action="store_true", help="Report problems; change nothing.")
+        parser.add_argument(
+            "--force-row-security", action="store_true",
+            help="Also FORCE row security on research tables (cutover; IR-718). "
+                 "The application must no longer connect as their owner.",
+        )
 
-    def handle(self, *args, check=False, **options):
+    def handle(self, *args, check=False, force_row_security=False, **options):
         with connection.cursor() as cursor:
             if check:
                 found = problems(cursor)
@@ -108,10 +153,21 @@ class Command(BaseCommand):
                 raise CommandError("needs maintenance credentials with CREATEROLE (IR-717)")
             with transaction.atomic():
                 self._provision(cursor, superuser)
+                if force_row_security:
+                    self._force(cursor)
             found = problems(cursor)
             if found:
                 raise CommandError("; ".join(found))
         self.stdout.write("research roles provisioned")
+
+    def _force(self, cursor):
+        cursor.execute("SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user")
+        if not cursor.fetchone()[0]:
+            # FORCE would filter this maintenance login too.
+            raise CommandError("--force-row-security needs a superuser or BYPASSRLS maintenance login")
+        for table in PROTECTED_TABLES:
+            cursor.execute(f"ALTER TABLE public.{table} FORCE ROW LEVEL SECURITY")
+        self.stdout.write(f"row security forced on {len(PROTECTED_TABLES)} tables")
 
     def _provision(self, cursor, superuser):
         for role in (VERIFIER, *RUNTIME_ROLES):

@@ -79,8 +79,28 @@ REVOKE ALL ON FUNCTION iris_authz.research_record_ids() FROM PUBLIC;
 """
 
 
+#: A runtime login must never own or migrate research tables.
+REFUSE_RUNTIME_LOGIN = r"""
+DO $$
+DECLARE
+    role_name text;
+BEGIN
+    FOREACH role_name IN ARRAY ARRAY['iris_ai_runtime', 'iris_django_runtime'] LOOP
+        -- Superusers count as members of every role; they are maintenance.
+        IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = role_name)
+           AND NOT (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)
+           AND pg_has_role(current_user, role_name, 'MEMBER') THEN
+            RAISE EXCEPTION 'migrations must not run as a research runtime login (%)', role_name
+                USING ERRCODE = 'insufficient_privilege';
+        END IF;
+    END LOOP;
+END
+$$;
+"""
+
+
 def forward_sql() -> str:
-    parts = [FUNCTION]
+    parts = [REFUSE_RUNTIME_LOGIN, FUNCTION]
     for table, using in POLICIES.items():
         parts.append(f"ALTER TABLE public.{table} ENABLE ROW LEVEL SECURITY;")
         parts.append(

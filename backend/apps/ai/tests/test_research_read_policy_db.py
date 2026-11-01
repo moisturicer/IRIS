@@ -253,3 +253,79 @@ def test_every_protected_table_has_row_security_and_its_policy(db):
             """SELECT c.relname FROM pg_class c JOIN pg_policy p ON p.polrelid = c.oid
                 WHERE c.relrowsecurity AND p.polname = 'iris_research_read'""")
         assert {row[0] for row in cursor.fetchall()} == set(PROTECTED_TABLES)
+
+
+def test_the_role_check_reports_missing_row_security_and_runtime_write_privileges(grant_db):
+    from django.core.management import CommandError, call_command
+    from django.db import connection
+
+    call_command("provision_research_roles", "--check")
+    with connection.cursor() as cursor:
+        cursor.execute("ALTER TABLE public.ai_documentchunk DISABLE ROW LEVEL SECURITY")
+        cursor.execute("GRANT UPDATE ON public.records_record TO iris_ai_runtime")
+    try:
+        with pytest.raises(CommandError):
+            call_command("provision_research_roles", "--check")
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("ALTER TABLE public.ai_documentchunk ENABLE ROW LEVEL SECURITY")
+            cursor.execute("REVOKE UPDATE ON public.records_record FROM iris_ai_runtime")
+    # Provisioning repairs privileges, never row security, which is migrate's.
+    call_command("provision_research_roles", "--check")
+
+
+def test_problems_name_what_is_wrong(grant_db):
+    from django.db import connection
+
+    from apps.ai.management.commands.provision_research_roles import problems
+
+    with connection.cursor() as cursor:
+        cursor.execute("ALTER TABLE public.ai_documentchunk DISABLE ROW LEVEL SECURITY")
+        cursor.execute("GRANT DELETE ON public.records_author TO iris_django_runtime")
+        try:
+            found = problems(cursor)
+        finally:
+            cursor.execute("ALTER TABLE public.ai_documentchunk ENABLE ROW LEVEL SECURITY")
+            cursor.execute("REVOKE DELETE ON public.records_author FROM iris_django_runtime")
+    assert "ai_documentchunk has no row security" in found
+    assert "role iris_django_runtime can write records_author" in found
+
+
+def test_force_row_security_is_an_explicit_cutover_step(world):
+    from django.core.management import call_command
+    from django.db import connection
+
+    from apps.ai.grants.policy import PROTECTED_TABLES
+
+    def forced():
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT relname FROM pg_class WHERE relforcerowsecurity "
+                           "AND relname = ANY(%s)", [list(PROTECTED_TABLES)])
+            return {row[0] for row in cursor.fetchall()}
+
+    assert forced() == set()
+    call_command("provision_research_roles", "--force-row-security")
+    try:
+        assert forced() == set(PROTECTED_TABLES)
+        stranger = world["users"]["stranger"]
+        with probe_login("iris_ai_runtime") as conn:
+            grant = issue.reader_grant(stranger, owned_run(stranger)).token
+            assert read_as(conn, grant, "reader_run") == expected(stranger)
+    finally:
+        with connection.cursor() as cursor:
+            for table in PROTECTED_TABLES:
+                cursor.execute(f"ALTER TABLE public.{table} NO FORCE ROW LEVEL SECURITY")
+
+
+@pytest.mark.parametrize("group", ["iris_ai_runtime", "iris_django_runtime"])
+def test_the_migration_refuses_to_run_as_a_runtime_login(grant_db, group):
+    import importlib
+
+    import psycopg2
+
+    migration = importlib.import_module("apps.ai.migrations.0035_research_read_policy")
+    with probe_login(group) as conn:
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege, match="runtime"), \
+                conn.cursor() as cursor:
+            cursor.execute(migration.REFUSE_RUNTIME_LOGIN)
+        conn.rollback()
