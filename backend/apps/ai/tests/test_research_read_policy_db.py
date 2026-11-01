@@ -349,3 +349,30 @@ def test_an_authenticated_django_read_agrees_with_the_ai_side_read(world, client
                 absent = client.get(reverse("record-detail", args=[missing]))
                 assert hidden.status_code == absent.status_code == 404
                 assert hidden.json() == absent.json(), name
+
+
+def test_policy_tables_match_the_policies_postgres_holds(db):
+    from django.db import connection
+
+    from apps.ai.grants.policy import PROTECTED_TABLES
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT tablename, policyname, cmd FROM pg_policies WHERE schemaname = 'public'")
+        rows = cursor.fetchall()
+    assert {table for table, _, _ in rows} == set(PROTECTED_TABLES)
+    assert {(name, cmd) for _, name, cmd in rows} == {("iris_research_read", "SELECT")}
+
+
+@pytest.mark.parametrize("group", ["iris_ai_runtime", "iris_django_runtime"])
+def test_migrate_refuses_a_runtime_login_in_any_direction(grant_db, group):
+    from django.core.management import call_command
+    from django.db import connection
+
+    from .grant_support import connected_as, probe_credentials
+
+    with probe_credentials(group) as (name, password):
+        with connection.cursor() as cursor:
+            # Enough to reach migrate's own checks.
+            cursor.execute(f'GRANT SELECT ON django_migrations TO "{name}"')
+        with connected_as(name, password), pytest.raises(Exception, match="runtime login"):
+            call_command("migrate", "ai", verbosity=0)

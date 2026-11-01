@@ -48,3 +48,10 @@ class AiConfig(AppConfig):
         # The evidence rule set is read here and nowhere else, so a
         # `.env` edit cannot remove a requirement between two questions.
         load_rule_set()
+
+        from django.db.models.signals import pre_migrate
+
+        from apps.ai.grants.migration_guard import refuse_runtime_login
+
+        pre_migrate.connect(refuse_runtime_login, sender=self,
+                            dispatch_uid="ai.refuse_runtime_login")
