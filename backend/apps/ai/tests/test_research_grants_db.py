@@ -287,3 +287,63 @@ def test_key_rotation_overlaps_for_one_grant_lifetime_only(grant_db):
     with connection.cursor() as cursor:
         cursor.execute("SELECT array_agg(kid) FROM iris_authz.grant_key")
         assert cursor.fetchone()[0] == ["k2"]
+
+
+@pytest.fixture
+def maintenance_login(grant_db):
+    """A CREATEROLE, non-superuser login owning what provisioning touches."""
+    import secrets
+    import uuid
+
+    from django.db import connection
+
+    from apps.ai.management.commands.provision_research_roles import (
+        HELPER_FUNCTIONS, RUNTIME_ROLES, VERIFIER, VERIFIER_COLUMNS,
+    )
+    from apps.ai.grants.policy import PROTECTED_TABLES
+
+    name = f"iris_maint_{uuid.uuid4().hex[:10]}"
+    password = secrets.token_urlsafe(16)
+    with connection.cursor() as cursor:
+        cursor.execute(f'CREATE ROLE "{name}" LOGIN CREATEROLE PASSWORD %s', [password])
+        # What PostgreSQL 16 gives the creator of a role: ADMIN, no SET.
+        for role in (VERIFIER, *RUNTIME_ROLES):
+            cursor.execute(f'GRANT {role} TO "{name}" WITH ADMIN TRUE, INHERIT FALSE, SET FALSE')
+        cursor.execute(f'ALTER SCHEMA iris_authz OWNER TO "{name}"')
+        cursor.execute(f'ALTER TABLE iris_authz.grant_key OWNER TO "{name}"')
+        for fn in HELPER_FUNCTIONS:
+            cursor.execute(f'ALTER FUNCTION iris_authz.{fn} OWNER TO "{name}"')
+        for table in {*VERIFIER_COLUMNS, *PROTECTED_TABLES}:
+            cursor.execute(f'ALTER TABLE public.{table} OWNER TO "{name}"')
+    try:
+        yield name, password
+    finally:
+        connection.close()
+        with connection.cursor() as cursor:
+            cursor.execute(f'REASSIGN OWNED BY "{name}" TO CURRENT_USER')
+            cursor.execute(f'DROP OWNED BY "{name}"')
+            cursor.execute(f'DROP ROLE "{name}"')
+
+
+def test_provisioning_leaves_the_maintenance_login_outside_the_verifier(maintenance_login):
+    import psycopg2
+    from django.core.management import call_command
+    from django.db import connection
+
+    from .grant_support import connected_as
+
+    name, password = maintenance_login
+    with connected_as(name, password):
+        call_command("provision_research_roles")
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT pg_has_role(%s, 'iris_authz_verifier', 'SET'), "
+                       "pg_has_role(%s, 'iris_authz_verifier', 'USAGE')", [name, name])
+        assert cursor.fetchone() == (False, False)
+    params = connection.settings_dict
+    conn = psycopg2.connect(host=params["HOST"] or "localhost", port=params["PORT"] or "5432",
+                            dbname=params["NAME"], user=name, password=password)
+    try:
+        assert denied(conn, "SET ROLE iris_authz_verifier")
+    finally:
+        conn.close()

@@ -1,18 +1,13 @@
-"""Create the restricted research roles and hand the verifier to its own owner (IR-717).
+"""Create the restricted research roles (IR-717, IR-718).
 
-Run with maintenance credentials (CREATEROLE or superuser), after migrate.
-Idempotent. Roles are NOLOGIN groups; a deployment adds its own LOGIN
-members. `--check` reports problems and changes nothing.
+Run after migrate with maintenance credentials (CREATEROLE or superuser).
+Idempotent; `--check` changes nothing.
 
-- `iris_authz_verifier` owns the verifier functions and may read only the
-  key table and the columns verification needs.
-- `iris_ai_runtime` and `iris_django_runtime` may bind and read a verified
-  identity; neither may read keys, own tables or bypass row security.
-  Both may SELECT the research tables of `apps.ai.grants.policy` and
-  nothing else in `public`; row security decides which rows (IR-718).
+- `iris_authz_verifier` owns the verifier; reads keys and needed columns.
+- `iris_ai_runtime`, `iris_django_runtime`: bind identity, SELECT the
+  protected tables; no keys, no ownership, no RLS bypass.
 
-`--force-row-security` is the cutover step: it FORCEs row security on
-those tables, so even their owner is filtered.
+`--force-row-security` is the cutover: FORCE RLS on protected tables.
 """
 
 from django.core.management.base import BaseCommand, CommandError
@@ -23,6 +18,8 @@ from apps.ai.grants.policy import PROTECTED_TABLES
 VERIFIER = "iris_authz_verifier"
 RUNTIME_ROLES = ("iris_ai_runtime", "iris_django_runtime")
 ROLE_FLAGS = "NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"
+#: What a CREATEROLE login may reset; `problems()` checks the rest.
+NONSUPERUSER_FLAGS = "NOLOGIN NOCREATEROLE"
 
 DEFINER_FUNCTIONS = (
     "verify_research_grant(text, text)",
@@ -178,9 +175,9 @@ class Command(BaseCommand):
                     END IF;
                 END $$"""
             )
-            cursor.execute(f"ALTER ROLE {role} {ROLE_FLAGS}")
+            cursor.execute(f"ALTER ROLE {role} {ROLE_FLAGS if superuser else NONSUPERUSER_FLAGS}")
         if not superuser:
-            # Owner privileges are needed to hand the functions over.
+            # Needed to hand the functions over; revoked below.
             cursor.execute(f"GRANT {VERIFIER} TO current_user")
         cursor.execute(f"GRANT USAGE ON SCHEMA iris_authz, public TO {VERIFIER}")
         cursor.execute(f"GRANT SELECT ON iris_authz.grant_key TO {VERIFIER}")
@@ -203,3 +200,6 @@ class Command(BaseCommand):
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.verify_research_grant(text, text) TO iris_django_runtime"
         )
+        if not superuser:
+            # No standing way into the verifier's key read or RLS bypass.
+            cursor.execute(f"REVOKE {VERIFIER} FROM current_user")
