@@ -103,7 +103,7 @@ from apps.ai.models.queued import (
 )
 from apps.ai.orchestrator import ChatOrchestrator
 from apps.ai.providers.deadline import model_call_deadline
-from apps.records.models import Record
+from apps.ai.grants.reads import bound_run, research_records
 
 logger = logging.getLogger(__name__)
 
@@ -582,7 +582,8 @@ def _answer(attempt: AskRunAttempt) -> None:
     from apps.ai.controller.durable_budget import bind
 
     with bind(attempt), admission_scope.run(run_scope(run, attempt)), \
-            model_call_deadline(max(0.0, left)):
+            model_call_deadline(max(0.0, left)), bound_run(run):
+        # bound_run: database-mode reads use this run's grant (ADR-049 §6).
         _answer_run(attempt, run)
 
 
@@ -744,7 +745,7 @@ def _sse(sequence: int, name: str, data: dict) -> str:
 
 
 def _visible_ids(user, ids) -> set:
-    return set(Record.objects.visible_to(user).filter(pk__in=set(ids)).values_list("pk", flat=True))
+    return set(research_records(user).filter(pk__in=set(ids)).values_list("pk", flat=True))
 
 
 def _visible_candidates(user, data: dict) -> dict:
@@ -752,7 +753,7 @@ def _visible_candidates(user, data: dict) -> dict:
     their current titles. One that is not visible is simply absent (IR-546)."""
     rows = data["candidates"]
     titles = dict(
-        Record.objects.visible_to(user)
+        research_records(user)
         .filter(pk__in={row["record_id"] for row in rows}).values_list("pk", "title")
     )
     return {**data, "candidates": [

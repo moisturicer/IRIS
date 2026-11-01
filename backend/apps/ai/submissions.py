@@ -12,6 +12,7 @@ from uuid import UUID
 from rest_framework.response import Response
 
 from apps.ai.models import ChatSubmission
+from apps.ai.grants.reads import research_records
 
 
 def claim(data, prepared, *, max_sources):
@@ -62,10 +63,9 @@ def replay(submission, user, *, public):
     from apps.ai import public as public_protocol
     from apps.ai.conversations import turn_for_reader
     from apps.ai.presentation import record_card
-    from apps.records.models import Record
 
     body = turn_for_reader(submission.turn, user, public=public)
-    records = Record.objects.visible_to(user).filter(
+    records = research_records(user).filter(
         pk__in=[ref["id"] for ref in submission.source_refs],
     ).select_related("classification").prefetch_related("authors").in_bulk()
     body.update(turn_id=submission.turn_id, conversation_id=submission.conversation_id,

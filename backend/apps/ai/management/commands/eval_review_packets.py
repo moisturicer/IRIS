@@ -13,7 +13,7 @@ from django.core.management.base import BaseCommand, CommandError
 from apps.ai.evaluation.conversations import postdates_lock
 from apps.ai.evaluation.review_packets import build_packets, cited_ids
 from apps.ai.evaluation.runfile import load_json, write_json
-from apps.records.models import Record
+from apps.ai.grants.reads import research_records
 
 
 class Command(BaseCommand):
@@ -39,7 +39,7 @@ class Command(BaseCommand):
             if not postdates_lock((run.get("manifest") or {}).get("timestamp_utc"), lock):
                 raise CommandError("held-out output opens only after the lock froze its "
                                    "prompts and rubric; pass --lock and a later run")
-        readable = Record.objects.visible_to(user).filter(
+        readable = research_records(user).filter(
             pk__in=cited_ids(run)).values_list("pk", flat=True)
         bundle = build_packets(run, reviewer=options["reviewer_name"].strip(), readable=readable)
         write_json(options["out"], bundle)

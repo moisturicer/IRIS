@@ -8,7 +8,7 @@ from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 
 from apps.ai.overview import overview_for
-from apps.records.models import Record
+from apps.ai.grants.reads import research_records
 
 
 class AIOverviewThrottle(UserRateThrottle):
@@ -45,6 +45,6 @@ class RecordOverviewView(APIView):
     throttle_classes = [AIOverviewThrottle]
 
     def get(self, request, pk: int):
-        record = get_object_or_404(Record.objects.visible_to(request.user), pk=pk)
+        record = get_object_or_404(research_records(request.user), pk=pk)
         retry = request.query_params.get("retry", "").lower() == "true"
         return Response(overview_for(record, retry=retry))

@@ -56,6 +56,7 @@ from apps.ai.presentation import (
     passage,
     record_sources,
 )
+from apps.ai.grants.reads import research_records
 
 #: A plain abuse guard, and since IR-295 nothing more than that. It used to be
 #: load-bearing by accident: the frontend glued the whole transcript into the
@@ -707,7 +708,6 @@ class AIStatusView(APIView):
         from apps.ai.models import get_active_embedding_space
         from apps.ai.models.chunk import ChunkEmbedding
         from apps.ai.policy.bypass import bypass_enabled
-        from apps.records.models import Record
 
         try:
             space = get_active_embedding_space()
@@ -718,7 +718,7 @@ class AIStatusView(APIView):
 
         indexed_records = 0
         if space is not None:
-            visible = Record.objects.visible_to(request.user).values("pk")
+            visible = research_records(request.user).values("pk")
             indexed_records = (
                 ChunkEmbedding.objects.filter(
                     space=space,
