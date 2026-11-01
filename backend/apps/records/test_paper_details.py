@@ -32,19 +32,20 @@ class PaperDetailsTests(DecisionTestBase):
     def details(self, record, viewer):
         return self.detail(record, viewer)["paper_details"]
 
-    def test_rdco_reads_registration_affiliations_but_not_an_unrelated_review(self):
+    def test_rdco_reads_registration_affiliations_and_the_review_it_holds(self):
         record = self.routed(Party.ITSO)
-        details = self.details(record, self.rdco)
+        # RDCO holds every record its Adviser sent (ADR-047), so its members
+        # take part in the review, seated or not.
+        details = self.details(record, self.rdco2)
         self.assertEqual(details["colleges"], ["College of Computer Studies"])
         self.assertEqual(details["programs"], ["BS Computer Science"])
         self.assertEqual(details["researchers"][0]["program"], self.course.name)
         self.assertEqual(details["researchers"][0]["email"], self.owner.email)
-        self.assertIsNone(details["participants"])
-        self.assertIsNone(details["due_dates"])
+        self.assertIsNotNone(details["participants"])
 
     def test_nonparticipant_sees_no_registration_affiliations_or_review_material(self):
         record = self.at_adviser()
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
         details = self.details(record, self.reader)
         self.assertIsNone(details["colleges"])
         self.assertIsNone(details["programs"])
@@ -94,7 +95,7 @@ class PaperDetailsTests(DecisionTestBase):
         self.assertEqual([p["id"] for p in details["researchers"]], [self.owner.pk])
         people = details["participants"]
         self.assertEqual([p["id"] for p in people],
-                         [self.owner.pk, self.adviser.pk, self.itso.pk, self.itso2.pk])
+                         [self.owner.pk, self.adviser.pk, self.rdco.pk, self.itso.pk, self.itso2.pk])
         reviewers = [p for p in people if p["office"] == "ITSO"]
         self.assertEqual([p["name"] for p in reviewers], ["Ian Reviewer", "Ian Reviewer"])
         for person in reviewers:
@@ -114,7 +115,7 @@ class PaperDetailsTests(DecisionTestBase):
         seat.state = SeatState.WITHDRAWN
         seat.save(update_fields=["state"])
         people = self.details(record, self.owner)["participants"]
-        self.assertEqual([p["id"] for p in people], [self.owner.pk, self.adviser.pk])
+        self.assertEqual([p["id"] for p in people], [self.owner.pk, self.adviser.pk, self.rdco.pk])
 
     def test_flags_are_adr018_office_hints_and_deadlines_keep_paused_and_overdue(self):
         record = self.routed(Party.ITSO, Party.IERC)
@@ -152,7 +153,7 @@ class PaperDetailsTests(DecisionTestBase):
 
     def test_inactive_adviser_is_not_given_picker_contact_fields(self):
         record = self.at_adviser()
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
         self.adviser.is_active = False
         self.adviser.save(update_fields=["is_active"])
         adviser = self.details(record, self.reader)["adviser"]

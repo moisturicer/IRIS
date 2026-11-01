@@ -196,7 +196,7 @@ def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
         assert (_active(final), _completed(final)) == ({"rdco"}, {"intake", "ierc"})
 
         assert (_active(by_office), _completed(by_office)) == ({"ierc", "ktto"}, {"intake", "itso"})
-        request = ResubmissionRequest.objects.get(record_id=by_office.pk)
+        request = _model(_AFTER, "ResubmissionRequest").objects.get(record_id=by_office.pk)
         assert (request.party, request.state, request.review_id) == ("ierc", "open", ierc_decline.pk)
         held = _assignments().get(pk=request.assignment_id)
         assert held.party == "ierc" and held.state == "active"
@@ -205,7 +205,7 @@ def test_the_backfill_writes_the_section6_rows_and_invents_no_routing():
 
         # A decline at intake is Intake's request, and Intake was never passed.
         assert (_active(at_intake), _completed(at_intake)) == ({"intake"}, set())
-        assert ResubmissionRequest.objects.get(record_id=at_intake.pk).review_id == intake_decline.pk
+        assert _model(_AFTER, "ResubmissionRequest").objects.get(record_id=at_intake.pk).review_id == intake_decline.pk
 
         # Terminal: one completed row per distinct stage, dated from its reviews.
         assert _active(published) == set()

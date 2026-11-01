@@ -149,7 +149,7 @@ class ToReviewTests(MyReviewsTestBase):
     def test_a_routed_row_says_who_routed_it_and_why(self):
         self.routed(Party.ITSO)
         row = self.rows(self.itso, tab="to_review")[0]
-        self.assertEqual(row["routed_by"], self.adviser.get_full_name())
+        self.assertEqual(row["routed_by"], self.rdco.get_full_name())
         self.assertEqual(row["routed_reason"], "Possible patentable mechanism.")
         self.assertIsNotNone(row["waiting_since"])
 
@@ -331,7 +331,7 @@ class DoneTests(MyReviewsTestBase):
         self.opened(self.seat(record, Party.ITSO, self.itso))
         self.office_review(record, self.itso, "cleared")
         rdco = self.assignment(record, Party.RDCO)
-        ReviewerSeat.objects.create(assignment=rdco, reviewer=self.rdco, source=SeatSource.CLAIMED)
+        rdco.seats.get(reviewer=self.rdco)
         response = self.route(record, self.rdco, [{"party": Party.ITSO}])
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.opened(self.seat(record, Party.ITSO, self.itso))

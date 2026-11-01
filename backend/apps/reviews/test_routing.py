@@ -98,12 +98,21 @@ class RoutingTestBase(APITestCase):
         assignment = RecordAssignment.objects.get(
             record=record, party=party, state=AssignmentState.ACTIVE,
         )
+        if party == Party.RDCO:
+            existing = assignment.seats.filter(reviewer=reviewer).first()
+            if existing:
+                return existing
         return ReviewerSeat.objects.create(
             assignment=assignment, reviewer=reviewer, source=SeatSource.CLAIMED,
         )
 
     def accepted_to(self, record, *parties):
-        response = self.accept(record, [{"party": p} for p in parties])
+        """Reach office review through the real Adviser -> RDCO -> office path."""
+        response = self.accept(record, [{"party": Party.RDCO, "nominees": [self.rdco.pk]}])
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        if parties == (Party.RDCO,):
+            return response
+        response = self.route(record, self.rdco, [{"party": p} for p in parties], reason="Possible patentable mechanism.")
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         return response
 
@@ -153,14 +162,14 @@ class EntryTests(RoutingTestBase):
 
 class AcceptAndRouteTests(RoutingTestBase):
 
-    def test_the_adviser_accepts_and_routes_to_two_offices(self):
+    def test_the_adviser_sends_to_rdco_which_requests_two_offices(self):
         record = self.new_model()
 
         with self.captureOnCommitCallbacks(execute=True):
             response = self.accepted_to(record, Party.ITSO, Party.IERC)
 
         # Both offices hold it, in their pools.
-        self.assertEqual(self.active(record), {Party.ITSO, Party.IERC})
+        self.assertEqual(self.active(record), {Party.RDCO, Party.ITSO, Party.IERC})
         for party in (Party.ITSO, Party.IERC):
             assignment = RecordAssignment.objects.get(
                 record=record, party=party, state=AssignmentState.ACTIVE,
@@ -173,10 +182,10 @@ class AcceptAndRouteTests(RoutingTestBase):
             m for m in response.data["routing_history"] if m["from"] == Party.ADVISER
         ]
         self.assertEqual(len(from_adviser), 1)
-        self.assertEqual(set(from_adviser[0]["to"]), {Party.ITSO, Party.IERC})
+        self.assertEqual(set(from_adviser[0]["to"]), {Party.RDCO})
         self.assertEqual(
             [(m["from"], m["to"]) for m in response.data["routing_history"]],
-            [(None, [Party.ADVISER]), (Party.ADVISER, from_adviser[0]["to"])],
+            [(None, [Party.ADVISER]), (Party.ADVISER, [Party.RDCO]), (Party.RDCO, [Party.ITSO, Party.IERC])],
         )
         # The Adviser's turn is over, and the record is still in review.
         adviser = RecordAssignment.objects.get(record=record, party=Party.ADVISER)
@@ -207,26 +216,18 @@ class AcceptAndRouteTests(RoutingTestBase):
 
     def test_a_nominee_is_seated(self):
         record = self.new_model()
-
         with self.captureOnCommitCallbacks(execute=True):
-            response = self.accept(record, [{"party": Party.ITSO, "nominee": self.itso.pk}])
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        seat = ReviewerSeat.objects.get(assignment__record=record, assignment__party=Party.ITSO)
-        self.assertEqual(
-            (seat.reviewer, seat.source, seat.assigned_by),
-            (self.itso, SeatSource.NOMINATED, self.adviser),
-        )
-        self.assertTrue(Notification.objects.filter(record=record, recipient=self.itso).exists())
-        # It went to the nominee, not the pool: ITSO is not told its pool has work.
-        self.assertFalse(
-            Notification.objects.filter(record=record, broadcast_to_role__name=RoleName.ITSO).exists()
-        )
+            response = self.accept(record, [{"party": Party.RDCO, "nominees": [self.rdco.pk]}])
+        self.assertEqual(response.status_code, 200, response.data)
+        seat = ReviewerSeat.objects.get(assignment__record=record, assignment__party=Party.RDCO)
+        self.assertEqual((seat.reviewer, seat.source, seat.assigned_by), (self.rdco, SeatSource.NOMINATED, self.adviser))
+        self.assertTrue(Notification.objects.filter(record=record, recipient=self.rdco).exists())
+        self.assertFalse(Notification.objects.filter(record=record, broadcast_to_role__name=RoleName.RDCO).exists())
 
     def test_a_nominee_who_does_not_staff_the_office_is_refused_and_nothing_is_written(self):
         record = self.new_model()
 
-        response = self.accept(record, [{"party": Party.ITSO, "nominee": self.ierc.pk}])
+        response = self.accept(record, [{"party": Party.RDCO, "nominees": [self.ierc.pk]}])
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertEqual(self.active(record), {Party.ADVISER})
@@ -265,7 +266,7 @@ class OnwardRoutingTests(RoutingTestBase):
         response = self.route(self.record, self.itso, [{"party": Party.KTTO}])
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(self.active(self.record), {Party.ITSO, Party.KTTO})
+        self.assertEqual(self.active(self.record), {Party.RDCO, Party.ITSO, Party.KTTO})
         self.assertEqual(
             RoutingEvent.objects.filter(record=self.record, from_party=Party.ITSO).count(), 1,
         )
@@ -277,7 +278,7 @@ class OnwardRoutingTests(RoutingTestBase):
         self.assertEqual(again.status_code, status.HTTP_400_BAD_REQUEST, again.data)
 
         self.ktto2 = make_user("route-ktto2@cit.edu", RoleName.KTTO)
-        with_nominee = self.route(self.record, self.itso, [{"party": Party.KTTO, "nominee": self.ktto2.pk}])
+        with_nominee = self.route(self.record, self.itso, [{"party": Party.KTTO, "nominees": [self.ktto2.pk]}])
         self.assertEqual(with_nominee.status_code, status.HTTP_200_OK, with_nominee.data)
         self.assertEqual(
             RecordAssignment.objects.filter(record=self.record, party=Party.KTTO).count(), 1,
@@ -311,7 +312,6 @@ class OnwardRoutingTests(RoutingTestBase):
         self.assertEqual(ierc_turn.state, AssignmentState.COMPLETED)
 
     def test_an_rdco_seat_holder_routes_to_an_office(self):
-        RecordAssignment.objects.create(record=self.record, party=Party.RDCO)
         self.seat(self.record, Party.RDCO, self.rdco)
 
         response = self.route(self.record, self.rdco, [{"party": Party.KTTO}])
@@ -333,7 +333,7 @@ class RefusalTests(RoutingTestBase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
 
     def test_targets_outside_the_graph_are_refused(self):
-        for target in (Party.ADVISER, Party.RDCO, Party.INTAKE, "nonsense"):
+        for target in (Party.ADVISER, Party.ITSO, Party.IERC, Party.KTTO, Party.INTAKE, "nonsense"):
             with self.subTest(target=target):
                 response = self.accept(self.record, [{"party": target}])
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
@@ -381,20 +381,13 @@ class RefusalTests(RoutingTestBase):
 
 class RoutingOptionsTests(RoutingTestBase):
 
-    def test_the_adviser_sees_three_offices_their_members_and_the_authors_hint(self):
+    def test_the_adviser_sees_only_rdco_and_its_members(self):
         record = self.new_model(requested_itso=True)
         self.client.force_authenticate(self.adviser)
-
         data = self.client.get(options_url(record)).data
-
         self.assertEqual((data["from_party"], data["accept"]), (Party.ADVISER, True))
-        by_party = {t["party"]: t for t in data["targets"]}
-        self.assertEqual(set(by_party), {Party.ITSO, Party.IERC, Party.KTTO})
-        self.assertEqual(
-            {m["id"] for m in by_party[Party.ITSO]["members"]}, {self.itso.pk, self.itso2.pk},
-        )
-        self.assertIsNotNone(by_party[Party.ITSO]["author_hint"])
-        self.assertIsNone(by_party[Party.IERC]["author_hint"])
+        self.assertEqual([t["party"] for t in data["targets"]], [Party.RDCO])
+        self.assertEqual({m["id"] for m in data["targets"][0]["members"]}, {self.rdco.pk})
 
     def test_someone_who_cannot_route_gets_no_picklist(self):
         record = self.new_model()
@@ -408,13 +401,13 @@ class RoutingOptionsTests(RoutingTestBase):
         self.client.force_authenticate(self.adviser)
         self.assertEqual(
             self.client.get(detail).data["routing"],
-            {"accept_and_route": True, "route_as": None, "targets": []},
+            {"send_to_rdco": True, "route_as": None, "targets": []},
         )
 
         self.accepted_to(record, Party.ITSO)
         self.seat(record, Party.ITSO, self.itso)
         self.client.force_authenticate(self.adviser)
-        self.assertFalse(self.client.get(detail).data["routing"]["accept_and_route"])
+        self.assertFalse(self.client.get(detail).data["routing"]["send_to_rdco"])
         self.client.force_authenticate(self.itso)
         routing = self.client.get(detail).data["routing"]
         self.assertEqual(routing["route_as"], Party.ITSO)

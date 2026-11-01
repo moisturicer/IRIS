@@ -99,7 +99,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
 
     def published(self):
         record = self.at_adviser()
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
         return record
 
     def proposal_with_adviser(self):
@@ -191,8 +191,8 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         return {
             "tag_ip": lambda r, u, d: self._call(u, "patch", url("record-tags", r), {"ip_type": "patent"}),
             "attach_file": attach,
-            "accept_route": lambda r, u, d: self._call(u, "post", url("record-accept-and-route", r), {
-                "to": [{"party": Party.IERC}], "reason": "Ethics review.",
+            "send_to_rdco": lambda r, u, d: self._call(u, "post", url("record-accept-and-route", r), {
+                "to": [{"party": Party.RDCO}], "reason": "Institutional review.",
             }),
             "route": lambda r, u, d: self._call(u, "post", url("record-route", r), {
                 "to": [{"party": Party.KTTO}], "reason": "Commercial potential.",
@@ -251,7 +251,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # routing and ITSO after clearing.
     TAKES_PART = {"cite", "comment_review"}
     ADVISER_AT_ENTRY = {
-        "cite", "open_review", "accept_route", "accept_publish", "reject",
+        "cite", "open_review", "send_to_rdco", "reject",
         "request_document", "request_revision", "comment_review",
     }
     ITSO_SEATED = {
@@ -260,6 +260,9 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     }
     # An owner is offered the one delete its record's status names (IR-508).
     OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"}
+    RDCO_SEATED = {"cite", "tag_ip", "attach_file", "request_document", "open_review",
+                   "add_reviewer", "route", "comment_review", "request_revision",
+                   "accept_publish", "keep_unlisted", "reject"}
     EXPECTED = {
         "draft": {
             "owner": {"cite", "continue_draft", "edit_details", "delete_record"}, "adviser": {"cite"},
@@ -278,17 +281,17 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         "itso_pool": {
             "owner": OWNER_IN_REVIEW, "adviser": TAKES_PART,
             "itso": {"cite", "tag_ip", "attach_file", "request_document"},
-            "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         "itso_open": {
             "owner": OWNER_IN_REVIEW, "adviser": TAKES_PART, "itso": ITSO_SEATED | {"request_revision"},
-            "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         # ITSO asked once, so it is offered the withdrawal, not a second ask.
         "revision_asked_by_itso": {
             "owner": OWNER_IN_REVIEW | {"create_version", "replace_manuscript", "edit_details"},
             "adviser": TAKES_PART, "itso": ITSO_SEATED | {"withdraw_revision"},
-            "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         # RDCO decides, and -- seated on an office party -- may add a colleague.
         "rdco_open": {
@@ -303,7 +306,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         "published": {
             "owner": {"cite", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": {"cite"},
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review"}, "stranger": {"cite"},
         },
         # A Proposal's Adviser accepts it or rejects it; it is never routed.
         "proposal_with_adviser": {

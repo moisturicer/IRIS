@@ -237,7 +237,8 @@ class SeedDemoRecordTests(TestCase):
                 record.reviews.count(), 1,
                 f"{record.title} is published with no review history behind it",
             )
-            self.assertEqual(record.reviews.first().stage, "adviser")
+            # Only RDCO publishes (ADR-047 §5).
+            self.assertTrue(record.reviews.filter(stage="rdco", status="approved").exists())
 
     def test_submitted_records_carry_dpa_consent(self):
         """The seed must not manufacture records that skipped the consent gate.
@@ -303,7 +304,7 @@ class SeedDemoRecordTests(TestCase):
             with self.subTest(state=state):
                 self.assertIn(state, states, f"no seeded seat is {state}")
 
-    def test_one_specialist_path_thesis_waits_in_rdcos_pool(self):
+    def test_one_specialist_path_thesis_has_rdcos_review_open(self):
         """
         IR-270: reached through the real acts -- the Adviser's accept & route,
         ITSO's clearance and the hand-back -- so RDCO's decisions can be demoed.
@@ -317,7 +318,7 @@ class SeedDemoRecordTests(TestCase):
             {("adviser", "completed"), ("itso", "completed"), ("rdco", "active")},
         )
         rdco = RecordAssignment.objects.get(record=record, party="rdco")
-        self.assertFalse(rdco.seats.exists(), "RDCO's pool should be unclaimed")
+        self.assertEqual(rdco.seats.get().state, "in_review")
         self.assertEqual(
             RecordClearance.objects.get(record=record, office=Office.ITSO).status,
             ClearanceStatus.CLEARED,

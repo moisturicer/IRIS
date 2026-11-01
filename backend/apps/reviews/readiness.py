@@ -23,7 +23,7 @@ from typing import Optional
 
 from django.utils import dateformat, timezone
 
-from core.enums import AssignmentState, DocumentRequestState, ResubmissionRequestState, SeatState
+from core.enums import AssignmentState, DocumentRequestState, Party, ResubmissionRequestState, SeatState
 
 from .models import RecordAssignment
 from .seats import _label, _name
@@ -80,7 +80,7 @@ def readiness_facts(record, user) -> dict:
             "party": assignment.party,
             "label": _label(assignment.party),
             "opened_at": assignment.opened_at.isoformat() if assignment.opened_at else None,
-            "seats": [{"reviewer": s.reviewer_id, "name": _name(s.reviewer), "state": s.state}
+            "seats": [{"reviewer": s.reviewer_id, "name": _name(s.reviewer) if s.reviewer else None, "state": s.state}
                       for s in live],
             **deadline_payload(assignment, user),
         })
@@ -118,10 +118,11 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
             party=unopened["party"], action=_action("open_review", unopened["id"]),
         ))
 
-    # The revision block lists its open requests under the request state's name.
+    overridden_revisions = {r["id"] for r in (decision.get("closes") or {}).get("revision_requests", [])}
+    # Decision's owner names the requests it may override; Readiness consumes that fact.
     for request in revision.get(ResubmissionRequestState.OPEN.value) or []:
         # Any open request blocks a Decision; an office only by its own.
-        blocks = deciding or request["party"] == office
+        blocks = (deciding and request["id"] not in overridden_revisions) or request["party"] == office
         items.append(_item(
             "revision_request", BLOCKER if blocks else INFO,
             f"{request['label']} asked the author for a revision.",
@@ -193,7 +194,12 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
     items.sort(key=lambda i: i["severity"] != BLOCKER)
     if deciding:
         verdict = "blocked" if blocked else "ready"
-        headline = "You can't decide yet." if blocked else "Ready for your Decision."
+        headline = (
+            "You can't decide yet." if blocked
+            # RDCO need not wait for the offices (ADR-047 §5).
+            else "RDCO can decide at any time." if decision.get("party") == Party.RDCO
+            else "Ready for your Decision."
+        )
     elif office:
         verdict = "blocked" if blocked else "waiting_on_you"
         headline = (f"{office_review['label']} can't finish yet." if blocked

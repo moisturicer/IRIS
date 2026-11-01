@@ -1,6 +1,6 @@
 """
-The Adviser accepts & publishes or rejects a Thesis/Project; RDCO decides
-specialist-path records (IR-270).
+The Adviser sends a Thesis/Project to RDCO or rejects it; only RDCO publishes and
+decides it (IR-270, ADR-047).
 
 ADR-032 §3 and §11, ADR-021 §12, at the REST seam IR-255 confirmed. One class
 per acceptance criterion, then the decisions settled in the 2026-10-09
@@ -71,6 +71,12 @@ class DecisionTestBase(RevisionTestBase):
         record.refresh_from_db()
         return response
 
+    def publish_via_rdco(self, record, comment=""):
+        """The only way to publish: the Adviser sends it to RDCO, which publishes it (ADR-047)."""
+        self.accepted_to(record, Party.RDCO)
+        self.opened_seat(record, Party.RDCO, self.rdco)
+        return self.decided(record, self.rdco, "publish", comment)
+
     def at_adviser(self, type_name=RecordTypeName.THESIS_RESEARCH, **extra):
         """A new-model record, its Adviser's seat opened."""
         record = self.new_model(type_name, **extra)
@@ -88,7 +94,7 @@ class DecisionTestBase(RevisionTestBase):
         rdco = RecordAssignment.objects.get(
             record=record, party=Party.RDCO, state=AssignmentState.ACTIVE,
         )
-        seat = seats.claim(rdco, self.rdco)
+        seat = rdco.seats.get(reviewer=self.rdco)
         seats.open_review(seat, self.rdco)
         return record
 
@@ -104,33 +110,54 @@ class DecisionTestBase(RevisionTestBase):
         return self.client.get(reverse("record-detail", args=[record.pk])).status_code == 200
 
 
-# --- AC: the Adviser publishes ------------------------------------------------------
+# --- AC: only RDCO publishes (ADR-047 §5) -------------------------------------------------
 
-class AdviserPublishesTests(DecisionTestBase):
+class OnlyRdcoPublishesTests(DecisionTestBase):
 
-    def test_published_and_no_rdco_assignment_was_ever_created(self):
+    def test_the_adviser_may_not_publish_a_thesis_or_project(self):
+        for type_name in (RecordTypeName.THESIS_RESEARCH, RecordTypeName.PROJECT):
+            with self.subTest(type_name):
+                record = self.at_adviser(type_name)
+
+                response = self.decide(record, self.adviser, "publish")
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+                self.assertIn("RDCO", response.data["detail"])
+                record.refresh_from_db()
+                self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+                self.assertFalse(Review.objects.filter(record=record, stage=Party.ADVISER).exists())
+
+    def test_the_adviser_is_offered_send_and_reject_never_publish(self):
+        record = self.at_adviser()
+        detail = self.detail(record, self.adviser)
+
+        self.assertEqual(detail["decision"]["outcomes"], ["reject"])
+        self.assertIn("send_to_rdco", detail["capabilities"])
+        self.assertIn("reject", detail["capabilities"])
+        self.assertNotIn("accept_publish", detail["capabilities"])
+
+    def test_rdco_publishes_once_the_adviser_sends_it(self):
         record = self.at_adviser()
 
-        self.decided(record, self.adviser, "publish", COMMENT)
+        self.publish_via_rdco(record, COMMENT)
 
         self.assertEqual(record.pipeline_status, PipelineStatus.PUBLISHED)
-        self.assertFalse(RecordAssignment.objects.filter(record=record, party=Party.RDCO).exists())
-        review = Review.objects.get(record=record, stage=Party.ADVISER)
+        review = Review.objects.get(record=record, stage=Party.RDCO)
         self.assertEqual(
             (review.status, review.reviewed_by, review.comment),
-            (ReviewDecision.APPROVED, self.adviser, COMMENT),
+            (ReviewDecision.APPROVED, self.rdco, COMMENT),
         )
-        self.assertEqual(review.version.number, 1)
-        assignment = RecordAssignment.objects.get(record=record, party=Party.ADVISER)
-        self.assertEqual(assignment.state, AssignmentState.COMPLETED)
-        self.assertEqual(assignment.closed_by_decision, review)
-        self.assertEqual(assignment.seats.get().state, SeatState.DONE)
+        rdco = RecordAssignment.objects.get(record=record, party=Party.RDCO)
+        self.assertEqual(rdco.state, AssignmentState.COMPLETED)
+        self.assertEqual(rdco.closed_by_decision, review)
+        adviser = RecordAssignment.objects.get(record=record, party=Party.ADVISER)
+        self.assertEqual(adviser.state, AssignmentState.COMPLETED)
 
     def test_any_signed_in_user_finds_it_in_discover_and_can_open_it(self):
         record = self.at_adviser()
         self.assertFalse(self.listed(record, self.reader))
 
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
 
         self.assertTrue(self.listed(record, self.reader))
         self.assertTrue(self.readable(record, self.reader))
@@ -139,15 +166,15 @@ class AdviserPublishesTests(DecisionTestBase):
 
     def test_a_comment_is_optional(self):
         record = self.at_adviser()
-        self.decided(record, self.adviser, "publish")
-        self.assertEqual(Review.objects.get(record=record, stage=Party.ADVISER).comment, "")
+        self.publish_via_rdco(record)
+        self.assertEqual(Review.objects.get(record=record, stage=Party.RDCO).comment, "")
 
     def test_my_reviews_files_it_under_published(self):
         """IR-268's hand-off (Jira comment 10581)."""
         record = self.at_adviser()
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
 
-        self.client.force_authenticate(self.adviser)
+        self.client.force_authenticate(self.rdco)
         published = self.client.get(MINE, {"tab": "done", "outcome": "published"}).data["rows"]
         accepted = self.client.get(MINE, {"tab": "done", "outcome": "accepted"}).data["rows"]
         self.assertEqual([r["record"] for r in published], [record.pk])
@@ -195,14 +222,14 @@ class AdviserRejectsTests(DecisionTestBase):
         self.assertIn("RDCO", response.data["detail"])
 
 
-# --- AC: the Adviser cannot publish after routing --------------------------------------
+# --- AC: the Adviser cannot decide after sending to RDCO --------------------------------------
 
 class AfterRoutingTests(DecisionTestBase):
 
-    def test_once_accepted_and_routed_the_adviser_may_not_publish(self):
+    def test_once_sent_to_rdco_the_adviser_may_not_reject(self):
         record = self.routed(Party.ITSO)
 
-        response = self.decide(record, self.adviser, "publish")
+        response = self.decide(record, self.adviser, "reject", REASON)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertIn("RDCO", response.data["detail"])
@@ -393,7 +420,7 @@ class OpenWorkClosesTests(DecisionTestBase):
             requested_by=self.adviser, message="The signed approval sheet.",
         )
 
-        self.decided(record, self.adviser, "publish")
+        self.decided(record, self.adviser, "reject", REASON)
 
         request.refresh_from_db()
         self.assertEqual(request.state, DocumentRequestState.WITHDRAWN)
@@ -403,17 +430,14 @@ class OpenWorkClosesTests(DecisionTestBase):
 
 class RevisionOpenTests(DecisionTestBase):
 
-    def test_deciding_with_an_open_revision_request_is_refused_and_explained(self):
+    def test_rdco_can_decide_over_its_own_open_revision_request(self):
         record = self.at_rdco()
-        self.asked(record, self.rdco)
-
-        for outcome, comment in (("publish", ""), ("keep_unlisted", ""), ("reject", REASON)):
-            with self.subTest(outcome=outcome):
-                response = self.decide(record, self.rdco, outcome, comment)
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-                self.assertIn("Waiting on the author", response.data["detail"])
-        record.refresh_from_db()
-        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+        request = self.asked(record, self.rdco)
+        response = self.decide(record, self.rdco, "publish")
+        self.assertEqual(response.status_code, 200, response.data)
+        request.refresh_from_db()
+        self.assertEqual(request.state, "withdrawn")
+        self.assertIsNotNone(request.closed_by_decision_id)
 
 
 # --- AC: refusals ------------------------------------------------------------------------
@@ -455,7 +479,7 @@ class RefusalTests(DecisionTestBase):
 
     def test_an_unopened_seat_is_refused(self):
         record = self.new_model()
-        response = self.decide(record, self.adviser, "publish")
+        response = self.decide(record, self.adviser, "reject", REASON)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("Open the review first", response.data["detail"])
 
@@ -485,13 +509,13 @@ class RefusalTests(DecisionTestBase):
     def test_a_decided_record_cannot_be_decided_again(self):
         record = self.at_adviser()
         token = self.token(record, self.adviser)
-        self.decided(record, self.adviser, "publish")
+        self.decided(record, self.adviser, "reject", REASON)
 
         response = self.decide(record, self.adviser, "reject", REASON, token=token)
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         record.refresh_from_db()
-        self.assertEqual(record.pipeline_status, PipelineStatus.PUBLISHED)
+        self.assertEqual(record.pipeline_status, PipelineStatus.REJECTED)
 
 
 # --- decision 11: a stale dialog never decides into a changed state ----------------------
@@ -535,7 +559,7 @@ class StaleTests(DecisionTestBase):
             record=record, party=Party.ADVISER, assignment=self.assignment(record, Party.ADVISER),
             requested_by=self.adviser, message="The approval sheet.",
         )
-        response = self.decide(record, self.adviser, "publish", token=token)
+        response = self.decide(record, self.adviser, "reject", REASON, token=token)
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
 
 
@@ -546,16 +570,16 @@ class DetailFlagTests(DecisionTestBase):
     def flag(self, record, user):
         return self.detail(record, user)["decision"]
 
-    def test_the_adviser_is_offered_publish_and_reject_with_the_authors_hints(self):
+    def test_the_adviser_is_offered_only_reject_with_the_authors_hints(self):
         record = self.at_adviser(requested_itso=True)
 
         flag = self.flag(record, self.adviser)
 
-        self.assertEqual(flag["outcomes"], ["publish", "reject"])
+        self.assertEqual(flag["outcomes"], ["reject"])
         self.assertEqual(flag["party"], Party.ADVISER)
         self.assertIsNone(flag["blocked"])
         self.assertTrue(flag["token"])
-        self.assertEqual(flag["closes"], {"assignments": [], "document_requests": 0})
+        self.assertEqual(flag["closes"], {"assignments": [], "document_requests": 0, "revision_requests": [], "findings": []})
         self.assertEqual(flag["author_hints"], ["The author flagged possible intellectual property."])
 
     def test_rdco_is_offered_all_three_and_told_what_closes(self):
@@ -580,7 +604,7 @@ class DetailFlagTests(DecisionTestBase):
     def test_an_unopened_seat_is_offered_but_blocked(self):
         record = self.new_model()
         flag = self.flag(record, self.adviser)
-        self.assertEqual(flag["outcomes"], ["publish", "reject"])
+        self.assertEqual(flag["outcomes"], ["reject"])
         self.assertEqual(flag["blocked"], "Open the review first.")
 
     def test_an_open_revision_request_blocks_with_its_reason(self):
@@ -591,7 +615,7 @@ class DetailFlagTests(DecisionTestBase):
     def test_nobody_else_is_offered_a_decision(self):
         record = self.routed(Party.ITSO)
         self.opened_seat(record, Party.ITSO, self.itso)
-        for user in (self.owner, self.itso, self.adviser, self.rdco):
+        for user in (self.owner, self.itso, self.adviser):
             with self.subTest(user=user.email):
                 flag = self.flag(record, user)
                 self.assertEqual(flag["outcomes"], [])

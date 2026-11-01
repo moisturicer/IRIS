@@ -2,8 +2,10 @@
 
 ## Status
 
-**Proposed** — 2026-10-11 (IR-528), awaiting human approval. If accepted, this
-decision supersedes [ADR-037](037-migrate-on-container-boot.md).
+**Accepted** — 2026-11-01 by Lee Jasmin Adolfo, the project lead, as relayed by
+Hermoine Zozobrado. Proposed 2026-10-11 (IR-528). This decision supersedes
+[ADR-037](037-migrate-on-container-boot.md). It is already built: IR-528 put the
+`migrate` service in both Compose files.
 
 ## Context
 

@@ -54,21 +54,21 @@ def submitted(record, actor, *, to_party) -> None:
     _write(AuditEvent.SUBMITTED, actor, record, to_party=str(to_party), version=_version(record))
 
 
-def routed(record, actor, *, from_party, to_party, opened, group, nominee=None, hand_back=False):
+def routed(record, actor, *, from_party, to_party, opened, group, nominees=()):
     """
     One routing movement, one row per target. `opened` is true when the target
     got a new assignment -- the start of its clock -- and false when the
-    target already held the record and only a nominee was seated. The
-    hand-back to RDCO is a movement nobody made: no actor, `hand_back` true.
+    target already held the record and nominees were seated. `hand_back`
+    remains false in new events; historical events keep their original flag.
     """
     _write(
         AuditEvent.ROUTED, actor, record,
         from_party=str(from_party) if from_party else None,
         to_party=str(to_party),
         opened=bool(opened),
-        nominee=getattr(nominee, "pk", None),
+        nominees=[n.pk for n in nominees],
         group=str(group),
-        hand_back=bool(hand_back),
+        hand_back=False,
     )
 
 
@@ -160,6 +160,8 @@ def revision_request_withdrawn(request, actor, *, closed_by=BY_REQUESTING_PARTY)
     _write(
         AuditEvent.REVISION_REQUEST_WITHDRAWN, actor, request.record,
         party=str(request.party), request=request.pk, closed_by=closed_by,
+        closed_by_decision=closed_by == BY_DECISION,
+        decision=request.closed_by_decision_id,
     )
 
 

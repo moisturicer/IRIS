@@ -503,7 +503,7 @@ class RestartAllTests(NewVersionTestBase):
         self.assertEqual(itso_assignment.state, AssignmentState.ACTIVE)
         self.assertIsNone(itso_assignment.closed_at)
         self.assertEqual(self.seat_state(record, Party.IERC, self.ierc), SeatState.IN_REVIEW)
-        self.assertEqual(self.active(record), {Party.ITSO, Party.IERC})
+        self.assertEqual(self.active(record), {Party.RDCO, Party.ITSO, Party.IERC})
         self.assertEqual(RecordAssignment.objects.filter(record=record, party=Party.ITSO).count(), 1)
         self.assertEqual(len(self.versions(record)), 2)
         self.assertFalse(self.open_requests(record).exists())
@@ -564,7 +564,7 @@ class RestartAllTests(NewVersionTestBase):
         ktto.refresh_from_db()
         self.assertEqual(ktto.state, SeatState.IN_REVIEW)
         self.assertIsNotNone(ktto.opened_at)
-        self.assertEqual(self.active(record), {Party.ITSO, Party.IERC, Party.KTTO})
+        self.assertEqual(self.active(record), {Party.RDCO, Party.ITSO, Party.IERC, Party.KTTO})
         self.assertEqual(RecordAssignment.objects.filter(record=record, party=Party.KTTO).count(), 1)
 
     def test_the_record_still_reaches_a_decision(self):
@@ -573,12 +573,12 @@ class RestartAllTests(NewVersionTestBase):
         self.submitted(record)
 
         self.cleared(record, self.itso)
-        self.assertFalse(self.rdco_assignments(record).exists())  # IERC still reviewing
+        self.assertTrue(self.rdco_assignments(record).exists())  # RDCO holds it while IERC reviews
         self.cleared(record, self.ierc)
         rdco = RecordAssignment.objects.get(
             record=record, party=Party.RDCO, state=AssignmentState.ACTIVE,
         )
-        seats.open_review(seats.claim(rdco, self.rdco), self.rdco)
+        seats.open_review(rdco.seats.get(reviewer=self.rdco), self.rdco)
         token = self.detail(record, self.rdco)["decision"]["token"]
         response = self.post(
             decide_url(record), self.rdco, {"outcome": "publish", "comment": "", "token": token},
@@ -611,7 +611,7 @@ class ClearanceAwareReopensNobodyElseTests(NewVersionTestBase):
         itso_assignment.refresh_from_db()
         self.assertEqual(itso_assignment.state, AssignmentState.COMPLETED)
         self.assertEqual(self.seat_state(record, Party.ITSO, self.itso), SeatState.DONE)
-        self.assertEqual(self.active(record), {Party.IERC})
+        self.assertEqual(self.active(record), {Party.RDCO, Party.IERC})
         self.assertEqual(self.clearance(record, Party.ITSO), ClearanceStatus.CLEARED)
 
     def test_the_owner_is_told_only_the_requester_reviews_again(self):

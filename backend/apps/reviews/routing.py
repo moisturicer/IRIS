@@ -7,7 +7,7 @@ and tests all call `enter_at_adviser()`.
 
 **Two acts, one core.**
 
-- *Accept & route* (the record's Adviser, Thesis/Research or Project only)
+- *Accept & send to RDCO* (the record's Adviser, Thesis/Research or Project only)
   accepts the work -- an `approved` `Review` at stage `adviser` -- finishes the
   Adviser's seat, which completes the Adviser's assignment, and routes.
 - *Route* (an office or RDCO seat holder) sends the record onward; the
@@ -17,11 +17,11 @@ Both go through `_plan()` then `_apply()`: everything that can refuse is
 checked before anything is written, so a refusal leaves no trace.
 
 **Routing into a pool.** A target office gets an active assignment with no
-seat -- its pool -- unless the router nominated a member, who is seated
+seat -- its pool -- unless the router nominated members, who are seated
 (`source=nominated`). A pending `RecordClearance` is created for a clearing
 office that has none; an existing one, `cleared` included, is never reset
 (ADR-021 §6, kept by ADR-032 §4). A target already holding the record is
-refused unless a nominee is named, in which case only the seat is added: a
+refused unless nominees are named, in which case only those Seats are added: a
 route never silently does nothing.
 
 Refusals: `RoutingRefused` is a 403 (who may act), `RoutingError` a 400 (what
@@ -58,10 +58,9 @@ from core.permissions import OFFICE_PARTY_BY_ROLE, holds_seat, is_office_member
 from . import seats
 from .models import RecordAssignment, RecordClearance, Review, ReviewerSeat, RoutingEvent
 
-#: ADR-032 §4's party graph: who may route to whom. Nothing routes to the
-#: Adviser or to RDCO -- RDCO is opened by the hand-back (IR-269), never by hand.
+#: ADR-047: the Adviser sends to RDCO; offices request specialist reviews.
 ROUTE_TARGETS = {
-    str(Party.ADVISER): (str(Party.ITSO), str(Party.IERC), str(Party.KTTO)),
+    str(Party.ADVISER): (str(Party.RDCO),),
     str(Party.ITSO): (str(Party.IERC), str(Party.KTTO)),
     str(Party.IERC): (str(Party.ITSO), str(Party.KTTO)),
     str(Party.KTTO): (str(Party.ITSO), str(Party.IERC)),
@@ -190,15 +189,15 @@ def _route_as(record, user):
 
 def routing_flags(record, user) -> dict:
     """
-    What record detail tells Paper View (IR-261): whether to offer *Accept &
-    route…*, and the party *Route to office…* acts as. A rendering hint; the
+    What record detail tells Paper View: whether to offer *Accept & send
+    to RDCO…*, and the party *Route to office…* acts as. A rendering hint; the
     endpoints re-check both.
     """
     if user is None or not getattr(user, "is_authenticated", False):
-        return {"accept_and_route": False, "route_as": None, "targets": []}
+        return {"send_to_rdco": False, "route_as": None, "targets": []}
     route_as = _route_as(record, user)
     return {
-        "accept_and_route": _may_accept_and_route(record, user),
+        "send_to_rdco": _may_accept_and_route(record, user),
         "route_as": route_as,
         # Where *Request review* may send it (IR-685): the sidebar lists these
         # and keeps no table of its own, so a new party graph needs no release.
@@ -272,11 +271,13 @@ def route_options(record, user) -> dict:
                 _HINT_TEXT[party] if hint_field and getattr(record, hint_field, False) else None
             ),
         })
+    sent = record.routing_events.filter(from_party=Party.ADVISER, to_party=Party.RDCO).order_by("-created_at", "-pk").first()
     return {
         "from_party": from_party,
         "from_label": _label(from_party),
         "accept": accepting,
         "targets": targets,
+        "suggested_offices": sent.suggested_offices if sent else [],
     }
 
 
@@ -285,7 +286,7 @@ def route_options(record, user) -> dict:
 @dataclass
 class _Target:
     party: str
-    nominee: object = None
+    nominees: list = field(default_factory=list)
     assignment: RecordAssignment | None = None
 
 
@@ -294,11 +295,12 @@ class _Plan:
     from_party: str
     reason: str
     targets: list[_Target] = field(default_factory=list)
+    suggested_offices: list[str] = field(default_factory=list)
 
 
 def _plan(record, from_party, to, reason) -> _Plan:
     """Validate a routing request completely, writing nothing."""
-    reason = (reason or "").strip()
+    reason = reason.strip() if isinstance(reason, str) else ""
     if not reason:
         raise RoutingError("Give a reason for routing, so the office knows why it was asked.")
     if not isinstance(to, list) or not to:
@@ -324,26 +326,37 @@ def _plan(record, from_party, to, reason) -> _Plan:
             raise RoutingError(f"{_label(party)} is listed twice.")
         seen.add(party)
 
-        nominee = None
-        nominee_id = entry.get("nominee")
-        if nominee_id not in (None, ""):
+        nominee_ids = entry.get("nominees", [])
+        if not isinstance(nominee_ids, list):
+            raise RoutingError("Choose officers as a list of member IDs.")
+        nominees = []
+        seen_members = set()
+        for nominee_id in nominee_ids:
             try:
+                if isinstance(nominee_id, bool) or not isinstance(nominee_id, int):
+                    raise ValueError
                 nominee = User.objects.filter(pk=int(nominee_id), is_active=True).first()
             except (TypeError, ValueError):
                 nominee = None
             if nominee is None or not is_office_member(nominee, party):
                 raise RoutingError(f"The nominee is not a member of {_label(party)}.")
+            if nominee.pk in seen_members:
+                raise RoutingError("An officer is listed twice.")
+            seen_members.add(nominee.pk)
+            nominees.append(nominee)
+        if "nominee" in entry:
+            raise RoutingError("Use nominees, a list of officers, instead of nominee.")
 
         held = active.get(party)
         if held is not None:
-            if nominee is None:
+            if not nominees:
                 raise RoutingError(
                     f"{_label(party)} already has this record. Nominate someone to add "
                     f"a reviewer, or ask a seat holder there to add one."
                 )
-            if held.seats.exclude(state=SeatState.WITHDRAWN).filter(reviewer=nominee).exists():
+            if held.seats.exclude(state=SeatState.WITHDRAWN).filter(reviewer__in=nominees).exists():
                 raise RoutingError(f"The nominee already holds a seat at {_label(party)}.")
-        plan.targets.append(_Target(party=party, nominee=nominee, assignment=held))
+        plan.targets.append(_Target(party=party, nominees=nominees, assignment=held))
     return plan
 
 
@@ -366,15 +379,16 @@ def _apply(record, actor, plan: _Plan) -> list[_Target]:
                     record=record, office=target.party,
                     defaults={"status": ClearanceStatus.PENDING},
                 )
-        if target.nominee is not None:
-            seats.nominate(target.assignment, actor, target.nominee)
+        for nominee in target.nominees:
+            seats.nominate(target.assignment, actor, nominee)
         RoutingEvent.objects.create(
             record=record, actor=actor, from_party=plan.from_party,
             to_party=target.party, reason=plan.reason, group_id=group, created_at=now,
+            suggested_offices=plan.suggested_offices,
         )
         audit.routed(
             record, actor, from_party=plan.from_party, to_party=target.party,
-            opened=opens, group=group, nominee=target.nominee,
+            opened=opens, group=group, nominees=target.nominees,
         )
     return opened
 
@@ -390,8 +404,8 @@ def _notify(record, actor, plan, opened, *, accepted):
         target_labels=[_label(p) for p in targets],
         # An office whose router named a nominee is not told its pool has work:
         # the record went straight to that person (decided 2026-10-08).
-        opened_parties=[t.party for t in opened if t.nominee is None],
-        nominees=[(t.nominee, _label(t.party)) for t in plan.targets if t.nominee is not None],
+        opened_parties=[t.party for t in opened if not t.nominees],
+        nominees=[(n, _label(t.party)) for t in plan.targets for n in t.nominees],
         reason=plan.reason,
         accepted=accepted,
     ))
@@ -421,10 +435,9 @@ def _seat_errors_as_routing_errors(act):
 
 
 @transaction.atomic
-def accept_and_route(record, actor, *, to, reason):
+def accept_and_route(record, actor, *, to, reason, suggested_offices=None):
     """
-    The Adviser accepts the work and routes it to one or more offices
-    (ADR-032 §3). The Adviser's review is an `approved` `Review` carrying the
+    The Adviser accepts the work and sends it to RDCO (ADR-047). The Adviser's review is an `approved` `Review` carrying the
     reason; their seat is done, so their assignment completes. The record stays
     `in_review`.
     """
@@ -432,12 +445,16 @@ def accept_and_route(record, actor, *, to, reason):
 
     record = _locked(record)
     from_party = _from_party_for(record, actor, accepting=True)
-    # Accepting is a decision, refused while any revision request is open
-    # (ADR-032 §11, IR-272). Routing alone is not.
+    # Acceptance completes the Adviser’s turn, so it waits for revisions.
+    # Office-to-office requests do not complete a turn.
     blocked = decision_blocked_reason(record)
     if blocked:
         raise RoutingError(blocked)
     plan = _plan(record, from_party, to, reason)
+    suggestions = [] if suggested_offices is None else suggested_offices
+    if not isinstance(suggestions, list) or any(not isinstance(p, str) or p not in _CLEARING_OFFICES for p in suggestions):
+        raise RoutingError("Suggested offices must be ITSO, IERC or KTTO.")
+    plan.suggested_offices = list(dict.fromkeys(suggestions))
 
     adviser_seat = (
         ReviewerSeat.objects.select_related("assignment")

@@ -106,7 +106,7 @@ const record: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
-  routing: { accept_and_route: false, route_as: null, targets: [] },
+  routing: { send_to_rdco: false, route_as: null, targets: [] },
   office_review: { party: null, label: null, blocked: null, assignment: null },
   revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
@@ -163,7 +163,7 @@ const approvedProposal: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
-  routing: { accept_and_route: false, route_as: null, targets: [] },
+  routing: { send_to_rdco: false, route_as: null, targets: [] },
   office_review: { party: null, label: null, blocked: null, assignment: null },
   revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
@@ -456,7 +456,7 @@ const inReview: RecordDetail = {
   can_request_document: [],
   my_seats: [],
   is_participant: false,
-  routing: { accept_and_route: false, route_as: null, targets: [] },
+  routing: { send_to_rdco: false, route_as: null, targets: [] },
   office_review: { party: null, label: null, blocked: null, assignment: null },
   revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
   decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
@@ -2029,7 +2029,7 @@ describe("the Review section (IR-412)", () => {
   });
 
   it.each([
-    { role: "Adviser", party: "adviser", capabilities: ["accept_publish", "accept_route", "reject"], primary: "Accept & publish…" },
+    { role: "Adviser", party: "adviser", capabilities: ["send_to_rdco", "reject"], primary: "Accept & send to RDCO…" },
     { role: "ITSO", party: "itso", capabilities: ["office_review", "request_revision", "route"], primary: "Clear…" },
     { role: "RDCO", party: "rdco", capabilities: ["accept_publish", "keep_unlisted", "reject"], primary: "Accept & publish…" },
   ] as const)("keeps one filled footer action for $role from its granted actions (IR-681)", async ({ role, party, capabilities, primary }) => {
@@ -2308,20 +2308,20 @@ describe("the Review section (IR-412)", () => {
     workspaceAt(1600);
     vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [partyRow("itso", "ITSO")] } } as never);
     shownRecord = { ...inReview, ...reviewing, capabilities: ["route"],
-      routing: { accept_and_route: false, route_as: "itso", targets: [{ party: "ierc", label: "IERC" }, { party: "ktto", label: "KTTO" }] } };
+      routing: { send_to_rdco: false, route_as: "itso", targets: [{ party: "ierc", label: "IERC" }, { party: "ktto", label: "KTTO" }] } };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
     const side = await screen.findByRole("complementary", { name: "Review details" });
     const request = await within(side).findByRole("button", { name: "Request review" });
     expect(request).toHaveAccessibleDescription("Can be sent to IERC and KTTO");
-    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).queryByRole("button", { name: /Route to office/ }))
+    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).queryByRole("button", { name: "Request review…" }))
       .not.toBeInTheDocument();
 
     const reads = vi.mocked(recordsApi.tracker).mock.calls.length;
     await userEvent.click(request);
     await userEvent.click(await screen.findByRole("checkbox", { name: "IERC" }));
-    await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Human participants.");
-    await userEvent.click(screen.getByRole("button", { name: "Route" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Why? (required)" }), "Human participants.");
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Send request" }));
     expect(recordsApi.route).toHaveBeenCalledWith(RECORD_ID, expect.objectContaining({ to: [{ party: "ierc" }] }));
     await waitFor(() => expect(vi.mocked(recordsApi.tracker).mock.calls.length).toBeGreaterThan(reads));
   });
@@ -2330,7 +2330,7 @@ describe("the Review section (IR-412)", () => {
     workspaceAt(1600);
     vi.mocked(recordsApi.tracker).mockResolvedValue({ data: { ...trackerPayload, parties: [partyRow("itso", "ITSO")] } } as never);
     shownRecord = { ...inReview, ...reviewing, capabilities: ["route", "add_reviewer"],
-      routing: { accept_and_route: false, route_as: "itso", targets: [] } };
+      routing: { send_to_rdco: false, route_as: "itso", targets: [] } };
     signInAs(2, "ITSO");
     renderPaper(`/records/${RECORD_ID}?section=review`);
     const side = await screen.findByRole("complementary", { name: "Review details" });

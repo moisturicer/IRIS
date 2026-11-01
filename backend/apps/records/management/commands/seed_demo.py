@@ -279,11 +279,13 @@ class Command(BaseCommand):
     # -- phase 3: the Discover catalogue -----------------------------------
 
     def _seed_catalogue(self, users):
-        """Published records reached through an Adviser's decision."""
+        """Published records: the Adviser sends each to RDCO, which publishes it (ADR-047)."""
         from apps.reviews import seats
         from apps.reviews.decisions import PUBLISH, decide, decision_token
+        from apps.reviews.models import RecordAssignment
+        from apps.reviews.routing import accept_and_route
 
-        adviser = users[RoleName.ADVISER]
+        adviser, rdco = users[RoleName.ADVISER], users[RoleName.RDCO]
         for (title, classification_name, type_name, year, is_ip, ip_type,
              commercial, extension, college_code, author_names) in CATALOGUE:
 
@@ -315,7 +317,13 @@ class Command(BaseCommand):
 
             entry = self._submit(record, owner)
             seats.open_review(entry.seats.get(), adviser)
-            decide(record, adviser, outcome=PUBLISH, token=decision_token(record))
+            accept_and_route(
+                record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}],
+                reason="Ready for publication.",
+            )
+            rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+            seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+            decide(record, rdco, outcome=PUBLISH, token=decision_token(record))
             self._done(record)
 
     # -- phase 4: one record per workflow state ----------------------------
@@ -402,7 +410,7 @@ class Command(BaseCommand):
         from apps.reviews.decisions import KEEP_UNLISTED, decide, decision_token
         from apps.reviews.models import RecordAssignment
         from apps.reviews.office_review import CLEARED, record_office_review
-        from apps.reviews.routing import accept_and_route
+        from apps.reviews.routing import accept_and_route, route
 
         student, adviser, ktto, rdco = (
             users[RoleName.STUDENT], users[RoleName.ADVISER],
@@ -416,14 +424,17 @@ class Command(BaseCommand):
             entry = self._submit(record, student)
             seats.open_review(entry.seats.get(), adviser)
             accept_and_route(
-                record, adviser, to=[{"party": "ktto", "nominee": ktto.pk}],
-                reason="KTTO should assess commercialisation potential.",
+                record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}],
+                reason="RDCO should assess which institutional reviews are needed.",
             )
+            rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+            seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+            route(record, rdco, to=[{"party": "ktto", "nominees": [ktto.pk]}], reason="Commercialisation review.")
             assignment = RecordAssignment.objects.get(record=record, party="ktto", state="active")
             seats.open_review(assignment.seats.get(reviewer=ktto), ktto)
             record_office_review(record, ktto, outcome=CLEARED, comment="Assessment complete.")
             rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
-            seats.open_review(seats.claim(rdco_assignment, rdco), rdco)
+
             decide(record, rdco, outcome=KEEP_UNLISTED, token=decision_token(record))
             self._done(record)
 
@@ -454,7 +465,7 @@ class Command(BaseCommand):
         from apps.reviews.models import RecordAssignment
         from apps.reviews.office_review import CLEARED, record_office_review
         from apps.reviews.revisions import request_revision
-        from apps.reviews.routing import accept_and_route
+        from apps.reviews.routing import accept_and_route, route
 
         student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
         record = self._make(
@@ -466,9 +477,13 @@ class Command(BaseCommand):
 
         entry = self._submit(record, student)
         seats.open_review(entry.seats.get(), adviser)
-        accept_and_route(
-            record, adviser,
-            to=[{"party": str(party), "nominee": users[role].pk} for party, role in (
+        rdco = users[RoleName.RDCO]
+        accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="Institutional review.")
+        rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+        seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+        route(
+            record, rdco,
+            to=[{"party": str(party), "nominees": [users[role].pk]} for party, role in (
                 (Office.ITSO, RoleName.ITSO),
                 (Office.IERC, RoleName.IERC),
                 (Office.KTTO, RoleName.KTTO),
@@ -600,18 +615,15 @@ class Command(BaseCommand):
     @transaction.atomic
     def _scenario_new_model_at_rdco(self, users):
         """
-        A Thesis/Research on the specialist path, in RDCO's pool (IR-270).
+        A Thesis/Research with RDCO's review open after ITSO cleared it.
 
-        Every step is the real act: it enters at its Adviser, who opens the
-        review and accepts & routes it to ITSO, nominating ITSO's account; ITSO
-        opens and clears it, and the hand-back opens RDCO's pool. Nobody at
-        RDCO is seated, so the demo starts with *Claim review* as rdco@cit.edu,
-        then *Accept & publish*, *Keep unlisted* or *Reject*.
+        The Adviser sends it to RDCO; RDCO requests ITSO's review. Office
+        completion leaves RDCO's existing turn open, ready for a Decision.
         """
         from apps.reviews import seats
-        from apps.reviews.models import ReviewerSeat
+        from apps.reviews.models import RecordAssignment, ReviewerSeat
         from apps.reviews.office_review import CLEARED, record_office_review
-        from apps.reviews.routing import accept_and_route, enter_at_adviser
+        from apps.reviews.routing import accept_and_route, enter_at_adviser, route
 
         student, adviser, itso = (
             users[RoleName.STUDENT], users[RoleName.ADVISER], users[RoleName.ITSO],
@@ -627,11 +639,11 @@ class Command(BaseCommand):
         record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
         entry = enter_at_adviser(record, student)
         seats.open_review(entry.seats.get(), adviser)
-        accept_and_route(
-            record, adviser,
-            to=[{"party": "itso", "nominee": itso.pk}],
-            reason="The prototype's sensor fusion method may be patentable.",
-        )
+        rdco = users[RoleName.RDCO]
+        accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="The sensor fusion method may be patentable.")
+        rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+        seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+        route(record, rdco, to=[{"party": "itso", "nominees": [itso.pk]}], reason="Assess prior art.")
         seat = ReviewerSeat.objects.get(
             assignment__record=record, assignment__party="itso", reviewer=itso,
         )

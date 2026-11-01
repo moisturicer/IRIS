@@ -489,13 +489,12 @@ def _party_rows(
         assignments[a.party] = a  # last one wins: the party's latest turn
     # The adviser-first model's rule for the RDCO row applies while a record
     # is in review (stored `in_review`, IR-261), and once a Decision closed it
-    # (IR-270): an Adviser's publish never involved RDCO. A record the retired
+    # (IR-270): an Adviser's rejection never involved RDCO. A record the retired
     # fixed pipeline finished says nothing about which model reviewed it, so
     # it keeps that pipeline's reading of the RDCO row.
     new_model = record.pipeline_status == PipelineStatus.IN_REVIEW or any(
         a.closed_by_decision_id is not None for a in assignments.values()
     )
-    specialist_ever = any(party in _CLEARING_OFFICES for party in assignments)
 
     latest_review: dict[str, Review] = {}
     for r in reviews:  # oldest first, so the last write is the latest
@@ -525,11 +524,13 @@ def _party_rows(
         clearance = clearance_by_office.get(party) if party in _CLEARING_OFFICES else None
 
         if assignment is None and party == Party.RDCO and new_model:
-            # ADR-032 §10 (amended 2026-10-08, IR-269): RDCO enters only by
-            # the hand-back, so it is awaited only once a specialist office
-            # has held the record, and "not required" until then.
+            # Only RDCO publishes a Thesis/Research or Project (ADR-047 §5), so
+            # it is awaited while one is in review. A Proposal never reaches
+            # RDCO, and an Adviser's rejection ends the review before it does.
             state = (
-                TrackerPartyState.AWAITING if specialist_ever
+                TrackerPartyState.AWAITING
+                if record.pipeline_status == PipelineStatus.IN_REVIEW
+                and lifecycle.type_name_of(record) != RecordTypeName.PROPOSAL
                 else TrackerPartyState.NOT_REQUIRED
             )
             at = None
@@ -655,6 +656,7 @@ def _routing_history(record, *, staff: bool, readable: bool) -> list[dict]:
                 # went is not.
                 "actor": _name(event.actor) if readable else None,
                 "reason": event.reason if readable else None,
+                "suggested_offices": event.suggested_offices if readable else None,
                 "at": _iso(event.created_at),
             }
         group["to"].append(event.to_party)
@@ -696,9 +698,10 @@ def _resubmissions(record, *, staff: bool, readable: bool) -> list[dict]:
             "resolved_at": _iso(r.resolved_at),
             # Who resubmitted, or withdrew, and so closed it.
             "resolved_by": _name(r.resolved_by) if readable else None,
+            "withdrawn_by_decision": withdrawn_by_label(r.closed_by_decision) if readable and r.closed_by_decision_id else None,
         }
         for r in ResubmissionRequest.objects.filter(record=record)
-        .select_related("requested_by", "resolved_by", "review__version")
+        .select_related("requested_by", "resolved_by", "review__version", "closed_by_decision__record")
         .order_by("created_at", "pk")
     ]
 

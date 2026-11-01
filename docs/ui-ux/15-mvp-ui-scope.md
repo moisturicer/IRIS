@@ -291,7 +291,7 @@ the same no-server-state caveat as My Library.
 
 **Narrowed by [IR-757](https://citiris.atlassian.net/browse/IR-757) (2026-11-01).** Only RDCO and Advisers post calls now, as decided by Hermoine Zozobrado. KTTO no longer posts or moderates: a call it posted earlier stays on the board, and only RDCO can change it. An Adviser still changes only their own calls. Still no requirement, so `TRACEABILITY.md` still does not change.
 
-**Outside the MVP (2026-11-01).** Hermoine Zozobrado decided the board is outside the MVP, which answers the scope question IR-121 left open. It is tagged `post-mvp-candidate` and stays visible during the pilot, but no validation session tests it. [ADR-050](../adr/050-calls-for-papers-and-rdco-confirmation.md), Proposed, narrows it to calls for papers and has RDCO confirm an Adviser's post, to be built after the MVP (spec [IR-758](https://citiris.atlassian.net/browse/IR-758)).
+**Outside the MVP (2026-11-01).** Hermoine Zozobrado decided the board is outside the MVP, which answers the scope question IR-121 left open. It is tagged `post-mvp-candidate` and stays visible during the pilot, but no validation session tests it. [ADR-050](../adr/050-calls-for-papers-and-rdco-confirmation.md), Accepted 2026-11-01, narrows it to calls for papers and has RDCO confirm an Adviser's post, to be built after the MVP (spec [IR-758](https://citiris.atlassian.net/browse/IR-758)).
 
 **One criterion met, one recommended for a human to close out.** This was open against IR-86 (now
 **[IR-160](https://citiris.atlassian.net/browse/IR-160)** — *Reduce the pilot surface to 16

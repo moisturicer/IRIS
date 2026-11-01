@@ -112,14 +112,14 @@ class ResubmissionRegressionTests(APITestCase):
         The reported Record: a Project that requested ITSO, IERC and KTTO.
         ITSO and KTTO have cleared, and IERC has asked for changes.
         """
-        record_type = RecordType.objects.filter(name=RecordTypeName.PROJECT).first()
+        record_type = RecordType.objects.get_or_create(name=RecordTypeName.PROJECT)[0]
         if record_type is None:
             raise SetupFailed("RecordType 'Project' is not seeded; migrations incomplete")
         from apps.reviews import seats
         from apps.reviews.models import RecordAssignment
         from apps.reviews.office_review import CLEARED, record_office_review
         from apps.reviews.revisions import request_revision
-        from apps.reviews.routing import accept_and_route, enter_at_adviser
+        from apps.reviews.routing import accept_and_route, enter_at_adviser, route
 
         record = Record.objects.create(
             title="IR-233 regression",
@@ -136,9 +136,12 @@ class ResubmissionRegressionTests(APITestCase):
 
         entry = enter_at_adviser(record, self.owner)
         seats.open_review(entry.seats.get(), self.adviser)
-        accept_and_route(
-            record, self.adviser,
-            to=[{"party": party, "nominee": reviewer.pk} for party, reviewer in (
+        accept_and_route(record, self.adviser, to=[{"party": "rdco", "nominees": [self.rdco.pk]}], reason="Institutional review.")
+        rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+        seats.open_review(rdco_assignment.seats.get(reviewer=self.rdco), self.rdco)
+        route(
+            record, self.rdco,
+            to=[{"party": party, "nominees": [reviewer.pk]} for party, reviewer in (
                 ("itso", self.itso), ("ierc", self.ierc), ("ktto", self.ktto),
             )],
             reason="Specialist review is needed.",

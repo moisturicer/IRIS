@@ -4,12 +4,15 @@ import { recordsApi } from "@/api/records";
 import { Button, Modal, Skeleton } from "@/components/ui";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
+import { joinLabels } from "@/lib/utils";
 import type { Party, RouteOptions, RouteRequest } from "@/types/records";
 
 interface RouteDialogProps {
   recordId: number;
-  /** *Accept & route* (the Adviser) or onward *Route* (an office seat holder). */
+  /** *Accept & send to RDCO* (the Adviser) or a request to another office (an office seat holder). */
   mode: "accept" | "route";
+  /** The offices the author flagged, shown beside the Adviser's suggestions. */
+  authorHints?: string[];
   onClose: () => void;
   /** Routed: the offices it went to, for the bar to announce. */
   onRouted: (officeLabels: string[]) => void;
@@ -18,26 +21,28 @@ interface RouteDialogProps {
 /** What the reviewer chose for one office: ticked, and whom (if anyone) to nominate. */
 interface Choice {
   ticked: boolean;
-  nominee: string;
+  nominees: number[];
 }
 
 /**
- * Route a record to one or more offices (ADR-032 §3–§4, IR-261).
+ * Send a record to RDCO, or request another office's review (ADR-047 §1–§3).
  *
  * The offices, their members and the author's hints come from the server
- * (`route-options`), which also decides who may route at all. Nothing is
- * pre-ticked, even where the author flagged an office: the hint is shown, and
- * the decision stays the router's (ADR-032 §3). An office that already holds
- * the record can only gain a nominee, so its picker has no "leave in pool".
+ * (`route-options`), which also decides who may route at all. The Adviser's
+ * only target is RDCO, so it comes ticked; the offices they tick are
+ * suggestions RDCO reads, never requests. An office's request ticks nothing,
+ * even where the author flagged an office. An office that already holds the
+ * record can only gain a nominee, so its picker has no "leave in pool".
  *
  * Adding a colleague from your own office is a different act (ADR-032 §4) and
  * is not here.
  */
-export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogProps) {
+export function RouteDialog({ recordId, mode, authorHints = [], onClose, onRouted }: RouteDialogProps) {
   const ids = useId();
   const [options, setOptions] = useState<RouteOptions | null>(null);
   const [loadFailed, setLoadFailed] = useState<string | null>(null);
   const [choices, setChoices] = useState<Partial<Record<Party, Choice>>>({});
+  const [suggested, setSuggested] = useState<string[]>([]);
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
@@ -47,7 +52,12 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
     recordsApi
       .routeOptions(recordId)
       .then(({ data }) => {
-        if (!cancelled) setOptions(data);
+        if (cancelled) return;
+        setOptions(data);
+        // The Adviser sends to RDCO alone: nothing to choose but whom.
+        if (data.accept && data.targets.length === 1) {
+          setChoices({ [data.targets[0].party]: { ticked: true, nominees: [] } });
+        }
       })
       .catch((err) => {
         if (!cancelled) setLoadFailed(errorDetail(err, "The offices could not be loaded."));
@@ -58,14 +68,14 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
   }, [recordId]);
 
   const accepting = mode === "accept";
-  const title = accepting ? "Accept and route" : "Route to office";
-  const choiceFor = (party: Party): Choice => choices[party] ?? { ticked: false, nominee: "" };
+  const title = accepting ? "Accept & send to RDCO" : "Request review";
+  const choiceFor = (party: Party): Choice => choices[party] ?? { ticked: false, nominees: [] };
   const setChoice = (party: Party, change: Partial<Choice>) =>
     setChoices((prev) => ({ ...prev, [party]: { ...choiceFor(party), ...change } }));
 
   const ticked = (options?.targets ?? []).filter((t) => choiceFor(t.party).ticked);
   // An office already reviewing it gains only a nominee: one must be named.
-  const missingNominee = ticked.some((t) => t.already_holds && !choiceFor(t.party).nominee);
+  const missingNominee = ticked.some((t) => t.already_holds && !choiceFor(t.party).nominees.length);
   const ready = ticked.length > 0 && reason.trim() !== "" && !missingNominee;
 
   const submit = async (e: FormEvent) => {
@@ -75,9 +85,10 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
     setSending(true);
     const body: RouteRequest = {
       reason: reason.trim(),
+      ...(accepting ? { suggested_offices: suggested } : {}),
       to: ticked.map((t) => {
-        const nominee = choiceFor(t.party).nominee;
-        return nominee ? { party: t.party, nominee: Number(nominee) } : { party: t.party };
+        const nominees = choiceFor(t.party).nominees;
+        return nominees.length ? { party: t.party, nominees } : { party: t.party };
       }),
     };
     try {
@@ -105,7 +116,7 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
             Cancel
           </Button>
           <Button type="submit" form={formId} disabled={!ready} loading={sending}>
-            {accepting ? "Accept and route" : "Route"}
+            {accepting ? "Accept & send to RDCO" : "Send request"}
           </Button>
         </div>
       }
@@ -113,8 +124,8 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
       <form id={formId} onSubmit={submit} noValidate className="space-y-5">
         <p className="text-[14px] text-stone-700 leading-relaxed">
           {accepting
-            ? "You accept this work, and your review ends here. The offices you choose review it next; the record stays in review."
-            : `${options?.from_label ?? "Your office"} keeps reviewing this record. The offices you choose review it as well.`}
+            ? "This accepts the work at your stage and sends it to RDCO. RDCO decides, and asks the offices it needs. Only RDCO publishes."
+            : "Ask another office, as a whole or specific officers in it. Your own review carries on."}
         </p>
 
         {loadFailed ? (
@@ -135,7 +146,7 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
                 const hintId = `${checkId}-hint`;
                 // Already reviewing: routing there only adds someone, so a
                 // reviewer must be chosen -- and the dialog says so.
-                const needsNominee = choice.ticked && target.already_holds && !choice.nominee;
+                const needsNominee = choice.ticked && target.already_holds && !choice.nominees.length;
                 return (
                   <li key={target.party} className="rounded-lg border border-stone-200 px-3 py-2.5">
                     <div className="flex items-start gap-2.5">
@@ -170,30 +181,29 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
 
                     {choice.ticked && (
                       <div className="mt-2.5 pl-6">
-                        <label htmlFor={pickId} className={LABEL}>
-                          Reviewer at {target.label}
-                        </label>
-                        <select
-                          id={pickId}
-                          value={choice.nominee}
-                          onChange={(e) => setChoice(target.party, { nominee: e.target.value })}
-                          aria-describedby={needsNominee ? `${pickId}-why` : undefined}
-                          className={fieldClasses(needsNominee)}
-                        >
-                          <option value="">
-                            {target.already_holds
-                              ? "Choose a reviewer to add"
-                              : `Leave in ${target.label}'s pool`}
-                          </option>
+                        <p className={LABEL}>
+                          {target.already_holds ? `Add officers to ${target.label}'s review` : `Who at ${target.label}?`}
+                        </p>
+                        <fieldset id={pickId} aria-label={`Officers at ${target.label}`}
+                          aria-describedby={needsNominee ? `${pickId}-why` : undefined} className="space-y-2">
                           {target.members.map((m) => (
-                            <option key={m.id} value={m.id}>
+                            <label key={m.id} className="flex items-center gap-2 text-small">
+                              <input type="checkbox" className={CHECKBOX} checked={choice.nominees.includes(m.id)}
+                                onChange={(e) => setChoice(target.party, { nominees: e.target.checked
+                                  ? [...choice.nominees, m.id] : choice.nominees.filter((id) => id !== m.id) })} />
                               {m.name}
-                            </option>
+                            </label>
                           ))}
-                        </select>
-                        {needsNominee && (
+                        </fieldset>
+                        {needsNominee ? (
                           <p id={`${pickId}-why`} className="mt-1 text-[13px] text-brand">
                             {target.label} already has this record. Choose someone to add.
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[13px] text-stone-600">
+                            {choice.nominees.length
+                              ? `${joinLabels(target.members.filter((m) => choice.nominees.includes(m.id)).map((m) => m.name))} ${choice.nominees.length > 1 ? "are" : "is"} asked directly and told now.`
+                              : `Nobody picked: it goes to ${target.label}'s pool, and anyone there can claim it.`}
                           </p>
                         )}
                       </div>
@@ -205,9 +215,22 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
           </fieldset>
         )}
 
+        {accepting && <fieldset className="space-y-2">
+          <legend className={LABEL}>Suggested specialist offices (optional)</legend>
+          <p className="text-small text-stone-600">RDCO sees these and decides which offices to ask. A suggestion requests nothing.</p>
+          {authorHints.length > 0 && <p className="text-small text-stone-700">
+            <i className="fas fa-flag mr-1.5 text-[11px]" aria-hidden />The author flagged: {authorHints.join("; ")}
+          </p>}
+          {["itso", "ierc", "ktto"].map((p) => <label key={p} className="flex items-center gap-2 text-small">
+            <input type="checkbox" className={CHECKBOX} checked={suggested.includes(p)} onChange={(e) => setSuggested(e.target.checked ? [...suggested, p] : suggested.filter((v) => v !== p))} />{p.toUpperCase()}
+          </label>)}
+        </fieldset>}
+        {!accepting && !!options?.suggested_offices?.length && <p className="text-small text-stone-700">
+          The Adviser suggested {joinLabels(options.suggested_offices.map((p) => p.toUpperCase()))}. Only the offices you tick are asked.
+        </p>}
         <div>
           <label htmlFor={`${ids}-reason`} className={LABEL}>
-            Reason
+            Why? (required)
           </label>
           <textarea
             id={`${ids}-reason`}
@@ -216,10 +239,11 @@ export function RouteDialog({ recordId, mode, onClose, onRouted }: RouteDialogPr
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             aria-describedby={`${ids}-reason-help`}
+            placeholder="What should they look at? Point to the section."
             className={fieldClasses(false)}
           />
           <p id={`${ids}-reason-help`} className="mt-1 text-[13px] text-stone-600">
-            The offices see this with the record.
+            {accepting ? "RDCO sees this with the record." : "The offices see this with the record."}
           </p>
         </div>
 

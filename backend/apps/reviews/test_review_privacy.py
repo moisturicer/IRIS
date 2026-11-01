@@ -151,7 +151,10 @@ class OfficeNotTakingPartTests(ReviewPrivacyTestBase):
         self.assertNothingDisclosed(record, self.ktto_member)
 
     def test_rdco_on_a_record_rdco_never_held_gets_none(self):
-        record = self.routed(Party.ITSO, Party.IERC)
+        record = self.new_model()
+        # A historical record without RDCO involvement must still withhold review content.
+        for party in (Party.ITSO, Party.IERC):
+            RecordAssignment.objects.create(record=record, party=party)
         self.opened_seat(record, Party.IERC, self.ierc)
         self.opened_seat(record, Party.ITSO, self.itso)
         self.cleared(record, self.itso, "No patentable mechanism.")
@@ -166,7 +169,7 @@ class OfficeNotTakingPartTests(ReviewPrivacyTestBase):
             state=ResubmissionRequestState.RESUBMITTED,
             resolved_by=self.owner, resolved_at=timezone.now(),
         )
-        # IERC is still reviewing, so there has been no hand-back.
+        # This record has no RDCO assignment or Seat.
         self.assertFalse(RecordAssignment.objects.filter(record=record, party=Party.RDCO).exists())
 
         self.assertNothingDisclosed(record, self.rdco)

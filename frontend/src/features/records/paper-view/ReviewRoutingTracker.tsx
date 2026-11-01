@@ -197,6 +197,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
                 <span className="font-bold text-stone-900">{r.label}</span> asked for changes
                 {" · "}
                 <span className="font-semibold">{r.state_label}</span>
+                {r.withdrawn_by_decision && <p className="text-stone-700">{r.withdrawn_by_decision}; this request was superseded by the Decision.</p>}
                 <span className="text-stone-500"> · {formatDate(r.created_at, "MMM d")}</span>
                 {r.reason && (
                   <p className="text-stone-600 mt-0.5 leading-relaxed">“{r.reason}”</p>

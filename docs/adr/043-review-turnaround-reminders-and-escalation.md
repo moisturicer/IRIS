@@ -4,7 +4,11 @@
 
 **Accepted — 2026-10-28, by Lee Jasmin Adolfo.** IR-618 (parent IR-612). Proposed the same day after a design grilling with Lee Jasmin Adolfo. IR-619, IR-620, IR-621 and IR-622–IR-626 build to it.
 
+[ADR-047](047-rdco-routes-and-decides-at-any-time.md), Accepted 2026-11-01 and built by IR-767, amends §1: RDCO's clock starts when the Adviser sends the Record, not at the hand-back.
+
 Amends ADR-032 by adding a time dimension to its assignments. It changes no ADR-032 decision: no act, state, routing edge or visibility rule.
+
+**Amended 2026-11-01 (IR-767, ADR-047):** RDCO's turnaround starts when the Adviser sends the record. RDCO's clock runs alongside specialist-office clocks. The hand-back no longer opens an assignment. Cutover assignments start a new clock at cutover and are identifiable by the migration reason.
 
 ## Context
 

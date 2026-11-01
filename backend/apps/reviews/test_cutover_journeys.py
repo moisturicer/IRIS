@@ -74,9 +74,10 @@ class MigratedApiJourneys(DecisionTestBase):
         self.decided(record, self.adviser, "reject", "The proposal duplicates existing work.")
         self.assertEqual(record.pipeline_status, "rejected")
 
-    def test_thesis_adviser_only_publish(self):
+    def test_thesis_adviser_sends_and_rdco_publishes(self):
         record = self.migrated(RecordTypeName.THESIS_RESEARCH)
-        self.decided(record, self.adviser, "publish")
+        self.assertEqual(self.decide(record, self.adviser, "publish").status_code, 400)
+        self.publish_via_rdco(record)
         self.assertEqual(record.pipeline_status, "published")
 
     def test_thesis_itso_ierc_revision_preserves_itso(self):
@@ -96,7 +97,7 @@ class MigratedApiJourneys(DecisionTestBase):
         self.opened_seat(record, "ktto", self.ktto)
         self.cleared(record, self.ktto)
         assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
-        seats.open_review(seats.claim(assignment, self.rdco), self.rdco)
+        seats.open_review(assignment.seats.get(reviewer=self.rdco), self.rdco)
         self.decided(record, self.rdco, "keep_unlisted")
         self.assertEqual(record.pipeline_status, "completed")
 

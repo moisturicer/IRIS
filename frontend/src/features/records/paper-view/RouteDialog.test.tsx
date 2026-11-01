@@ -1,6 +1,6 @@
 /**
- * The routing dialog: *Accept & route…* and *Route to office…* (IR-261,
- * ADR-032 §3–§4). Every query goes through the accessible tree, by role and
+ * The routing dialog: *Accept & send to RDCO…* and *Request review…*
+ * (ADR-047 §1–§3). Every query goes through the accessible tree, by role and
  * accessible name.
  */
 import userEvent from "@testing-library/user-event";
@@ -27,32 +27,25 @@ vi.mock("@/api/records", () => ({
 const RECORD_ID = 7;
 
 const ADVISER_OPTIONS: RouteOptions = {
-  from_party: "adviser",
-  from_label: "Adviser",
-  accept: true,
-  targets: [
-    {
-      party: "itso",
-      label: "ITSO",
-      members: [{ id: 51, name: "Ina Tso" }, { id: 52, name: "Ivo Tso" }],
-      already_holds: false,
-      author_hint: "The author flagged possible intellectual property.",
-    },
-    { party: "ierc", label: "IERC", members: [{ id: 61, name: "Iris Erc" }], already_holds: false, author_hint: null },
-    { party: "ktto", label: "KTTO", members: [], already_holds: false, author_hint: null },
-  ],
+  from_party: "adviser", from_label: "Adviser", accept: true,
+  targets: [{ party: "rdco", label: "RDCO", members: [{ id: 51, name: "Rhea Director" }, { id: 52, name: "Rico Officer" }], already_holds: false, author_hint: null }],
+};
+const OFFICE_OPTIONS: RouteOptions = {
+  from_party: "rdco", from_label: "RDCO", accept: false, suggested_offices: ["itso"],
+  targets: [{ ...ADVISER_OPTIONS.targets[0], party: "itso", label: "ITSO" },
+    { party: "ierc", label: "IERC", members: [], already_holds: false, author_hint: null }],
 };
 
-function open(mode: "accept" | "route" = "accept") {
+function open(mode: "accept" | "route" = "accept", authorHints: string[] = []) {
   const onClose = vi.fn();
   const onRouted = vi.fn();
   const view = renderScreen(
-    <RouteDialog recordId={RECORD_ID} mode={mode} onClose={onClose} onRouted={onRouted} />,
+    <RouteDialog recordId={RECORD_ID} mode={mode} authorHints={authorHints} onClose={onClose} onRouted={onRouted} />,
   );
   return { onClose, onRouted, container: view.container };
 }
 
-const submitButton = () => screen.getByRole("button", { name: "Accept and route" });
+const submitButton = () => screen.getByRole("button", { name: "Accept & send to RDCO" });
 
 beforeEach(() => {
   routeOptions.mockReset().mockResolvedValue({ data: ADVISER_OPTIONS });
@@ -61,105 +54,67 @@ beforeEach(() => {
 });
 
 describe("RouteDialog", () => {
-  it("offers each office unticked, with the author's hint beside it", async () => {
-    const { container } = open();
-
-    expect(screen.getByRole("dialog", { name: "Accept and route" })).toBeInTheDocument();
-    const itso = await screen.findByRole("checkbox", { name: "ITSO" });
-    expect(itso).not.toBeChecked();
-    expect(itso).toHaveAccessibleDescription("The author flagged possible intellectual property.");
-    expect(screen.getByRole("checkbox", { name: "IERC" })).not.toBeChecked();
-    expect(screen.getByRole("checkbox", { name: "KTTO" })).not.toBeChecked();
+  it("sends to RDCO's pool and keeps suggestions separate", async () => {
+    const { onRouted, container } = open();
+    expect(await screen.findByRole("checkbox", { name: "RDCO" })).toBeChecked();
+    await userEvent.click(screen.getByRole("checkbox", { name: "ITSO" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Why? (required)" }), "Possible IP.");
     await expectNoBlockingA11yViolations(container);
-  });
-
-  it("waits for an office and a reason before it can be sent", async () => {
-    open();
-    await userEvent.click(await screen.findByRole("checkbox", { name: "ITSO" }));
-    expect(submitButton()).toBeDisabled();
-
-    await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Patentable sensor.");
-    expect(submitButton()).toBeEnabled();
-  });
-
-  it("accepts and routes to the ticked offices, with a nominee where one was chosen", async () => {
-    const { onRouted } = open();
-    await userEvent.click(await screen.findByRole("checkbox", { name: "ITSO" }));
-    await userEvent.click(screen.getByRole("checkbox", { name: "IERC" }));
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Reviewer at ITSO" }), "52");
-    // IERC's picker is left at its default: the record goes to IERC's pool.
-    expect(screen.getByRole("combobox", { name: "Reviewer at IERC" })).toHaveDisplayValue(
-      "Leave in IERC's pool",
-    );
-    await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Patentable sensor.");
     await userEvent.click(submitButton());
-
-    await waitFor(() => expect(onRouted).toHaveBeenCalledWith(["ITSO", "IERC"]));
-    expect(acceptAndRoute).toHaveBeenCalledWith(RECORD_ID, {
-      reason: "Patentable sensor.",
-      to: [{ party: "itso", nominee: 52 }, { party: "ierc" }],
-    });
-    expect(route).not.toHaveBeenCalled();
+    await waitFor(() => expect(onRouted).toHaveBeenCalledWith(["RDCO"]));
+    expect(acceptAndRoute).toHaveBeenCalledWith(RECORD_ID, { reason: "Possible IP.", to: [{ party: "rdco" }], suggested_offices: ["itso"] });
   });
-
-  it("onward routing uses the route endpoint and says the router keeps reviewing", async () => {
-    routeOptions.mockResolvedValue({
-      data: {
-        ...ADVISER_OPTIONS,
-        from_party: "itso",
-        from_label: "ITSO",
-        accept: false,
-        targets: ADVISER_OPTIONS.targets.slice(1),
-      },
-    });
+  it("nominates multiple RDCO officers", async () => {
+    open();
+    expect(await screen.findByRole("checkbox", { name: "RDCO" })).toBeChecked();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Rhea Director" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Rico Officer" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Why? (required)" }), "Institutional review.");
+    await userEvent.click(submitButton());
+    await waitFor(() => expect(acceptAndRoute).toHaveBeenCalledWith(RECORD_ID, { reason: "Institutional review.", to: [{ party: "rdco", nominees: [51, 52] }], suggested_offices: [] }));
+  });
+  it("offices request the pool or multiple officers and see the Adviser's suggestions", async () => {
+    routeOptions.mockResolvedValue({ data: OFFICE_OPTIONS });
     const { onRouted } = open("route");
-
-    expect(await screen.findByText(/ITSO keeps reviewing this record/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("checkbox", { name: "KTTO" }));
-    await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Commercial potential.");
-    await userEvent.click(screen.getByRole("button", { name: "Route" }));
-
-    await waitFor(() => expect(onRouted).toHaveBeenCalledWith(["KTTO"]));
-    expect(route).toHaveBeenCalledWith(RECORD_ID, { reason: "Commercial potential.", to: [{ party: "ktto" }] });
-  });
-
-  it("an office already reviewing it needs a nominee", async () => {
-    routeOptions.mockResolvedValue({
-      data: {
-        ...ADVISER_OPTIONS,
-        targets: [{ ...ADVISER_OPTIONS.targets[0], already_holds: true }],
-      },
-    });
-    open();
-    await userEvent.click(await screen.findByRole("checkbox", { name: "ITSO already reviewing" }));
-    await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Second opinion.");
-    expect(submitButton()).toBeDisabled();
-    // Disabled, and the dialog says why.
-    expect(screen.getByRole("combobox", { name: "Reviewer at ITSO" })).toHaveAccessibleDescription(
-      "ITSO already has this record. Choose someone to add.",
-    );
-
-    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Reviewer at ITSO" }), "51");
-    expect(submitButton()).toBeEnabled();
-  });
-
-  it("shows a refusal in the dialog and keeps what was typed", async () => {
-    acceptAndRoute.mockRejectedValue({ response: { data: { detail: "The nominee is not a member of ITSO." } } });
-    const { onRouted } = open();
     await userEvent.click(await screen.findByRole("checkbox", { name: "ITSO" }));
-    await userEvent.type(screen.getByRole("textbox", { name: "Reason" }), "Patentable sensor.");
-    await userEvent.click(submitButton());
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("The nominee is not a member of ITSO.");
-    expect(screen.getByRole("textbox", { name: "Reason" })).toHaveValue("Patentable sensor.");
-    expect(screen.getByRole("checkbox", { name: "ITSO" })).toBeChecked();
-    expect(onRouted).not.toHaveBeenCalled();
+    expect(screen.getByText(/The Adviser suggested ITSO/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Rhea Director" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Rico Officer" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "IERC" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Why? (required)" }), "IP and ethics.");
+    await userEvent.click(screen.getByRole("button", { name: "Send request" }));
+    await waitFor(() => expect(onRouted).toHaveBeenCalledWith(["ITSO", "IERC"]));
+    expect(route).toHaveBeenCalledWith(RECORD_ID, { reason: "IP and ethics.", to: [{ party: "itso", nominees: [51, 52] }, { party: "ierc" }] });
   });
-
-  it("says so when the offices cannot be loaded", async () => {
-    routeOptions.mockRejectedValue({ response: { data: { detail: "Only a reviewer seated on this record may route it onward." } } });
+  it("requires officers for an office that already holds the record", async () => {
+    routeOptions.mockResolvedValue({ data: { ...OFFICE_OPTIONS, targets: [{ ...OFFICE_OPTIONS.targets[0], already_holds: true }] } });
     open("route");
-
-    expect(await screen.findByRole("alert")).toHaveTextContent("Only a reviewer seated on this record");
+    await userEvent.click(await screen.findByRole("checkbox", { name: "ITSO already reviewing" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Why? (required)" }), "Second opinion.");
+    expect(screen.getByRole("button", { name: "Send request" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Rhea Director" }));
+    expect(screen.getByRole("button", { name: "Send request" })).toBeEnabled();
+  });
+  it("keeps the reason and officers after a refusal", async () => {
+    acceptAndRoute.mockRejectedValue({ response: { data: { detail: "Officer unavailable." } } });
+    open();
+    expect(await screen.findByRole("checkbox", { name: "RDCO" })).toBeChecked();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Rhea Director" }));
+    await userEvent.type(screen.getByRole("textbox", { name: "Why? (required)" }), "Institutional review.");
+    await userEvent.click(submitButton());
+    expect(await screen.findByRole("alert")).toHaveTextContent("Officer unavailable.");
+    expect(screen.getByRole("checkbox", { name: "Rhea Director" })).toBeChecked();
+    expect(screen.getByRole("textbox", { name: "Why? (required)" })).toHaveValue("Institutional review.");
+  });
+  it("says where an unnamed request goes and who is told when officers are named", async () => {
+    open("accept", ["The author flagged possible intellectual property."]);
+    expect(await screen.findByText("Nobody picked: it goes to RDCO's pool, and anyone there can claim it.")).toBeInTheDocument();
+    expect(screen.getByText(/The author flagged: The author flagged possible intellectual property./)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("checkbox", { name: "Rhea Director" }));
+    expect(screen.getByText("Rhea Director is asked directly and told now.")).toBeInTheDocument();
+  });
+  it("reports failure to load offices", async () => {
+    routeOptions.mockRejectedValue(new Error("offline")); open("route");
+    expect(await screen.findByRole("alert")).toHaveTextContent("The offices could not be loaded.");
   });
 });

@@ -66,7 +66,7 @@ class TrackerCarryoverTests(NewVersionTestBase):
         non-participant office member reads it, and still no seat names."""
         record = self.resubmitted()
 
-        self.client.force_authenticate(self.rdco2)
+        self.client.force_authenticate(self.ktto)
         response = self.client.get(f"/api/v1/records/{record.pk}/tracker/")
         self.assertEqual(response.status_code, 200)
         rows = self.rows(response.data)

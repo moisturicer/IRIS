@@ -40,14 +40,14 @@ class RequestedFlagsRouteNothingTests(RoutingTestBase):
 
     def test_only_the_office_routed_to_gets_a_clearance(self):
         record = self.new_model(requested_itso=True, requested_ierc=True, requested_ktto=True)
-        response = self.accept(record, [{"party": Party.ITSO}])
+        response = self.accepted_to(record, Party.ITSO)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(self.offices(record), {"itso"})
         self.assertIn(Party.ITSO, self.active(record))
 
     def test_an_office_nobody_flagged_can_still_be_routed_to(self):
         record = self.new_model()
-        response = self.accept(record, [{"party": Party.IERC}])
+        response = self.accepted_to(record, Party.IERC)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(self.offices(record), {"ierc"})
 
@@ -85,7 +85,7 @@ class OwnerNeverReviewsTests(RoutingTestBase):
 
     def test_the_owner_cannot_record_an_office_review(self):
         record = self.new_model()
-        self.accept(record, [{"party": Party.ITSO}])
+        self.accepted_to(record, Party.ITSO)
         response = self.post_as_owner(
             "record-office-review", record, {"outcome": "cleared", "comment": ""},
         )

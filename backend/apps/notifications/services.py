@@ -193,7 +193,7 @@ def notify_routed(
 
 
 def notify_office_completed(
-    record, *, actor, office_label, outcome_label, handed_back, rdco_holding, rdco_holders,
+    record, *, actor, office_label, outcome_label, rdco_holding, rdco_holders,
 ):
     """
     A specialist office finished its review round (ADR-032 §3-§4, IR-269).
@@ -201,12 +201,8 @@ def notify_office_completed(
     - The owners hear the office's outcome. A single reviewer's verdict is
       not announced: it shows on the record, and the office's outcome is the
       fact the author can act on.
-    - On the hand-back, every RDCO member hears, in-app and by email: RDCO's
-      pool is shared work, as an office pool is in `notify_routed`. The owners
-      hear that the record is with RDCO.
-    - When RDCO already holds the record -- it routed it back for another
-      look -- RDCO's seat holders hear that the office finished, or the whole
-      office when nobody there is seated yet.
+    - RDCO already holds the record. Its seated reviewers hear each office
+      finish; if it is still in RDCO's Pool, the office hears it instead.
     """
     try:
         notif_type = NotificationType.objects.get_or_create(name="Office Review Complete")[0]
@@ -215,22 +211,13 @@ def notify_office_completed(
         owners = [o.user for o in record.owners.select_related("user").all()]
 
         message = f'{office_label} finished its review of "{title}": {outcome_label}.'
-        if handed_back:
-            message += " It is now with RDCO for its final decision."
         for owner in owners:
             Notification.objects.create(
                 sender=actor, recipient=owner, record=record,
                 notif_type=notif_type, message=message,
             )
 
-        rdco_message = None
-        if handed_back:
-            rdco_message = (
-                f'Every office has finished reviewing "{title}". It is in RDCO\'s '
-                f"pool for its final decision until someone claims it."
-            )
-        elif rdco_holding:
-            rdco_message = f'{office_label} finished its review of "{title}": {outcome_label}.'
+        rdco_message = f'{office_label} finished its review of "{title}": {outcome_label}.' if rdco_holding else None
         if rdco_message is None:
             return
 
@@ -256,8 +243,7 @@ def notify_office_completed(
             )
         if emails:
             send_email_async(
-                subject=f"[IRIS] For final review: {title[:60]}" if handed_back
-                else f"[IRIS] {office_label} finished: {title[:60]}",
+                subject=f"[IRIS] {office_label} finished: {title[:60]}",
                 message=f"Hello,\n\n{rdco_message}\n\n{url}\n\n-- The IRIS Team",
                 recipient_list=emails,
             )
@@ -265,7 +251,7 @@ def notify_office_completed(
         _log_failure("notify_office_completed", record=record)
 
 
-def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off):
+def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off, closed_revisions=()):
     """
     A Decision ended the record's review (ADR-032 §2-§3; IR-270, IR-271).
 
@@ -300,6 +286,11 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
                 if closed_requests == 1 else
                 " Its open document requests are withdrawn, so nothing more is needed."
             )
+
+        if closed_revisions:
+            message += " RDCO withdrew revision requests: " + ", ".join(
+                f"#{r['id']} from {r['label']}" for r in closed_revisions
+            ) + ". No response to those requests is required."
 
         notif_type = NotificationType.objects.get_or_create(name="Record Decided")[0]
         owners = list(record.owners.select_related("user").all())
