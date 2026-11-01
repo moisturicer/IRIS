@@ -26,7 +26,7 @@ Observed on `main`, 2026-11-01:
 3. **Fields.**
    - **Required:** type, title, about, paper deadline, location, at least one Area (from `Classification`), link.
    - **Optional:** start date, end date, registration fee (free text, because fees are often tiered or in another currency).
-   - **Automatic:** Posted by, always the signed-in account. It shows a name and never falls back to an email address.
+   - **Automatic:** Posted by, always the signed-in account's name.
    - **Removed:** posting office, audience, funding ceiling, tags and source.
 4. **Journal and Book Chapter have no event.** Their form hides the start and end dates and fills location with "Online", which the poster can change. They store no event dates.
 5. **The server checks no date**, against today or against another date. The poster is responsible for them.
@@ -85,7 +85,7 @@ Narrowing the board to calls for papers gives it one job, and every other decisi
 - **Readers can't tell why a Call is Featured.** It is a signal from RDCO with no stated reason.
 - **Two save tables and APIs** exist, one for papers and one for Calls.
 - **Ended Calls collect in My Library** until the reader removes them.
-- **The pilot runs before this is built**, on the current rules: Advisers publish immediately, and saves stay in the browser. Real Calls and saves may exist by then, which is why decision 16 keeps a copy of each deleted Call, and why dropped browser saves are a real, accepted loss.
+- **The pilot runs before this is built**, on the current rules: Advisers publish immediately, and saves stay in the browser. Real Calls and saves may exist by then, which is why decision 16 keeps a copy of each deleted Call. Calls saved in a browser before this ships are dropped once, an accepted loss; every save after that is stored per account.
 - There is no public archive of past Calls.
 
 ## MVP Impact
@@ -98,7 +98,7 @@ The types and Areas apply to any institution. RDCO's role here would map to whic
 
 ## Security Impact
 
-It closes the unvetted-link risk (decision 8) and the typed-office impersonation (decision 3), and makes every change attributable (decision 15). Decision 3 also stops a poster's email address from appearing when they have no name. A compromised RDCO account can still publish a bad link immediately, and the audit trail records it. The authorization matrix gains the new routes.
+It closes the unvetted-link risk (decision 8) and the typed-office impersonation (decision 3), and makes every change attributable (decision 15). A compromised RDCO account can still publish a bad link immediately, and the audit trail records it. The authorization matrix gains the new routes.
 
 ## Deployment Impact
 
