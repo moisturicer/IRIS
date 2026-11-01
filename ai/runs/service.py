@@ -12,7 +12,7 @@ import uuid
 import asyncpg
 
 from ai.runs import config as runs_config
-from ai.runs.executor import Executor
+from ai.runs.executor import Executor, Unavailable
 from ai.runs.store import Fenced, RunStore
 
 
@@ -24,10 +24,14 @@ class RunService:
         self.worker = f"inline-{uuid.uuid4().hex[:12]}"
 
     def pinned(self) -> dict:
-        return {
+        pinned = {
             "executor": self.executor.name, "executor_version": self.executor.version,
             "protocol": runs_config.PROTOCOL, "schema": runs_config.SCHEMA,
         }
+        pin = getattr(self.executor, "pin", None)
+        if pin is not None:
+            pinned["agent"] = pin.as_dict()
+        return pinned
 
     async def submit(self, grant, *, key, question, conversation_id, base_revision):
         """The run's projection, and whether this submission admitted it."""
@@ -47,8 +51,15 @@ class RunService:
         )
         if claim is None:
             return
+        if claim.pinned != self.pinned():
+            # Never continue a run under another model or protocol (IR-727).
+            await self.store.fail(run_id, claim.fence, "unavailable")
+            return
         try:
             result = await self.executor.answer(claim.question)
+        except Unavailable:
+            await self.store.fail(run_id, claim.fence, "unavailable")
+            return
         except Exception:
             await self.store.fail(run_id, claim.fence, "executor_failed")
             return

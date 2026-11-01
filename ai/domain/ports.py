@@ -1,16 +1,36 @@
 from abc import ABC, abstractmethod
 from typing import List
 
+
+class UnsupportedCapability(Exception):
+    """The provider cannot serve this request; nothing is substituted."""
+
+
 class LLMProvider(ABC):
     """
     Abstract Base Class for LLM providers (e.g. OpenAI).
     """
+
+    #: What an AGENT pin is checked against (IR-727). Empty means no
+    #: agent support, so `converse` refuses rather than guessing.
+    endpoint: str = ""
+    models: frozenset = frozenset()
+    capabilities: frozenset = frozenset()
+    dialect = None
+
     @abstractmethod
     async def generate_response(self, prompt: str, context: str = "") -> str:
         """
         Generate a response based on the prompt and context.
         """
         pass
+
+    async def converse(self, request):
+        """One AGENT model turn for an `ai.agent.protocol.AgentRequest`.
+
+        Concrete so existing adapters stay valid; they refuse.
+        """
+        raise UnsupportedCapability("converse")
 
 class EmbeddingProvider(ABC):
     """

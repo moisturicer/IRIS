@@ -25,6 +25,14 @@ class Result:
     reported_units: int = 0
 
 
+class Unavailable(Exception):
+    """No acceptable answer; the run ends `unavailable` and nothing is substituted."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
 class Executor(Protocol):
     name: str
     version: str

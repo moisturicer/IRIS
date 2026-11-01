@@ -63,6 +63,7 @@ class _Raced(Exception):
 class Claim:
     fence: int
     question: str
+    pinned: dict
 
 
 def request_hash(question: str, conversation_id, base_revision) -> str:
@@ -218,7 +219,7 @@ class RunStore:
                         WHERE r.id = $1 AND c.id = r.conversation_id AND c.deleted_at IS NULL
                           AND r.state IN ('queued', 'running') AND r.deadline_at > now()
                           AND (r.lease_expires_at IS NULL OR r.lease_expires_at <= now())
-                    RETURNING r.fence, r.question, r.allowance""",
+                    RETURNING r.fence, r.question, r.allowance, r.pinned""",
                     run_id, worker, float(lease_seconds),
                 )
                 if row is None:
@@ -242,7 +243,7 @@ class RunStore:
                     run_id, row["fence"], executor, reserved_units,
                 )
                 await self._journal(conn, run_id, "started", {"attempt": used + 1})
-                return Claim(fence=row["fence"], question=row["question"])
+                return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"])
 
     async def _end(self, conn, run_id, state: str, reason: str, *, move_fence=False,
                    reported_units: int | None = None) -> str:
@@ -391,8 +392,9 @@ class RunStore:
                 if revision is None:
                     raise NotFound
                 turns = await conn.fetch(
-                    """SELECT id, run_id, ordinal, question, answer, created_at FROM iris_ai.turn
-                        WHERE conversation_id = $1 ORDER BY ordinal""",
+                    """SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.created_at, r.pinned
+                         FROM iris_ai.turn t JOIN iris_ai.ask_run r ON r.id = t.run_id
+                        WHERE t.conversation_id = $1 ORDER BY t.ordinal""",
                     conversation_id,
                 )
                 citations = await conn.fetch(
@@ -413,6 +415,7 @@ class RunStore:
                 "id": str(t["id"]), "run_id": str(t["run_id"]), "ordinal": t["ordinal"],
                 "question": t["question"], "answer": t["answer"],
                 "created_at": t["created_at"].isoformat(),
+                "pinned": t["pinned"],
                 "citations": by_turn.get(t["id"], []),
             } for t in turns],
         }
