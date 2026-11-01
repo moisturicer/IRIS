@@ -2,9 +2,9 @@
 
 ## Status
 
-**Proposed** — 2026-11-01 (IR-780, spec IR-779), awaiting acceptance by Lee Jasmin Adolfo, the project lead. The decisions come from a design session with Hermoine Zozobrado on 2026-11-01.
+**Accepted** — 2026-11-01 by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado (IR-780, spec IR-779). The decisions come from design sessions with Hermoine Zozobrado on 2026-11-01. **None of it is built yet.**
 
-It would reverse IR-165's choice that `admin@cit.edu` holds no application role, though not IR-165's rule that `is_superuser` grants nothing in the API. It would change [ADR-050](050-calls-for-papers-and-rdco-confirmation.md) decision 15, give "system administrator" in [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) a meaning, widen [ADR-029](029-proposal-similarity-and-collaboration.md)'s choice of Contact person from Proposals to every paper, and answer IR-705's open decision.
+It reverses IR-165's choice that `admin@cit.edu` holds no application role, though not IR-165's rule that `is_superuser` grants nothing in the API. It changes [ADR-050](050-calls-for-papers-and-rdco-confirmation.md) decision 15, gives "system administrator" in [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) a meaning, widens [ADR-029](029-proposal-similarity-and-collaboration.md)'s choice of Contact person from Proposals to every paper, and answers IR-705's open decision.
 
 The data protection officer's review under IR-123 can change the wording of any notice, the retention periods and the withdrawal rule. Nothing here is legal advice.
 

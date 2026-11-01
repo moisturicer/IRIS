@@ -4,7 +4,7 @@
 
 Accepted — 2026-09-01
 
-[ADR-051](051-system-admin-account-deletion-and-consent.md), Proposed 2026-11-01, would add a seventh role, the System Admin, and move the Audit Log and system settings to it. It keeps decision 2: Django's `is_staff` and `is_superuser` grant nothing in this API.
+[ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01 and not built yet, adds a seventh role, the System Admin, and moves the Audit Log and system settings to it. It keeps decision 2: Django's `is_staff` and `is_superuser` grant nothing in this API.
 
 ## Context
 

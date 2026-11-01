@@ -4,7 +4,7 @@
 
 **Accepted** — 2026-09-26, by **Lee Jasmin Adolfo** (project lead), after [PR #133](https://github.com/moisturicer/IRIS/pull/133) merged. Tracked on [IR-373](https://citiris.atlassian.net/browse/IR-373).
 
-"System administrator" names no role in the code today. [ADR-051](051-system-admin-account-deletion-and-consent.md), Proposed 2026-11-01, would make it the System Admin role, and would also let RDCO replace an Adviser, add an owner to a paper in review and withdraw one.
+"System administrator" names no role in the code today. [ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01 and not built yet, makes it the System Admin role, and also lets RDCO replace an Adviser, add an owner to a paper in review and withdraw one.
 
 **The five design defaults are confirmed as part of acceptance.** They were marked as defaults in the Proposed draft; they are now decisions:
 
