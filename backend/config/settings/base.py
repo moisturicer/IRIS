@@ -198,6 +198,10 @@ REST_FRAMEWORK = {
         "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
         "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
         "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
+        # Per client address (IR-661). A campus shares one, so these allow a
+        # class signing in together; the lockout still answers per account and address.
+        "auth_login": throttle_rate("API_THROTTLE_LOGIN", "300/hour"),
+        "auth_register": throttle_rate("API_THROTTLE_REGISTER", "60/hour"),
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
         "ai_overview": "600/hour",

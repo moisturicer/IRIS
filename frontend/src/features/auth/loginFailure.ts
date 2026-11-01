@@ -13,6 +13,8 @@
  * because a server that is failing has not judged the credentials.
  */
 
+import { errorDetail } from "@/lib/errorDetail";
+
 /**
  * Which lock refused the sign-in (IR-555). Only the server knows when its own
  * lock lifts, so `unlockAt` is the time it sent, or `null` when it sent none.
@@ -27,6 +29,7 @@ export type LoginFailure =
   | { kind: "unverified" }
   | { kind: "locked"; lock: AccountLock }
   | { kind: "unreachable" }
+  | { kind: "throttled"; message: string }
   | { kind: "other"; detail: string };
 
 const INVALID_CREDENTIALS_DETAIL = "Invalid credentials.";
@@ -68,11 +71,15 @@ export function classifyLoginFailure(error: unknown): LoginFailure {
   // The server-side lock. django-axes (AXES_FAILURE_LIMIT) replaces the login
   // response with a plain-text 429, "Account locked: too many login
   // attempts…", so it carries no `detail` and would otherwise read as an
-  // outage. A DRF throttle is a 429 too, but with a JSON detail, and stays
-  // "other". This is an older server's reply, kept so it still opens the
+  // outage. This is an older server's reply, kept so it still opens the
   // dialog; it gives no time, so the dialog shows none.
   if (status === 429 && typeof response.data === "string" && /locked/i.test(response.data)) {
     return { kind: "locked", lock: { by: "attempts", unlockAt: null } };
+  }
+
+  // The rate limit (IR-661), which judged the address and not this password.
+  if (status === 429 && detail !== null) {
+    return { kind: "throttled", message: errorDetail(error, detail) };
   }
 
   // Anything below here needs the server's own words. A reply without them --
