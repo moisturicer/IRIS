@@ -39,6 +39,7 @@ from django.core.exceptions import ImproperlyConfigured
 
 from apps.ai.admission.scope import charged_to
 from apps.ai.policy.disclosure import Decision
+from apps.ai.policy.outbound import Dependency, OutboundGuard, Withheld
 from apps.ai.providers.batching import window_for_embedding
 from apps.ai.providers.ports import EmbeddingProvider
 
@@ -196,6 +197,16 @@ def default_permits(record) -> Decision:
     return decision_for_record(record)
 
 
+#: Why an embed stopped at the send itself (IR-720).
+WITHHELD_BEFORE_SEND = "disclosure refused: a governing fact changed before sending"
+PROVIDER_REFUSED = "disclosure refused: the embedding model has no known provider policy"
+
+
+def _withheld(record_id, space, refused) -> "EmbeddingOutcome":
+    reason = PROVIDER_REFUSED if refused.authorization.provider_refused else WITHHELD_BEFORE_SEND
+    return EmbeddingOutcome(record_id=record_id, space_id=space.id, refused=True, reason=reason)
+
+
 def _require_disclosure(record, permits: DisclosurePredicate) -> None:
     """Enforce ``permits`` for this record, or raise with the reason.
 
@@ -256,7 +267,12 @@ def embed_record_summary(
         )
 
     text = f"{record.title}. {record.abstract}"
-    vector = provider.embed_documents([text])[0]
+    sent = Dependency.abstract(record.pk, record.title, record.abstract)
+    try:
+        with OutboundGuard(principal=None, permits=permits).fence(lambda: {sent}):
+            vector = provider.embed_documents([text])[0]
+    except Withheld as refused:
+        return _withheld(record_id, space, refused)
     RecordEmbedding.objects.update_or_create(
         record=record,
         defaults={"embedding": vector, "model_name": space.model_id},
@@ -325,7 +341,7 @@ def embed_active_chunk_set(
     incremental path exists to avoid. ``force=True`` is how a caller chooses
     the other trade.
     """
-    from apps.ai.models.chunk import ChunkEmbedding
+    from apps.ai.models.chunk import ChunkEmbedding, ChunkSet
     from apps.records.models import Record
 
     provider = provider or build_embedding_provider()
@@ -348,11 +364,22 @@ def embed_active_chunk_set(
     # A long paper cannot go as one document: voyage-context-4 rejects one over
     # its window and does not truncate (IR-423). Each window is its own document.
     windows = window_for_embedding(chunk_texts(chunks))
-    vectors = [
-        vector
-        for group in provider.embed_document_chunks(windows)
-        for vector in group
-    ]
+    versions = {
+        Dependency.passage(record_id, version)
+        for version in ChunkSet.objects.filter(
+            pk__in={chunk.chunk_set_id for chunk in chunks}
+        ).values_list("content_hash", flat=True)
+    }
+    try:
+        # Rechecked per window and per retry: a refusal mid-paper sends no more.
+        with OutboundGuard(principal=None, permits=permits).fence(lambda: versions):
+            vectors = [
+                vector
+                for group in provider.embed_document_chunks(windows)
+                for vector in group
+            ]
+    except Withheld as refused:
+        return _withheld(record_id, space, refused)
     if len(vectors) != len(chunks):
         raise ValueError(
             f"The provider returned {len(vectors)} vectors for {len(chunks)} "
