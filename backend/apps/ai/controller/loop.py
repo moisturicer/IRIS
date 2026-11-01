@@ -22,6 +22,7 @@ from apps.ai.conversation_state import ContextState, committed_state
 from apps.ai.history import estimate_tokens
 from apps.ai.inference import InferenceTask
 from apps.ai.models import DocumentChunk
+from apps.ai.policy.outbound import Dependency, Withheld
 from apps.ai.providers.deadline import bounded, model_call_deadline
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.tool_calling import (
@@ -30,6 +31,7 @@ from apps.ai.providers.tool_calling import (
 from apps.ai.research.audit import RunAudit, Step, argument_digest
 from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.context import RunContext
+from apps.ai.research.ledger import PASSAGE
 from apps.ai.research.prompts import conversation_state, planner_history
 from apps.ai.research.registry import ToolRun, general_tools, offered, sources_current
 from apps.ai.research.results import Status, ToolStatus, population_snapshot
@@ -71,6 +73,7 @@ class _Gathered:
     facts: set = field(default_factory=set)
     revoked: bool = False
     malformed: int = 0
+    refusals: int = 0
     stalls: int = 0
     history_ids: Optional[frozenset] = None
     context_changed: bool = False
@@ -154,15 +157,27 @@ class Controller:
             if (run.spend.remaining_prompt_tokens - estimate < budget.reserved_tokens
                     or seconds <= 0):
                 return prompts.Decision(), "answer_reserve"
+            sent = list(gathered.envelopes)
             try:
                 run.spend.charge_prompt_tokens(estimate)
                 started = self.clock()
-                completion = model.converse_with_tools(
-                    messages, tools,
-                    timeout_seconds=bounded(min(settings.AI_RESEARCH_PLAN_TIMEOUT_SECONDS, seconds)),
-                )
+                with run.ctx.outbound().fence(lambda: _envelope_dependencies(run, sent)):
+                    completion = model.converse_with_tools(
+                        messages, tools,
+                        timeout_seconds=bounded(min(settings.AI_RESEARCH_PLAN_TIMEOUT_SECONDS, seconds)),
+                    )
             except BudgetExhausted as exc:
                 return prompts.Decision(), str(exc)
+            except Withheld as refused:
+                # Nothing was sent. Rebuild without what lost permission, once.
+                audit.append(Step("plan", "refused"))
+                gathered.refusals += 1
+                if gathered.refusals >= 2:
+                    return prompts.Decision(), "source_unavailable"
+                gathered.envelopes[:] = refused.authorization.retain(
+                    gathered.envelopes, lambda e: _envelope_dependencies(run, (e,)))
+                previous, gathered.revoked = [], False
+                continue
             except (LLMUnavailable, CircuitOpen, TimeoutError):
                 audit.append(Step("plan", "unavailable"))
                 return prompts.Decision(), "planner_unavailable"
@@ -273,6 +288,7 @@ class Controller:
         if reason != "ready":
             limitations.append(f"stopped_{reason}")
         facts = tuple(dict(f) for e in envelopes for f in e.facts)
+        fact_dependencies = _envelope_dependencies(run, [e for e in envelopes if e.facts])
         history = list(planner_history(run.ctx))
         return ReadyToCompose(
             question=asked.question,
@@ -285,6 +301,8 @@ class Controller:
             stop_reason=reason, history=history, clarify_about=decision.about,
             repair_attempts=budget.repair_attempts, pins=pin(CONTROLLER_ENGINE),
             current=_still_current(run),
+            guard=run.ctx.outbound(),
+            dependencies=_dependencies_at_handoff(run, fact_dependencies),
         )
 
     @staticmethod
@@ -349,6 +367,37 @@ def _current(run, envelopes) -> list:
             if ids <= allowed.keys() and _snapshots(e) <= {snapshot}
             and (e.metadata_version is None or e.metadata_version == version)
             and sources_current(run, e.source_items)]
+
+
+def _item_dependency(item) -> Dependency:
+    if item.kind == PASSAGE:
+        return Dependency.passage(item.record_id, item.chunk_set_hash or "")
+    return Dependency.abstract(item.record_id, item.record_title, item.text)
+
+
+def _envelope_dependencies(run, envelopes) -> set:
+    """Every source a planner payload carrying ``envelopes`` was built from."""
+    owners = {item.handle: item.record_id
+              for item in (*run.ledger.records(), *run.ledger.passages())}
+    found = {Dependency.metadata(owners[h]) for e in envelopes for h in _handles(e) if h in owners}
+    found.update(_item_dependency(item) for e in envelopes for item in e.source_items)
+    return found
+
+
+def _dependencies_at_handoff(run, fact_dependencies):
+    """Answer sources' reads, snapshotted now so a later eviction drops nothing."""
+    passages = {p.chunk_id: _item_dependency(p) for p in run.ledger.passages()}
+    records = {r.record_id: _item_dependency(r) for r in run.ledger.records()}
+
+    def dependencies(sources) -> set:
+        found = set(fact_dependencies)
+        for source in sources:
+            known = records.get(source.record_id) if is_abstract(source) else passages.get(source.chunk_id)
+            # A source the ledger never read has no version, so it never matches.
+            found.add(known or Dependency.passage(source.record_id, ""))
+        return found
+
+    return dependencies
 
 
 def _snapshots(envelope) -> set:
