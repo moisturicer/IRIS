@@ -20,7 +20,8 @@ RUNTIME_ROLES = ("iris_ai_runtime", "iris_django_runtime")
 GRANTS = (
     "GRANT USAGE ON SCHEMA iris_ai TO {role}",
     "GRANT SELECT, INSERT, UPDATE ON iris_ai.conversation, iris_ai.ask_run TO {role}",
-    "GRANT SELECT, INSERT, DELETE ON iris_ai.turn, iris_ai.citation, iris_ai.run_event TO {role}",
+    "GRANT SELECT, INSERT, DELETE ON iris_ai.turn, iris_ai.citation, iris_ai.run_event,"
+    " iris_ai.research_handle TO {role}",
     "GRANT SELECT, INSERT, UPDATE ON iris_ai.attempt_accounting TO {role}",
     "GRANT USAGE ON SEQUENCE iris_ai.attempt_accounting_id_seq TO {role}",
 )

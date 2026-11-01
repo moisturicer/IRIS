@@ -11,6 +11,7 @@ import uuid
 
 import asyncpg
 
+from ai.research.tools import ResearchTools
 from ai.runs import config as runs_config
 from ai.runs.executor import Executor
 from ai.runs.store import Fenced, RunStore
@@ -37,10 +38,11 @@ class RunService:
             allowance=self.cfg.limits.allowance(), pinned=self.pinned(),
         )
         if created:
-            await self.execute(row["id"])
+            await self.execute(row["id"], grant)
         return await self.store.status(grant, row["id"]), created
 
-    async def execute(self, run_id) -> None:
+    async def execute(self, run_id, grant) -> None:
+        """The run's tools read under the reader's `grant` (IR-719)."""
         claim = await self.store.claim(
             run_id, worker=self.worker, lease_seconds=self.cfg.limits.lease_seconds,
             executor=self.executor.name, reserved_units=self.executor.reserved_units,
@@ -48,7 +50,8 @@ class RunService:
         if claim is None:
             return
         try:
-            result = await self.executor.answer(claim.question)
+            tools = ResearchTools(self.store.dsn, grant, run_id, claim.fence, claim.scope_record_id)
+            result = await self.executor.answer(claim.question, tools)
         except Exception:
             await self.store.fail(run_id, claim.fence, "executor_failed")
             return
