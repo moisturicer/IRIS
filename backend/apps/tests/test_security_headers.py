@@ -23,15 +23,12 @@ stays on both servers.
 """
 
 import re
-from pathlib import Path
 
 import pytest
 from django.test import SimpleTestCase, override_settings
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-NGINX_CONF = REPO_ROOT / "frontend" / "nginx.conf"
-NGINX_SNIPPET = REPO_ROOT / "frontend" / "security-headers.conf"
-FRONTEND_DOCKERFILE = REPO_ROOT / "frontend" / "Dockerfile"
+from apps.documents.tests.test_document_access_control import NEEDS_CHECKOUT, REPO_ROOT
+
 SNIPPET_INCLUDE_PATH = "/etc/nginx/iris/security-headers.conf"
 
 # A referrer policy that sends no more than strict-origin-when-cross-origin.
@@ -41,7 +38,6 @@ ACCEPTABLE_REFERRER_POLICIES = {
     "strict-origin",
     "strict-origin-when-cross-origin",
 }
-CSP_HEADERS = ("Content-Security-Policy", "Content-Security-Policy-Report-Only")
 
 
 def parse_csp(policy):
@@ -77,20 +73,20 @@ def assert_policy_is_strict(policy):
 class DjangoResponseHeaderTests(SimpleTestCase):
     """A 404 goes through the whole middleware stack and touches no database."""
 
-    def headers(self, path="/api/v1/no-such-endpoint/"):
+    def get(self, path="/api/v1/no-such-endpoint/"):
         return self.client.get(path)
 
     def test_nosniff(self):
-        self.assertEqual(self.headers()["X-Content-Type-Options"], "nosniff")
+        self.assertEqual(self.get()["X-Content-Type-Options"], "nosniff")
 
     def test_referrer_policy_is_strict_origin_when_cross_origin_or_stricter(self):
-        self.assertIn(self.headers()["Referrer-Policy"], ACCEPTABLE_REFERRER_POLICIES)
+        self.assertIn(self.get()["Referrer-Policy"], ACCEPTABLE_REFERRER_POLICIES)
 
     def test_framing_is_denied(self):
-        self.assertEqual(self.headers()["X-Frame-Options"], "DENY")
+        self.assertEqual(self.get()["X-Frame-Options"], "DENY")
 
     def test_csp_ships_report_only(self):
-        response = self.headers()
+        response = self.get()
         self.assertIn("Content-Security-Policy-Report-Only", response)
         self.assertNotIn(
             "Content-Security-Policy",
@@ -99,46 +95,52 @@ class DjangoResponseHeaderTests(SimpleTestCase):
         )
 
     def test_csp_is_strict(self):
-        assert_policy_is_strict(self.headers()["Content-Security-Policy-Report-Only"])
+        assert_policy_is_strict(self.get()["Content-Security-Policy-Report-Only"])
 
     def test_admin_pages_carry_it_too(self):
-        self.assertIn("Content-Security-Policy-Report-Only", self.headers("/admin/login/"))
+        self.assertIn("Content-Security-Policy-Report-Only", self.get("/admin/login/"))
 
     @override_settings(CONTENT_SECURITY_POLICY_REPORT_ONLY=False)
     def test_enforcing_is_one_setting(self):
-        response = self.headers()
+        response = self.get()
         self.assertIn("Content-Security-Policy", response)
         self.assertNotIn("Content-Security-Policy-Report-Only", response)
 
     @override_settings(CONTENT_SECURITY_POLICY="")
     def test_no_policy_sends_no_header(self):
-        response = self.headers()
-        for name in CSP_HEADERS:
-            self.assertNotIn(name, response)
+        response = self.get()
+        self.assertNotIn("Content-Security-Policy", response)
+        self.assertNotIn("Content-Security-Policy-Report-Only", response)
 
 
 # ---- nginx -----------------------------------------------------------------
 
 
-def _needs_frontend():
-    if not NGINX_CONF.exists():
-        pytest.skip("frontend/ is not mounted in the backend container")
+def _frontend(name):
+    """A file under frontend/, or a skip where the checkout is not mounted."""
+    if REPO_ROOT is None:
+        pytest.skip(NEEDS_CHECKOUT)
+    return (REPO_ROOT / "frontend" / name).read_text(encoding="utf-8")
 
 
 def _snippet_headers():
     """`{name: value}` for every `add_header` in the snippet, which must be `always`."""
-    text = NGINX_SNIPPET.read_text(encoding="utf-8")
-    headers = {}
-    for name, value, always in re.findall(
+    text = _without_comments(_frontend("security-headers.conf"))
+    found = re.findall(
         r'^\s*add_header\s+(\S+)\s+"([^"]*)"\s*(always)?\s*;', text, re.MULTILINE
-    ):
+    )
+    assert len(found) == len(re.findall(r"\badd_header\b", text)), (
+        "an add_header line this test cannot read; quote its value"
+    )
+    headers = {}
+    for name, value, always in found:
         assert always, f"{name} is missing `always`, so error responses would lack it"
         headers[name] = value
     return headers
 
 
 def _location_blocks(conf):
-    """`[(location line, body)]` for each top-level location in the server block."""
+    """`[(location line, body)]` for each location block, nested ones included."""
     blocks = []
     for match in re.finditer(r"^\s*location\b[^{]*\{", conf, re.MULTILINE):
         depth, i = 1, match.end()
@@ -154,7 +156,6 @@ def _without_comments(text):
 
 
 def test_the_snippet_sends_every_header():
-    _needs_frontend()
     headers = _snippet_headers()
     assert headers.get("X-Content-Type-Options") == "nosniff"
     assert headers.get("Referrer-Policy") in ACCEPTABLE_REFERRER_POLICIES
@@ -174,8 +175,7 @@ def test_every_location_nginx_answers_itself_includes_the_snippet():
     serves files includes the snippet instead. Proxied locations do not: Django
     sets the same headers, and nginx would send them twice.
     """
-    _needs_frontend()
-    conf = _without_comments(NGINX_CONF.read_text(encoding="utf-8"))
+    conf = _without_comments(_frontend("nginx.conf"))
     blocks = _location_blocks(conf)
     assert blocks, "no location blocks found -- has nginx.conf changed shape?"
     served = [(line, body) for line, body in blocks if "proxy_pass" not in body]
@@ -190,8 +190,7 @@ def test_every_location_nginx_answers_itself_includes_the_snippet():
 
 
 def test_the_image_puts_the_snippet_where_nginx_includes_it():
-    _needs_frontend()
-    dockerfile = FRONTEND_DOCKERFILE.read_text(encoding="utf-8")
+    dockerfile = _frontend("Dockerfile")
     assert re.search(
         rf"^COPY\s+security-headers\.conf\s+{re.escape(SNIPPET_INCLUDE_PATH)}\s*$",
         dockerfile,

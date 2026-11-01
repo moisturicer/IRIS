@@ -252,10 +252,9 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "form-action 'self'",
     "frame-ancestors 'none'",
 ])
-# Report-only until a manual walk-through of the main screens (sign in,
-# Discover, a Record with the PDF reader, Ask IRIS streaming, Submit, the
-# review screens and the admin) shows no violation in the browser console.
-# Enforcing is a reviewed change to this line, never an environment variable.
+# Report-only until the manual walk-through in docs/testing/TRACEABILITY.md
+# (IR-663) shows no violation. Enforcing is a reviewed change to this line,
+# and to frontend/security-headers.conf, never an environment variable.
 CONTENT_SECURITY_POLICY_REPORT_ONLY = True
 
 # ---- CORS ---------------------------------------------------------------

@@ -20,11 +20,11 @@ class ContentSecurityPolicyMiddleware(MiddlewareMixin):
     """
 
     def process_response(self, request, response):
-        policy = getattr(settings, "CONTENT_SECURITY_POLICY", "")
+        policy = settings.CONTENT_SECURITY_POLICY
         if policy:
             name = (
                 "Content-Security-Policy-Report-Only"
-                if getattr(settings, "CONTENT_SECURITY_POLICY_REPORT_ONLY", True)
+                if settings.CONTENT_SECURITY_POLICY_REPORT_ONLY
                 else "Content-Security-Policy"
             )
             response.headers.setdefault(name, policy)
