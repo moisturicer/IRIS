@@ -14,7 +14,20 @@ interface ReadingPositionOptions {
   scrollAreaRef: MutableRefObject<HTMLElement | null>;
   /** The reader is a contained pane (IR-569); a change swaps the scroller. */
   contained: boolean;
+  /**
+   * Changes when pages take their real size in place of an estimate (IR-565):
+   * the pages above the reader may have moved, so their place is put back.
+   */
+  geometryKey: string | number;
 }
+
+/** Where the reader is: the page under the toolbar, and the last page in view. */
+export interface ReadingPosition {
+  currentPage: number;
+  lastVisiblePage: number;
+}
+
+const START: ReadingPosition = { currentPage: 1, lastVisiblePage: 1 };
 
 /** Throttles to the next frame where the browser offers one. */
 function nextFrame(callback: () => void): () => void {
@@ -33,7 +46,11 @@ function nextFrame(callback: () => void): () => void {
  * when contained, the window otherwise -- and returns its number for
  * "Page n / N". When the zoom changes, or the workspace crosses into or out of
  * the contained layout (which swaps the scroller), it puts the same point of
- * the same page back under the toolbar before the browser paints.
+ * the same page back under the toolbar before the browser paints. So it does
+ * when a page loads at a size other than the one estimated for it (IR-565).
+ *
+ * The last page in view is what, with the current one, decides which pages
+ * the reader paints (`liveWindow`).
  */
 export function useReadingPosition({
   ready,
@@ -43,8 +60,9 @@ export function useReadingPosition({
   toolbarRef,
   scrollAreaRef,
   contained,
-}: ReadingPositionOptions): number {
-  const [currentPage, setCurrentPage] = useState(1);
+  geometryKey,
+}: ReadingPositionOptions): ReadingPosition {
+  const [position, setPosition] = useState<ReadingPosition>(START);
   const anchorRef = useRef<ReadingAnchor | null>(null);
 
   const viewTop = useCallback(
@@ -52,10 +70,19 @@ export function useReadingPosition({
     [toolbarRef],
   );
 
+  /** The bottom of what can be read: the pane's when it scrolls, else the window's. */
+  const viewBottom = useCallback(() => {
+    const area = scrollAreaRef.current;
+    if (area && /auto|scroll/.test(getComputedStyle(area).overflowY)) {
+      return area.getBoundingClientRect().bottom;
+    }
+    return window.innerHeight;
+  }, [scrollAreaRef]);
+
   useEffect(() => {
     if (ready) return;
     anchorRef.current = null;
-    setCurrentPage(1);
+    setPosition(START);
   }, [ready]);
 
   useEffect(() => {
@@ -72,7 +99,14 @@ export function useReadingPosition({
       const anchor = readingAnchor(boxes, viewTop());
       if (!anchor) return;
       anchorRef.current = anchor;
-      setCurrentPage(anchor.page);
+      const bottom = viewBottom();
+      let last = anchor.page;
+      while (last < boxes.length && boxes[last].top < bottom) last += 1;
+      setPosition((previous) =>
+        previous.currentPage === anchor.page && previous.lastVisiblePage === last
+          ? previous
+          : { currentPage: anchor.page, lastVisiblePage: last },
+      );
     };
     const onScroll = () => {
       if (!cancelFrame) cancelFrame = nextFrame(measure);
@@ -81,14 +115,17 @@ export function useReadingPosition({
     const area = scrollAreaRef.current;
     area?.addEventListener("scroll", onScroll, { passive: true });
     window.addEventListener("scroll", onScroll, { passive: true });
+    // Once on opening and on every zoom: a paper opened at 40% shows more
+    // pages than one at 140%, before anything has scrolled.
+    onScroll();
     return () => {
       cancelFrame?.();
       area?.removeEventListener("scroll", onScroll);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [ready, pageCount, pageRefs, scrollAreaRef, viewTop]);
+  }, [ready, pageCount, scale, pageRefs, scrollAreaRef, viewTop, viewBottom]);
 
-  const layoutKey = `${scale}|${contained}`;
+  const layoutKey = `${scale}|${contained}|${geometryKey}`;
   const lastLayoutKey = useRef(layoutKey);
   useLayoutEffect(() => {
     if (lastLayoutKey.current === layoutKey) return;
@@ -108,5 +145,5 @@ export function useReadingPosition({
     // Refs and `viewTop` are stable: only a change of layout runs this.
   }, [layoutKey, pageRefs, scrollAreaRef, viewTop]);
 
-  return currentPage;
+  return position;
 }

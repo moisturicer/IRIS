@@ -1,10 +1,8 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { recordsApi } from "@/api/records";
 import { Button, Skeleton } from "@/components/ui";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { cn } from "@/lib/utils";
 import {
-  loadPdfDocument,
   pageSize,
   renderPageToCanvas,
   renderTextLayer,
@@ -29,11 +27,14 @@ import {
   citationLandingDelta,
   firstRegionOn,
   fitScale,
+  liveWindow,
   regionInView,
   type RegionBand,
 } from "./readerGeometry";
 import { usePaperFind } from "./usePaperFind";
+import { usePdfDocument } from "./usePdfDocument";
 import { useReadingPosition } from "./useReadingPosition";
+import { useAuthStore } from "@/store/auth.store";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 const SCALE_STEP = 0.2;
@@ -63,38 +64,23 @@ const SETTLE_AFTER_LANDING_MS = 1500;
 const NO_HITS: FindHit[] = [];
 
 /**
- * One rendered page: its own canvas, its text layer, its own citation
- * overlay, and a ref the parent uses to scroll to it (IR-335).
+ * A page's canvas and text layer (IR-353): mounted only while the page is in
+ * the reader's live window (IR-565), so a long paper never holds more than
+ * `MAX_LIVE_PAGES` of them. Leaving the window cancels a render still in
+ * progress and drops both.
  *
- * The text layer (IR-353) is what makes the paper's text selectable and
- * what find highlights. It sits over the canvas and under the citation
- * overlay, so a citation's highlight still shows above a find's.
- *
- * The box is sized from the page's own dimensions at the current zoom before
- * the canvas paints (IR-352), so a zoom change moves every page at once
- * instead of one by one as each render lands. That is also what lets the
- * reader restore its position in the same frame.
+ * The text layer is what makes the paper's text selectable and what find
+ * highlights. It sits over the canvas and under the citation overlay, so a
+ * citation's highlight still shows above a find's.
  */
-function PdfPageView({
-  page,
-  pageNumber,
-  scale,
-  regions,
-  hits,
-  registerRef,
-}: {
-  page: PdfPage;
-  pageNumber: number;
-  scale: number;
-  regions: Region[];
-  hits: FindHit[];
-  registerRef: (pageNumber: number, el: HTMLDivElement | null) => void;
+function LivePageLayers({ page, scale, hits, onPaint }: {
+  page: PdfPage; scale: number; hits: FindHit[];
+  onPaint: (page: number, scale: number | null) => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const layerRef = useRef<TextLayerHandle | null>(null);
   const [textReady, setTextReady] = useState(false);
-  const { width, height } = pageSize(page, scale);
   // The scale the text layer is first drawn at; later zooms `update` it.
   const scaleRef = useRef(scale);
   scaleRef.current = scale;
@@ -103,11 +89,14 @@ function PdfPageView({
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rendering = renderPageToCanvas(page, canvas, scale);
-    rendering.promise.catch(() => {
+    let cancelled = false;
+    rendering.promise.then(() => {
+      if (!cancelled) onPaint(page.pageNumber, scale);
+    }, () => {
       /* a cancelled render rejects on purpose -- nothing to report */
     });
-    return () => rendering.cancel();
-  }, [page, scale]);
+    return () => { cancelled = true; rendering.cancel(); onPaint(page.pageNumber, null); };
+  }, [page, scale, onPaint]);
 
   useEffect(() => {
     const container = textLayerRef.current;
@@ -138,6 +127,51 @@ function PdfPageView({
   }, [textReady, hits]);
 
   return (
+    <>
+      <canvas ref={canvasRef} className="block w-full h-full" />
+      <div ref={textLayerRef} className="textLayer" />
+    </>
+  );
+}
+
+/**
+ * One page of the paper: a box of the page's size at the current zoom, its
+ * citation overlay, and a ref the parent uses to scroll to it (IR-335).
+ *
+ * The box is sized from the page's own dimensions before the canvas paints
+ * (IR-352), so a zoom change moves every page at once instead of one by one
+ * as each render lands. That is also what lets the reader restore its
+ * position in the same frame.
+ *
+ * Outside the live window, or before pdf.js has loaded it, the box is all
+ * there is (IR-565): the spacer that keeps the paper's scroll geometry. A
+ * page not loaded yet is sized from `sizePage`, one that has; a paper's pages
+ * are nearly always one size, and the reader keeps its place when one is not.
+ */
+function PdfPageView({
+  page,
+  sizePage,
+  live,
+  pageNumber,
+  scale,
+  regions,
+  hits,
+  registerRef,
+  onPaint,
+}: {
+  page: PdfPage | undefined;
+  sizePage: PdfPage;
+  live: boolean;
+  pageNumber: number;
+  scale: number;
+  regions: Region[];
+  hits: FindHit[];
+  registerRef: (pageNumber: number, el: HTMLDivElement | null) => void;
+  onPaint: (page: number, scale: number | null) => void;
+}) {
+  const { width, height } = pageSize(page ?? sizePage, scale);
+
+  return (
     <div
       ref={(el) => registerRef(pageNumber, el)}
       data-page-number={pageNumber}
@@ -152,8 +186,7 @@ function PdfPageView({
       // pdf.js sizes the text layer's glyphs from this (index.css, `.textLayer`).
       style={{ width, height, ["--total-scale-factor" as string]: scale }}
     >
-      <canvas ref={canvasRef} className="block w-full h-full" />
-      <div ref={textLayerRef} className="textLayer" />
+      {live && page && <LivePageLayers page={page} scale={scale} hits={hits} onPaint={onPaint} />}
       <CitationOverlay regions={regions.filter((r) => r.page === pageNumber)} />
     </div>
   );
@@ -207,12 +240,22 @@ export interface PaperPdfReaderProps {
  * inside a scrolling page is awkward on touch. Either way the paper opens
  * fitted to the width it has.
  *
+ * A long paper opens at the useful page first (IR-565): the reader is ready
+ * once the page it opens at has loaded (`usePdfDocument`), and only the pages
+ * around the view -- plus one a citation or find is landing on -- carry a
+ * canvas and a text layer (`liveWindow`). The rest are boxes of their size.
+ *
  * Fetched as a blob through `apiClient`, not a plain `<a href>`: the
  * manuscript endpoint requires `IsAuthenticated`, and only a request carrying
  * the bearer token in memory can reach it. Saving a copy is not this blob:
  * it goes through the download route, which marks it (`downloadControl`).
  */
-export function PaperPdfReader({
+export function PaperPdfReader(props: PaperPdfReaderProps) {
+  const epoch = useAuthStore((state) => state.sessionEpoch);
+  return <PaperPdfReaderSource key={`${epoch}:${props.recordId}:${props.version ?? "current"}`} {...props} />;
+}
+
+function PaperPdfReaderSource({
   recordId,
   version = null,
   scrollToPage,
@@ -222,12 +265,25 @@ export function PaperPdfReader({
   fill = false,
   downloadControl,
 }: PaperPdfReaderProps) {
-  const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
-  const [pages, setPages] = useState<PdfPage[]>([]);
+  const { status, pageCount, pages, pageProxy, prioritize } = usePdfDocument({
+    recordId,
+    version,
+    attempt,
+    firstPage: scrollToPage,
+  });
   const [zoom, setZoom] = useState<number | "fit" | null>(null);
+  const [painted, setPainted] = useState<ReadonlyMap<number, number>>(new Map());
+  const onPaint = useCallback((page: number, atScale: number | null) => {
+    setPainted((previous) => {
+      const next = new Map(previous);
+      if (atScale === null) next.delete(page);
+      else next.set(page, atScale);
+      return next;
+    });
+  }, []);
+  const [findLanding, setFindLanding] = useState<{ page: number; region: RegionBand } | null>(null);
   const pageRefs = useRef(new Map<number, HTMLDivElement>());
-  const destroyRef = useRef<(() => Promise<void>) | null>(null);
   const paneRef = useRef<HTMLDivElement>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
   // Read when a citation lands, not a reason to land again: the caller
@@ -249,63 +305,40 @@ export function PaperPdfReader({
     [observeArea],
   );
 
-  // Fitted to the widest page, so a landscape table page never overflows.
-  const baseWidth = useMemo(
-    () => pages.reduce((widest, page) => Math.max(widest, pageSize(page, 1).width), 0),
-    [pages],
-  );
+  // Fitted to the widest page loaded, so a landscape table page never overflows.
+  const { baseWidth, sizePage, geometryKey } = useMemo(() => {
+    const loaded = pages.filter((page): page is PdfPage => page !== undefined);
+    const estimate = loaded[0] && pageSize(loaded[0], 1);
+    // What the boxes' sizes rest on: the page unloaded ones are sized from,
+    // and every loaded page that is not that size. A paper of one page size
+    // keeps one key while the rest of it loads, so the reader's place is put
+    // back only when a page above it really moved -- not on every chunk,
+    // where a place measured before an instant landing would undo it.
+    const resized = pages.flatMap((page, index) => {
+      if (!page || !estimate) return [];
+      const { width, height } = pageSize(page, 1);
+      return width === estimate.width && height === estimate.height ? [] : [index + 1];
+    });
+    return {
+      baseWidth: loaded.reduce((widest, page) => Math.max(widest, pageSize(page, 1).width), 0),
+      sizePage: loaded[0],
+      geometryKey: `${loaded[0]?.pageNumber ?? 0}|${resized.join(",")}`,
+    };
+  }, [pages]);
   const fitted = fitScale(baseWidth, paneWidth);
   const fitting = zoom === "fit" || (zoom === null && paneWidth > 0 && paneWidth < READING_SPLIT_PX);
   const scale = fitting ? (fitted ?? DEFAULT_SCALE) : (zoom ?? DEFAULT_SCALE);
 
-  const currentPage = useReadingPosition({
+  const { currentPage, lastVisiblePage } = useReadingPosition({
     ready: status === "ready",
-    pageCount: pages.length,
+    pageCount,
     scale,
     pageRefs,
     toolbarRef,
     scrollAreaRef,
     contained,
+    geometryKey,
   });
-
-  useEffect(() => {
-    let cancelled = false;
-    setStatus("loading");
-    setPages([]);
-
-    (async () => {
-      try {
-        const { data } = version == null
-          ? await recordsApi.manuscriptBlob(recordId)
-          : await recordsApi.versionManuscriptBlob(recordId, version);
-        if (cancelled) return;
-        const buffer = await data.arrayBuffer();
-        const { document: doc, destroy } = await loadPdfDocument(buffer);
-        if (cancelled) {
-          void destroy();
-          return;
-        }
-        destroyRef.current = destroy;
-
-        const loaded: PdfPage[] = [];
-        for (let n = 1; n <= doc.numPages; n += 1) {
-          loaded.push(await doc.getPage(n));
-        }
-        if (cancelled) return;
-
-        setPages(loaded);
-        setStatus("ready");
-      } catch {
-        if (!cancelled) setStatus("error");
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      void destroyRef.current?.();
-      destroyRef.current = null;
-    };
-  }, [recordId, version, attempt]);
 
   /**
    * Brings `region` of page `pageNumber` to rest just below the reader's
@@ -355,7 +388,7 @@ export function PaperPdfReader({
   // it, rather than the page's top edge at the window's top -- under the
   // fixed header, and a lower passage off the screen altogether.
   useEffect(() => {
-    if (status !== "ready" || scrollToPage == null) return;
+    if (status !== "ready" || scrollToPage == null || painted.get(scrollToPage) !== scale) return;
     const landed = landedRef.current;
     const followed = landed?.navKey !== navKey;
     const settling =
@@ -376,17 +409,45 @@ export function PaperPdfReader({
     // not a trigger: crossing the breakpoint keeps the reader's place
     // (`useReadingPosition`), it does not land again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [status, scrollToPage, navKey, scale]);
+  }, [status, scrollToPage, navKey, scale, painted]);
 
   const find = usePaperFind({
     ready: status === "ready",
-    pages,
+    pageCount,
+    pageProxy,
     currentPage,
     paneRef,
     // Instant, as a browser's find moves: a smooth scroll per keystroke
     // would still be travelling when the next one lands.
-    land: (page, region) => land(page, region, "auto", true),
+    land: (page, region) => setFindLanding({ page, region }),
   });
+
+  // A landing still waiting for its page to paint is dropped with find: the
+  // page is no longer pinned, and the reader scrolling to it later must not
+  // be jumped to a match they closed.
+  useEffect(() => {
+    if (!find.open) setFindLanding(null);
+  }, [find.open]);
+
+  useEffect(() => {
+    if (!findLanding || painted.get(findLanding.page) !== scale) return;
+    land(findLanding.page, findLanding.region, "auto", true);
+    setFindLanding(null);
+    // Geometry is read only when the requested target has finished painting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [findLanding, painted, scale]);
+
+  // A citation's page and find's are painted before the reader is moved
+  // there (`liveWindow`'s pins), and loaded out of turn if the background
+  // loader has not reached them yet.
+  const targetPage = find.targetPage;
+  const live = useMemo(
+    () => new Set(liveWindow(currentPage, lastVisiblePage, pageCount, [scrollToPage, targetPage])),
+    [currentPage, lastVisiblePage, pageCount, scrollToPage, targetPage],
+  );
+  useEffect(() => {
+    live.forEach(prioritize);
+  }, [live, prioritize]);
 
   const registerRef = (pageNumber: number, el: HTMLDivElement | null) => {
     if (el) pageRefs.current.set(pageNumber, el);
@@ -446,7 +507,7 @@ export function PaperPdfReader({
       >
         {fill && ready && (
           <span className="order-first px-2 text-small text-stone-600 tabular-nums">
-            Page {currentPage} / {pages.length}
+            Page {currentPage} / {pageCount}
           </span>
         )}
         {fill && <span aria-hidden className="w-px h-5 bg-stone-300 mx-1" />}
@@ -501,7 +562,7 @@ export function PaperPdfReader({
 
         {!fill && ready && (
           <span className="text-xs font-semibold text-stone-600 tabular-nums">
-            Page {currentPage} / {pages.length}
+            Page {currentPage} / {pageCount}
           </span>
         )}
         {fill && <span aria-hidden className="flex-1" />}
@@ -529,7 +590,7 @@ export function PaperPdfReader({
       <div
         ref={scrollAreaCallbackRef}
         role="region"
-        aria-label={ready ? `Paper, ${pages.length} page${pages.length === 1 ? "" : "s"}` : "Paper"}
+        aria-label={ready ? `Paper, ${pageCount} page${pageCount === 1 ? "" : "s"}` : "Paper"}
         tabIndex={0}
         className={cn(
           "rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-brand/40",
@@ -550,10 +611,14 @@ export function PaperPdfReader({
         )}
 
         {ready &&
+          sizePage &&
           pages.map((page, index) => (
             <PdfPageView
               key={index + 1}
               page={page}
+              sizePage={sizePage}
+              live={live.has(index + 1)}
+              onPaint={onPaint}
               pageNumber={index + 1}
               scale={scale}
               regions={highlightRegions}

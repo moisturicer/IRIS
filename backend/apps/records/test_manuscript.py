@@ -57,6 +57,16 @@ class ManuscriptEndpointTests(APITestCase):
 
         self.assertEqual(response["Accept-Ranges"], "bytes")
 
+    def test_the_paper_is_never_kept_in_a_browser_cache(self):
+        """The bytes are one signed-in reader's (IR-565): a browser that kept
+        them on disk would still hold an authenticated PDF after logout, where
+        the next person at the machine could reach it."""
+        self.client.force_authenticate(self.owner)
+
+        response = self._get()
+
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+
     def test_a_reader_who_may_not_see_the_record_gets_404_not_403(self):
         """The same rule every other record endpoint follows (IR-153): a
         refusal must read identically to a missing record, or the response
