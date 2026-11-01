@@ -46,6 +46,12 @@ keys into your local `backend/.env` and restart backend processes to use them.
 also work). Invalid values stop startup and name the offending key.
 The separate AI overview budget is unchanged.
 
+Login and registration have budgets of their own (IR-661): `API_THROTTLE_LOGIN`
+(`300/hour`) and `API_THROTTLE_REGISTER` (`60/hour`), same format. They count per
+client address, read as `TRUSTED_PROXY_COUNT` says, and do not spend the anonymous
+budget. A refusal is a 429 with `Retry-After`. The axes lockout is separate and
+still answers per account and address.
+
 A 429 recovers after its `Retry-After` window. **Production must wait out
 that window.** Locally, after changing a limit, old counters can still lock
 an account out. Open `docker compose exec backend python manage.py shell`
@@ -311,6 +317,7 @@ cp backend/.env.example backend/.env
 - Never commit a real secret. If one is committed, **rotate it** — removing it from the diff is not enough
 - The application fails to start on a missing required secret rather than defaulting silently. `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have **no defaults**: `config/settings/base.py`'s `required()` raises `ImproperlyConfigured` naming the variable, and a value set to the empty string counts as missing
 - Production must run with `TRUSTED_PROXY_COUNT` set to the number of proxies in front of Django, nginx included (IR-656). `apps/accounts/client_address.py` reads the sign-in lockout's client address from it.
+- `/django-admin/` answers 403 in production unless the client is in `DJANGO_ADMIN_ALLOWED_NETWORKS` (IR-668). Set it in the repo-root `.env`, as addresses or CIDRs separated by spaces or commas: `DJANGO_ADMIN_ALLOWED_NETWORKS=203.0.113.0/24, 198.51.100.7`. Empty allows nobody. With a value set, also put `TRUSTED_PROXY_COUNT` in that `.env`, matching `backend/.env`, because nginx reads the client address the same way. A bad value, `/0` or a missing count stops the frontend container. Restart it after a change: `docker compose -f docker-compose.prod.yml up -d frontend`. Port 80 must be reachable only from the TLS proxy, or a client could forge its address (IR-662). Development has no nginx, so it is unaffected. **Django serves its admin at `/admin/` until IR-782 moves it, and that path is not restricted until then.**
 - Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`. `config/settings/production.py` re-reads the last two without base's `localhost` default and refuses to start on an empty, `*` or non-https value
 
 `CORS_ALLOW_ALL_ORIGINS` is **gone** from every settings module (IR-154 — earlier text here attributing this to IR-61 is superseded; IR-61 was replaced by IR-154). It was set in development and, combined with `CORS_ALLOW_CREDENTIALS`, permitted any origin to make authenticated requests on a logged-in user's behalf. `development.py` now lists its dev origins explicitly, and `production.py` refuses to start if the setting reappears anywhere.
@@ -326,6 +333,21 @@ cd backend && python -m pytest -q
 cd backend && python -m pytest apps/reviews -v
 cd backend && python -m pytest apps/ai apps/documents   # the RAG pipeline suites
 ```
+
+**Backend CI (IR-810)** runs the complete pytest collection across four isolated
+runners/PostgreSQL services. Whole test modules stay together, assigned by test
+count; tests within a shard retain collection order. This avoids sharing the
+database roles and migration state that integration tests mutate. The required
+`Backend` check passes only when all four shards succeed. Each shard retains
+its JUnit report as a `backend-tests-N` artifact and logs its slowest 25 tests.
+Static/configuration/migration checks and `IRIS_REQUIRE_DB=1` remain enabled.
+PR updates cancel that PR's obsolete run; main push runs remain independent.
+
+The optional plugin is loaded only in CI (ordinary local pytest remains serial).
+The shard regression tests execute actual pytest subprocesses and verify that
+their union runs every collected test once, preserving module order. Shard
+balance currently uses counts; use the reports to judge elapsed time before
+claiming a speedup or changing the partition policy.
 
 **Frontend still has no test runner** — `npm test` is not wired up, deliberately deferred (P3). `npm run lint` and `npm run build` (`tsc && vite build`) are the only automated frontend checks.
 

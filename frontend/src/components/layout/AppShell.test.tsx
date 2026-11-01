@@ -123,4 +123,18 @@ describe("the app shell", () => {
     expect(notificationsApi.list).toHaveBeenCalledTimes(1);
     expect(notificationsApi.list).toHaveBeenCalledWith(true);
   });
+
+  it("never makes main a scroll container, so sticky chrome keeps working (IR-351, IR-534)", async () => {
+    // Spec Appendix K: F1 must not add `overflow` to `main`. The window is the
+    // scroll root; any overflow value on `main` makes it the nearest scroll
+    // container and leaves every `sticky` descendant inert.
+    for (const path of ["/records/mine", "/admin/audit"]) {
+      const { unmount } = renderAt(path);
+      await screen.findByRole("heading", { level: 1 });
+      const main = screen.getByRole("main");
+      expect(main.className).not.toMatch(/(^|\s|:)overflow-/);
+      expect(main.style.overflow).toBe("");
+      unmount();
+    }
+  });
 });

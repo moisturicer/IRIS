@@ -168,8 +168,8 @@ class DisclosureGateTests:
         self, embedder, space, reader
     ):
         """The gate must be capable of *allowing*, or the test above would pass
-        against a gate that refuses everything for the wrong reason -- which,
-        until IR-250 adds an embargo field, is exactly what it does."""
+        against a gate that refuses everything for the wrong reason. The real
+        gate's own table is in `apps/ai/tests/test_embargo_every_way_out.py`."""
         make_record("Open Work", reader, embedder, space, ["an open passage"])
         spy = _TransmittingReranker()
 

@@ -1,4 +1,4 @@
-import { createBrowserRouter, redirect, type RouteObject } from "react-router-dom";
+import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
 import { rolesFor } from "@/lib/access";
@@ -99,7 +99,6 @@ export const routes: RouteObject[] = [{
                   { path: "review/office",   element: <OfficeConsolePage />,   handle: { crumb: "Office console" } },
                 ],
               },
-              { path: "review/:id/evaluate", loader: ({ params }) => redirect(`/records/${params.id}?section=review`) },
             ],
           },
           {

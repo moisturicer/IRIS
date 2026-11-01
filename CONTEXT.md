@@ -119,8 +119,18 @@ _Avoid_: Duplicate detection (that is about two Proposals overlapping with each 
 ### Review workflow
 
 **Specialist office**:
-ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (IP, ethics, commercialisation). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
+ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (technical review, ethics compliance, the commercial potential of IP). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
 _Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
+
+**ITSO**:
+The Innovation & Technology Support Office, which handles technical review of research outputs. Questions about IP go to [[KTTO]].
+_Avoid_: IP office.
+
+**IERC**:
+The Institutional Ethics Review Committee, responsible for ethics compliance review of research submissions.
+
+**KTTO**:
+The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions.
 
 **Specialist path**:
 A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
@@ -182,9 +192,17 @@ _Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which
 A Proposal its Adviser accepted: its resting state. It is not published, and nothing further is decided on it.
 _Avoid_: Approved (the stored name), ongoing, completed (the state of the retired *complete* act).
 
+**Continuation**:
+The Thesis/Research or Project a researcher starts from their own [[Accepted]] Proposal, carrying it forward into a manuscript submission with its own [[Manuscript]] and its own review. A Proposal has at most one Continuation, and each names the other; a reader is shown that link only when they may open the Record it names.
+_Avoid_: Child record, child manuscript, derived record, fork, follow-up.
+
 **Unlisted**:
 A Thesis/Research or Project that RDCO accepted but kept out of Discover and Ask IRIS, for example ahead of a patent filing. Its owners and reviewers can still open it.
 _Avoid_: Completed (the code's status name), embargoed, hidden.
+
+**Embargo**:
+A hold that stops a Record's text going to outside AI companies, for a reason such as a sponsor's agreement or a journal that publishes first. Its date is a reminder, and it ends only when the Adviser or RDCO releases it. It doesn't hide the Record from readers in IRIS, which is what [[Unlisted]] does.
+_Avoid_: Expired (an embargo doesn't expire), hidden, private.
 
 **Archived**:
 How a rejected Record is shown to readers. It is terminal: the owner cannot answer it with a new [[Version]] and must submit a new Record.
@@ -297,7 +315,7 @@ The role of the person who reviews their advisees' Records first and routes them
 _Avoid_: Faculty, faculty adviser, professor.
 
 **RDCO**:
-The highest office staff role. It runs the research workflow: it approves roles, manages accounts and office coordinators, and answers download and delete requests. It is not the [[System Admin]].
+The Research and Development Coordinating Office, responsible for final approval and archiving of all research and IP submissions. It is the highest office staff role and runs the research workflow: it approves roles, manages accounts and office coordinators, and answers download and delete requests. It is not the [[System Admin]].
 _Avoid_: Admin, administrator.
 
 **System Admin**:

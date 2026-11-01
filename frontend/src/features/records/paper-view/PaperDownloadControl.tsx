@@ -1,9 +1,9 @@
 import { useId, useState } from "react";
-import { recordsApi } from "@/api/records";
 import { Button } from "@/components/ui";
 import { DownloadRequestModal } from "@/components/records/DownloadRequestModal";
-import { cn, downloadBlob, filenameFromDisposition, formatDate } from "@/lib/utils";
-import { useUIStore } from "@/store/ui.store";
+import { useCancelDownloadRequest } from "@/components/records/useCancelDownloadRequest";
+import { useDownloadCopy } from "@/components/records/useDownloadCopy";
+import { cn, formatDate } from "@/lib/utils";
 import type { DownloadState } from "@/types/records";
 import { CONTROL_SIZE } from "./controls";
 
@@ -25,20 +25,6 @@ const ENDED_LABEL: Partial<Record<DownloadState["state"], string>> = {
   expired: "Access expired",
 };
 
-/** A refused download's reason, read out of the blob axios hands back. */
-async function refusalDetail(err: unknown): Promise<{ status?: number; detail?: string }> {
-  const response = (err as { response?: { status?: number; data?: unknown } }).response;
-  let detail: string | undefined;
-  if (response?.data instanceof Blob) {
-    try {
-      detail = (JSON.parse(await response.data.text()) as { detail?: string }).detail;
-    } catch {
-      detail = undefined;
-    }
-  }
-  return { status: response?.status, detail };
-}
-
 /**
  * The reader's download control (IR-677, ADR-048). The server says where the
  * viewer stands; this only picks the control for it. Download saves a copy
@@ -52,10 +38,13 @@ export function PaperDownloadControl({
   fill = false,
   onChanged,
 }: PaperDownloadControlProps) {
-  const addToast = useUIStore((s) => s.addToast);
-  const [saving, setSaving] = useState(false);
+  // Refused: the grant ended or was revoked since the page loaded.
+  const { saving, download: handleDownload } = useDownloadCopy(onChanged);
   const [asking, setAsking] = useState(false);
+  // Cancelled, or decided since the page loaded: either way, re-read.
+  const { cancelling, cancel } = useCancelDownloadRequest(onChanged);
   const describedBy = useId();
+  const rdcoNoteId = useId();
 
   if (!download) return null;
 
@@ -64,24 +53,6 @@ export function PaperDownloadControl({
       {text}
     </span>
   );
-
-  const handleDownload = async () => {
-    setSaving(true);
-    try {
-      const response = await recordsApi.downloadCopy(recordId);
-      const name =
-        filenameFromDisposition(response.headers?.["content-disposition"] as string | undefined)
-        ?? `record-${recordId}.pdf`;
-      downloadBlob(response.data, name);
-    } catch (err) {
-      const { status, detail } = await refusalDetail(err);
-      addToast({ type: "error", message: detail ?? "The paper could not be downloaded. Please try again." });
-      // Refused: the grant ended or was revoked since the page loaded.
-      if (status === 403) onChanged?.();
-    } finally {
-      setSaving(false);
-    }
-  };
 
   if (download.allowed) {
     const until = download.state === "granted" && download.grant_expires_at
@@ -93,7 +64,7 @@ export function PaperDownloadControl({
         <Button
           variant="ghost"
           size={fill ? "sm" : "icon"}
-          onClick={handleDownload}
+          onClick={() => void handleDownload(recordId)}
           loading={saving}
           aria-label="Download"
           aria-describedby={until ? describedBy : undefined}
@@ -108,23 +79,49 @@ export function PaperDownloadControl({
   }
 
   if (download.state === "pending") {
+    const pendingRequest = download.request;
     return (
-      <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600" title={download.message}>
-        <i className="fas fa-clock" aria-hidden />
-        Request pending
+      <span className="inline-flex items-center gap-2">
+        <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-stone-600" title={download.message}>
+          <i className="fas fa-clock" aria-hidden />
+          Request pending
+        </span>
+        {pendingRequest != null && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => void cancel(pendingRequest)}
+            loading={cancelling}
+            className={cn("text-stone-600", CONTROL_SIZE)}
+          >
+            Cancel request
+          </Button>
+        )}
       </span>
     );
   }
 
   const ended = ENDED_LABEL[download.state];
+  // RDCO's reason (IR-688), shown beside Request again (IR-743). Absent on an
+  // older API; blank on a decline made before notes existed.
+  const endedByRdco = download.state === "declined" || download.state === "revoked";
+  const rdcoNote = endedByRdco && download.rdco_note !== undefined
+    ? `RDCO's note: ${download.rdco_note.trim() || "No note recorded"}`
+    : null;
+  const descriptions = [ended && describedBy, rdcoNote && rdcoNoteId].filter(Boolean).join(" ");
   return (
     <span className="inline-flex items-center gap-2">
       {ended && note(ended)}
+      {rdcoNote && (
+        <span id={rdcoNoteId} className="max-w-xs text-xs text-stone-600 line-clamp-2" title={rdcoNote}>
+          {rdcoNote}
+        </span>
+      )}
       <Button
         variant="outline"
         size="sm"
         onClick={() => setAsking(true)}
-        aria-describedby={ended ? describedBy : undefined}
+        aria-describedby={descriptions || undefined}
         title={download.message}
         className={CONTROL_SIZE}
       >

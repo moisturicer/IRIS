@@ -34,10 +34,15 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
 SECRET = "ir722-service-secret"
 LIMITS = runs_config.RunLimits(
-    deadline_seconds=120, lease_seconds=30, max_attempts=2,
+    deadline_seconds=120, deep_deadline_seconds=600, lease_seconds=30, max_attempts=2,
     max_input_tokens=1000, max_output_tokens=500, max_cost_usd=0.5,
 )
-IRIS_AI_TABLES = "iris_ai.citation, iris_ai.run_event, iris_ai.turn, iris_ai.ask_run," \
+# Test bounds only; no production value is implied.
+DISPATCH = runs_config.Dispatch(
+    max_queued=50, max_active_per_reader=10, max_running_per_reader=4,
+    deep_concurrency=1, worker_concurrency=2, poll_seconds=0.1,
+)
+IRIS_AI_TABLES = "iris_ai.research_handle, iris_ai.citation,iris_ai.run_event, iris_ai.turn, iris_ai.ask_run," \
                  " iris_ai.conversation, iris_ai.attempt_accounting"
 
 
@@ -76,16 +81,37 @@ class ScriptedExecutor:
         self.probe = probe
         self.calls = 0
 
-    async def answer(self, question):
+    async def answer(self, question, tools):
         self.calls += 1
         if self.probe:
             await self.probe()
         return self.result
 
 
-def service(runtime_dsn, executor=None):
-    cfg = runs_config.RunsConfig(database_url=runtime_dsn, executor="deterministic", limits=LIMITS)
-    return RunService(RunStore(runtime_dsn), cfg, executor or DeterministicExecutor())
+class Drain:
+    """A wakeup that runs the queue in-process, so a submission returns finished."""
+
+    def __init__(self):
+        self.service = None
+
+    async def notify(self):
+        while await self.service.run_next():
+            pass
+
+    async def wait(self, timeout):
+        await asyncio.sleep(timeout)
+
+
+def service(runtime_dsn, executor=None, notifier=None, dispatch=DISPATCH):
+    """By default a submission is drained before it returns (IR-723 queues it)."""
+    cfg = runs_config.RunsConfig(database_url=runtime_dsn, executor="deterministic",
+                                 limits=LIMITS, dispatch=dispatch)
+    drain = notifier is None
+    built = RunService(RunStore(runtime_dsn), cfg, executor or DeterministicExecutor(),
+                       Drain() if drain else notifier)
+    if drain:
+        built.notifier.service = built
+    return built
 
 
 @pytest.fixture
@@ -148,7 +174,7 @@ def test_the_original_deadline_allowance_and_versions_are_persisted(api):
     assert run_["allowance"] == LIMITS.allowance()
     assert run_["pinned"] == {
         "executor": "deterministic", "executor_version": "1",
-        "protocol": "runs-1", "schema": "0001_runs.sql",
+        "protocol": "runs-1", "schema": "0003_dispatch.sql",
     }
     assert run_["version"] >= 1
     created = run_["created_at"]
@@ -326,7 +352,8 @@ def test_turn_citations_revision_and_journal_commit_together(runtime):
     reopened = run(RunStore(runtime).reopen(grant, run_["conversation_id"]))
     assert reopened["revision"] == 1
     assert reopened["turns"][0]["citations"] == [
-        {"record_id": 11, "page": 3, "quote": "a"}, {"record_id": 12, "page": None, "quote": "b"},
+        {"record_id": 11, "page": 3, "quote": "a", "revision": None},
+        {"record_id": 12, "page": None, "quote": "b", "revision": None},
     ]
 
     # The second citation violates a constraint after the Turn row is written.

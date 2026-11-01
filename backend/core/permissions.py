@@ -178,6 +178,19 @@ def owns_or_staffs_record(user, record) -> bool:
     return record.owners.filter(user=user).exists()
 
 
+def may_read_embargo(user, record) -> bool:
+    """
+    May `user` see where `record`'s embargo stands? Owners, the Adviser and
+    office staff (ADR-052, IR-811).
+
+    Reading a record is not enough: every signed-in user reads a published one,
+    and that a paper is under an agreement is not theirs to learn from it.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return record.adviser_id == user.pk or owns_or_staffs_record(user, record)
+
+
 def is_record_owner(user, record) -> bool:
     """
     Does `user` own `record`? Ownership alone: no staff role, and no seat,

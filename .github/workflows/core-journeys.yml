@@ -1,0 +1,102 @@
+name: Core journeys (IR-631)
+
+# The pinned-build verification run. Started by hand on one commit; never on
+# push or pull request. It builds the production compose stack under
+# production settings (docker-compose.e2e.yml says exactly what differs),
+# runs every journey once, serially, and uploads the evidence.
+#
+# Not a PR gate on purpose (IR-631 Q7): the stack builds Docling and every
+# worker, which would slow every PR and make CI flaky, and IR-631 asks for one
+# run on one build, not a run per change. A failure here is a failed check in
+# the run record, not a red PR.
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Commit SHA (or ref) to verify. The run record names the resolved SHA.
+        required: true
+        default: main
+      grep:
+        description: Optional Playwright --grep to run a subset (leave empty for the full run)
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-journeys
+  cancel-in-progress: false
+
+jobs:
+  journeys:
+    name: Core journeys on ${{ inputs.ref }}
+    runs-on: ubuntu-latest
+    # Docling's CPU image and the worker builds dominate; the journeys are
+    # minutes. A hang must fail rather than bill.
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      - name: Resolve the build under test
+        id: build
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: e2e/package-lock.json
+
+      - name: Generate the run's throwaway environment
+        run: node e2e/scripts/make-env.mjs
+
+      - name: Build and start the stack (production settings)
+        run: |
+          docker compose -p iris-e2e --env-file e2e/.env.e2e \
+            -f docker-compose.prod.yml -f docker-compose.e2e.yml up --build -d
+
+      - name: Install Playwright
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the journeys
+        working-directory: e2e
+        env:
+          CI: "true"
+          E2E_BUILD_SHA: ${{ steps.build.outputs.sha }}
+          # Passed through the environment, never interpolated into the
+          # script, so the input cannot inject shell.
+          JOURNEY_GREP: ${{ inputs.grep }}
+        run: |
+          if [ -n "$JOURNEY_GREP" ]; then
+            npx playwright test --grep "$JOURNEY_GREP"
+          else
+            npx playwright test
+          fi
+
+      - name: Stack logs
+        if: ${{ !cancelled() }}
+        run: |
+          docker compose -p iris-e2e --env-file e2e/.env.e2e \
+            -f docker-compose.prod.yml -f docker-compose.e2e.yml logs --no-color > e2e/test-results/stack.log 2>&1 || true
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: core-journeys-${{ steps.build.outputs.sha }}
+          path: |
+            e2e/playwright-report/
+            e2e/test-results/
+          retention-days: 90
+
+      - name: Tear down
+        if: ${{ always() }}
+        run: |
+          docker compose -p iris-e2e --env-file e2e/.env.e2e \
+            -f docker-compose.prod.yml -f docker-compose.e2e.yml down -v || true

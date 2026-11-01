@@ -1,11 +1,10 @@
 """Standing beside the disclosure gate, in development only (IR-317).
 
 ADR-015 §A development bypass permits this and permits nothing else. The gate
-in ``disclosure.py`` is unchanged and still refuses every record, because
-``Record`` carries no embargo field and an undetermined embargo is treated as
-an embargo (IR-250). What this module adds is a way to *stand beside* that
-refusal while CIT-U decides what an embargo is — not a rule that answers the
-question for them.
+in ``disclosure.py`` still refuses a record with no embargo answer (ADR-052),
+and seeded and loaded records carry none until IR-815 gives them one. What this
+module adds is a way to *stand beside* that refusal until then — not a rule that
+answers the question for them.
 
 **Why a labelled switch rather than a plausible rule.** The tempting shortcut
 is "published records are not embargoed", which sounds defensible and is
@@ -13,10 +12,8 @@ therefore the dangerous option: months later nobody can separate CIT-U's
 policy from a placeholder added to unblock a sprint. ``BYPASS_FOR_DEVELOPMENT``
 cannot be mistaken for a decision.
 
-**Why no field.** Adding ``Record.embargoed_until`` now reads as ``None`` on
-every existing row, and ``None`` means *known not embargoed* — which does not
-open the gate temporarily, it removes it permanently and silently. The bypass
-is runtime only, so IR-250 lands as one migration and a deliberate backfill.
+**Why it writes nothing.** The bypass is runtime only, so removing it (IR-815)
+leaves no row claiming an answer nobody gave.
 
 **The conditions are here, not in a docstring elsewhere.** It refuses to start
 under ``DEBUG=False``, it logs on every use, it is reported by
@@ -63,7 +60,7 @@ def permit_everything(record: Any) -> Decision:
     logger.warning(
         "%s is on: the ADR-015 disclosure gate was bypassed for record %s. "
         "Content is being sent to a commercial vendor without an embargo "
-        "check (IR-317, removed by IR-250).",
+        "check (IR-317, removed by IR-815).",
         SETTING,
         getattr(record, "pk", record),
     )

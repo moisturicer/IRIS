@@ -6,14 +6,24 @@ import { useLibraryStore } from "@/store/library.store";
 import type { User } from "@/types/auth";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
-import type { MyResearchItem, RecordListItem } from "@/types/records";
+import type { MyResearchItem, ReaderDownloadRequest, RecordListItem } from "@/types/records";
 import MyLibraryPage from "./MyLibraryPage";
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
     mine: vi.fn(),
     list: vi.fn().mockResolvedValue({ data: { results: [] } }),
+    myDownloadRequests: vi.fn(),
+    cancelDownloadRequest: vi.fn(),
+    requestDownload: vi.fn(),
+    downloadCopy: vi.fn(),
   },
+}));
+
+const downloadBlob = vi.fn();
+vi.mock("@/lib/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/utils")>()),
+  downloadBlob: (...args: unknown[]) => downloadBlob(...args),
 }));
 
 vi.mock("@/api/library", () => ({
@@ -68,6 +78,25 @@ const mine = (records: MyResearchItem[]) =>
   vi.mocked(recordsApi.mine).mockResolvedValue({ data: records } as MineResponse);
 
 const SUBMISSIONS = { route: "/records/mine?section=research" };
+const DOWNLOADS = { route: "/records/mine?section=downloads" };
+
+type MyDownloadsResponse = Awaited<ReturnType<typeof recordsApi.myDownloadRequests>>;
+
+const downloadRequest = (overrides: Partial<ReaderDownloadRequest>): ReaderDownloadRequest => ({
+  id: 1,
+  record: 41,
+  record_title: "Rainwater Harvesting Survey",
+  note: "Citing its survey method.",
+  created_at: "2026-10-28T08:00:00Z",
+  state: "pending",
+  grant_expires_at: null,
+  rdco_note: "",
+  actions: ["cancel"],
+  ...overrides,
+});
+
+const myDownloads = (rows: ReaderDownloadRequest[]) =>
+  vi.mocked(recordsApi.myDownloadRequests).mockResolvedValue({ data: rows } as MyDownloadsResponse);
 
 const section = (name: string) =>
   screen.getByRole("heading", { name, level: 2 }).closest("section, details") as HTMLElement;
@@ -78,6 +107,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   mine([]);
   saves([]);
+  myDownloads([]);
   vi.mocked(libraryApi.unsave).mockResolvedValue({ status: 204 } as Awaited<ReturnType<typeof libraryApi.unsave>>);
   signIn(9);
 });
@@ -249,12 +279,15 @@ describe("My Library: reading", () => {
     expect(screen.getByRole("link", { name: "Community Water Monitoring" })).toBeInTheDocument();
   });
 
-  it("defaults a non-author to All saved and never fetches owned research", async () => {
+  // IR-743 replaces "no tablist" for a non-author: every reader has a
+  // Download requests tab beside Saved papers, and nothing an author has.
+  it("defaults a non-author to All saved, with Download requests beside it, and never fetches owned research", async () => {
     signIn(10, "RDCO");
     const { container } = renderScreen(<MyLibraryPage />);
 
     expect(await screen.findByRole("heading", { name: "No saved papers yet" })).toBeInTheDocument();
-    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("tab").map((t) => t.textContent)).toEqual(["Saved papers", "Download requests"]);
+    expect(screen.getByRole("tab", { name: "Saved papers" })).toHaveAttribute("aria-selected", "true");
     expect(screen.queryByRole("link", { name: "Publish" })).not.toBeInTheDocument();
     await waitFor(() => expect(recordsApi.mine).not.toHaveBeenCalled());
     await expectNoBlockingA11yViolations(container);
@@ -340,5 +373,110 @@ describe("My Library: saves follow the account (IR-566)", () => {
     expect(await screen.findByRole("heading", { name: "Nothing in Want to read yet" })).toBeInTheDocument();
     expect(localStorage.getItem("iris_record_collections")).toBe(legacy);
     expect(localStorage.getItem("iris_starred_records")).toBe(JSON.stringify([rice.id]));
+  });
+});
+
+describe("My Library: download requests (IR-743)", () => {
+  const row = (name: string) => screen.getByRole("link", { name }).closest("li") as HTMLElement;
+
+  it("lists the reader's requests in the server's order, each with its state, note and what fits", async () => {
+    myDownloads([
+      downloadRequest({ id: 5, record: 45, record_title: "Pending paper", created_at: "2026-10-30T08:00:00Z" }),
+      downloadRequest({ id: 4, record: 44, record_title: "Granted paper", state: "granted", grant_expires_at: "2026-11-30T08:00:00Z", actions: ["download"] }),
+      downloadRequest({ id: 3, record: 43, record_title: "Declined paper", state: "declined", rdco_note: "Not for commercial use.", actions: ["request_again"] }),
+      downloadRequest({ id: 2, record: 42, record_title: "Revoked paper", state: "revoked", rdco_note: "", actions: ["request_again"] }),
+      downloadRequest({ id: 1, record: 41, record_title: "Expired paper", state: "expired", actions: [] }),
+    ]);
+    const { container } = renderScreen(<MyLibraryPage />, DOWNLOADS);
+
+    expect(await screen.findByRole("link", { name: "Pending paper" })).toHaveAttribute("href", "/records/45");
+    expect(screen.getByRole("tab", { name: "Download requests" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getAllByRole("listitem").map((li) => within(li).getByRole("link").textContent))
+      .toEqual(["Pending paper", "Granted paper", "Declined paper", "Revoked paper", "Expired paper"]);
+
+    const pending = row("Pending paper");
+    expect(pending).toHaveTextContent("Asked 30 Oct 2026");
+    expect(pending).toHaveTextContent("Citing its survey method.");
+    expect(within(pending).getByText("Pending")).toBeInTheDocument();
+    expect(within(pending).getByRole("button", { name: "Cancel request" })).toBeInTheDocument();
+
+    const granted = row("Granted paper");
+    expect(within(granted).getByText("Granted until 30 Nov 2026")).toBeInTheDocument();
+    expect(within(granted).getByRole("button", { name: "Download" })).toBeInTheDocument();
+
+    const declined = row("Declined paper");
+    expect(within(declined).getByText("Declined")).toBeInTheDocument();
+    expect(declined).toHaveTextContent("RDCO's note: Not for commercial use.");
+    expect(within(declined).getByRole("button", { name: "Request again" })).toBeInTheDocument();
+
+    const revoked = row("Revoked paper");
+    expect(within(revoked).getByText("Revoked")).toBeInTheDocument();
+    expect(revoked).toHaveTextContent("RDCO's note: No note recorded");
+
+    // The server offered nothing on this row (a newer request counts), so nothing shows.
+    const expired = row("Expired paper");
+    expect(within(expired).getByText("Expired")).toBeInTheDocument();
+    expect(within(expired).queryByRole("button")).not.toBeInTheDocument();
+
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("is offered to an author as a fourth tab, and fetched only when opened", async () => {
+    renderScreen(<MyLibraryPage />);
+
+    expect(await screen.findByRole("tab", { name: "Overview" })).toHaveAttribute("aria-selected", "true");
+    expect(recordsApi.myDownloadRequests).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("tab", { name: "Download requests" }));
+    expect(await screen.findByRole("heading", { name: "No download requests yet" })).toBeInTheDocument();
+    expect(recordsApi.myDownloadRequests).toHaveBeenCalledOnce();
+  });
+
+  it("cancels a pending request and re-reads the list", async () => {
+    myDownloads([downloadRequest({ id: 5 })]);
+    vi.mocked(recordsApi.cancelDownloadRequest).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.cancelDownloadRequest>>);
+    renderScreen(<MyLibraryPage />, DOWNLOADS);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel request" }));
+
+    expect(recordsApi.cancelDownloadRequest).toHaveBeenCalledWith(5);
+    await waitFor(() => expect(recordsApi.myDownloadRequests).toHaveBeenCalledTimes(2));
+  });
+
+  it("asks again from the dialog, for that paper", async () => {
+    myDownloads([downloadRequest({ id: 3, record: 43, record_title: "Declined paper", state: "declined", rdco_note: "No.", actions: ["request_again"] })]);
+    vi.mocked(recordsApi.requestDownload).mockResolvedValue({} as Awaited<ReturnType<typeof recordsApi.requestDownload>>);
+    renderScreen(<MyLibraryPage />, DOWNLOADS);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Request again" }));
+    const dialog = await screen.findByRole("dialog", { name: "Request download access" });
+    expect(dialog).toHaveTextContent("Declined paper");
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Why do you need a copy?" }), "For my defence.");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Submit request" }));
+
+    await waitFor(() => expect(recordsApi.requestDownload).toHaveBeenCalledWith(43, "For my defence."));
+    await waitFor(() => expect(recordsApi.myDownloadRequests).toHaveBeenCalledTimes(2));
+  });
+
+  it("saves a marked copy through the download route on a granted request", async () => {
+    const pdf = new Blob(["%PDF-"], { type: "application/pdf" });
+    vi.mocked(recordsApi.downloadCopy).mockResolvedValue({
+      data: pdf, headers: { "content-disposition": 'attachment; filename="Granted paper.pdf"' },
+    } as unknown as Awaited<ReturnType<typeof recordsApi.downloadCopy>>);
+    myDownloads([downloadRequest({ id: 4, record: 44, record_title: "Granted paper", state: "granted", grant_expires_at: "2026-11-30T08:00:00Z", actions: ["download"] })]);
+    renderScreen(<MyLibraryPage />, DOWNLOADS);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Download" }));
+
+    expect(recordsApi.downloadCopy).toHaveBeenCalledWith(44);
+    await waitFor(() => expect(downloadBlob).toHaveBeenCalledWith(pdf, "Granted paper.pdf"));
+  });
+
+  it("says when there are none, and offers a retry when the list fails to load", async () => {
+    vi.mocked(recordsApi.myDownloadRequests).mockRejectedValueOnce(new Error("offline"));
+    renderScreen(<MyLibraryPage />, DOWNLOADS);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("heading", { name: "No download requests yet" })).toBeInTheDocument();
+    expect(recordsApi.myDownloadRequests).toHaveBeenCalledTimes(2);
   });
 });

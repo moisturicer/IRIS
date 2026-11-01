@@ -1,58 +1,58 @@
-"""The decision table behind what may leave the deployment (IR-127).
+"""The decision table behind what may leave the deployment (IR-127, ADR-052).
 
 Pure, and deliberately so: this is the gate ADR-015 puts in front of every
 outbound call to a commercial AI vendor, and a gate whose tests need a
 database, a network or a clock is a gate nobody runs.
-"""
 
-from datetime import date
+The policy reads a paper's embargo *state* and never a date (ADR-052 §9), so
+there is no boundary to test here. That a passed date stays refused is asserted
+against real rows in ``test_embargo_rows.py``.
+"""
 
 import pytest
 
-from apps.ai.policy.disclosure import (
-    DisclosureInputs,
-    EmbargoUnknown,
-    Reason,
-    may_disclose,
-)
+from apps.ai.policy.disclosure import DisclosureInputs, Reason, may_disclose
+from core.enums import EmbargoState
 
 
 def _inputs(**overrides) -> DisclosureInputs:
     """A record that is allowed to leave, unless a test says otherwise."""
-    base = dict(
-        is_ip=False,
-        embargoed_until=None,
-        consent_given=True,
-        today=date(2026, 9, 15),
-    )
+    base = dict(is_ip=False, embargo=EmbargoState.NONE, consent_given=True)
     base.update(overrides)
     return DisclosureInputs(**base)
 
 
-class AllowingTests:
-    def test_an_unembargoed_consented_record_may_be_disclosed(self):
-        assert may_disclose(_inputs()).allowed is True
+class EmbargoStateTests:
+    """ADR-052 §3's table: two states allow and two refuse."""
 
-    def test_an_expired_embargo_no_longer_refuses(self):
-        decision = may_disclose(_inputs(embargoed_until=date(2026, 9, 14)))
-        assert decision.allowed is True
+    @pytest.mark.parametrize("state", [EmbargoState.NONE, EmbargoState.RELEASED])
+    def test_an_answered_no_or_a_release_allows(self, state):
+        assert may_disclose(_inputs(embargo=state)).allowed is True
 
-    def test_an_embargo_expiring_today_no_longer_refuses(self):
-        """The embargo runs *until* its date; on the day itself it is spent."""
-        decision = may_disclose(_inputs(embargoed_until=date(2026, 9, 15)))
-        assert decision.allowed is True
+    def test_an_active_embargo_is_refused_even_with_consent(self):
+        decision = may_disclose(_inputs(embargo=EmbargoState.ACTIVE, consent_given=True))
+        assert decision.allowed is False
+        assert decision.reasons == (Reason.EMBARGOED,)
+
+    def test_an_unanswered_paper_is_refused_when_everything_else_passes(self):
+        decision = may_disclose(
+            _inputs(embargo=EmbargoState.UNKNOWN, is_ip=False, consent_given=True)
+        )
+        assert decision.allowed is False
+        assert decision.reasons == (Reason.EMBARGO_UNKNOWN,)
+
+    @pytest.mark.parametrize("value", ["", "expired", None])
+    def test_a_state_the_policy_does_not_know_refuses(self, value):
+        """Fails closed. ADR-052 replaced the "expired" state, and a value that
+        reaches this gate by mistake must never read as permission."""
+        decision = may_disclose(_inputs(embargo=value))
+        assert decision.allowed is False
+        assert decision.reasons == (Reason.EMBARGO_UNKNOWN,)
 
 
 class RefusingTests:
-    def test_a_record_under_embargo_is_refused_even_with_consent(self):
-        decision = may_disclose(
-            _inputs(embargoed_until=date(2026, 12, 1), consent_given=True)
-        )
-        assert decision.allowed is False
-        assert Reason.EMBARGOED in decision.reasons
-
     def test_a_record_without_consent_is_refused_even_when_unembargoed(self):
-        decision = may_disclose(_inputs(consent_given=False, embargoed_until=None))
+        decision = may_disclose(_inputs(consent_given=False, embargo=EmbargoState.NONE))
         assert decision.allowed is False
         assert Reason.NO_CONSENT in decision.reasons
 
@@ -67,7 +67,7 @@ class RefusingTests:
         """A refusal that names one cause sends the reader to fix one thing and
         be refused again."""
         decision = may_disclose(
-            _inputs(is_ip=True, embargoed_until=date(2026, 12, 1), consent_given=False)
+            _inputs(is_ip=True, embargo=EmbargoState.ACTIVE, consent_given=False)
         )
         assert decision.allowed is False
         assert set(decision.reasons) == {
@@ -75,22 +75,6 @@ class RefusingTests:
             Reason.EMBARGOED,
             Reason.NO_CONSENT,
         }
-
-
-class UnknownEmbargoTests:
-    """There is no embargo field on `Record` yet. The policy must not paper
-    over that by reading a missing value as "not embargoed"."""
-
-    def test_an_unknown_embargo_is_refused_rather_than_assumed_absent(self):
-        decision = may_disclose(_inputs(embargoed_until=EmbargoUnknown))
-        assert decision.allowed is False
-        assert Reason.EMBARGO_UNKNOWN in decision.reasons
-
-    def test_an_unknown_embargo_refuses_even_when_everything_else_passes(self):
-        decision = may_disclose(
-            _inputs(embargoed_until=EmbargoUnknown, is_ip=False, consent_given=True)
-        )
-        assert decision.allowed is False
 
 
 class DecisionValueTests:
@@ -123,7 +107,7 @@ class IndependentInputTests:
         "overrides",
         [
             dict(is_ip=True),
-            dict(embargoed_until=date(2026, 12, 1)),
+            dict(embargo=EmbargoState.ACTIVE),
             dict(consent_given=False),
         ],
     )

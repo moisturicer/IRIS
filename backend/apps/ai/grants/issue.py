@@ -4,8 +4,8 @@ Purposes, never interchangeable:
 - `record_read`: the reader only.
 - `reader_run`: an owned AskRun, its Conversation and Record scope.
 - `ingestion`: one IngestionJob and revision; no reader.
-- `reader_session`: the reader only, for the AI runtime's own runs (IR-722);
-  reads no Record.
+- `reader_session`: the reader, optionally one Record scope, for the AI
+  runtime's own runs (IR-722); reads what the reader may (IR-719).
 
 Claims carry identity and binding; access is read live on verification.
 """
@@ -81,13 +81,14 @@ def record_read_grant(user) -> Grant:
     ))
 
 
-def reader_session_grant(user) -> Grant:
+def reader_session_grant(user, record_id: int | None = None) -> Grant:
+    """`record_id` is a Paper Chat scope; the row policy enforces it (IR-719)."""
     cfg = config.read()
     _require_reader(user)
     now = int(time.time())
     return _sign(cfg, _claims(
         cfg, READER_SESSION, now=now, exp=now + cfg.ttl_seconds,
-        sub=user.pk, gen=user.credential_version,
+        sub=user.pk, gen=user.credential_version, rec=record_id,
     ))
 
 

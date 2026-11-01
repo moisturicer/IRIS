@@ -24,8 +24,8 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 @pytest.fixture(autouse=True)
 def disclosure_gate_open(embedder):
-    """Explicit, not inherited from a developer .env: the real gate refuses every
-    record until IR-250. Tests that need their own root nest inside this one."""
+    """Explicit, not inherited from a developer .env: these records carry no embargo
+    answer, so the real gate refuses them. Tests needing their own root nest inside."""
     with use_composition_root(root_with(embedder=embedder)):
         yield
 

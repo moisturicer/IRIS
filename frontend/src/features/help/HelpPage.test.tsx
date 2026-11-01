@@ -55,6 +55,18 @@ describe("Help", () => {
     expect(within(stuck).queryByRole("link")).not.toBeInTheDocument();
   });
 
+  it("says the Adviser sends a paper to RDCO and only RDCO publishes (ADR-047)", () => {
+    renderAs({ role_name: ROLES.STUDENT });
+
+    const workflow = section("How a record moves through review")!;
+    expect(within(workflow).getByText(/accept it and send it to RDCO/)).toBeInTheDocument();
+    expect(within(workflow).getByText(/Only RDCO can publish a paper/)).toBeInTheDocument();
+    expect(within(workflow).queryByText(/accept and publish/)).not.toBeInTheDocument();
+    expect(within(workflow).queryByText(/When the last one finishes/)).not.toBeInTheDocument();
+    expect(within(workflow).getByText(/ITSO for technical review/)).toBeInTheDocument();
+    expect(within(workflow).queryByText(/ITSO about intellectual property/)).not.toBeInTheDocument();
+  });
+
   it("shows reviewing only to someone the server says has review work", () => {
     renderAs({ role_name: ROLES.ADVISER, review_access: { my_reviews: false, offices: [], is_coordinator: false } });
     expect(section("Reviewing records")).not.toBeInTheDocument();

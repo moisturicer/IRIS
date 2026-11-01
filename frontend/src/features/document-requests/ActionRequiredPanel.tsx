@@ -1,7 +1,10 @@
-import { useCallback, useEffect, useId, useRef, useState } from "react";
+import { forwardRef, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
+import { ProgressBar, toPercent } from "@/components/shared/ProgressBar";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatDate } from "@/lib/utils";
 import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip } from "./itemStatus";
@@ -31,18 +34,28 @@ interface ActionRequiredPanelProps {
  * tracker's document-request history. A withdrawn request is never shown: the
  * reviewer no longer needs it (IR-263).
  *
+ * An item's upload stays a compact button (spec §4.10 as amended
+ * 2026-10-06), not an `UploadDropzone`, yet behaves like one (IR-471): a
+ * progress bar while it runs, Retry with the same file after a failure, and
+ * a live region per row that announces each start and finish.
+ *
  * Each item reads in spec §4.10's one vocabulary (`itemStatus`): Requested,
  * Uploaded · awaiting review, Accepted, Replacement needed.
  *
  * An upload the requesting party rejected is back to missing, with the
  * reviewer's reason beside it and the upload control offered again (ADR-022
  * §3.4). A list that fails to load says so: an empty panel would read as
- * "nothing required", which is exactly the wrong thing to tell an owner.
+ * "nothing required", which is exactly the wrong thing to tell an owner. A
+ * refresh that fails after an upload keeps the list on screen and says so
+ * inside the panel, so another item's upload in progress is not lost (IR-471).
  */
 export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredPanelProps) {
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  /** A refresh that failed after a list was shown: reported inside the panel, never instead of it. */
+  const [refreshFailed, setRefreshFailed] = useState<string | null>(null);
+  const hasList = useRef(false);
   /** Ids of requests seen open since this panel mounted. */
   const seenOpen = useRef<Set<number>>(new Set());
 
@@ -52,10 +65,20 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
         .documentRequests(recordId)
         .then(({ data }) => {
           data.filter((r) => r.state === "open").forEach((r) => seenOpen.current.add(r.id));
+          hasList.current = true;
           setRequests(data);
           setFailed(null);
+          setRefreshFailed(null);
         })
-        .catch((error: unknown) => setFailed(errorDetail(error, "Could not load the documents reviewers asked for. Reload the page to try again."))),
+        .catch((error: unknown) => {
+          // Before any list arrives, the panel has nothing to show but the failure.
+          if (!hasList.current) {
+            setFailed(errorDetail(error, "Could not load the documents reviewers asked for. Reload the page to try again."));
+            return;
+          }
+          // After one has, keep it, so an upload still running in another row stays in view.
+          setRefreshFailed(errorDetail(error, "Could not refresh the documents reviewers asked for. Reload the page to see the latest."));
+        }),
     [recordId],
   );
 
@@ -96,6 +119,11 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
         <i className="fas fa-file-circle-exclamation text-xs" aria-hidden />
         {anyOpen ? "Action required" : "Requested documents"}
       </h2>
+      {refreshFailed && (
+        <p role="alert" className="text-xs text-brand-dark">
+          {refreshFailed}
+        </p>
+      )}
       {shown.map((r) => (
         <RequestEntry key={r.id} recordId={recordId} request={r} onUploaded={uploaded} />
       ))}
@@ -150,6 +178,11 @@ function RequestEntry({
   );
 }
 
+/** One row's upload, if any: under way, or failed and holding the file for Retry. */
+type RowUpload =
+  | { status: "uploading"; fileName: string; progress: number }
+  | { status: "failed"; file: File; error: string };
+
 function ItemRow({
   recordId,
   item,
@@ -163,50 +196,108 @@ function ItemRow({
   onUploaded: () => Promise<void>;
 }) {
   const inputId = useId();
-  const [uploading, setUploading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [upload, setUpload] = useState<RowUpload | null>(null);
+  /**
+   * This row's live region. One per row, as UploadDropzone has one per zone,
+   * so two items uploading at once never overwrite each other's news.
+   */
+  const [announcement, setAnnouncement] = useState("");
+  /** Set synchronously, so a second click before the re-render cannot send twice. */
+  const inFlight = useRef(false);
+  const uploading = upload?.status === "uploading";
 
-  const onFile = async (file: File | undefined) => {
-    if (!file) return;
-    setError(null);
-    setUploading(true);
+  const rowRef = useRef<HTMLLIElement>(null);
+  const progressRef = useRef<HTMLSpanElement>(null);
+  const retryRef = useRef<HTMLButtonElement>(null);
+  /** Whether keyboard focus was in this row when the upload control was swapped out. */
+  const carryFocus = useRef(false);
+
+  const send = async (file: File) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
+    const active = typeof document === "undefined" ? null : document.activeElement;
+    carryFocus.current = active != null && (rowRef.current?.contains(active) ?? false);
+    setUpload({ status: "uploading", fileName: file.name, progress: 0 });
+    setAnnouncement(`Uploading ${file.name}`);
     try {
-      await documentsApi.uploadForRequestItem(recordId, item.id, file);
-      await onUploaded();
+      await documentsApi.uploadForRequestItem(recordId, item.id, file, {
+        onProgress: (progress) =>
+          setUpload((u) => (u?.status === "uploading" ? { ...u, progress } : u)),
+      });
     } catch (err) {
-      setError(errorDetail(err, "The upload failed. Please try again."));
-    } finally {
-      setUploading(false);
+      inFlight.current = false;
+      // The failure is announced by its own alert; saying it here too would say it twice.
+      setAnnouncement("");
+      setUpload({
+        status: "failed",
+        file,
+        error: errorDetail(err, "The upload failed. Please try again."),
+      });
+      return;
     }
+    inFlight.current = false;
+    setUpload(null);
+    setAnnouncement(`${file.name} uploaded`);
+    // Outside the try: the file is already sent, so a failed refresh must never offer Retry.
+    await onUploaded();
+  };
+
+  // Carry keyboard focus across each swap, as UploadDropzone does, instead of
+  // letting it fall to the page when the focused control leaves it.
+  const status = upload?.status;
+  useEffect(() => {
+    if (!carryFocus.current) return;
+    if (status === "uploading") progressRef.current?.focus();
+    else if (status === "failed") retryRef.current?.focus();
+    else {
+      rowRef.current?.focus();
+      carryFocus.current = false;
+    }
+  }, [status]);
+
+  const onFile = (file: File | undefined) => {
+    if (file) void send(file);
   };
 
   return (
-    <li className="py-2 first:pt-0 last:pb-0">
+    <li ref={rowRef} tabIndex={-1} className="py-2 first:pt-0 last:pb-0 focus:outline-none">
+      {/* Mounted with the row, so the first announcement is heard. */}
+      <span role="status" className="sr-only">
+        {announcement}
+      </span>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <span className="text-sm font-semibold text-stone-800 min-w-0 break-words">
           {item.label}
         </span>
         <span className="flex items-center gap-2">
           <ItemStatusChip item={item} />
-          {item.state === "missing" && (
+          {item.state === "missing" && uploading && (
+            <CompactProgress
+              ref={progressRef}
+              fileName={upload.fileName}
+              progress={upload.progress}
+            />
+          )}
+          {item.state === "missing" && !uploading && (
             <label
               htmlFor={inputId}
               className={cn(
-                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light focus-within:ring-2 focus-within:ring-brand/40",
-                uploading && "opacity-60 pointer-events-none",
+                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-brand text-white text-xs font-bold cursor-pointer hover:bg-brand-light",
+                COLOUR_TRANSITION,
+                // FOCUS_RING's ring, on the label: the focused element is its hidden input.
+                "has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-brand has-[:focus-visible]:ring-offset-2",
               )}
             >
               <i className="fas fa-upload text-2xs" aria-hidden />
-              {uploading ? "Uploading…" : "Upload"}
+              Upload
               <span className="sr-only"> {item.label}</span>
               <input
                 id={inputId}
                 type="file"
                 accept="application/pdf,.pdf"
                 className="sr-only"
-                disabled={uploading}
                 onChange={(e) => {
-                  void onFile(e.target.files?.[0]);
+                  onFile(e.target.files?.[0]);
                   e.target.value = "";
                 }}
               />
@@ -219,11 +310,46 @@ function ItemRow({
           {asker} did not accept your last upload: “{item.rejection_reason}”
         </p>
       )}
-      {error && (
-        <p role="alert" className="text-xs text-brand mt-1">
-          {error}
-        </p>
+      {upload?.status === "failed" && (
+        <div role="alert" className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-brand">
+          <span className="break-words min-w-0">
+            {upload.file.name} could not be uploaded. {upload.error}
+          </span>
+          <button
+            ref={retryRef}
+            type="button"
+            onClick={() => void send(upload.file)}
+            aria-label={`Retry uploading ${upload.file.name}`}
+            className={cn(PILL_SECONDARY, FOCUS_RING)}
+          >
+            <i className="fas fa-rotate-right text-2xs" aria-hidden />
+            Retry
+          </button>
+        </div>
       )}
     </li>
   );
 }
+
+/**
+ * The row's progress, as compact as the button it replaces (spec §4.10 as
+ * amended 2026-10-06): a short bar and a percentage, not `UploadDropzone`'s panel.
+ */
+const CompactProgress = forwardRef<HTMLSpanElement, { fileName: string; progress: number }>(
+  function CompactProgress({ fileName, progress }, ref) {
+    return (
+      <span className="inline-flex items-center gap-2">
+        <ProgressBar
+          ref={ref}
+          focusable
+          label={`Uploading ${fileName}`}
+          progress={progress}
+          className={cn("h-1.5 w-20 bg-brand-100", FOCUS_RING)}
+        />
+        <span className="text-2xs font-semibold text-stone-600 tabular-nums" aria-hidden>
+          {toPercent(progress)}%
+        </span>
+      </span>
+    );
+  },
+);
