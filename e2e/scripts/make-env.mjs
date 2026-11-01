@@ -53,6 +53,7 @@ const lines = [
   "DB_NAME=iris_e2e",
   "DB_USER=iris_e2e",
   `DB_PASSWORD=${hex(16)}`,
+  `REDIS_PASSWORD=${hex(16)}`,
   "",
   "# Production settings' required keys (config/settings/production.py)",
   `SECRET_KEY=${hex(32)}`,

@@ -2374,3 +2374,7 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 `scripts/check_django_admin_allowlist.sh`, in CI's Docker Compose job, runs the real nginx and proves the default deny, a listed client, an unlisted one, forged `X-Forwarded-For` values, refused bad settings, and that `/admin/users`, `/admin/role-requests` and `/admin/audit` are not refused.
 
 **PARTIAL:** Django's admin stays at `/admin/`, unrestricted, until IR-782 moves it. Until then the 403 guards a path Django does not serve.
+
+## IR-669 — Dev Postgres and Redis listen on localhost only, and Redis requires a password
+
+`docker-compose.yml` binds Postgres and Redis to `127.0.0.1`. Redis takes `--requirepass` in both Compose files, and every Redis URL in them carries the password, from the repo-root `.env` that `scripts/setup_env.py` generates when it is missing. No ASVS Level 1 item: this is developer-machine hygiene. Evidence is recorded on the PR.
