@@ -270,7 +270,7 @@ export default function DownloadRequestsPage() {
                       <td className="px-4 py-3">
                         <RequestStatusChip
                           state={req.status}
-                          expired={req.status === "approved" && !req.grant_live}
+                          expired={!req.grant_live && !!req.grant_expires_at}
                         />
                         {grant && <p className="mt-1 text-[12px] text-stone-600 whitespace-nowrap">{grant}</p>}
                         {endedByRdco && (

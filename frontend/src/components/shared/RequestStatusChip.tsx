@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
  * A staff request's state, as a chip (IR-363): role, delete and download
  * requests all say the same thing the same way.
  *
- * Each state carries its word and, except a cancelled one, an icon, so it never
+ * Each state carries its word and an icon, so it never
  * reads by colour alone (01-design-system.md section 0). Tones by meaning
  * (IR-358): pending is quiet grey, approved is near-black, declined and revoked
  * are maroon. An approval whose access has expired goes quiet again; the caller
@@ -13,12 +13,12 @@ import { cn } from "@/lib/utils";
  */
 export type RequestState = "pending" | "approved" | "declined" | "revoked" | "cancelled";
 
-const STATES: Record<RequestState, { word: string; tone: string; icon: string | null }> = {
+const STATES: Record<RequestState, { word: string; tone: string; icon: string }> = {
   pending:   { word: "Pending",   tone: TONES.quiet,     icon: "fa-clock" },
   approved:  { word: "Approved",  tone: TONES.settled,   icon: "fa-check" },
   declined:  { word: "Declined",  tone: TONES.attention, icon: "fa-xmark" },
   revoked:   { word: "Revoked",   tone: TONES.attention, icon: "fa-ban" },
-  cancelled: { word: "Cancelled", tone: TONES.quiet,     icon: null },
+  cancelled: { word: "Cancelled", tone: TONES.quiet,     icon: "fa-circle-minus" },
 };
 
 type RequestStatusChipProps = {
@@ -39,7 +39,7 @@ export function RequestStatusChip({ state, expired = false }: RequestStatusChipP
         lapsed ? TONES.quiet : tone,
       )}
     >
-      {shownIcon && <i className={cn("fas", shownIcon)} aria-hidden />}
+      <i className={cn("fas", shownIcon)} aria-hidden />
       {word}
     </span>
   );

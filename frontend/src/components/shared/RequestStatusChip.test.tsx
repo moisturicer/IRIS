@@ -41,8 +41,10 @@ describe("RequestStatusChip (IR-363)", () => {
     expect(iconOf(chip)).toContain("fa-hourglass-end");
   });
 
-  it("shows a cancelled request as quiet grey", () => {
+  it("shows a cancelled request as quiet grey, with its own icon", () => {
     render(<RequestStatusChip state="cancelled" />);
-    expect(screen.getByText("Cancelled")).toHaveClass(...TONES.quiet.split(" "));
+    const chip = screen.getByText("Cancelled");
+    expect(chip).toHaveClass(...TONES.quiet.split(" "));
+    expect(iconOf(chip)).toContain("fa-circle-minus");
   });
 });

@@ -9,6 +9,7 @@ import { PageHeader }    from "@/components/layout/PageHeader";
 import { Button }        from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
+import { TONES } from "@/components/ui/statusTones";
 import type { RoleRequest } from "@/types/auth";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -99,7 +100,7 @@ export default function RoleRequestsPage() {
                     <div className="font-medium text-stone-900">{req.user_name}</div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-brand-50 text-brand border border-brand-100">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${TONES.active}`}>
                       {req.role_name}
                     </span>
                   </td>
