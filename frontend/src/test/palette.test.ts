@@ -23,11 +23,6 @@ import { offGreyClasses, offPaletteClasses, seeThroughWhiteClasses } from "./pal
 const NOT_YET_CONVERTED: readonly string[] = [
   // IR-362 -- Notifications (My Library came off with IR-410, Calls &
   // Conferences with IR-530)
-  // IR-363 -- Documents and the admin screens
-  "src/features/accounts/RoleRequestsPage.tsx",
-  "src/features/admin/DeleteRequestsPage.tsx",
-  "src/features/admin/DownloadRequestsPage.tsx",
-  "src/features/admin/SessionsPage.tsx",
   // IR-365 -- the Ask IRIS hub and chat page
   "src/features/ai/AIHubPage.tsx",
   "src/features/ai/components/ConversationSidebar.tsx",
@@ -45,14 +40,6 @@ const GREY_NOT_YET_CONVERTED: readonly string[] = [
   "src/features/ai/AIHubPage.tsx",
   "src/features/ai/components/answerLayout.ts",
   // IR-362 -- Notifications
-  // IR-363 -- Documents and the admin screens
-  "src/features/accounts/RoleRequestsPage.tsx",
-  "src/features/accounts/UserListPage.tsx",
-  "src/features/admin/DeleteRequestsPage.tsx",
-  "src/features/admin/DownloadRequestsPage.tsx",
-  "src/features/admin/SessionsPage.tsx",
-  "src/features/audit/AuditLogPage.tsx",
-  "src/features/records/ImportRecordsPage.tsx",
   // Shared pieces no subtask names yet
   "src/components/compliance/DpaConsentModal.tsx",
   "src/components/layout/Breadcrumbs.tsx",

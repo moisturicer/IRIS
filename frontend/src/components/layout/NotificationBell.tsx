@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { notificationsApi } from "@/api/notifications";
 import { useNotificationsStore } from "@/store/notifications.store";
-import { useNotifications } from "@/hooks/useNotifications";
 import type { Notification } from "@/types/notifications";
 import { formatDate, cn } from "@/lib/utils";
 
@@ -18,9 +17,9 @@ const PREVIEW_LIMIT = 5;
  * answers "is there anything new right now?" without leaving the current
  * screen.
  *
- * Reads from the shared `useNotificationsStore`, which the sidebar's unread
- * badge already uses -- deliberately NOT its own fetch. An earlier version
- * fetched independently and the two counters immediately disagreed: marking
+ * Reads from the shared `useNotificationsStore` -- deliberately NOT its own
+ * fetch: `AppShell` fetches once for every bell on screen (IR-370). An
+ * earlier version fetched independently and the two counters disagreed: marking
  * all read in the bell cleared the bell but left the sidebar showing the old
  * count until a page refresh. One source of truth, two surfaces.
  *
@@ -37,8 +36,8 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ align = "end" }: NotificationBellProps) {
-  // Shares the mount-time fetch the sidebar already performs.
-  const { unreadCount } = useNotifications();
+  // AppShell owns the fetch (IR-370); the bell only reads the store.
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const items = useNotificationsStore((s) => s.items);
   const markReadInStore = useNotificationsStore((s) => s.markRead);
   const markAllReadInStore = useNotificationsStore((s) => s.markAllRead);
@@ -72,7 +71,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
     try {
       await notificationsApi.markAllRead();
     } catch {
-      /* left cleared locally; the next mount-time fetch re-syncs */
+      /* left cleared locally; the next session's or page load's fetch re-syncs */
     }
   };
 

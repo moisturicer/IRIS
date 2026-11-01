@@ -4,6 +4,8 @@
  */
 import type { Region } from "@/types/ai";
 
+import { READER_TOOLBAR_TOP_PX } from "./paneLayout";
+
 /** The zoom range the reader's controls allow. The floor is low enough that
  *  fit-to-width still fits a US Letter page on a 360px phone (NFR-U3). */
 export const MIN_SCALE = 0.4;
@@ -84,6 +86,16 @@ export const PAGE_LANDING_GAP = 16;
 export interface ReadingBand {
   top: number;
   bottom: number;
+}
+
+/**
+ * The reading band when the window scrolls, below `reading-wide`: from under
+ * the reader's toolbar, where it rests once stuck, down to the bottom of the
+ * window less `bottomInset` -- whatever the caller keeps stuck over the
+ * bottom of the screen, as the Review tab does its action bar (IR-477).
+ */
+export function windowReadingBand(toolbarHeight: number, windowHeight: number, bottomInset = 0): ReadingBand {
+  return { top: READER_TOOLBAR_TOP_PX + toolbarHeight, bottom: windowHeight - bottomInset };
 }
 
 /**

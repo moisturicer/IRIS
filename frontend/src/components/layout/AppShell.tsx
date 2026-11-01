@@ -3,6 +3,7 @@ import { Outlet, useLocation, useMatches } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { Breadcrumbs, type RouteHandle } from "./Breadcrumbs";
 import { NotificationBell } from "./NotificationBell";
+import { useUnreadNotificationsFetch } from "@/hooks/useNotifications";
 import { PageContainer } from "./PageContainer";
 import { Button } from "@/components/ui/Button";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -47,6 +48,9 @@ const PhoneBar = forwardRef<HTMLButtonElement>(function PhoneBar(_props, menuBut
 });
 
 export function AppShell() {
+  // The one fetch of unread notifications for every bell on screen (IR-370).
+  // The bells only read the shared store.
+  useUnreadNotificationsFetch();
   const sidebarOpen  = useUIStore((s) => s.sidebarOpen);
   const collapsed    = useUIStore(selectSidebarCollapsed);
   const closeSidebar = useUIStore((s) => s.closeSidebar);

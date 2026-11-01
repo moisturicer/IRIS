@@ -76,7 +76,7 @@ export default function AuditLogPage() {
 
   return <div>
     <PageHeader title="Audit Log" description="Read-only system activity and workflow history." />
-    <p className="mb-4 text-sm text-gray-600">Only observed events are shown. Earlier activity and events that failed to log cannot be reconstructed; missing events do not prove that no action occurred.</p>
+    <p className="mb-4 text-sm text-stone-600">Only observed events are shown. Earlier activity and events that failed to log cannot be reconstructed; missing events do not prove that no action occurred.</p>
     <form className="flex flex-wrap items-end gap-3 mb-4" onSubmit={(e) => {
       e.preventDefault();
       if (from && to && from > to) { setError("From date must be on or before To date."); return; }
@@ -84,7 +84,7 @@ export default function AuditLogPage() {
       setFilters({ event_type: eventType || undefined, record: record ? Number(record) : undefined, user: user ? Number(user) : undefined, from: from || undefined, to: to || undefined });
     }}>
       <label className="flex flex-col gap-1 text-sm">Event type
-        <select className="border border-gray-300 rounded-lg px-3 py-2" value={eventType} onChange={(e) => setEventType(e.target.value as AuditEventType | "")}>
+        <select className="border border-stone-300 rounded-lg px-3 py-2" value={eventType} onChange={(e) => setEventType(e.target.value as AuditEventType | "")}>
           <option value="">All events</option>
           {Object.entries(AUDIT_EVENT_GROUPS).map(([group, types]) => <optgroup key={group} label={group}>{Object.entries(types).map(([type, text]) => <option key={type} value={type}>{text}</option>)}</optgroup>)}
         </select>
@@ -96,8 +96,8 @@ export default function AuditLogPage() {
       <Button type="submit" variant="secondary">Filter</Button>
       <Button type="button" variant="secondary" disabled={exporting || loading} onClick={exportCsv}>{exporting ? "Exporting…" : "Export CSV"}</Button>
     </form>
-    <p className="mb-3 text-sm text-gray-600">Filter applies the fields above. CSV exports every row matching the applied filters, across all pages.</p>
+    <p className="mb-3 text-sm text-stone-600">Filter applies the fields above. CSV exports every row matching the applied filters, across all pages.</p>
     {error && <p role="alert" className="mb-4 text-danger">{error}</p>}
-    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden"><DataTable data={events} columns={COLUMNS} loading={loading} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
+    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden"><DataTable data={events} columns={COLUMNS} loading={loading} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
   </div>;
 }
