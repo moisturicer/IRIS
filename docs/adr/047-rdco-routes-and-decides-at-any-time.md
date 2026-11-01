@@ -8,6 +8,8 @@
 
 **Built by IR-767** ([PR #410](https://github.com/moisturicer/IRIS/pull/410)), including the amendment: the Adviser has no publish outcome.
 
+**Amended 2026-11-01, after the build,** by Hermoine Zozobrado, to record two behaviours PR #410 added and this text did not state: §5's return to the last submitted manuscript, and §7's refusal to reverse once work exists.
+
 **Supersedes, in part, [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md):**
 
 - §3: *Accept & publish* for the Adviser, *Accept & route*, "RDCO enters only on the specialist path", "Nobody routes to RDCO by hand", and the hand-back
@@ -115,6 +117,7 @@ The party tracker shows which offices are still reviewing, and the Decision dial
 
 - An RDCO Decision withdraws every open Revision request, its own included. It records the Decision as the reason, through a new nullable `ResubmissionRequest.closed_by_decision` (the same shape as the IR-270 links on Seats, assignments and document requests).
 - The owners' Decision notice names each request it withdrew and which party asked.
+- **The Record goes back to its last submitted manuscript** if the author uploaded a replacement under a withdrawn request and never submitted it. RDCO decides on what was reviewed, never on an unsubmitted file. The upload stays in storage.
 - **The Adviser's rejection is still refused while any Revision request is open.** RDCO's executive authority is RDCO's alone.
 - *Rejected: RDCO waits for open Revision requests, as every decider does today.* An office's request would then block the institution's decision indefinitely when the author never answers.
 - *Rejected: RDCO may reject but not accept over an open request.* That is half an override, and harder to explain than either rule.
@@ -134,6 +137,7 @@ A one-off data migration, in the same change as the code:
 - **Records with RDCO already active, and records still with their Adviser,** are untouched. An Adviser still holding one uses *Accept & send to RDCO* from then on.
 - **A paper an Adviser already published stays published.** IRIS is not deployed, so this concerns only demo and proxy data.
 - The migration writes no `Review`, changes no Clearance, and is reversible: reversing it removes only the assignments it opened.
+- **Reversing stops with an error once anything has happened on one of those assignments**: a Seat, a review, an Extension, a document or Revision request, a sent reminder, or the assignment closing. A rollback then needs manual cleanup, so it can never silently erase a reviewer's work.
 - *Rejected: keeping the hand-back for Records routed before cutover.* Two rules would then live in the code for the life of those Records, which is the brittleness ADR-032 §13 avoided.
 
 ### 8. Tests that pin the decisions

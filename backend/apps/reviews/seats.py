@@ -163,8 +163,8 @@ def _close_if_complete(assignment, actor) -> bool:
     assignment.closed_at = timezone.now()
     assignment.save(update_fields=["state", "closed_by", "closed_at"])
     audit.assignment_closed(assignment, actor, how=audit.COMPLETED)
-    # A specialist office's clearance, the RDCO hand-back and their
-    # notifications (IR-269). Here rather than in the caller, so a verdict and
+    # A specialist office's clearance and its notifications
+    # (IR-269). Here rather than in the caller, so a verdict and
     # a coordinator's withdrawal complete an office the same way.
     from .office_review import office_completed
 
