@@ -45,7 +45,12 @@ Both run inside the backend container (`support/stack.ts`).
   their path on the plain-HTTP address.
 - **Inactivity expiry** is enforced by the server at 30 minutes. Its check
   runs only in a separate pass with `SESSION_IDLE_TIMEOUT_MINUTES=2`
-  (`E2E_IDLE_PASS=1`), the one setting that differs.
+  (`E2E_IDLE_PASS=1`).
+- **Request throttles.** DRF's general throttles are raised to 20000/day
+  (`API_THROTTLE_ANON`, `API_THROTTLE_USER`). Behind nginx every signed-out
+  request comes from one address, and the 100/day default runs out partway
+  through one full run. No acceptance criterion measures them. The lockout
+  under test is axes', left at its default of three failures.
 - **Ask IRIS** is not driven here. IR-631 reuses IR-630 and IR-605/IR-608
   evidence from the same SHA, and until IR-250 lands every question answers
   "no readable sources" under normal settings.

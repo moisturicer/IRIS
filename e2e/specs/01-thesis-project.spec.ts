@@ -9,15 +9,18 @@
 // the record is shown about them is checked in the browser.
 import { expect, test } from "@playwright/test";
 import { as, anonymous, ok, signInBrowser, type Client } from "../support/api";
+import { newStudent } from "../support/people";
 import { manuscriptPdf } from "../support/pdf";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
-import { expectNoSeriousA11yViolations, expectReflowsAt360 } from "../support/a11y";
+import { A11yLedger } from "../support/a11y";
 import {
   acceptAndRoute, claimAndOpen, clear, createDraft, decide, newVersion, party,
   requestRevision, reviewRow, reviseAbstract, submit, tracker,
 } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
+
+const a11y = new A11yLedger();
 
 let student: Client, adviser: Client, itso: Client, ierc: Client, ktto: Client, kttoCoordinator: Client, rdco: Client;
 let recordId: number;
@@ -121,8 +124,8 @@ test("a new Version resets only IERC; ITSO and KTTO are preserved", async ({ pag
   await expect(row(/ITSO/)).toContainText("Preserved");
   await expect(row(/KTTO/)).toContainText("Preserved");
   await expect(row(/IERC/)).not.toContainText("Preserved");
-  await expectNoSeriousA11yViolations(page, testInfo, "paper-view-after-new-version");
-  await expectReflowsAt360(page, "paper-view-after-new-version");
+  await a11y.scan(page, testInfo, "paper-view-after-new-version");
+  await a11y.reflow360(page, "paper-view-after-new-version");
 });
 
 test("IERC clears, the record is handed back to RDCO, and RDCO decides", async () => {
@@ -138,8 +141,17 @@ test("IERC clears, the record is handed back to RDCO, and RDCO decides", async (
   t = await tracker(student, recordId);
   expect(party(t, "rdco").state).toBe("completed");
 
-  // Published means readable by anyone: the catalogue serves it anonymously.
+  // Published means readable by any signed-in reader with no tie to the
+  // record. The catalogue is not anonymous: the API's default permission is
+  // IsAuthenticated, so a signed-out request is 401 whatever it asks for.
+  const reader = await newStudent("reader");
+  expect((await reader.get(`/records/${recordId}/`)).status(), "an unrelated reader reads it").toBe(200);
+  await reader.dispose();
   const anon = await anonymous();
-  expect((await anon.get(`/api/v1/records/${recordId}/`)).status()).toBe(200);
+  expect((await anon.get(`/api/v1/records/${recordId}/`)).status(), "signed out").toBe(401);
   await anon.dispose();
+});
+
+test("accessibility: no serious or critical findings on this journey's key screens", async ({}, testInfo) => {
+  a11y.assertClean(testInfo);
 });

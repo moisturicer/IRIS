@@ -4,11 +4,13 @@
 import { expect, test } from "@playwright/test";
 import { as, ok, signInBrowser, type Client } from "../support/api";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
-import { expectNoSeriousA11yViolations } from "../support/a11y";
+import { A11yLedger } from "../support/a11y";
 import { manuscriptPdf } from "../support/pdf";
 import { claimAndOpen, createDraft, decide, recordTypeId, submit, tracker, party } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
+
+const a11y = new A11yLedger();
 
 let student: Client, adviser: Client;
 let proposalId: number, childId: number;
@@ -71,7 +73,17 @@ test("lineage reads both ways, in the API and on the page", async ({ page }, tes
   expect(child.lineage.derived_from?.id).toBe(proposalId);
   expect(parent.lineage.continued_as?.id).toBe(childId);
 
+  // The Paper View names the other record by type and id, not by title.
   await signInBrowser(page, ACCOUNTS.student, `/records/${proposalId}`);
-  await expect(page.getByRole("link", { name: new RegExp(child.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")) })).toBeVisible();
-  await expectNoSeriousA11yViolations(page, testInfo, "proposal-with-continuation");
+  const forward = page.getByRole("link", { name: new RegExp(`^Continued as .+ #${childId}$`) });
+  await expect(forward).toBeVisible();
+  await a11y.scan(page, testInfo, "proposal-with-continuation");
+
+  await forward.click();
+  await expect(page).toHaveURL(new RegExp(`/records/${childId}$`));
+  await expect(page.getByRole("link", { name: `Developed from Proposal #${proposalId} — View proposal` })).toBeVisible();
+});
+
+test("accessibility: no serious or critical findings on this journey's key screens", async ({}, testInfo) => {
+  a11y.assertClean(testInfo);
 });

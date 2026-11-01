@@ -4,11 +4,13 @@
 import { expect, test } from "@playwright/test";
 import { as, ok, signInBrowser, type Client } from "../support/api";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
-import { expectNoSeriousA11yViolations, expectReflowsAt360 } from "../support/a11y";
+import { A11yLedger } from "../support/a11y";
 import { newStudent } from "../support/people";
 import { claimAndOpen, createDraft, newVersion, requestRevision, reviseAbstract, submit, tracker } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
+
+const a11y = new A11yLedger();
 
 let student: Client, adviser: Client, rdco: Client, ktto: Client, stranger: Client;
 let recordId: number, firstComment: number;
@@ -45,17 +47,18 @@ test("the discussion is private to the Record's participants", async () => {
 test("the owner's next action follows a Revision request and the new Version", async ({ page }, testInfo) => {
   await requestRevision(adviser, recordId, "Please justify the sample size in Chapter 3.");
   let detail = await student.json(`/records/${recordId}/`);
-  expect(detail.submitter_status.waiting_on_you, "waiting on the owner").toBeTruthy();
+  // One item per party with an open revision request or document request.
+  expect(detail.submitter_status.waiting_on_you, "waiting on the owner").toHaveLength(1);
 
   await signInBrowser(page, ACCOUNTS.student, `/records/${recordId}`);
   await expect(page.getByText(detail.submitter_status.line)).toBeVisible();
-  await expectNoSeriousA11yViolations(page, testInfo, "owner-next-action");
-  await expectReflowsAt360(page, "owner-next-action");
+  await a11y.scan(page, testInfo, "owner-next-action");
+  await a11y.reflow360(page, "owner-next-action");
 
   await reviseAbstract(student, recordId, "power analysis added");
   await newVersion(student, recordId);
   detail = await student.json(`/records/${recordId}/`);
-  expect(detail.submitter_status.waiting_on_you, "no longer waiting on the owner").toBeFalsy();
+  expect(detail.submitter_status.waiting_on_you, "no longer waiting on the owner").toEqual([]);
 });
 
 test("history keeps both Versions and each comment's Version", async () => {
@@ -96,4 +99,8 @@ test("the stranger's own history and exports never mention the Record", async ()
   expect(JSON.stringify(await stranger.json("/notifications/"))).not.toContain(title);
   const mine = await stranger.json("/records/mine/");
   expect(JSON.stringify(mine)).not.toContain(title);
+});
+
+test("accessibility: no serious or critical findings on this journey's key screens", async ({}, testInfo) => {
+  a11y.assertClean(testInfo);
 });

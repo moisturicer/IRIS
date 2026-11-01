@@ -8,6 +8,7 @@
 import { expect, test } from "@playwright/test";
 import { anonymous, as, ok, signInBrowser, type Client } from "../support/api";
 import { uniqueTitle } from "../support/accounts";
+import { manuscriptPdf } from "../support/pdf";
 import { NEW_PASSWORD, newStudent } from "../support/people";
 import { claimAndOpen, createDraft, reviewRow, submit, acceptAndRoute } from "../support/workflow";
 
@@ -22,9 +23,16 @@ test.beforeAll(async () => {
   [owner, adviser, itso, ierc] = await Promise.all(["student", "adviser", "itso", "ierc"].map((w) => as(w)));
   stranger = await newStudent("stranger");
   draftId = await createDraft(owner, { title, type: "Thesis / Research", adviserId: adviser.userId });
-  const uploads = await owner.json("/documents/uploads/", { record: draftId });
-  const list = Array.isArray(uploads) ? uploads : uploads.results ?? [];
-  uploadId = list[0]?.id;
+  // The manuscript sits on the Record itself, so give the draft a slot upload
+  // whose id a stranger could guess.
+  const slots = await owner.json(`/documents/records/${draftId}/slots/`);
+  expect(slots.length, "the record type has an upload slot").toBeGreaterThan(0);
+  const upload = await ok(await owner.multipart("post", "/documents/uploads/create/", {
+    record: String(draftId),
+    slot: String(slots[0].id),
+    file: { name: "supporting.pdf", mimeType: "application/pdf", buffer: manuscriptPdf(`${title} — supporting document`) },
+  }), "owner uploads into a slot");
+  uploadId = upload.id;
 });
 
 test.afterAll(async () => {
@@ -75,7 +83,6 @@ test("another student: the same draft is a 404 like a missing id, and never list
 });
 
 test("guessed file ids: a hidden Record's upload answers as a missing one", async () => {
-  test.skip(!uploadId, "the draft's manuscript is not listed as an upload on this build");
   const hidden = await probe(stranger, `/documents/uploads/${uploadId}/download/`);
   const missing = await probe(stranger, `/documents/uploads/${MISSING}/download/`);
   expect(hidden.status).toBe(404);

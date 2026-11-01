@@ -5,11 +5,13 @@
 import { expect, test } from "@playwright/test";
 import { as, ok, signInBrowser, type Client } from "../support/api";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
-import { expectNoSeriousA11yViolations } from "../support/a11y";
+import { A11yLedger } from "../support/a11y";
 import { manage } from "../support/stack";
 import { acceptAndRoute, claimAndOpen, createDraft, party, reviewRow, submit, tracker } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
+
+const a11y = new A11yLedger();
 
 let student: Client, adviser: Client, rdco: Client, itso: Client, itsoCoord: Client;
 let recordId: number, assignmentId: number;
@@ -75,13 +77,15 @@ test("an overdue turn escalates to the coordinators and decides nothing", async 
 
   const after = party(await tracker(itsoCoord, recordId), "itso");
   expect(after.state, "still ITSO's turn").toBe("active");
-  expect(after.outcome, "nothing cleared").toBeNull();
+  // The turn's outcome stays open ("pending"); an Escalation records none.
+  expect(after.outcome, "nothing cleared").not.toBe("cleared");
+  expect(after.outcome, "nothing decided").toBe("pending");
   expect((await student.json(`/records/${recordId}/`)).pipeline_status).toBe(statusBefore);
 
   await signInBrowser(page, ACCOUNTS.itsoCoordinator, "/review?overdue=true");
   await expect(page.getByText(title)).toBeVisible();
   await expect(page.getByText(/overdue/i).first()).toBeVisible();
-  await expectNoSeriousA11yViolations(page, testInfo, "my-reviews-overdue");
+  await a11y.scan(page, testInfo, "my-reviews-overdue");
 });
 
 test("analytics are scoped: an office reads its own, RDCO reads every party", async () => {
@@ -94,4 +98,8 @@ test("analytics are scoped: an office reads its own, RDCO reads every party", as
 
   const studentRes = await student.get("/reviews/analytics/");
   expect(studentRes.status()).toBe(403);
+});
+
+test("accessibility: no serious or critical findings on this journey's key screens", async ({}, testInfo) => {
+  a11y.assertClean(testInfo);
 });

@@ -69,7 +69,8 @@ export async function reviewRow(client: Client, recordId: number, partyName: str
         const params: Record<string, string> = { tab };
         if (opts.office) params.office = opts.office;
         const res = await client.get("/reviews/mine/", params);
-        if (!res.ok()) continue;
+        // A refusal is not "not there yet": fail with it rather than poll it away.
+        if (!res.ok()) throw new Error(`GET /reviews/mine/?tab=${tab} as ${client.email} -> ${res.status()} ${(await res.text()).slice(0, 200)}`);
         const body = await res.json();
         found = (body.rows as ReviewRow[]).find((r) => r.record === recordId && r.party === partyName);
         if (found) return true;
