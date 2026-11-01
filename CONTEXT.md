@@ -190,6 +190,10 @@ _Avoid_: Child record, child manuscript, derived record, fork, follow-up.
 A Thesis/Research or Project that RDCO accepted but kept out of Discover and Ask IRIS, for example ahead of a patent filing. Its owners and reviewers can still open it.
 _Avoid_: Completed (the code's status name), embargoed, hidden.
 
+**Embargo**:
+A hold that stops a Record's text going to outside AI companies, for a reason such as a sponsor's agreement or a journal that publishes first. Its date is a reminder, and it ends only when the Adviser or RDCO releases it. It doesn't hide the Record from readers in IRIS, which is what [[Unlisted]] does.
+_Avoid_: Expired (an embargo doesn't expire), hidden, private.
+
 **Archived**:
 How a rejected Record is shown to readers. It is terminal: the owner cannot answer it with a new [[Version]] and must submit a new Record.
 _Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision request).
