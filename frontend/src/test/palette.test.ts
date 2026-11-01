@@ -23,7 +23,6 @@ import { offGreyClasses, offPaletteClasses, seeThroughWhiteClasses } from "./pal
 const NOT_YET_CONVERTED: readonly string[] = [
   // IR-362 -- Notifications (My Library came off with IR-410, Calls &
   // Conferences with IR-530)
-  "src/features/notifications/NotificationsPage.tsx",
   // IR-363 -- Documents and the admin screens
   "src/features/accounts/RoleRequestsPage.tsx",
   "src/features/admin/DeleteRequestsPage.tsx",
@@ -48,7 +47,6 @@ const GREY_NOT_YET_CONVERTED: readonly string[] = [
   "src/features/ai/AIHubPage.tsx",
   "src/features/ai/components/answerLayout.ts",
   // IR-362 -- Notifications
-  "src/features/notifications/NotificationsPage.tsx",
   // IR-363 -- Documents and the admin screens
   "src/features/accounts/RoleRequestsPage.tsx",
   "src/features/accounts/UserListPage.tsx",
