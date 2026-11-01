@@ -47,7 +47,7 @@ def make_opportunity(**overrides):
 class OpportunityPermissionTests(APITestCase):
     """
     Browsing is open to any authenticated user; publishing is limited to
-    RDCO, KTTO and Adviser.
+    RDCO and Adviser.
 
     Students must never be able to post -- an unvetted "funding call" carrying
     an external link is a phishing vector aimed at the whole institution.
@@ -59,6 +59,7 @@ class OpportunityPermissionTests(APITestCase):
         self.rdco    = make_user("rdco@cit.edu",    "RDCO")
         self.ktto    = make_user("ktto@cit.edu",    "KTTO")
         self.itso    = make_user("itso@cit.edu",    "ITSO")
+        self.ierc    = make_user("ierc@cit.edu",    "IERC")
         self.opportunity = make_opportunity()
 
         self.list_url   = reverse("opportunity-list")
@@ -94,14 +95,16 @@ class OpportunityPermissionTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(Opportunity.objects.count(), 1)
 
-    def test_itso_cannot_create(self):
-        """ITSO is in STAFF_ROLES but is deliberately NOT a poster."""
-        self.client.force_authenticate(self.itso)
-        response = self.client.post(self.list_url, self._payload(), format="json")
-        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+    def test_clearing_offices_cannot_create(self):
+        """ITSO, IERC and KTTO are in STAFF_ROLES but are deliberately NOT posters."""
+        for user in (self.itso, self.ierc, self.ktto):
+            with self.subTest(role=user.role.name):
+                self.client.force_authenticate(user)
+                response = self.client.post(self.list_url, self._payload(), format="json")
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_poster_roles_can_create(self):
-        for user in (self.rdco, self.ktto, self.adviser):
+        for user in (self.rdco, self.adviser):
             self.client.force_authenticate(user)
             response = self.client.post(self.list_url, self._payload(), format="json")
             self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
@@ -151,8 +154,29 @@ class OpportunityPermissionTests(APITestCase):
         mine.refresh_from_db()
         self.assertEqual(mine.title, "Corrected")
 
+    def test_a_call_ktto_posted_earlier_is_now_rdcos_to_change(self):
+        """
+        KTTO stopped posting with IR-757. Its earlier calls stay on the board, and
+        having posted one does not keep the right to change it.
+        """
+        theirs = make_opportunity(title="KTTO's Earlier Call", posted_by=self.ktto)
+        url = reverse("opportunity-detail", args=[theirs.pk])
+
+        self.client.force_authenticate(self.ktto)
+        self.assertEqual(
+            self.client.patch(url, {"title": "Corrected"}, format="json").status_code,
+            status.HTTP_403_FORBIDDEN,
+        )
+        self.assertEqual(self.client.delete(url).status_code, status.HTTP_403_FORBIDDEN)
+
+        self.client.force_authenticate(self.rdco)
+        self.assertEqual(
+            self.client.patch(url, {"title": "Corrected"}, format="json").status_code,
+            status.HTTP_200_OK,
+        )
+
     def test_an_admin_can_moderate_another_posters_call(self):
-        """RDCO/KTTO can correct anyone's posting — a deadline outlives its poster."""
+        """RDCO can correct anyone's posting — a deadline outlives its poster."""
         theirs = make_opportunity(title="Adviser's Own Call", posted_by=self.adviser)
         url = reverse("opportunity-detail", args=[theirs.pk])
 
@@ -199,18 +223,22 @@ class OpportunityCapabilityTests(APITestCase):
 
     def test_can_post_matches_who_may_create(self):
         for user, expected in (
-            (self.student, False), (self.itso, False),
-            (self.adviser, True), (self.rdco, True), (self.ktto, True),
+            (self.student, False), (self.itso, False), (self.ktto, False),
+            (self.adviser, True), (self.rdco, True),
         ):
             with self.subTest(role=user.role.name):
                 self.assertIs(self._list(user)["can_post"], expected)
 
     def test_non_posters_can_edit_nothing(self):
-        for user in (self.student, self.itso):
+        for user in (self.student, self.itso, self.ktto):
             with self.subTest(role=user.role.name):
                 self.assertEqual(
                     self._can_edit(user), {"Adviser's Call": False, "RDCO's Call": False},
                 )
+
+    def test_ktto_cannot_edit_a_call_it_posted_earlier(self):
+        make_opportunity(title="KTTO's Earlier Call", posted_by=self.ktto)
+        self.assertFalse(any(self._can_edit(self.ktto).values()))
 
     def test_an_adviser_can_edit_only_their_own_call(self):
         self.assertEqual(self._can_edit(self.adviser), {"Adviser's Call": True, "RDCO's Call": False})
@@ -218,12 +246,10 @@ class OpportunityCapabilityTests(APITestCase):
             self._can_edit(self.other_adviser), {"Adviser's Call": False, "RDCO's Call": False},
         )
 
-    def test_moderators_can_edit_every_call(self):
-        for user in (self.rdco, self.ktto):
-            with self.subTest(role=user.role.name):
-                self.assertEqual(
-                    self._can_edit(user), {"Adviser's Call": True, "RDCO's Call": True},
-                )
+    def test_rdco_can_edit_every_call(self):
+        self.assertEqual(
+            self._can_edit(self.rdco), {"Adviser's Call": True, "RDCO's Call": True},
+        )
 
     def test_a_created_call_comes_back_editable_by_its_poster(self):
         self.client.force_authenticate(self.adviser)
