@@ -153,9 +153,11 @@ _PREFIX = "[DEMO]"
 
 FLAGSHIP_TITLE = f"{_PREFIX} Declined by IERC, ITSO and KTTO preserved"
 RESUBMITTED_TITLE = f"{_PREFIX} Resubmitted, ITSO and KTTO preserved"
-NEW_MODEL_TITLE = f"{_PREFIX} New model: Thesis at its Adviser, ready to accept and route"
-AT_RDCO_TITLE = f"{_PREFIX} New model: Thesis ITSO cleared, in RDCO's pool to decide"
-PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} New model: Proposal at its Adviser, ready to accept or reject"
+NEW_MODEL_TITLE = f"{_PREFIX} Thesis at its Adviser, ready to accept and send to RDCO"
+IN_RDCO_POOL_TITLE = f"{_PREFIX} Thesis in RDCO's pool, Adviser suggests ITSO and IERC"
+RDCO_DECIDES_EARLY_TITLE = f"{_PREFIX} Project with IERC and KTTO still reviewing, RDCO can decide"
+AT_RDCO_TITLE = f"{_PREFIX} Thesis ITSO cleared, RDCO's turn to decide"
+PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} Proposal at its Adviser, ready to accept or reject"
 AWAITING_DOCUMENT_TITLE = f"{_PREFIX} Adviser requested a supporting document"
 
 
@@ -173,7 +175,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--accounts-only", action="store_true",
-            help="Seed the seven accounts and stop. Replaces seed_demo_users.py.",
+            help="Seed the eleven accounts and stop. Replaces seed_demo_users.py.",
         )
 
     def handle(self, *args, **options):
@@ -204,6 +206,8 @@ class Command(BaseCommand):
             self.stdout.write(f"  Drive the preservation demo on: '{FLAGSHIP_TITLE}'")
             self.stdout.write("    (upload a document as the student first -- resubmission requires one)")
             self.stdout.write(f"  Already-preserved badges render on: '{RESUBMITTED_TITLE}'")
+            self.stdout.write(f"  Pick the offices as RDCO on: '{IN_RDCO_POOL_TITLE}'")
+            self.stdout.write(f"  Decide early as RDCO on: '{RDCO_DECIDES_EARLY_TITLE}'")
 
     # -- phase 1: accounts -------------------------------------------------
 
@@ -339,6 +343,8 @@ class Command(BaseCommand):
             self._scenario_new_model_at_adviser,
             self._scenario_awaiting_document,
             self._scenario_new_model_at_rdco,
+            self._scenario_in_rdco_pool,
+            self._scenario_rdco_decides_early,
             self._scenario_new_model_proposal_at_adviser,
         ):
             scenario(users)
@@ -576,7 +582,7 @@ class Command(BaseCommand):
         A Thesis/Research on the adviser-first model, at its Adviser (IR-261).
 
         Entered through `routing.enter_at_adviser`, as every submission is.
-        This one is where *Accept & route…* is demoed (as adviser@cit.edu).
+        This one is where *Accept & send to RDCO…* is demoed (as adviser@cit.edu).
         """
         from apps.reviews.routing import enter_at_adviser
 
@@ -651,6 +657,81 @@ class Command(BaseCommand):
         record_office_review(
             record, itso, outcome=CLEARED,
             comment="No prior art found; no filing needed before publication.",
+        )
+        self._done(record)
+
+    @transaction.atomic
+    def _scenario_in_rdco_pool(self, users):
+        """
+        RDCO's first step (ADR-047 §1): a Thesis/Research nobody at RDCO has
+        claimed yet. The author flagged KTTO and the Adviser suggests ITSO and
+        IERC, so rdco@cit.edu claims it and picks the offices. A suggestion
+        requests nothing, so no office holds it yet.
+        """
+        from apps.reviews import seats
+        from apps.reviews.routing import accept_and_route
+
+        student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
+        record = self._make(
+            IN_RDCO_POOL_TITLE, RecordTypeName.THESIS_RESEARCH, student,
+            adviser=adviser, requested_ktto=True,
+        )
+        if record:
+            entry = self._submit(record, student)
+            seats.open_review(entry.seats.get(), adviser)
+            accept_and_route(
+                record, adviser, to=[{"party": "rdco"}],
+                reason="The method may be patentable, and the study involved human participants.",
+                suggested_offices=["itso", "ierc"],
+            )
+            self._done(record)
+
+    @transaction.atomic
+    def _scenario_rdco_decides_early(self, users):
+        """
+        RDCO deciding with work still open (ADR-047 §3 and §5). RDCO asked one
+        ITSO officer, IERC's whole office and two KTTO officers. ITSO recorded a
+        finding, and IERC and KTTO have not finished. rdco@cit.edu's Decision
+        dialog names both offices and the finding before anything closes.
+        """
+        from apps.reviews import seats
+        from apps.reviews.models import RecordAssignment
+        from apps.reviews.office_review import FINDING, record_office_review
+        from apps.reviews.routing import accept_and_route, route
+
+        student, adviser, rdco, itso, ktto = (
+            users[RoleName.STUDENT], users[RoleName.ADVISER], users[RoleName.RDCO],
+            users[RoleName.ITSO], users[RoleName.KTTO],
+        )
+        record = self._make(
+            RDCO_DECIDES_EARLY_TITLE, RecordTypeName.PROJECT, student, adviser=adviser,
+            requested_itso=True, requested_ierc=True, requested_ktto=True,
+        )
+        if not record:
+            return
+        entry = self._submit(record, student)
+        seats.open_review(entry.seats.get(), adviser)
+        accept_and_route(
+            record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}],
+            reason="Ready for institutional review.",
+        )
+        rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+        seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+        ktto_coordinator = User.objects.get(email="ktto.coordinator@cit.edu")
+        route(
+            record, rdco,
+            to=[
+                {"party": "itso", "nominees": [itso.pk]},
+                {"party": "ierc"},
+                {"party": "ktto", "nominees": [ktto.pk, ktto_coordinator.pk]},
+            ],
+            reason="The project needs prior-art, ethics and commercialisation review.",
+        )
+        itso_assignment = RecordAssignment.objects.get(record=record, party="itso", state="active")
+        seats.open_review(itso_assignment.seats.get(reviewer=itso), itso)
+        record_office_review(
+            record, itso, outcome=FINDING,
+            comment="An existing patent may cover part of the claimed method.",
         )
         self._done(record)
 

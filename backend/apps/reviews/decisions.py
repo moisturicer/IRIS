@@ -439,7 +439,7 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
 
     # Seats are closed here rather than through `seats.complete_seat()` and
     # `seats.withdraw()`: those run the office completion rule and its
-    # hand-back, which must not fire on a record the Decision is ending, and
+    # notices, which must not fire on a record the Decision is ending, and
     # `withdraw()` is a coordinator's act with a coordinator's checks.
     now = timezone.now()
     cut_off = []  # reviewers whose open seat the decision withdrew
