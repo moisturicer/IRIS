@@ -19,8 +19,8 @@ const PREVIEW_LIMIT = 5;
  * screen.
  *
  * Reads from the shared `useNotificationsStore` -- deliberately NOT its own
- * fetch. `AppShell` fetches once for every bell on screen (IR-370). An earlier version
- * fetched independently and the two counters immediately disagreed: marking
+ * fetch: `AppShell` fetches once for every bell on screen (IR-370). An
+ * earlier version fetched independently and the two counters disagreed: marking
  * all read in the bell cleared the bell but left the sidebar showing the old
  * count until a page refresh. One source of truth, two surfaces.
  *
@@ -72,7 +72,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
     try {
       await notificationsApi.markAllRead();
     } catch {
-      /* left cleared locally; the next page load's fetch re-syncs */
+      /* left cleared locally; the next session's or page load's fetch re-syncs */
     }
   };
 
