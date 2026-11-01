@@ -18,7 +18,8 @@ import { importedReference } from "@/test/fixtures/importedReference";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { recordsApi } from "@/api/records";
 import { useAuthStore } from "@/store/auth.store";
-import { getCollections, isStarred } from "@/lib/recordLibrary";
+import { libraryApi } from "@/api/library";
+import { useLibraryStore } from "@/store/library.store";
 import type { RecordListItem } from "@/types/records";
 import type { User } from "@/types/auth";
 
@@ -95,6 +96,17 @@ vi.mock("@/api/records", () => ({
   },
 }));
 
+vi.mock("@/api/library", () => ({
+  libraryApi: {
+    saves: vi.fn(() => Promise.resolve({ data: { results: [] } })),
+    save: vi.fn((recordId: number, body: { reading_status?: string | null } = {}) => Promise.resolve({ data: {
+      record_id: recordId, available: true, reading_status: body.reading_status ?? null,
+      saved_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z", record: { id: recordId, title: "Saved" },
+    } })),
+    unsave: vi.fn(() => Promise.resolve({ status: 204 })),
+  },
+}));
+
 vi.mock("@/api/accounts", () => ({
   accountsApi: { colleges: vi.fn(() => page([{ id: 4, name: "College of Engineering" }])) },
 }));
@@ -156,6 +168,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   sessionStorage.clear();
   localStorage.clear();
+  useLibraryStore.setState({ load: "idle", items: {}, failure: null });
   listed = [publishedThesis];
   total = null;
   recommended = { mode: "latest", results: [{ ...publishedThesis, reason: { kind: "latest" } }], next_cursor: null, count: 1 };
@@ -432,7 +445,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     localStorage.setItem("iris.discover.columns", "2");
   });
 
-  /** Everything this browser keeps for the reader: saves, folders and stars live here. */
+  /** Everything this browser keeps for the reader. Saves are the account's since IR-566. */
   const browserLibrary = () => JSON.stringify(Object.entries({ ...localStorage }).sort());
 
   it("removes a recommendation at once and offers Undo, which restores it in a fresh feed", async () => {
@@ -512,43 +525,37 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     expect(within(card).queryByRole("button", { name: "Not interested" })).not.toBeInTheDocument();
   });
 
-  it("leaves saves and folders alone when dismissing, and keeps feedback off this browser", async () => {
+  it("leaves saves alone when dismissing, and keeps feedback off this browser", async () => {
     renderDiscover("/?feed=for_you");
     const card = await screen.findByRole("article", { name: publishedThesis.title });
-    await userEvent.click(within(card).getByRole("button", { name: "Save to collection" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Save" }));
     await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
-    await userEvent.click(within(card).getByRole("button", { name: "Star paper" }));
+    await waitFor(() => expect(libraryApi.save).toHaveBeenCalledWith(publishedThesis.id, { reading_status: "want_to_read" }));
     const saved = browserLibrary();
 
     await userEvent.click(within(card).getByRole("button", { name: "Not interested" }));
 
-    // The folder and star are untouched, and the feedback went to the account, not storage.
+    // The save is untouched, and the feedback went to the account, not storage.
     expect(browserLibrary()).toBe(saved);
-    expect(getCollections().find((c) => c.id === "want-to-read")?.recordIds).toEqual([publishedThesis.id]);
-    expect(isStarred(publishedThesis.id)).toBe(true);
+    expect(libraryApi.unsave).not.toHaveBeenCalled();
     expect(recordsApi.notInterested).toHaveBeenCalledWith(publishedThesis.id);
   });
 
-  it("does not count unstarring a paper as Not interested", async () => {
+  it("offers no Star: Likes are retired and Save covers them (ADR-044 Q1)", async () => {
     renderDiscover("/?feed=for_you");
     const card = await screen.findByRole("article", { name: second.title });
-    await userEvent.click(within(card).getByRole("button", { name: "Star paper" }));
-    await userEvent.click(within(card).getByRole("button", { name: "Starred" }));
 
-    expect(isStarred(second.id)).toBe(false);
-    expect(screen.getByRole("article", { name: second.title })).toBeInTheDocument();
-    expect(recordsApi.notInterested).not.toHaveBeenCalled();
+    expect(within(card).queryByRole("button", { name: /star/i })).not.toBeInTheDocument();
   });
 
-  it("does not count removing a paper from a folder as Not interested", async () => {
+  it("does not count clearing a reading status as Not interested", async () => {
     renderDiscover("/?feed=for_you");
     const card = await screen.findByRole("article", { name: second.title });
-    await userEvent.click(within(card).getByRole("button", { name: "Save to collection" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Save" }));
     await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
-    expect(getCollections().find((c) => c.id === "want-to-read")?.recordIds).toEqual([second.id]);
     await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
 
-    expect(getCollections().find((c) => c.id === "want-to-read")?.recordIds).toEqual([]);
+    await waitFor(() => expect(libraryApi.save).toHaveBeenLastCalledWith(second.id, { reading_status: null }));
     expect(screen.getByRole("article", { name: second.title })).toBeInTheDocument();
     expect(recordsApi.notInterested).not.toHaveBeenCalled();
   });
@@ -559,7 +566,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     } as unknown as Awaited<ReturnType<typeof recordsApi.interests>>);
     renderDiscover("/?feed=for_you");
     const card = await screen.findByRole("article", { name: publishedThesis.title });
-    await userEvent.click(within(card).getByRole("button", { name: "Save to collection" }));
+    await userEvent.click(within(card).getByRole("button", { name: "Save" }));
     await userEvent.click(within(card).getByRole("button", { name: "Want to read" }));
     const saved = browserLibrary();
     await userEvent.click(await screen.findByRole("button", { name: "Edit Areas" }));
@@ -575,6 +582,7 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     await waitFor(() => expect(recordsApi.forYou).toHaveBeenCalledTimes(2));
     expect(await screen.findByText(/interests were reset/i)).toBeInTheDocument();
     expect(browserLibrary()).toBe(saved);
+    expect(libraryApi.unsave).not.toHaveBeenCalled();
     expect(await screen.findByRole("button", { name: "Choose Areas" })).toBeInTheDocument();
   });
 
