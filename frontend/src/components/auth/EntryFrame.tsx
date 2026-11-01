@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import citLogo from "@/assets/images/cit-logo.png";
-import irisLogo from "@/assets/images/iris_logo.png";
+import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn } from "@/lib/utils";
 
@@ -66,9 +66,10 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
         <div className="mx-auto flex max-w-page items-center justify-between gap-3 px-4 py-2 sm:px-8 lg:px-12">
           <h1 className="flex min-w-0 items-center gap-2.5 sm:gap-4">
             <span className="flex shrink-0 items-center gap-2">
-              <img src={irisLogo} alt="" className="size-7 sm:size-9" />
-              <span className="text-heading font-extrabold tracking-widest text-brand sm:text-title">
-                IRIS
+              <IrisMark className="size-7 text-brand sm:size-9" />
+              <span className="text-brand">
+                <IrisWordmark className="h-3.5 w-auto sm:h-4" />
+                <span className="sr-only">IRIS</span>
               </span>
             </span>
             <span className="h-7 shrink-0 border-l border-stone-200 sm:h-9" aria-hidden />

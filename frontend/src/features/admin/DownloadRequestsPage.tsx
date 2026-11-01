@@ -1,6 +1,6 @@
 /**
  * RDCO's download-request queue (ADR-048): the only one. Gated to RDCO by
- * RoleRoute in router/index.tsx; the server refuses everyone else anyway.
+ * ProtectedRoute in router/index.tsx; the server refuses everyone else anyway.
  *
  * Backend endpoints:
  *   GET  /records/download-requests/                → list all requests
@@ -220,7 +220,7 @@ export default function DownloadRequestsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading download requests" /></div>
       ) : requests.length === 0 ? (
         <EmptyState
           icon="fa-download"

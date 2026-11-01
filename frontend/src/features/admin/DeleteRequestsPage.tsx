@@ -1,6 +1,6 @@
 /**
  * Admin page — list pending delete requests and approve them.
- * Accessible to staff roles only (gated by RoleRoute in router/index.tsx).
+ * Accessible to staff roles only (gated by ProtectedRoute in router/index.tsx).
  *
  * Notes:
  *   - Only admins can approve deletions (backend: IsAdmin permission).
@@ -115,7 +115,7 @@ export default function DeleteRequestsPage() {
       )}
 
       {loading ? (
-        <div className="flex justify-center py-16"><Spinner size="lg" /></div>
+        <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" /></div>
       ) : requests.length === 0 ? (
         <EmptyState
           icon="fa-trash-alt"

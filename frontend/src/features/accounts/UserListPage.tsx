@@ -11,6 +11,7 @@ import { useEffect, useId, useState } from "react";
 import { accountsApi }  from "@/api/accounts";
 import { PageHeader }   from "@/components/layout/PageHeader";
 import { DataTable }    from "@/components/shared/DataTable";
+import { EmptyState }   from "@/components/shared/EmptyState";
 import { RoleBadge }    from "@/components/shared/RoleBadge";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Input }        from "@/components/ui/Input";
@@ -21,6 +22,7 @@ import { ALL_ROLES, STAFF_ROLES } from "@/lib/constants";
 import { useUIStore }   from "@/store/ui.store";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { UserListItem } from "@/types/auth";
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 /** The four office roles: the only ones the server lets coordinate. */
 function isOfficeMember(user: UserListItem): boolean {
@@ -35,6 +37,7 @@ export default function UserListPage() {
   const [total, setTotal]     = useState(0);
   const [page, setPage]       = useState(1);
   const [loading, setLoading] = useState(true);
+  const [loadFailed, setLoadFailed] = useState(false);
   const [search, setSearch]   = useState("");
 
   // Lock/unlock confirm dialog
@@ -55,7 +58,10 @@ export default function UserListPage() {
       .then(({ data }) => {
         setUsers(data.results);
         setTotal(data.count);
+        setLoadFailed(false);
       })
+      // An empty table after an error would read as "no users" (IR-745).
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   };
 
@@ -207,12 +213,22 @@ export default function UserListPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-          leading={<i className="fa fa-search text-[14px]" aria-hidden />}
+          leading={<SearchGlyph className="h-3.5 w-3.5" />}
           className="max-w-xs"
         />
         <Button variant="secondary" size="sm" onClick={handleSearch}>Filter</Button>
       </div>
 
+      {loadFailed && !loading ? (
+        <EmptyState
+          framed
+          tone="error"
+          icon="fa-circle-exclamation"
+          title="Couldn't load users"
+          message="Check your connection and try again."
+          action={<Button variant="outline" size="sm" onClick={() => load(page)}>Try again</Button>}
+        />
+      ) : (
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         <DataTable
           data={users}
@@ -224,6 +240,7 @@ export default function UserListPage() {
           onPageChange={setPage}
         />
       </div>
+      )}
 
       {/* Lock/unlock confirm */}
       <ConfirmDialog

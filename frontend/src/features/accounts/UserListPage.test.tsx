@@ -195,3 +195,16 @@ describe("accessibility", () => {
     await expectNoBlockingA11yViolations(document.body);
   });
 });
+
+describe("a list that fails to load (IR-745)", () => {
+  it("says so and tries again, rather than showing an empty table", async () => {
+    userList.mockRejectedValueOnce(new Error("Network Error"));
+    renderScreen(<UserListPage />);
+
+    expect(await screen.findByRole("heading", { name: "Couldn't load users" })).toBeInTheDocument();
+    expect(screen.queryByRole("table")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await rowFor(STUDENT.email)).toBeInTheDocument();
+  });
+});

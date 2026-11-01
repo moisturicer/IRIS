@@ -68,7 +68,7 @@ export default function SessionsPage() {
       {/* Loading */}
       {loading && (
         <div className="flex justify-center py-16">
-          <Spinner size="lg" />
+          <Spinner size="lg" label="Loading sessions" />
         </div>
       )}
 

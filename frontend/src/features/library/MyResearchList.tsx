@@ -14,6 +14,7 @@ import { waitingHref } from "@/features/records/waitingOnYou";
 import { ContinueProposal } from "@/features/records/ContinueProposal";
 
 import { groupResearch, type ResearchSection } from "./researchSections";
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 const CHIP = "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-2xs font-semibold";
 
@@ -194,7 +195,7 @@ export function MyResearchList({ items, loading, failed, onRetry }: MyResearchLi
     <div>
       <label className="relative mb-section block">
         <span className="sr-only">Search your research</span>
-        <i className="fas fa-magnifying-glass pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-small text-stone-500" aria-hidden />
+        <SearchGlyph className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-500" />
         <input
           type="search"
           value={query}

@@ -17,11 +17,19 @@ export default function NotificationsPage() {
   const { markRead, markAllRead } = useNotificationsStore();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  // A failed load is not an empty inbox (IR-745): saying "No notifications
+  // yet" after an error would tell the reader something untrue.
+  const [loadFailed, setLoadFailed] = useState(false);
 
   const load = () => {
+    setLoading(true);
     notificationsApi
       .list()
-      .then(({ data }) => setNotifications(data.results ?? data))
+      .then(({ data }) => {
+        setNotifications(data.results ?? data);
+        setLoadFailed(false);
+      })
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   };
 
@@ -60,6 +68,14 @@ export default function NotificationsPage() {
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
         {loading ? (
           <Skeleton />
+        ) : loadFailed ? (
+          <EmptyState
+            tone="error"
+            icon="fa-circle-exclamation"
+            title="Couldn't load your notifications"
+            message="Check your connection and try again."
+            action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
+          />
         ) : notifications.length === 0 ? (
           <EmptyState icon="fa-bell-slash" title="No notifications yet." />
         ) : (

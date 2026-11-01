@@ -47,7 +47,7 @@ This document tracks what we can build **now** against the SRS/SDD and current b
 
 ## Phase 1 — App shell & navigation (done)
 
-Matches Discover dashboard wireframe structure; `AppShell`, `Sidebar`, `Header`, `Breadcrumbs`, `ForbiddenPage`.
+Matches Discover dashboard wireframe structure; `AppShell`, `Sidebar`, `Header`, `Breadcrumbs`, `ForbiddenScreen`.
 
 | Task | Priority | SRS module | Status |
 |------|----------|------------|--------|
@@ -56,7 +56,7 @@ Matches Discover dashboard wireframe structure; `AppShell`, `Sidebar`, `Header`,
 | Sign out in header | High | FR-M6-01 | Done |
 | Breadcrumbs (`Home / Discover`) | Medium | — | Done (`Breadcrumbs` + route `handle.crumb`) |
 | Mobile sidebar drawer | High | NFR-U3 (360px+) | Done (overlay + hamburger) |
-| HTTP 403 forbidden page | High | FR-M6-03 | Done (`ForbiddenPage`, `RoleRoute`) |
+| HTTP 403 forbidden page | High | FR-M6-03 | Done (`ForbiddenScreen`, `ProtectedRoute`; IR-745) |
 | Help page stub | Low | — | Done (`HelpPage`) |
 
 **How to test**

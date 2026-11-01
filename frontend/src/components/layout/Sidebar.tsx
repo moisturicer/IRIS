@@ -10,7 +10,7 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { NotificationBell } from "./NotificationBell";
 import { AccountMenu } from "./AccountMenu";
 import { navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
-import irisLogo from "@/assets/images/iris_logo.png";
+import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 
 interface NavItem {
   to:     string;
@@ -208,20 +208,17 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             title={collapsed ? "Open sidebar" : "Collapse sidebar"}
             className={cn("hidden h-9 w-9 flex-shrink-0 rounded-lg md:block", FOCUS_RING)}
           >
-            <img src={irisLogo} alt="" className="h-9 w-9 object-contain" />
+            <IrisMark className="h-9 w-9 text-brand" />
           </button>
-          <img
-            src={irisLogo}
-            alt=""
-            className="h-9 w-9 flex-shrink-0 object-contain md:hidden"
-          />
+          <IrisMark className="h-9 w-9 flex-shrink-0 text-brand md:hidden" />
           <p
             className={cn(
-              "min-w-0 flex-1 font-display text-title font-semibold leading-none tracking-widest text-brand",
+              "min-w-0 flex-1 leading-none text-brand",
               collapsed && "md:sr-only",
             )}
           >
-            IRIS
+            <IrisWordmark className="h-4 w-auto" />
+            <span className="sr-only">IRIS</span>
           </p>
           {/* Desktop only: below md the phone bar carries the bell, and a
               second one in the drawer would put two on screen at once. */}

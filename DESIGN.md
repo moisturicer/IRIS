@@ -192,7 +192,7 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 
 **The Four Inks Rule.** The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).
 
-Gold (`gold.DEFAULT`, about 2.8:1 on white) stays decorative, as on the logo. It is never text or the only status signal.
+Gold (`gold.DEFAULT`, about 2.8:1 on white) stays decorative. It is never text or the only status signal, and the Folio Ribbon logo does not use it.
 
 **The One Bright Object Rule.** On the reading surfaces, only the thing being read is white. Bars, toolbars and headers around it are stone.
 
@@ -274,7 +274,7 @@ A white field with a Rule Stone outline and the control radius. Focus darkens th
 
 ### Navigation
 - **Record bar:** 56 px, Bar Stone, a Desk Stone hairline under it. Back (always labelled), a hairline divider, the paper's title on Paper, then the section tabs.
-- **Ask IRIS icon:** a 56 px Binding Maroon circle at the bottom right with the IRIS mark, shown only while the panel is closed, lifting 2 px on hover.
+- **Ask IRIS icon:** a 56 px Binding Maroon circle at the bottom right with the white Folio Ribbon Ask IRIS glyph, shown only while the panel is closed, lifting 2 px on hover.
 
 ### Ask IRIS panel (signature)
 A column on Endpaper behind one Rule Stone line, never a card. A Bar Stone header with the Garamond heading, an "AI" tag and the paper's title. Below it, the conversation, or a Garamond "Ask about this paper." with three outlined starter questions. At the bottom, the composer. It arrives from its edge (320 ms) and has dialog semantics only when it covers the paper.
@@ -292,6 +292,9 @@ Sign in, register, email verification and the pending and declined screens share
 - **Motion:** the sheet settles once (280 ms, 0.5 rem rise and fade, a recorded exception to the 150–200 ms rule because it runs once on load) and register's steps cross-fade (150 ms), both only when motion is welcome.
 
 Replaced the split screen with its "shelf of bound work" brand panel (IR-535, IR-586), deleted in IR-711.
+
+### Identity (IR-744)
+**Folio Ribbon.** The mark is a serif I standing in the gutter of an open folio: four maroon pieces (two leaves, two ribbons), with the I as the white space between them. `IrisMark`, `IrisWordmark`, `IrisLoader`, `SearchGlyph` and `AskIrisGlyph` (`frontend/src/components/brand/IrisBrand.tsx`) fill with `currentColor`: maroon on white, white only on maroon. The loader replays the concept's storyboard (one leaf, its partner, the ribbons, then the I) on a 2 s loop; Ask IRIS answering writes its three lines in turn. Both fade instead under reduced motion. Assets and their build: `docs/brand/folio-ribbon/final/`.
 
 ## Do's and Don'ts
 
