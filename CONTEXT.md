@@ -123,7 +123,7 @@ ITSO, IERC or KTTO: an office a Record is routed to for a question only it can a
 _Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
 
 **Specialist path**:
-A Thesis/Research or Project its Adviser accepted and sent to RDCO for institutional review. RDCO decides whether to request any [[Specialist office]]. The alternative is the Adviser’s accept & publish, where RDCO is never involved.
+A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
 _Avoid_: Full review, RDCO path.
 
 **Pool**:
@@ -147,7 +147,7 @@ A [[Specialist office]]'s outcome on a Record, *Cleared* or *Not cleared*, settl
 _Avoid_: Approval (an office clears its own question; it does not approve the Record), office decision.
 
 **Hand-back**:
-A historical step: IRIS opened RDCO’s [[Pool]] when the last specialist office finished. Retired by ADR-047. RDCO now holds the Record from the Adviser’s send; office completion only notifies RDCO.
+A retired step: IRIS opening RDCO's [[Pool]] on a Record when the last active specialist office finished. RDCO now holds the Record from the moment its Adviser sends it, and an office finishing only notifies RDCO.
 _Avoid_: Route to RDCO, escalation, final routing.
 
 **Review round**:
@@ -171,11 +171,11 @@ Telling an office's coordinators that its [[Due date]] has passed. Only a notifi
 _Avoid_: Using it for the [[Hand-back]] to RDCO, auto-escalation (suggests the Record moves).
 
 **Revision request**:
-One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and nobody can decide it; the party that asked cannot finish its own review either. Answered by the next Version, or withdrawn by the party that asked. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
+One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and only RDCO can decide it; the party that asked cannot finish its own review either. Answered by the next Version, withdrawn by the party that asked, or withdrawn by RDCO's [[Decision]]. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
 _Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
 
 **Decision**:
-An act that ends a Record's review: accept & publish, keep [[Unlisted]] or reject, made by the Adviser or by RDCO, and a Proposal's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. An Adviser’s Decision is refused while any [[Revision request]] is open. RDCO may decide at any time, withdrawing open Revision requests and identifying its Decision as the reason. Accept & send to RDCO is not a Decision: it completes the Adviser’s turn and asks RDCO for institutional review; it is refused while any Revision request is open.
+An act that ends a Record's review: on a Thesis/Research or Project, accept & publish or keep [[Unlisted]] by RDCO alone, or reject by RDCO or the Adviser; on a Proposal, its Adviser's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. An Adviser's Decision is refused while any [[Revision request]] is open; RDCO's withdraws them. Accept & send to RDCO is not a Decision: it is how an Adviser accepts a Thesis/Research or Project, it closes nothing, and it is refused while a Revision request is open.
 _Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which a Decision also records).
 
 **Accepted**:
@@ -201,7 +201,7 @@ _Avoid_: Comments (the public thread), notes, chat.
 ### Comments
 
 **Comment**:
-A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or a system administrator may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
+A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or the [[System Admin]] may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
 _Avoid_: Public discussion (the ADR's name for the thread), post, review comment.
 
 **Comment report**:
@@ -241,7 +241,7 @@ Another account that shared a published paper with this person, as a co-owner, a
 _Avoid_: Co-author (a byline name, not an account), team member.
 
 **Contact person**:
-The one owner of a Record whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; the owners can choose another. Their email is shown only where a decision says so, never on their Profile.
+The one owner of a Record who gets its review emails, and whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; any owner can choose another. Their email is shown only where a decision says so, never on their Profile.
 _Avoid_: Representative, group leader, primary author (authors are byline names, not accounts).
 
 ### Downloads
@@ -289,9 +289,37 @@ Entering IRIS with an existing account's CIT-U email and password.
 _Avoid_: Login, log in, sign on.
 
 **Register**:
-Asking for an IRIS account as a Student or an [[Adviser]]. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request.
+Asking for an IRIS account as a Student or an [[Adviser]], with a CIT-U email address. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request. A registration nobody verifies is eventually deleted, and registering again replaces it.
 _Avoid_: Sign up, signup, create account (the screen's title, not the act).
 
 **Adviser**:
 The role of the person who reviews their advisees' Records first and routes them onward. It is a role someone asks for when they register, not a job title.
 _Avoid_: Faculty, faculty adviser, professor.
+
+**RDCO**:
+The highest office staff role. It runs the research workflow: it approves roles, manages accounts and office coordinators, and answers download and delete requests. It is not the [[System Admin]].
+_Avoid_: Admin, administrator.
+
+**System Admin**:
+The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments and publishing [[Notice]]s with RDCO. Nobody can ask for it; developers set up the first one.
+_Avoid_: Admin (on its own), administrator, superuser.
+
+**Account deletion**:
+Removing a person from IRIS at their own request, once the System Admin confirms it and nobody is waiting on them. Their personal details go and they can't sign in. A published paper keeps their name as an Author or as Adviser, and elsewhere they show as "Former user".
+_Avoid_: Closure, close account, deactivate.
+
+**Notice**:
+The text a person accepts to give Signup consent or Submission consent. RDCO or the System Admin publishes each new version by pasting it, and a published version never changes.
+_Avoid_: Terms, DPA terms, privacy policy (a document the university writes).
+
+**Signup consent**:
+A person's acceptance of the signup Notice, which having an account requires. Withdrawing it means Account deletion.
+_Avoid_: Consent (on its own), terms.
+
+**Submission consent**:
+An owner's acceptance of the submission Notice, which lets AI features use one paper. Any one owner can withdraw it, which stops AI use of the whole paper and leaves its review untouched.
+_Avoid_: Consent (on its own), DPA acceptance, Discoverable (a separate decision).
+
+**Retention period**:
+How long IRIS keeps one kind of personal data before erasing it for good. The System Admin enters it once the data protection officer approves it, and a blank period erases nothing.
+_Avoid_: Expiry, TTL.

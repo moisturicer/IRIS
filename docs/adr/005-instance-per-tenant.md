@@ -91,3 +91,21 @@ Not directly specified in the SRS — the SRS assumes a single CIT-U deployment.
 ## Related Tasks
 
 `SA-01`…`SA-04`. See [`07-saas.md`](../architecture-tasks/07-saas.md).
+
+## Amendment — 2026-11-01 (IR-768): platform identity and institutional identity
+
+**Status of this amendment: PROPOSED, for team review.** It was drafted with IR-768 and is not accepted until a reviewer records approval.
+
+**Principle.** IRIS owns the platform identity. Each institution owns its institutional identity, policies, workflows and research data. CIT-U is the pilot institution, not the product's identity.
+
+This applies the SaaS Impact section above to the interface. That section already rules out hard-coding CIT-U's office names, record types and stage sequence. The same reasoning covers the name, logo and wording on screen: copy that assumes one university makes institution #2 a copy rewrite, which is a small fork.
+
+**What follows from it:**
+
+* **Neutral by default.** Copy that needs no institution's name does not use one: "your institutional email", "an administrator", "My Library", "Published Research", "Institutional Review".
+* **Named from one place.** Where the institution must be named (its logo and that logo's alt text, the footer, "Managed by …"), the frontend reads it from `frontend/src/config/institution.ts` (`name`, `shortName`, `logo`, `emailDomain`). Under this ADR an institution is a deployment, so these are per-deployment values. Moving them into the environment or the backend is a later choice and not decided here.
+* **IRIS is always visible.** The IRIS mark and wordmark appear on every screen. The institution's logo may appear beside them.
+* **Legal text is excluded.** Text that names a legal party (data-privacy consent, `lib/dpaTerms.ts`) names the institution that is that party. It changes only through that institution's legal review, never as copy.
+* **Not multi-tenancy.** Neutral copy and a config module do not isolate data, permissions or policy between institutions. Isolation is still the one-deployment-per-institution decision above.
+
+**Built so far:** the sign-in and registration screens (IR-768). The rest of the application follows in IR-769. Configurable office names (RDCO, ITSO, IERC, KTTO in copy) are not yet ticketed.

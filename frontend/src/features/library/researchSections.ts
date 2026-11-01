@@ -92,3 +92,55 @@ export function groupResearch(items: readonly MyResearchItem[]): ResearchSection
     return [{ id: rule.id, title: rule.title, note: rule.note, items: found }];
   });
 }
+
+/** The filters over My submissions, each a set of sections (no counts). */
+export type ResearchFilter = "all" | "waiting" | "review" | "drafts" | "finished";
+
+export const RESEARCH_FILTERS: { value: ResearchFilter; label: string }[] = [
+  { value: "all",      label: "All" },
+  { value: "waiting",  label: "Needs your action" },
+  { value: "review",   label: "In review" },
+  { value: "drafts",   label: "Drafts" },
+  { value: "finished", label: "Finished" },
+];
+
+const FILTER_SECTIONS: Record<Exclude<ResearchFilter, "all">, readonly ResearchSectionId[]> = {
+  waiting:  ["waiting"],
+  review:   ["adviser", "offices", "rdco", "review"],
+  drafts:   ["drafts"],
+  finished: ["finished", "deleting", "archived"],
+};
+
+export function inFilter(section: ResearchSection, filter: ResearchFilter): boolean {
+  return filter === "all" || FILTER_SECTIONS[filter].includes(section.id);
+}
+
+/** One group of My submissions: a filter and the records it holds. */
+export interface FilterGroup {
+  id:    Exclude<ResearchFilter, "all">;
+  title: string;
+  note:  string;
+  items: MyResearchItem[];
+}
+
+const GROUP_NOTES: Record<FilterGroup["id"], string> = {
+  waiting:  "A reviewer needs something from you before review can go on.",
+  review:   "With your Adviser, the offices or RDCO. An office that has cleared stays cleared if another asks for revisions.",
+  drafts:   "Not yet submitted.",
+  finished: "Accepted, published, kept unlisted, or closed.",
+};
+
+/**
+ * The owner's records filed under the filters, in filter order. The
+ * holder-level sections still decide where a record lands and its order
+ * inside a group (adviser, then offices, then RDCO); an empty group is left
+ * out.
+ */
+export function groupByFilter(items: readonly MyResearchItem[]): FilterGroup[] {
+  const sections = groupResearch(items);
+  return RESEARCH_FILTERS.flatMap(({ value, label }) => {
+    if (value === "all") return [];
+    const found = sections.filter((s) => FILTER_SECTIONS[value].includes(s.id)).flatMap((s) => s.items);
+    return found.length ? [{ id: value, title: label, note: GROUP_NOTES[value], items: found }] : [];
+  });
+}

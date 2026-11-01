@@ -2,6 +2,8 @@
 
 ## Status
 
+[ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01 and not built yet, lets owners choose the Contact person on every paper, not only Proposals, before validation (IR-801).
+
 > **§3–§4 partially superseded by [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §8**
 > (Accepted 2026-09-26). The unbuilt Collaboration opt-in becomes a Proposal's **Discoverable**
 > visibility setting, and that setting *does* permit listing the title and abstract in Discover,

@@ -67,11 +67,11 @@ describe("a valid link", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Email Verified"));
   });
 
-  it("says RDCO approval follows, so the waiting screen is no surprise", async () => {
+  it("says an administrator's approval follows, so the waiting screen is no surprise", async () => {
     activationSucceeds();
     renderVerify();
 
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/RDCO/));
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(/An administrator now reviews/));
   });
 
   it("offers sign in as a named link that reaches the sign-in screen", async () => {
@@ -167,7 +167,7 @@ describe.each([
     return view;
   }
 
-  it("names IRIS and CIT-U in the masthead, the page's only top-level heading", async () => {
+  it("names IRIS and the pilot institution in the masthead, the page's only top-level heading", async () => {
     await renderResult();
 
     const [masthead, ...others] = screen.getAllByRole("heading", { level: 1 });
@@ -190,11 +190,11 @@ describe.each([
     expect(screen.queryByText(/^IRIS is CIT-U's system/)).not.toBeInTheDocument();
   });
 
-  it("carries CIT-U's name in the footer, with no link in it", async () => {
+  it("names the pilot institution in the footer, with no link in it", async () => {
     await renderResult();
 
     const footer = screen.getByRole("contentinfo");
-    expect(footer).toHaveTextContent("Cebu Institute of Technology – University");
+    expect(footer).toHaveTextContent("Pilot institution: Cebu Institute of Technology – University");
     expect(within(footer).queryAllByRole("link")).toEqual([]);
   });
 });

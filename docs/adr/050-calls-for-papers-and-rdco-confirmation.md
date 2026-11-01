@@ -2,9 +2,11 @@
 
 ## Status
 
-**Proposed** — 2026-11-01 (IR-759, spec IR-758), awaiting acceptance by Lee Jasmin Adolfo, the project lead. The decisions come from a design session with Hermoine Zozobrado on 2026-11-01. ADR-049 is skipped because IR-716 already names it.
+**Accepted** — 2026-11-01 by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado (IR-759, spec IR-758). The decisions come from a design session with Hermoine Zozobrado on 2026-11-01. ADR-049 is skipped because IR-716 already names it.
 
 This is the feature's first ADR. It replaces IR-121's decisions on types, posting and saving, and ADR-044's Q3 on saves.
+
+[ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01, changes two things here: the System Admin rather than RDCO reads these events in the Audit Log (decision 15), and the Call Requests page sits at `/rdco/call-requests`, in a nav section named RDCO.
 
 ## Context
 

@@ -396,6 +396,21 @@ class RequestStatus(models.TextChoices):
     CANCELLED = "cancelled", "Cancelled"
 
 
+class ReadingStatus(models.TextChoices):
+    """
+    Where a reader is with a saved Record: `SavedRecord.reading_status`
+    (IR-566, ADR-044 §2).
+
+    At most one per reader and Record, which the nullable column enforces.
+    Null means saved with no status. Private to the reader: never a
+    discovery signal or a count.
+    """
+
+    WANT_TO_READ = "want_to_read", "Want to read"
+    READING = "reading", "Reading"
+    COMPLETED = "completed", "Completed"
+
+
 class SessionEndReason(models.TextChoices):
     """
     Why a sign-in ended: `UserSession.ended_reason` (IR-645).

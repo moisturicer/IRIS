@@ -50,13 +50,13 @@ afterEach(() => {
 });
 
 describe("a pending request", () => {
-  it("says RDCO is reviewing it, for which role, and where the decision will be emailed", () => {
+  it("says an administrator is reviewing it, for which role, and where the decision will be emailed", () => {
     signInAs(PENDING);
 
     expect(screen.getByRole("heading", { level: 2, name: "Waiting for approval" })).toBeInTheDocument();
     expect(
       screen.getByText(
-        "RDCO is reviewing your request to join as an Adviser. You'll get an email at applicant@cit.edu when they decide.",
+        "An administrator is reviewing your request to join as an Adviser. You'll get an email at applicant@cit.edu when they decide.",
       ),
     ).toBeInTheDocument();
   });
@@ -88,7 +88,7 @@ describe("a declined request", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Request not approved" })).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Your request to join as a Student was not approved. Contact RDCO or your department administrator if you think this is a mistake.",
+        "Your request to join as a Student was not approved. Contact an administrator if you think this is a mistake.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/reviewing/i)).not.toBeInTheDocument();
@@ -129,7 +129,7 @@ describe("no request at all", () => {
 
     expect(screen.getByRole("heading", { level: 2, name: "No role assigned" })).toBeInTheDocument();
     expect(screen.queryByText(/reviewing|not approved/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Contact RDCO or your department administrator/)).toBeInTheDocument();
+    expect(screen.getByText(/Contact an administrator/)).toBeInTheDocument();
   });
 });
 
@@ -167,7 +167,7 @@ describe.each([
   { standing: "declined", request: DECLINED, title: "Request not approved" },
   { standing: "no-request", request: null, title: "No role assigned" },
 ])("the frame for a $standing account", ({ request, title }) => {
-  it("names IRIS and CIT-U in the masthead, the page's only top-level heading", () => {
+  it("names IRIS and the pilot institution in the masthead, the page's only top-level heading", () => {
     signInAs(request);
 
     const [masthead, ...others] = screen.getAllByRole("heading", { level: 1 });
@@ -191,11 +191,11 @@ describe.each([
     expect(screen.queryAllByRole("link")).toEqual([]);
   });
 
-  it("carries CIT-U's name in the footer", () => {
+  it("names the pilot institution in the footer", () => {
     signInAs(request);
 
     expect(screen.getByRole("contentinfo")).toHaveTextContent(
-      "Cebu Institute of Technology – University",
+      "Pilot institution: Cebu Institute of Technology – University",
     );
   });
 });

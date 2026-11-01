@@ -77,7 +77,13 @@ the DPO review should cover them.
 | Comments on published papers | The comment, the writer's name and an Author badge, shown to every signed-in user. A deleted or removed comment's text is kept and shown to no one. A report keeps a copy of the reported text, the reporter and the reason, visible to RDCO only. A removal reason is sent to the writer. | IR-420 |
 | Download requests | The reader's note on each request, RDCO's decline and revocation notes, the grant's dates, and an audit event per download naming the downloader. Once IR-676 lands, each downloaded copy carries the downloader's name and email in its footer and metadata. A request flow already exists without notes or grants. | IR-672, IR-676 |
 | Collaboration matching | When two Discoverable Proposals are similar, every owner of each is notified with the other's title, owners' names, and its Contact person's name and email. Only the owners of the matched Proposal see that email; it stays in their notification after either Proposal closes. The AI compares title and abstract only; no email is sent to a vendor. Consent is the Discoverable setting's text. Decided in ADR-029's 2026-10-31 amendment, accepted by the project lead. | IR-311, IR-421 |
-| Calls & Conferences changes | Each Call shows its poster's name to every signed-in user, as it does today. New: RDCO's reason for rejecting or removing an Adviser's Call, sent to that Adviser and kept in the audit event; audit events naming who posted, edited, deleted, confirmed, rejected or removed a Call, with a copy of a deleted Call; and which Calls each account saved, visible only to that reader and never audited. Proposed in ADR-050, to be built after the MVP. | IR-758 |
+| Calls & Conferences changes | Each Call shows its poster's name to every signed-in user, as it does today. New: RDCO's reason for rejecting or removing an Adviser's Call, sent to that Adviser and kept in the audit event; audit events naming who posted, edited, deleted, confirmed, rejected or removed a Call, with a copy of a deleted Call; and which Calls each account saved, visible only to that reader and never audited. Decided in ADR-050, to be built after the MVP. | IR-758 |
+| Account deletion | A request to delete an account, with its decision and any rejection reason, seen by the person and the System Admin. On confirmation: name, email, profile and private data are removed, and the person shows as "Former user" in comments and review history. **Kept:** their name as an Author or as Adviser on a published paper, and audit events naming them, which can't be edited. Decided in ADR-051, not built yet. | IR-779 |
+| Personal data download | A file of the person's own data, including Ask IRIS conversations, delivered only to them. Each download writes an audit event. Decided in ADR-051, not built yet. | IR-786 |
+| Consent versions and withdrawal | Which notice version each person accepted and when, kept as a history. RDCO or the System Admin publishes each new version by pasting it, naming who published it. Every published version stays stored and can't be edited. Any owner can withdraw consent on a paper, and the other owners are told who withdrew. Withdrawal removes the paper's stored passages, vectors and AI Overview from IRIS, though text already sent to vendors can't be recalled. Decided in ADR-051, not built yet. | IR-789, IR-791, IR-792 |
+| Unverified signups | The name, email, affiliation and role request of someone who registered and never verified. No office sees them, and they're deleted after 30 days or when the address registers again. The verification email carries the registrant's name to whatever address was typed, which may be a stranger's. Decided in ADR-051, not built yet. | IR-705 |
+| Contact person on every paper | Any owner can name any co-owner, who is told in-app. The Contact person receives the paper's review emails, and on a Discoverable Proposal their email is shared under the row above. Decided in ADR-051, not built yet. | IR-801 |
+| Audit Log access | The System Admin alone will read the Audit Log, which names who did what across IRIS. RDCO reads it until IR-781 lands. Decided in ADR-051, not built yet. | IR-781 |
 
 Decisions these features add:
 
@@ -88,7 +94,22 @@ Decisions these features add:
   removed on request or when the account is deleted.
 - [ ] Set retention for deleted and removed comment text, comment reports,
   per-account view records, download notes and download audit events. None is
-  set yet.
+  set yet. Under ADR-051 the System Admin enters each approved period, and a
+  blank period erases nothing. Audit events can't be erased, so their period
+  needs a different answer.
+- [ ] Confirm that an account deletion may keep a person's name on published
+  papers and in audit events, and that a deleted person's notice says so
+  (ADR-051).
+- [ ] Confirm the withdrawal rule: one owner's withdrawal stops AI use of the
+  whole paper, and existing vendor copies can't be recalled (ADR-051).
+- [ ] Decide how papers submitted under an older notice are treated when the
+  submission notice changes (ADR-051).
+- [ ] Decide who approves a notice before it is published. Under ADR-051 RDCO or
+  the System Admin can publish one alone, and IRIS doesn't check for approval.
+- [ ] Confirm that a co-owner may be named Contact person without accepting first,
+  given that their email can then reach other proposers (ADR-051, IR-311).
+- [ ] Confirm that a verification email may name the registrant when the address
+  turns out to be a stranger's (ADR-051, IR-705).
 - [ ] Confirm that printing a downloader's name and email in each copy (IR-676)
   is acceptable.
 - [ ] Confirm that the Discoverable consent text covers sharing a Proposal's

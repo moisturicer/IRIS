@@ -47,6 +47,7 @@ from core.enums import (
     PipelineStatus,
     DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
+    ReadingStatus,
     RecordTypeName,
     RequestStatus,
     ReviewDecision,
@@ -90,6 +91,10 @@ GOVERNED_ENUMS = (
     # IR-645: why a sign-in ended. Its "locked" was also `LockUserView`'s
     # response wording, rewritten there rather than allowing the whole module.
     SessionEndReason,
+    # IR-566: a reader's status on a saved Record (ADR-044 §2), governed from
+    # the start. Its "completed" collides only with `ai/models/shadow.py`,
+    # already allowed below as a Celery job's own lifecycle.
+    ReadingStatus,
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}
@@ -397,6 +402,13 @@ class EnumsMatchTheDatabaseTests(TestCase):
         field = Record._meta.get_field("pipeline_status")
         self.assertEqual(list(field.choices), list(PipelineStatus.choices))
         self.assertEqual(field.default, PipelineStatus.DRAFT)
+
+    def test_reading_status_choices_come_from_the_enum(self):
+        from apps.library.models import SavedRecord
+
+        field = SavedRecord._meta.get_field("reading_status")
+        self.assertEqual(list(field.choices), list(ReadingStatus.choices))
+        self.assertTrue(field.null)
 
     def test_review_choices_come_from_the_enums(self):
         from apps.reviews.models import Review

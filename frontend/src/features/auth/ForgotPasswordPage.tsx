@@ -10,7 +10,7 @@ import { classifyRecoveryFailure, retryMessage, useSecondsUntil } from "./recove
 const FALLBACK_RECEIVED =
   "If this address is eligible, an email will arrive shortly. You can try again after 60 seconds.";
 const DELIVERY_GUIDANCE =
-  "Email may take a few minutes. Check spam, try again after 60 seconds, or contact RDCO or your department administrator.";
+  "Email may take a few minutes. Check spam, try again after 60 seconds, or contact an administrator.";
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function emailProblem(value: string): string | undefined {

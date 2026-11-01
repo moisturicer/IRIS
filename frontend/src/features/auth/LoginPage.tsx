@@ -200,11 +200,11 @@ export default function LoginPage() {
 
   return (
     <EntryFrame
-      crossLink={{ prompt: "New to IRIS?", label: "Register", to: "/signup" }}
+      crossLink={{ prompt: "New to IRIS?", label: "Create an account", to: "/signup" }}
       lede={{
         headline: <>Your research has <span className="text-brand">a place.</span></>,
         sentence:
-          "IRIS is CIT-U's system for submitting, reviewing and reading theses, projects and proposals. Work goes to an adviser and the university's offices; what clears review is published.",
+          "IRIS brings research submission, review, approval, and discovery into one connected workspace. From initial submission to institutional clearance and publication, every step has its place.",
       }}
       tabs={<EntryTab>Sign in</EntryTab>}
       before={
@@ -233,9 +233,9 @@ export default function LoginPage() {
         </AuthAlert>
       )}
 
-      <h2 className="text-balance font-display text-display font-semibold text-stone-900">Welcome Back</h2>
+      <h2 className="text-balance font-display text-display font-semibold text-stone-900">Welcome back</h2>
       <p className="mt-2 mb-section text-body text-stone-600">
-        Please enter your credentials to access your records.
+        Sign in to access your research workspace.
       </p>
 
       {loginAlert?.kind === "credentials" && (
@@ -283,7 +283,7 @@ export default function LoginPage() {
       />
 
       <p className="mt-5 text-center text-sm text-stone-600">
-        No account?{" "}
+        New to IRIS?{" "}
         <Link
           to="/signup"
           className={cn(
@@ -291,7 +291,7 @@ export default function LoginPage() {
             FOCUS_RING,
           )}
         >
-          Register
+          Create an account
         </Link>
       </p>
     </EntryFrame>
