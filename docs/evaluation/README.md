@@ -448,7 +448,8 @@ exploratory planning estimate with no statistical basis and is not used.
 
 - **The corpus has no Voyage vectors.** Every vector observed so far came from
   the deterministic fake. Indexing is `manage.py backfill_embeddings` (measured
-  on the dev database: 26 records, 1,236 chunks, ~381,073 tokens).
+  on the dev database: 26 records, 1,236 chunks, ~381,073 tokens; a proxy number that decides
+  engineering and is never cited as a finding about CIT-U research, per ADR-023).
 - **The disclosure gate refuses every record** until `Record` carries an embargo
   field (IR-250), so the final set is empty and final-set recall is 0. Use
   `AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT` / `manage.py

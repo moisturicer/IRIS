@@ -164,7 +164,8 @@ python manage.py backfill_embeddings --dry-run           # what indexing the cor
                                    # chunks with no vector in the space, recomputed every run.
                                    # --space N fills a pending space (chunk vectors only).
                                    # Verified on the dev database 2026-09-20: 26 records, 1,236 chunks,
-                                   # 381,073 estimated tokens
+                                   # 381,073 estimated tokens (proxy
+                                   # corpus: never a finding about CIT-U research, ADR-023)
 python manage.py backfill_turn_vectors --dry-run          # give existing Turns the answer
                                    # vector IR-447 added (ADR-026 §7 as amended). A Turn written
                                    # before IR-447 carries only its question vector, so a fact
