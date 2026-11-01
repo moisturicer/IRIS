@@ -13,32 +13,32 @@ import {
   deleteCollection,
   getCollections,
   getReadingHistory,
-  getStarredIds,
-  removeFromAllCollections,
+  removeFromCollections,
   renameCollection,
-  toggleStarred,
   type Collection,
   type ReadingVisit,
 } from "@/lib/recordLibrary";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
+import { useLibraryStore } from "@/store/library.store";
 import type { MyResearchItem } from "@/types/records";
 
 import { MyResearchList } from "./MyResearchList";
-import { ReadingPanel, isSameView, type LibraryView } from "./ReadingPanel";
+import { ReadingPanel, isSameView, viewKey, type LibraryView } from "./ReadingPanel";
 import { SavedView } from "./SavedView";
+import { useLibrary } from "./useLibrary";
 
-const WANT_TO_READ: LibraryView = { kind: "folder", id: "want-to-read" };
+const ALL_SAVED: LibraryView = { kind: "saved" };
 
 /**
  * My Library (IR-410; spec §4.9 as amended 2026-10-11): an author's own
- * research, grouped by who has each record now, beside this browser's saved
- * reading.
+ * research, grouped by who has each record now, beside their saved reading.
  *
- * Owned research comes from `/records/mine/` and is account-backed; saved
- * folders, likes and history live in this browser and say so. Authors open on
- * their research, everyone else on Want to read. `?section=research` (where
- * the retired `/workspace` lands) and `?section=saved` pick one explicitly.
+ * Owned research comes from `/records/mine/`, and saves and Reading status
+ * from the account library (IR-566, ADR-044). The reader's own folders and
+ * history still live in this browser and say so. Authors open on their
+ * research, everyone else on All saved. `?section=research` (where the
+ * retired `/workspace` lands) and `?section=saved` pick one explicitly.
  */
 export default function MyLibraryPage() {
   const role = useAuthStore((state) => state.user?.role_name);
@@ -47,11 +47,16 @@ export default function MyLibraryPage() {
   const section = searchParams.get("section");
 
   const [view, setView] = useState<LibraryView>(() =>
-    canAuthor && section !== "saved" ? { kind: "research" } : WANT_TO_READ,
+    canAuthor && section !== "saved" ? { kind: "research" } : ALL_SAVED,
   );
   const [collections, setCollections] = useState<Collection[]>(() => getCollections());
-  const [starredIds, setStarredIds] = useState<number[]>(() => getStarredIds());
   const [history, setHistory] = useState<ReadingVisit[]>(() => getReadingHistory());
+
+  const { load: libraryLoad, retry: retryLibrary } = useLibrary();
+  const library = useLibraryStore((s) => s.items);
+  const failure = useLibraryStore((s) => s.failure);
+  const unsave = useLibraryStore((s) => s.unsave);
+  const dismissFailure = useLibraryStore((s) => s.dismissFailure);
 
   const [research, setResearch] = useState<MyResearchItem[]>([]);
   const [loading, setLoading] = useState(canAuthor);
@@ -60,7 +65,7 @@ export default function MyLibraryPage() {
   // A bookmark or the retired Workspace URL may arrive while this page is mounted.
   useEffect(() => {
     if (section === "research" && canAuthor) setView({ kind: "research" });
-    if (section === "saved") setView(WANT_TO_READ);
+    if (section === "saved") setView(ALL_SAVED);
   }, [section, canAuthor]);
 
   const loadResearch = useCallback(async () => {
@@ -81,11 +86,12 @@ export default function MyLibraryPage() {
   }, [canAuthor, loadResearch]);
 
   const removeFromView = (ids: number[]) => {
-    if (view.kind === "starred") {
-      ids.forEach((id) => toggleStarred(id));
-      setStarredIds(getStarredIds());
-    } else if (view.kind === "folder") {
-      setCollections(removeFromAllCollections(collections, ids));
+    if (view.kind === "folder") {
+      setCollections(removeFromCollections(collections, ids, view.id));
+    } else if (view.kind === "saved" || view.kind === "status") {
+      // Unsaving takes a paper out of the library, folders included.
+      setCollections(removeFromCollections(collections, ids));
+      ids.forEach((id) => void unsave(id));
     }
   };
 
@@ -95,7 +101,7 @@ export default function MyLibraryPage() {
     <div>
       <PageHeader
         title="My Library"
-        description={canAuthor ? "Where your research is, and what you are reading." : "Papers you saved, liked and opened."}
+        description={canAuthor ? "Where your research is, and what you are reading." : "Papers you saved and opened."}
         actions={canAuthor && (
           <>
             {showingResearch && (
@@ -109,7 +115,7 @@ export default function MyLibraryPage() {
       />
 
       <div className="grid gap-section-lg lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-        <section key={view.kind === "folder" ? `folder:${view.id}` : view.kind} className="min-w-0 motion-safe:animate-fade-in" aria-label={showingResearch ? "Your research" : "Saved reading"}>
+        <section key={viewKey(view)} className="min-w-0 motion-safe:animate-fade-in" aria-label={showingResearch ? "Your research" : "Saved reading"}>
           {!showingResearch && canAuthor && (
             <button
               type="button"
@@ -120,20 +126,29 @@ export default function MyLibraryPage() {
               Back to your research
             </button>
           )}
+          {failure && !showingResearch && (
+            <p role="alert" className="mb-3 flex flex-wrap items-center gap-x-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2 text-small text-brand">
+              {failure.message}
+              <button type="button" onClick={dismissFailure} className={cn("ml-auto rounded-md px-2 py-1 font-semibold hover:bg-brand-100", FOCUS_RING)}>
+                Dismiss
+              </button>
+            </p>
+          )}
           {showingResearch ? (
             <MyResearchList items={research} loading={loading} failed={failed} onRetry={() => void loadResearch()} />
           ) : (
             <SavedView
               view={view}
               collections={collections}
-              starredIds={starredIds}
               history={history}
+              library={library}
+              libraryLoad={libraryLoad}
+              onRetryLibrary={retryLibrary}
               onRemove={removeFromView}
-              onToggleStar={(id) => { toggleStarred(id); setStarredIds(getStarredIds()); }}
               onRename={(id, name) => setCollections(renameCollection(collections, id, name))}
               onDelete={(id) => {
                 setCollections(deleteCollection(collections, id));
-                if (isSameView(view, { kind: "folder", id })) setView(canAuthor ? { kind: "research" } : WANT_TO_READ);
+                if (isSameView(view, { kind: "folder", id })) setView(canAuthor ? { kind: "research" } : ALL_SAVED);
               }}
               onClearHistory={() => { clearReadingHistory(); setHistory([]); }}
             />

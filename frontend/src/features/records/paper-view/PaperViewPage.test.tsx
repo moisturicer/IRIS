@@ -223,6 +223,15 @@ vi.mock("@/api/documents", () => ({
     files:          vi.fn(() => Promise.resolve({ data: [] })),
   },
 }));
+// The Save menu reads the account library (IR-566); this page's tests start empty.
+vi.mock("@/api/library", () => ({
+  libraryApi: {
+    saves: vi.fn(() => Promise.resolve({ data: { results: [] } })),
+    save: vi.fn(),
+    unsave: vi.fn(),
+  },
+}));
+
 vi.mock("@/api/accounts", () => ({
   accountsApi: { listAdvisers: vi.fn(() => Promise.resolve(page([]))) },
 }));
@@ -2790,7 +2799,7 @@ describe("the Overview's header (IR-569)", () => {
 
     const view = screen.getByRole("button", { name: "View" });
     expect(view).toHaveClass(...PILL_PRIMARY.split(" "));
-    expect(screen.getByRole("button", { name: "Save to collection" })).not.toHaveClass("bg-brand");
+    expect(screen.getByRole("button", { name: "Save" })).not.toHaveClass("bg-brand");
 
     await userEvent.click(view);
 
@@ -2804,7 +2813,7 @@ describe("the Overview's header (IR-569)", () => {
     await waitForRecord(record.title);
 
     expect(screen.queryByRole("button", { name: "View" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Save to collection" })).toHaveClass("bg-brand");
+    expect(screen.getByRole("button", { name: "Save" })).toHaveClass("bg-brand");
   });
 
   it("lists the authors as chips, and says what the record is", async () => {

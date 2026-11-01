@@ -102,9 +102,9 @@ export const HELP_SECTIONS: HelpSection[] = [
     body: (
       <>
         <p>
-          My Library holds the records you have saved. Nobody else can see it. Give a saved record a
-          reading status (Want to read, Reading or Completed), and group saved records as you
-          like.
+          My Library holds the records you have saved, on every device you sign in on. Nobody else
+          can see it. Give a saved record a reading status (Want to read, Reading or Completed), and
+          group saved records into folders, which for now stay in the browser you made them in.
         </p>
         <p>
           Your own research is listed there too. Reading history, the papers you opened recently,
