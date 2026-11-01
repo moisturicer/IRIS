@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { notificationsApi } from "@/api/notifications";
 import { useNotificationsStore } from "@/store/notifications.store";
-import { useNotifications } from "@/hooks/useNotifications";
 import type { Notification } from "@/types/notifications";
 import { formatDate, cn } from "@/lib/utils";
 
@@ -38,7 +37,7 @@ interface NotificationBellProps {
 
 export function NotificationBell({ align = "end" }: NotificationBellProps) {
   // AppShell owns the fetch (IR-370); the bell only reads the store.
-  const { unreadCount } = useNotifications();
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const items = useNotificationsStore((s) => s.items);
   const markReadInStore = useNotificationsStore((s) => s.markRead);
   const markAllReadInStore = useNotificationsStore((s) => s.markAllRead);

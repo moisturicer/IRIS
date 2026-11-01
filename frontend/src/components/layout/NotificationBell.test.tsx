@@ -92,11 +92,14 @@ function FetchOwner() {
   return null;
 }
 
-function renderBell() {
+/** The fetch owner and `count` bells, as a page with several bells has. */
+function renderBell(count = 1) {
   return render(
     <MemoryRouter>
       <FetchOwner />
-      <NotificationBell />
+      {Array.from({ length: count }, (_, i) => (
+        <NotificationBell key={i} />
+      ))}
     </MemoryRouter>,
   );
 }
@@ -243,17 +246,6 @@ describe("NotificationBell across a change of account in one tab", () => {
 });
 
 describe("several bells sharing one fetch (IR-370)", () => {
-  function renderBells() {
-    return render(
-      <MemoryRouter>
-        <FetchOwner />
-        <NotificationBell />
-        <NotificationBell />
-        <NotificationBell />
-      </MemoryRouter>,
-    );
-  }
-
   afterEach(() => vi.mocked(notificationsApi.list).mockReset());
 
   it("fetches nothing when a bell mounts without the owner", () => {
@@ -273,7 +265,7 @@ describe("several bells sharing one fetch (IR-370)", () => {
     vi.mocked(notificationsApi.markRead).mockResolvedValue({} as never);
     vi.mocked(notificationsApi.markAllRead).mockResolvedValue({} as never);
     signIn(1);
-    renderBells();
+    renderBell(3);
 
     expect(await screen.findAllByRole("button", { name: "Notifications, 2 unread" })).toHaveLength(3);
     expect(notificationsApi.list).toHaveBeenCalledTimes(1);
@@ -293,7 +285,7 @@ describe("several bells sharing one fetch (IR-370)", () => {
     vi.mocked(notificationsApi.list)
       .mockResolvedValueOnce(page([notification(1, "Account A's manuscript was returned", 41)]))
       .mockResolvedValueOnce(page([notification(2, "Account B has a review due")]));
-    renderBells();
+    renderBell(3);
     expect(notificationsApi.list).not.toHaveBeenCalled();
 
     signIn(1);
@@ -317,7 +309,7 @@ describe("several bells sharing one fetch (IR-370)", () => {
       .mockResolvedValueOnce(page([notification(1, "Account A's manuscript was returned", 41)]))
       .mockResolvedValueOnce(page([]));
     signIn(1);
-    renderBells();
+    renderBell(3);
     expect(await screen.findAllByRole("button", { name: "Notifications, 1 unread" })).toHaveLength(3);
 
     signIn(2);

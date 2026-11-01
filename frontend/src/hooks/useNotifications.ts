@@ -4,21 +4,12 @@ import { notificationsApi } from "@/api/notifications";
 import { useAuthStore } from "@/store/auth.store";
 
 /**
- * The unread notifications, read from the shared store. Fetches nothing.
- *
- * Every bell calls this, and there can be three on screen at once (the
- * sidebar, the phone bar, Ask IRIS's toolbar). When each one fetched on mount,
- * a single page load asked for the same list two or three times (IR-370).
- * The fetch now has one owner: `useUnreadNotificationsFetch`, in `AppShell`.
- */
-export function useNotifications() {
-  const { items, unreadCount, markRead, markAllRead } = useNotificationsStore();
-  return { notifications: items, unreadCount, markRead, markAllRead };
-}
-
-/**
  * Fetches the unread notifications into the shared store, once per signed-in
  * session. Call it from exactly one place -- `AppShell` -- not from a bell.
+ *
+ * Up to three bells are on screen at once (the sidebar, the phone bar, Ask
+ * IRIS's toolbar). When each fetched on mount, one page load asked for the
+ * same list two or three times (IR-370). Bells read `useNotificationsStore`.
  *
  * Keyed on `sessionEpoch` as well as `isAuthenticated`, so signing in as
  * someone else without signing out first still fetches for the new session.
