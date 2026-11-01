@@ -1,5 +1,20 @@
 # Requirements Traceability
 
+## IR-364 · Settings and session bootstrap palette (NFR-U1)
+
+Settings uses the shared settled tone for saved feedback, active maroon for
+recoverable errors, and stone for consent information and capability checks.
+Feedback includes a check or warning icon and text, with the existing polite
+status announcement preserved. The bootstrap uses the stone canvas surface.
+Both files are removed from their palette guard allowlists. Profile inputs use
+the shared solid maroon focus ring, and feedback rows wrap at phone widths.
+
+**Evidence:** existing SettingsPage, SettingsProfileFields, AuthBootstrap and
+palette tests pass (37 tests); `tsc --noEmit` passes. Before/after captures at
+1440 px and 360 px, contrast checks, focus verification and capture limitations
+are in [the evidence index](evidence/IR-364/README.md). Full-suite and CI results
+are recorded in the PR. No behavioral test assertions were changed.
+
 ## IR-123 · Disclosure notice describes external AI processing (FR-M6-02)
 
 The shared notice describes manuscript extraction, external Voyage AI embedding
