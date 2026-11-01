@@ -9,7 +9,7 @@ from django.urls import reverse
 from apps.ai.grants import database
 from apps.ai.models import AskRun
 from .corpus import make_user
-from .grant_support import grant_keys, owned_run  # noqa: F401
+from .grant_support import owned_run
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 

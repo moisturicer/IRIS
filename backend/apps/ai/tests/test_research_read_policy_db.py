@@ -7,7 +7,7 @@ from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
 from core.permissions import ROLE_ADVISER, ROLE_STUDENT, STAFF_ROLES
 from .corpus import make_record, make_user
-from .grant_support import grant_db, owned_run, probe_login  # noqa: F401
+from .grant_support import owned_run, probe_login
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -102,7 +102,7 @@ def test_paper_chat_scope_narrows_to_its_record_and_never_widens(world):
 def test_no_verified_context_reads_nothing(world, space):
     from apps.ai.models import IngestionJob
 
-    users, records = world["users"], world["records"]
+    records = world["records"]
     job = IngestionJob.objects.create(record=records["published"], extraction_hash="e" * 64,
                                       strategy_id="s", space=space, idempotency_key="j" * 64)
     with probe_login("iris_ai_runtime") as conn:

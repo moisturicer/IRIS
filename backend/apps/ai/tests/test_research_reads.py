@@ -8,8 +8,8 @@ from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
 from core.permissions import ROLE_ADVISER, ROLE_RDCO, ROLE_STUDENT
 from .corpus import make_user
-from .grant_support import (  # noqa: F401
-    drop_research_alias, grant_db, probe_credentials, use_research_alias,
+from .grant_support import (
+    drop_research_alias, probe_credentials, use_research_alias,
 )
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]

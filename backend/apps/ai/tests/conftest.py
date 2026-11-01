@@ -12,6 +12,7 @@ import pytest
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
+from .grant_support import grant_db, grant_keys  # noqa: F401  shared fixtures (IR-717)
 
 
 @pytest.fixture

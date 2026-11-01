@@ -4,7 +4,7 @@ import pytest
 
 from apps.ai.grants import issue
 from .corpus import make_user
-from .grant_support import grant_db, owned_run, probe_login  # noqa: F401
+from .grant_support import owned_run, probe_login
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
