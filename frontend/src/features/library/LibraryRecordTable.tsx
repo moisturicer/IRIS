@@ -9,6 +9,8 @@ import {
   recordYearLabel,
 } from "@/features/discover/discoverUtils";
 import { cn } from "@/lib/utils";
+import type { ReadingStatus } from "@/api/library";
+import { READING_STATUSES, readingStatusLabel } from "@/store/library.store";
 
 export type LibraryLayout = "list" | "grid";
 
@@ -26,6 +28,8 @@ interface LibraryRecordTableProps {
   removeLabel?: string;
   /** ISO timestamps, only supplied by the reading-history view. */
   viewedAt?: Record<number, string>;
+  /** The account's Reading status per saved paper (IR-566), shown on a grid card. */
+  readingStatusOf?: Record<number, ReadingStatus | null>;
 }
 
 /**
@@ -59,6 +63,7 @@ export function LibraryRecordTable({
   onRemove,
   removeLabel = "Remove from library",
   viewedAt,
+  readingStatusOf,
 }: LibraryRecordTableProps) {
   const allSelected = records.length > 0 && records.every((r) => selected.has(r.id));
 
@@ -87,10 +92,10 @@ export function LibraryRecordTable({
     </div>
   );
 
-  const badges = (record: RecordListItem) => {
+  const badges = (record: RecordListItem, dash = true) => {
     const list = statusBadges(record);
     if (list.length === 0) {
-      return <span className="text-[13px] text-stone-300">—</span>;
+      return dash ? <span className="text-[13px] text-stone-300">—</span> : null;
     }
     return (
       <div className="flex flex-wrap gap-1">
@@ -111,44 +116,56 @@ export function LibraryRecordTable({
 
   if (layout === "grid") {
     return (
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-        {records.map((record) => (
-          <div
-            key={record.id}
-            className={cn(
-              "relative bg-white border rounded-xl p-4 transition-colors",
-              selected.has(record.id) ? "border-brand/40" : "border-stone-200 hover:border-stone-300",
-            )}
-          >
-            <div className="flex items-start gap-2 mb-2">
-              <input
-                type="checkbox"
-                checked={selected.has(record.id)}
-                onChange={() => onToggleSelect(record.id)}
-                aria-label={`Select ${record.title}`}
-                className="mt-1 accent-brand"
-              />
-              <Link
-                to={`/records/${record.id}`}
-                className="flex-1 min-w-0 text-[14px] font-semibold text-stone-900 hover:text-brand leading-snug line-clamp-2"
-              >
-                {highlightMatch(record.title, query)}
-              </Link>
-            </div>
-            <p className="text-[13px] text-stone-500 truncate mb-1">
-              <span className={formatAuthorList(record.authors, 2) === "Authors not recorded" ? "italic text-stone-500" : undefined}>{formatAuthorList(record.authors, 2)}</span>
-            </p>
-            <p className="text-[12px] text-stone-400 mb-2.5">
-              {recordYearLabel(record)}
-              {viewedLabel(viewedAt?.[record.id]) && ` · ${viewedLabel(viewedAt?.[record.id])}`}
-            </p>
-            <div className="flex items-end justify-between gap-2">
-              {badges(record)}
-              {actions(record)}
-            </div>
-          </div>
-        ))}
-      </div>
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {records.map((record) => {
+          const status = readingStatusOf?.[record.id];
+          const viewed = viewedLabel(viewedAt?.[record.id]);
+          return (
+            <li
+              key={record.id}
+              className={cn(
+                "group relative flex flex-col rounded-2xl border bg-white p-card-compact transition-[border-color,box-shadow] duration-200 hover:shadow-card-md md:p-card",
+                selected.has(record.id) ? "border-brand-200" : "border-stone-200",
+              )}
+            >
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={selected.has(record.id)}
+                  onChange={() => onToggleSelect(record.id)}
+                  aria-label={`Select ${record.title}`}
+                  className="relative z-10 h-4 w-4 accent-brand"
+                />
+                <p className="min-w-0 flex-1 truncate text-label text-stone-600">
+                  {[record.record_type_name, recordYearLabel(record)].filter((part) => part && part !== "—").join(" · ")}
+                </p>
+                <div className="relative z-10 -mr-1.5">{actions(record)}</div>
+              </div>
+              <h3 className="mt-2 font-display text-title font-semibold leading-snug text-stone-900">
+                <Link
+                  to={`/records/${record.id}`}
+                  className="line-clamp-3 rounded-sm transition-colors group-hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 after:absolute after:inset-0 after:rounded-2xl after:content-['']"
+                >
+                  {highlightMatch(record.title, query)}
+                </Link>
+              </h3>
+              <p className="mt-1 truncate text-small text-stone-600">
+                <span className={formatAuthorList(record.authors, 2) === "Authors not recorded" ? "italic" : undefined}>{formatAuthorList(record.authors, 2)}</span>
+              </p>
+              {viewed && <p className="mt-0.5 text-label text-stone-500">{viewed}</p>}
+              <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-4">
+                {status && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-50 px-2.5 py-0.5 text-2xs font-semibold text-brand ring-1 ring-brand-200">
+                    <i className={cn("fas", READING_STATUSES.find((s) => s.value === status)?.icon)} aria-hidden />
+                    {readingStatusLabel(status)}
+                  </span>
+                )}
+                {badges(record, false)}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     );
   }
 

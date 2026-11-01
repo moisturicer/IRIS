@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 
 import { recordsApi } from "@/api/records";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -43,6 +43,10 @@ interface SavedViewProps {
   onRename:    (id: string, name: string) => void;
   onDelete:    (id: string) => void;
   onClearHistory: () => void;
+  /** The Reading status filters, set under the search in the toolbar. */
+  filters?:       ReactNode;
+  /** The Folder picker, set beside Sort in the toolbar. */
+  folderControl?: ReactNode;
 }
 
 /**
@@ -61,13 +65,13 @@ interface SavedViewProps {
  * rather than silently hidden.
  */
 export function SavedView({
-  view, collections, history, library, libraryLoad, onRetryLibrary, onRemove, onRename, onDelete, onClearHistory,
+  view, collections, history, library, libraryLoad, onRetryLibrary, onRemove, onRename, onDelete, onClearHistory, filters, folderControl,
 }: SavedViewProps) {
   const accountView = view.kind === "saved" || view.kind === "status";
   const [records, setRecords] = useState<RecordListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
-  const [layout, setLayout] = useState<LibraryLayout>("list");
+  const [layout, setLayout] = useState<LibraryLayout>("grid");
   const [sort, setSort] = useState<SortKey>("added");
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -160,6 +164,10 @@ export function SavedView({
     return sorted;
   }, [shownRecords, viewIds, query, sort]);
 
+  const readingStatusOf = useMemo(
+    () => Object.fromEntries(Object.values(library).map((i) => [i.recordId, i.readingStatus])),
+    [library],
+  );
   const viewedAt = useMemo(() => Object.fromEntries(history.map((v) => [v.recordId, v.viewedAt])), [history]);
   const unavailable = viewIds.length - shownRecords.length;
 
@@ -179,6 +187,48 @@ export function SavedView({
 
   return (
     <div>
+      <div className="mb-section rounded-2xl border border-stone-200 bg-white p-card-compact md:p-card">
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="relative min-w-[12rem] flex-1">
+          <span className="sr-only">Search this folder</span>
+          <SearchGlyph className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-500" />
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search by title or author"
+            className="w-full rounded-lg border border-stone-300 bg-white py-2 pl-10 pr-3 text-body placeholder:text-stone-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
+          />
+        </label>
+        {folderControl}
+        <label className="flex items-center gap-2 text-small text-stone-600">
+          Sort
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as SortKey)}
+            className="min-h-9 rounded-lg border border-stone-300 bg-white px-2 text-small text-stone-800 focus:border-brand focus:outline-none"
+          >
+            {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <option key={key} value={key}>{SORT_LABELS[key]}</option>)}
+          </select>
+        </label>
+        <div className="flex items-center rounded-lg border border-stone-300 bg-white p-0.5">
+          {(["list", "grid"] as const).map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setLayout(mode)}
+              aria-label={`${mode === "list" ? "List" : "Grid"} view`}
+              aria-pressed={layout === mode}
+              className={cn("rounded-md px-2.5 py-1.5", COLOUR_TRANSITION, FOCUS_RING,
+                layout === mode ? "bg-brand-50 text-brand" : "text-stone-500 hover:text-stone-800")}
+            >
+              <i className={cn("fas", mode === "list" ? "fa-list" : "fa-table-cells-large", "text-small")} aria-hidden />
+            </button>
+          ))}
+        </div>
+      </div>
+      {filters && <div className="mt-3 border-t border-stone-200 pt-3">{filters}</div>}
+      </div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         {renaming && folder ? (
           <input
@@ -208,44 +258,6 @@ export function SavedView({
         </div>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <label className="relative min-w-[12rem] flex-1">
-          <span className="sr-only">Search this folder</span>
-          <SearchGlyph className="pointer-events-none absolute left-3.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-stone-500" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search by title or author"
-            className="w-full rounded-xl border border-stone-200 bg-white py-2.5 pl-10 pr-3 text-body placeholder:text-stone-500 focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/20"
-          />
-        </label>
-        <label className="flex items-center gap-2 text-small text-stone-600">
-          Sort
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="rounded-lg border border-stone-200 bg-white px-2 py-2 text-small text-stone-800 focus:border-brand focus:outline-none"
-          >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <option key={key} value={key}>{SORT_LABELS[key]}</option>)}
-          </select>
-        </label>
-        <div className="flex items-center rounded-lg border border-stone-200 bg-white p-0.5">
-          {(["list", "grid"] as const).map((mode) => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setLayout(mode)}
-              aria-label={`${mode === "list" ? "List" : "Grid"} view`}
-              aria-pressed={layout === mode}
-              className={cn("rounded-md px-2.5 py-1.5", COLOUR_TRANSITION, FOCUS_RING,
-                layout === mode ? "bg-brand-50 text-brand" : "text-stone-500 hover:text-stone-800")}
-            >
-              <i className={cn("fas", mode === "list" ? "fa-list" : "fa-table-cells-large", "text-small")} aria-hidden />
-            </button>
-          ))}
-        </div>
-      </div>
 
       {selected.size > 0 && view.kind !== "history" && (
         <div className="mb-3 flex flex-wrap items-center gap-2 rounded-xl border border-brand-200 bg-brand-50 px-3 py-2">
@@ -311,6 +323,7 @@ export function SavedView({
           onRemove={view.kind === "history" ? undefined : (id) => remove([id])}
           removeLabel={removeLabel}
           viewedAt={view.kind === "history" ? viewedAt : undefined}
+          readingStatusOf={readingStatusOf}
         />
       )}
 

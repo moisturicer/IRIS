@@ -1,11 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
 
-import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { COLOUR_TRANSITION } from "@/components/ui/interaction";
 import type { ReadingStatus } from "@/api/library";
-import type { Collection, ReadingVisit } from "@/lib/recordLibrary";
-import { READING_STATUSES } from "@/store/library.store";
-import { cn, formatDate } from "@/lib/utils";
+import type { Collection } from "@/lib/recordLibrary";
+import { cn } from "@/lib/utils";
 
 /**
  * Which part of My Library the main column shows. `research` is the owner's
@@ -33,25 +31,22 @@ export function viewKey(view: LibraryView): string {
   return view.kind;
 }
 
-interface ReadingPanelProps {
-  collections: Collection[];
-  history:     ReadingVisit[];
-  view:        LibraryView;
+interface FolderPickerProps {
+  collections:  Collection[];
+  view:         LibraryView;
   onViewChange: (view: LibraryView) => void;
-  onCreate:    (name: string) => void;
+  onCreate:     (name: string) => void;
 }
 
-/** How many recent papers the panel lists before pointing at History. */
-const RECENT = 3;
+const NEW_FOLDER = "__new__";
 
 /**
- * "Your reading": saved papers by Reading status (account-backed, IR-566),
- * the reader's own folders and history (still this browser's). It stays
- * beside the owner's research rather than behind a tab, so saved reading is
- * never hidden. Renaming and deleting a folder happen in the folder's own
- * view, not on hover here.
+ * The reader's own folders as one picker in the Saved papers toolbar,
+ * beside Sort, rather than a second panel to navigate. Folders are still
+ * this browser's until IR-572; the toolbar says so. "New folder…" swaps the picker for a name field in place.
+ * Renaming and deleting a folder happen in the folder's own view.
  */
-export function ReadingPanel({ collections, history, view, onViewChange, onCreate }: ReadingPanelProps) {
+export function FolderPicker({ collections, view, onViewChange, onCreate }: FolderPickerProps) {
   const [creating, setCreating] = useState(false);
   const [name, setName] = useState("");
   const input = useRef<HTMLInputElement>(null);
@@ -67,107 +62,54 @@ export function ReadingPanel({ collections, history, view, onViewChange, onCreat
     setCreating(false);
   };
 
-  const item = (target: LibraryView, label: string, icon: string) => {
-    const active = isSameView(view, target);
+  if (creating) {
     return (
-      <li key={viewKey(target)}>
-        <button
-          type="button"
-          onClick={() => onViewChange(target)}
-          aria-current={active ? "page" : undefined}
-          className={cn(
-            "flex w-full min-h-10 items-center gap-3 rounded-lg px-3 text-left text-small",
-            COLOUR_TRANSITION,
-            FOCUS_RING,
-            active ? "bg-brand-50 font-semibold text-brand" : "text-stone-700 hover:bg-stone-50",
-          )}
-        >
-          <i className={cn("fas w-4 text-center", icon, active ? "text-brand" : "text-stone-500")} aria-hidden />
-          <span className="min-w-0 flex-1 truncate">{label}</span>
-        </button>
-      </li>
+      <input
+        ref={input}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        onBlur={submit}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") submit();
+          if (e.key === "Escape") {
+            setName("");
+            setCreating(false);
+          }
+        }}
+        aria-label="New folder name"
+        placeholder="Folder name, then Enter"
+        className="min-h-9 w-48 rounded-lg border border-brand-200 bg-white px-3 text-small placeholder:text-stone-500 focus:border-brand focus:outline-none"
+      />
     );
-  };
+  }
 
+  const value = view.kind === "folder" ? `folder:${view.id}` : "";
 
   return (
-    <section
-      id="your-reading"
-      aria-labelledby="your-reading-title"
-      className="rounded-2xl border border-stone-200 bg-white p-card-compact md:p-card scroll-mt-24"
-    >
-      <h2 id="your-reading-title" className="font-display text-title font-semibold text-stone-900">
-        Your reading
-      </h2>
-      <p className="mt-0.5 text-small text-stone-600">Saved papers follow your account.</p>
-
-      <ul className="mt-4 space-y-0.5" aria-label="Saved papers">
-        {item({ kind: "saved" }, "All saved", "fa-bookmark")}
-        {READING_STATUSES.map((s) => item({ kind: "status", status: s.value }, s.label, s.icon))}
-      </ul>
-
-      <h3 className="mt-4 px-3 text-label font-semibold text-stone-600">In this browser only</h3>
-      <ul className="mt-1 space-y-0.5" aria-label="Folders and history in this browser">
-        {collections.map((c) => item({ kind: "folder", id: c.id }, c.name, "fa-folder"))}
-        {item({ kind: "history" }, "History", "fa-clock-rotate-left")}
-      </ul>
-
-      <div className="mt-2">
-        {creating ? (
-          <input
-            ref={input}
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            onBlur={submit}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") submit();
-              if (e.key === "Escape") {
-                setName("");
-                setCreating(false);
-              }
-            }}
-            aria-label="New folder name"
-            placeholder="Folder name"
-            className="w-full rounded-lg border border-brand-200 bg-white px-3 py-2 text-small placeholder:text-stone-500 focus:border-brand focus:outline-none"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className={cn(
-              "inline-flex min-h-10 items-center gap-2 rounded-lg px-3 text-small font-semibold text-brand hover:bg-brand-50",
-              COLOUR_TRANSITION,
-              FOCUS_RING,
-            )}
-          >
-            <i className="fas fa-plus text-label" aria-hidden />
-            New folder
-          </button>
+    <label className="flex items-center gap-2 text-small text-stone-600">
+      Folder
+      <select
+        value={value}
+        onChange={(e) => {
+          const next = e.target.value;
+          if (next === NEW_FOLDER) setCreating(true);
+          else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: next.slice("folder:".length) });
+          else onViewChange({ kind: "saved" });
+        }}
+        className={cn(
+          "min-h-9 max-w-[12rem] rounded-lg border bg-white px-2 text-small focus:border-brand focus:outline-none",
+          COLOUR_TRANSITION,
+          value ? "border-brand-200 text-brand" : "border-stone-300 text-stone-800",
         )}
-      </div>
-
-      {history.length > 0 && (
-        <div className="mt-5 border-t border-stone-100 pt-4">
-          <h3 className="text-label font-semibold text-stone-600">Recently opened</h3>
-          <ul className="mt-2 space-y-3">
-            {history.slice(0, RECENT).map((visit) => (
-              <li key={visit.recordId}>
-                <Link
-                  to={`/records/${visit.recordId}`}
-                  className={cn(
-                    "block rounded-sm font-display text-heading font-semibold leading-snug text-stone-900 hover:text-brand",
-                    COLOUR_TRANSITION,
-                    FOCUS_RING,
-                  )}
-                >
-                  {visit.title}
-                </Link>
-                <p className="text-label text-stone-600">Opened {formatDate(visit.viewedAt)}</p>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-    </section>
+      >
+        <option value="">All saved papers</option>
+        {collections.length > 0 && (
+          <optgroup label="Your folders">
+            {collections.map((c) => <option key={c.id} value={`folder:${c.id}`}>{c.name}</option>)}
+          </optgroup>
+        )}
+        <option value={NEW_FOLDER}>+ New folder…</option>
+      </select>
+    </label>
   );
 }
