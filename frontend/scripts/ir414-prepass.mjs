@@ -153,7 +153,7 @@ async function nav(page, url, signedIn) {
 
 // The dev backend restarts whenever a backend file changes (StatReloader), so
 // a sign-in that meets a restart is retried rather than failing a whole role.
-// It stops at once on 429: retrying a throttle only spends more of it.
+// Only "no answer" or a 5xx is retried; any other status stops at once.
 async function signIn(page, role, attempts = 3) {
   for (let attempt = 1; ; attempt++) {
     let status = null;
@@ -167,7 +167,11 @@ async function signIn(page, role, attempts = 3) {
       await page.waitForURL((u) => !u.pathname.startsWith("/login"), { timeout: 15000 });
       return;
     } catch (e) {
-      if (status === 429) throw new Error(`login throttled (429) for ${role}@cit.edu`);
+      if (status === 429) throw new Error(`login throttled or locked (429) for ${role}@cit.edu`);
+      // A refusal is an answer: retrying it counts as another failed attempt
+      // toward the account lockout (IR-555). Found when a coordinator account
+      // missing from an older seed was retried until it locked.
+      if (status !== null && status < 500) throw new Error(`login refused (${status}) for ${role}@cit.edu — is the account seeded (manage.py seed_demo)?`);
       if (attempt >= attempts) throw new Error(`${firstLine(e)} (login status ${status ?? "none"}, ${attempt} attempts)`);
       await page.waitForTimeout(20000);
     } finally {
