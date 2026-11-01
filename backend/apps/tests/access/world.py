@@ -141,6 +141,7 @@ def _users() -> dict[str, User | None]:
         "unseated": _user("itso-pool@cit.edu", RoleName.ITSO),
         "coordinator": _user("itso-coordinator@cit.edu", RoleName.ITSO, is_office_coordinator=True),
         "rdco": seeded[RoleName.RDCO],
+        "routing_officer": _user("rdco-routing@cit.edu", RoleName.RDCO),
         "admin": admin,
     }
 
@@ -165,7 +166,7 @@ def _at_itso(title, users) -> Record:
     )
     entry = enter_at_adviser(record, owner)
     seats.open_review(entry.seats.get(), adviser)
-    rdco = users["rdco"]
+    rdco = users["routing_officer"]
     accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="Institutional review.")
     rdco_seat = ReviewerSeat.objects.get(assignment__record=record, assignment__party="rdco", reviewer=rdco)
     seats.open_review(rdco_seat, rdco)

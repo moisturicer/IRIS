@@ -133,10 +133,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     )}),
     "record-manuscript": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     # Earlier versions are review material: participants, or the pool of a
-    # party with an active assignment (IR-479). RDCO holds none on `record`.
+    # party with an active assignment (IR-479). ADR-047 makes RDCO active on `record`.
     "record-version-manuscript": Entry({
         "GET": _case(
-            row(ANON, HIDE, OK, OK, OK, OK, OK, HIDE, HIDE),
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE),
             kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
         ),
     }),
@@ -160,10 +160,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # staff a party that took part -- the Adviser, ITSO's whole pool. RDCO
     # took no part in `record`, so sees it but not its requests.
     "record-document-requests": Entry({
-        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, DENY, HIDE), kwargs=RECORD),
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE), kwargs=RECORD),
         # Asked by an active assignment the caller can staff: ITSO's, here.
         "POST": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=RECORD,
+            row(ANON, HIDE, DENY, DENY, OK, OK, OK, OK, HIDE), kwargs=RECORD,
             data={"message": "Please attach it.", "items": [{"label": "Endorsement"}]},
         ),
     }),
@@ -175,7 +175,7 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "POST": _case(
             row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, DENY, HIDE),
             kwargs={"pk": Ref("at_adviser")},
-            data={"to": [{"party": "itso"}], "reason": "Possible IP."},
+            data={"to": [{"party": "rdco"}], "reason": "Possible IP."},
         ),
     }),
     "record-decide": Entry({
@@ -207,17 +207,17 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # The review discussion (IR-419, ADR-032 §7): read under `may_read_review`
     # (participants, and the pool of a party holding the record now), written by
     # participants alone, so ITSO's unseated pool reads and is refused. RDCO
-    # holds no assignment on `record`. An edit is its author's: the owner's here.
+    # holds an assignment from the Adviser’s send (ADR-047), but this account has no Seat. An edit is its author’s.
     "record-review-comments": Entry({
-        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE), kwargs=RECORD),
         "POST": _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE),
             kwargs=RECORD, data={"body": "Which version is this?"},
         ),
     }),
     "record-review-comment": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
             data={"body": "Is the signed endorsement enough?"},
         ),
@@ -336,10 +336,10 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     }),
 
     # -- office acts on documents ----------------------------------------
-    # An office taking part files its own supplementary file (IR-474).
+    # An office taking part files its own supplementary file (IR-474); RDCO is now active by ADR-047.
     "record-file-upload": Entry(
         {"POST": _case(
-            row(ANON, DENY, DENY, DENY, OK, OK, OK, DENY, DENY),
+            row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY),
             data={"record": Ref("record"), "file": Upload("note.pdf")}, format="multipart",
         )},
         waiver=DOCUMENTS_EXCEPTION,

@@ -153,7 +153,7 @@ At the REST seam, replacing ADR-032 §12's two hand-back tests:
 
 **The Adviser routes to RDCO *and* to offices.** It keeps the Adviser as router and adds RDCO in parallel. The user asked that only offices request offices. The Adviser's suggested offices (§1) keep the Adviser's reading in front of RDCO without giving the Adviser the act.
 
-**RDCO decides every Thesis/Project (removing Accept & publish).** Already offered and not chosen in ADR-032. Kept as is, subject to confirmation (§1).
+**RDCO decides every Thesis/Project (removing Accept & publish).** Already offered and not chosen in ADR-032. Kept as is, retained under the implementation authorization (§1).
 
 **Office-to-RDCO requests.** A specialist office asking RDCO "please look now" would duplicate the completion notice (§4), and RDCO already holds the Record.
 
@@ -175,7 +175,7 @@ The Adviser's role shrinks only in which offices they pick. Their acceptance, th
 
 - **RDCO sees every Record that leaves its Adviser for further review**, including ones that end up needing no specialist office. RDCO's workload rises, and its Turnaround (ADR-043) now runs while offices review.
 - **The router is no longer the person who read the paper.** This is mitigated, not removed, by the send's reason and suggested offices.
-- **RDCO can override an office's open Revision request** (§5, if confirmed). An office's request becomes advisory to RDCO, though still binding on the Adviser. This must be visible in the tracker and in the owners' notice, or the office will not know why its request disappeared.
+- **RDCO can override an office's open Revision request** (§5). An office's request becomes advisory to RDCO, though still binding on the Adviser. This must be visible in the tracker and in the owners' notice, or the office will not know why its request disappeared.
 
 ## Research Impact
 
@@ -193,7 +193,7 @@ Records that crossed the cutover (§7) are tagged by their migration reason and 
 - [`../review_workspace_roadmap.md`](../review_workspace_roadmap.md) §5a and §7 #7
 - [`../ui-ux/prototypes/review-workspace.html`](../ui-ux/prototypes/review-workspace.html): the routing, request and Decision flows, clickable
 - [IR-678](https://citiris.atlassian.net/browse/IR-678): the review workspace's first phase. It reads request targets from the server's routing flags, so it is unaffected by whether this ADR is accepted.
-- **`CONTEXT.md` on acceptance:**
+- **`CONTEXT.md` updated with implementation:**
   - retire *Hand-back*
   - redefine *Specialist path* as "a Thesis/Research or Project its Adviser sent to RDCO"
   - in *Decision*, replace *Accept & route* with *Accept & send to RDCO*, and note RDCO's override of open Revision requests
