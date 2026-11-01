@@ -181,6 +181,54 @@ describe("the sidebar's list", () => {
   });
 });
 
+/** `/dashboard/stats/` says this many of the user's records wait on them. */
+function waitingOnYou(needsActionMine: number) {
+  vi.mocked(apiClient.get).mockImplementation(((url: string) =>
+    Promise.resolve({
+      data: url === "/dashboard/stats/"
+        ? { needs_action_mine: needsActionMine }
+        : { count: 0, results: [] },
+    })) as never);
+}
+
+describe("the My Library dot (IR-534, B2)", () => {
+  it("appears when a record waits on you, and says so to a screen reader", async () => {
+    waitingOnYou(2);
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(
+      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
+    ).toBeInTheDocument();
+  });
+
+  it("is absent when nothing waits on you", async () => {
+    waitingOnYou(0);
+    signIn(ROLES.ADVISER, true);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/stats/"));
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
+  });
+
+  it("stays named on the collapsed rail", async () => {
+    useUIStore.setState({ sidebarCollapsed: true });
+    waitingOnYou(1);
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(
+      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("the account menu", () => {
   it("holds Settings & Profile, Help and Sign out", async () => {
     const user = userEvent.setup();

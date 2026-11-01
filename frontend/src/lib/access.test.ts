@@ -70,16 +70,19 @@ test("only Student and Adviser may author a disclosure", () => {
   only("submit", [ROLES.STUDENT, ROLES.ADVISER]);
 });
 
-test("a Student publishes from Discover, so the sidebar offers no Submit Disclosure (IR-407)", () => {
-  // The route stays open to both authors -- `/records/add` redirects to the
-  // Publish dialog -- only the sidebar shortcut narrows. An Adviser's home is
-  // still the Dashboard, not Discover, so the shortcut is an Adviser's only
-  // menu route into Publish until IR-413 makes Discover everyone's home.
-  const inNav = (role: RoleName) => navFor(role).some((item) => item.key === "submit");
-
-  assertEqual(inNav(ROLES.STUDENT), false, "Student sidebar shows Submit Disclosure");
-  assertEqual(inNav(ROLES.ADVISER), true, "Adviser sidebar shows Submit Disclosure");
+test("no role sees Submit Disclosure in the sidebar; /records/add stays open to authors (IR-534)", () => {
+  // Discover is every role's home, and its Publish button is the way in
+  // (IR-407), so the Adviser's sidebar shortcut went with the role split.
+  // The route stays open to both authors: `/records/add` redirects to the
+  // Publish dialog (`router/redirects.tsx`).
+  for (const role of EVERY_ROLE) {
+    assertEqual(
+      navFor(role).some((item) => item.key === "submit"), false,
+      `${role} sidebar shows Submit Disclosure`,
+    );
+  }
   assertEqual(canAccess(ROLES.STUDENT, "submit"), true, "Student may still open /records/add");
+  assertEqual(canAccess(ROLES.ADVISER, "submit"), true, "Adviser may still open /records/add");
 });
 
 test("Notifications is the bell, not a sidebar link, and its page stays open (IR-519)", () => {
@@ -105,18 +108,13 @@ test("every role shares one short main list, in the spec's order", () => {
   expect(labels(ROLES.STUDENT)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Calls & Conferences",
   ]);
-  for (const role of [ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
+  // The Adviser included since IR-534: Discover is its home, so the Submit
+  // Disclosure shortcut it kept until then is gone.
+  for (const role of [ROLES.ADVISER, ROLES.ITSO, ROLES.IERC, ROLES.KTTO]) {
     expect(labels(role, REVIEW_WORK)).toEqual([
       "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
     ]);
   }
-});
-
-test("an Adviser keeps Submit Disclosure until Discover is their home (IR-534)", () => {
-  expect(labels(ROLES.ADVISER, REVIEW_WORK)).toEqual([
-    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Submit Disclosure",
-    "Main: My Reviews", "Main: Calls & Conferences",
-  ]);
 });
 
 test("RDCO's coordination screens, Import Records included, are one Administration group", () => {
