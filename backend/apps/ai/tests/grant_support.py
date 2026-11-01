@@ -68,6 +68,50 @@ def probe_login(group="iris_ai_runtime"):
             conn.close()
 
 
+@contextmanager
+def connected_as(name, password):
+    """Run Django's default connection as another login for the body."""
+    saved = connection.settings_dict["USER"], connection.settings_dict["PASSWORD"]
+    connection.close()
+    connection.settings_dict.update(USER=name, PASSWORD=password)
+    try:
+        yield
+    finally:
+        connection.close()
+        connection.settings_dict.update(USER=saved[0], PASSWORD=saved[1])
+
+
+def use_research_alias(name, password):
+    """A `research` connection as `name`, like settings' `database` mode.
+
+    Registered as a dynamic connection, which Django's test isolation allows.
+    """
+    from django.db import connections
+    from django.db.backends.postgresql.base import DatabaseWrapper
+
+    from apps.ai.grants.reads import ALIAS
+
+    drop_research_alias()
+    default = connections["default"].settings_dict
+    connections[ALIAS] = DatabaseWrapper({
+        **default, "USER": name, "PASSWORD": password,
+        "OPTIONS": {**default.get("OPTIONS", {}), "application_name": "iris-research-read"},
+    }, alias=ALIAS)
+
+
+def drop_research_alias():
+    from django.db import connections
+
+    from apps.ai.grants.reads import ALIAS
+
+    try:
+        wrapper = connections[ALIAS]
+    except Exception:
+        return
+    wrapper.close()
+    del connections[ALIAS]
+
+
 @pytest.fixture
 def grant_db(settings):
     """Grants on, keys installed, roles provisioned; keys removed afterwards."""

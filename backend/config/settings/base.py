@@ -639,6 +639,18 @@ AI_RESEARCH_GRANT_TTL_SECONDS = config("AI_RESEARCH_GRANT_TTL_SECONDS", default=
 AI_RESEARCH_READ_POLICY = config("AI_RESEARCH_READ_POLICY", default="application")
 AI_RESEARCH_DB_USER = config("AI_RESEARCH_DB_USER", default="")
 AI_RESEARCH_DB_PASSWORD = config("AI_RESEARCH_DB_PASSWORD", default="")
+# The restricted research login, as its own alias (like `admission`).
+if AI_RESEARCH_READ_POLICY == "database":
+    DATABASES["research"] = {
+        **DATABASES["default"],
+        "USER": AI_RESEARCH_DB_USER,
+        "PASSWORD": AI_RESEARCH_DB_PASSWORD,
+        "OPTIONS": {
+            **DATABASES["default"].get("OPTIONS", {}),
+            "connect_timeout": 5,
+            "application_name": "iris-research-read",
+        },
+    }
 AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
 AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
 AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)

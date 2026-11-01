@@ -8,9 +8,17 @@ from apps.records.models import Record, RecordOwner
 from core.enums import PipelineStatus
 from core.permissions import ROLE_ADVISER, ROLE_RDCO, ROLE_STUDENT
 from .corpus import make_user
-from .grant_support import grant_db, probe_credentials  # noqa: F401
+from .grant_support import (  # noqa: F401
+    drop_research_alias, grant_db, probe_credentials, use_research_alias,
+)
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
+
+
+@pytest.fixture(autouse=True)
+def _no_research_alias_left_behind():
+    yield
+    drop_research_alias()
 
 
 @pytest.fixture
@@ -36,6 +44,7 @@ def use_database(settings, name, password):
     settings.AI_RESEARCH_READ_POLICY = "database"
     settings.AI_RESEARCH_DB_USER = name
     settings.AI_RESEARCH_DB_PASSWORD = password
+    use_research_alias(name, password)
 
 
 def test_application_mode_is_visible_to(settings, people):
@@ -132,3 +141,32 @@ def test_django_startup_runs_the_check(settings):
     settings.AI_RESEARCH_READ_POLICY = "nonsense"
     with pytest.raises(ImproperlyConfigured, match="AI_RESEARCH_READ_POLICY"):
         apps.get_app_config("ai").ready()
+
+
+def test_database_mode_reads_under_a_bound_run_s_own_scope(settings, grant_db, people):
+    from .grant_support import owned_run
+
+    owner, draft, stranger = people["owner"], people["draft"], people["stranger"]
+    with probe_credentials("iris_django_runtime") as (name, password):
+        use_database(settings, name, password)
+        assert len(ids(reads.research_records(owner))) > 1
+        with reads.bound_run(owned_run(owner, record=draft)):
+            assert ids(reads.research_records(owner)) == {draft.pk}
+        with reads.bound_run(owned_run(owner, state="succeeded")):
+            assert ids(reads.research_records(owner)) == set()
+        with reads.bound_run(owned_run(stranger)):
+            assert ids(reads.research_records(owner)) == set()
+
+
+def test_a_queued_answer_reads_under_its_own_run(people, monkeypatch):
+    from apps.ai import durable
+    from apps.ai.models import AskRunAttempt
+    from .grant_support import owned_run
+
+    run = owned_run(people["owner"])
+    attempt = AskRunAttempt.objects.create(run=run, number=1)
+    seen = []
+    monkeypatch.setattr(durable, "_answer_run",
+                        lambda attempt_, run_: seen.append(reads.current_run()))
+    durable._answer(attempt)
+    assert [r.pk for r in seen] == [run.pk]

@@ -103,7 +103,7 @@ from apps.ai.models.queued import (
 )
 from apps.ai.orchestrator import ChatOrchestrator
 from apps.ai.providers.deadline import model_call_deadline
-from apps.ai.grants.reads import research_records
+from apps.ai.grants.reads import bound_run, research_records
 
 logger = logging.getLogger(__name__)
 
@@ -582,7 +582,8 @@ def _answer(attempt: AskRunAttempt) -> None:
     from apps.ai.controller.durable_budget import bind
 
     with bind(attempt), admission_scope.run(run_scope(run, attempt)), \
-            model_call_deadline(max(0.0, left)):
+            model_call_deadline(max(0.0, left)), bound_run(run):
+        # bound_run: database-mode reads use this run's grant (ADR-049 §6).
         _answer_run(attempt, run)
 
 
