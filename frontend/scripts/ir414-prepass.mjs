@@ -261,17 +261,25 @@ async function reviewInteractions(page) {
   const n = await enabled.count();
   out.actions = await bar.locator("button").allInnerTexts().then((t) => t.map((x) => x.trim()));
 
-  // Arrow keys move along the bar and wrap (APG toolbar pattern).
+  // Arrow keys move along the bar and wrap (APG toolbar pattern). Focus is
+  // read as a position among the enabled controls, never by text: two
+  // controls may share a label. Left from the first must wrap to the last.
   if (n >= 2) {
+    const at = () => bar.evaluate((el) =>
+      [...el.querySelectorAll("button:not(:disabled), a[href]")].indexOf(document.activeElement));
     await enabled.first().focus();
-    const name = () => page.evaluate(() => document.activeElement?.textContent?.trim() ?? "");
-    const first = await name();
     await page.keyboard.press("ArrowRight");
-    const second = await name();
+    const right = await at();
     await page.keyboard.press("ArrowLeft");
-    const back = await name();
-    out.arrowKeysMove = second !== first && back === first;
-  } else out.arrowKeysMove = null;
+    const back = await at();
+    await page.keyboard.press("ArrowLeft");
+    const wrapped = await at();
+    out.arrowKeysMove = right === 1 && back === 0;
+    out.arrowKeysWrap = wrapped === n - 1;
+  } else {
+    out.arrowKeysMove = null;
+    out.arrowKeysWrap = null;
+  }
 
   // Below lg the bar is sticky: when scrolled to the end, the timeline's last
   // entry must not sit underneath it.
@@ -289,13 +297,17 @@ async function reviewInteractions(page) {
 
   // The Request documents dialog: focus moves in, Tab stays in, Escape closes,
   // focus returns to the button. It is opened and closed, never submitted.
+  // The dialog is found by its name and the opener by a mark set on that very
+  // element, so another dialog or another "Request documents" button on the
+  // page cannot answer for them.
   const opener = bar.getByRole("button", { name: "Request documents" });
   if ((await opener.count()) && (await opener.isEnabled())) {
+    await opener.evaluate((el) => el.setAttribute("data-ir414-opener", ""));
     await opener.focus();
     await page.keyboard.press("Enter");
-    const dialog = page.getByRole("dialog");
+    const dialog = page.getByRole("dialog", { name: "Request documents" });
     await dialog.first().waitFor({ timeout: 4000 }).catch(() => {});
-    const inDialog = () => page.evaluate(() => !!document.activeElement?.closest("[role=dialog],[role=alertdialog]"));
+    const inDialog = () => dialog.first().evaluate((d) => d.contains(document.activeElement)).catch(() => false);
     out.dialogOpened = (await dialog.count()) > 0;
     out.focusMovesIn = out.dialogOpened ? await inDialog() : null;
     if (out.dialogOpened) {
@@ -308,7 +320,7 @@ async function reviewInteractions(page) {
       await page.keyboard.press("Escape");
       await page.waitForTimeout(300);
       out.escapeCloses = (await dialog.count()) === 0;
-      out.focusReturns = await page.evaluate(() => document.activeElement?.textContent?.trim() === "Request documents");
+      out.focusReturns = await page.evaluate(() => document.activeElement?.hasAttribute("data-ir414-opener") ?? false);
     }
   } else out.dialogOpened = null;
   return out;
@@ -355,7 +367,14 @@ async function measure(page, screen, vp, consoleErrors) {
 // Resume: a cell that finished cleanly in an earlier run into this <dir> is
 // kept and not measured again, so a crash or a throttled sign-in costs only
 // the cells it touched. A role whose cells are all kept is not signed in.
-const prior = existsSync(path.join(OUT, "prepass.json")) ? JSON.parse(readFileSync(path.join(OUT, "prepass.json"), "utf8")) : null;
+// Only cells measured against this same stack are kept: the file is stamped
+// with one frontend, backend and API, so a cell from another must not ride
+// under that stamp. A run with --only keeps every cell outside its slice.
+const STACK = { base: BASE, api: API ?? `${BASE} (dev proxy)`, frontendRef: FRONTEND_REF, backendRef: args["backend-ref"] ?? "unrecorded" };
+const priorFile = existsSync(path.join(OUT, "prepass.json")) ? JSON.parse(readFileSync(path.join(OUT, "prepass.json"), "utf8")) : null;
+const sameStack = priorFile && Object.entries(STACK).every(([k, v]) => priorFile[k] === v);
+if (priorFile && !sameStack) console.log("earlier results in this <dir> were measured against another stack; starting afresh");
+const prior = sameStack ? priorFile : null;
 const key = (c) => `${c.name}|${c.viewport}`;
 const kept = (list) => new Map((list ?? []).filter((c) => !c.error).map((c) => [key(c), c]));
 const keptResults = kept(prior?.results);
@@ -365,11 +384,17 @@ const results = [];
 const interactions = [];
 const browser = await chromium.launch();
 const browserVersion = browser.version();
+// Earlier cells this run neither measured nor kept (outside --only) come back
+// on every write, so a slice never truncates the file.
+const withOthers = (now, earlier) => {
+  const here = new Set(now.map(key));
+  return [...now, ...(earlier ?? []).filter((c) => !here.has(key(c)))];
+};
 const save = () => writeFileSync(
   path.join(OUT, "prepass.json"),
   JSON.stringify({
-    base: BASE, api: API ?? `${BASE} (dev proxy)`, frontendRef: FRONTEND_REF, backendRef: args["backend-ref"] ?? "unrecorded",
-    ranAt: new Date().toISOString(), browser: `chromium ${browserVersion}`, viewports: VIEWPORTS, results, interactions,
+    ...STACK, ranAt: new Date().toISOString(), browser: `chromium ${browserVersion}`, viewports: VIEWPORTS,
+    results: withOthers(results, prior?.results), interactions: withOthers(interactions, prior?.interactions),
   }, null, 2),
 );
 const screens = only(SCREENS);
@@ -434,24 +459,35 @@ try {
 }
 process.stdout.write("\n");
 
-// A compact Markdown summary: one row per screen x viewport, then the details.
+// A compact Markdown summary from the file just written (this run's cells and
+// the earlier ones it kept): one row per screen x viewport, then the Review
+// interactions. It names its stack first, so no table is read without it.
+const final = JSON.parse(readFileSync(path.join(OUT, "prepass.json"), "utf8"));
 const serious = (c) => (c.axe ?? []).filter((v) => v.impact === "serious" || v.impact === "critical");
-const lines = ["| Screen | Viewport | Overflow | axe serious/critical | axe other | Keyboard |", "|---|---|---|---|---|---|"];
-for (const c of results) {
-  const kb = c.keyboard ? `${c.keyboard.stops} stops${c.keyboard.cycled ? ", cycles" : ""}; ${c.keyboard.noIndicator.length} no-indicator; ${c.keyboard.covered.length} covered` : "—";
+const lines = [
+  `Automated pre-pass, headless Chromium (${final.browser}), emulated viewports. Frontend ${final.frontendRef}; backend ${final.backendRef} at ${final.api}; ${final.ranAt}.`,
+  "",
+  "| Screen | Viewport | Overflow | axe serious/critical | axe other | Keyboard |",
+  "|---|---|---|---|---|---|",
+];
+for (const c of final.results) {
+  const k = c.keyboard;
+  const kb = k
+    ? `${k.stops} stops${k.reachedLimit ? ` (**stopped at ${MAX_TABS} Tabs without returning to the start**)` : k.cycled ? ", cycles" : ""}; ${k.noIndicator.length} no-indicator; ${k.covered.length} covered`
+    : "—";
   lines.push(`| ${c.name} | ${c.viewport} | ${c.error ? "ERROR " + c.error : c.overflow ? `**${c.overflow.px}px**` : "none"} | ${c.error ? "" : serious(c).map((v) => `${v.id}×${v.count}`).join(", ") || "0"} | ${c.error ? "" : (c.axe ?? []).filter((v) => !serious(c).includes(v)).map((v) => `${v.id}×${v.count}`).join(", ") || "0"} | ${kb} |`);
 }
 const yn = (v) => (v === true ? "yes" : v === false ? "**no**" : "n/a");
 lines.push(
   "",
-  "| Review interactions | Viewport | Actions | Arrow keys move | Last entry under sticky bar | Dialog: focus in | Tab stays in | Escape closes | Focus returns |",
-  "|---|---|---|---|---|---|---|---|---|",
+  "| Review interactions | Viewport | Actions | Arrow keys move | Arrow keys wrap | Last entry under sticky bar | Dialog: focus in | Tab stays in | Escape closes | Focus returns |",
+  "|---|---|---|---|---|---|---|---|---|---|",
 );
-for (const c of interactions) {
-  if (c.error) { lines.push(`| ${c.name} | ${c.viewport} | ERROR ${c.error} | | | | | | |`); continue; }
-  if (c.skipped) { lines.push(`| ${c.name} | ${c.viewport} | skipped: ${c.skipped} | n/a | n/a | n/a | n/a | n/a | n/a |`); continue; }
+for (const c of final.interactions) {
+  if (c.error) { lines.push(`| ${c.name} | ${c.viewport} | ERROR ${c.error} | | | | | | | |`); continue; }
+  if (c.skipped) { lines.push(`| ${c.name} | ${c.viewport} | skipped: ${c.skipped} | n/a | n/a | n/a | n/a | n/a | n/a | n/a |`); continue; }
   const covered = c.lastEntryCovered === true ? "**yes**" : c.lastEntryCovered === false ? "no" : "n/a";
-  lines.push(`| ${c.name} | ${c.viewport} | ${(c.actions ?? []).join(", ")} | ${yn(c.arrowKeysMove)} | ${covered} | ${yn(c.focusMovesIn)} | ${yn(c.tabStaysIn)} | ${yn(c.escapeCloses)} | ${yn(c.focusReturns)} |`);
+  lines.push(`| ${c.name} | ${c.viewport} | ${(c.actions ?? []).join(", ")} | ${yn(c.arrowKeysMove)} | ${yn(c.arrowKeysWrap)} | ${covered} | ${yn(c.focusMovesIn)} | ${yn(c.tabStaysIn)} | ${yn(c.escapeCloses)} | ${yn(c.focusReturns)} |`);
 }
 writeFileSync(path.join(OUT, "prepass.md"), lines.join("\n") + "\n");
 console.log(`wrote ${OUT}`);
