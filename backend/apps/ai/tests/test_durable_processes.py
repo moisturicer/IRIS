@@ -38,7 +38,7 @@ def _environment():
         AI_PROVIDER_ADMISSION="enforce", AI_EVIDENCE_DECISION="off",
         AI_RESEARCH_LANE="off", AI_JEV_ROUTING_ENABLED="False",
         # The fakes send as "cheap"; the outbound guard refuses an unconfigured model.
-        LLM_ANSWER_MODEL="cheap", LLM_PLAN_MODEL="",
+        LLM_ANSWER_MODEL="cheap", LLM_PLAN_MODEL="", LLM_API_KEY="probe-key",
         DB_NAME=str(database["NAME"]), DB_USER=str(database["USER"]),
         DB_PASSWORD=str(database["PASSWORD"]), DB_HOST=str(database["HOST"]),
         DB_PORT=str(database["PORT"]),
