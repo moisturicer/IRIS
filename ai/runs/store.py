@@ -36,6 +36,10 @@ RUN_COLUMNS = (
 )
 
 
+#: A Paper Chat grant ($2) reaches only its own Record's Conversations (IR-719).
+IN_SCOPE = "($2::bigint IS NULL OR scope_record_id = $2)"
+
+
 class NotFound(Exception):
     pass
 
@@ -63,6 +67,8 @@ class _Raced(Exception):
 class Claim:
     fence: int
     question: str
+    #: The Conversation's Paper Chat scope, if any (IR-719).
+    scope_record_id: int | None = None
 
 
 def request_hash(question: str, conversation_id, base_revision) -> str:
@@ -87,14 +93,16 @@ class RunStore:
             await conn.close()
 
     @staticmethod
-    async def _reader(conn, grant: str | None) -> int:
+    async def _principal(conn, grant: str | None) -> tuple[int, int | None]:
+        """The verified reader and Paper Chat scope, bound for this transaction."""
         if not grant:
             raise Unauthorized
         try:
             claims = await conn.fetchval("SELECT iris_authz.begin_research($1, 'reader_session')", grant)
         except asyncpg.InsufficientPrivilegeError:
             raise Unauthorized from None
-        return int(claims["sub"])
+        scope = claims.get("rec")
+        return int(claims["sub"]), int(scope) if scope is not None else None
 
     @staticmethod
     async def _journal(conn, run_id, name: str, data: dict) -> None:
@@ -106,8 +114,8 @@ class RunStore:
         )
 
     @staticmethod
-    async def _owned_run(conn, reader: int, run_id) -> None:
-        """Lock the run's Conversation; NotFound unless the reader's and alive."""
+    async def _owned_run(conn, reader: int, scope: int | None, run_id) -> None:
+        """Lock the run's Conversation; NotFound unless the reader's, alive and in scope."""
         conversation_id = await conn.fetchval(
             "SELECT conversation_id FROM iris_ai.ask_run WHERE id = $1 AND reader_id = $2",
             run_id, reader,
@@ -115,8 +123,9 @@ class RunStore:
         if conversation_id is None:
             raise NotFound
         alive = await conn.fetchval(
-            "SELECT deleted_at IS NULL FROM iris_ai.conversation WHERE id = $1 FOR UPDATE",
-            conversation_id,
+            f"""SELECT deleted_at IS NULL FROM iris_ai.conversation
+                 WHERE id = $1 AND {IN_SCOPE} FOR UPDATE""",
+            conversation_id, scope,
         )
         if not alive:
             raise NotFound
@@ -139,7 +148,7 @@ class RunStore:
 
     async def _admit(self, conn, grant, key, question, conversation_id, base_revision,
                      digest, deadline_seconds, allowance, pinned):
-        reader = await self._reader(conn, grant)
+        reader, scope = await self._principal(conn, grant)
         existing = await conn.fetchrow(
             f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE reader_id = $1 AND request_key = $2",
             reader, key,
@@ -157,18 +166,22 @@ class RunStore:
         if conversation_id is None:
             conversation_id = uuid.uuid4()
             await conn.execute(
-                "INSERT INTO iris_ai.conversation (id, reader_id) VALUES ($1, $2)",
-                conversation_id, reader,
+                "INSERT INTO iris_ai.conversation (id, reader_id, scope_record_id) VALUES ($1, $2, $3)",
+                conversation_id, reader, scope,
             )
             revision = 0
         else:
-            revision = await conn.fetchval(
-                """SELECT revision FROM iris_ai.conversation
+            found = await conn.fetchrow(
+                """SELECT revision, scope_record_id FROM iris_ai.conversation
                     WHERE id = $1 AND reader_id = $2 AND deleted_at IS NULL FOR UPDATE""",
                 conversation_id, reader,
             )
-            if revision is None:
+            if found is None:
                 raise NotFound
+            # Paper Chat stays on its Record; widening is a new Conversation.
+            if found["scope_record_id"] != scope:
+                raise Conflict("scope_mismatch")
+            revision = found["revision"]
             if base_revision != revision:
                 raise Conflict("revision_conflict", revision=revision)
             await self._expire_overdue(conn, conversation_id)
@@ -218,7 +231,7 @@ class RunStore:
                         WHERE r.id = $1 AND c.id = r.conversation_id AND c.deleted_at IS NULL
                           AND r.state IN ('queued', 'running') AND r.deadline_at > now()
                           AND (r.lease_expires_at IS NULL OR r.lease_expires_at <= now())
-                    RETURNING r.fence, r.question, r.allowance""",
+                    RETURNING r.fence, r.question, r.allowance, c.scope_record_id""",
                     run_id, worker, float(lease_seconds),
                 )
                 if row is None:
@@ -242,7 +255,8 @@ class RunStore:
                     run_id, row["fence"], executor, reserved_units,
                 )
                 await self._journal(conn, run_id, "started", {"attempt": used + 1})
-                return Claim(fence=row["fence"], question=row["question"])
+                return Claim(fence=row["fence"], question=row["question"],
+                             scope_record_id=row["scope_record_id"])
 
     async def _end(self, conn, run_id, state: str, reason: str, *, move_fence=False,
                    reported_units: int | None = None) -> str:
@@ -307,9 +321,9 @@ class RunStore:
                 )
                 if result.citations:
                     await conn.executemany(
-                        """INSERT INTO iris_ai.citation (turn_id, position, record_id, page, quote)
-                           VALUES ($1, $2, $3, $4, $5)""",
-                        [(turn_id, n, c.record_id, c.page, c.quote)
+                        """INSERT INTO iris_ai.citation (turn_id, position, record_id, page, quote, revision)
+                           VALUES ($1, $2, $3, $4, $5, $6)""",
+                        [(turn_id, n, c.record_id, c.page, c.quote, c.revision)
                          for n, c in enumerate(result.citations, start=1)],
                     )
                 await conn.execute(
@@ -338,8 +352,8 @@ class RunStore:
         """Stop: fence the run so no attempt can advance it. Idempotent."""
         async with self._connect() as conn:
             async with conn.transaction():
-                reader = await self._reader(conn, grant)
-                await self._owned_run(conn, reader, run_id)
+                reader, scope = await self._principal(conn, grant)
+                await self._owned_run(conn, reader, scope, run_id)
                 state = await conn.fetchval(
                     "SELECT state FROM iris_ai.ask_run WHERE id = $1 FOR UPDATE", run_id,
                 )
@@ -350,8 +364,8 @@ class RunStore:
     async def status(self, grant, run_id) -> dict:
         async with self._connect() as conn:
             async with conn.transaction():
-                reader = await self._reader(conn, grant)
-                await self._owned_run(conn, reader, run_id)
+                reader, scope = await self._principal(conn, grant)
+                await self._owned_run(conn, reader, scope, run_id)
                 return await self._projection(conn, run_id)
 
     @staticmethod
@@ -382,11 +396,11 @@ class RunStore:
         """The Conversation's committed Turns, in order, with their citations."""
         async with self._connect() as conn:
             async with conn.transaction():
-                reader = await self._reader(conn, grant)
+                reader, scope = await self._principal(conn, grant)
                 revision = await conn.fetchval(
-                    """SELECT revision FROM iris_ai.conversation
-                        WHERE id = $1 AND reader_id = $2 AND deleted_at IS NULL""",
-                    conversation_id, reader,
+                    f"""SELECT revision FROM iris_ai.conversation
+                         WHERE id = $1 AND reader_id = $3 AND deleted_at IS NULL AND {IN_SCOPE}""",
+                    conversation_id, scope, reader,
                 )
                 if revision is None:
                     raise NotFound
@@ -396,7 +410,7 @@ class RunStore:
                     conversation_id,
                 )
                 citations = await conn.fetch(
-                    """SELECT c.turn_id, c.position, c.record_id, c.page, c.quote
+                    """SELECT c.turn_id, c.position, c.record_id, c.page, c.quote, c.revision
                          FROM iris_ai.citation c JOIN iris_ai.turn t ON t.id = c.turn_id
                         WHERE t.conversation_id = $1 ORDER BY c.turn_id, c.position""",
                     conversation_id,
@@ -404,7 +418,8 @@ class RunStore:
         by_turn: dict = {}
         for c in citations:
             by_turn.setdefault(c["turn_id"], []).append(
-                {"record_id": c["record_id"], "page": c["page"], "quote": c["quote"]}
+                {"record_id": c["record_id"], "page": c["page"], "quote": c["quote"],
+                 "revision": c["revision"]}
             )
         return {
             "id": str(conversation_id),
@@ -420,11 +435,12 @@ class RunStore:
     async def delete_conversation(self, grant, conversation_id) -> None:
         async with self._connect() as conn:
             async with conn.transaction():
-                reader = await self._reader(conn, grant)
+                reader, scope = await self._principal(conn, grant)
                 found = await conn.fetchval(
-                    """SELECT id FROM iris_ai.conversation
-                        WHERE id = $1 AND reader_id = $2 AND deleted_at IS NULL FOR UPDATE""",
-                    conversation_id, reader,
+                    f"""SELECT id FROM iris_ai.conversation
+                         WHERE id = $1 AND reader_id = $3 AND deleted_at IS NULL AND {IN_SCOPE}
+                         FOR UPDATE""",
+                    conversation_id, scope, reader,
                 )
                 if found is None:
                     raise NotFound
@@ -443,6 +459,11 @@ class RunStore:
             await self._end(conn, run["id"], "deleted", "conversation_deleted", move_fence=True)
         await conn.execute(
             """DELETE FROM iris_ai.run_event
+                WHERE run_id IN (SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1)""",
+            conversation_id,
+        )
+        await conn.execute(
+            """DELETE FROM iris_ai.research_handle
                 WHERE run_id IN (SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1)""",
             conversation_id,
         )
