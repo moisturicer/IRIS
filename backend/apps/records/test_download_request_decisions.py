@@ -52,9 +52,11 @@ class DownloadRequestDecisionFixtures(APITestCase):
         url = f"{DOWNLOAD_REQUESTS}{request.pk}/"
         if route == "patch-approve":
             return self.client.patch(url, {"action": "approve"}, format="json")
+        # A decline says why (IR-688); its refusals are test_download_request_notes.
         if route == "patch-decline":
-            return self.client.patch(url, {"action": "decline"}, format="json")
-        return self.client.post(f"{url}{route}/", {}, format="json")
+            return self.client.patch(url, {"action": "decline", "note": "Not now."}, format="json")
+        data = {"note": "Not now."} if route == "decline" else {}
+        return self.client.post(f"{url}{route}/", data, format="json")
 
 
 APPROVING = ("approve", "patch-approve")
@@ -154,7 +156,7 @@ class ANewRequestNotifiesRdcoOnlyTests(DownloadRequestDecisionFixtures):
     def test_only_rdco_is_notified(self):
         self.client.force_authenticate(self.requester)
 
-        response = self.client.post(DOWNLOAD_REQUESTS, {"record": self.record.pk}, format="json")
+        response = self.client.post(DOWNLOAD_REQUESTS, {"record": self.record.pk, "note": "For my thesis."}, format="json")
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         broadcasts = Notification.objects.filter(

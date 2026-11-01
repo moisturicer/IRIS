@@ -1,4 +1,6 @@
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { StatusScreen } from "@/components/shared/StatusScreen";
+import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
@@ -612,38 +614,26 @@ export default function PaperViewPage() {
 
   if (!record && loadFailed) {
     return (
-      <div role="alert" className="max-w-md mx-auto text-center py-20">
-        <i className="fas fa-circle-exclamation text-3xl text-stone-300 mb-3" aria-hidden />
-        <h1 className="text-heading font-bold text-stone-800">We couldn't load this record</h1>
-        <p className="text-small text-stone-600 mt-1">Check your connection and try again.</p>
-        <button
-          type="button"
-          onClick={() => setAttempt((n) => n + 1)}
-          className={cn(PILL_PRIMARY, FOCUS_RING, "mt-4")}
-        >
-          Try again
-        </button>
-      </div>
+      <StatusScreen
+        tone="error"
+        icon="fa-circle-exclamation"
+        title="We couldn't load this record"
+        message="Check your connection and try again."
+        actions={
+          <button
+            type="button"
+            onClick={() => setAttempt((n) => n + 1)}
+            className={cn(PILL_PRIMARY, FOCUS_RING)}
+          >
+            Try again
+          </button>
+        }
+      />
     );
   }
 
-  if (!record) {
-    return (
-      <div className="max-w-md mx-auto text-center py-20">
-        <i className="fas fa-file-circle-question text-3xl text-stone-300 mb-3" aria-hidden />
-        <h1 className="text-heading font-bold text-stone-800">Record not available</h1>
-        <p className="text-sm text-stone-500 mt-1">
-          It may have been withdrawn, or you may not have access to it.
-        </p>
-        <Link
-          to="/"
-          className="inline-block mt-4 px-4 py-2 rounded-lg bg-brand text-white text-sm font-bold hover:bg-brand-light transition-colors"
-        >
-          Back to Discover
-        </Link>
-      </div>
-    );
-  }
+  // Missing and refused alike (IR-153), on the shared Not found screen (IR-745).
+  if (!record) return <NotFoundScreen subject="Record" />;
 
   const can = capabilitiesFor(record);
   const userIsOwner = isOwner(record, viewer);

@@ -898,6 +898,11 @@ export interface DownloadState {
   grant_expires_at: string | null;
   /** The viewer's own request this state comes from, if any. */
   request:          number | null;
+  /**
+   * RDCO's note when `state` is "declined" or "revoked" (IR-688); "" otherwise,
+   * and on a decline made before notes existed ("No note recorded").
+   */
+  rdco_note?:       string;
 }
 
 export interface DownloadRequest {
@@ -907,10 +912,18 @@ export interface DownloadRequest {
   requested_by:        number;
   requested_by_name:   string | null;
   requested_by_email:  string | null;
-  status:              "pending" | "approved" | "declined" | "revoked";
+  /** Why the reader asks (IR-688). Blank only on requests made before notes. */
+  note:                string;
+  status:              "pending" | "approved" | "declined" | "revoked" | "cancelled";
+  /** RDCO's reason for a decline or a revocation; "" otherwise. */
+  rdco_note:           string;
   reviewed_by:         number | null;
   reviewed_at:         string | null;
   grant_expires_at:    string | null;
+  /** Approved and unexpired: RDCO may still revoke it. Worked out by the server. */
+  grant_live:          boolean;
+  revoked_at:          string | null;
+  cancelled_at:        string | null;
   created_at:          string;
 }
 

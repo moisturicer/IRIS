@@ -635,16 +635,64 @@ def notify_download_reviewed(download_request, reviewed_by, approved: bool):
                 recipient_list=[requester.email],
             )
         else:
-            notif_type = _get_type("Download Request Declined")
+            # RDCO's note travels with the decline (IR-688). The email links to
+            # the record, never to a file (ADR-048, decision 6).
+            note = download_request.rdco_note
             Notification.objects.create(
                 sender=reviewed_by,
                 recipient=requester,
                 record=record,
-                notif_type=notif_type,
-                message=f'Your download request for "{record.title}" has been declined.',
+                notif_type=_get_type("Download Request Declined"),
+                message=(
+                    f'Your download request for "{record.title}" has been declined. '
+                    f"RDCO's note: {note}"
+                ),
+            )
+            send_email_async(
+                subject=f"[IRIS] Download request declined: {record.title[:60]}",
+                message=(
+                    f"Hello {requester.first_name},\n\n"
+                    f'Your request to download "{record.title}" has been declined.\n\n'
+                    f"RDCO's note:\n{note}\n\n"
+                    f"You may request again from the record's page:\n{url}\n\n"
+                    f"-- The IRIS Team"
+                ),
+                recipient_list=[requester.email],
             )
     except Exception:
         _log_failure("notify_download_reviewed", request=download_request)
+
+
+def notify_download_revoked(download_request, revoked_by):
+    """Tell the reader RDCO ended their download access early, and why (IR-688)."""
+    try:
+        requester = download_request.requested_by
+        record    = download_request.record
+        note      = download_request.rdco_note
+        Notification.objects.create(
+            sender=revoked_by,
+            recipient=requester,
+            record=record,
+            notif_type=_get_type("Download Access Revoked"),
+            message=(
+                f'Your download access to "{record.title}" has been revoked. '
+                f"RDCO's note: {note}"
+            ),
+        )
+        send_email_async(
+            subject=f"[IRIS] Download access revoked: {record.title[:60]}",
+            message=(
+                f"Hello {requester.first_name},\n\n"
+                f'RDCO has revoked your access to download "{record.title}". '
+                f"You can no longer download it.\n\n"
+                f"RDCO's note:\n{note}\n\n"
+                f"You may request again from the record's page:\n{_record_url(record)}\n\n"
+                f"-- The IRIS Team"
+            ),
+            recipient_list=[requester.email],
+        )
+    except Exception:
+        _log_failure("notify_download_revoked", request=download_request)
 
 
 def notify_delete_approved(delete_request, reviewed_by):

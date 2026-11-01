@@ -70,6 +70,7 @@ from django.conf import settings
 
 from apps.ai.chunking.tokens import count_tokens, truncate_to_tokens
 from apps.ai.resolution import turn_qa_lines
+from apps.ai.grants.reads import research_records
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from apps.ai.models import Turn
@@ -185,12 +186,10 @@ def _cut(text: str, estimated_budget: int) -> str:
 
 def readable_record_ids(user, record_ids) -> set:
     """The ids among ``record_ids`` that ``user`` may read now."""
-    from apps.records.models import Record
-
     if not record_ids:
         return set()
     return set(
-        Record.objects.visible_to(user).filter(pk__in=record_ids).values_list("pk", flat=True)
+        research_records(user).filter(pk__in=record_ids).values_list("pk", flat=True)
     )
 
 

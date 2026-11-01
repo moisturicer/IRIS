@@ -31,11 +31,15 @@ class AiConfig(AppConfig):
         from apps.ai.routing.chat import verify_research_configuration
         from apps.ai.comparison_configuration import verify_comparison_configuration
         from apps.ai.controller.budget import verify_controller_configuration
+        from apps.ai.grants.config import verify_grant_configuration
+        from apps.ai.grants.reads import verify_research_read_configuration
 
         verify_research_configuration()
         verify_controller_configuration()
         verify_comparison_configuration()
         verify_admission_configuration()
+        verify_grant_configuration()
+        verify_research_read_configuration()
         verify_bypass_configuration()
         verify_inference_configuration()
         verify_evidence_configuration()
@@ -44,3 +48,10 @@ class AiConfig(AppConfig):
         # The evidence rule set is read here and nowhere else, so a
         # `.env` edit cannot remove a requirement between two questions.
         load_rule_set()
+
+        from django.db.models.signals import pre_migrate
+
+        from apps.ai.grants.migration_guard import refuse_runtime_login
+
+        pre_migrate.connect(refuse_runtime_login, sender=self,
+                            dispatch_uid="ai.refuse_runtime_login")

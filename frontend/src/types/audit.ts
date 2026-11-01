@@ -7,6 +7,10 @@ export const AUDIT_EVENT_GROUPS = {
     SYSTEM_SETTING_CHANGED: "System Setting Changed",
   },
   Files: { ACCESS: "Record Access", UPLOAD: "File Upload", DOWNLOAD: "File Download", DELETE: "File Delete", RENAME: "File Rename" },
+  "Download requests": {
+    DOWNLOAD_REQUEST_CANCELLED: "Download Request Cancelled",
+    DOWNLOAD_GRANT_REVOKED: "Download Access Revoked",
+  },
   Research: { RESEARCH_METADATA_CORRECTED: "Research Metadata Corrected" },
   "Account recovery": {
     RECOVERY_REQUESTED: "Recovery Requested",

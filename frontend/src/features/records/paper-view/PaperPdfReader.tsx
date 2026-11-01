@@ -34,6 +34,7 @@ import {
 } from "./readerGeometry";
 import { usePaperFind } from "./usePaperFind";
 import { useReadingPosition } from "./useReadingPosition";
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 const SCALE_STEP = 0.2;
 /**
@@ -494,7 +495,7 @@ export function PaperPdfReader({
             aria-expanded={find.open}
             title="Find in this paper (Ctrl+F)"
           >
-            <i className="fas fa-magnifying-glass" aria-hidden />
+            <SearchGlyph className="h-3.5 w-3.5" />
           </Button>
         </div>
 

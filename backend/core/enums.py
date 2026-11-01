@@ -385,13 +385,15 @@ class RequestStatus(models.TextChoices):
 
     One enum for all three because it is genuinely one concept -- asked,
     granted, refused -- not three that happen to share strings. `REVOKED` is a
-    grant withdrawn early, which only a download request has (ADR-048).
+    grant withdrawn early and `CANCELLED` a pending request its maker withdrew;
+    only a download request has either (ADR-048, IR-688).
     """
 
     PENDING = "pending", "Pending"
     APPROVED = "approved", "Approved"
     DECLINED = "declined", "Declined"
     REVOKED = "revoked", "Revoked"
+    CANCELLED = "cancelled", "Cancelled"
 
 
 class SessionEndReason(models.TextChoices):

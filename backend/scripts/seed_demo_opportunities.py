@@ -42,7 +42,7 @@ SEED = [
     {
         "opportunity_type": Opportunity.TYPE_FUNDING_WINDOW,
         "title":            "DOST-PCIEERD Call for Proposals: Smart Agriculture & Sensor Networks",
-        "posting_office":   "External Grants Liaison / KTTO",
+        "posting_office":   "External Grants Liaison / RDCO",
         "audience":         "Engineering, Computing & Allied Sciences Faculty",
         "description": (
             "National priority grant window for commercializable multi-sensor aerial drone "

@@ -69,7 +69,7 @@ export function DataTable<T>({
               <tr>
                 <td colSpan={columns.length} className="py-12 text-center">
                   <div className="flex justify-center">
-                    <Spinner />
+                    <Spinner label="Loading rows" />
                   </div>
                 </td>
               </tr>

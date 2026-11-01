@@ -6,7 +6,7 @@ from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, record_versions, resubmission_payload
 
 from .models import (
-    Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
+    DOWNLOAD_NOTE_MAX_LENGTH, Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
     Classification, PSCEDClassification, RecordType,
 )
 
@@ -726,16 +726,32 @@ class DownloadRequestSerializer(serializers.ModelSerializer):
     record_title         = serializers.CharField(source="record.title",                    read_only=True)
     requested_by_name    = serializers.SerializerMethodField()
     requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
+    # Why the reader asks (IR-688): required, plain text, at most 500 characters.
+    note                 = serializers.CharField(
+        max_length=DOWNLOAD_NOTE_MAX_LENGTH, allow_blank=False, trim_whitespace=True,
+    )
+    # Whether RDCO may still revoke it: approved and not yet expired. Worked
+    # out here so the queue never decides expiry itself.
+    grant_live           = serializers.SerializerMethodField()
 
     class Meta:
         model  = DownloadRequest
         fields = [
             "id", "record", "record_title",
             "requested_by", "requested_by_name", "requested_by_email",
-            "status", "reviewed_by", "reviewed_at", "grant_expires_at", "created_at",
+            "note", "status", "rdco_note",
+            "reviewed_by", "reviewed_at", "grant_expires_at", "grant_live",
+            "revoked_at", "cancelled_at", "created_at",
         ]
         # A request is created pending; only the review actions move it.
-        read_only_fields = ["requested_by", "status", "reviewed_by", "reviewed_at", "grant_expires_at"]
+        read_only_fields = [
+            "requested_by", "status", "rdco_note", "reviewed_by", "reviewed_at",
+            "grant_expires_at", "revoked_at", "cancelled_at",
+        ]
+
+    def get_grant_live(self, obj):
+        from .download_service import grant_is_live
+        return grant_is_live(obj)
 
     def get_requested_by_name(self, obj):
         if obj.requested_by:

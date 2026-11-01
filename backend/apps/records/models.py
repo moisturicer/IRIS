@@ -459,6 +459,10 @@ class Collaboration(models.Model):
 
 # ---- Download / Delete requests -----------------------------------------
 
+#: The longest note a reader or RDCO may leave on a download request (IR-688).
+DOWNLOAD_NOTE_MAX_LENGTH = 500
+
+
 class DownloadRequest(models.Model):
     STATUS = RequestStatus.choices
     record       = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="download_requests")
@@ -475,6 +479,19 @@ class DownloadRequest(models.Model):
     # When an approval stops letting the requester download (ADR-048). Expired
     # is worked out from this, not stored.
     grant_expires_at = models.DateTimeField(null=True, blank=True)
+    # Why the reader asks (IR-688). Required of every new request; blank only
+    # on requests made before notes existed.
+    note = models.CharField(max_length=DOWNLOAD_NOTE_MAX_LENGTH, blank=True, default="")
+    # RDCO's reason for a decline or a revocation (IR-688). An approval takes
+    # none. Blank on a decline made before notes existed: "No note recorded".
+    rdco_note = models.CharField(max_length=DOWNLOAD_NOTE_MAX_LENGTH, blank=True, default="")
+    # A revocation keeps `reviewed_by`/`reviewed_at` as the approval's.
+    revoked_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="revoked_download_requests",
+    )
+    revoked_at   = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
 
 
 class DeleteRequest(models.Model):

@@ -1,4 +1,4 @@
-import { createBrowserRouter, redirect } from "react-router-dom";
+import { createBrowserRouter, redirect, type RouteObject } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
 import { rolesFor } from "@/lib/access";
@@ -34,7 +34,15 @@ import HelpPage             from "@/features/help/HelpPage";
 import DownloadRequestsPage  from "@/features/admin/DownloadRequestsPage";
 import DeleteRequestsPage    from "@/features/admin/DeleteRequestsPage";
 
-export const router = createBrowserRouter([
+// Error screens (IR-745)
+import { NotFoundScreen }   from "@/features/errors/NotFoundScreen";
+import { RouteErrorScreen } from "@/features/errors/RouteErrorScreen";
+
+export const routes: RouteObject[] = [{
+  // The last resort (IR-745): a crash outside the shell's own boundary below,
+  // in a public page or in the shell itself, is drawn with no shell at all.
+  errorElement: <RouteErrorScreen standalone />,
+  children: [
   { path: "/login",  element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
   { path: "/activate/:uidb64/:token", element: <EmailVerifyPage /> },
@@ -52,6 +60,10 @@ export const router = createBrowserRouter([
         element: <AppShell />,
         // Every page is centred at the standard width unless its handle says
         // `width: "full"`: the PDF reader and the wide admin tables (IR-521).
+        children: [{
+        // A page that crashes is replaced by the error screen inside the
+        // shell, so the sidebar and in-memory state survive it (IR-745).
+        errorElement: <RouteErrorScreen />,
         children: [
           { index: true, element: <HomePage />, handle: { crumb: "Discover" } },
           // Retired URLs (spec §4.1). Outside the role gates: a redirect only
@@ -110,8 +122,17 @@ export const router = createBrowserRouter([
               { path: "admin/audit",               element: <AuditLogPage />,          handle: { crumb: "Audit Log", width: "full" } },
             ],
           },
+
+          // Any other address (IR-745). Behind sign-in like every app
+          // address, so a signed-out visitor learns nothing about which
+          // paths exist, and inside the shell so the way out is in reach.
+          { path: "*", element: <NotFoundScreen /> },
         ],
+        }],
       },
     ],
   },
-]);
+  ],
+}];
+
+export const router = createBrowserRouter(routes);

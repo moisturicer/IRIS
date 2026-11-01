@@ -526,6 +526,23 @@ def test_a_papers_search_answers_from_the_top_papers_best_passage_with_its_page(
     assert FLOOD_TEXT in writer.calls[0][1]
 
 
+def test_papers_named_by_the_reader_answer_from_their_abstracts(
+    flood_scene, monkeypatch, embedder,
+):
+    """IR-703: "which two should I read first?" resolves the shown papers and
+    composes; resolved papers carry no search rank, so nothing was citable."""
+    planner = ScriptedToolCallingLLM([
+        call("resolve_papers", {"references": ["Flood Prediction"]}, "c1"),
+        compose(basis="evidence", topic="which to read first"),
+    ])
+    writer = ScriptedLLM(reply="Start with Flood Prediction [1].")
+    root = controller_root(monkeypatch, embedder=embedder, planner=planner, writer=writer)
+    with use_composition_root(root):
+        body = asked_flood(flood_scene["client"], flood_scene["conversation"])
+    assert body["mode"] == "generative"
+    assert [c["record_id"] for c in body["citations"]] == [flood_scene["flood"].pk]
+
+
 def test_an_abstract_is_not_sent_when_a_passage_of_that_paper_was_read(
     flood_scene, monkeypatch, embedder,
 ):

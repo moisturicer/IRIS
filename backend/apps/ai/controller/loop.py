@@ -368,16 +368,24 @@ ABSTRACT_SOURCES = 5
 
 
 def _abstracts(run, passages, envelopes) -> tuple:
-    """IR-703: a top-ranked paper with no passage read is a source by its abstract.
+    """IR-703: a named or top-ranked paper with no passage read is a source by its abstract.
 
     Best rank first and scored below every passage, so the input limit trims
     abstracts before passages and the lowest-ranked abstract first.
     """
-    ranks = {}
+    named, searched = [], {}
     for envelope in envelopes:
         for item in envelope.items:
-            if isinstance(item.get("rank"), int) and isinstance(item.get("record"), str):
-                ranks[item["record"]] = min(item["rank"], ranks.get(item["record"], item["rank"]))
+            if not isinstance(item.get("record"), str):
+                continue
+            if "reference" in item:
+                named.append(item["record"])
+            elif isinstance(item.get("rank"), int):
+                searched[item["record"]] = min(item["rank"], searched.get(item["record"], item["rank"]))
+    # Papers the reader named lead, in the order named; then search rank.
+    ranks = {handle: position for position, handle in enumerate(dict.fromkeys(named), 1)}
+    for handle, rank in searched.items():
+        ranks.setdefault(handle, len(named) + rank)
     read = {p.record_id for p in passages}
     found = sorted((r for r in run.ledger.records() if r.handle in ranks
                     and r.text.strip() and r.record_id not in read),

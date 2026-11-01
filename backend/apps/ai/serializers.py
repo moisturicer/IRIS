@@ -12,6 +12,7 @@ from apps.ai.conversations import turns_for_reader
 from apps.records.models import Record
 
 from .models import Conversation, EmbeddingJob
+from apps.ai.grants.reads import research_records
 
 
 class EmbeddingJobSerializer(serializers.ModelSerializer):
@@ -53,7 +54,7 @@ class ConversationSerializer(serializers.ModelSerializer):
         super().__init__(*args, **kwargs)
         request = self.context.get("request")
         if request is not None:
-            self.fields["record"].queryset = Record.objects.visible_to(request.user)
+            self.fields["record"].queryset = research_records(request.user)
 
     def validate(self, attrs):
         if attrs.get("reuse_default") and not attrs.get("record"):

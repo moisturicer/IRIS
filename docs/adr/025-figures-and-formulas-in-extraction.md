@@ -143,3 +143,15 @@ IR-107, IR-113, IR-245 (produced the region data this finally consumes), IR-243 
 
 Related: IR-424 (IR-426, IR-427, IR-428, IR-429, IR-430).
 
+
+## Amendment — 2026-11-01 (IR-437): an AI Overview sends a whole Record to the vendor
+
+**Status of this amendment.** Adds to the IR-424 amendment above rather than competing with it; the decisions in this ADR (crop from the source PDF, formula enrichment, no picture description) are unchanged.
+
+1. **What changed.** Since IR-431 an AI Overview is grounded in the whole paper: every chunk of the Record's active `ChunkSet`, in `sequence` order, goes to the vendor in one request, with no retrieval step. Before it, a request sent the few passages retrieval chose. The amount of one Record's text leaving the deployment per request is now all of it.
+2. **It is gated per Record, before anything is assembled.** `apps/ai/overview/service.py` calls `CompositionRoot.vendor_permits()` (the ADR-015 disclosure gate) and assembles nothing for a Record it refuses, so a refused Record produces no vendor call. Nothing real is sent today: the gate refuses every Record until IR-250 gives `Record` an embargo field.
+3. **"No image ever leaves the deployment" (Security Impact) still holds.** Chunks are text. A Figure carries no text of its own and rides on its caption's chunk, so the caption goes and the pixels do not; formulas go as LaTeX text. Cropping stays in-process and picture description stays declined.
+4. **What this does not settle.** The `summary` Inference task carries the uniform no-training data policy like every task (ADR-036 §Amendment), but confirming the vendor's actual terms remains ADR-015's open condition. This note does not close it.
+5. **The size figure is a proxy number.** Indexing the dev database measured 26 records, 1,236 chunks and 381,073 tokens. That is the proxy corpus: it decides engineering (how long a whole paper is, what a request costs) and is never cited as a finding about CIT-U research, per [ADR-023](023-retrieval-quality-evaluation.md).
+
+Related: IR-437 (IR-425, IR-431).

@@ -17,7 +17,7 @@ interface AuthState {
   /** False until we have checked sessionStorage for a refresh token on load. */
   authReady:       boolean;
   /**
-   * Bumped by `logout`/`clearTokens`. `client.ts` captures this before starting a
+   * Bumped by `login`/`logout`/`clearTokens`. `client.ts` captures this before starting a
    * refresh and checks it again after the refresh resolves: if it moved, the
    * session that requested the refresh no longer exists, so the result is
    * discarded instead of reviving a session the user already signed out of.
@@ -45,12 +45,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   login: (user, access, refresh) => {
     setStoredRefreshToken(refresh);
-    set({
+    // A sign-in is a new session even with no sign-out before it: `/login` has
+    // no guard, so a signed-in account can open it and sign in as someone else
+    // (IR-746). Anything still in flight for the session it replaces -- a token
+    // refresh, a notifications fetch -- must be discarded, not applied to it.
+    set((s) => ({
       user,
       accessToken: access,
       refreshToken: refresh,
       isAuthenticated: true,
-    });
+      sessionEpoch: s.sessionEpoch + 1,
+    }));
   },
 
   logout: () => {

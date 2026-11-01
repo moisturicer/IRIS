@@ -45,7 +45,7 @@ The product name for IRIS's retrieval-augmented chat/search feature (`apps/ai`, 
 _Avoid_: RAG chat, chatbot (fine in casual conversation, but "Ask IRIS" is the product-facing name used in the UI and should be used in specs/tickets too).
 
 **AI Overview**:
-An AI-generated account of a Record's content, grounded in that Record's own passages and cached per active `ChunkSet`. Shown on the record's detail page. Deliberately distinct from **Abstract** (below) — the Abstract is what the author wrote, the AI Overview is what IRIS derived, and the two must never be presented as interchangeable.
+An AI-generated account of a Record's content, grounded in the whole Record (every chunk of its active `ChunkSet`, in order, with no retrieval) rather than in retrieved passages, and cached per active `ChunkSet`. Shown on the record's detail page. Deliberately distinct from **Abstract** (below) — the Abstract is what the author wrote, the AI Overview is what IRIS derived, and the two must never be presented as interchangeable.
 _Avoid_: AI Summary (the earlier name for this, now retired — the code, the API field and the UI all say Overview), Summary alone (ambiguous next to Abstract), DocumentSummary (an internal name that no longer matches the model).
 
 **Manuscript**:
@@ -211,7 +211,7 @@ _Avoid_: Flag, complaint.
 ### Library
 
 **Library**:
-A reader's private collection of [[Saved Record]]s. It belongs to the reader's account, and nobody else can see it.
+A reader's private collection of [[Saved Record]]s and [[Saved Call]]s. It belongs to the reader's account, and nobody else can see it.
 _Avoid_: Repository, catalogue (that is Discover), collection, bookshelf.
 
 **Saved Record**:
@@ -267,6 +267,20 @@ _Avoid_: Access (the audit log's word for one opening), hit, read, reader count.
 **Trending**:
 Published papers ordered by the [[View]]s they gained in the last 30 days, then by all-time views, then newest first. Distinct from Most Viewed, which orders by all-time views alone.
 _Avoid_: Popular, hot, most viewed.
+
+### Calls & Conferences
+
+**Call**:
+An invitation to submit papers on the Calls & Conferences board, to a conference, congress, symposium, workshop, journal or book. It has a paper deadline, one or more [[Area]]s and, when there is an event, the event's dates. RDCO or an Adviser posts it. An Adviser changes only the Calls they posted; RDCO can change any.
+_Avoid_: Opportunity (the code's name, which readers never see), announcement, posting.
+
+**Call request**:
+An Adviser's [[Call]] waiting for RDCO to confirm or reject it. Only that Adviser and RDCO can see it, and it becomes public only once confirmed.
+_Avoid_: Post request, pending post, submission (that is a Record's).
+
+**Saved Call**:
+A [[Call]] a reader has kept in their [[Library]]. A reader saves a Call at most once, and it stays saved after the Call is over, until the reader removes it or RDCO deletes the Call.
+_Avoid_: Bookmark, reminder.
 
 ### Accounts
 

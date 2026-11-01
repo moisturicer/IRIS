@@ -34,6 +34,7 @@ from apps.ai.resilience.rate_limit import RateLimited
 from apps.records.models import Record
 
 from .ports import FULL_TEXT, RetrievalResult, RetrievedChunk, Retriever
+from apps.ai.grants.reads import research_records
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,7 @@ class FullTextRetriever(Retriever):
         if not question.strip():
             return RetrievalResult(degraded=True, mode=FULL_TEXT)
 
-        visible = Record.objects.visible_to(user)
+        visible = research_records(user)
         if self._record is not None:
             visible = visible.filter(pk=self._record.pk)
         if self._records is not None:

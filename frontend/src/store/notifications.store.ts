@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { Notification } from "@/types/notifications";
+import { useAuthStore } from "./auth.store";
 
 interface NotificationsState {
   items:       Notification[];
@@ -27,3 +28,19 @@ export const useNotificationsStore = create<NotificationsState>((set) => ({
   // zeroed badge -- visible in the header bell, which lists from `items`.
   markAllRead: () => set({ items: [], unreadCount: 0 }),
 }));
+
+/**
+ * Unread notifications belong to one signed-in session (IR-746).
+ *
+ * This store outlives sign-out -- it is module state, shared by the whole tab
+ * -- so without this, the next person to sign in on the same tab saw the
+ * previous account's notification text and record links until their own fetch
+ * replaced them. `sessionEpoch` moves on every `logout` and `clearTokens`,
+ * which is exactly "the session these items were fetched for has ended".
+ * Subscribing here keeps the auth store from having to know this one exists.
+ */
+useAuthStore.subscribe((state, previous) => {
+  if (state.sessionEpoch !== previous.sessionEpoch) {
+    useNotificationsStore.setState({ items: [], unreadCount: 0 });
+  }
+});
