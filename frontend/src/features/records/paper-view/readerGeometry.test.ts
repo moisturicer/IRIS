@@ -18,6 +18,7 @@ import {
   fitScale,
   readingAnchor,
   regionInView,
+  windowReadingBand,
 } from "./readerGeometry";
 
 describe("fitScale", () => {
@@ -164,5 +165,17 @@ describe("regionInView (IR-353)", () => {
   it("is false for a band under the toolbar, or below the view", () => {
     expect(regionInView(page, { top: 0.05, bottom: 0.12 }, view)).toBe(false);
     expect(regionInView(page, { top: 0.68, bottom: 0.72 }, view)).toBe(false);
+  });
+});
+
+describe("windowReadingBand (IR-477)", () => {
+  // A 360x740 phone: the toolbar sticks at 64px (8px under the 56px header)
+  // and is 104px tall, two rows of controls.
+  it("runs from under the stuck toolbar to the bottom of the window", () => {
+    expect(windowReadingBand(104, 740)).toEqual({ top: 168, bottom: 740 });
+  });
+
+  it("stops above whatever covers the bottom of the window, such as the Review tab's action bar", () => {
+    expect(windowReadingBand(104, 740, 112)).toEqual({ top: 168, bottom: 628 });
   });
 });
