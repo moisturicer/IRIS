@@ -3,6 +3,7 @@ import { forwardRef, useCallback, useEffect, useId, useRef, useState } from "rea
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatDate } from "@/lib/utils";
 import { errorDetail } from "@/lib/errorDetail";
 import { ItemStatusChip } from "./itemStatus";
@@ -35,7 +36,7 @@ interface ActionRequiredPanelProps {
  * An item's upload stays a compact button (spec §4.10 as amended
  * 2026-10-06), not an `UploadDropzone`, yet behaves like one (IR-471): a
  * progress bar while it runs, Retry with the same file after a failure, and
- * one live region for the panel that announces each start and finish.
+ * a live region per row that announces each start and finish.
  *
  * Each item reads in spec §4.10's one vocabulary (`itemStatus`): Requested,
  * Uploaded · awaiting review, Accepted, Replacement needed.
@@ -49,8 +50,6 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
   const headingId = useId();
   const [requests, setRequests] = useState<DocumentRequest[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
-  /** What the live region last said: an upload starting or finishing. */
-  const [announcement, setAnnouncement] = useState("");
   /** Ids of requests seen open since this panel mounted. */
   const seenOpen = useRef<Set<number>>(new Set());
 
@@ -104,18 +103,8 @@ export function ActionRequiredPanel({ recordId, id, onChanged }: ActionRequiredP
         <i className="fas fa-file-circle-exclamation text-xs" aria-hidden />
         {anyOpen ? "Action required" : "Requested documents"}
       </h2>
-      {/* Mounted with the panel, so the first announcement is heard (as UploadDropzone's is). */}
-      <span role="status" className="sr-only">
-        {announcement}
-      </span>
       {shown.map((r) => (
-        <RequestEntry
-          key={r.id}
-          recordId={recordId}
-          request={r}
-          onUploaded={uploaded}
-          announce={setAnnouncement}
-        />
+        <RequestEntry key={r.id} recordId={recordId} request={r} onUploaded={uploaded} />
       ))}
     </section>
   );
@@ -125,12 +114,10 @@ function RequestEntry({
   recordId,
   request,
   onUploaded,
-  announce,
 }: {
   recordId: number;
   request: DocumentRequest;
   onUploaded: () => Promise<void>;
-  announce: (message: string) => void;
 }) {
   const listId = useId();
   return (
@@ -163,7 +150,6 @@ function RequestEntry({
             item={item}
             asker={request.label}
             onUploaded={onUploaded}
-            announce={announce}
           />
         ))}
       </ul>
@@ -181,17 +167,22 @@ function ItemRow({
   item,
   asker,
   onUploaded,
-  announce,
 }: {
   recordId: number;
   item: DocumentRequestItem;
   /** Who asked, as the server words it. */
   asker: string;
   onUploaded: () => Promise<void>;
-  announce: (message: string) => void;
 }) {
   const inputId = useId();
   const [upload, setUpload] = useState<RowUpload | null>(null);
+  /**
+   * This row's live region. One per row, as UploadDropzone has one per zone,
+   * so two items uploading at once never overwrite each other's news.
+   */
+  const [announcement, setAnnouncement] = useState("");
+  /** Set synchronously, so a second click before the re-render cannot send twice. */
+  const inFlight = useRef(false);
   const uploading = upload?.status === "uploading";
 
   const rowRef = useRef<HTMLLIElement>(null);
@@ -201,18 +192,21 @@ function ItemRow({
   const carryFocus = useRef(false);
 
   const send = async (file: File) => {
+    if (inFlight.current) return;
+    inFlight.current = true;
     const active = typeof document === "undefined" ? null : document.activeElement;
     carryFocus.current = active != null && (rowRef.current?.contains(active) ?? false);
     setUpload({ status: "uploading", fileName: file.name, progress: 0 });
-    announce(`Uploading ${file.name}`);
+    setAnnouncement(`Uploading ${file.name}`);
     try {
       await documentsApi.uploadForRequestItem(recordId, item.id, file, {
         onProgress: (progress) =>
           setUpload((u) => (u?.status === "uploading" ? { ...u, progress } : u)),
       });
     } catch (err) {
+      inFlight.current = false;
       // The failure is announced by its own alert; saying it here too would say it twice.
-      announce("");
+      setAnnouncement("");
       setUpload({
         status: "failed",
         file,
@@ -220,8 +214,9 @@ function ItemRow({
       });
       return;
     }
+    inFlight.current = false;
     setUpload(null);
-    announce(`${file.name} uploaded`);
+    setAnnouncement(`${file.name} uploaded`);
     // Outside the try: the file is already sent, so a failed refresh must never offer Retry.
     await onUploaded();
   };
@@ -245,6 +240,10 @@ function ItemRow({
 
   return (
     <li ref={rowRef} tabIndex={-1} className="py-2 first:pt-0 last:pb-0 focus:outline-none">
+      {/* Mounted with the row, so the first announcement is heard. */}
+      <span role="status" className="sr-only">
+        {announcement}
+      </span>
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <span className="text-sm font-semibold text-stone-800 min-w-0 break-words">
           {item.label}
@@ -295,10 +294,7 @@ function ItemRow({
             type="button"
             onClick={() => void send(upload.file)}
             aria-label={`Retry uploading ${upload.file.name}`}
-            className={cn(
-              "inline-flex items-center gap-1 px-2 py-0.5 rounded-lg ring-1 ring-brand-200 font-bold hover:bg-brand-50",
-              FOCUS_RING,
-            )}
+            className={cn(PILL_SECONDARY, FOCUS_RING)}
           >
             <i className="fas fa-rotate-right text-2xs" aria-hidden />
             Retry

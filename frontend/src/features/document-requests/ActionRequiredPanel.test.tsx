@@ -7,10 +7,10 @@
  * tree, by role and accessible name.
  */
 import userEvent from "@testing-library/user-event";
+import { act } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { act } from "react";
 import { fireEvent, renderScreen, screen, waitFor, within } from "@/test/render";
 import type { DocumentRequest } from "@/types/records";
 
@@ -132,6 +132,7 @@ describe("ActionRequiredPanel", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "42");
     // The row cannot start a second upload while this one runs.
     expect(screen.queryByLabelText("Upload Ethics Clearance")).not.toBeInTheDocument();
+    expect(uploadForRequestItem).toHaveBeenCalledTimes(1);
 
     await act(async () => finish({ data: {} }));
     await waitFor(() =>
@@ -148,7 +149,8 @@ describe("ActionRequiredPanel", () => {
     );
     renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
 
-    const status = await screen.findByRole("status");
+    const [row] = await screen.findAllByRole("listitem");
+    const status = within(row).getByRole("status");
     expect(status).toBeEmptyDOMElement();
 
     const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
@@ -165,12 +167,40 @@ describe("ActionRequiredPanel", () => {
     uploadForRequestItem.mockRejectedValue({ response: { data: { detail: "Too large." } } });
     renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
 
-    const status = await screen.findByRole("status");
+    const [row] = await screen.findAllByRole("listitem");
+    const status = within(row).getByRole("status");
     const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
     await user.upload(screen.getByLabelText("Upload Ethics Clearance"), file);
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Too large.");
     expect(status).toBeEmptyDOMElement();
+  });
+
+  it("keeps each item's news apart when two upload at once", async () => {
+    const user = userEvent.setup();
+    const both = request({
+      items: [request().items[0], { ...request().items[0], id: 13, label: "Data sheet" }],
+    });
+    documentRequests.mockResolvedValue({ data: [both] });
+    const settle: Record<number, { ok: (v: unknown) => void; fail: (e: unknown) => void }> = {};
+    uploadForRequestItem.mockImplementation(
+      (_r, itemId: number) => new Promise((ok, fail) => { settle[itemId] = { ok, fail }; }),
+    );
+    renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const [ethics, data] = await screen.findAllByRole("listitem");
+    await user.upload(within(ethics).getByLabelText("Upload Ethics Clearance"),
+      new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" }));
+    await user.upload(within(data).getByLabelText("Upload Data sheet"),
+      new File(["%PDF-1.4"], "data.pdf", { type: "application/pdf" }));
+
+    await act(async () => settle[11].ok({ data: {} }));
+    await act(async () => settle[13].fail({ response: { data: { detail: "Too large." } } }));
+
+    // The second item's failure does not wipe what the first one said.
+    expect(within(ethics).getByRole("status")).toHaveTextContent("ethics.pdf uploaded");
+    expect(within(data).getByRole("status")).toBeEmptyDOMElement();
+    expect(within(data).getByRole("alert")).toHaveTextContent("Too large.");
   });
 
   it("shows the request as fulfilled once the last item is uploaded", async () => {
@@ -316,6 +346,25 @@ describe("ActionRequiredPanel", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /could not load the documents reviewers asked for/i,
     );
+  });
+
+  it("has no blocking accessibility violations while uploading or after a failure", async () => {
+    const user = userEvent.setup();
+    documentRequests.mockResolvedValue({ data: [request()] });
+    let fail: (reason: unknown) => void = () => {};
+    uploadForRequestItem.mockImplementation(
+      () => new Promise((_resolve, reject) => { fail = reject; }),
+    );
+    const { container } = renderScreen(<ActionRequiredPanel recordId={RECORD_ID} />);
+
+    const file = new File(["%PDF-1.4"], "ethics.pdf", { type: "application/pdf" });
+    await user.upload(await screen.findByLabelText("Upload Ethics Clearance"), file);
+    await screen.findByRole("progressbar");
+    await expectNoBlockingA11yViolations(container);
+
+    await act(async () => fail({ response: { data: { detail: "Too large." } } }));
+    await screen.findByRole("button", { name: "Retry uploading ethics.pdf" });
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("has no blocking accessibility violations", async () => {
