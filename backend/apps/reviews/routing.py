@@ -243,8 +243,8 @@ def _from_party_for(record, user, *, accepting: bool) -> str:
 def author_hints_by_office(record) -> dict[str, str]:
     """What the author flagged for each office. Two flags can point at one office."""
     hints: dict[str, str] = {}
-    for field, office, text in _AUTHOR_FLAGS:
-        if getattr(record, field, False):
+    for flag, office, text in _AUTHOR_FLAGS:
+        if getattr(record, flag, False):
             hints[office] = f"{hints[office]} {text}" if office in hints else text
     return hints
 
