@@ -27,7 +27,7 @@ The [focused field](after-focus-360.png) has a solid 2 px maroon ring with a
 
 Browser axe color-contrast checks reported no violations in Profile, Privacy,
 or the bootstrap status. Shared tone contrast is 17.49:1 for white on
-stone-900 (success) and 11.53:1 for brand on brand-50 (recoverable error).
+stone-900 (success) and 11.26:1 for brand on brand-50 (recoverable error).
 Consent icons use stone-900 or stone-600 on white. Error announcements retain
 the existing polite `role="status"`; added icons are hidden from assistive
 technology, leaving the message unchanged.
@@ -35,4 +35,12 @@ technology, leaving the message unchanged.
 The existing SettingsPage, SettingsProfileFields, AuthBootstrap and palette
 test files pass: 4 files, 37 tests. TypeScript `tsc --noEmit` passes.
 Only the two palette allowlist entries were removed; no behavioral test or
-assertion was changed. Full-suite and CI results are recorded in the PR.
+assertion was changed. The full frontend suite (`npm test -- --maxWorkers=4`)
+reports 126 files and 1,607 tests passing (332.04 s). Its stderr includes
+expected error-boundary fixtures and jsdom's unimplemented `scrollBy` warning.
+CI results are recorded in the PR.
+
+`npm run build` also completes (`tsc && vite build`), with the existing large
+chunk warning. AI-assisted review against base `7b5f7447` found zero Spec
+findings and one Standards finding (a contrast-ratio typo), corrected above.
+This is supporting review evidence; human approval remains outstanding.

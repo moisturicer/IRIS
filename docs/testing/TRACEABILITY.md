@@ -12,8 +12,9 @@ the shared solid maroon focus ring, and feedback rows wrap at phone widths.
 **Evidence:** existing SettingsPage, SettingsProfileFields, AuthBootstrap and
 palette tests pass (37 tests); `tsc --noEmit` passes. Before/after captures at
 1440 px and 360 px, contrast checks, focus verification and capture limitations
-are in [the evidence index](evidence/IR-364/README.md). Full-suite and CI results
-are recorded in the PR. No behavioral test assertions were changed.
+are in [the evidence index](evidence/IR-364/README.md). The full frontend suite
+reports 126 files / 1,607 tests passing; CI results are recorded in the PR.
+No behavioral test assertions were changed.
 
 ## IR-123 · Disclosure notice describes external AI processing (FR-M6-02)
 
