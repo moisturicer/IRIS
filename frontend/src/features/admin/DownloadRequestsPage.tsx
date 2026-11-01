@@ -179,31 +179,30 @@ export default function DownloadRequestsPage() {
       />
 
       {/* Filter bar */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         {FILTERS.map((s) => (
-          <button
+          <Button
             key={s}
             type="button"
             onClick={() => setFilterStatus(s)}
             aria-pressed={filterStatus === s}
-            className={`px-3 py-1.5 rounded-lg text-[13px] font-semibold border transition-colors ${
-              filterStatus === s
-                ? "bg-brand text-white border-brand"
-                : "bg-white text-stone-600 border-stone-200 hover:border-stone-300"
-            }`}
+            variant="ghost"
+            size="sm"
           >
             {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
           type="button"
           onClick={load}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-stone-500 border border-stone-200 rounded-lg bg-white hover:bg-stone-50 disabled:opacity-50"
+          variant="outline"
+          size="sm"
+          className="ml-auto"
         >
           <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {error && (

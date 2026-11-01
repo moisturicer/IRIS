@@ -1,5 +1,23 @@
 # Requirements Traceability
 
+## IR-363 · Admin screens adopt the shared palette
+
+The seven admin/staff screens leave both palette-guard exception lists. Request
+states use `RequestStatusChip`: a label, icon and shared tone; expired download
+approvals also show an explicit expiry date. Destructive actions retain their
+confirmations and use the shared danger `Button`. Request filters and Refresh
+actions now use `Button`, and both request filter groups expose `aria-pressed`.
+The deletion advisory uses `WARNING_NOTICE`; load failures retain `LOAD_ERROR`.
+
+**Evidence:** `palette.test.ts`, `RequestStatusChip.test.tsx` and the existing
+admin/accounts/audit page tests passed (43 tests, 6 files). No existing test was
+changed. Typechecking and targeted ESLint passed. The
+[before/after gallery](evidence/IR-363/README.md) records all seven screens and
+distinguishes real endpoint captures from supplemental component states. Sessions
+has no application route and its endpoint returns active sessions only; no
+expired-session behavior or navigation was added. Full-suite results and review
+are recorded in the PR. This is implementation evidence, not human sign-off.
+
 ## IR-123 · Disclosure notice describes external AI processing (FR-M6-02)
 
 The shared notice describes manuscript extraction, external Voyage AI embedding

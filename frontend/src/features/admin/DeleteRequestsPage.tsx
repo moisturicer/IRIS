@@ -17,7 +17,7 @@ import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
 import { Button }      from "@/components/ui/Button";
-import { LOAD_ERROR }  from "@/components/ui/fieldClasses";
+import { LOAD_ERROR, WARNING_NOTICE }  from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
 import { EmptyState }  from "@/components/shared/EmptyState";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
@@ -69,7 +69,7 @@ export default function DeleteRequestsPage() {
       />
 
       {/* Danger notice */}
-      <div className={`mb-4 ${LOAD_ERROR}`}>
+      <div className={`mb-4 ${WARNING_NOTICE}`}>
         <i className="fas fa-exclamation-triangle mt-0.5 flex-shrink-0" aria-hidden />
         <span>
           Approving a deletion <strong>permanently removes</strong> the record from the system.
@@ -79,30 +79,30 @@ export default function DeleteRequestsPage() {
       </div>
 
       {/* Filter tabs */}
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         {(["pending", "approved", ""] as const).map((s) => (
-          <button
+          <Button
             key={s}
             type="button"
             onClick={() => setFilterStatus(s)}
-            className={`px-3 py-1.5 rounded-lg text-[13px] font-semibold border transition-colors ${
-              filterStatus === s
-                ? "bg-brand text-white border-brand"
-                : "bg-white text-stone-600 border-stone-200 hover:border-stone-300"
-            }`}
+            aria-pressed={filterStatus === s}
+            variant="ghost"
+            size="sm"
           >
             {s === "" ? "All" : s.charAt(0).toUpperCase() + s.slice(1)}
-          </button>
+          </Button>
         ))}
-        <button
+        <Button
           type="button"
           onClick={load}
           disabled={loading}
-          className="ml-auto flex items-center gap-1.5 px-3 py-1.5 text-[13px] text-stone-500 border border-stone-200 rounded-lg bg-white hover:bg-stone-50 disabled:opacity-50"
+          variant="outline"
+          size="sm"
+          className="ml-auto"
         >
           <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
-        </button>
+        </Button>
       </div>
 
       {error && (
