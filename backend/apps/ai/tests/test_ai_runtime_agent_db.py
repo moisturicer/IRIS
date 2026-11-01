@@ -11,7 +11,7 @@ import pytest
 
 # First: it puts the repository root on sys.path.
 from . import test_ai_runtime_runs_db as runs_db
-from .test_ai_runtime_runs_db import LIMITS, as_reader, service, session, submit
+from .test_ai_runtime_runs_db import as_reader, service, session, submit
 from ai.agent.dialect import ChatCompletions  # noqa: E402
 from ai.runs import config as runs_config  # noqa: E402
 from ai.agent.executor import AgentExecutor  # noqa: E402
@@ -86,17 +86,17 @@ def test_an_unsupported_pin_ends_unavailable_with_no_turn(api, runtime):
 
 def test_a_run_is_never_continued_under_another_pin(runtime):
     reader = make_user("agent-repinned@cit.edu")
-    admitted_by = service(runtime, AgentExecutor(recording(), PIN))
-    row, _ = asyncio_run(admitted_by.store.admit(
+    admitted_by = service(runtime, AgentExecutor(recording(), PIN), notifier=Quiet())
+    run_, created = asyncio_run(admitted_by.submit(
         session(reader), key="agent-repinned", question="Q?", conversation_id=None,
-        base_revision=None, deadline_seconds=LIMITS.deadline_seconds,
-        allowance=LIMITS.allowance(), pinned=admitted_by.pinned(),
+        base_revision=None,
     ))
+    assert created and run_["state"] == "queued"
     upgraded = Pin(**{**PIN.as_dict(), "requires": PIN.requires, "prompt_version": "agent-direct-2"})
     provider = recording(reply("Would be the wrong interpretation."))
-    worker = service(runtime, AgentExecutor(provider, upgraded))
-    asyncio_run(worker.execute(row["id"], session(reader)))
-    status = asyncio_run(RunStore(runtime).status(session(reader), row["id"]))
+    worker = service(runtime, AgentExecutor(provider, upgraded), notifier=Quiet())
+    assert asyncio_run(worker.run_next())
+    status = asyncio_run(RunStore(runtime).status(session(reader), run_["id"]))
     assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
     assert status["pinned"]["agent"] == PIN.as_dict()
     assert provider.requests == []
@@ -121,6 +121,29 @@ def test_no_opaque_payload_reaches_the_projection_transcript_or_logs(api, runtim
     assert SECRET not in caplog.text and "private working" not in caplog.text
 
 
+class Quiet:
+    """A wakeup that wakes no one, so the run stays queued."""
+
+    async def notify(self):
+        pass
+
+    async def wait(self, timeout):
+        pass
+
+
 def asyncio_run(coro):
     import asyncio
     return asyncio.run(coro)
+
+
+def test_an_agent_run_is_not_answered_by_a_worker_without_its_pin(runtime):
+    reader = make_user("agent-unpinned-worker@cit.edu")
+    admitted_by = service(runtime, AgentExecutor(recording(), PIN), notifier=Quiet())
+    run_, _ = asyncio_run(admitted_by.submit(
+        session(reader), key="agent-unpinned", question="Q?", conversation_id=None,
+        base_revision=None,
+    ))
+    worker = service(runtime, notifier=Quiet())
+    assert asyncio_run(worker.run_next())
+    status = asyncio_run(RunStore(runtime).status(session(reader), run_["id"]))
+    assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
