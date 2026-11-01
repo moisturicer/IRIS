@@ -1373,6 +1373,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     PATCH  /download-requests/<id>/               -- RDCO: the same decision, by `action`
     POST   /download-requests/<id>/revoke/        -- RDCO: end a live grant with a `note` (IR-688)
     POST   /download-requests/<id>/cancel/        -- the requester: withdraw their own pending request
+    GET    /download-requests/mine/               -- the reader: their own requests (IR-743)
     """
     serializer_class = DownloadRequestSerializer
     queryset         = DownloadRequest.objects.select_related("record", "requested_by")
@@ -1382,7 +1383,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         # Anyone may *request* a download; only RDCO acts on the queue. This was
         # IsStaff, which is all four offices -- so ITSO or IERC could approve
         # release of a document from a record routed to neither of them (IR-165).
-        if self.action in ("create", "cancel"):
+        if self.action in ("create", "cancel", "mine"):
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdmin()]
 
@@ -1467,6 +1468,16 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         download_request = self.get_object()
         response = self._refusal(cancel_download_request, download_request, request.user)
         return response or Response(self.get_serializer(download_request).data)
+
+    @action(detail=False, methods=["get"])
+    def mine(self, request):
+        """
+        GET /download-requests/mine/ — the reader's own requests, newest first
+        (IR-743). Only ever the caller's own, whatever their role, so anyone
+        else's request is invisible; RDCO's queue stays the list above.
+        """
+        from .download_service import reader_request_rows
+        return Response(reader_request_rows(request.user))
 
     @staticmethod
     def _refusal(act, download_request, user, **kwargs):

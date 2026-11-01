@@ -10,6 +10,7 @@ urlpatterns = [
     path("", include(router.urls)),
     path("download-requests/", include([
         path("", DownloadRequestViewSet.as_view({"get": "list", "post": "create"}), name="download-requests"),
+        path("mine/", DownloadRequestViewSet.as_view({"get": "mine"}), name="download-requests-mine"),
         path("<int:pk>/", DownloadRequestViewSet.as_view({"get": "retrieve", "patch": "partial_update"}), name="download-request-detail"),
         path("<int:pk>/approve/", DownloadRequestViewSet.as_view({"post": "approve"}), name="download-request-approve"),
         path("<int:pk>/decline/", DownloadRequestViewSet.as_view({"post": "decline"}), name="download-request-decline"),

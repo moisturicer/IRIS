@@ -932,6 +932,26 @@ export interface DownloadRequest {
   created_at:          string;
 }
 
+/**
+ * One of the reader's own download requests, for My Library (IR-743). The
+ * server works out `state` and `actions`, so the browser decides no access.
+ */
+export interface ReaderDownloadRequest {
+  id:               number;
+  record:           number;
+  record_title:     string;
+  /** Why the reader asked. Blank only on requests made before notes. */
+  note:             string;
+  created_at:       string;
+  state:            "pending" | "granted" | "declined" | "revoked" | "expired";
+  /** When a live grant ends; null unless `state` is "granted". */
+  grant_expires_at: string | null;
+  /** RDCO's reason when declined or revoked; "" otherwise, or when none was recorded. */
+  rdco_note:        string;
+  /** What this row offers. Only a record's newest request offers anything. */
+  actions:          ("cancel" | "download" | "request_again")[];
+}
+
 export interface DeleteRequest {
   id:                  number;
   record:              number;
