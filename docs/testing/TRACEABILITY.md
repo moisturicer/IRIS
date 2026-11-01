@@ -2070,7 +2070,7 @@ static checks passed. Final full-suite results are recorded on the PR.
 Authority: ADR-042 §Amendment 2026-10-31 (IR-703), approved by Jive Tyler Revalde. Root causes found by the IR-702 real smoke.
 
 - Answer fitted to its input limit, lowest-scored sources dropped first and logged; unavailable only when none fits; startup refusal under `enforce` when the reserve cannot hold the prompt plus one read. Tests: `test_answer_composer.py`.
-- Found papers' abstracts (top five ranked) are record-level sources; a read passage replaces its paper's abstract. Tests: `test_controller_http.py` abstract tests.
+- Found papers' abstracts (top five ranked) are record-level sources; a read passage replaces its paper's abstract. Papers the reader named (`resolve_papers`, e.g. "which two should I read first?") count first; they carry no search rank and were skipped. Tests: `test_controller_http.py` abstract tests, `test_papers_named_by_the_reader_answer_from_their_abstracts`. Real A01-D01, two runs: all three turns generative with citations.
 - A papers search keeps the top three shown papers' best-matching passage, page-cited. Tests: `test_general_tools.py::test_a_papers_search_keeps_the_top_papers_best_matching_passage`, `test_controller_http.py::test_a_papers_search_answers_from_the_top_papers_best_passage_with_its_page`.
 - Only working tools offered (no brief view with briefs off, no `extract_evidence` without a verified window). Tests: `test_controller_http.py`, `test_controller_security_http.py`.
 - `manage.py backfill_abstracts` fills empty abstracts from the manuscript's front chunks (headed, inline or dated front matter), never overwrites, `--classification` scopes it. Tests: `test_backfill_abstracts.py`.
