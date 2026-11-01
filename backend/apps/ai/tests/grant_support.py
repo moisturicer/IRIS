@@ -78,3 +78,13 @@ def owned_run(user, *, record=None, state="queued", seconds=120):
         user=user, conversation=conversation, state=state,
         deadline_at=timezone.now() + timedelta(seconds=seconds),
     )
+
+
+@pytest.fixture
+def grant_keys(settings):
+    """Grants on and keys installed; no role privileges needed."""
+    enable_grants(settings)
+    call_command("install_research_grant_keys")
+    yield settings
+    with connection.cursor() as cursor:
+        cursor.execute("DELETE FROM iris_authz.grant_key")
