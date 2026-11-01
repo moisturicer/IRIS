@@ -12,6 +12,7 @@ from apps.ai.research.context import RunContext
 from apps.ai.research.ledger import EvidenceItem, Ledger
 from apps.ai.research.schema import ArgumentsRejected
 from apps.records.models import Classification, PSCEDClassification, Record, RecordType
+from apps.ai.grants.reads import research_records
 
 QUERY = {"type": "string", "minLength": 1, "maxLength": 300}
 YEAR = {"type": "integer", "minimum": 1900, "maximum": 2100}
@@ -31,7 +32,7 @@ _TAXONOMIES = {
 
 def readable_records(ctx: RunContext) -> QuerySet:
     """The only way a tool reaches `Record`: `visible_to`, then scope."""
-    visible = Record.objects.visible_to(ctx.user)
+    visible = research_records(ctx.user)
     if ctx.scope_record_id is not None:
         visible = visible.filter(pk=ctx.scope_record_id)
     # A plain queryset over the ids, so counts and grouping need no DISTINCT.

@@ -31,9 +31,9 @@ from apps.ai.research.ledger import Ledger
 from apps.ai.research.results import ToolStatus
 from apps.ai.research.validation import validate_answer
 from apps.ai.retrieval.ports import RetrievedChunk
-from apps.records.models import Record
 
 from .storage import resolved_quote
+from apps.ai.grants.reads import research_records
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +84,7 @@ def reader_view(comparison, user):
     versions = comparison.get("source_versions")
     if not isinstance(versions, list):
         return None
-    permitted = Record.objects.visible_to(user).in_bulk(
+    permitted = research_records(user).in_bulk(
         {v.get("record_id") for v in versions if isinstance(v, dict)}
     )
     gate = composition_root().vendor_permits()
@@ -287,7 +287,7 @@ def comparison_events(run, question, record_ids=()):
     if ids:
         if len(ids) < 2 or len(ids) > maximum:
             return _answer(f"Select between 2 and {maximum} papers to compare."), None
-        visible = Record.objects.visible_to(run.ctx.user).in_bulk(ids)
+        visible = research_records(run.ctx.user).in_bulk(ids)
         records = [visible.get(record_id) for record_id in ids]
     else:
         records, missing = _named_records(run.ctx, question)
