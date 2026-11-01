@@ -89,27 +89,8 @@ def space(_one_active_space):
     return _one_active_space
 
 
-@pytest.fixture(autouse=True)
-def _records_carry_an_embargo_fact(monkeypatch):
-    """Stand in for the embargo field IR-250 will add.
-
-    ``Record`` carries none today, and the disclosure policy treats an
-    undetermined embargo as an embargo — so **every** record is currently
-    refused, and nothing in IRIS can be indexed until that ticket lands. That
-    is the correct failure direction for a gate whose purpose is to stop
-    content leaving, and it is asserted directly in ``DisclosureGateTests``.
-
-    The rest of this file is about embedding, not about the gate, so it needs
-    records the gate lets through. Patching the attribute onto the model is
-    the smallest way to get them: the policy adapter already reads it with
-    ``getattr``, so this is exactly the shape IR-250 will make real, and no
-    production code is bent to accommodate a test.
-    """
-    monkeypatch.setattr(Record, "embargoed_until", None, raising=False)
-
-
 def _disclosable_record(**kwargs) -> Record:
-    """A record the disclosure policy permits — given the fixture above."""
+    """A record the disclosure policy permits: answered "no embargo" (ADR-052)."""
     record = Record.objects.create(
         title=kwargs.pop("title", "A thesis"),
         abstract=kwargs.pop("abstract", "An abstract about pond sampling."),
@@ -117,6 +98,7 @@ def _disclosable_record(**kwargs) -> Record:
         # `dpa_accepted` is a derived property, not a field: consent is the
         # timestamp, and IR-226 made that stamp the only evidence of it.
         dpa_accepted_at=timezone.now(),
+        embargo_answered_at=timezone.now(),
         **kwargs,
     )
     return record
@@ -328,12 +310,9 @@ class DisclosureGateTests:
         assert provider.grouped_calls == []
         assert not ChunkEmbedding.objects.filter(chunk__record=record).exists()
 
-    def test_a_record_with_no_embargo_fact_is_refused(self, monkeypatch):
-        """IR-250. `Record` carries no embargo field, so the policy cannot
-        determine one and treats it as an embargo. Asserted rather than
-        worked around: it is why a real corpus cannot be indexed yet, and it
-        should fail loudly the day someone changes the default."""
-        monkeypatch.delattr(Record, "embargoed_until", raising=False)
+    def test_a_record_with_no_embargo_answer_is_refused(self):
+        """ADR-052 §3. Nobody has said it may be sent, so the policy treats it as
+        under embargo. It should fail loudly the day someone changes that."""
         record = Record.objects.create(
             title="A thesis",
             abstract="An abstract.",

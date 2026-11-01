@@ -65,14 +65,6 @@ def space(_one_active_space):
 
 
 @pytest.fixture(autouse=True)
-def _records_carry_an_embargo_fact(monkeypatch):
-    """Stand in for the field IR-250 will add — see the note in
-    ``test_chunk_embedding.py``. Without it the gate refuses every record and
-    a backfill has nothing to demonstrate."""
-    monkeypatch.setattr(Record, "embargoed_until", None, raising=False)
-
-
-@pytest.fixture(autouse=True)
 def _deterministic_provider(monkeypatch):
     """No vendor, ever, from a command's own composition.
 
@@ -92,6 +84,7 @@ def _record(title="A thesis", chunks=("alpha", "beta")) -> Record:
         abstract="An abstract.",
         is_ip=False,
         dpa_accepted_at=timezone.now(),
+        embargo_answered_at=timezone.now(),
     )
     if chunks:
         _chunk(record, *chunks)
@@ -329,6 +322,7 @@ class StubUploadTests:
             title="Stub only",
             record_type=record_type,
             dpa_accepted_at=timezone.now(),
+            embargo_answered_at=timezone.now(),
         )
         slot = UploadSlot.objects.create(name="Manuscript", record_type=record_type)
         RecordUpload.objects.create(

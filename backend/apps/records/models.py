@@ -14,6 +14,7 @@ from django.contrib.postgres.indexes import GinIndex
 # and avoids a rename that has nothing to do with this ticket.
 from core.enums import (  # noqa: F401
     PUBLICLY_VISIBLE_STATUSES,
+    EmbargoState,
     IPType,
     PipelineStatus,
     RequestStatus,
@@ -287,6 +288,51 @@ class Record(models.Model):
         """
         return self.dpa_accepted_at is not None
 
+    # The paper's embargo answer (ADR-052). Its own fact: separate from status,
+    # IP and consent, because a published paper can still be under an agreement.
+    # Stamped by `apps.records.embargo` and by nothing else; none of these is
+    # writable through a serializer.
+    #
+    # **The answer's timestamp is what makes a blank date mean "no embargo".**
+    # An unanswered paper stores a blank date too, and it must stay refused.
+    embargoed_until = models.DateField(
+        null=True, blank=True,
+        help_text="The date to review the embargo. A reminder: it never ends the embargo.",
+    )
+    embargo_answered_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the embargo question was answered. Null means never, so the paper stays blocked.",
+    )
+    embargo_answered_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="embargo_answered_records",
+        help_text="Who answered. SET_NULL so a deleted account cannot erase the timestamp.",
+    )
+    embargo_released_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When a person ended the embargo. Null means it has not been released.",
+    )
+    embargo_released_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="embargo_released_records",
+        help_text="Who released it. SET_NULL so a deleted account cannot erase the timestamp.",
+    )
+
+    @property
+    def embargo_state(self) -> EmbargoState:
+        """Where the embargo stands (ADR-052 §3).
+
+        Derived, never stored, so it cannot drift from the stamps it describes,
+        and it reads no clock: a passed date stays `ACTIVE` until a person acts.
+        """
+        if self.embargo_answered_at is None:
+            return EmbargoState.UNKNOWN
+        if self.embargo_released_at is not None:
+            return EmbargoState.RELEASED
+        if self.embargoed_until is not None:
+            return EmbargoState.ACTIVE
+        return EmbargoState.NONE
+
     # Soft delete
     is_deleted  = models.BooleanField(default=False, db_index=True)
     deleted_at  = models.DateTimeField(null=True, blank=True)
@@ -321,6 +367,21 @@ class Record(models.Model):
             models.UniqueConstraint(
                 fields=["derived_from"],
                 name="record_one_continuation",
+            ),
+            # Rows that would read as something nobody said (ADR-052 §3).
+            models.CheckConstraint(
+                condition=(
+                    models.Q(embargoed_until__isnull=True)
+                    | models.Q(embargo_answered_at__isnull=False)
+                ),
+                name="record_embargo_date_needs_answer",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(embargo_released_at__isnull=True)
+                    | models.Q(embargoed_until__isnull=False)
+                ),
+                name="record_embargo_release_needs_date",
             ),
         ]
 

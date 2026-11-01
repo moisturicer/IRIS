@@ -160,7 +160,7 @@ class TestTheOwnerSeesRelatedPublishedResearch:
 
         assert response.status_code == status.HTTP_200_OK
         assert response.data["results"] == []
-        # Every Proposal is in this state until IR-250, and "nothing close"
+        # A Proposal the disclosure gate refused is in this state, and "nothing close"
         # would be a claim the check never made.
         assert response.data["checked"] is False
 

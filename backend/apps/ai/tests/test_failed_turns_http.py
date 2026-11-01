@@ -86,7 +86,7 @@ def _refusing_gate_root(embedder, llm=None):
     `root_with` hardcodes a permitting gate -- deliberately, since every other
     suite needs one -- so this is built directly rather than widening a shared
     helper for one ticket. The gate is a realistic producer of `no_sources`:
-    it is what refuses every record on a live deployment today (IR-250).
+    it refuses every paper with no embargo answer (ADR-052).
     """
     return CompositionRoot(
         embedder=embedder,
