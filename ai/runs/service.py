@@ -7,6 +7,7 @@ a newly admitted run is executed inline, once.
 
 from __future__ import annotations
 
+import logging
 import uuid
 
 import asyncpg
@@ -14,6 +15,8 @@ import asyncpg
 from ai.runs import config as runs_config
 from ai.runs.executor import Executor, Unavailable
 from ai.runs.store import Fenced, RunStore
+
+logger = logging.getLogger(__name__)
 
 
 class RunService:
@@ -53,11 +56,14 @@ class RunService:
             return
         if claim.pinned != self.pinned():
             # Never continue a run under another model or protocol (IR-727).
+            logger.info("run %s unavailable: pin_changed", run_id)
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
         try:
             result = await self.executor.answer(claim.question)
-        except Unavailable:
+        except Unavailable as refused:
+            # Operators get the code; readers only see `unavailable`.
+            logger.info("run %s unavailable: %s", run_id, refused.code)
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
         except Exception:

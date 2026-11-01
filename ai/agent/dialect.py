@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Any
 
 from ai.agent.protocol import (
-    AgentRequest, ModelTurn, Opaque, StopReason, Text, ToolCall, ToolGroup, ToolResult, User,
+    AgentRequest, ModelTurn, Opaque, Pin, StopReason, Text, ToolCall, ToolGroup, ToolResult, User,
     check_history,
 )
 
@@ -51,9 +51,8 @@ class ChatCompletions:
     @staticmethod
     def _assistant(turn: ModelTurn) -> dict:
         message: dict[str, Any] = {"role": "assistant", "content": None}
-        text = "".join(i.text for i in turn.items if isinstance(i, Text))
-        if text:
-            message["content"] = text
+        if turn.text:
+            message["content"] = turn.text
         calls = [c for i in turn.items if isinstance(i, ToolGroup) for c in i.calls]
         if calls:
             message["tool_calls"] = [
@@ -66,14 +65,14 @@ class ChatCompletions:
         return message
 
     @classmethod
-    def decode(cls, response: Any, *, endpoint: str, model: str) -> ModelTurn:
+    def decode(cls, response: Any, pin: Pin) -> ModelTurn:
         try:
-            return cls._decode(response, endpoint, model)
+            return cls._decode(response, pin.binding())
         except _Malformed:
             return ModelTurn(items=(), stop=StopReason.MALFORMED)
 
     @classmethod
-    def _decode(cls, response, endpoint, model) -> ModelTurn:
+    def _decode(cls, response, binding) -> ModelTurn:
         try:
             choice = response["choices"][0]
             message = choice["message"]
@@ -102,7 +101,7 @@ class ChatCompletions:
             raise _Malformed
         for name in cls.opaque_fields:
             if message.get(name) is not None:
-                items.append(Opaque(endpoint=endpoint, model=model, field=name, payload=message[name]))
+                items.append(Opaque(binding=binding, field=name, payload=message[name]))
         usage = response.get("usage") or {}
         return ModelTurn(
             items=tuple(items), stop=stop, reasoned=bool(message.get("reasoning")),

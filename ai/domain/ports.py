@@ -11,19 +11,16 @@ class LLMProvider(ABC):
     Abstract Base Class for LLM providers (e.g. OpenAI).
     """
 
-    #: What an AGENT pin is checked against (IR-727). Empty means no
-    #: agent support, so `converse` refuses rather than guessing.
-    endpoint: str = ""
-    models: frozenset = frozenset()
-    capabilities: frozenset = frozenset()
-    dialect = None
-
     @abstractmethod
     async def generate_response(self, prompt: str, context: str = "") -> str:
         """
         Generate a response based on the prompt and context.
         """
         pass
+
+    def accepts(self, pin) -> bool:
+        """Whether this provider serves an AGENT `Pin` exactly (IR-727)."""
+        return False
 
     async def converse(self, request):
         """One AGENT model turn for an `ai.agent.protocol.AgentRequest`.

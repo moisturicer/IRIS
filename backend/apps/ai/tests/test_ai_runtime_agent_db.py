@@ -10,9 +10,8 @@ import logging
 import pytest
 
 # First: it puts the repository root on sys.path.
-from .test_ai_runtime_runs_db import (  # noqa: F401  (fixtures)
-    LIMITS, api, as_reader, runtime, service, session, submit,
-)
+from . import test_ai_runtime_runs_db as runs_db
+from .test_ai_runtime_runs_db import LIMITS, as_reader, service, session, submit
 from ai.agent.dialect import ChatCompletions  # noqa: E402
 from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.agent.protocol import Pin  # noqa: E402
@@ -21,6 +20,10 @@ from ai.runs.store import RunStore  # noqa: E402
 from .corpus import make_user  # noqa: E402
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
+
+# IR-722's fixtures, shared.
+runtime = runs_db.runtime
+api = runs_db.api
 
 PIN = Pin(
     model="scripted-model", endpoint="scripted", adapter="recording", dialect=ChatCompletions.name,

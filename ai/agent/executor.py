@@ -36,13 +36,8 @@ class AgentExecutor:
         self.pin = pin
 
     def supported(self) -> bool:
-        pin, provider = self.pin, self.provider
-        dialect = getattr(provider.dialect, "name", None)
-        return (
-            all(getattr(pin, k) == v for k, v in SUPPORTED.items())
-            and pin.endpoint == provider.endpoint and pin.model in provider.models
-            and pin.dialect == dialect and set(pin.requires) <= set(provider.capabilities)
-        )
+        return (all(getattr(self.pin, k) == v for k, v in SUPPORTED.items())
+                and self.provider.accepts(self.pin))
 
     async def answer(self, question: str) -> Result:
         if not self.supported():

@@ -11,25 +11,33 @@ from ai.domain.ports import LLMProvider, UnsupportedCapability
 
 
 class RecordingAgentProvider(LLMProvider):
+    adapter = "recording"
+
     def __init__(self, *, responses, endpoint="scripted", models=("scripted-model",),
-                 capabilities=(), dialect=ChatCompletions):
+                 capabilities=(), data_policies=("no-training",), dialect=ChatCompletions):
         self.responses = list(responses)
         self.endpoint = endpoint
         self.models = frozenset(models)
         self.capabilities = frozenset(capabilities)
+        self.data_policies = frozenset(data_policies)
         self.dialect = dialect
         self.requests: list[dict] = []
+
+    def accepts(self, pin) -> bool:
+        return (
+            pin.adapter == self.adapter and pin.endpoint == self.endpoint
+            and pin.model in self.models and pin.dialect == self.dialect.name
+            and pin.data_policy in self.data_policies and set(pin.requires) <= self.capabilities
+        )
 
     async def generate_response(self, prompt: str, context: str = "") -> str:
         raise UnsupportedCapability("generate_response")
 
     async def converse(self, request):
-        pin = request.pin
-        if (pin.endpoint != self.endpoint or pin.model not in self.models
-                or pin.dialect != self.dialect.name):
+        if not self.accepts(request.pin):
             raise UnsupportedCapability("pin")
         payload = self.dialect.encode(request)
         self.requests.append(payload)
         if not self.responses:
             raise UnsupportedCapability("script_exhausted")
-        return self.dialect.decode(self.responses.pop(0), endpoint=self.endpoint, model=pin.model)
+        return self.dialect.decode(self.responses.pop(0), request.pin)

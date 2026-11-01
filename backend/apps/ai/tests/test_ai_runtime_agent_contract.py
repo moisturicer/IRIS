@@ -16,7 +16,7 @@ if str(REPO) not in sys.path:
 
 from ai.agent.dialect import ChatCompletions  # noqa: E402
 from ai.agent.protocol import (  # noqa: E402
-    AgentRequest, Pin, StopReason, Text, ToolCall, ToolGroup, ToolResult, User,
+    AgentRequest, Pin, StopReason, ToolCall, ToolGroup, ToolResult, User,
 )
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
 
@@ -168,3 +168,35 @@ def test_existing_adapters_keep_working_and_refuse_agent_turns(monkeypatch):
         run(legacy.converse(ask()))
     with pytest.raises(Unavailable):
         run(agent(legacy).answer("q"))
+
+
+@pytest.mark.parametrize("change", [
+    {"prompt_version": "agent-direct-2"}, {"tool_version": "local-2"}, {"dialect": "responses-1"},
+])
+def test_an_artifact_is_not_forwarded_across_a_prompt_tool_or_dialect_change(change):
+    from ai.agent.protocol import IncompatibleContinuation, check_history
+
+    turn = run(provider(reply("Hi.", reasoning_details={"s": 1})).converse(ask()))
+    moved = Pin(**{**PIN.as_dict(), "requires": PIN.requires, **change})
+    with pytest.raises(IncompatibleContinuation):
+        check_history(AgentRequest(pin=moved, instructions="Answer.",
+                                   history=(User("q"), turn, User("again"))))
+
+
+@pytest.mark.parametrize("change", [{"adapter": "openai"}, {"data_policy": "vendor-default"}])
+def test_an_adapter_or_data_policy_the_provider_does_not_have_is_unavailable(change):
+    from ai.runs.executor import Unavailable
+
+    pin = Pin(**{**PIN.as_dict(), "requires": PIN.requires, **change})
+    target = provider(reply("Never sent."))
+    with pytest.raises(Unavailable):
+        run(agent(target, pin).answer("q"))
+    assert target.requests == []
+
+
+def test_an_artifact_without_answer_text_is_reasoning_only():
+    from ai.runs.executor import Unavailable
+
+    with pytest.raises(Unavailable) as refused:
+        run(agent(provider(reply(None, reasoning_details={"s": 1}))).answer("q"))
+    assert refused.value.code == "reasoning_only"

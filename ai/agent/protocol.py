@@ -2,7 +2,7 @@
 
 A model turn is an ordered tuple of items. Nothing here drops, merges or
 reorders them; an opaque continuation artifact hides its payload and may
-only travel back to the endpoint and model that produced it.
+only travel back under the pin binding that produced it.
 """
 
 from __future__ import annotations
@@ -44,8 +44,8 @@ class ToolGroup:
 class Opaque:
     """A provider artifact required back unchanged; never read, rendered or logged."""
 
-    endpoint: str
-    model: str
+    #: `Pin.binding()` of the request that produced it.
+    binding: tuple
     field: str
     payload: Any = field(default=None, repr=False, compare=False)
 
@@ -61,6 +61,10 @@ class ModelTurn:
     reasoned: bool = False
     input_tokens: int | None = None
     output_tokens: int | None = None
+
+    @property
+    def text(self) -> str:
+        return "".join(i.text for i in self.items if isinstance(i, Text))
 
 
 @dataclass(frozen=True)
@@ -101,6 +105,10 @@ class Pin:
     def as_dict(self) -> dict:
         return {**asdict(self), "requires": list(self.requires)}
 
+    def binding(self) -> tuple:
+        """What an opaque artifact stays valid under (ADR-049 §20)."""
+        return (self.endpoint, self.model, self.dialect, self.prompt_version, self.tool_version)
+
 
 @dataclass(frozen=True)
 class ToolSpec:
@@ -118,7 +126,7 @@ class AgentRequest:
 
 
 class IncompatibleContinuation(Exception):
-    """An opaque artifact would be sent to an endpoint or model that did not produce it."""
+    """An opaque artifact would be sent under a pin binding that did not produce it."""
 
 
 class BrokenExchange(Exception):
@@ -146,9 +154,7 @@ def check_history(request: AgentRequest) -> None:
             for item in entry.items:
                 if isinstance(item, ToolGroup):
                     pending.extend(call.id for call in item.calls)
-                elif isinstance(item, Opaque) and (
-                    item.endpoint != request.pin.endpoint or item.model != request.pin.model
-                ):
+                elif isinstance(item, Opaque) and item.binding != request.pin.binding():
                     raise IncompatibleContinuation(item.field)
 
 
@@ -162,7 +168,8 @@ def final_answer(turn: ModelTurn) -> str:
         raise NotFinal("filtered")
     if turn.stop is StopReason.TOOLS or any(isinstance(i, ToolGroup) for i in turn.items):
         raise NotFinal("tool_only")
-    text = "".join(i.text for i in turn.items if isinstance(i, Text)).strip()
+    text = turn.text.strip()
     if not text:
-        raise NotFinal("reasoning_only" if turn.reasoned else "empty")
+        reasoned = turn.reasoned or any(isinstance(i, Opaque) for i in turn.items)
+        raise NotFinal("reasoning_only" if reasoned else "empty")
     return text
