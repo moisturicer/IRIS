@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CITATION_CONTEXT,
+  MAX_LIVE_PAGES,
   MAX_SCALE,
   MIN_SCALE,
   PAGE_LANDING_GAP,
@@ -16,6 +17,7 @@ import {
   citationLandingDelta,
   firstRegionOn,
   fitScale,
+  liveWindow,
   readingAnchor,
   regionInView,
   windowReadingBand,
@@ -165,6 +167,43 @@ describe("regionInView (IR-353)", () => {
   it("is false for a band under the toolbar, or below the view", () => {
     expect(regionInView(page, { top: 0.05, bottom: 0.12 }, view)).toBe(false);
     expect(regionInView(page, { top: 0.68, bottom: 0.72 }, view)).toBe(false);
+  });
+});
+
+/**
+ * Which pages carry a canvas and a text layer (IR-565). Every other page is
+ * an empty box of its measured size, so a 120-page thesis paints a handful of
+ * pages rather than all of them.
+ */
+describe("liveWindow", () => {
+  it("is the pages in view and two either side", () => {
+    expect(liveWindow(50, 51, 100, [])).toEqual([48, 49, 50, 51, 52, 53]);
+  });
+
+  it("stops at the paper's first and last pages", () => {
+    expect(liveWindow(1, 1, 100, [])).toEqual([1, 2, 3]);
+    expect(liveWindow(100, 100, 100, [])).toEqual([98, 99, 100]);
+    expect(liveWindow(1, 1, 3, [])).toEqual([1, 2, 3]);
+  });
+
+  it("adds a page a citation or a find is about to land on, however far away", () => {
+    expect(liveWindow(1, 1, 100, [60])).toEqual([1, 2, 3, 60]);
+  });
+
+  it("ignores no page, a page already in the window, and one the paper does not have", () => {
+    expect(liveWindow(1, 1, 100, [null, 2, 0, 101])).toEqual([1, 2, 3]);
+  });
+
+  it("never holds more than MAX_LIVE_PAGES, however much of the paper is in view", () => {
+    const live = liveWindow(1, 40, 100, [80]);
+
+    expect(live).toHaveLength(MAX_LIVE_PAGES);
+    expect(live[0]).toBe(1);
+    expect(live).toContain(80);
+  });
+
+  it("is empty for a paper with no pages", () => {
+    expect(liveWindow(1, 1, 0, [])).toEqual([]);
   });
 });
 

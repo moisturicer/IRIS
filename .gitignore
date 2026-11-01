@@ -39,6 +39,8 @@ staticfiles/
 
 # ── Node / React ──────────────────────────────────────────────────────────
 node_modules/
+# frontend/scripts/benchmark-reader.mjs's scratch; it removes its own on exit (IR-565)
+.reader-benchmark-*/
 dist/
 dist-ssr/
 *.local

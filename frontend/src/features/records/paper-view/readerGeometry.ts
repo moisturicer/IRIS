@@ -144,3 +144,48 @@ export function regionInView(page: PageBox, region: RegionBand, view: ReadingBan
   const bottom = page.top + region.bottom * page.height;
   return top >= view.top && bottom <= view.bottom;
 }
+
+/** Pages kept live either side of the ones in view, so a short scroll finds them painted. */
+export const LIVE_BUFFER = 2;
+
+/**
+ * The most pages that carry a canvas and a text layer at once (IR-565). At
+ * the lowest zoom a tall screen shows a few pages; this leaves room for those,
+ * the buffer either side, and a page a citation or a find is landing on.
+ */
+export const MAX_LIVE_PAGES = 10;
+
+/**
+ * The pages to paint (IR-565): those from `first` to `last` in view, `LIVE_BUFFER`
+ * either side, and each `pinned` page -- one a citation or a find is about to
+ * land on, which is painted before the reader is moved there. Ascending, and
+ * never more than `MAX_LIVE_PAGES`: the buffer gives way first, then the end
+ * of a view showing more pages than that.
+ *
+ * Every other page stays an empty box of its own measured size, so the
+ * scroll geometry is the same whichever pages are live.
+ */
+export function liveWindow(
+  first: number,
+  last: number,
+  pageCount: number,
+  pinned: (number | null)[],
+): number[] {
+  if (pageCount < 1) return [];
+  const clamp = (n: number) => Math.min(pageCount, Math.max(1, n));
+  const lo = clamp(first);
+  const hi = clamp(Math.max(first, last));
+  let start = clamp(lo - LIVE_BUFFER);
+  let end = clamp(hi + LIVE_BUFFER);
+
+  const pins = [...new Set(pinned)].filter((n): n is number => n !== null && n >= 1 && n <= pageCount);
+  const outside = (n: number) => n < start || n > end;
+  const room = () => MAX_LIVE_PAGES - pins.filter(outside).length;
+  while (end - start + 1 > room() && end > hi) end -= 1;
+  while (end - start + 1 > room() && start < lo) start += 1;
+  while (end - start + 1 > room()) end -= 1;
+
+  const live = new Set<number>(pins);
+  for (let n = start; n <= end; n += 1) live.add(n);
+  return [...live].sort((a, b) => a - b);
+}

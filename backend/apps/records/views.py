@@ -427,6 +427,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
+        response["Cache-Control"] = "private, no-store"
         return response
 
     @action(detail=True, methods=["get"])
@@ -531,6 +532,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
+        response["Cache-Control"] = "private, no-store"
         return response
 
     @action(detail=True, methods=["get"])
