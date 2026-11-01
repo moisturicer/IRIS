@@ -103,7 +103,10 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
         return ReviewerSeat.objects.get(pk=response.data["id"])
 
     def claimed_and_opened(self, record, party, user):
-        seat = self.claim(record, party, user)
+        # The Adviser now nominates RDCO before any specialist is requested.
+        seat = self.assignment(record, party).seats.filter(reviewer=user).first()
+        if seat is None:
+            seat = self.claim(record, party, user)
         self.open_seat(seat, user)
         return seat
 
@@ -348,7 +351,7 @@ class RevisionTests(AuditTestBase):
         row = self.one(record, AuditEvent.REVISION_REQUEST_WITHDRAWN)
         self.assertEqual(
             row["metadata"],
-            {"party": Party.IERC, "request": request.pk, "closed_by": "requesting_party"},
+            {"party": Party.IERC, "request": request.pk, "closed_by": "requesting_party", "closed_by_decision": False, "decision": None},
         )
 
 
@@ -418,7 +421,8 @@ class SeatTests(AuditTestBase):
 
         seat_rows = [
             row for row in self.events(record)
-            if row["event_type"].startswith("SEAT_") or row["event_type"] == "REVIEWER_ADDED"
+            if (row["event_type"].startswith("SEAT_") or row["event_type"] == "REVIEWER_ADDED")
+            and row["metadata"]["party"] == Party.ITSO
         ]
         self.assertEqual(
             [(row["event_type"], row["user"], row["metadata"]["seat"], row["metadata"]["reviewer"])
@@ -468,17 +472,17 @@ class RecordWithdrawnTests(AuditTestBase):
         self.assertEqual(withdrawn["user"], self.owner.pk)
         self.assertEqual(
             withdrawn["metadata"],
-            {"version": 1, "closed_parties": [Party.IERC, Party.ITSO]},
+            {"version": 1, "closed_parties": [Party.IERC, Party.ITSO, Party.RDCO]},
         )
         closed = {
             row["metadata"]["party"]: row["metadata"]["how"]
             for row in self.events(record, AuditEvent.ASSIGNMENT_CLOSED)
             if row["metadata"]["party"] != Party.ADVISER
         }
-        self.assertEqual(closed, {Party.ITSO: "withdrawn", Party.IERC: "withdrawn"})
+        self.assertEqual(closed, {Party.ITSO: "withdrawn", Party.IERC: "withdrawn", Party.RDCO: "withdrawn"})
         self.assertEqual(
             self.one(record, AuditEvent.REVISION_REQUEST_WITHDRAWN)["metadata"],
-            {"party": Party.IERC, "request": revision.pk, "closed_by": "record_withdrawn"},
+            {"party": Party.IERC, "request": revision.pk, "closed_by": "record_withdrawn", "closed_by_decision": False, "decision": None},
         )
         documents = self.one(record, AuditEvent.DOCUMENT_REQUEST_WITHDRAWN)["metadata"]
         self.assertEqual(
@@ -655,11 +659,11 @@ class AuditFailureTests(AuditTestBase):
 
         with patch.object(AuditEvent, "save", _fail_insert):
             with self.assertLogs("apps.audit.services", level="ERROR") as logs:
-                response = self.accept(record, [{"party": Party.ITSO}])
+                response = self.accept(record, [{"party": Party.RDCO}])
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(
-            RecordAssignment.objects.get(record=record, party=Party.ITSO).state,
+            RecordAssignment.objects.get(record=record, party=Party.RDCO).state,
             AssignmentState.ACTIVE,
         )
         self.assertEqual(

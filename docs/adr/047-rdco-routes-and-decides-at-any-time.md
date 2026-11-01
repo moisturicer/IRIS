@@ -128,7 +128,7 @@ A one-off data migration, in the same change as the code:
 
 - **A Thesis/Research or Project that is `in_review`, has passed its Adviser, and has no active RDCO assignment** gets one opened in RDCO's Pool. The reason is *"Opened when RDCO began holding every routed Record (ADR-047)"*, and the `RoutingEvent` carries `actor = None`, as the hand-back's did. Its offices continue as they are.
 - **Records with RDCO already active, and records still with their Adviser,** are untouched.
-- The migration writes no `Review`, changes no Clearance, and is reversible: reversing it removes only the assignments it opened, and refuses if any has acquired Seats, Reviews or Extensions so their history cannot be erased.
+- The migration writes no `Review`, changes no Clearance, and is reversible: reversing it removes only the assignments it opened, and refuses if any has acquired Seats, Reviews, requests, Extensions or reminder history so that work cannot be erased.
 - *Rejected: keeping the hand-back for Records routed before cutover.* Two rules would then live in the code for the life of those Records, which is the brittleness ADR-032 §13 avoided.
 
 ### 8. Tests that pin the decisions
