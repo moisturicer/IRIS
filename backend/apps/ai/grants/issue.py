@@ -4,6 +4,8 @@ Purposes, never interchangeable:
 - `record_read`: the reader only.
 - `reader_run`: an owned AskRun, its Conversation and Record scope.
 - `ingestion`: one IngestionJob and revision; no reader.
+- `reader_session`: the reader only, for the AI runtime's own runs (IR-722);
+  reads no Record.
 
 Claims carry identity and binding; access is read live on verification.
 """
@@ -21,7 +23,8 @@ from apps.ai.grants import config, tokens
 RECORD_READ = "record_read"
 READER_RUN = "reader_run"
 INGESTION = "ingestion"
-PURPOSES = (RECORD_READ, READER_RUN, INGESTION)
+READER_SESSION = "reader_session"
+PURPOSES = (RECORD_READ, READER_RUN, INGESTION, READER_SESSION)
 
 
 class Refusal(str, Enum):
@@ -74,6 +77,16 @@ def record_read_grant(user) -> Grant:
     now = int(time.time())
     return _sign(cfg, _claims(
         cfg, RECORD_READ, now=now, exp=now + cfg.ttl_seconds,
+        sub=user.pk, gen=user.credential_version,
+    ))
+
+
+def reader_session_grant(user) -> Grant:
+    cfg = config.read()
+    _require_reader(user)
+    now = int(time.time())
+    return _sign(cfg, _claims(
+        cfg, READER_SESSION, now=now, exp=now + cfg.ttl_seconds,
         sub=user.pk, gen=user.credential_version,
     ))
 

@@ -27,6 +27,20 @@ class Settings(BaseSettings):
     # Models
     LLM_MODEL: str = "gpt-4o-mini"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+
+    # AI-owned runs (IR-722). The runtime login, and the maintenance login
+    # `python -m ai.runs.migrate` uses.
+    RUNS_DATABASE_URL: str = ""
+    RUNS_MIGRATION_DATABASE_URL: str = ""
+    # Only the deterministic executor exists; no paid work is possible.
+    RUNS_EXECUTOR: str = "deterministic"
+    # No defaults: unset limits refuse every submission.
+    RUNS_DEADLINE_SECONDS: int | None = None
+    RUNS_LEASE_SECONDS: int | None = None
+    RUNS_MAX_ATTEMPTS: int | None = None
+    RUNS_MAX_INPUT_TOKENS: int | None = None
+    RUNS_MAX_OUTPUT_TOKENS: int | None = None
+    RUNS_MAX_COST_USD: float | None = None
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
