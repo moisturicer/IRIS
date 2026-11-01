@@ -154,3 +154,136 @@ def test_a_raw_session_setting_establishes_no_principal(grant_db):
         cursor.execute("SET iris.research_bind = %s", [tag])
         assert reader(conn) is None
         conn.rollback()
+
+
+def test_one_pooled_connection_never_carries_a_reader_forward(grant_db):
+    import psycopg2
+
+    alice = make_user("grant-alice@cit.edu")
+    bob = make_user("grant-bob@cit.edu")
+    alice_grant = issue.reader_grant(alice, owned_run(alice)).token
+    bob_grant = issue.reader_grant(bob, owned_run(bob)).token
+    with probe_login() as conn:
+        begin(conn, alice_grant, "reader_run")
+        assert reader(conn) == alice.pk
+        conn.commit()
+        assert reader(conn) is None
+        conn.rollback()
+
+        begin(conn, bob_grant, "reader_run")
+        assert reader(conn) == bob.pk
+        # No switching identity inside a transaction.
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+            begin(conn, alice_grant, "reader_run")
+        conn.rollback()
+        assert reader(conn) is None
+        conn.rollback()
+
+        # A savepoint rolled back takes its identity with it.
+        with conn.cursor() as cursor:
+            cursor.execute("SAVEPOINT s")
+        begin(conn, alice_grant, "reader_run")
+        with conn.cursor() as cursor:
+            cursor.execute("ROLLBACK TO SAVEPOINT s")
+        assert reader(conn) is None
+        conn.rollback()
+
+        # A failed transaction, then a retry as the other reader.
+        assert rejected(conn, alice_grant + "x", "reader_run")
+        begin(conn, bob_grant, "reader_run")
+        assert reader(conn) == bob.pk
+        conn.commit()
+
+        # Autocommit: the identity lives for one statement only.
+        conn.autocommit = True
+        begin(conn, alice_grant, "reader_run")
+        assert reader(conn) is None
+
+
+def denied(conn, sql, params=()):
+    import psycopg2
+
+    try:
+        with conn.cursor() as cursor:
+            cursor.execute(sql, params)
+    except psycopg2.errors.InsufficientPrivilege:
+        conn.rollback()
+        return True
+    conn.rollback()
+    return False
+
+
+@pytest.mark.parametrize("group", ["iris_ai_runtime", "iris_django_runtime"])
+def test_runtime_roles_cannot_mint_read_keys_or_escalate(grant_db, group):
+    from django.core.management import call_command
+    from django.db import connection
+
+    with probe_login(group) as conn:
+        assert denied(conn, "SELECT secret FROM iris_authz.grant_key")
+        assert denied(conn, "SELECT iris_authz.binding_tag('irg1.k1.x.y', 'reader_run')")
+        assert denied(conn, "SELECT iris_authz.hmac_sha256('k'::bytea, 'm'::bytea)")
+        assert denied(conn, "INSERT INTO iris_authz.grant_key VALUES ('kx', %s, 'a', 'd', NULL)",
+                      [b"x" * 32])
+        assert denied(conn, "CREATE FUNCTION iris_authz.evil() RETURNS int LANGUAGE sql AS 'SELECT 1'")
+        assert denied(conn, "SELECT password FROM accounts_user")
+        assert denied(conn, "SET ROLE iris_authz_verifier")
+        assert denied(conn, "ALTER TABLE accounts_user DISABLE ROW LEVEL SECURITY")
+    if group == "iris_ai_runtime":
+        with probe_login(group) as conn:
+            assert denied(conn, "SELECT iris_authz.verify_research_grant('x', 'reader_run')")
+
+    with connection.cursor() as cursor:
+        cursor.execute(
+            """SELECT rolsuper OR rolbypassrls OR rolcreaterole OR rolcanlogin
+                 FROM pg_roles WHERE rolname = %s""", [group])
+        assert cursor.fetchone()[0] is False
+        cursor.execute(
+            """SELECT count(*) FROM pg_class c JOIN pg_roles r ON r.oid = c.relowner
+                WHERE r.rolname = %s""", [group])
+        assert cursor.fetchone()[0] == 0
+        cursor.execute(
+            """SELECT p.proname, r.rolname, p.proconfig FROM pg_proc p
+                 JOIN pg_namespace n ON n.oid = p.pronamespace JOIN pg_roles r ON r.oid = p.proowner
+                WHERE n.nspname = 'iris_authz' AND p.prosecdef""")
+        definers = cursor.fetchall()
+    assert {name for name, _, _ in definers} >= {"begin_research", "verify_research_grant",
+                                                 "current_reader", "current_research_claims"}
+    for name, owner, config_ in definers:
+        assert owner == "iris_authz_verifier", name
+        assert "search_path=pg_catalog, pg_temp" in config_, name
+    call_command("provision_research_roles", "--check")
+
+
+def test_key_rotation_overlaps_for_one_grant_lifetime_only(grant_db):
+    from django.core.management import call_command
+    from django.db import connection
+
+    from .grant_support import KEY_A, KEY_B, enable_grants
+
+    user = make_user("grant-rotate@cit.edu")
+    run = owned_run(user)
+    old = issue.reader_grant(user, run).token
+    enable_grants(grant_db, keys=f"k2:{KEY_B},k1:{KEY_A}", active="k2", ttl=300)
+    call_command("install_research_grant_keys")
+    new = issue.reader_grant(user, run).token
+    assert new.split(".")[1] == "k2"
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT retire_at - now() FROM iris_authz.grant_key WHERE kid = 'k1'")
+        assert cursor.fetchone()[0].total_seconds() <= 300
+    # Re-installing never pushes the retirement later.
+    call_command("install_research_grant_keys")
+    with probe_login() as conn:
+        assert not rejected(conn, old, "reader_run")
+        assert not rejected(conn, new, "reader_run")
+        with connection.cursor() as cursor:
+            cursor.execute("UPDATE iris_authz.grant_key SET retire_at = now() - interval '1 second' "
+                           "WHERE kid = 'k1'")
+        assert rejected(conn, old, "reader_run")
+        call_command("install_research_grant_keys")
+        assert rejected(conn, old, "reader_run")
+        enable_grants(grant_db, keys=f"k2:{KEY_B}", active="k2")
+        call_command("install_research_grant_keys")
+        assert not rejected(conn, new, "reader_run")
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT array_agg(kid) FROM iris_authz.grant_key")
+        assert cursor.fetchone()[0] == ["k2"]
