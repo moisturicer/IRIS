@@ -5,6 +5,12 @@
 > **Further superseded by [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md)** (Accepted
 > 2026-09-26): there is no intake step, and the requested-office booleans are now only a hint the
 > Adviser sees when deciding whether to route. See also ADR-021.
+>
+> **Corrected 2026-11-01 (IR-767):** this ADR's `is_ip` → ITSO mapping is wrong. ITSO handles technical
+> review of research outputs, and KTTO evaluates IP submissions, so `is_ip` now hints at KTTO and no flag
+> hints at ITSO. The hints read the form's own flags (`is_ip`, `requires_ethics_review`,
+> `for_commercialization`). The form never wrote `requested_itso/ierc/ktto`, so those fields had made the
+> hints empty for anyone using it. The fields stay, and no hint reads them.
 
 **Accepted** — 2026-09-07, by **Lee Jasmin Adolfo**. Proposed 2026-09-04 and implemented behind
 this ADR so the change had a paper trail before the team decided; the decision has now been

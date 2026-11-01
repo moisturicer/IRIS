@@ -18,10 +18,10 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
-import { getRoleDashboardPath } from "@/lib/roleDashboard";
+import { landingPathFor } from "@/lib/landing";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { FIXTURE_ROLE, makeUser } from "@/test/authFixtures";
+import { makeUser } from "@/test/authFixtures";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 
 import LoginPage from "./LoginPage";
@@ -176,12 +176,12 @@ describe("where the login screen sends you", () => {
   const KTTO_USER = makeUser();
 
   /**
-   * The landing page this role has always had. Read from `roleDashboard.ts`
+   * The landing page this user gets by default. Read from `landing.ts`
    * rather than hardcoded, so these tests assert "fell back to the existing
    * default" -- which is the acceptance criterion -- instead of quietly
    * becoming a second, competing definition of where KTTO lands.
    */
-  const ROLE_DEFAULT = getRoleDashboardPath(FIXTURE_ROLE);
+  const ROLE_DEFAULT = landingPathFor(KTTO_USER);
 
   function acceptAnyPassword() {
     return vi.spyOn(authApi, "login").mockResolvedValue({

@@ -571,7 +571,7 @@ class DetailFlagTests(DecisionTestBase):
         return self.detail(record, user)["decision"]
 
     def test_the_adviser_is_offered_only_reject_with_the_authors_hints(self):
-        record = self.at_adviser(requested_itso=True)
+        record = self.at_adviser(is_ip=True)
 
         flag = self.flag(record, self.adviser)
 

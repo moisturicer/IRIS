@@ -109,14 +109,12 @@ export const SCREEN_ACCESS = {
   paper:         { path: "/records/:id",           roles: EVERYONE },
 
   // --- authoring ---------------------------------------------------------
-  // `/records/add` now redirects to the Publish dialog (IR-408); F1 replaces
-  // this entry with a `publish` capability and drops it from the sidebar.
-  // A Student publishes from Discover's Publish button (IR-407), so only an
-  // Adviser keeps the shortcut: an Adviser's home is the Dashboard, not
-  // Discover, until F1 (IR-413) makes Discover everyone's home.
-  submit:     { path: "/records/add",       roles: AUTHORS,
-                nav: { label: "Submit Disclosure", icon: "fa-file-signature", section: "Main",
-                       onlyFor: [ROLES.ADVISER] } },
+  // Not a sidebar item and not really a screen any more: `/records/add`
+  // redirects to the Publish dialog (IR-408), which every author reaches from
+  // Discover's Publish button now that Discover is everyone's home (IR-534).
+  // The entry stays as the authors gate the Publish button, My Library and
+  // Help read; spec §4.2 renames it `publish`, which no ticket has done yet.
+  submit:     { path: "/records/add",       roles: AUTHORS },
 
   // --- review ------------------------------------------------------------
   // One queue, three filters (IR-143). Approved and Declined were separate nav
@@ -168,7 +166,7 @@ export function rolesFor(key: ScreenKey): RoleName[] {
  * The route a screen is registered at.
  *
  * Exists so nothing outside this file writes a path string of its own. Before
- * IR-201, `roleDashboard.ts` kept its own copy of the login landing paths and
+ * IR-201, `roleDashboard.ts` (now `landing.ts`) kept its own copy of the login landing paths and
  * still pointed at `/review/pending` long after IR-143 replaced it with
  * `/review` — four of the six roles 404'd immediately after signing in, and
  * nothing caught it, because a hand-written string cannot be checked against

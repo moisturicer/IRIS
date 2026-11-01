@@ -348,6 +348,11 @@ services:
       # listens on 8080 because it does not run as root. Mapping 80:80
       # made the frontend unreachable even when it started (IR-156).
       - "80:8080"
+    # Set in the repo-root .env (IR-668). No allowlist closes /django-admin/ to
+    # everyone. The proxy count must match backend/.env's.
+    environment:
+      - DJANGO_ADMIN_ALLOWED_NETWORKS=${DJANGO_ADMIN_ALLOWED_NETWORKS:-}
+      - TRUSTED_PROXY_COUNT=${TRUSTED_PROXY_COUNT:-}
     # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
     # longer serves /media/, so the web container has no reason to be able to
     # read uploaded documents at all.

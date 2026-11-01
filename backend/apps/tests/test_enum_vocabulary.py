@@ -95,6 +95,9 @@ GOVERNED_ENUMS = (
     # the start. Its "completed" collides only with `ai/models/shadow.py`,
     # already allowed below as a Celery job's own lifecycle.
     ReadingStatus,
+    # `EmbargoState` (IR-811) is left out on purpose: its "unknown" and "none"
+    # mean unrelated things in more than twenty places, and each of those files
+    # would be exempted from every other governed value to allow them.
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}

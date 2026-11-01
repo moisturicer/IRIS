@@ -20,7 +20,7 @@ import {
   sessionEndMessage,
   setLockoutUntil,
 } from "@/lib/authSession";
-import { getRoleDashboardPath } from "@/lib/roleDashboard";
+import { landingPathFor } from "@/lib/landing";
 import { safeRedirectPath } from "@/lib/redirectTarget";
 import { classifyLoginFailure, type AccountLock, type LoginFailure } from "./loginFailure";
 
@@ -50,7 +50,7 @@ export default function LoginPage() {
   const [identifier, setIdentifier] = useState("");
   /**
    * The page this visitor asked for before they were sent here, or `null` to
-   * use the role's normal landing page (IR-236).
+   * use the normal landing page (IR-236, IR-534).
    *
    * **Captured once, on mount, on purpose.** The guard passes it in router
    * state, and `dismissSessionAlert` below navigates to clear that state — so
@@ -158,9 +158,9 @@ export default function LoginPage() {
       clearLockout(loginId);
       login(res.data.user, res.data.access, res.data.refresh);
       // Back to the page they asked for, or -- when they simply came to sign
-      // in, or asked for somewhere `safeRedirectPath` refused -- the landing
-      // page their role has always had.
-      navigate(redirectTo ?? getRoleDashboardPath(res.data.user.role_name), { replace: true });
+      // in, or asked for somewhere `safeRedirectPath` refused -- My Reviews
+      // when they have review work, otherwise Discover (IR-534).
+      navigate(redirectTo ?? landingPathFor(res.data.user), { replace: true });
     } catch (err: unknown) {
       const failure = classifyLoginFailure(err);
 

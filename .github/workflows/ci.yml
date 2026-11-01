@@ -11,6 +11,11 @@ on:
   # is gated now, whatever it is based on.
   pull_request:
 
+# PR updates replace obsolete evidence; each main push retains its own run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # CI is evidence, not decoration.
 # Application boot was restored by IR-155 (not IR-57, which no longer
 # exists) and the Docker stack by IR-156 (not IR-58). Both original keys
@@ -19,9 +24,13 @@ on:
 # Do not weaken a gate to make it green — fix the defect it is reporting.
 
 jobs:
-  backend:
-    name: Backend
+  backend-tests:
+    name: Backend tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # A hang must fail, not bill. Before IR-251 this job had no bound, so a
     # 4h31m test run reported success and the default 6-hour cap was the only
     # thing that would ever have stopped it. The suite's honest runtime is
@@ -194,7 +203,12 @@ jobs:
         # because the run reported no per-test timing at all. A suite that
         # cannot say which test was slow cannot be fixed from its own
         # evidence.
-        run: pytest -ra --durations=25 --junitxml=pytest-results.xml
+        # Separate runners isolate cluster-wide role changes and schema rewinds.
+        # Keep modules intact; no tests are omitted by a hand-maintained path list.
+        run: >-
+          python -m pytest -p testing.ci_sharding
+          --ci-shard=${{ matrix.shard }} --ci-shards=4
+          -ra --durations=25 --junitxml=pytest-results.xml
 
       - name: Report authorization matrix duration
         if: always()
@@ -214,6 +228,28 @@ jobs:
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
                   summary.write(line + "\n")
           PY
+
+      - name: Keep backend test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-tests-${{ matrix.shard }}
+          path: backend/pytest-results.xml
+          if-no-files-found: error
+
+  # Retain the required check's name. Failure, cancellation or skipped shards
+  # must not turn into a successful merge gate.
+  backend:
+    name: Backend
+    needs: backend-tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every backend shard
+        env:
+          RESULT: ${{ needs.backend-tests.result }}
+        run: test "$RESULT" = success
 
   frontend:
     name: Frontend
@@ -308,6 +344,55 @@ jobs:
       # break. The frontend job already runs a real `npm run build`.
       - name: Build the backend image
         run: docker compose -f docker-compose.yml build backend
+
+      # IR-663: the real nginx, with the real config and snippet mounted where
+      # the frontend image puts them, answers with the security headers on the
+      # SPA route, an asset, a 404 and the legacy activation path. A stand-in
+      # index.html replaces the build; `backend` resolves to the runner so the
+      # proxy locations load, and nothing here is proxied. `nginx -t` first, so
+      # a config error fails with nginx's own message.
+      - name: nginx sends the browser security headers
+        run: |
+          mkdir -p "$RUNNER_TEMP/html/assets"
+          echo '<!doctype html><title>IRIS</title>' > "$RUNNER_TEMP/html/index.html"
+          echo 'export {};' > "$RUNNER_TEMP/html/assets/app.js"
+          echo 'export {};' > "$RUNNER_TEMP/html/assets/pdf.worker.min-x.mjs"
+          image=nginxinc/nginx-unprivileged:1.25-alpine
+          mounts="-v $PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+                  -v $PWD/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
+                  -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
+                  -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"
+          docker run --rm --add-host backend:127.0.0.1 $mounts "$image" nginx -t
+          docker run -d --name iris-nginx --add-host backend:127.0.0.1 -p 8080:8080 $mounts "$image"
+          trap 'docker logs iris-nginx; docker rm -f iris-nginx' EXIT
+          ready=
+          for i in $(seq 1 20); do curl -s -o /dev/null localhost:8080/ && { ready=1; break; }; sleep 1; done
+          [ -n "$ready" ] || { echo "::error::nginx did not answer within 20s"; exit 1; }
+          status=0
+          for path in / /discover /assets/app.js /assets/pdf.worker.min-x.mjs /assets/missing.js /activate/x; do
+            headers=$(curl -s -D - -o /dev/null "localhost:8080$path" || true)
+            echo "== $path"; echo "$headers"
+            for expected in \
+              'x-content-type-options: nosniff' \
+              'referrer-policy: same-origin' \
+              'x-frame-options: DENY' \
+              "content-security-policy-report-only: default-src 'self'; script-src 'self';"; do
+              echo "$headers" | grep -qiF "$expected" || { echo "::error::$path lacks '$expected'"; status=1; }
+            done
+          done
+          # A module worker runs only when served as JavaScript.
+          type=$(curl -s -o /dev/null -w '%{content_type}' localhost:8080/assets/pdf.worker.min-x.mjs || true)
+          echo "== .mjs Content-Type: $type"
+          case "$type" in
+            application/javascript*|text/javascript*) ;;
+            *) echo "::error::the pdf.js worker (.mjs) is served as '$type'"; status=1 ;;
+          esac
+          exit $status
+
+      # IR-668: the default is deny, the allowlist reads the real client, and
+      # IRIS's own /admin/... pages are not refused.
+      - name: nginx closes /django-admin/ unless allowlisted
+        run: sh scripts/check_django_admin_allowlist.sh
 
       # IR-620: beat's only job is ADR-043's hourly deadline task. Booting it
       # proves the service starts and loads that entry; validating the file

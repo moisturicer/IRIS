@@ -20,7 +20,7 @@ from core.enums import (
     RecordTypeName,
     RequestStatus,
 )
-from . import lifecycle
+from . import embargo, lifecycle
 from core.permissions import (
     IsAdmin,
     IsAuthor,
@@ -353,19 +353,29 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        # The embargo answer (ADR-052 §2). Parsed here too, so a bad one refuses
+        # before anything is written. No answer leaves the paper Unknown and so
+        # blocked from the AI; IR-816 makes the form send one, then requires it.
+        embargo_answer = embargo.answer_from(request.data)
         try:
-            # Consent, assignment, entry seat and v1 commit together.
+            # Consent, embargo answer, assignment, entry seat and v1 commit together.
             with transaction.atomic():
                 if not record.dpa_accepted:
                     record.dpa_accepted_at = timezone.now()
                     record.dpa_accepted_by = request.user
                     record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+                if embargo_answer is not None:
+                    embargo.record_answer(record, embargo_answer, actor=request.user)
                 enter_at_adviser(record, actor=request.user)
         except RoutingError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
 
         # Notify the correct party — never raises (wrapped inside the service)
         notify_new_record(record, submitted_by=request.user)
+
+        from apps.ai.tasks import send_to_ai_on_commit
+
+        send_to_ai_on_commit(record.pk)
 
         return Response(
             {"detail": "Record submitted successfully. The adviser has been notified."},
@@ -534,11 +544,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         narrower second visibility rule — and of the module IR-285 deleted.
 
         **Empty until the corpus is indexed.** A record with no vector has no
-        neighbours, and today no record has one: the disclosure gate refuses
-        every record while `Record` carries no embargo field (IR-250). That is
-        a visible behaviour change from keyword matching, and it is the
-        intended one — a keyword fallback would hide "nothing is indexed"
-        behind plausible results.
+        neighbours, and the disclosure gate refuses a record with no embargo
+        answer (ADR-052). That is a visible behaviour change from keyword
+        matching, and it is the intended one — a keyword fallback would hide
+        "nothing is indexed" behind plausible results.
         """
         from apps.ai.presentation import record_card
         from apps.ai.similarity import similar_records
@@ -1373,6 +1382,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     PATCH  /download-requests/<id>/               -- RDCO: the same decision, by `action`
     POST   /download-requests/<id>/revoke/        -- RDCO: end a live grant with a `note` (IR-688)
     POST   /download-requests/<id>/cancel/        -- the requester: withdraw their own pending request
+    GET    /download-requests/mine/               -- the reader: their own requests (IR-743)
     """
     serializer_class = DownloadRequestSerializer
     queryset         = DownloadRequest.objects.select_related("record", "requested_by")
@@ -1382,7 +1392,7 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         # Anyone may *request* a download; only RDCO acts on the queue. This was
         # IsStaff, which is all four offices -- so ITSO or IERC could approve
         # release of a document from a record routed to neither of them (IR-165).
-        if self.action in ("create", "cancel"):
+        if self.action in ("create", "cancel", "mine"):
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdmin()]
 
@@ -1467,6 +1477,16 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         download_request = self.get_object()
         response = self._refusal(cancel_download_request, download_request, request.user)
         return response or Response(self.get_serializer(download_request).data)
+
+    @action(detail=False, methods=["get"])
+    def mine(self, request):
+        """
+        GET /download-requests/mine/ — the reader's own requests, newest first
+        (IR-743). Only ever the caller's own, whatever their role, so anyone
+        else's request is invisible; RDCO's queue stays the list above.
+        """
+        from .download_service import reader_request_rows
+        return Response(reader_request_rows(request.user))
 
     @staticmethod
     def _refusal(act, download_request, user, **kwargs):

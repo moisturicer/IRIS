@@ -325,12 +325,8 @@ def decision_token(record) -> str:
 # --- what record detail tells Paper View ------------------------------------------------
 
 def author_hints(record) -> list[str]:
-    """The author's ADR-018 flags, as the routing dialog words them (ADR-032 §3)."""
-    return [
-        routing._HINT_TEXT[office]
-        for office, field in routing._HINT_FIELD.items()
-        if getattr(record, field, False)
-    ]
+    """The author's flags, as the routing dialog words them (ADR-032 §3)."""
+    return [text for field, _, text in routing._AUTHOR_FLAGS if getattr(record, field, False)]
 
 
 def decision_flags(record, user) -> dict:
@@ -439,7 +435,7 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
 
     # Seats are closed here rather than through `seats.complete_seat()` and
     # `seats.withdraw()`: those run the office completion rule and its
-    # hand-back, which must not fire on a record the Decision is ending, and
+    # notices, which must not fire on a record the Decision is ending, and
     # `withdraw()` is a coordinator's act with a coordinator's checks.
     now = timezone.now()
     cut_off = []  # reviewers whose open seat the decision withdrew

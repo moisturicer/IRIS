@@ -1,5 +1,33 @@
 from celery import shared_task
+from django.db import transaction
 from django.utils import timezone
+
+
+def _send_to_ai_if_permitted(record_id: int) -> None:
+    from apps.ai.indexing import default_permits
+    from apps.ai.overview.service import overview_for
+    from apps.records.models import Record
+
+    record = Record.objects.get(pk=record_id)
+    if default_permits(record):
+        index_record.delay(record_id)
+        overview_for(record, retry=True)
+
+
+def send_to_ai_on_commit(record_id: int) -> None:
+    """Once this transaction commits, send a paper on to the AI if the gate allows.
+
+    For an act that may have just opened the gate. The paper's upload was refused
+    while it was a draft with no answer and no consent, and a refused paper is
+    never tried again, so without this it would stay out of Ask IRIS, with its AI
+    Overview stuck on the "unavailable" stored at upload (ADR-052 §Consequences).
+    Both are safe to repeat: indexing embeds only what is missing, and an overview
+    that is ready or generating stays as it is.
+
+    ``robust``: the act has committed by then, so a broker outage must not turn it
+    into an error for the person who just did it.
+    """
+    transaction.on_commit(lambda: _send_to_ai_if_permitted(record_id), robust=True)
 
 
 def _claim_job(task, record_id: int):

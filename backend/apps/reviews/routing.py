@@ -74,18 +74,18 @@ ONWARD_PARTIES = (str(Party.ITSO), str(Party.IERC), str(Party.KTTO), str(Party.R
 #: Adviser alone and never routed (ADR-032 §2).
 ROUTABLE_TYPES = (RecordTypeName.THESIS_RESEARCH, RecordTypeName.PROJECT)
 
-#: The author's ADR-018 flag that hints at each office (ADR-032 §3): shown to
-#: the router, routing nothing by itself.
-_HINT_FIELD = {
-    str(Office.ITSO): "requested_itso",
-    str(Office.IERC): "requested_ierc",
-    str(Office.KTTO): "requested_ktto",
-}
-_HINT_TEXT = {
-    str(Office.ITSO): "The author flagged possible intellectual property.",
-    str(Office.IERC): "The author flagged human participants, animal subjects or sensitive data.",
-    str(Office.KTTO): "The author flagged possible commercialisation.",
-}
+#: The author's flags on the publish form, in the form's order, and the office
+#: each hints at (ADR-032 §3): shown to the router, routing nothing by itself.
+#: KTTO evaluates IP submissions, so the IP flag points there. ITSO handles
+#: technical review, which the form doesn't ask about, so no flag points at it.
+_AUTHOR_FLAGS = (
+    ("is_ip", str(Office.KTTO), "The author flagged possible intellectual property."),
+    (
+        "requires_ethics_review", str(Office.IERC),
+        "The author flagged human participants, animal subjects or sensitive data.",
+    ),
+    ("for_commercialization", str(Office.KTTO), "The author flagged possible commercialisation."),
+)
 _CLEARING_OFFICES = frozenset(str(o) for o in Office)
 #: The role that staffs each office party: `core.permissions`' map, inverted.
 _ROLE_FOR_PARTY = {str(party): role for role, party in OFFICE_PARTY_BY_ROLE.items()}
@@ -240,6 +240,15 @@ def _from_party_for(record, user, *, accepting: bool) -> str:
 
 # --- route options (the dialog's picklist) ---------------------------------------
 
+def author_hints_by_office(record) -> dict[str, str]:
+    """What the author flagged for each office. Two flags can point at one office."""
+    hints: dict[str, str] = {}
+    for flag, office, text in _AUTHOR_FLAGS:
+        if getattr(record, flag, False):
+            hints[office] = f"{hints[office]} {text}" if office in hints else text
+    return hints
+
+
 def route_options(record, user) -> dict:
     """
     `GET /records/<id>/route-options/`: what the caller may route this record
@@ -253,6 +262,7 @@ def route_options(record, user) -> dict:
         .values_list("party", flat=True)
     )
     User = get_user_model()
+    hints = author_hints_by_office(record)
     targets = []
     for party in ROUTE_TARGETS[from_party]:
         members = [
@@ -261,15 +271,12 @@ def route_options(record, user) -> dict:
                 is_active=True, role__name=_ROLE_FOR_PARTY[party],
             ).order_by("last_name", "first_name", "pk")
         ]
-        hint_field = _HINT_FIELD.get(party)
         targets.append({
             "party": party,
             "label": _label(party),
             "members": members,
             "already_holds": party in active,
-            "author_hint": (
-                _HINT_TEXT[party] if hint_field and getattr(record, hint_field, False) else None
-            ),
+            "author_hint": hints.get(party),
         })
     sent = record.routing_events.filter(from_party=Party.ADVISER, to_party=Party.RDCO).order_by("-created_at", "-pk").first()
     return {
@@ -414,7 +421,7 @@ def _notify(record, actor, plan, opened, *, accepted):
 def _locked(record):
     """
     Re-read `record` under a row lock, so routing requests on it run one after
-    the other: a double-clicked *Accept & route*, or two offices routing to the
+    the other: a double-clicked *Accept & send to RDCO*, or two offices routing to the
     same third one at once, then refuse cleanly instead of racing.
     """
     from apps.records.models import Record

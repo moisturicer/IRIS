@@ -13,6 +13,7 @@ import { PaperDownloadControl } from "./PaperDownloadControl";
 
 const downloadCopy = vi.fn();
 const requestDownload = vi.fn();
+const cancelDownloadRequest = vi.fn();
 const downloadBlob = vi.fn();
 const addToast = vi.fn();
 
@@ -20,6 +21,7 @@ vi.mock("@/api/records", () => ({
   recordsApi: {
     downloadCopy: (...args: unknown[]) => downloadCopy(...args),
     requestDownload: (...args: unknown[]) => requestDownload(...args),
+    cancelDownloadRequest: (...args: unknown[]) => cancelDownloadRequest(...args),
   },
 }));
 
@@ -53,6 +55,7 @@ function renderControl(download: DownloadState | null, onChanged = vi.fn()) {
 beforeEach(() => {
   downloadCopy.mockReset();
   requestDownload.mockReset();
+  cancelDownloadRequest.mockReset();
   downloadBlob.mockReset();
   addToast.mockReset();
 });
@@ -130,11 +133,37 @@ describe("a reader who must ask", () => {
     expect(note).toHaveAccessibleDescription(/500 characters/);
   });
 
-  it("shows a pending request and offers nothing to click", () => {
-    renderControl(state({ state: "pending", message: "Your download request is waiting for RDCO's decision.", request: 3 }));
+  // IR-743 replaces IR-677's "offers nothing to click": a pending request
+  // may now be withdrawn, through the cancel endpoint IR-688 added.
+  it("shows a pending request and cancels it on request", async () => {
+    cancelDownloadRequest.mockResolvedValue({});
+    const { container, onChanged } = renderControl(
+      state({ state: "pending", message: "Your download request is waiting for RDCO's decision.", request: 3 }),
+    );
 
     expect(screen.getByText("Request pending")).toBeInTheDocument();
-    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel request" }));
+
+    expect(cancelDownloadRequest).toHaveBeenCalledWith(3);
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(addToast).toHaveBeenCalledWith({ type: "success", message: "Download request cancelled." });
+  });
+
+  it("tells the reader when the cancel is refused, and re-reads the state", async () => {
+    cancelDownloadRequest.mockRejectedValue({
+      response: { status: 400, data: { detail: "Only a pending request can be cancelled." } },
+    });
+    const { onChanged } = renderControl(state({ state: "pending", request: 3 }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Cancel request" }));
+
+    await waitFor(() =>
+      expect(addToast).toHaveBeenCalledWith({ type: "error", message: "Only a pending request can be cancelled." }),
+    );
+    expect(onChanged).toHaveBeenCalled();
   });
 
   it.each([
@@ -147,6 +176,29 @@ describe("a reader who must ask", () => {
     expect(screen.getByRole("button", { name: "Request again" })).toHaveAccessibleDescription(word);
     expect(screen.queryByRole("button", { name: "Download" })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
+  });
+
+  it.each([
+    ["declined", "Not for commercial use."],
+    ["revoked", "Shared outside the institution."],
+  ] as const)("shows RDCO's note beside Request again when %s", async (ended, rdcoNote) => {
+    const { container } = renderControl(state({ state: ended, rdco_note: rdcoNote }));
+
+    expect(screen.getByText(`RDCO's note: ${rdcoNote}`)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Request again" })).toHaveAccessibleDescription(
+      new RegExp(`RDCO's note: ${rdcoNote}`),
+    );
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("says no note was recorded on a decline made before notes existed", () => {
+    renderControl(state({ state: "declined", rdco_note: "" }));
+    expect(screen.getByText("RDCO's note: No note recorded")).toBeInTheDocument();
+  });
+
+  it("shows no RDCO note on an expired grant", () => {
+    renderControl(state({ state: "expired" }));
+    expect(screen.queryByText(/RDCO's note/)).not.toBeInTheDocument();
   });
 });
 
