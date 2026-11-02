@@ -12,7 +12,10 @@ RUN npm ci --frozen-lockfile
 
 # Copy source and build
 COPY . .
+ARG VITE_AI_RUNTIME_READER_ENABLED=false
+ENV VITE_AI_RUNTIME_READER_ENABLED=$VITE_AI_RUNTIME_READER_ENABLED
 RUN npm run build
+RUN printf '%s' "$VITE_AI_RUNTIME_READER_ENABLED" > /app/runtime-reader-enabled
 
 # Output goes to /app/dist
 
@@ -27,7 +30,10 @@ RUN rm /etc/nginx/conf.d/default.conf
 # entrypoint runs this directory when the command is nginx.
 COPY docker-entrypoint.d/40-iris-django-admin.sh /docker-entrypoint.d/40-iris-django-admin.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.d/40-iris-django-admin.sh && chmod 755 /docker-entrypoint.d/40-iris-django-admin.sh
+COPY docker-entrypoint.d/41-iris-runtime-reader.sh /docker-entrypoint.d/41-iris-runtime-reader.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.d/41-iris-runtime-reader.sh && chmod 755 /docker-entrypoint.d/41-iris-runtime-reader.sh
 USER nginx
+COPY --from=builder /app/runtime-reader-enabled /etc/nginx/iris/runtime-reader-enabled
 
 # Our custom config -- handles SPA routing (all routes fall back to index.html)
 COPY nginx.conf /etc/nginx/conf.d/default.conf

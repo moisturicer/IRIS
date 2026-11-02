@@ -2596,3 +2596,24 @@ IR-722's run tests pass with the schema pin literal moved to `0004_agent.sql`, a
 - `0004_agent.sql` has been applied only to the test database, migrated from empty through 0001–0003, not yet to a copy of the dev database.
 
 **Status.** Implemented; awaiting review.
+
+### IR-730 — Safe reader progress and bounded depth (ADR-049 §13–17)
+
+Ask IRIS and Paper Chat share an opt-in `runs-reader-1` transport and reader component.
+Live/reopened plans use actual journalled IDs, statuses and revisions; run activity is
+separate, unknown context has no guessed capacity, and Stop/reconnect/deep requests keep
+the reader grant and Record scope. Public projections exclude internal pins, journals,
+provider/tool state and diagnostic reasons. Reopened evidence and dependent plans are
+withheld when source revisions or current RLS access no longer match. No schema change.
+
+**Tests:** `test_runtime_reader_progress.py`, `test_runtime_reader_edge.py`;
+`RuntimeReader.test.tsx`, existing Ask IRIS/Paper Chat/notice suites. Real PostgreSQL
+checks include queued/live/reopened/completed/deep/cancelled states from the bounded
+AGENT loop. Keyboard/narrow-layout evidence replays those captured public snapshots.
+See [verification, public recording and screenshot](evidence/IR-730/README.md).
+
+**Limits:** disabled by default; the reader refuses the operator echo executor until
+an AGENT service is composed. No paid enablement or cutover. Manual compaction is
+IR-754. Full-suite/typechecking failures and the discarded overlapping-database run
+are recorded in the evidence. Automated standards/spec reviews were performed and
+their material findings addressed; independent human approval and CI remain required.

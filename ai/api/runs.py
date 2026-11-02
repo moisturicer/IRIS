@@ -21,6 +21,7 @@ from pydantic import BaseModel, Field
 from ai.runs import config as runs_config
 from ai.runs.service import RunService
 from ai.runs.store import Busy, Conflict, NotFound, Unauthorized
+from ai.runs import public
 
 router = APIRouter()
 
@@ -55,8 +56,13 @@ def _unavailable():
     return JSONResponse({"status": "unavailable"}, status_code=503)
 
 
-async def _call(service, action):
+async def _call(service, action, protocol=None):
+    if protocol not in (None, public.PROTOCOL):
+        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
     if service is None:
+        return _unavailable()
+    if protocol and service.executor.name != "agent":
+        # A deterministic echo is an operator test, never a reader research answer.
         return _unavailable()
     try:
         return await action(service)
@@ -65,9 +71,11 @@ async def _call(service, action):
     except NotFound:
         return JSONResponse({"status": "not_found"}, status_code=404)
     except Conflict as conflict:
+        if protocol:
+            return JSONResponse({"status": "conflict"}, status_code=409)
         return JSONResponse({"status": conflict.code, **conflict.detail}, status_code=409)
     except Busy as busy:
-        return JSONResponse({"status": "busy", "reason": busy.reason}, status_code=503)
+        return JSONResponse({"status": "busy", **({} if protocol else {"reason": busy.reason})}, status_code=503)
 
 
 @router.post("/runs")
@@ -76,6 +84,7 @@ async def submit_run(
     idempotency_key: str = Header(min_length=8, max_length=128),
     grant: str | None = Header(default=None, alias=GRANT_HEADER),
     service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
 ):
     async def act(s: RunService):
         run, created = await s.submit(
@@ -83,9 +92,11 @@ async def submit_run(
             conversation_id=body.conversation_id, base_revision=body.base_revision,
             depth=body.depth,
         )
-        return JSONResponse(run, status_code=201 if created else 200)
+        if protocol:
+            run = await s.store.status(grant, run["id"], reader_projection=True)
+        return JSONResponse(public.run(run) if protocol else run, status_code=201 if created else 200)
 
-    return await _call(service, act)
+    return await _call(service, act, protocol)
 
 
 @router.get("/runs/{run_id}")
@@ -93,11 +104,13 @@ async def run_status(
     run_id: uuid.UUID,
     grant: str | None = Header(default=None, alias=GRANT_HEADER),
     service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
 ):
     async def act(s: RunService):
-        return JSONResponse(await s.store.status(grant, run_id))
+        snapshot = await s.store.status(grant, run_id, reader_projection=bool(protocol))
+        return JSONResponse(public.run(snapshot) if protocol else snapshot)
 
-    return await _call(service, act)
+    return await _call(service, act, protocol)
 
 
 @router.post("/runs/{run_id}/cancel")
@@ -105,11 +118,13 @@ async def cancel_run(
     run_id: uuid.UUID,
     grant: str | None = Header(default=None, alias=GRANT_HEADER),
     service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
 ):
     async def act(s: RunService):
-        return JSONResponse(await s.store.cancel(grant, run_id))
+        snapshot = await s.store.cancel(grant, run_id, reader_projection=bool(protocol))
+        return JSONResponse(public.run(snapshot) if protocol else snapshot)
 
-    return await _call(service, act)
+    return await _call(service, act, protocol)
 
 
 @router.get("/conversations/{conversation_id}")
@@ -117,11 +132,13 @@ async def reopen_conversation(
     conversation_id: uuid.UUID,
     grant: str | None = Header(default=None, alias=GRANT_HEADER),
     service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
 ):
     async def act(s: RunService):
-        return JSONResponse(await s.store.reopen(grant, conversation_id))
+        snapshot = await s.store.reopen(grant, conversation_id, include_runs=bool(protocol))
+        return JSONResponse(public.conversation(snapshot) if protocol else snapshot)
 
-    return await _call(service, act)
+    return await _call(service, act, protocol)
 
 
 @router.delete("/conversations/{conversation_id}")

@@ -85,3 +85,28 @@ class ReaderSessionGrantView(APIView):
             return Response({"status": "invalid"}, status=400)
         return _outcome(
             lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
+
+
+class RuntimeEdgeGrantView(APIView):
+    """Authenticate a same-origin nginx subrequest; no service credential leaves nginx."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        raw = request.headers.get("X-IRIS-Record")
+        record_id = None
+        if raw:
+            if not raw.isascii() or not raw.isdigit() or len(raw) > 19:
+                return Response({"status": "invalid"}, status=400)
+            record_id = int(raw)
+            if not 0 < record_id < 2**63:
+                return Response({"status": "invalid"}, status=400)
+            from apps.records.models import Record
+            if not Record.objects.visible_to(request.user).filter(pk=record_id).exists():
+                raise Http404
+        result = _outcome(lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
+        if result.status_code != 201:
+            return Response(status=403)
+        return Response(status=204, headers={
+            "X-IRIS-Reader-Grant": result.data["grant"], "Cache-Control": "no-store",
+        })

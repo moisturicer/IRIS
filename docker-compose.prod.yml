@@ -348,6 +348,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_AI_RUNTIME_READER_ENABLED: ${VITE_AI_RUNTIME_READER_ENABLED:-false}
     restart: unless-stopped
     ports:
       # 8080, not 80: the runtime image is nginx-unprivileged, which
@@ -359,6 +361,8 @@ services:
     environment:
       - DJANGO_ADMIN_ALLOWED_NETWORKS=${DJANGO_ADMIN_ALLOWED_NETWORKS:-}
       - TRUSTED_PROXY_COUNT=${TRUSTED_PROXY_COUNT:-}
+      # Server-only nginx credential. Never use a VITE_ prefix for this secret.
+      - AI_GATEWAY_SERVICE_SECRET=${AI_GATEWAY_SERVICE_SECRET:-}
     # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
     # longer serves /media/, so the web container has no reason to be able to
     # read uploaded documents at all.

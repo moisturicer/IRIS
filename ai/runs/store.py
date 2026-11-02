@@ -475,7 +475,7 @@ class RunStore:
                     return
                 await self._end(conn, run_id, "failed", reason)
 
-    async def cancel(self, grant, run_id) -> dict:
+    async def cancel(self, grant, run_id, *, reader_projection=False) -> dict:
         """Stop: fence the run so no attempt can advance it. Idempotent."""
         async with self._connect() as conn:
             async with conn.transaction():
@@ -486,9 +486,9 @@ class RunStore:
                 )
                 if state not in TERMINAL:
                     await self._end(conn, run_id, "cancelled", "stopped", move_fence=True)
-                return await self._projection(conn, run_id)
+                return await self._projection(conn, run_id, reader=reader_projection)
 
-    async def status(self, grant, run_id) -> dict:
+    async def status(self, grant, run_id, *, reader_projection=False) -> dict:
         """The run's projection. A reconnect renews an active run's grant."""
         async with self._connect() as conn:
             async with conn.transaction():
@@ -505,10 +505,10 @@ class RunStore:
                           AND r.grant_expires_at < to_timestamp($3)""",
                     run_id, grant, claims["exp"], list(ACTIVE), scope,
                 )
-                return await self._projection(conn, run_id)
+                return await self._projection(conn, run_id, reader=reader_projection)
 
     @staticmethod
-    async def _projection(conn, run_id) -> dict:
+    async def _projection(conn, run_id, *, reader=False) -> dict:
         run = await conn.fetchrow(
             f"""SELECT {RUN_COLUMNS},
                        extract(epoch FROM coalesce(started_at, finished_at, now()) - created_at)
@@ -522,7 +522,26 @@ class RunStore:
             "SELECT sequence, name, data FROM iris_ai.run_event WHERE run_id = $1 ORDER BY sequence",
             run_id,
         )
+        evidence = {}
+        if reader:
+            # Recheck every evidence dependency under begin_research's live RLS,
+            # including papers read but not finally cited (ADR-049 §8).
+            dependencies = {source for event in events if event["name"] == "tool"
+                            for source in event["data"].get("sources", [])}
+            citations = await conn.fetch(
+                "SELECT c.revision FROM iris_ai.citation c JOIN iris_ai.turn t ON t.id = c.turn_id"
+                " WHERE t.run_id = $1", run_id,
+            )
+            dependencies.update(c["revision"] for c in citations)
+            current = await conn.fetch(
+                "SELECT cs.id::text || ':' || cs.extraction_hash AS revision"
+                " FROM public.ai_chunkset cs JOIN public.records_record r ON r.id = cs.record_id"
+                " WHERE cs.is_active AND cs.id::text || ':' || cs.extraction_hash = ANY($1::text[])",
+                list(dependencies),
+            ) if dependencies else []
+            evidence["sources_available"] = {row["revision"] for row in current} == dependencies
         return {
+            **evidence,
             "id": str(run["id"]),
             "conversation_id": str(run["conversation_id"]),
             "state": run["state"],
@@ -547,10 +566,10 @@ class RunStore:
             "events": [dict(e) for e in events],
         }
 
-    async def reopen(self, grant, conversation_id) -> dict:
+    async def reopen(self, grant, conversation_id, *, include_runs=False) -> dict:
         """The Conversation's committed Turns, in order, with their citations."""
         async with self._connect() as conn:
-            async with conn.transaction():
+            async with conn.transaction(isolation="repeatable_read"):
                 reader, scope = await self._principal(conn, grant)
                 revision = await conn.fetchval(
                     f"""SELECT revision FROM iris_ai.conversation
@@ -571,6 +590,11 @@ class RunStore:
                         WHERE t.conversation_id = $1 ORDER BY c.turn_id, c.position""",
                     conversation_id,
                 )
+                run_ids = await conn.fetch(
+                    "SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1 ORDER BY created_at, id",
+                    conversation_id,
+                ) if include_runs else []
+                runs = [await self._projection(conn, row["id"], reader=True) for row in run_ids]
         by_turn: dict = {}
         for c in citations:
             by_turn.setdefault(c["turn_id"], []).append(
@@ -580,6 +604,7 @@ class RunStore:
         return {
             "id": str(conversation_id),
             "revision": revision,
+            **({"runs": runs} if include_runs else {}),
             "turns": [{
                 "id": str(t["id"]), "run_id": str(t["run_id"]), "ordinal": t["ordinal"],
                 "question": t["question"], "answer": t["answer"], "kind": t["kind"],

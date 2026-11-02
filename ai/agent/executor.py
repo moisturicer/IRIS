@@ -245,6 +245,10 @@ class _Run:
                 and self.deadline - time.monotonic() > self.bounds.final_seconds)
 
     async def _attempt(self, request: AgentRequest, status, phase: str) -> ModelTurn:
+        if not await self.tools.journal("context", {
+            "used_tokens": status.occupancy_tokens, "capacity_tokens": status.context_tokens,
+        }):
+            raise Unavailable("run_ended")
         # Recorded before sending; a stopped run admits no further attempt.
         if not await self.tools.journal("model", {"purpose": PURPOSE, "phase": phase, "step": self.steps + 1}):
             raise Unavailable("run_ended")
