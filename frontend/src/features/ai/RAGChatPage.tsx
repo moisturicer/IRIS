@@ -1,4 +1,5 @@
 import { errorDetail } from "@/lib/errorDetail";
+import { TONES } from "@/components/ui/statusTones";
 /**
  * FR-M3-01 — Conversational RAG chatbot UI (SDD Module 3).
  *
@@ -393,7 +394,7 @@ export default function RAGChatPage() {
           )}
 
           {status && !status.generative && (
-            <div className="shrink-0 flex items-start gap-2 px-4 py-2 bg-amber-50 border-b border-amber-200 text-[13px] text-amber-800">
+            <div className={`shrink-0 flex items-start gap-2 px-4 py-2 text-[13px] ring-inset ${TONES.active}`}>
               <AskIrisMark className="w-4 h-4 shrink-0 mt-px" />
               <p>
                 <strong>Retrieval-only mode.</strong> IRIS finds and ranks real passages, but no
@@ -405,15 +406,15 @@ export default function RAGChatPage() {
 
           {unavailable ? (
             <div role="status" className="flex-1 flex items-center justify-center p-8 text-center">
-              <div className="max-w-md">
-                <h2 className="text-[20px] font-bold text-stone-900 mb-2">This conversation is not available.</h2>
-                <p className="text-[15px] text-stone-500 leading-relaxed mb-5">
+              <div className={`max-w-md rounded-xl px-6 py-5 ${TONES.attention}`}>
+                <h2 className="text-[20px] font-bold mb-2">This conversation is not available.</h2>
+                <p className="text-[15px] leading-relaxed mb-5">
                   It may have been deleted, or the link may be wrong.
                 </p>
                 <button
                   type="button"
                   onClick={handleNewChat}
-                  className="rounded-lg bg-brand px-4 py-2 text-[14px] font-semibold text-white hover:bg-brand/90"
+                  className="rounded-lg bg-white px-4 py-2 text-[14px] font-semibold text-brand hover:bg-stone-100"
                 >
                   Start a new chat
                 </button>
