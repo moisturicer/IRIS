@@ -39,6 +39,8 @@ from ai.runs import config as runs_config  # noqa: E402
 from ai.runs.store import RunStore, Unauthorized  # noqa: E402
 from apps.ai.models.admission import ProviderCampaign, ProviderReservation
 from .corpus import make_user  # noqa: E402
+from .test_ai_runtime_context_contract import MILLION  # noqa: E402
+from ai.agent.context import Capacity, FITS, Reserves  # noqa: E402
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -49,6 +51,10 @@ PIN = Pin(
     prompt_version="agent-direct-1", tool_version="none-1", public_version=runs_config.PROTOCOL,
     state_version=runs_config.SCHEMA, data_policy="no-training",
 )
+# A declared fixture capacity (IR-732).
+CAPACITIES = {"scripted-model": MILLION}
+# A completion cap of 100, AI_ADMISSION_MAX_OUTPUT_TOKENS below.
+RESERVES = Reserves(output_tokens=60, reasoning_tokens=40, next_result_tokens=300, repair_tokens=100)
 # Test bounds only; no production value is implied.
 ADMISSION = dict(
     AI_ADMISSION_CAMPAIGN="ir725-test",
@@ -83,13 +89,13 @@ def limits(**overrides):
 
 
 def admitted(dsn, *responses, retries=0, **overrides):
-    provider = RecordingAgentProvider(responses=list(responses))
+    provider = RecordingAgentProvider(responses=list(responses), capacities=CAPACITIES)
     return provider, AdmittedAgentProvider(provider, Ledger(dsn, limits(**overrides)), retries=retries)
 
 
 def answer_one(dsn, email, key, transport):
     """Submit one question and drain it through `transport`."""
-    built = service(dsn, AgentExecutor(transport, PIN))
+    built = service(dsn, AgentExecutor(transport, PIN, RESERVES))
     grant = session(make_user(email))
     run_, _ = run(built.submit(grant, key=key, question="What did it find?",
                                conversation_id=None, base_revision=None))
@@ -144,7 +150,7 @@ def test_a_retry_is_a_second_admitted_attempt_within_the_same_allowance(runtime)
 
 
 def test_an_unanswered_attempt_times_out_and_keeps_its_reservation(runtime):
-    provider = RecordingAgentProvider(responses=[HANG])
+    provider = RecordingAgentProvider(responses=[HANG], capacities=CAPACITIES)
     transport = AdmittedAgentProvider(provider, Ledger(runtime, limits()), timeout_seconds=0.5)
     _, status = answer_one(runtime, "admit-timeout@cit.edu", "admit-timeout1", transport)
 
@@ -180,7 +186,7 @@ def refused(runtime, email, key, transport, provider):
 
 
 def test_missing_limits_refuse_before_anything_is_sent(runtime):
-    provider = RecordingAgentProvider(responses=[reply()])
+    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
     transport = AdmittedAgentProvider(provider, Ledger.from_settings(runtime, SimpleNamespace()))
     refused(runtime, "admit-unset@cit.edu", "admit-unset-1", transport, provider)
     assert not ProviderReservation.objects.exists()
@@ -190,7 +196,7 @@ def test_an_unadmitted_paid_provider_is_never_called(runtime):
     class Paid(RecordingAgentProvider):
         paid = True
 
-    provider = Paid(responses=[reply()])
+    provider = Paid(responses=[reply()], capacities=CAPACITIES)
     refused(runtime, "admit-paid@cit.edu", "admit-paid-01", provider, provider)
 
 
@@ -270,7 +276,7 @@ def test_revoked_access_between_admission_and_send_sends_nothing(runtime):
                            WHERE id = (SELECT reader_id FROM iris_ai.ask_run WHERE id = $1)""", run_id)
 
     interrupt_before_send(transport, deactivate)
-    built = service(runtime, AgentExecutor(transport, PIN))
+    built = service(runtime, AgentExecutor(transport, PIN, RESERVES))
     # The drained submission's projection is refused: its reader is gone.
     with pytest.raises(Unauthorized):
         run(built.submit(session(make_user("admit-revoked@cit.edu")), key="admit-revoke1",
@@ -424,3 +430,56 @@ def race(dsn, commands):
     finally:
         loop.run_until_complete(holder.close())
         loop.close()
+
+
+# --- Capacity is fitted before admission and never replaces it (IR-732) -------
+
+def test_the_paid_reservation_stays_byte_based_while_occupancy_is_a_token_estimate(runtime):
+    dense = Capacity(context_tokens=1_000_000, max_output_tokens=32_000, max_reasoning_tokens=None,
+                     max_request_bytes=8_000_000, min_bytes_per_token=4.0, framing_tokens_per_message=0)
+    provider = RecordingAgentProvider(responses=[reply()], capacities={"scripted-model": dense})
+    executor = AgentExecutor(AdmittedAgentProvider(provider, Ledger(runtime, limits())), PIN, RESERVES)
+    built = service(runtime, executor)
+    grant = session(make_user("admit-capacity@cit.edu"))
+    run_, _ = run(built.submit(grant, key="admit-capacity1", question="What did it find? " + "w" * 300,
+                               conversation_id=None, base_revision=None))
+    status = run(RunStore(runtime).status(grant, run_["id"]))
+
+    assert status["state"] == "completed"
+    [payload] = provider.requests
+    sent = len(json.dumps(payload, default=str, ensure_ascii=False).encode("utf-8"))
+    [attempt] = run(run_report(runtime, status["id"]))["attempts"]
+    assert executor.capacity_status.request_bytes == sent
+    assert attempt["reserved_input_tokens"] >= sent
+    assert executor.capacity_status.occupancy_tokens * 4 < sent + 4
+
+
+def test_a_request_that_fits_the_window_is_still_bounded_by_the_run_allowance(runtime):
+    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
+    executor = AgentExecutor(AdmittedAgentProvider(provider, Ledger(runtime, limits())), PIN, RESERVES)
+    built = service(runtime, executor)
+    grant = session(make_user("admit-allowance@cit.edu"))
+    # Its byte reservation exceeds the fixture allowance of 1,000 input tokens.
+    run_, _ = run(built.submit(grant, key="admit-allowance1", question="Q? " + "w" * 1_000,
+                               conversation_id=None, base_revision=None))
+    status = run(RunStore(runtime).status(grant, run_["id"]))
+
+    assert executor.capacity_status.outcome == FITS
+    assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
+    assert provider.requests == []
+
+
+def test_a_request_over_capacity_reserves_nothing_and_sends_nothing(runtime):
+    tiny = Capacity(context_tokens=750, max_output_tokens=400, max_reasoning_tokens=None,
+                    max_request_bytes=64_000, min_bytes_per_token=1.0, framing_tokens_per_message=4)
+    provider = RecordingAgentProvider(responses=[reply()], capacities={"scripted-model": tiny})
+    transport = AdmittedAgentProvider(provider, Ledger(runtime, limits()))
+    refused(runtime, "admit-overcap@cit.edu", "admit-overcap1", transport, provider)
+    assert not ProviderReservation.objects.exists()
+
+
+def test_admission_refuses_a_fitted_output_cap_above_its_limit_rather_than_lowering_it(runtime):
+    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
+    transport = AdmittedAgentProvider(provider, Ledger(runtime, limits(AI_ADMISSION_MAX_OUTPUT_TOKENS=50)))
+    refused(runtime, "admit-outcap@cit.edu", "admit-outcap1", transport, provider)
+    assert not ProviderReservation.objects.exists()
