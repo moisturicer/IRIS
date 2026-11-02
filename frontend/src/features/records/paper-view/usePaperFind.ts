@@ -9,7 +9,13 @@ type LandOnMatch = (page: number, region: RegionBand) => void;
 
 interface UsePaperFindOptions {
   ready: boolean;
-  pages: PdfPage[];
+  pageCount: number;
+  /**
+   * A page, loaded if need be (IR-565). Find reads every page's text through
+   * this, whether or not the page is painted, so it searches the whole paper
+   * while only a window of it is on canvases.
+   */
+  pageProxy: (pageNumber: number) => Promise<PdfPage>;
   /** The page being read: where a first search starts from. */
   currentPage: number;
   /** The reader's whole pane, to know where focus returns to on close. */
@@ -24,9 +30,17 @@ interface UsePaperFindOptions {
  * The text is pdf.js's own, extracted page by page in the browser. Typing
  * never waits on it: matches fill in as each page's text arrives, and a
  * query typed before its first match exists goes there once it does.
+ *
+ * Extraction starts the first time find opens, not when the paper does
+ * (IR-565): a 120-page thesis would otherwise keep pdf.js busy reading text
+ * nobody asked to search while the page the reader opened at is painting.
+ * `targetPage` is the page find is about to land on, which the reader paints
+ * in the same render, before the landing.
  */
-export function usePaperFind({ ready, pages, currentPage, paneRef, land }: UsePaperFindOptions) {
+export function usePaperFind({ ready, pageCount, pageProxy, currentPage, paneRef, land }: UsePaperFindOptions) {
   const [open, setOpen] = useState(false);
+  /** Find has been opened on this reader: its text is wanted from here on. */
+  const [wanted, setWanted] = useState(false);
   const [query, setQuery] = useState("");
   /** Each page's text, or `undefined` until it is extracted. */
   const [texts, setTexts] = useState<(TextRun[] | undefined)[]>([]);
@@ -47,14 +61,14 @@ export function usePaperFind({ ready, pages, currentPage, paneRef, land }: UsePa
   landRef.current = land;
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || !wanted) return;
     let cancelled = false;
-    setTexts(pages.map(() => undefined));
+    setTexts(new Array<TextRun[] | undefined>(pageCount).fill(undefined));
     (async () => {
-      for (let i = 0; i < pages.length; i += 1) {
+      for (let i = 0; i < pageCount; i += 1) {
         let runs: TextRun[];
         try {
-          runs = await pageText(pages[i]);
+          runs = await pageText(await pageProxy(i + 1));
         } catch {
           // A page pdf.js cannot read text from is searched as empty.
           runs = [];
@@ -70,11 +84,11 @@ export function usePaperFind({ ready, pages, currentPage, paneRef, land }: UsePa
     return () => {
       cancelled = true;
     };
-  }, [ready, pages]);
+  }, [ready, wanted, pageCount, pageProxy]);
 
   const matches = useMemo(() => findMatches(texts, query), [texts, query]);
   const activeIndex = Math.min(active, matches.length - 1);
-  const extracting = texts.length < pages.length || texts.some((runs) => runs === undefined);
+  const extracting = texts.length < pageCount || texts.some((runs) => runs === undefined);
   const searchable = extracting || isSearchable(texts as TextRun[][]);
 
   // A new query goes to its first match from where find last was, or from
@@ -120,6 +134,7 @@ export function usePaperFind({ ready, pages, currentPage, paneRef, land }: UsePa
       returnFocusRef.current =
         focused instanceof HTMLElement && paneRef.current?.contains(focused) ? focused : null;
       setOpen(true);
+      setWanted(true);
     }
     // Once the bar is in the document; selected, so a second Ctrl+F types
     // over the last query as a browser's find does.
@@ -169,6 +184,7 @@ export function usePaperFind({ ready, pages, currentPage, paneRef, land }: UsePa
 
   return {
     open,
+    targetPage: open ? (matches[activeIndex]?.page ?? null) : null,
     query,
     status,
     hitsByPage,

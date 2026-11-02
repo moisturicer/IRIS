@@ -139,7 +139,7 @@ def _post(path: str, payload: dict[str, Any]) -> dict[str, Any]:
         timeout_seconds=timeout,
     )):
         try:
-            mark_sent()
+            mark_sent(model=str(payload.get("model", "")))
             response = httpx.post(
                 f"{_BASE_URL}{path}",
                 json=payload,

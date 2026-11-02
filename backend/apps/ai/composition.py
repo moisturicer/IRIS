@@ -24,15 +24,15 @@ deterministic provider fakes; without a root a test can replace, there is no
 way to reach the views with a fake vendor, and the security assertions would
 have to be made a layer lower than the layer that can actually leak.
 
-**The default root answers nothing today, and that is the gate working.**
-``permits`` defaults to ``disclosure_permits``, which refuses every record
-because ``Record`` carries no embargo field and an undetermined embargo is
-treated as an embargo (IR-250). So a live deployment returns "no readable
-sources" to every question until that lands. Said here rather than left to be
-discovered, because every test in ``test_ask_http.py`` opens the gate to
-assert anything at all, and a reader of those tests could otherwise conclude
-the shipped configuration answers questions. Nothing here works around it: the
-way around a fail-closed gate is to supply the missing fact.
+**The default root answers only from papers a person has cleared, and that is
+the gate working.** ``permits`` defaults to ``disclosure_permits``, which refuses
+a paper with no embargo answer or an active embargo (ADR-052), no consent, or an
+IP mark. So a live deployment returns "no readable sources" until its papers
+have answers. Said here rather than left to be discovered, because every test in
+``test_ask_http.py`` opens the gate rather than giving each record an answer, and
+a reader of those tests could otherwise conclude the gate is not in the way.
+Nothing here works around it: the way around a fail-closed gate is to supply the
+missing fact.
 
 **The LLM seam is resilient (IR-321) and tasked (IR-388).**
 ``llm_for(task)`` is the only way to reach a model -- ``llm()``, the untasked

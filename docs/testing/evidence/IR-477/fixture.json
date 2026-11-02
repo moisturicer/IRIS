@@ -1,0 +1,137 @@
+{
+  "record": {
+    "id": 7,
+    "title": "Flood Prediction in the Mananga Catchment",
+    "abstract": "A study of rainfall-driven flood prediction.",
+    "year_accomplished": 2026,
+    "year_completed": null,
+    "abstract_file": "/fixture.pdf",
+    "classification_name": "Applied Research",
+    "classification": "Applied Research",
+    "psced": null,
+    "record_type_name": "Thesis/Research",
+    "record_type": "Thesis/Research",
+    "pipeline_status": "published",
+    "is_ip": false,
+    "ip_type": "",
+    "for_commercialization": false,
+    "community_extension": false,
+    "access_count": 0,
+    "file_count": 1,
+    "created_at": "2026-09-01T08:00:00Z",
+    "authors": [
+      {
+        "id": 1,
+        "name": "R. Dela Cruz",
+        "role": null
+      }
+    ],
+    "adviser": null,
+    "adviser_name": null,
+    "added_by": null,
+    "requires_ethics_review": false,
+    "requested_itso": false,
+    "requested_ierc": false,
+    "requested_ktto": false,
+    "owners": [
+      {
+        "id": 1,
+        "user": 1,
+        "email": "browser@example.test",
+        "full_name": "Browser Tester",
+        "is_primary": true
+      }
+    ],
+    "is_deleted": false,
+    "reviews": [],
+    "clearances": [],
+    "resubmission": {
+      "count": 0,
+      "last_resubmitted_at": null,
+      "declining_office": null,
+      "offices_preserved": []
+    },
+    "stage_label": "Published",
+    "files": [],
+    "workflow_state": "published",
+    "workflow_state_label": "Published",
+    "current_holders": [],
+    "capabilities": [
+      "request_document",
+      "comment_review",
+      "request_revision"
+    ],
+    "can_request_document": [
+      "ierc"
+    ],
+    "my_seats": [],
+    "is_participant": true,
+    "routing": {
+      "send_to_rdco": false,
+      "route_as": null,
+      "targets": []
+    },
+    "office_review": {
+      "party": null,
+      "label": null,
+      "blocked": null,
+      "assignment": null
+    },
+    "revision": {
+      "party": null,
+      "label": null,
+      "blocked": null,
+      "withdrawable": null,
+      "decision_blocked": null,
+      "open": [],
+      "new_version": null
+    },
+    "decision": {
+      "party": null,
+      "outcomes": [],
+      "blocked": null,
+      "closes": null,
+      "token": null,
+      "author_hints": []
+    },
+    "versions": null,
+    "manuscript_unsubmitted": false,
+    "submitter_status": null
+  },
+  "user": {
+    "id": 1,
+    "email": "browser@example.test",
+    "first_name": "Browser",
+    "last_name": "Tester",
+    "middle_initial": "",
+    "role": 1,
+    "role_name": "Student",
+    "is_staff": false,
+    "is_superuser": false,
+    "is_active": true,
+    "is_verified": true,
+    "is_locked": false,
+    "is_office_coordinator": false,
+    "consent_given": true,
+    "date_joined": "2026-01-01",
+    "college_name": "",
+    "department_name": "",
+    "course_name": ""
+  },
+  "citation": {
+    "marker": 1,
+    "record_id": 7,
+    "record_title": "Flood Prediction in the Mananga Catchment",
+    "page": 2,
+    "text": "Synthetic tall cited passage for IR-477 browser validation",
+    "regions": [
+      {
+        "page": 2,
+        "left": 0.1,
+        "right": 0.9,
+        "top": 0.1,
+        "bottom": 0.6555555555555556
+      }
+    ]
+  }
+}

@@ -21,6 +21,7 @@ import { ROLES } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
 
 import { AppShell } from "./AppShell";
+import { NotificationBell } from "./NotificationBell";
 import { PAGE_WIDTH } from "./PageContainer";
 
 vi.mock("@/api/client", () => ({ apiClient: { get: vi.fn() } }));
@@ -37,6 +38,16 @@ function renderAt(path: string) {
         children: [
           { path: "/records/mine", element: <h1>My Library</h1>, handle: { crumb: "My Library" } },
           { path: "/admin/audit", element: <h1>Audit Log</h1>, handle: { crumb: "Audit Log", width: "full" } },
+          // Stands in for Ask IRIS, whose toolbar mounts a third bell.
+          {
+            path: "/with-bell",
+            element: (
+              <>
+                <h1>Page with a bell</h1>
+                <NotificationBell />
+              </>
+            ),
+          },
         ],
       },
     ],
@@ -101,6 +112,16 @@ describe("the app shell", () => {
 
     const page = await screen.findByRole("heading", { name: "Audit Log" });
     expect(page.parentElement!.className).not.toContain(PAGE_WIDTH.standard);
+  });
+
+  it("fetches unread notifications once however many bells are mounted (IR-370)", async () => {
+    renderAt("/with-bell");
+
+    await screen.findByRole("heading", { name: "Page with a bell" });
+    // The sidebar's bell, the phone bar's and the page's own.
+    expect(screen.getAllByRole("button", { name: /^Notifications/ })).toHaveLength(3);
+    expect(notificationsApi.list).toHaveBeenCalledTimes(1);
+    expect(notificationsApi.list).toHaveBeenCalledWith(true);
   });
 
   it("never makes main a scroll container, so sticky chrome keeps working (IR-351, IR-534)", async () => {

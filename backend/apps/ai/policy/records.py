@@ -1,32 +1,23 @@
 """Adapting a ``Record`` to the disclosure policy's inputs (IR-127).
 
-The impure edge of an otherwise pure module: it reads model attributes and,
-by default, the clock. Everything that decides anything lives in
-``disclosure.py`` and takes values.
+The impure edge of an otherwise pure module: it reads model attributes.
+Everything that decides anything lives in ``disclosure.py`` and takes values.
 """
 
 from __future__ import annotations
 
-from datetime import date
-from typing import Any, Optional
+from typing import Any
 
-from .disclosure import Decision, DisclosureInputs, EmbargoUnknown, may_disclose
+from .disclosure import Decision, DisclosureInputs, may_disclose
 
 
-def inputs_for_record(record: Any, today: Optional[date] = None) -> DisclosureInputs:
+def inputs_for_record(record: Any) -> DisclosureInputs:
     """Read the three governing facts off a record.
 
-    **Embargo is read with ``getattr`` and defaults to ``EmbargoUnknown``.**
-    ``Record`` carries no embargo field today, so there is nothing truthful to
-    report and the policy refuses -- deliberately, because the alternative is
-    to report "not embargoed" on the strength of a field nobody implemented,
-    and send unpublished work to a commercial vendor because of it.
-
-    Reading it dynamically rather than hardcoding the sentinel means the day
-    an ``embargoed_until`` field is added to ``Record``, this adapter honours
-    it without also having to be remembered. Until then the refusal is loud:
-    every record is withheld, which is the correct failure direction for a
-    gate whose whole purpose is to stop content leaving.
+    Embargo is ``Record.embargo_state`` (ADR-052 §3), which reads an unanswered
+    paper as ``UNKNOWN``. It is not the date column: a blank date is what an
+    unanswered paper and an answered "no" both store, and reading it as "no
+    embargo" would clear every paper that was never asked.
 
     Consent is ``Record.dpa_accepted`` (IR-226) -- the per-disclosure stamp,
     not ``User.consent_given``, which records that a person accepted terms
@@ -34,13 +25,12 @@ def inputs_for_record(record: Any, today: Optional[date] = None) -> DisclosureIn
     """
     return DisclosureInputs(
         is_ip=bool(record.is_ip),
-        embargoed_until=getattr(record, "embargoed_until", EmbargoUnknown),
+        embargo=record.embargo_state,
         consent_given=bool(record.dpa_accepted),
-        today=today if today is not None else date.today(),
     )
 
 
-def decision_for_record(record: Any, today: Optional[date] = None) -> Decision:
+def decision_for_record(record: Any) -> Decision:
     """The gate's verdict on a record, as one call.
 
     The two steps are separable and stay separable — that is what keeps the
@@ -50,4 +40,4 @@ def decision_for_record(record: Any, today: Optional[date] = None) -> Decision:
     at runtime right up to the point where ``is_ip`` is read off a dataclass
     that has one.
     """
-    return may_disclose(inputs_for_record(record, today))
+    return may_disclose(inputs_for_record(record))

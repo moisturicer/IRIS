@@ -1429,6 +1429,8 @@ The ADR-032 vertical tickets are created later, per the hold recorded on IR-255.
 
 **Net:** the redesign adds sections and slots *around* the IR-350 family's work and changes none of its behaviour. No reader or chat ticket is duplicated.
 
+*Amended 2026-11-01 (IR-477):* the Review section now gives the reader its action bar's measured height (`PaperPdfReader`'s `bottomInset`, below `reading-wide` only), so a citation lands, and find counts a match in view, above the bar rather than under it. This is a deliberate exception to "reuses `PaperPdfReader` unchanged"; the Paper tab passes no inset, and its landing is unchanged.
+
 ## Appendix L — Duplication check: F/B tickets against the seven ADR-032 tickets
 
 | F / B | Overlaps with | Finding | Resolution |

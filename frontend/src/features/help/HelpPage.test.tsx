@@ -63,6 +63,8 @@ describe("Help", () => {
     expect(within(workflow).getByText(/Only RDCO can publish a paper/)).toBeInTheDocument();
     expect(within(workflow).queryByText(/accept and publish/)).not.toBeInTheDocument();
     expect(within(workflow).queryByText(/When the last one finishes/)).not.toBeInTheDocument();
+    expect(within(workflow).getByText(/ITSO for technical review/)).toBeInTheDocument();
+    expect(within(workflow).queryByText(/ITSO about intellectual property/)).not.toBeInTheDocument();
   });
 
   it("shows reviewing only to someone the server says has review work", () => {

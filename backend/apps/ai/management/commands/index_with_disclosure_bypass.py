@@ -4,14 +4,14 @@
     python manage.py index_with_disclosure_bypass --record 29     # index one record
     python manage.py index_with_disclosure_bypass                 # index the corpus
 
-**Why this exists at all.** The gate refuses every record (IR-250: `Record`
-carries no embargo field, and an undetermined embargo is treated as an
-embargo), so `backfill_embeddings` indexes nothing and Ask IRIS answers "no
-readable sources" to every question. Until CIT-U decides what an embargo is,
-this is how the RAG work is exercised end to end instead of only in tests.
+**Why this exists at all.** The gate refuses a record with no embargo answer
+(ADR-052), and seeded and loaded records carry none until IR-815 gives them one,
+so `backfill_embeddings` indexes nothing and Ask IRIS answers "no readable
+sources". Until then, this is how the RAG work is exercised end to end instead
+of only in tests.
 
 **Why a separate command rather than a flag on `backfill_embeddings`.** This
-file is the whole bypass on the indexing path: IR-250 deletes it and nothing
+file is the whole bypass on the indexing path: IR-815 deletes it and nothing
 is left behind to find. A `--bypass-disclosure` flag on the permanent command
 would be surgery in a file that stays.
 
@@ -41,7 +41,7 @@ from apps.ai.policy.bypass import permit_everything
 class Command(BaseCommand):
     help = (
         "Embed records with the ADR-015 disclosure gate bypassed. "
-        "Development only (IR-317); removed by IR-250."
+        "Development only (IR-317); removed by IR-815."
     )
 
     def add_arguments(self, parser):

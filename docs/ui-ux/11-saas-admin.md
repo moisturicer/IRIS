@@ -34,6 +34,8 @@ If the next customer calls IERC "the Research Ethics Committee", calls a submiss
 
 ### The finding
 
+> **Superseded count (IR-94, 2026-11-02).** The "twenty files" figure and the table below are historical. The re-derived inventory — 47 non-test files, of which 12 hold logic that blocks a second institution, 12 hold copy and 23 mention an office only in comments — with a retirement plan for each, is in [`../institution_configuration_boundary.md`](../institution_configuration_boundary.md) §5. That document also states the configuration/product boundary, the authorization boundary and a four-office worked example. Of the three files named below, `PIPELINE_LABELS` and `EvaluationPage.tsx` are gone and `StatusBadge.tsx` no longer names an office.
+
 **Twenty frontend files hardcode CIT-U office and role names** (`itso`, `ierc`, `ktto`, `rdco`), including:
 
 | File | What it hardcodes |
@@ -144,4 +146,4 @@ Django admin covers the operator cases for a pilot of this size. Building a seco
 
 Nothing in the MVP interface prevents the pooled model later. The label contract is the migration's largest UI dependency, and it is being built for the thesis contribution regardless.
 
-**Backend/API dependencies for this file as a whole.** `W-01` (transition table as the configuration source) · `W-07` (labels delivered in the record payload) · `SA-01` (which knobs are institutional configuration) · `S-05` (narrow `IsAdminUser`). No SaaS-specific frontend work exists beyond removing the twenty files' hardcoded vocabulary.
+**Backend/API dependencies for this file as a whole.** `W-01` (transition table as the configuration source) · `W-07` (labels delivered in the record payload) · `SA-01` (which knobs are institutional configuration) · `S-05` (narrow `IsAdminUser`). No SaaS-specific frontend work exists beyond removing the hardcoded vocabulary inventoried in [`../institution_configuration_boundary.md`](../institution_configuration_boundary.md) §5.

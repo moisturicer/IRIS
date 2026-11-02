@@ -59,6 +59,13 @@ class RunContext:
     context_revision: Optional[int] = None
     run_id: str = field(default_factory=lambda: uuid.uuid4().hex)
 
+    def outbound(self):
+        """The guard every provider attempt for this run passes (IR-720)."""
+        from apps.ai.policy.outbound import OutboundGuard
+
+        return OutboundGuard(principal=self.user, permits=self.permits,
+                             scope_record_id=self.scope_record_id)
+
     @property
     def caller(self) -> str:
         """Who a cursor is bound to."""

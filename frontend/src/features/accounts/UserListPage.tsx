@@ -138,14 +138,14 @@ export default function UserListPage() {
       header: "Email",
       accessorKey: "email",
       cell: ({ getValue }) => (
-        <span className="font-medium text-gray-900">{getValue<string>()}</span>
+        <span className="font-medium text-stone-900">{getValue<string>()}</span>
       ),
     },
     {
       header: "Name",
       id: "name",
       cell: ({ row }) => (
-        <span className="text-gray-700">
+        <span className="text-stone-700">
           {row.original.first_name} {row.original.last_name}
         </span>
       ),
@@ -172,7 +172,7 @@ export default function UserListPage() {
       ),
     },
     {
-      header: "",
+      header: () => <span className="sr-only">Actions</span>,
       id: "actions",
       cell: ({ row }) => (
         <div className="flex gap-2 justify-end">
@@ -229,8 +229,9 @@ export default function UserListPage() {
           action={<Button variant="outline" size="sm" onClick={() => load(page)}>Try again</Button>}
         />
       ) : (
-      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <DataTable
+          caption="User accounts"
           data={users}
           columns={columns}
           loading={loading}
@@ -280,7 +281,7 @@ export default function UserListPage() {
         title="Change Role"
       >
         <div className="flex flex-col gap-4">
-          <p className="text-[14px] text-gray-600">
+          <p className="text-[14px] text-stone-600">
             Changing role for <strong>{roleTarget?.email}</strong>.
           </p>
           {/* `User.assign_role` drops the grant on every role change, even to
@@ -292,13 +293,13 @@ export default function UserListPage() {
             </p>
           )}
           <div>
-            <label htmlFor={roleSelectId} className="text-[14px] font-medium text-gray-700 block mb-1">New role</label>
+            <label htmlFor={roleSelectId} className="text-[14px] font-medium text-stone-700 block mb-1">New role</label>
             <select
               id={roleSelectId}
               value={newRole}
               onChange={(e) => setNewRole(e.target.value)}
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-[14px] outline-none
-                focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12]"
+              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-[14px] outline-none
+                focus:border-brand focus:ring-1 focus:ring-brand"
             >
               {ALL_ROLES.map((r) => (
                 <option key={r} value={r}>{r}</option>

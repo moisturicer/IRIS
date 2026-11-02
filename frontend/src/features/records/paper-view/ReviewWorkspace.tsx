@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { useElementHeight } from "@/hooks/useElementHeight";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import type { Capability } from "@/features/records/capabilities";
 import { cn } from "@/lib/utils";
@@ -26,6 +27,12 @@ export interface ReviewWorkspaceProps {
   /** Authors retain their existing timeline and reader. */
   authorView?: boolean;
   onOpenReview?: () => Promise<void>;
+  /**
+   * The author's action bar's height in px, as it changes, and 0 once the
+   * tab closes (IR-477). Below `reading-wide` the bar sticks over the bottom
+   * of the screen, so the page hands this to the reader as `bottomInset`.
+   */
+  onBarInset?: (px: number) => void;
 }
 
 export function ReviewWorkspace(props: ReviewWorkspaceProps) {
@@ -51,6 +58,11 @@ export function ReviewWorkspace(props: ReviewWorkspaceProps) {
  * **No Ask IRIS here** (spec §4.6, decided 2026-09-26): *Ask about this
  * paper* goes to the Paper tab, where the conversation is waiting.
  *
+ * The bar's measured height goes to `onBarInset`, so the reader lands a
+ * citation above the bar rather than under it (IR-477; spec Appendix K,
+ * amended). Wide, the bar sits in the pane beside the reader, and the
+ * contained reader ignores the inset.
+ *
  * Decisions use the adviser-first review actions in `REVIEW_ACTIONS`.
  */
 function AuthorReviewWorkspace({
@@ -60,7 +72,16 @@ function AuthorReviewWorkspace({
   timelineVersion,
   onChanged,
   onAskAboutPaper,
+  onBarInset,
 }: ReviewWorkspaceProps) {
+  const [measureBar, barHeight] = useElementHeight<HTMLDivElement>();
+  const reportRef = useRef(onBarInset);
+  reportRef.current = onBarInset;
+  useEffect(() => {
+    reportRef.current?.(barHeight);
+  }, [barHeight]);
+  useEffect(() => () => reportRef.current?.(0), []);
+
   return (
     <div className={cn("reading-wide:flex reading-wide:gap-6 reading-wide:items-start", !reader && "max-w-3xl mx-auto")}>
       {reader && <div className="min-w-0 reading-wide:flex-1">{reader}</div>}
@@ -104,6 +125,7 @@ function AuthorReviewWorkspace({
           record={record}
           can={can}
           onChanged={onChanged}
+          boxRef={measureBar}
           className={cn(
             "sticky bottom-0 z-20 mt-4 rounded-t-2xl bg-white ring-1 ring-stone-200 shadow-card-md px-3 py-2",
             "reading-wide:static reading-wide:z-auto reading-wide:mt-0 reading-wide:rounded-none",

@@ -64,9 +64,8 @@ def make_record(*, title, abstract, embedder, status=PipelineStatus.PUBLISHED,
                 owner=None, embedded=True):
     """A record and, unless a test says otherwise, its summary vector.
 
-    `embedded=False` is the state the whole corpus is in today: the disclosure
-    gate refuses every record while `Record` carries no embargo field
-    (IR-250), so nothing real has a vector yet.
+    `embedded=False` is the state of any paper the disclosure gate has refused,
+    which includes every paper with no embargo answer (ADR-052).
     """
     record = Record.objects.create(
         title=title, abstract=abstract, pipeline_status=status
@@ -143,8 +142,8 @@ class SimilarRecordsTests:
         assert hidden.pk in [m.record.pk for m in similar_records(seed, author)]
 
     def test_nothing_comes_back_when_the_seed_has_no_vector(self, embedder, space):
-        """Today's state for every record: the disclosure gate (IR-250) means
-        nothing is indexed, so this endpoint is empty rather than wrong."""
+        """The state of a record the disclosure gate has refused: it has no
+        vector, so this endpoint is empty rather than wrong."""
         reader = make_user("reader@cit.edu")
         seed = make_record(
             title="Flood prediction",

@@ -165,14 +165,17 @@ export const recordsApi = {
    * do double duty: `Blob.arrayBuffer()` feeds pdf.js, and the same URL
    * backs a "download"/"open in new tab" link with no second request.
    */
-  manuscriptBlob: (id: number) =>
-    apiClient.get<Blob>(`/records/${id}/manuscript/`, { responseType: "blob" }),
+  manuscriptBlob: (id: number, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<Blob>(`/records/${id}/manuscript/`, { responseType: "blob", signal: options.signal }),
   /**
    * An earlier version's manuscript (IR-416), fetched the same way and for
    * the same reason. Participants only: anyone else gets a 404.
    */
-  versionManuscriptBlob: (id: number, version: number) =>
-    apiClient.get<Blob>(`/records/${id}/versions/${version}/manuscript/`, { responseType: "blob" }),
+  versionManuscriptBlob: (id: number, version: number, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<Blob>(`/records/${id}/versions/${version}/manuscript/`, {
+      responseType: "blob",
+      signal: options.signal,
+    }),
   /**
    * A saved copy of the paper (IR-675, IR-676): marked with who it was made
    * for, and refused with a 403 `code` unless the viewer is exempt or holds a

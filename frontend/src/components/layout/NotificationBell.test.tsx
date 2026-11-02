@@ -19,7 +19,10 @@ import { MemoryRouter } from "react-router-dom";
 
 import { makeUser, validToken } from "@/test/authFixtures";
 import { useAuthStore } from "@/store/auth.store";
+import { useNotificationsStore } from "@/store/notifications.store";
 import type { Notification } from "@/types/notifications";
+
+import { useUnreadNotificationsFetch } from "@/hooks/useNotifications";
 
 import { NotificationBell } from "./NotificationBell";
 
@@ -81,10 +84,23 @@ function signIn(id: number) {
   act(() => useAuthStore.getState().login(makeUser({ id }), validToken({ user_id: id }), "refresh"));
 }
 
-function renderBell() {
+/**
+ * What `AppShell` does: own the one unread fetch (IR-370). A bell on its own
+ * fetches nothing, so the tests below mount the owner beside it.
+ */
+function FetchOwner() {
+  useUnreadNotificationsFetch();
+  return null;
+}
+
+/** The fetch owner and `count` bells, as a page with several bells has. */
+function renderBell(count = 1) {
   return render(
     <MemoryRouter>
-      <NotificationBell />
+      <FetchOwner />
+      {Array.from({ length: count }, (_, i) => (
+        <NotificationBell key={i} />
+      ))}
     </MemoryRouter>,
   );
 }
@@ -96,6 +112,32 @@ async function openBell() {
 
 afterEach(() => {
   act(() => useAuthStore.getState().logout());
+});
+
+
+describe("the bell's visible count and accessible name (IR-777)", () => {
+  it.each([
+    [0, null, "Notifications"],
+    [7, "7", "Notifications, 7 unread"],
+    [20, "9+", "Notifications, 9+ unread"],
+  ] as const)(
+    "keeps the visible badge text in the accessible name at %i unread",
+    (unreadCount, visibleBadge, accessibleName) => {
+      useNotificationsStore.setState({ items: [], unreadCount });
+      render(
+        <MemoryRouter>
+          <NotificationBell />
+        </MemoryRouter>,
+      );
+
+      const bell = screen.getByRole("button", { name: accessibleName });
+      if (visibleBadge === null) {
+        expect(within(bell).queryByText(/\d/)).not.toBeInTheDocument();
+      } else {
+        expect(within(bell).getByText(visibleBadge)).toBeInTheDocument();
+      }
+    },
+  );
 });
 
 describe("NotificationBell across a change of account in one tab", () => {
@@ -228,4 +270,83 @@ describe("NotificationBell across a change of account in one tab", () => {
       nodeProcess.off("unhandledRejection", unhandled);
     }
   });
+});
+
+describe("several bells sharing one fetch (IR-370)", () => {
+  afterEach(() => vi.mocked(notificationsApi.list).mockReset());
+
+  it("fetches nothing when a bell mounts without the owner", () => {
+    signIn(1);
+    render(
+      <MemoryRouter>
+        <NotificationBell />
+      </MemoryRouter>,
+    );
+    expect(notificationsApi.list).not.toHaveBeenCalled();
+  });
+
+  it("shows every bell the same count, and moves them all when one is read", async () => {
+    vi.mocked(notificationsApi.list).mockResolvedValueOnce(
+      page([notification(1, "Your manuscript was returned", 41), notification(2, "A broadcast")]),
+    );
+    vi.mocked(notificationsApi.markRead).mockResolvedValue({} as never);
+    vi.mocked(notificationsApi.markAllRead).mockResolvedValue({} as never);
+    signIn(1);
+    renderBell(3);
+
+    expect(await screen.findAllByRole("button", { name: "Notifications, 2 unread" })).toHaveLength(3);
+    expect(notificationsApi.list).toHaveBeenCalledTimes(1);
+
+    const [first] = screen.getAllByRole("button", { name: "Notifications, 2 unread" });
+    await userEvent.click(first);
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /A broadcast/ }));
+    expect(screen.getAllByRole("button", { name: "Notifications, 1 unread" })).toHaveLength(3);
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Notifications, 1 unread" })[1]);
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mark all read" }));
+    expect(screen.getAllByRole("button", { name: "Notifications" })).toHaveLength(3);
+    expect(notificationsApi.list).toHaveBeenCalledTimes(1);
+  });
+
+  it("fetches nothing while signed out, and once more for each new session", async () => {
+    vi.mocked(notificationsApi.list)
+      .mockResolvedValueOnce(page([notification(1, "Account A's manuscript was returned", 41)]))
+      .mockResolvedValueOnce(page([notification(2, "Account B has a review due")]));
+    renderBell(3);
+    expect(notificationsApi.list).not.toHaveBeenCalled();
+
+    signIn(1);
+    expect(await screen.findAllByRole("button", { name: "Notifications, 1 unread" })).toHaveLength(3);
+    expect(notificationsApi.list).toHaveBeenCalledTimes(1);
+
+    // The bells stay mounted throughout, as the shell's would if it did.
+    act(() => useAuthStore.getState().logout());
+    expect(screen.getAllByRole("button", { name: "Notifications" })).toHaveLength(3);
+    expect(notificationsApi.list).toHaveBeenCalledTimes(1);
+
+    signIn(2);
+    await screen.findAllByRole("button", { name: "Notifications, 1 unread" });
+    expect(notificationsApi.list).toHaveBeenCalledTimes(2);
+    const dialog = await openBellAt(0);
+    expect(within(dialog).getByText("Account B has a review due")).toBeInTheDocument();
+  });
+
+  it("fetches again when another account signs in over the first without signing out", async () => {
+    vi.mocked(notificationsApi.list)
+      .mockResolvedValueOnce(page([notification(1, "Account A's manuscript was returned", 41)]))
+      .mockResolvedValueOnce(page([]));
+    signIn(1);
+    renderBell(3);
+    expect(await screen.findAllByRole("button", { name: "Notifications, 1 unread" })).toHaveLength(3);
+
+    signIn(2);
+    await act(async () => {});
+    expect(notificationsApi.list).toHaveBeenCalledTimes(2);
+    expect(screen.getAllByRole("button", { name: "Notifications" })).toHaveLength(3);
+  });
+
+  async function openBellAt(index: number) {
+    await userEvent.click(screen.getAllByRole("button", { name: /^Notifications/ })[index]);
+    return screen.getByRole("dialog", { name: "Notifications" });
+  }
 });

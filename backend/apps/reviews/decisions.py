@@ -325,12 +325,8 @@ def decision_token(record) -> str:
 # --- what record detail tells Paper View ------------------------------------------------
 
 def author_hints(record) -> list[str]:
-    """The author's ADR-018 flags, as the routing dialog words them (ADR-032 §3)."""
-    return [
-        routing._HINT_TEXT[office]
-        for office, field in routing._HINT_FIELD.items()
-        if getattr(record, field, False)
-    ]
+    """The author's flags, as the routing dialog words them (ADR-032 §3)."""
+    return [text for field, _, text in routing._AUTHOR_FLAGS if getattr(record, field, False)]
 
 
 def decision_flags(record, user) -> dict:

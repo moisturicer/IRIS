@@ -17,11 +17,10 @@ a bug (ADR-014).
 
 **What this does not do**, stated because the endpoint looks the same from
 outside: it does not fall back to keyword matching when nothing is indexed.
-A record with no vector has no neighbours here, and today that is every
-record — the disclosure gate refuses them all while `Record` carries no
-embargo field (IR-250). An empty panel is the honest rendering of "nothing is
-indexed"; a keyword fallback would hide that behind plausible results and put
-the second visibility rule back on the path.
+A record with no vector has no neighbours here, and that is every record the
+disclosure gate has refused (ADR-052). An empty panel is the honest rendering of
+"nothing is indexed"; a keyword fallback would hide that behind plausible results
+and put the second visibility rule back on the path.
 """
 
 from __future__ import annotations
@@ -88,9 +87,9 @@ def related_published_research(record: Record, user) -> Optional[list[SimilarRec
 
     Returns ``None`` when no comparison was made -- the record is not a
     Proposal (§1: only a Proposal is the subject), or it has no vector yet --
-    so a caller can tell "not checked" from "checked, nothing close". Every
-    Proposal is unchecked until IR-250 lets the corpus be indexed, and showing
-    that as "nothing close" would be a claim the check never made.
+    so a caller can tell "not checked" from "checked, nothing close". A
+    Proposal the disclosure gate has refused stays unchecked, and showing that
+    as "nothing close" would be a claim the check never made.
 
     **Candidates are published records that are not Proposals.** Published is
     the public catalogue, which is why no consent is consulted: nothing here
