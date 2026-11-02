@@ -48,14 +48,18 @@ Refuses to run with `DEBUG` off unless `--force`, because these are
 known-password accounts.
 """
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import College, Course, Role, StudentProfile, User
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.records import lifecycle
+from apps.records.embargo import EmbargoAnswer, record_answer
 from apps.records.models import (
     Author,
     Classification,
@@ -63,7 +67,7 @@ from apps.records.models import (
     RecordOwner,
     RecordType,
 )
-from core.enums import IPType, Office, RecordTypeName, RoleName
+from core.enums import IPType, Office, PipelineStatus, RecordTypeName, RoleName
 
 #: The convention that already existed, kept deliberately (see module docstring).
 PASSWORD = "IrisDemo123!"
@@ -160,6 +164,12 @@ AT_RDCO_TITLE = f"{_PREFIX} Thesis ITSO cleared, RDCO's turn to decide"
 PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} Proposal at its Adviser, ready to accept or reject"
 AWAITING_DOCUMENT_TITLE = f"{_PREFIX} Adviser requested a supporting document"
 
+#: The one paper under embargo, so the blocked state can be seen (ADR-052
+#: decision 16). This one because RDCO's warning (IR-818) needs a paper in front
+#: of RDCO. A date always ahead, so the demo never reads as overdue.
+EMBARGOED_TITLE = AT_RDCO_TITLE
+EMBARGO_DAYS_AHEAD = 365
+
 
 class Command(BaseCommand):
     help = "Seed demo accounts, the Discover catalogue, and every pipeline state (IR-227)."
@@ -198,6 +208,7 @@ class Command(BaseCommand):
             self._seed_classifications()
             self._seed_catalogue(users)
             self._seed_workflow(users)
+            self._answer_for_papers_seeded_earlier()
 
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Demo data ready."))
@@ -208,6 +219,7 @@ class Command(BaseCommand):
             self.stdout.write(f"  Already-preserved badges render on: '{RESUBMITTED_TITLE}'")
             self.stdout.write(f"  Pick the offices as RDCO on: '{IN_RDCO_POOL_TITLE}'")
             self.stdout.write(f"  Decide early as RDCO on: '{RDCO_DECIDES_EARLY_TITLE}'")
+            self.stdout.write(f"  Under embargo, so the AI refuses it: '{EMBARGOED_TITLE}'")
 
     # -- phase 1: accounts -------------------------------------------------
 
@@ -381,10 +393,39 @@ class Command(BaseCommand):
         """Submit through the same adviser-first service as the API."""
         from apps.reviews.routing import enter_at_adviser
 
+        record_answer(record, self._embargo_answer(record), actor=owner)
         record.dpa_accepted_at = timezone.now()
         record.dpa_accepted_by = owner
         record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
         return enter_at_adviser(record, owner)
+
+    def _embargo_answer(self, record: Record) -> EmbargoAnswer:
+        if record.title == EMBARGOED_TITLE:
+            return EmbargoAnswer(until=timezone.localdate() + timedelta(days=EMBARGO_DAYS_AHEAD))
+        return EmbargoAnswer(until=None)
+
+    def _answer_for_papers_seeded_earlier(self):
+        """
+        Answer for this command's own papers that an older run left Unknown.
+
+        A second run creates nothing, so without this a database seeded before
+        the question existed would keep answering "no readable sources". Named
+        by title and origin together, so a paper from anywhere else doesn't get an
+        answer nobody gave. The draft stays for Publish to ask.
+        """
+        catalogue = [entry[0] for entry in CATALOGUE]
+        earlier = (
+            Record.objects.filter(
+                Q(title__startswith=_PREFIX) | Q(title__in=catalogue),
+                origin=Record.Origin.SYNTHETIC,
+                embargo_answered_at__isnull=True,
+            )
+            .exclude(pipeline_status=PipelineStatus.DRAFT)
+            .select_related("added_by")
+        )
+        for record in earlier:
+            record_answer(record, self._embargo_answer(record), actor=record.added_by)
+            self.stdout.write(f"  ~ {record.title[:58]} (embargo answered)")
 
     @transaction.atomic
     def _scenario_draft(self, users):
@@ -584,17 +625,12 @@ class Command(BaseCommand):
         Entered through `routing.enter_at_adviser`, as every submission is.
         This one is where *Accept & send to RDCO…* is demoed (as adviser@cit.edu).
         """
-        from apps.reviews.routing import enter_at_adviser
-
         record = self._make(
             NEW_MODEL_TITLE, RecordTypeName.THESIS_RESEARCH, users[RoleName.STUDENT],
             adviser=users[RoleName.ADVISER], is_ip=True,
         )
         if record:
-            record.dpa_accepted_at = timezone.now()
-            record.dpa_accepted_by = users[RoleName.STUDENT]
-            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-            enter_at_adviser(record, users[RoleName.STUDENT])
+            self._submit(record, users[RoleName.STUDENT])
             self._done(record)
 
     @transaction.atomic
@@ -604,18 +640,13 @@ class Command(BaseCommand):
         through `routing.enter_at_adviser`; adviser@cit.edu opens the review and
         demos *Accept* and *Reject*, which a Proposal's Adviser alone decides.
         """
-        from apps.reviews.routing import enter_at_adviser
-
         student = users[RoleName.STUDENT]
         record = self._make(
             PROPOSAL_AT_ADVISER_TITLE, RecordTypeName.PROPOSAL, student,
             adviser=users[RoleName.ADVISER],
         )
         if record:
-            record.dpa_accepted_at = timezone.now()
-            record.dpa_accepted_by = student
-            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-            enter_at_adviser(record, student)
+            self._submit(record, student)
             self._done(record)
 
     @transaction.atomic
@@ -629,7 +660,7 @@ class Command(BaseCommand):
         from apps.reviews import seats
         from apps.reviews.models import RecordAssignment, ReviewerSeat
         from apps.reviews.office_review import CLEARED, record_office_review
-        from apps.reviews.routing import accept_and_route, enter_at_adviser, route
+        from apps.reviews.routing import accept_and_route, route
 
         student, adviser, itso = (
             users[RoleName.STUDENT], users[RoleName.ADVISER], users[RoleName.ITSO],
@@ -640,10 +671,7 @@ class Command(BaseCommand):
         )
         if not record:
             return
-        record.dpa_accepted_at = timezone.now()
-        record.dpa_accepted_by = student
-        record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-        entry = enter_at_adviser(record, student)
+        entry = self._submit(record, student)
         seats.open_review(entry.seats.get(), adviser)
         rdco = users[RoleName.RDCO]
         accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="The sensor fusion method needs technical review.")

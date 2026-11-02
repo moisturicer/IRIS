@@ -198,7 +198,7 @@ export default function DownloadRequestsPage() {
           disabled={loading}
           variant="outline"
           size="sm"
-          className="ml-auto"
+          className="w-full justify-center sm:ml-auto sm:w-auto"
         >
           <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh

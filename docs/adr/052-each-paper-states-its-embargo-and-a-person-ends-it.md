@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it), and IR-816 adds the question itself. Decision 2 is amended and decision 18 added in the Amendment below. The acts, the reminders and the bypass's removal are still to come.
+**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it), IR-816 adds the question itself, and IR-815 adds decisions 16 and 17: test data answers for itself, and IR-317's bypass is gone. Decision 2 is amended and decision 18 added in the Amendment below. The acts, the reminders and the bypass's removal are still to come.
 
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
@@ -129,6 +129,8 @@ The evaluation's 40 proxy papers keep working once they're marked. Runs from the
 IR-250 (builds this) · IR-317 (the bypass it removes) · IR-127 (the gate) · IR-226 (the consent precedent) · IR-630 and IR-631 (blocked by it) · IR-720 (uses its facts) · IR-278 (real papers) · IR-791 (consent withdrawal, which uses the same gate)
 
 ## Amendment — 2026-11-02 (IR-816): the question comes first, and who can see the answer
+
+**Changed since by [ADR-054](054-each-person-answers-whether-ai-may-use-their-papers.md):** consent no longer stays on the last step, once that ADR is built. The Why below records the reasoning at the time.
 
 **What this supersedes.** Decision 2's "at submission: a toggle and a date on the publish form, beside the IP question", and the word "toggle" in decision 5. Everything else stands. Decided by Hermoine Zozobrado. Decision 18 was accepted separately on 2026-11-02.
 

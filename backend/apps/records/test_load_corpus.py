@@ -16,13 +16,14 @@ from unittest.mock import patch
 
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase
+from django.test import TestCase, override_settings
 
 from apps.accounts.models import User
+from apps.ai.policy.records import decision_for_record
 from apps.documents.models import DocumentKind, PdfExtraction
 from apps.records.management.commands.load_corpus import DEFAULT_OWNER_EMAIL
 from apps.records.models import Classification, Record, RecordOwner, RecordType
-from core.enums import PipelineStatus
+from core.enums import EmbargoState, PipelineStatus
 
 from apps.documents.testing import real_pdf_bytes
 
@@ -280,6 +281,83 @@ class LoadCorpusTests(_LoadsCorpus):
     def test_an_empty_directory_reports_no_categories_and_writes_nothing(self):
         self.load(str(self.root))
 
+        self.assertEqual(Record.objects.count(), 0)
+
+
+class LoadCorpusClearingTests(_LoadsCorpus):
+    """The answer as an option (ADR-052 decision 16), and only for test papers."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        _write(self.root, "econometrics", "Paper.pdf")
+
+    def test_a_paper_loaded_without_the_option_stays_unknown(self):
+        self.load(str(self.root))
+
+        record = Record.objects.get(title="Paper")
+        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertFalse(decision_for_record(record).allowed)
+
+    @override_settings(DEBUG=True)
+    def test_the_option_clears_a_paper_for_the_ai(self):
+        self.load(str(self.root), clear_for_ai=True)
+
+        record = Record.objects.get(title="Paper")
+        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertTrue(decision_for_record(record).allowed)
+        self.assertEqual(record.embargo_answered_by.email, DEFAULT_OWNER_EMAIL)
+        self.assertEqual(record.dpa_accepted_by.email, DEFAULT_OWNER_EMAIL)
+
+    @override_settings(DEBUG=True)
+    def test_the_report_says_what_the_option_will_spend(self):
+        for options in ({"dry_run": True}, {}):
+            out = StringIO()
+            with patch("apps.documents.tasks.extract_manuscript_text.delay"):
+                with self.captureOnCommitCallbacks(execute=True):
+                    call_command(
+                        "load_corpus", str(self.root), clear_for_ai=True, stdout=out, **options,
+                    )
+
+            self.assertIn("spends", out.getvalue())
+            self.assertIn("backfill_embeddings", out.getvalue())
+
+    def test_without_the_option_the_report_says_nothing_about_spending(self):
+        out = StringIO()
+        with patch("apps.documents.tasks.extract_manuscript_text.delay"):
+            with self.captureOnCommitCallbacks(execute=True):
+                call_command("load_corpus", str(self.root), force=True, stdout=out)
+
+        self.assertNotIn("spends", out.getvalue())
+
+    @override_settings(DEBUG=True)
+    def test_a_paper_already_loaded_is_left_alone(self):
+        """That is `mark_corpus_cleared`'s job, which reports what it does."""
+        self.load(str(self.root))
+
+        self.load(str(self.root), clear_for_ai=True)
+
+        record = Record.objects.get(title="Paper")
+        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+
+    def test_force_does_not_get_past_the_refusal_with_debug_off(self):
+        """`--force` loads on any machine. Clearing never does: it would answer
+        for real papers, which only their owners may do."""
+        with self.assertRaises(CommandError) as caught:
+            self.load(str(self.root), clear_for_ai=True, force=True)
+
+        self.assertIn("DEBUG", str(caught.exception))
+        self.assertEqual(Record.objects.count(), 0)
+
+    @override_settings(DEBUG=True)
+    def test_a_paper_declared_institutional_cannot_be_cleared(self):
+        with self.assertRaises(CommandError) as caught:
+            self.load(
+                str(self.root), clear_for_ai=True, origin=Record.Origin.INSTITUTIONAL,
+            )
+
+        self.assertIn("institutional", str(caught.exception))
         self.assertEqual(Record.objects.count(), 0)
 
 

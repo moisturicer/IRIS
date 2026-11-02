@@ -34,9 +34,18 @@ is skipped the same way, per-record, rather than aborting the whole run.
 Needs Docling and a worker on the ``extraction`` queue to actually complete;
 chunking is queued automatically after
 (``documents.tasks._queue_chunking_if_manuscript``). No vendor account
-needed -- chunking does not embed.
+needed -- chunking does not embed, and the disclosure gate refuses to embed a
+paper with no embargo answer (ADR-052), which is what one loaded here has.
+
+``--clear-for-ai`` answers for each new paper instead (decision 16): "no embargo",
+with consent. The gate then lets it through, so **after chunking the worker embeds
+its chunks and queues its AI Overview, which spends credits**. Retrieval can't find
+the paper until ``backfill_embeddings`` adds its title-and-abstract vector. A paper
+already loaded is skipped as ever, and ``mark_corpus_cleared`` answers for those.
 
 Refuses to run with ``DEBUG`` off unless ``--force``, matching ``seed_demo``.
+``--force`` doesn't reach ``--clear-for-ai``, which refuses with ``DEBUG`` off
+whatever else is passed. See ``apps.records.corpus_clearance``.
 """
 
 from pathlib import Path
@@ -51,6 +60,7 @@ from apps.accounts.models import User
 from apps.documents.sources import manuscript_changes, reset_manuscript
 from apps.documents.validators import pdf_upload_problem
 from apps.records import lifecycle
+from apps.records.corpus_clearance import clear_for_ai, refuse_outside_development
 from apps.records.models import Classification, Record, RecordOwner, RecordType
 from core.enums import RecordTypeName
 
@@ -83,6 +93,13 @@ class Command(BaseCommand):
                  "Created, with an unusable password, if it does not already exist.",
         )
         parser.add_argument(
+            "--clear-for-ai", action="store_true",
+            help="Answer 'no embargo', with consent, for each new test paper. The worker "
+                 "then embeds its chunks and queues its AI Overview, which spends credits. "
+                 "Without this a paper stays Unknown and the AI refuses it. Refuses with "
+                 "DEBUG off, even with --force.",
+        )
+        parser.add_argument(
             "--dry-run", action="store_true", help="Report what would happen; write nothing.",
         )
         parser.add_argument(
@@ -96,6 +113,15 @@ class Command(BaseCommand):
                 "and queues extraction against whatever database is configured. "
                 "Pass --force if you are certain this is not production."
             )
+
+        self.clearing = options["clear_for_ai"]
+        if self.clearing:
+            refuse_outside_development()
+            if options["origin"] == Record.Origin.INSTITUTIONAL:
+                raise CommandError(
+                    "refusing --clear-for-ai: a paper declared institutional is a real "
+                    "CIT-U paper, and only its owners may answer for it, through Publish."
+                )
 
         root = Path(options["directory"])
         if not root.is_dir():
@@ -163,6 +189,12 @@ class Command(BaseCommand):
             f"{skipped_non_pdf} non-PDF file(s) skipped; {skipped_error} file(s) failed to load; "
             f"{queued} extraction(s) {queued_verb}."
         ))
+        if self.clearing:
+            self.stdout.write(
+                "Each new paper is answered 'no embargo', with consent. After chunking, the "
+                "worker embeds its chunks and queues its AI Overview, which spends credits. "
+                "Then, for retrieval to find it: python manage.py backfill_embeddings --dry-run"
+            )
 
     def _classification_for(self, name: str):
         # A read-only lookup in dry-run, not `None`: the idempotency check
@@ -207,6 +239,8 @@ class Command(BaseCommand):
                     setattr(record, field, value)
                 record.abstract_file.save(path.name, source, save=True)
             RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+            if self.clearing:
+                clear_for_ai(record, actor=owner)
 
             reset_manuscript(record)
 
