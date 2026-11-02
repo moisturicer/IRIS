@@ -92,3 +92,27 @@ def test_bad_configuration_cannot_silently_run_a_partial_suite(run_pytest, args)
     result = run_pytest(*args)
     assert result.returncode == 4
     assert "supply both --ci-shard and --ci-shards" in result.stderr
+
+
+def test_duration_weights_balance_slow_small_modules():
+    ids = [f"apps/test_{i}.py::test_{j}" for i in range(4) for j in range(10 if i > 1 else 1)]
+    durations = {f"apps/test_{i}.py": seconds for i, seconds in enumerate([90, 80, 10, 20])}
+    assigned = module_shards(ids, 2, durations)
+    loads = [sum(durations[m] for m, shard in assigned.items() if shard == target) for target in (1, 2)]
+    assert loads == [100, 100]
+    assert assigned == module_shards(reversed(ids), 2, durations)
+
+
+def test_unseen_modules_use_seconds_per_test():
+    ids = ["apps/test_old.py::one", "apps/test_new.py::one", "apps/test_new.py::two"]
+    assigned = module_shards(ids, 2, {"apps/test_old.py": 0.3})
+    assert assigned["apps/test_new.py"] == 1
+    assert assigned["apps/test_old.py"] == 2
+
+
+def test_invalid_timing_file_refuses_to_select_a_shard(run_pytest, tmp_path):
+    timings = tmp_path / "broken.json"
+    timings.write_text('{"apps/test_a.py": -10}')
+    result = run_pytest("--ci-shard", "1", "--ci-shards", "4", "--ci-timings", str(timings))
+    assert result.returncode == 4
+    assert "invalid CI timings" in result.stderr

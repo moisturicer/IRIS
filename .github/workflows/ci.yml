@@ -208,6 +208,7 @@ jobs:
         run: >-
           python -m pytest -p testing.ci_sharding
           --ci-shard=${{ matrix.shard }} --ci-shards=4
+          --ci-timings=testing/module_durations.json
           -ra --durations=25 --junitxml=pytest-results.xml
 
       - name: Report authorization matrix duration

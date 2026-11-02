@@ -365,20 +365,37 @@ loads; `config/settings/dotenv.py` applies it, and child processes inherit it.
 A value exported in your shell still applies, as it would in CI. To test with
 real settings, run the app, not the suite.
 
-**Backend CI (IR-810)** runs the complete pytest collection across four isolated
-runners/PostgreSQL services. Whole test modules stay together, assigned by test
-count; tests within a shard retain collection order. This avoids sharing the
-database roles and migration state that integration tests mutate. The required
-`Backend` check passes only when all four shards succeed. Each shard retains
-its JUnit report as a `backend-tests-N` artifact and logs its slowest 25 tests.
-Static/configuration/migration checks and `IRIS_REQUIRE_DB=1` remain enabled.
-PR updates cancel that PR's obsolete run; main push runs remain independent.
+**Full suite in parallel (IR-854).** After installing
+`backend/requirements/development.txt`, run `cd backend && python -m pytest -n 8`.
+Use fewer workers if memory or database connections are limited; `-n 0` runs
+serially. Every selected test still runs. pytest-django creates one migrated
+database per worker (`test_<DB_NAME>_gw0`, etc.). The controller holds IR-835's
+server lock before starting workers, so separate invocations cannot collide.
+Whole modules stay on one worker, and the research-role consumers share one
+worker because Postgres roles belong to the server. Schema rewinds and advisory
+locks stay inside their worker's database. Tests launching child processes must
+pass the active connection's database name/DSN, as the existing process tests do.
+Run on Linux (or in a Linux container) for the PDF validation suites.
 
-The optional plugin is loaded only in CI (ordinary local pytest remains serial).
-The shard regression tests execute actual pytest subprocesses and verify that
-their union runs every collected test once, preserving module order. Shard
-balance currently uses counts; use the reports to judge elapsed time before
-claiming a speedup or changing the partition policy.
+**Backend CI (IR-810, IR-854)** runs the complete collection across four isolated
+runners/Postgres services. Complete modules are assigned longest-first to the
+shard with the lowest estimated duration, with stable path/index tie breaks.
+`backend/testing/module_durations.json` holds seconds including setup/teardown
+from successful CI run **41455637632** (2026-11-02). Unseen modules use **0.2 seconds
+per collected test**; old entries for removed modules are ignored. To refresh,
+download all four `backend-tests-*` JUnit artifacts from one successful run and
+execute, from `backend`:
+
+```bash
+python -m testing.timings path/to/shard1/pytest-results.xml path/to/shard2/pytest-results.xml path/to/shard3/pytest-results.xml path/to/shard4/pytest-results.xml
+```
+
+Commit the updated JSON. Duplicate cases and invalid durations are refused;
+keep reports from different runs separate. Refresh after substantial suite
+changes. The required `Backend` check still waits for all four shards.
+
+The CI shard plugin is opt-in; local runs use one process unless `-n` is supplied.
+Regression tests verify complete coverage and stable assignment.
 
 **AI gateway:** CI's `AI gateway` job runs `ai/tests` with `ai/requirements-dev.txt` (IR-844). Run it with `cd ai && python -m pytest -ra`.
 
