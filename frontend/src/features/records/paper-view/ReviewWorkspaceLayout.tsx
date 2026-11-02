@@ -190,7 +190,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           <header className="review-pane-head">
             <div className="flex items-center justify-between gap-2">
               <div>
-                <p className="text-2xs font-semibold uppercase tracking-wider text-stone-500">Review workspace / current record</p>
+                <p className="text-2xs font-semibold uppercase tracking-wider text-stone-600">Review workspace / current record</p>
                 {record.current_holders.length > 0 && (
                   <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-full border border-brand/40 bg-brand/5 px-2 py-0.5 text-2xs font-semibold text-brand">
                     <span className="h-1.5 w-1.5 rounded-full bg-brand" aria-hidden />

@@ -2526,3 +2526,8 @@ NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECK
 **Not done here.** No real adapter declares a capacity yet, so no vendor's window is verified; compaction (IR-734) does not exist, so `compaction_required` is only reachable when a caller opts in. The status is logged, not persisted or shown to readers (IR-735). `Capacity` is what an adapter declares; nothing yet checks a declaration against the vendor. Repacking withholds greedily in call order, not the best subset. With compaction available, a single result that does not fit is still withheld by marker; compaction is requested only when the group cannot be answered. Repacking means withholding whole results by marker; ranged continuations of a long result are IR-733. The executor still sends one turn with no tools; the tool loop that will call `pack` is IR-728.
 
 **Status.** Implemented; awaiting review.
+
+## IR-770 — Paper View and My Reviews contrast (2026-11-02)
+
+NFR-A1: muted text on stone-100 now uses the existing stone-600 utility in the reading header, single-version label, PDF zoom, Paper Chat heading context, review workspace heading and inactive My Reviews counts. Real Chromium measured the affected pair at 4.3977:1 before and 6.9934:1 after (AA minimum 4.5:1). The existing IR-414 browser pre-pass is the acceptance check; see [executed evidence and limits](evidence/IR-770/README.md). Human approval remains outstanding.
+
