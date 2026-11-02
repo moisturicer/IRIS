@@ -60,6 +60,8 @@ const lines = [
   "ALLOWED_HOSTS=localhost,127.0.0.1,backend",
   `CORS_ALLOWED_ORIGINS=${origin}`,
   "TRUSTED_PROXY_COUNT=1",
+  // Required by the production file; its caddy service is off in this stack.
+  "IRIS_DOMAIN=localhost",
   // An https origin is a production requirement for recovery links. Nothing
   // listens on it with TLS: the run reads links from Mailpit and follows only
   // their path on the plain-HTTP base URL (see e2e/README.md, Limitations).

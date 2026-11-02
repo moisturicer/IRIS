@@ -349,11 +349,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      # 8080, not 80: the runtime image is nginx-unprivileged, which
-      # listens on 8080 because it does not run as root. Mapping 80:80
-      # made the frontend unreachable even when it started (IR-156).
-      - "80:8080"
+    # Not published (IR-847): Caddy is the only way in. nginx listens on 8080
+    # because the runtime image is nginx-unprivileged (IR-156).
     # Set in the repo-root .env (IR-668). No allowlist closes /django-admin/ to
     # everyone. The proxy count must match backend/.env's.
     environment:
@@ -376,6 +373,36 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  # TLS (IR-847, ADR-056). Needs a public IRIS_DOMAIN with ports 80 and 443 open,
+  # and TRUSTED_PROXY_COUNT=2. Certificates persist in caddy_data, so a restart
+  # doesn't request new ones.
+  caddy:
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - IRIS_DOMAIN=${IRIS_DOMAIN:?set IRIS_DOMAIN in the repo-root .env}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
 volumes:
   postgres_data:
   media_files:
+  caddy_data:
+  caddy_config:

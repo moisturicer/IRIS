@@ -138,9 +138,9 @@
 
 | Item | Requirement | Status | Evidence |
 |---|---|---|---|
-| 9.1.1 | TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. | Gap | nginx listens on plain 8080, and this repository configures no TLS. **No ticket yet.** [IR-662](https://citiris.atlassian.net/browse/IR-662) only trusts the proxy's scheme |
-| 9.1.2 | using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred. | Gap | As 9.1.1. **No ticket yet** |
-| 9.1.3 | only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option. | Gap | As 9.1.1. **No ticket yet** |
+| 9.1.1 | TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. | Partial | Caddy serves HTTPS and redirects plain HTTP, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-056). CI shows this on the real Caddy with a local certificate. Not yet seen on a deployed domain |
+| 9.1.2 | using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred. | Partial | CI's OpenSSL probe refuses weak ciphers on the real Caddy (IR-847). A full scan on a deployed domain is still owed |
+| 9.1.3 | only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option. | Partial | The Caddyfile allows only 1.2 and 1.3, and CI's probe confirms it (IR-847). Not yet seen on a deployed domain |
 
 ## V10 · Malicious Code
 
