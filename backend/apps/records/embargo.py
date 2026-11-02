@@ -1,5 +1,5 @@
 """
-A paper's embargo answer (ADR-052, IR-811).
+A paper's embargo answer (ADR-052, IR-811, IR-816).
 
 The only place that writes `Record`'s embargo stamps. The state they add up to
 is `Record.embargo_state`, and what it permits is `apps.ai.policy`'s to decide.
@@ -15,6 +15,8 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .models import Record
+
+ANSWER_REQUIRED = "Say whether this paper is under embargo."
 
 
 @dataclass(frozen=True)
@@ -59,9 +61,7 @@ def answer_from(data: Any) -> Optional[EmbargoAnswer]:
     """
     if "embargoed" not in data:
         if "embargoed_until" in data:
-            raise serializers.ValidationError(
-                {"embargoed": "Say whether this paper is under embargo."}
-            )
+            raise serializers.ValidationError({"embargoed": ANSWER_REQUIRED})
         return None
     serializer = _AnswerSerializer(data=data)
     serializer.is_valid(raise_exception=True)
@@ -72,8 +72,9 @@ def record_answer(record: Record, answer: EmbargoAnswer, *, actor) -> None:
     """
     Store `answer` with who gave it and when, replacing any answer before it.
 
-    Only the submit action calls this, on a draft: before submission the toggle
-    is the owners' to change freely, because nothing has been sent (§5).
+    Only ever on a draft: before submission the answer is the owners' to change
+    freely (§5). After it, changing an embargo is a separate act (IR-812), because
+    this would let an owner end one with no release (§6).
     """
     record.embargoed_until = answer.until
     record.embargo_answered_at = timezone.now()
@@ -86,3 +87,7 @@ def record_answer(record: Record, answer: EmbargoAnswer, *, actor) -> None:
     ])
 
 
+def state_payload(record: Record) -> dict:
+    """`{state, until}`: where the embargo stands, as the API says it."""
+    until = record.embargoed_until
+    return {"state": record.embargo_state.value, "until": until.isoformat() if until else None}

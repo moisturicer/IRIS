@@ -2469,7 +2469,7 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 **Design:** [ADR-052](../adr/052-each-paper-states-its-embargo-and-a-person-ends-it.md) decisions 1 to 4, 15 and 18, amending ADR-015's gate. Subtask 1 of IR-250.
 
 - **Answer:** `Record.embargoed_until`, `embargo_answered_at`/`_by` and `embargo_released_at`/`_by` (migration `records/0025`, with two check constraints). `Record.embargo_state` derives Unknown, None, Active or Released from them, like `dpa_accepted`, and reads no clock.
-- **Submission:** `POST /records/<id>/submit/` takes `embargoed` and `embargoed_until` through `apps/records/embargo.py`. No answer submits and stays Unknown, because the form sends none until IR-816. A bad answer refuses before anything is written. When the gate then allows the paper, submitting queues `index_record` and asks again for its AI Overview (`apps.ai.tasks.send_to_ai_on_commit`), because its upload was refused and nothing else retries either.
+- **Submission:** `POST /records/<id>/submit/` took `embargoed` and `embargoed_until` through `apps/records/embargo.py`. IR-816 moved the answer to its own route, saved before the file, and made a paper with no answer a refusal. When the gate then allows the paper, submitting queues `index_record` and asks again for its AI Overview (`apps.ai.tasks.send_to_ai_on_commit`), because its upload was refused and nothing else retries either.
 - **Gate:** `apps/ai/policy/disclosure.py` reads the state and never a date. None and Released allow; Unknown, Active and anything unrecognised refuse. The `EmbargoUnknown` sentinel and `today` are gone.
 - **Record detail:** `embargo: {state, until}` goes to owners, the Adviser and office staff (`core.permissions.may_read_embargo`), and is `null` for other readers.
 
@@ -2477,7 +2477,26 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 
 **Evidence:** migrated on a copy of one developer's Docker database, starting from `records/0021`, 2026-11-01: 18 records, 17 with consent, 5 marked IP, all Unknown and none allowed; reversed and re-applied cleanly. Each gate was broken on purpose in turn, and the tests for that path failed.
 
-**PARTIAL:** nothing sends an answer yet (IR-816), test data carries none (IR-815), and no audit event records the answer: the row holds who and when, and IR-812 adds the audit types. The set, extend and release acts are IR-812, KTTO's release is IR-813 and the reminders are IR-814. Earlier chat answers quoting a paper are checked for visibility only (`_recent_turns`, `memory.py`, `turn_backfill.py`), so they can be re-sent after a paper becomes refused. That predates this change and IR-812 closes it, since IR-812 is what lets an already-sent paper be embargoed.
+**PARTIAL:** test data carries no answer (IR-815), and no audit event records the answer: the row holds who and when, and IR-812 adds the audit types. The set, extend and release acts are IR-812, KTTO's release is IR-813 and the reminders are IR-814. Earlier chat answers quoting a paper are checked for visibility only (`_recent_turns`, `memory.py`, `turn_backfill.py`), so they can be re-sent after a paper becomes refused. That predates this change and IR-812 closes it, since IR-812 is what lets an already-sent paper be embargoed.
+
+**Status:** Implemented; awaiting review.
+
+## IR-816 · Publish asks about an embargo first, and saves the answer before the file
+
+**Design:** [ADR-052](../adr/052-each-paper-states-its-embargo-and-a-person-ends-it.md) decision 2, and its Amendment of 2026-11-02. Subtask 6 of IR-250.
+
+- **Question:** `frontend/src/features/publish/EmbargoStep.tsx` is the Publish dialog's first screen, before the type and the file. It is a required No or Yes with a date, and it starts unanswered. An answered draft skips it, and "Publish another" asks again.
+- **Saved first:** `POST /records/<id>/embargo-answer/`, a draft's owners only, is called after the draft exists and before `uploadManuscript`. If it fails, the file is not sent. It joins `apps/tests/access/table.py`.
+- **Submission:** `POST /records/<id>/submit/` refuses a paper with no answer, like consent, and no longer writes one. A new Version goes through its own action and is not asked.
+- **Under Yes:** the title and abstract suggestions from the PDF are off. IRIS still reads the PDF with Docling, which stays inside IRIS.
+- **Continuations:** a Continuation starts unanswered and Publish asks again, even when its Proposal is under embargo (`apps/records/test_continuation.py`).
+- **Review and Help:** the review step has an Embargo group whose Edit goes back to the question, and Help's publishing section explains it.
+
+**Tests:** `frontend/src/features/publish/PublishDialog.test.tsx` and `draft.test.ts` (asked first and alone, no default, date rules, saved before the file, a failed save sends no file, reopening a draft, suggestions off, axe), `frontend/src/features/help/HelpPage.test.tsx`, `apps/records/test_embargo.py` (the route and the refusal), and `apps/tests/test_access_matrix.py`.
+
+**Evidence:** driven in a real browser on 2026-11-02 against the real backend on a throwaway database, not in CI: the question comes first with no default, Continue refuses no answer and a past date, `POST /records/` then `embargo-answer/` then the file, the date stored on the row, no suggestion requests under Yes and two under No, an answered draft skips the question, and no sideways scroll at 360, 768, 1280 or 1745 px.
+
+**PARTIAL:** the server does not refuse a file on an unanswered draft: only Publish's order enforces "answer first", and the gate still refuses an unanswered paper. Releasing an embargo is IR-812, so a submitted Yes cannot end yet, and the screen does not promise it. Saving the answer writes no audit event: the row holds who and when, and IR-812 adds the audit types. Jive's planned AI that fills in fields at upload still needs consent, which comes at the last step, so the gate refuses it for every paper.
 
 **Status:** Implemented; awaiting review.
 
@@ -2589,3 +2608,6 @@ IR-722's run tests pass with the schema pin literal moved to `0004_agent.sql`, a
 
 NFR-A1: muted text on stone-100 now uses the existing stone-600 utility in the reading header, single-version label, PDF zoom, Paper Chat heading context, review workspace heading and inactive My Reviews counts. Real Chromium measured the affected pair at 4.3977:1 before and 6.9934:1 after (AA minimum 4.5:1). The existing IR-414 browser pre-pass is the acceptance check; see [executed evidence and limits](evidence/IR-770/README.md). Human approval remains outstanding.
 
+## IR-98 — The test plan describes the testing IRIS does
+
+`TEST_PLAN.md` now lists the tooling and levels in use, and §9 lists what testing does not establish yet. `SECURITY.md` §11 gives each risk a reason and stays the one register. Documentation only: no test or requirement status changes.

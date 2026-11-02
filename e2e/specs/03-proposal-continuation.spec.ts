@@ -56,6 +56,7 @@ test("two simultaneous requests start exactly one Continuation", async () => {
 });
 
 test("the Continuation cannot be submitted without its own manuscript", async () => {
+  await student.act(`/records/${childId}/embargo-answer/`, { embargoed: false });
   const refused = await student.post(`/records/${childId}/submit/`, { dpa_accepted: true });
   expect(refused.status()).toBe(400);
   expect(await refused.text()).toContain("manuscript");
