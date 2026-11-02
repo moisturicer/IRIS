@@ -1,5 +1,27 @@
 # Requirements Traceability
 
+## IR-737 · Recoverable committed Manuscript work (ADR-049 §22)
+
+`apps/publication` atomically records source changes in the institutional
+outbox; revision-bound local processing grants are verified against current
+canonical work. `ai/ingestion` acknowledges through AI-owned receipts and
+recovers without Redis delivery. The existing owner-only metadata-suggestions
+surface reports pending or acknowledged/pending, never completed extraction.
+
+Behavioral evidence: `apps/ai/tests/test_manuscript_publication.py` covers
+save/rollback and duplicate identity, owner isolation, real restricted-role
+source reads and forged/mismatched/stale/revoked grant refusal, renewal, lost
+publication, and two independent worker processes racing one acknowledgement.
+The authenticated PDF-upload test runs on Linux (bounded intake is unavailable
+on Windows). Five core checks passed on PostgreSQL and the upload seam passed
+in the Linux backend container on 2026-11-02. Additive Django and AI migrations
+also passed on a development database copy preserving 63 Records; publication
+model/migration consistency and Python F-rule lint passed. No live writer
+switch, provider call, extraction or index activation was performed.
+
+Operational details: `ai/ingestion/README.md`. Deployment and human review remain
+required; implementation evidence does not mark the ticket Done.
+
 ## IR-364 · Settings and session bootstrap palette (NFR-U1)
 
 Settings uses the shared settled tone for saved feedback, active maroon for
