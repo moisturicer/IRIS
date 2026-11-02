@@ -111,11 +111,13 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 [ADR-015](../adr/015-voyage-embedding-and-reranking.md) sends chunk text to Voyage, and it dropped the earlier written sign-off precondition on 2026-09-04. Its remaining conditions:
 
-1. **A disclosure check before sending.** `apps/ai/policy/disclosure.py` refuses on IP status, embargo state and missing consent. An Unknown embargo is refused, and nothing yet sends an embargo answer, so **new submissions stay refused until [IR-250](https://citiris.atlassian.net/browse/IR-250) finishes**.
+1. **A disclosure check before sending.** `apps/ai/policy/disclosure.py` refuses on IP status, embargo state and missing consent. An Unknown embargo is refused until someone answers: Publish asks first, and after submission owners or the Adviser set an embargo and the Adviser or RDCO release it ([IR-812](https://citiris.atlassian.net/browse/IR-812)).
 2. **Voyage's training opt-out**, an account setting. The repository can't show whether it was exercised (§11).
 3. **`VOYAGE_API_KEY` as a production secret.**
 
 IR-317's development bypass is deleted ([IR-815](https://citiris.atlassian.net/browse/IR-815)), and the indexing path no longer accepts a substitute for the check. Test papers get an answer instead: `load_corpus --clear-for-ai` and `mark_corpus_cleared` refuse with `DEBUG` off, and `--force` doesn't change that. Neither answers for a paper declared `institutional`, but neither can recognise a real paper whose origin was never declared, so they depend on `DEBUG` and on who runs them. `seed_demo` answers only for its own synthetic papers, whose text it wrote.
+
+An earlier chat answer citing a paper the check now refuses stays out of history, recall and the answer backfill ([IR-812](https://citiris.atlassian.net/browse/IR-812)), because it holds that paper's text. It goes by what a Turn cites, so an answer repeating a paper without citing it isn't caught.
 
 `apps/ai/policy/outbound.py` rechecks withheld or revoked sources before each provider attempt ([IR-720](https://citiris.atlassian.net/browse/IR-720), partially implemented and awaiting review). Retrieval is filtered by `visible_to(user)` before anything is scored.
 

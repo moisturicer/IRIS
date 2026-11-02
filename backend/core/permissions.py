@@ -1,8 +1,8 @@
 from rest_framework.permissions import BasePermission
 
 from core.enums import (
-    DELETE_REVIEW_STATUSES, OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus,
-    RoleName, WorkflowState,
+    DELETE_REVIEW_STATUSES, OPEN_SEAT_STATES, AssignmentState, EmbargoState, Party,
+    PipelineStatus, RoleName, WorkflowState,
 )
 
 # Role name constants -- match the Role.name values in the DB exactly.
@@ -189,6 +189,20 @@ def may_read_embargo(user, record) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     return record.adviser_id == user.pk or owns_or_staffs_record(user, record)
+
+
+def may_set_embargo(user, record) -> bool:
+    """Owners or the Adviser (ADR-052 §5). No office, RDCO included."""
+    return record.adviser_id == user.pk or is_record_owner(user, record)
+
+
+def may_release_embargo(user, record) -> bool:
+    """
+    The Adviser or RDCO, and never a student owner, even on their own paper (§6).
+    A release sends text out for good, and an embargo may protect a sponsor's
+    agreement or the other owners' wishes. If the Adviser has left, RDCO does it.
+    """
+    return record.adviser_id == user.pk or get_role_name(user) == ROLE_RDCO
 
 
 def is_record_owner(user, record) -> bool:
@@ -386,6 +400,14 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         if delete_act is not None:
             offered.append(delete_act)
 
+    # `embargo-set/` and `embargo-release/` (ADR-052 §5, §6). A draft's answer
+    # is `embargo-answer/`'s instead, under `continue_draft`.
+    if record.pipeline_status != PipelineStatus.DRAFT:
+        if may_set_embargo(user, record):
+            offered.append("set_embargo")
+        if record.embargo_state == EmbargoState.ACTIVE and may_release_embargo(user, record):
+            offered.append("release_embargo")
+
     # `review-comments/`: the record's participants, once it is submitted
     # (ADR-032 §7, IR-419). A pool member reads the discussion but is not
     # offered a place in it.
@@ -404,6 +426,16 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
     if office_staff and filing_party(record, user) is not None:
         offered.append("attach_file")
     return offered
+
+
+class MaySetEmbargo(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return may_set_embargo(request.user, obj)
+
+
+class MayReleaseEmbargo(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return may_release_embargo(request.user, obj)
 
 
 class IsRecordOwner(BasePermission):

@@ -127,6 +127,17 @@ Every seat event carries `party`, `assignment`, `seat`, `reviewer` (user id) and
 
 The Adviser's entry seat writes no seat event: `SUBMITTED` is that act.
 
+### A paper's embargo (ADR-052 §8, IR-812)
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `EMBARGO_ANSWERED` | An owner answers Publish's question on a draft, each time they change it. `seed_demo`, `load_corpus --clear-for-ai` and `mark_corpus_cleared` write it too, for test papers | `embargoed`, `until` (an ISO date, or `null`) |
+| `EMBARGO_SET` | An owner or the Adviser puts a submitted paper under an embargo, including a paper released before | `until`, `previous_state` (`unknown`, `none` or `released`) |
+| `EMBARGO_EXTENDED` | An owner or the Adviser moves an active embargo's date, earlier or later | `until`, `previous_until` |
+| `EMBARGO_RELEASED` | The Adviser or RDCO ends an active embargo | `until`, the date it held |
+
+There is no backfill: answers saved before this have no row. The Record holds only who gave the latest answer or set the current date, and when.
+
 ### Withdrawal
 
 | Type | Written when | `metadata` |

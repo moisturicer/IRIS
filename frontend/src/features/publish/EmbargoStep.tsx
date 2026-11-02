@@ -92,7 +92,7 @@ export function EmbargoStep({ value, onChange, problem, today }: EmbargoStepProp
           />
           {dateProblem && <FieldError id={DATE_ERROR_ID}>{dateProblem}</FieldError>}
           <p id={DATE_HINT_ID} className="mt-1 text-small text-stone-600">
-            This date doesn't end the embargo.
+            This date doesn't end the embargo. After you submit, only your Adviser or RDCO can.
           </p>
         </div>
       )}

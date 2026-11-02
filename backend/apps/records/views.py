@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from rest_framework import viewsets, mixins, status
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -28,6 +28,8 @@ from core.permissions import (
     IsRDCO,
     IsRecordOwner,
     IsStaff,
+    MayReleaseEmbargo,
+    MaySetEmbargo,
 )
 from .download_service import (
     DownloadRequestAlreadyDecided,
@@ -148,6 +150,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
         if self.action in ("update", "partial_update", "submit", "embargo_answer", "destroy"):
             return [IsAuthenticated(), IsRecordOwner()]
+        if self.action == "embargo_set":
+            return [IsAuthenticated(), MaySetEmbargo()]
+        if self.action == "embargo_release":
+            return [IsAuthenticated(), MayReleaseEmbargo()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -414,6 +420,45 @@ class RecordViewSet(viewsets.ModelViewSet):
             )
         embargo.record_answer(record, answer, actor=request.user)
         return Response(embargo.state_payload(record))
+
+    def _submitted_paper_under_lock(self):
+        record = self.get_object()  # a 404 for a paper they can't see, then a 403
+        Record.objects.select_for_update().get(pk=record.pk)
+        record = self.get_object()
+        if record.pipeline_status == PipelineStatus.DRAFT:
+            raise serializers.ValidationError({"detail": embargo.DRAFT_ANSWERS_INSTEAD})
+        return record
+
+    @action(detail=True, methods=["post"], url_path="embargo-set")
+    @transaction.atomic
+    def embargo_set(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-set/  {"embargoed_until": date}
+
+        An owner or the Adviser sets an embargo on a submitted paper, or moves an
+        active one's date (ADR-052 §5, IR-812). The date is required, so this can
+        never blank one: that would read as "no embargo" with no release.
+        """
+        record = self._submitted_paper_under_lock()
+        until = embargo.until_from(request.data)
+        return Response(embargo.set_embargo(record, until, actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="embargo-release")
+    @transaction.atomic
+    def embargo_release(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-release/
+
+        The Adviser or RDCO ends an active embargo and sends the paper on to the
+        AI (ADR-052 §6, §10, IR-812). Who may ask is checked before where the
+        embargo stands, so a refusal says nothing about it.
+        """
+        record = self._submitted_paper_under_lock()
+        if record.embargo_state != EmbargoState.ACTIVE:
+            return Response(
+                {"detail": embargo.NOTHING_TO_RELEASE}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(embargo.release_embargo(record, actor=request.user))
 
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):

@@ -46,6 +46,10 @@ OFFICE_ONLY = row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY)
 READS_RECORD = row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE)
 #: `record`, an owner's act: visible non-owners are refused, others hidden.
 OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE)
+# ADR-052 §5: owners or the Adviser set an embargo, and no office does.
+SETS_EMBARGO = row(ANON, HIDE, OK, OK, DENY, DENY, DENY, DENY, HIDE)
+# ADR-052 §6: the Adviser or RDCO release one, and never a student owner.
+RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE)
 #: `record`, the seated ITSO reviewer's act alone.
 SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE)
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
@@ -132,6 +136,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-embargo-answer": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"embargoed": False},
     )}),
+    "record-embargo-set": Entry({"POST": _case(
+        SETS_EMBARGO, kwargs=RECORD, data={"embargoed_until": "2099-01-01"},
+    )}),
+    "record-embargo-release": Entry({"POST": _case(RELEASES_EMBARGO, kwargs=RECORD)}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),

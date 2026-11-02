@@ -219,6 +219,8 @@ export type Capability =
   | "withdraw_submission"
   | "request_deletion"
   | "continue_as"
+  | "set_embargo"
+  | "release_embargo"
   | "set_visibility"
   | "tag_ip"
   | "attach_file"

@@ -272,13 +272,15 @@ def _store_answer_vector(turn: Turn, answer: GroundedAnswer, embedder) -> None:
     alone cannot recall a Turn whose answer states a fact the question never
     named.
 
-    Four reasons to store nothing, all of them normal:
+    Five reasons to store nothing, all of them normal:
 
     * the switch is off;
     * there is no embedding space -- a degraded, full-text answer has no
       vector of any kind, exactly as the question vector above;
     * the state is not one whose text is an answer (see
       `_EMBEDDABLE_STATES`), or the text is blank;
+    * a paper behind the answer was refused while it was being written, which
+      makes this one more send of that paper's text (IR-812);
     * the embedding call failed.
 
     Only the last is a problem, and it is still not this function's to
@@ -297,6 +299,13 @@ def _store_answer_vector(turn: Turn, answer: GroundedAnswer, embedder) -> None:
 
     text = (answer.text or "").strip()
     if not text:
+        return
+
+    from apps.ai.history import disclosable_record_ids
+
+    papers = {citation.record_id for citation in answer.citations}
+    papers |= {source.record_id for source in answer.sources}
+    if papers - disclosable_record_ids(papers):
         return
 
     if embedder is None:
