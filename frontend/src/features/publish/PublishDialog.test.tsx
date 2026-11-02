@@ -1058,6 +1058,8 @@ describe("the embargo question (ADR-052 decision 2)", () => {
     expect(group).toHaveTextContent(/outside AI companies/);
     expect(group).toHaveTextContent(/doesn't hide the paper/);
     expect(group).toHaveTextContent(/can't be recalled/);
+    // The author protects possible IP by answering Yes, so Yes has to say it covers that.
+    expect(screen.getByRole("radio", { name: /may want to patent or protect/ })).not.toBeChecked();
   });
 
   it("refuses to continue with no answer, in words, and moves focus to it", async () => {

@@ -69,7 +69,7 @@ export function EmbargoStep({ value, onChange, problem, today }: EmbargoStepProp
         <Choice
           id="publish-embargo-yes"
           label="Yes"
-          sentence="A patent, an agreement or something similar is still pending. IRIS won't read a title or abstract out of the PDF for you, so you'll type those yourself."
+          sentence="A patent or an agreement is pending, or you may want to patent or protect this work. IRIS won't read a title or abstract out of the PDF for you, so you'll type those yourself."
           checked={value.choice === "yes"}
           onSelect={() => onChange({ ...value, choice: "yes" })}
         />
