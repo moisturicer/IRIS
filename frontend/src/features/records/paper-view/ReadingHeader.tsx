@@ -64,7 +64,7 @@ export function ReadingHeader({
         type="button"
         onClick={onBack}
         className={cn(
-          "shrink-0 inline-flex items-center gap-1.5 -ml-1 px-2 text-small text-stone-500 hover:text-brand",
+          "shrink-0 inline-flex items-center gap-1.5 -ml-1 px-2 text-small text-stone-600 hover:text-brand",
           CONTROL_SIZE,
           CONTROL_SHAPE,
           FOCUS_RING,

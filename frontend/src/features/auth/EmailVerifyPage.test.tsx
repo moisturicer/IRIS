@@ -190,11 +190,12 @@ describe.each([
     expect(screen.queryByText(/^IRIS is CIT-U's system/)).not.toBeInTheDocument();
   });
 
-  it("names the pilot institution in the footer, with no link in it", async () => {
+  it("offers privacy and terms in the shared entry footer", async () => {
     await renderResult();
 
     const footer = screen.getByRole("contentinfo");
-    expect(footer).toHaveTextContent("Pilot institution: Cebu Institute of Technology – University");
-    expect(within(footer).queryAllByRole("link")).toEqual([]);
+    expect(footer).not.toHaveTextContent("Pilot institution:");
+    expect(within(footer).getByRole("link", { name: "Data privacy" })).toBeInTheDocument();
+    expect(within(footer).getByRole("link", { name: "Terms" })).toBeInTheDocument();
   });
 });

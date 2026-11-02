@@ -531,7 +531,7 @@ function PaperPdfReaderSource({
           </Button>
           {/* The percentage gives way below `sm`, so the toolbar keeps its
               44px controls on one row at 360px. */}
-          <span className={cn("text-2xs font-semibold text-stone-500 w-10 text-center tabular-nums", !fill && "hidden sm:inline")}>
+          <span className={cn("text-2xs font-semibold text-stone-600 w-10 text-center tabular-nums", !fill && "hidden sm:inline")}>
             {Math.round(scale * 100)}%
           </span>
           <Button

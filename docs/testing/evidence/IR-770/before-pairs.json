@@ -1,0 +1,722 @@
+[
+  {
+    "url": "/review",
+    "title": "IRIS",
+    "body": "IRIS\n\n1\n\nResearch-to-IP Platform\n\nDiscover\nAsk IRIS\nMy Library\nMy Reviews\nCalls & Conferences\nAA\nAna Adviser\n,\nAdviser\n, account menu\nHome\n/\nMy Review",
+    "pairs": [
+      {
+        "text": "Research-to-IP Platform",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Adviser",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "What you need to review, what you have opened, and what you have finished.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "In review 0",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "0",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "Done 17",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "17",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "Longest waiting",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Overdue only",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Thesis / ResearchWaiting 6 days",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 7.629256919887909
+      },
+      {
+        "text": "ProposalWaiting 6 days",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 7.629256919887909
+      }
+    ],
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "tags": [
+          "cat.color",
+          "wcag2aa",
+          "wcag143",
+          "TTv5",
+          "TT13.c",
+          "EN-301-549",
+          "EN-9.1.4.3",
+          "ACT",
+          "RGAAv4",
+          "RGAA-3.2.1"
+        ],
+        "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "9.8pt (13px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div role=\"tablist\" aria-label=\"My Reviews\" class=\"inline-flex flex-wrap gap-1 rounded-full bg-stone-100 p-1\">",
+                    "target": [
+                      ".gap-1"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span class=\"ml-1 tabular-nums text-stone-500\">17</span>",
+            "target": [
+              "#\\:rb\\:-tab-done > .ml-1.tabular-nums.text-stone-500"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "url": "/records/18?section=review",
+    "title": "IRIS",
+    "body": "IRIS\n\n1\n\nResearch-to-IP Platform\n\nDiscover\nAsk IRIS\nMy Library\nMy Reviews\nCalls & Conferences\nAA\nAna Adviser\n,\nAdviser\n, account menu\nBack\n[DEMO] New ",
+    "pairs": [
+      {
+        "text": "Research-to-IP Platform",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Adviser",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Back",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "v1",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "Overview",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "Files",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "Review workspace / current record",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "Your readiness",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Timeline",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Routing recorded from Oct 26, 2026.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Sam Student · Oct 26, 2026",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Sam Student · Oct 26, 2026",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Submission · no manuscript",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Readiness",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Open review",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Open the review first.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 7.629256919887909
+      },
+      {
+        "text": "Open the review first.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 7.629256919887909
+      },
+      {
+        "text": "Active",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Assigned",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "ITSONot requested",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Not requested",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "IERCNot requested",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Not requested",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "KTTONot requested",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Not requested",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "RDCO FinalNot required",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Not required",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Nothing flagged",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "None listed",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "None running",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      }
+    ],
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "tags": [
+          "cat.color",
+          "wcag2aa",
+          "wcag143",
+          "TTv5",
+          "TT13.c",
+          "EN-301-549",
+          "EN-9.1.4.3",
+          "ACT",
+          "RGAAv4",
+          "RGAA-3.2.1"
+        ],
+        "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "9.8pt (13px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"flex flex-wrap items-center gap-x-3 px-3 reading-split:px-5 bg-stone-100 border-b border-stone-200 reading-split:flex-nowrap reading-split:h-14\">",
+                    "target": [
+                      ".gap-x-3"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span>Back</span>",
+            "target": [
+              ".-ml-1 > span"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+          },
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "9.8pt (13px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"flex flex-wrap items-center gap-x-3 px-3 reading-split:px-5 bg-stone-100 border-b border-stone-200 reading-split:flex-nowrap reading-split:h-14\">",
+                    "target": [
+                      ".gap-x-3"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span class=\"shrink-0 text-small font-semibold text-stone-500\">v1</span>",
+            "target": [
+              ".gap-2\\.5 > .shrink-0.text-stone-500.text-small"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+          },
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<header class=\"review-pane-head\">",
+                    "target": [
+                      "header"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<p class=\"text-2xs font-semibold uppercase tracking-wider text-stone-500\">Review workspace / current record</p>",
+            "target": [
+              "div > .tracking-wider.uppercase.text-stone-500"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "url": "/records/20?section=paper",
+    "title": "IRIS",
+    "body": "IRIS\n\n1\nDiscover\nAsk IRIS\nMy Library\nMy Reviews\nCalls & Conferences\nAA\nAna Adviser\n,\nAdviser\n, account menu\nBack\nWhere Do Long Captions Fail Position ",
+    "pairs": [
+      {
+        "text": "Adviser",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Back",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "v1",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "Overview",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "Review",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "Files",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "140%",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "Download",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "AI",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "Where Do Long Captions Fail Position Aware Diagnosis and Reinforcement Learning for Detailed Image C",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 4.397733606829998
+      },
+      {
+        "text": "Answers come from this paper’s own text, with citations that open the passage.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Enter to send · Shift+Enter for a new line",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 4.59355777241922
+      },
+      {
+        "text": "Ask IRIS can make mistakes. Check important details against the cited papers.",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 4.59355777241922
+      }
+    ],
+    "violations": [
+      {
+        "id": "color-contrast",
+        "impact": "serious",
+        "tags": [
+          "cat.color",
+          "wcag2aa",
+          "wcag143",
+          "TTv5",
+          "TT13.c",
+          "EN-301-549",
+          "EN-9.1.4.3",
+          "ACT",
+          "RGAAv4",
+          "RGAA-3.2.1"
+        ],
+        "description": "Ensure the contrast between foreground and background colors meets WCAG 2 AA minimum contrast ratio thresholds",
+        "help": "Elements must meet minimum color contrast ratio thresholds",
+        "helpUrl": "https://dequeuniversity.com/rules/axe/4.14/color-contrast?application=axeAPI",
+        "nodes": [
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "9.8pt (13px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"flex flex-wrap items-center gap-x-3 px-3 reading-split:px-5 bg-stone-100 border-b border-stone-200 reading-split:flex-nowrap reading-split:h-14\">",
+                    "target": [
+                      ".gap-x-3"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span>Back</span>",
+            "target": [
+              ".-ml-1 > span"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+          },
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "9.8pt (13px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"flex flex-wrap items-center gap-x-3 px-3 reading-split:px-5 bg-stone-100 border-b border-stone-200 reading-split:flex-nowrap reading-split:h-14\">",
+                    "target": [
+                      ".gap-x-3"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span class=\"shrink-0 text-small font-semibold text-stone-500\">v1</span>",
+            "target": [
+              ".gap-2\\.5 > .shrink-0.text-small.text-stone-500"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.8pt (13px), font weight: normal). Expected contrast ratio of 4.5:1"
+          },
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div role=\"toolbar\" aria-label=\"Paper tools\" class=\"shrink-0 flex flex-wrap items-center gap-x-1 gap-y-1 min-h-12 px-2 reading-split:px-4 bg-stone-100 border-b border-stone-200\">",
+                    "target": [
+                      ".gap-x-1"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span class=\"text-2xs font-semibold text-stone-500 w-10 text-center tabular-nums\">140%</span>",
+            "target": [
+              ".w-10"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+          },
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "8.3pt (11px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"shrink-0 px-4 pt-3 pb-3 border-b border-stone-200 bg-stone-100\">",
+                    "target": [
+                      ".pt-3"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<span class=\"px-1 rounded border border-stone-300 text-3xs font-semibold uppercase tracking-wider text-stone-500\">AI</span>",
+            "target": [
+              ".uppercase"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 8.3pt (11px), font weight: normal). Expected contrast ratio of 4.5:1"
+          },
+          {
+            "any": [
+              {
+                "id": "color-contrast",
+                "data": {
+                  "fgColor": "#78716c",
+                  "bgColor": "#f5f5f4",
+                  "contrastRatio": 4.39,
+                  "fontSize": "9.0pt (12px)",
+                  "fontWeight": "normal",
+                  "messageKey": null,
+                  "expectedContrastRatio": "4.5:1"
+                },
+                "relatedNodes": [
+                  {
+                    "html": "<div class=\"shrink-0 px-4 pt-3 pb-3 border-b border-stone-200 bg-stone-100\">",
+                    "target": [
+                      ".pt-3"
+                    ]
+                  }
+                ],
+                "impact": "serious",
+                "message": "Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+              }
+            ],
+            "all": [],
+            "none": [],
+            "impact": "serious",
+            "html": "<p class=\"mt-2 truncate text-2xs text-stone-500\">Where Do Long Captions Fail Position Aware Diagnosis and Reinforcement Learning for Detailed Image Captioning</p>",
+            "target": [
+              ".pt-3 > .mt-2"
+            ],
+            "failureSummary": "Fix any of the following:\n  Element has insufficient color contrast of 4.39 (foreground color: #78716c, background color: #f5f5f4, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+          }
+        ]
+      }
+    ]
+  }
+]
