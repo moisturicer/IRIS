@@ -94,6 +94,18 @@ beforeEach(() => {
 });
 
 describe("persisted conversations", () => {
+  it("uses AA secondary text for the Ask IRIS label, hint and history timestamp (IR-771)", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" })] });
+    get.mockResolvedValue({ data: detail({ id: 9, title: "Flooding" }) });
+
+    renderScreen(<RAGChatPage />);
+
+    expect(await screen.findByText("Ask IRIS")).toHaveClass("text-stone-600");
+    expect(screen.getByText("Enter to send · Shift+Enter for new line")).toHaveClass("text-stone-600");
+    const conversation = screen.getByRole("link", { name: /Flooding/ });
+    expect(within(conversation).getByText(/Sep 20/)).toHaveClass("text-stone-600");
+  });
+
   it("announces a throttled question with the server's wait", async () => {
     useUIStore.setState({ toasts: [] });
     list.mockResolvedValue({ data: [summary()] });

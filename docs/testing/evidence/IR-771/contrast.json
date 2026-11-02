@@ -1,0 +1,28 @@
+{
+  "browser": "156.0.8078.4",
+  "backend": "fixture API; no live backend",
+  "pairs": [
+    {
+      "text": "Ask IRIS",
+      "color": "rgb(87, 83, 78)",
+      "background": "rgb(255, 255, 255)",
+      "ratio": 7.629256919887909,
+      "originalStone400Ratio": 2.5219703297776124
+    },
+    {
+      "text": "Enter to send · Shift+Enter for new line",
+      "color": "rgb(87, 83, 78)",
+      "background": "rgb(255, 255, 255)",
+      "ratio": 7.629256919887909,
+      "originalStone400Ratio": 2.5219703297776124
+    },
+    {
+      "text": "Nov 1 · 8:00 AM",
+      "color": "rgb(87, 83, 78)",
+      "background": "rgb(253, 242, 242)",
+      "ratio": 6.960622522197801,
+      "originalStone400Ratio": 2.3009427604939776
+    }
+  ],
+  "axe": []
+}
