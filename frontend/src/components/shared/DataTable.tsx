@@ -1,7 +1,6 @@
 /**
  * Generic paginated DataTable.
  * Wraps TanStack Table (react-table v8) for server-side pagination.
- * TODO: add column sorting support (pass sort state up via onSortChange prop).
  */
 import {
   useReactTable,
@@ -13,6 +12,7 @@ import { Spinner } from "@/components/ui/Spinner";
 import { Button }  from "@/components/ui/Button";
 
 interface DataTableProps<T> {
+  caption:       string;
   data:          T[];
   columns:       ColumnDef<T, unknown>[];
   loading?:      boolean;
@@ -23,6 +23,7 @@ interface DataTableProps<T> {
 }
 
 export function DataTable<T>({
+  caption,
   data,
   columns,
   loading,
@@ -43,17 +44,34 @@ export function DataTable<T>({
   const totalPages = Math.ceil(totalCount / pageSize);
   const start      = totalCount === 0 ? 0 : (page - 1) * pageSize + 1;
   const end        = Math.min(page * pageSize, totalCount);
+  const status = loading
+    ? `Loading ${caption}.`
+    : totalCount === 0
+      ? `${caption} has no results.`
+      : `${caption}: showing ${start}–${end} of ${totalCount}. Page ${page} of ${totalPages}.`;
 
   return (
     <div className="flex flex-col">
+      <p
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+        aria-label={`${caption} status`}
+        className="sr-only"
+      >
+        {status}
+      </p>
+
       <div className="overflow-x-auto">
         <table className="w-full text-[14px]">
+          <caption className="sr-only">{caption}</caption>
           <thead className="bg-gray-50 border-b border-gray-200">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
+                    scope="col"
                     className="text-left px-4 py-3 font-semibold text-gray-600 whitespace-nowrap"
                   >
                     {header.isPlaceholder
@@ -69,7 +87,7 @@ export function DataTable<T>({
               <tr>
                 <td colSpan={columns.length} className="py-12 text-center">
                   <div className="flex justify-center">
-                    <Spinner label="Loading rows" />
+                    <Spinner />
                   </div>
                 </td>
               </tr>

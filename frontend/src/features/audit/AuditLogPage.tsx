@@ -98,6 +98,6 @@ export default function AuditLogPage() {
     </form>
     <p className="mb-3 text-sm text-stone-600">Filter applies the fields above. CSV exports every row matching the applied filters, across all pages.</p>
     {error && <p role="alert" className="mb-4 text-danger">{error}</p>}
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden"><DataTable data={events} columns={COLUMNS} loading={loading} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
+    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden"><DataTable caption="Audit log events" data={events} columns={COLUMNS} loading={loading} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
   </div>;
 }

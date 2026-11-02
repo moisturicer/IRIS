@@ -172,7 +172,7 @@ export default function UserListPage() {
       ),
     },
     {
-      header: "",
+      header: () => <span className="sr-only">Actions</span>,
       id: "actions",
       cell: ({ row }) => (
         <div className="flex gap-2 justify-end">
@@ -231,6 +231,7 @@ export default function UserListPage() {
       ) : (
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <DataTable
+          caption="User accounts"
           data={users}
           columns={columns}
           loading={loading}
