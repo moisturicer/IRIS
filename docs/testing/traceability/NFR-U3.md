@@ -2,6 +2,8 @@
 
 [Back to the matrix](../TRACEABILITY.md)
 
+**IR-97, 2026-11-02:** Moved from NOT STARTED. `reflow360` checks exist in three browser journey specs and IR-414 ran an automated pre-pass. PARTIAL, because no journey run record is committed and no person has checked every screen.
+
 ## NFR-U3
 
 **Requirement:** Responsive at 360 px, no horizontal scroll

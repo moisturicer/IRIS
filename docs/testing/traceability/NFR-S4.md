@@ -2,6 +2,8 @@
 
 [Back to the matrix](../TRACEABILITY.md)
 
+**IR-97, 2026-11-02:** Status unchanged, with a different reason. The "2 of 12" count below is out of date: IR-153 closed the endpoint gaps. It stays PARTIAL because `/admin/` is still reachable (IR-782) and no deployment smoke test exists.
+
 ## NFR-S4
 
 **Requirement:** Server-side authorization

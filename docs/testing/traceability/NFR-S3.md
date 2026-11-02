@@ -2,6 +2,8 @@
 
 [Back to the matrix](../TRACEABILITY.md)
 
+**IR-97, 2026-11-02:** Status unchanged. `IR-58`, named below, doesn't exist in Jira. The gateway's `DATABASE_URL` is tracked by IR-826.
+
 ## NFR-S3
 
 **Requirement:** Secure configuration

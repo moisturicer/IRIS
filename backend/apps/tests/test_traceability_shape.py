@@ -48,3 +48,24 @@ def test_every_row_links_to_a_file_that_exists():
         if not (DOCS / "traceability" / target).is_file()
     ]
     assert missing == []
+
+
+def _row_id(row):
+    return row.split("|")[1].replace("*", "").strip()
+
+
+def test_no_requirement_label_has_two_rows():
+    labels = [_row_id(row) for row in _matrix_rows() if re.match(r"N?FR-", _row_id(row))]
+    assert sorted(labels) == sorted(set(labels))
+
+
+def test_no_row_is_verified_without_a_link_to_evidence():
+    unlinked = []
+    for row in _matrix_rows():
+        if "VERIFIED" not in row.split("|")[-2]:
+            continue
+        target = re.search(r"\]\(traceability/([^)]+)\)", row).group(1)
+        detail = (DOCS / "traceability" / target).read_text(encoding="utf-8")
+        if not re.search(r"https://github\.com/\S+/(pull|actions/runs)/\d+", detail):
+            unlinked.append(_row_id(row))
+    assert unlinked == []
