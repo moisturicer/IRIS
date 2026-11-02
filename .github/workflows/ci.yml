@@ -485,7 +485,7 @@ jobs:
         run: |
           compose="docker compose -p iris-net -f docker-compose.prod.yml"
           trap '$compose down -v' EXIT
-          $compose create --no-deps redis caddy
+          $compose up --no-start --no-deps redis caddy
           $compose start redis
           url=https://example.com
           docker run --rm --network iris-net_egress alpine:3.20 wget -q -T 15 -O /dev/null "$url"
