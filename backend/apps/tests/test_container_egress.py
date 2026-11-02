@@ -32,7 +32,7 @@ EXPECTED = {
 
 
 def _networks_by_service():
-    services = PROD.split("\nservices:\n", 1)[1].split("\nvolumes:\n", 1)[0]
+    services = PROD.split("\nservices:\n", 1)[1].split("\nnetworks:\n", 1)[0]
     found = {}
     for name, body in re.findall(r"^  ([a-z][a-z0-9-]*):\n((?:(?:    .*|\s*)\n)*)", services, re.MULTILINE):
         block = re.search(r"^    networks:\n((?:      - .*\n)+)", body, re.MULTILINE)
