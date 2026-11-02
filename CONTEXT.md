@@ -44,6 +44,10 @@ _Avoid_: Parse, OCR result, the PDF text
 The adapter that turns PDF bytes into an Extraction behind the `StructuredExtractor` port. `EXTRACTION_BACKEND` chooses which one runs; every non-legacy Extractor passes the contract suite.
 _Avoid_: Parser, Docling (one legacy Extractor, not the role)
 
+**Transient failure** / **Permanent failure**:
+How an Extraction attempt failed (IR-839). Transient is an unavailable Extractor and is retried; permanent is everything else, an unexpected exception included, and fails once.
+_Avoid_: Retryable (that names the reader's retry action, offered after either kind)
+
 **Conversation**:
 A persisted, multi-turn Ask IRIS chat thread, owned by exactly one `User`. Optionally scoped to one `Record` (a "Paper Chat" conversation) via a nullable FK; unscoped when general Ask IRIS. One `Conversation` model covers both the full-page Ask IRIS surface and the per-record docked panel — they are two presentations of the same underlying thread, not two features.
 _Avoid_: Chat, session, thread (used loosely elsewhere in the codebase for unrelated things), Paper Chat (a UI surface/preset scope, not a distinct data concept).

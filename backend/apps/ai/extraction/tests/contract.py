@@ -1,7 +1,7 @@
 """The contract every non-legacy Extractor honours (IR-838).
 
 Subclass ``ExtractorContract`` and implement its three hooks; pytest then
-runs the six clauses against that adapter over the synthetic fixtures. The
+runs the clauses against that adapter over the synthetic fixtures. The
 in-memory adapter runs it here, and IR-841 adds LlamaParse. Docling is
 legacy (ADR-056) and is not held to it.
 """
@@ -15,7 +15,14 @@ from apps.ai.chunking.document import (
     TABLE_ROW,
     NormalizedDocument,
 )
-from apps.ai.extraction import EmptyExtraction, ExtractorUnavailable, StructuredExtractor
+from apps.ai.extraction import (
+    DocumentRejected,
+    EmptyExtraction,
+    ExtractorUnavailable,
+    Failure,
+    StructuredExtractor,
+    classify,
+)
 
 from .fixtures import FIXTURES, Fixture, blank_pdf, pdf_bytes
 
@@ -89,6 +96,10 @@ class ExtractorContract:
         """An adapter whose service fails by ``failure``: one of ``FAILURES``."""
         raise NotImplementedError
 
+    def extractor_rejecting(self) -> StructuredExtractor:
+        """An adapter whose service reads ``blank_pdf()`` and refuses it (IR-839)."""
+        raise NotImplementedError
+
     @pytest.mark.parametrize("clause", CLAUSES, ids=lambda c: c.__name__[len("check_"):])
     @pytest.mark.parametrize("name", sorted(FIXTURES))
     def test_clause(self, name, clause):
@@ -97,10 +108,21 @@ class ExtractorContract:
         clause(extracted.document, fixture)
 
     def test_an_empty_pdf_is_an_empty_extraction(self):
-        with pytest.raises(EmptyExtraction):
+        with pytest.raises(EmptyExtraction) as raised:
             self.extractor_for_blank().extract(blank_pdf(), filename="blank.pdf")
+        assert classify(raised.value) is Failure.PERMANENT
 
     @pytest.mark.parametrize("failure", FAILURES)
     def test_a_failing_service_is_unavailable(self, failure):
-        with pytest.raises(ExtractorUnavailable):
+        with pytest.raises(ExtractorUnavailable) as raised:
             self.extractor_failing_with(failure).extract(blank_pdf(), filename="any.pdf")
+        assert classify(raised.value) is Failure.TRANSIENT
+
+    def test_a_rejected_document_is_permanent(self):
+        with pytest.raises(DocumentRejected) as raised:
+            self.extractor_rejecting().extract(blank_pdf(), filename="any.pdf")
+        assert classify(raised.value) is Failure.PERMANENT
+
+    def test_a_declared_timeout(self):
+        timeout = self.extractor_for_blank().timeout_seconds
+        assert isinstance(timeout, (int, float)) and timeout > 0

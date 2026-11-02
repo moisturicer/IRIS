@@ -13,6 +13,7 @@ disagrees with its own elements — the two were separate fields in the design
 sketch, and separate fields are exactly how they drift.
 """
 
+import enum
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, runtime_checkable
 
@@ -27,12 +28,12 @@ class ExtractorUnavailable(ExtractionError):
     """The extractor could not be reached, or failed in a way that says
     nothing about the document — a connection refused, a timeout, a 5xx.
 
-    Kept distinct from its parent because the two want different operational
-    responses: a retry is likely to succeed here and unlikely to succeed on a
-    document the extractor rejected. Both retry today (ADR-016 keeps the
-    Celery retry either way); only this one is a reason to look at the
-    container rather than at the PDF.
+    The one transient failure (IR-839): the only one the task retries.
     """
+
+
+class DocumentRejected(ExtractionError):
+    """The extractor read the document and refused it. Permanent (IR-839)."""
 
 
 class EmptyExtraction(ExtractionError):
@@ -56,10 +57,26 @@ class Provenance:
 
 @dataclass(frozen=True)
 class ExtractedDocument:
-    """What an extractor returns: the structured document and its provenance."""
+    """What an extractor returns: the structured document and its provenance.
+
+    ``failed_pages`` are pages the extractor could not read; the rest of the
+    document is still used (IR-839).
+    """
 
     document: NormalizedDocument
     provenance: Provenance
+    failed_pages: tuple[int, ...] = ()
+
+
+class Failure(enum.Enum):
+    TRANSIENT = "transient"
+    PERMANENT = "permanent"
+
+
+def classify(error: BaseException) -> Failure:
+    """Only an unavailable extractor is worth retrying; anything else,
+    an unexpected exception included, fails once (IR-839)."""
+    return Failure.TRANSIENT if isinstance(error, ExtractorUnavailable) else Failure.PERMANENT
 
 
 @runtime_checkable
@@ -75,6 +92,11 @@ class StructuredExtractor(Protocol):
 
     Raises ``ExtractionError`` (or a subclass) rather than returning an empty
     document on failure.
+
+    ``timeout_seconds`` is the longest one call may take; the task's time
+    limit is derived from it (IR-839).
     """
+
+    timeout_seconds: float
 
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument: ...

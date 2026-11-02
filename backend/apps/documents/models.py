@@ -177,9 +177,17 @@ class PdfExtraction(models.Model):
     extractor_version = models.CharField(max_length=64, blank=True, default="")
     extractor_options = models.JSONField(default=dict, blank=True)
     celery_task_id = models.CharField(max_length=200, blank=True)
+    # The reader's message; never an exception or a path (IR-839).
     error          = models.TextField(blank=True)
+    # Admin only: pages the Extractor could not read (IR-839).
+    warnings       = models.JSONField(default=list, blank=True)
     created_at     = models.DateTimeField(auto_now_add=True)
     completed_at   = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def reader_message(self):
+        """A failed extraction's message (IR-839); ``warnings`` stay admin-only."""
+        return (self.error or None) if self.status == "failed" else None
 
     class Meta:
         ordering = ["-created_at"]

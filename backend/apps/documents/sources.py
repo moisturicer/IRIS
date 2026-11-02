@@ -38,7 +38,7 @@ def reset_manuscript(record, *, defer=False, retry=False):
         "kind": DocumentKind.MANUSCRIPT, "status": "queued",
         "phase": ExtractionPhase.AWAITING_SUBMISSION if defer else ExtractionPhase.QUEUED, "attempt": None,
         "extracted_text": "", "structure": {}, "content_hash": "", "extractor": "",
-        "error": "", "completed_at": None, "celery_task_id": "",
+        "error": "", "warnings": [], "completed_at": None, "celery_task_id": "",
     })
     if not defer:
         from apps.ai.models import ChunkSet

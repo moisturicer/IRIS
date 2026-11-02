@@ -8,7 +8,7 @@ from django.urls import reverse
 from django.db import connections
 from rest_framework.test import APIClient
 
-from apps.ai.extraction import InMemoryExtractor, use_extractor
+from apps.ai.extraction import ExtractorUnavailable, InMemoryExtractor, use_extractor
 from apps.documents.models import PdfExtraction
 from apps.documents.testing import pdf_upload
 from apps.records.models import Record, RecordOwner, RecordType
@@ -89,7 +89,9 @@ def test_replaced_source_cannot_finish_fail_retry_or_chunk_last(manuscript, monk
         if old:
             started.set()
             assert release.wait(20)
-            if old_outcome != "success":
+            if old_outcome == "retry":
+                return ExtractorUnavailable("private parser path /secret/old.pdf")
+            if old_outcome == "failure":
                 return RuntimeError("private parser path /secret/old.pdf")
         title = "Old manuscript" if old else "Current manuscript"
         return NormalizedDocument(title=title, elements=(
@@ -164,7 +166,7 @@ def test_retrying_is_pending_and_final_failure_requires_owner_action(manuscript,
     monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: queued.append(args))
     assert attach(client, record).status_code == 200
 
-    with use_extractor(InMemoryExtractor(RuntimeError("private parser path /secret.pdf"))):
+    with use_extractor(InMemoryExtractor(ExtractorUnavailable("private parser path /secret.pdf"))):
         from celery.exceptions import Retry
         monkeypatch.setattr(tasks.extract_manuscript_text, "retry", lambda **kwargs: (_ for _ in ()).throw(Retry()))
         tasks.extract_manuscript_text.apply(args=queued[-1])

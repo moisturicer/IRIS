@@ -16,18 +16,32 @@ fallback path silently yields chunks with no regions and citations that
 cannot be highlighted. Failing and retrying is the honest behaviour: the
 Celery retry below is what covers a container that is briefly down.
 
+Only a transient failure retries (IR-839): an unavailable Extractor, after 1,
+3 and 9 minutes. Anything else, an unexpected exception included, fails once.
+
 The task stays thin on purpose. Reading bytes, persisting a row and moving a
 status through its states is all it does; every judgement — reading order,
 table shape, coordinate origin, what counts as a failure — lives in
 ``apps.ai.extraction``, where it is pure and tested without a container.
 """
 
+import logging
 import os
 from typing import TYPE_CHECKING
 
-from celery import shared_task
+from celery import Task, shared_task
+from celery.exceptions import SoftTimeLimitExceeded
 from django.utils import timezone
 from .phases import ExtractionPhase
+
+logger = logging.getLogger(__name__)
+
+PERMANENT_MESSAGE = "This PDF can't be read automatically. Enter the details manually."
+TRANSIENT_MESSAGE = "Reading is temporarily unavailable. Try again later."
+RETRY_COUNTDOWNS = (60, 180, 540)
+TIME_LIMIT_MARGIN_SECONDS = 60
+# The soft limit fires first so an overrun attempt can still record itself.
+SOFT_LIMIT_HEADROOM_SECONDS = 30
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from apps.documents.models import PdfExtraction
@@ -54,7 +68,10 @@ def _locked_extraction(extraction_id):
 def _run_extraction(self, extraction_id, source_revision):
     import uuid
     from django.db import transaction
-    from apps.ai.extraction import current_extractor, document_to_json, extraction_hash, flatten_for_search
+    from apps.ai.extraction import (
+        ExtractionError, Failure, classify, current_extractor,
+        document_to_json, extraction_hash, flatten_for_search,
+    )
 
     attempt = uuid.uuid4()
     with transaction.atomic():
@@ -83,11 +100,15 @@ def _run_extraction(self, extraction_id, source_revision):
             "extractor": extracted.provenance.name,
             "extractor_version": extracted.provenance.version,
             "extractor_options": dict(extracted.provenance.options),
+            "warnings": [{"kind": "page_failed", "page": page} for page in extracted.failed_pages],
             "error": "", "status": "done",
             "phase": ExtractionPhase.READY, "completed_at": timezone.now(),
         }
-    except Exception:
-        final = self.request.retries >= self.max_retries
+    except Exception as error:
+        transient = isinstance(error, SoftTimeLimitExceeded) or classify(error) is Failure.TRANSIENT
+        if not transient and not isinstance(error, ExtractionError):
+            logger.exception("Unexpected failure extracting PdfExtraction %s", extraction_id)
+        final = not transient or self.request.retries >= len(RETRY_COUNTDOWNS)
         with transaction.atomic():
             extraction = _locked_extraction(extraction_id)
             if (not extraction or extraction.attempt != attempt
@@ -95,13 +116,16 @@ def _run_extraction(self, extraction_id, source_revision):
                 return
             extraction.status = "failed" if final else "retrying"
             extraction.phase = ExtractionPhase.FAILED if final else ExtractionPhase.RETRYING
-            extraction.error = "PDF reading failed. Retry extraction or enter details manually."
+            if not final:
+                extraction.error = ""
+            else:
+                extraction.error = TRANSIENT_MESSAGE if transient else PERMANENT_MESSAGE
             extraction.save(update_fields=["status", "phase", "error"])
         # No parser exception/path in Celery messages or public status.
         safe_error = RuntimeError("PDF extraction failed")
         if final:
             raise safe_error from None
-        raise self.retry(exc=safe_error, countdown=60) from None
+        raise self.retry(exc=safe_error, countdown=RETRY_COUNTDOWNS[self.request.retries]) from None
 
     with transaction.atomic():
         extraction = _locked_extraction(extraction_id)
@@ -114,7 +138,19 @@ def _run_extraction(self, extraction_id, source_revision):
         _queue_chunking_if_manuscript(extraction)
 
 
-@shared_task(bind=True, max_retries=3)
+class ExtractionTask(Task):
+    """Every dispatch, retries included, carries the current Extractor's time limit."""
+
+    def apply_async(self, args=None, kwargs=None, **options):
+        from apps.ai.extraction import current_extractor
+
+        limit = current_extractor().timeout_seconds + TIME_LIMIT_MARGIN_SECONDS
+        options.setdefault("time_limit", limit)
+        options.setdefault("soft_time_limit", limit - SOFT_LIMIT_HEADROOM_SECONDS)
+        return super().apply_async(args, kwargs, **options)
+
+
+@shared_task(bind=True, base=ExtractionTask, max_retries=len(RETRY_COUNTDOWNS))
 def extract_pdf_text(self, upload_id: int, source_revision=None):
     from apps.documents.models import PdfExtraction
 
@@ -123,7 +159,7 @@ def extract_pdf_text(self, upload_id: int, source_revision=None):
         _run_extraction(self, extraction.pk, source_revision)
 
 
-@shared_task(bind=True, max_retries=3)
+@shared_task(bind=True, base=ExtractionTask, max_retries=len(RETRY_COUNTDOWNS))
 def extract_manuscript_text(self, record_id: int, source_revision=None):
     """Unpinned pre-upgrade messages cannot process a revisioned attachment."""
     from apps.documents.models import PdfExtraction

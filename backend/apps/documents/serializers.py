@@ -107,14 +107,18 @@ class PdfExtractionSerializer(serializers.ModelSerializer):
     """
     manuscript_revision = serializers.UUIDField(source="source_revision", read_only=True)
     retryable = serializers.SerializerMethodField()
+    message = serializers.SerializerMethodField()
 
     def get_retryable(self, obj):
         return obj.status == "failed"
+
+    def get_message(self, obj):
+        return obj.reader_message
 
     class Meta:
         model  = PdfExtraction
         fields = [
             "id", "upload", "status", "extractor",
-            "manuscript_revision", "phase", "retryable", "created_at", "completed_at",
+            "manuscript_revision", "phase", "retryable", "message", "created_at", "completed_at",
         ]
         read_only_fields = fields

@@ -16,12 +16,15 @@ from .flattening import flatten_for_search
 from .hashing import extraction_hash
 from .memory import InMemoryExtractor
 from .ports import (
+    DocumentRejected,
     EmptyExtraction,
     ExtractedDocument,
     ExtractionError,
     ExtractorUnavailable,
+    Failure,
     Provenance,
     StructuredExtractor,
+    classify,
 )
 from .selection import current_extractor, use_extractor, verify_extraction_configuration
 from .serialization import document_from_json, document_to_json
@@ -33,6 +36,9 @@ __all__ = [
     "ExtractionError",
     "ExtractorUnavailable",
     "EmptyExtraction",
+    "DocumentRejected",
+    "Failure",
+    "classify",
     "Provenance",
     # selection
     "current_extractor",
