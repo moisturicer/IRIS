@@ -122,6 +122,10 @@ class DoclingExtractor:
         if do_formula_enrichment or do_code_enrichment:
             self._convert_options["code_formula_preset"] = _CODE_FORMULA_PRESET
 
+    @property
+    def timeout_seconds(self) -> float:
+        return self._timeout
+
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument:
         payload = self._convert(pdf_bytes, filename=filename)
         document = normalized_document_from_docling(payload, fallback_title=filename)

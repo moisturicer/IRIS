@@ -70,7 +70,7 @@ class PdfExtractionAdmin(admin.ModelAdmin):
     list_select_related = ("record", "upload")
     fields = readonly_fields = (
         "record", "upload", "kind", "status", "phase", "extractor", "extractor_version",
-        "extractor_options", "content_hash", "created_at", "completed_at",
+        "extractor_options", "content_hash", "warnings", "created_at", "completed_at",
     )
 
     def has_module_permission(self, request):

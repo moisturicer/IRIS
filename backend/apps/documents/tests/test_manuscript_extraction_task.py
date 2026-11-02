@@ -100,19 +100,22 @@ def test_resolved_record_id_reads_through_the_record_fk(record, extraction):
 
 
 @pytest.mark.parametrize(
-    "error",
+    "error, message",
     [
-        ExtractorUnavailable("Docling-serve unreachable at http://docling:5001"),
-        ExtractionError("Docling-serve rejected the document (413)"),
+        (ExtractorUnavailable("Docling-serve unreachable at http://docling:5001"),
+         "Reading is temporarily unavailable. Try again later."),
+        (ExtractionError("Docling-serve rejected the document (413)"),
+         "This PDF can't be read automatically. Enter the details manually."),
     ],
     ids=["unavailable", "rejected"],
 )
-def test_a_failed_extraction_is_recorded_and_retried(monkeypatch, record, extraction, error):
+def test_a_failed_extraction_is_recorded_with_its_reader_message(monkeypatch, record, extraction, error, message):
+    """IR-839 replaced the one message, and the retry of a rejection."""
     result = _run(InMemoryExtractor(error), record.id)
 
     extraction.refresh_from_db()
     assert extraction.status == "failed"
-    assert extraction.error == "PDF reading failed. Retry extraction or enter details manually."
+    assert extraction.error == message
     assert str(error) not in extraction.error
     assert result.failed()
 

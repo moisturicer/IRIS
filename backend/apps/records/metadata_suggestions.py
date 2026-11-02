@@ -76,7 +76,8 @@ def suggestions_payload(record) -> dict:
     return {"state": state.value, "suggestions": suggestions, "source": SOURCE,
             "manuscript_revision": str(record.manuscript_revision) if record.manuscript_revision else None,
             "phase": extraction.phase if extraction else "unsupported",
-            "retryable": bool(extraction and extraction.status == "failed")}
+            "retryable": bool(extraction and extraction.status == "failed"),
+            "message": extraction.reader_message if extraction else None}
 
 
 def _state(extraction: Optional[PdfExtraction]) -> SuggestionState:

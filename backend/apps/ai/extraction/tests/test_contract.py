@@ -11,7 +11,15 @@ import pytest
 from pypdf import PdfReader
 
 from apps.ai.chunking.document import PARAGRAPH, BoundingBox, NormalizedDocument
-from apps.ai.extraction import ExtractorUnavailable, InMemoryExtractor
+from apps.ai.extraction import (
+    DocumentRejected,
+    EmptyExtraction,
+    ExtractionError,
+    ExtractorUnavailable,
+    Failure,
+    InMemoryExtractor,
+    classify,
+)
 
 from .contract import (
     ExtractorContract,
@@ -32,6 +40,20 @@ class TestInMemoryExtractor(ExtractorContract):
 
     def extractor_failing_with(self, failure):
         return InMemoryExtractor(ExtractorUnavailable(failure))
+
+    def extractor_rejecting(self):
+        return InMemoryExtractor(DocumentRejected("refused"))
+
+
+@pytest.mark.parametrize("error, failure", [
+    (ExtractorUnavailable("down"), Failure.TRANSIENT),
+    (DocumentRejected("refused"), Failure.PERMANENT),
+    (EmptyExtraction("nothing"), Failure.PERMANENT),
+    (ExtractionError("odd body"), Failure.PERMANENT),
+    (RuntimeError("a bug"), Failure.PERMANENT),
+], ids=["unavailable", "rejected", "empty", "other", "unexpected"])
+def test_only_an_unavailable_extractor_is_transient(error, failure):
+    assert classify(error) is failure
 
 
 @pytest.mark.parametrize("name", sorted(FIXTURES))

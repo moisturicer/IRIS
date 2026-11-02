@@ -18,9 +18,12 @@ PROVENANCE = Provenance(name="memory", version="1")
 
 
 class InMemoryExtractor:
-    def __init__(self, result: Answers, *, provenance: Provenance = PROVENANCE):
+    def __init__(self, result: Answers, *, provenance: Provenance = PROVENANCE,
+                 timeout_seconds: float = 60, failed_pages: tuple[int, ...] = ()):
         self._result = result
         self._provenance = provenance
+        self._failed_pages = failed_pages
+        self.timeout_seconds = timeout_seconds
         self.calls: list[tuple[bytes, str]] = []
 
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument:
@@ -30,4 +33,5 @@ class InMemoryExtractor:
             raise outcome
         if not outcome.elements:
             raise EmptyExtraction(f"no extractable content for {filename!r}")
-        return ExtractedDocument(document=outcome, provenance=self._provenance)
+        return ExtractedDocument(document=outcome, provenance=self._provenance,
+                                 failed_pages=self._failed_pages)
