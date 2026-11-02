@@ -4,6 +4,8 @@ import { reviewsApi } from "@/api/reviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Button, Input, Select, Skeleton } from "@/components/ui";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { cn } from "@/lib/utils";
 import type { AnalyticsTimeInStage, WorkflowAnalytics } from "@/types/reviews";
 
 const formatDate = (value: string) => new Intl.DateTimeFormat("en-US", {
@@ -37,14 +39,21 @@ const TABLE = "w-full text-left text-sm";
 const HEAD = "border-b border-stone-200 py-2 pr-4 font-medium text-stone-600";
 const CELL = "border-b border-stone-100 py-2 pr-4 tabular-nums";
 
-function Section({ id, title, note, children }: {
-  id: string; title: string; note?: ReactNode; children: ReactNode;
+function Section({ id, title, note, children, scrollRegionLabel }: {
+  id: string; title: string; note?: ReactNode; children: ReactNode; scrollRegionLabel?: string;
 }) {
   return (
     <section aria-labelledby={id} className="mb-8">
       <h2 id={id} className="mb-1 text-lg font-semibold text-stone-900">{title}</h2>
       {note && <p className="mb-3 max-w-3xl text-sm text-stone-600">{note}</p>}
-      <div className="overflow-x-auto">{children}</div>
+      <div
+        className={cn("overflow-x-auto", scrollRegionLabel && FOCUS_RING)}
+        {...(scrollRegionLabel
+          ? { role: "region" as const, tabIndex: 0, "aria-label": scrollRegionLabel }
+          : {})}
+      >
+        {children}
+      </div>
     </section>
   );
 }
@@ -141,7 +150,7 @@ export default function ReviewAnalyticsPage() {
             {" "}Times are Asia/Manila; weeks start on Monday.
           </p>
 
-          <Section id="open-now" title="Open now"
+          <Section id="open-now" title="Open now" scrollRegionLabel="Open now table"
                    note="Overdue counts only assignments with a due date whose clock is running. A clock waiting on the owner is paused. Older assignments and offices without a configured turnaround may have no due date; these are listed separately, never counted as on time.">
             <table className={TABLE} aria-labelledby="open-now">
               <thead>
@@ -162,7 +171,7 @@ export default function ReviewAnalyticsPage() {
             </table>
           </Section>
 
-          <Section id="time-in-stage" title="Time in stage"
+          <Section id="time-in-stage" title="Time in stage" scrollRegionLabel="Time in stage table"
                    note={<>Elapsed time from an office receiving a record to its turn closing, including nights, weekends and waits on the author. It is not hands-on effort. A cell needs {data.thresholds.median} records for a median and {data.thresholds.p90} for a 90th percentile. &ldquo;Still open&rdquo; means open now.</>}>
             {data.time_in_stage.length === 0 ? (
               <p className="text-sm text-stone-600">No completed turns in this range.</p>

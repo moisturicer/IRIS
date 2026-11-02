@@ -25,12 +25,12 @@ describe("Discover search composer", () => {
     act(() => { vi.advanceTimersByTime(3600); });
     expect(screen.getByText("What research explores flood resilience in Cebu?")).toHaveClass("opacity-0");
     act(() => { vi.advanceTimersByTime(180); });
-    expect(screen.getByText("How can AI support learning at CIT-U?")).toHaveClass("opacity-100");
+    expect(screen.getByText("How can AI support learning in higher education?")).toHaveClass("opacity-100");
     rerender(<DiscoverSearchComposer value="flood" onChange={() => {}} />);
-    expect(screen.queryByText("How can AI support learning at CIT-U?")).not.toBeInTheDocument();
+    expect(screen.queryByText("How can AI support learning in higher education?")).not.toBeInTheDocument();
     act(() => { vi.advanceTimersByTime(8000); });
     rerender(<DiscoverSearchComposer value="" onChange={() => {}} />);
-    expect(screen.getByText("How can AI support learning at CIT-U?")).toBeInTheDocument();
+    expect(screen.getByText("How can AI support learning in higher education?")).toBeInTheDocument();
   });
 
   it("keeps the example static when reduced motion is preferred", () => {

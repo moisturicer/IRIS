@@ -286,7 +286,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           <legend className={LABEL}>Source</legend>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-section">
             {([
-              ["internal", "Posted by a CIT-U office"],
+              ["internal", "Posted by an institutional office"],
               ["external", "Reposted from an outside body"],
             ] as const).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 min-h-11 sm:min-h-0 text-small text-stone-700">

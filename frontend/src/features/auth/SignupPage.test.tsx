@@ -120,6 +120,28 @@ afterEach(() => {
 // Each walk through the steps types key by key, which took close to the 15s
 // default in the dev container, so the blocks get room rather than a flaky edge.
 describe("the register steps", { timeout: 30_000 }, () => {
+  it("offers one Sign in link and opens help and policy dialogs without losing identity", async () => {
+    const user = userEvent.setup();
+    renderSignup();
+    expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    await user.type(firstName(), "Rea");
+    await user.click(within(screen.getByRole("banner")).getByRole("link", { name: "Help" }));
+    const help = screen.getByRole("dialog", { name: "Help" });
+    expect(within(help).getByRole("link", { name: "Reset your password" })).toHaveAttribute("href", "/password/forgot");
+    await expectNoBlockingA11yViolations(help);
+    await user.keyboard("{Escape}");
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).not.toHaveTextContent(/Pilot institution/);
+    for (const name of ["Data privacy", "Terms"]) {
+      await user.click(within(footer).getByRole("link", { name }));
+      const dialog = screen.getByRole("dialog", { name });
+      await expectNoBlockingA11yViolations(dialog);
+      await user.keyboard("{Escape}");
+      expect(firstName()).toHaveValue("Rea");
+    }
+  });
+
   it("opens on Identity in the folder, under the register headline", async () => {
     renderSignup();
 
