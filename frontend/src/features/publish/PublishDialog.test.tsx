@@ -1075,6 +1075,17 @@ describe("the embargo question (ADR-052 decision 2)", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("says under Yes who ends an embargo, because its date doesn't", async () => {
+    const user = userEvent.setup();
+    openAtQuestion();
+    await question();
+
+    await user.click(screen.getByRole("radio", { name: /^Yes/ }));
+
+    expect(dateField()).toHaveAccessibleDescription(/doesn't end the embargo/);
+    expect(dateField()).toHaveAccessibleDescription(/only your Adviser or RDCO can/);
+  });
+
   it("asks for a date only under Yes, and requires one that has not passed", async () => {
     const user = userEvent.setup();
     const { container } = openAtQuestion();

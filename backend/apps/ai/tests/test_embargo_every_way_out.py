@@ -5,8 +5,9 @@ These run the shipped gate on real rows: no test here injects `permits`, because
 one that did could pass with the gate disconnected. A fake vendor stands at each
 exit and records what reached it, so "refused" means the text never arrived.
 
-Paths: indexing, the reranker, the answering model and the AI Overview. The last
-two classes hold test data to the same gate, now IR-317's bypass is gone (IR-815).
+Paths: indexing, the reranker, the answering model and the AI Overview. Later
+classes hold test data to the same gate, now IR-317's bypass is gone (IR-815), and
+the acts that change an embargo after submission, old chat answers included (IR-812).
 """
 
 import importlib.util
@@ -23,18 +24,33 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.ai.composition import CompositionRoot, composition_root, use_composition_root
+from apps.ai.answers.citations import GENERATED, Citation, GroundedAnswer
+from apps.ai.conversations import record_turn
+from apps.ai.history import recent_window, sendable_turns
 from apps.ai.indexing import embed_active_chunk_set, embed_record_summary
-from apps.ai.models import ChunkSet
+from apps.ai.memory import ConversationMemory
+from apps.ai.models import TURN_ANSWER_VECTOR, ChunkSet, Turn, TurnCitation, TurnEmbedding
 from apps.ai.models.chunk import ChunkEmbedding
 from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.overview.service import PROMPT_VERSION, generate_overview
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedLLM
 from apps.ai.providers.ports import RerankedCandidate, Reranker
+from apps.ai.tasks import index_record
+from apps.ai.turn_backfill import embed_turn_answer, plan_turns, turns_to_consider
 from apps.records.management.commands.load_corpus import DEFAULT_OWNER_EMAIL
 from apps.records.management.commands.seed_demo import AT_RDCO_TITLE, PROPOSAL_AT_ADVISER_TITLE
-from apps.records.models import Record
+from apps.records.models import Record, RecordOwner
 
-from .corpus import DIMENSIONS, FLOOD_QUESTION, FLOOD_TEXT, ask, make_record, make_user
+from .corpus import (
+    DIMENSIONS,
+    FLOOD_QUESTION,
+    FLOOD_TEXT,
+    POND_QUESTION,
+    POND_TEXT,
+    ask,
+    make_record,
+    make_user,
+)
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
@@ -82,6 +98,10 @@ class _RecordingEmbedder(DeterministicEmbeddingProvider):
     def embed_documents(self, texts):
         self.sent.extend(texts)
         return super().embed_documents(texts)
+
+    def embed_query(self, text):
+        self.sent.append(text)
+        return super().embed_query(text)
 
     def embed_document_chunks(self, documents):
         self.sent.extend(text for document in documents for text in document)
@@ -134,11 +154,11 @@ def _llm_received(llm, text) -> bool:
     return any(text in prompt for _, prompt in llm.calls)
 
 
-def _ask_recording_vendors(embedder, reader, client_for):
+def _ask_recording_vendors(embedder, reader, client_for, question=FLOOD_QUESTION, **body):
     reranker, llm = _TransmittingReranker(), ScriptedLLM(reply="Rainfall gauges [1].")
     root = CompositionRoot(embedder=embedder, reranker=reranker, llm=llm)
     with use_composition_root(root):
-        response = ask(client_for(reader), FLOOD_QUESTION)
+        response = ask(client_for(reader), question, **body)
     assert response.status_code == 200, response.content
     return reranker, llm
 
@@ -333,3 +353,231 @@ class TestTheBypassIsGone:
                 django_apps.get_app_config("ai").ready()
 
             assert not composition_root().vendor_permits()(record)
+
+
+def _embargo_set(client_for, user, record):
+    response = client_for(user).post(
+        reverse("record-embargo-set", args=[record.pk]),
+        {"embargoed_until": (timezone.localdate() + timedelta(days=90)).isoformat()},
+        format="json",
+    )
+    assert response.status_code == 200, response.content
+    return response.json()
+
+
+class TestTheActsThroughTheRealGate:
+    """IR-812. Nothing here injects `permits`, and the vendors are fakes at the exit."""
+
+    @pytest.fixture
+    def owner(self, db):
+        return make_user("way-out-owner@cit.edu")
+
+    def _owned(self, embedder, space, owner, stamps):
+        record = _paper(embedder, space, stamps)
+        RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+        return record
+
+    def test_a_paper_refused_during_its_embargo_is_indexed_after_release(
+        self, embedder, space, owner, client_for, monkeypatch, django_capture_on_commit_callbacks,
+    ):
+        adviser = make_user("way-out-adviser@cit.edu")
+        record = _unindexed(self._owned(embedder, space, owner, _stamps(until_days=30)))
+        Record.objects.filter(pk=record.pk).update(adviser=adviser)
+        vendor = _RecordingEmbedder()
+        monkeypatch.setattr("apps.ai.indexing.build_embedding_provider", lambda: vendor)
+        monkeypatch.setattr(
+            "apps.ai.tasks.index_record.delay",
+            lambda record_id: index_record.apply(args=[record_id]).get(),
+        )
+        assert embed_active_chunk_set(record.pk, provider=vendor).refused
+        assert vendor.sent == []
+
+        with django_capture_on_commit_callbacks(execute=True):
+            response = client_for(adviser).post(
+                reverse("record-embargo-release", args=[record.pk]), {}, format="json",
+            )
+
+        assert response.status_code == 200, response.content
+        assert FLOOD_TEXT in vendor.sent
+        assert ChunkEmbedding.objects.filter(chunk__record=record).exists()
+        assert RecordEmbedding.objects.filter(record=record).exists()
+
+    def test_setting_one_stops_further_sending_and_says_what_left(
+        self, embedder, space, owner, reader, client_for,
+    ):
+        record = self._owned(embedder, space, owner, _stamps())
+        reranker, llm = _ask_recording_vendors(embedder, reader, client_for)
+        assert FLOOD_TEXT in reranker.sent
+        assert _llm_received(llm, FLOOD_TEXT)
+
+        body = _embargo_set(client_for, owner, record)
+
+        assert "can't be recalled" in body["notice"]
+        reranker, llm = _ask_recording_vendors(embedder, reader, client_for)
+        assert FLOOD_TEXT not in reranker.sent
+        assert not _llm_received(llm, FLOOD_TEXT)
+        vendor = _RecordingEmbedder()
+        _unindexed(record)
+        assert embed_active_chunk_set(record.pk, provider=vendor).refused
+        assert embed_record_summary(record.pk, provider=vendor).refused
+        assert vendor.sent == []
+
+
+class TestEarlierAnswersThatQuoteThePaper:
+    """
+    An answer quoting a paper is that paper's text. Once an embargo is set, it must
+    not go back out as chat history, as recall or as a backfilled vector, while the
+    reader keeps it in their own transcript. Each test first shows the Turn does go
+    out while the paper is clear, so a pass can't come from an empty window.
+    """
+
+    @pytest.fixture
+    def scene(self, embedder, space, reader, client_for):
+        owner = make_user("quoted-owner@cit.edu")
+        flood = _paper(embedder, space, _stamps())
+        RecordOwner.objects.create(record=flood, user=owner, is_primary=True)
+        pond = make_record(title="Pond Culture", text=POND_TEXT, embedder=embedder, space=space)
+        Record.objects.filter(pk=pond.pk).update(dpa_accepted_at=timezone.now(), **_stamps())
+        RecordOwner.objects.create(record=pond, user=owner, is_primary=True)
+        client = client_for(reader)
+        conversation_id = client.post(reverse("ai-conversations"), {}, format="json").json()["id"]
+        _ask_recording_vendors(embedder, reader, client_for, conversation_id=conversation_id)
+        turn = Turn.objects.get(conversation_id=conversation_id)
+        assert turn.citations.filter(record=flood).exists()
+        return {
+            "owner": owner, "flood": flood, "pond": pond, "turn": turn,
+            "conversation": turn.conversation,
+        }
+
+    def _next_prompt_quotes_it(self, embedder, reader, client_for, scene) -> bool:
+        _, llm = _ask_recording_vendors(
+            embedder, reader, client_for, POND_QUESTION, conversation_id=scene["conversation"].pk,
+        )
+        assert llm.calls
+        return _llm_received(llm, FLOOD_QUESTION)
+
+    def test_chat_history_keeps_it_out_of_the_next_prompt(
+        self, scene, embedder, reader, client_for,
+    ):
+        assert self._next_prompt_quotes_it(embedder, reader, client_for, scene)
+
+        _embargo_set(client_for, scene["owner"], scene["flood"])
+
+        assert not self._next_prompt_quotes_it(embedder, reader, client_for, scene)
+
+    def test_the_window_and_the_older_turns_drop_it(self, scene, reader, client_for, embedder):
+        with use_composition_root(CompositionRoot(embedder=embedder)):
+            turns = scene["conversation"].turns.all()
+            assert [t.pk for t in recent_window(turns, user=reader)] == [scene["turn"].pk]
+            assert [t.pk for t in sendable_turns(turns, reader)] == [scene["turn"].pk]
+
+            _embargo_set(client_for, scene["owner"], scene["flood"])
+
+            assert recent_window(turns, user=reader) == []
+            assert sendable_turns(turns, reader) == []
+
+    def test_a_turn_citing_two_papers_stays_out_when_either_is_held(
+        self, scene, reader, client_for, embedder,
+    ):
+        first = scene["turn"].citations.get()
+        TurnCitation.objects.create(
+            turn=scene["turn"], marker=2, record=scene["pond"],
+            chunk=scene["pond"].document_chunks.get(), page=first.page,
+        )
+        turns = scene["conversation"].turns.all()
+        with use_composition_root(CompositionRoot(embedder=embedder)):
+            assert [t.pk for t in sendable_turns(turns, reader)] == [scene["turn"].pk]
+
+            _embargo_set(client_for, scene["owner"], scene["pond"])
+
+            assert sendable_turns(turns, reader) == []
+
+    def test_recall_drops_it(self, scene, space, embedder, client_for):
+        query = embedder.embed_query(FLOOD_QUESTION)
+        with use_composition_root(CompositionRoot(embedder=embedder)):
+            recalled = ConversationMemory().recall(scene["conversation"], query, space.pk)
+            assert scene["turn"].pk in [t.pk for t in recalled]
+
+            _embargo_set(client_for, scene["owner"], scene["flood"])
+
+            recalled = ConversationMemory().recall(scene["conversation"], query, space.pk)
+            assert scene["turn"].pk not in [t.pk for t in recalled]
+
+    def test_the_backfill_skips_it(self, scene, space, client_for):
+        TurnEmbedding.objects.filter(turn=scene["turn"], kind=TURN_ANSWER_VECTOR).delete()
+
+        def planned():
+            return plan_turns(
+                turns_to_consider(), space_id=space.pk, space_model="m", cost_per_million=0.0,
+            )
+
+        assert [p.turn_id for p in planned().to_embed] == [scene["turn"].pk]
+
+        _embargo_set(client_for, scene["owner"], scene["flood"])
+
+        plan = planned()
+        assert plan.to_embed == []
+        assert any("disclosure" in reason for reason in plan.skipped)
+
+    def test_the_backfill_checks_again_right_before_it_sends(self, scene, space, client_for):
+        """A run can be long, and planning isn't the moment of sending."""
+        TurnEmbedding.objects.filter(turn=scene["turn"], kind=TURN_ANSWER_VECTOR).delete()
+        vendor = _RecordingEmbedder()
+
+        _embargo_set(client_for, scene["owner"], scene["flood"])
+
+        assert embed_turn_answer(scene["turn"], space_id=space.pk, embedder=vendor) is False
+        assert vendor.sent == []
+        assert not TurnEmbedding.objects.filter(
+            turn=scene["turn"], kind=TURN_ANSWER_VECTOR,
+        ).exists()
+
+    def test_an_answer_finished_as_the_embargo_lands_is_not_embedded(
+        self, scene, space, client_for,
+    ):
+        """The model had the paper already, and the answer vector is one more send."""
+        chunk = scene["flood"].document_chunks.get()
+        answer = GroundedAnswer(
+            text="Rainfall gauges [1].",
+            citations=(Citation(
+                marker=1, chunk_id=chunk.pk, record_id=scene["flood"].pk,
+                record_title=scene["flood"].title, source_page=chunk.source_page,
+                text=FLOOD_TEXT, context_path=(),
+            ),),
+            state=GENERATED, embedding_space_id=space.pk,
+        )
+        vendor = _RecordingEmbedder()
+        record_turn(scene["conversation"], "while it is clear", answer, embedder=vendor)
+        assert "Rainfall gauges [1]." in vendor.sent
+
+        _embargo_set(client_for, scene["owner"], scene["flood"])
+
+        vendor = _RecordingEmbedder()
+        turn = record_turn(scene["conversation"], "as it lands", answer, embedder=vendor)
+        assert vendor.sent == []
+        assert not TurnEmbedding.objects.filter(turn=turn, kind=TURN_ANSWER_VECTOR).exists()
+
+    def test_a_release_lets_it_back_in(self, scene, reader, client_for, embedder):
+        adviser = make_user("quoted-adviser@cit.edu")
+        Record.objects.filter(pk=scene["flood"].pk).update(adviser=adviser)
+        _embargo_set(client_for, scene["owner"], scene["flood"])
+
+        response = client_for(adviser).post(
+            reverse("record-embargo-release", args=[scene["flood"].pk]), {}, format="json",
+        )
+
+        assert response.status_code == 200, response.content
+        with use_composition_root(CompositionRoot(embedder=embedder)):
+            window = recent_window(scene["conversation"].turns.all(), user=reader)
+        assert [t.pk for t in window] == [scene["turn"].pk]
+
+    def test_the_reader_keeps_it_in_their_own_transcript(self, scene, reader, client_for):
+        _embargo_set(client_for, scene["owner"], scene["flood"])
+
+        response = client_for(reader).get(
+            reverse("ai-conversation-detail", args=[scene["conversation"].pk]),
+        )
+
+        assert response.status_code == 200, response.content
+        assert FLOOD_QUESTION in response.content.decode()
+        assert "Rainfall gauges" in response.content.decode()
