@@ -20,6 +20,13 @@ import socket
 
 import pytest
 
+# Explicit synthetic test profile; deployment values are configured separately.
+PDF_TEST_LIMITS = {
+    "PDF_VALIDATION_WALL_SECONDS": 10, "PDF_VALIDATION_MEMORY_MIB": 256,
+    "PDF_VALIDATION_MAX_PAGES": 1000, "PDF_VALIDATION_MAX_OBJECTS": 200000,
+    "PDF_VALIDATION_MAX_DEPTH": 100,
+}
+
 from testing import run_lock
 from testing.harness import (
     HarnessMode,
@@ -40,6 +47,7 @@ def pytest_configure(config):
     # Before the Hypothesis work below, and deliberately not after it: that
     # block returns early when Hypothesis is absent, and the hasher matters
     # to the Django half of the suite whether or not Hypothesis is installed.
+    _configure_pdf_test_limits()
     _use_fast_password_hashing()
     _use_in_process_celery_broker()
     _use_local_memory_cache()
@@ -56,6 +64,16 @@ def pytest_configure(config):
         # this wrongly" error, so a typo reads as a one-line usage message
         # rather than an INTERNALERROR traceback.
         raise pytest.UsageError(str(exc)) from exc
+
+
+def _configure_pdf_test_limits():
+    try:
+        from django.conf import settings
+    except ImportError:
+        return
+    for key, value in PDF_TEST_LIMITS.items():
+        if getattr(settings, key, None) is None:
+            setattr(settings, key, value)
 
 
 #: Every Django test that logs anyone in pays for a password hash, and PBKDF2

@@ -57,8 +57,8 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from apps.accounts.models import User
-from apps.documents.models import DocumentKind, PdfExtraction
-from apps.documents.tasks import extract_manuscript_text
+from apps.documents.sources import manuscript_changes, reset_manuscript
+from apps.documents.validators import pdf_upload_problem
 from apps.records import lifecycle
 from apps.records.corpus_clearance import clear_for_ai, refuse_outside_development
 from apps.records.models import Classification, Record, RecordOwner, RecordType
@@ -167,7 +167,7 @@ class Command(BaseCommand):
 
                 try:
                     record = self._load_one(path, title, classification, record_type, owner)
-                except SuspiciousFileOperation as exc:
+                except (SuspiciousFileOperation, ValueError) as exc:
                     # A storage path Django refuses to write -- per-record,
                     # not fatal to the batch (IR-422).
                     self.stdout.write(self.style.WARNING(
@@ -231,15 +231,17 @@ class Command(BaseCommand):
                 pipeline_status=self.status,
             )
             with path.open("rb") as fh:
-                record.abstract_file.save(path.name, File(fh), save=True)
+                source = File(fh, name=path.name)
+                problem = pdf_upload_problem(source)
+                if problem:
+                    raise ValueError(problem)
+                for field, value in manuscript_changes(None, source).items():
+                    setattr(record, field, value)
+                record.abstract_file.save(path.name, source, save=True)
             RecordOwner.objects.create(record=record, user=owner, is_primary=True)
             if self.clearing:
                 clear_for_ai(record, actor=owner)
 
-            PdfExtraction.objects.update_or_create(
-                record=record,
-                defaults={"status": "queued", "error": "", "kind": DocumentKind.MANUSCRIPT},
-            )
-            transaction.on_commit(lambda record_id=record.id: extract_manuscript_text.delay(record_id))
+            reset_manuscript(record)
 
         return record

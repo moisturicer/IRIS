@@ -52,7 +52,7 @@ def queued_chunkings(monkeypatch):
     rather than fail."""
     calls = []
     monkeypatch.setattr(
-        tasks, "_queue_chunk_extraction", lambda extraction_id: calls.append(extraction_id)
+        tasks, "_queue_chunk_extraction", lambda extraction_id, revision=None: calls.append(extraction_id)
     )
     return calls
 

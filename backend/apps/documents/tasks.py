@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 from celery import shared_task
 from django.utils import timezone
+from .phases import ExtractionPhase
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from apps.documents.models import PdfExtraction
@@ -49,145 +50,112 @@ def _build_extractor():
     )
 
 
-_EXTRACTION_RESULT_FIELDS = [
-    "extracted_text",
-    "structure",
-    "content_hash",
-    "extractor",
-    "error",
-    "status",
-    "completed_at",
-]
-
-
-def _run_extraction(self, extraction, *, file_field) -> None:
-    """Shared body of ``extract_pdf_text``/``extract_manuscript_text``
-    (IR-195): both differ only in which file field they read and how they
-    looked up ``extraction`` -- the Docling call, status lifecycle and
-    retry policy are identical either way.
-
-    ``self`` is the bound Celery task (for ``self.request.id``/``self.retry``);
-    passed through rather than looked up, since a plain function has neither.
-    """
-    from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
-
-    extraction.status         = "running"
-    extraction.celery_task_id = self.request.id
-    extraction.save(update_fields=["status", "celery_task_id"])
-
-    try:
-        with file_field.open("rb") as f:
-            pdf_bytes = f.read()
-
-        extracted = _build_extractor().extract(
-            pdf_bytes, filename=os.path.basename(file_field.name)
-        )
-
-        extraction.extracted_text = flatten_for_search(extracted.document)
-        extraction.structure      = document_to_json(extracted.document)
-        extraction.content_hash   = extraction_hash(extracted.document)
-        extraction.extractor      = extracted.extractor
-        extraction.error          = ""
-        extraction.status         = "done"
-        extraction.completed_at   = timezone.now()
-        extraction.save(update_fields=_EXTRACTION_RESULT_FIELDS)
-
-    except Exception as exc:
-        extraction.status = "failed"
-        extraction.error  = str(exc)
-        extraction.save(update_fields=["status", "error"])
-        raise self.retry(exc=exc, countdown=60)
-
-
-@shared_task(bind=True, max_retries=3)
-def extract_pdf_text(self, upload_id: int):
-    """Background task: extract a supplementary upload's PDF and persist the
-    result.
-
-    Triggered by ``SubmitDocumentView`` immediately after the file is saved,
-    so the API response is never blocked on a conversion that can take
-    minutes on a scanned thesis. Retries three times, sixty seconds apart.
-
-    Whether the result is chunked is not this task's call (IR-239): it asks
-    ``_queue_chunking_if_manuscript`` below, which reads the row's ``kind``.
-    In practice every ``UploadSlot`` a real record uses is supplementary --
-    an Ethics Clearance form, a Patent Draft, and so on -- so in practice
-    nothing extracted here is chunked. The difference from IR-195, where this
-    task simply never chunked, is that "in practice" is now a fact about the
-    data rather than a fact about this function.
-    """
-    from apps.documents.models import PdfExtraction, RecordUpload
-
-    extraction = PdfExtraction.objects.filter(upload_id=upload_id).first()
-    if not extraction:
-        return  # record deleted before the task ran
-
-    upload = RecordUpload.objects.get(pk=upload_id)
-    _run_extraction(self, extraction, file_field=upload.file)
-
-    # Reachable only on success -- _run_extraction's handler always raises.
-    _queue_chunking_if_manuscript(extraction)
-
-
-@shared_task(bind=True, max_retries=3)
-def extract_manuscript_text(self, record_id: int):
-    """Background task: extract a record's manuscript and persist the result.
-
-    The manuscript-side counterpart to ``extract_pdf_text`` above: same
-    Docling call, same status lifecycle, but reading ``Record.abstract_file``
-    and writing a ``PdfExtraction`` keyed by ``record`` rather than
-    ``upload`` -- the manuscript has no ``UploadSlot`` to hang one off.
-    Queued by ``RecordViewSet.perform_update`` whenever a PATCH changes
-    ``abstract_file`` (IR-195).
-
-    Whether the result is chunked is decided the same way as in
-    ``extract_pdf_text`` -- by the row's ``kind``, through the one guard
-    below (IR-239). A manuscript is what this path normally carries, so in
-    practice it chunks; but the rule lives on the data, not in the choice of
-    which task to call.
-    """
+def _locked_extraction(extraction_id):
+    """Lock order matches upload: Record first, then its extraction row."""
     from apps.documents.models import PdfExtraction
     from apps.records.models import Record
 
+    reference = PdfExtraction.objects.filter(pk=extraction_id).first()
+    if not reference:
+        return None
+    record = Record.objects.select_for_update().filter(pk=reference.resolved_record_id).first()
+    extraction = PdfExtraction.objects.select_for_update().filter(pk=extraction_id).first()
+    if not record or record.is_deleted or not extraction:
+        return None
+    from .sources import current_source
+    if extraction.record_id and not current_source(extraction, record):
+        return None
+    return extraction
+
+
+def _run_extraction(self, extraction_id, source_revision):
+    import uuid
+    from django.db import transaction
+    from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
+
+    attempt = uuid.uuid4()
+    with transaction.atomic():
+        extraction = _locked_extraction(extraction_id)
+        if not extraction or str(extraction.source_revision) != str(source_revision):
+            return
+        if extraction.status in {"done", "failed"} or extraction.phase == ExtractionPhase.AWAITING_SUBMISSION:
+            return
+        extraction.status = "running"
+        extraction.phase = ExtractionPhase.READING
+        extraction.attempt = attempt
+        extraction.celery_task_id = self.request.id or ""
+        extraction.save(update_fields=["status", "phase", "attempt", "celery_task_id"])
+        field = extraction.upload.file if extraction.upload_id else extraction.record.abstract_file
+        filename = extraction.source_file or field.name
+        storage = field.storage
+
+    try:
+        with storage.open(filename, "rb") as source:
+            pdf_bytes = source.read()
+        extracted = _build_extractor().extract(pdf_bytes, filename=os.path.basename(filename))
+        values = {
+            "extracted_text": flatten_for_search(extracted.document),
+            "structure": document_to_json(extracted.document),
+            "content_hash": extraction_hash(extracted.document),
+            "extractor": extracted.extractor, "error": "", "status": "done",
+            "phase": ExtractionPhase.READY, "completed_at": timezone.now(),
+        }
+    except Exception:
+        final = self.request.retries >= self.max_retries
+        with transaction.atomic():
+            extraction = _locked_extraction(extraction_id)
+            if (not extraction or extraction.attempt != attempt
+                    or str(extraction.source_revision) != str(source_revision)):
+                return
+            extraction.status = "failed" if final else "retrying"
+            extraction.phase = ExtractionPhase.FAILED if final else ExtractionPhase.RETRYING
+            extraction.error = "PDF reading failed. Retry extraction or enter details manually."
+            extraction.save(update_fields=["status", "phase", "error"])
+        # No parser exception/path in Celery messages or public status.
+        safe_error = RuntimeError("PDF extraction failed")
+        if final:
+            raise safe_error from None
+        raise self.retry(exc=safe_error, countdown=60) from None
+
+    with transaction.atomic():
+        extraction = _locked_extraction(extraction_id)
+        if (not extraction or extraction.attempt != attempt
+                or str(extraction.source_revision) != str(source_revision)):
+            return
+        for key, value in values.items():
+            setattr(extraction, key, value)
+        extraction.save(update_fields=list(values))
+        _queue_chunking_if_manuscript(extraction)
+
+
+@shared_task(bind=True, max_retries=3)
+def extract_pdf_text(self, upload_id: int, source_revision=None):
+    from apps.documents.models import PdfExtraction
+
+    extraction = PdfExtraction.objects.filter(upload_id=upload_id).first()
+    if extraction:
+        _run_extraction(self, extraction.pk, source_revision)
+
+
+@shared_task(bind=True, max_retries=3)
+def extract_manuscript_text(self, record_id: int, source_revision=None):
+    """Unpinned pre-upgrade messages cannot process a revisioned attachment."""
+    from apps.documents.models import PdfExtraction
+
     extraction = PdfExtraction.objects.filter(record_id=record_id).first()
-    if not extraction:
-        return  # record deleted, or its manuscript removed, before the task ran
-
-    record = Record.objects.get(pk=record_id)
-    _run_extraction(self, extraction, file_field=record.abstract_file)
-
-    # Reachable only on success -- _run_extraction's handler always raises.
-    _queue_chunking_if_manuscript(extraction)
+    if extraction:
+        _run_extraction(self, extraction.pk, source_revision)
 
 
 def _queue_chunking_if_manuscript(extraction: "PdfExtraction") -> None:
-    """The one place that decides whether an extraction enters the RAG corpus.
-
-    Both extraction tasks call this, and it asks the row what it holds
-    (IR-239). Neither task decides by being itself, which is what ADR-013
-    §Decision ("Retrieval scope") means by keying off "is this the
-    manuscript" rather than off the upload path -- and is why a manuscript
-    attached to an ``UploadSlot``, a thing no endpoint can produce today,
-    would nonetheless be chunked correctly the day one can.
-    """
     from apps.documents.models import DocumentKind
 
-    if extraction.kind != DocumentKind.MANUSCRIPT:
-        return
-
-    _queue_chunk_extraction(extraction.pk)
+    if extraction.kind == DocumentKind.MANUSCRIPT:
+        _queue_chunk_extraction(extraction.pk, str(extraction.source_revision) if extraction.source_revision else None)
 
 
-def _queue_chunk_extraction(extraction_id: int) -> None:
-    """Hand the extraction to the chunker, in another worker.
-
-    ``on_commit`` rather than a bare ``delay``, for the same reason IR-116's
-    original ``_queue_chunking`` used it: the chunker reads the row this task
-    just wrote, and a worker that picked the message up inside an open
-    transaction would find the pre-save extraction.
-    """
+def _queue_chunk_extraction(extraction_id: int, source_revision=None) -> None:
     from django.db import transaction
-
     from apps.ai.tasks import chunk_extraction
 
-    transaction.on_commit(lambda: chunk_extraction.delay(extraction_id))
+    transaction.on_commit(lambda: chunk_extraction.delay(extraction_id, source_revision))

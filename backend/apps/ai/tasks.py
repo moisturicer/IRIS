@@ -101,7 +101,7 @@ def embed_record(self, record_id: int, *, skip_existing: bool = False):
 
 
 @shared_task(bind=True, max_retries=3)
-def embed_chunk_set(self, record_id: int, *, force: bool = False):
+def embed_chunk_set(self, record_id: int, *, force: bool = False, chunk_set_id=None, source_revision=None):
     """Embed the chunks of a record's active chunk set (IR-281).
 
     Separate from ``embed_record`` rather than folded into it: they write
@@ -112,8 +112,15 @@ def embed_chunk_set(self, record_id: int, *, force: bool = False):
     """
     from apps.ai.indexing import embed_active_chunk_set
 
+    if chunk_set_id is not None:
+        from apps.ai.models import ChunkSet
+        if not ChunkSet.objects.filter(pk=chunk_set_id, record_id=record_id, is_active=True,
+                                       source_revision=source_revision).exists():
+            return None
+
     try:
-        outcome = embed_active_chunk_set(record_id, force=force)
+        pinned = {"chunk_set_id": chunk_set_id, "source_revision": source_revision} if chunk_set_id is not None else {}
+        outcome = embed_active_chunk_set(record_id, force=force, **pinned)
     except Exception as exc:
         raise self.retry(exc=exc, countdown=60)
 
@@ -212,10 +219,18 @@ def _run_ingestion(self, extraction, force: bool) -> dict:
     """
     from apps.ai.ingestion.pipeline import IngestionError, ingest_extraction
     from apps.ai.repositories import DjangoChunkRepository
+    from apps.ai.models import ChunkSet
+
+    # Two different original files may normalize to identical text. An old
+    # ingestion key cannot stand in for a chunk set bound to this new source.
+    needs_source_binding = extraction.source_revision is not None and not ChunkSet.objects.filter(
+        record_id=extraction.resolved_record_id, is_active=True,
+        source_revision=extraction.source_revision,
+    ).exists()
 
     try:
         outcome = ingest_extraction(
-            extraction, repository=DjangoChunkRepository(), force=force
+            extraction, repository=DjangoChunkRepository(), force=force or needs_source_binding
         )
     except IngestionError:
         raise
@@ -233,7 +248,12 @@ def _run_ingestion(self, extraction, force: bool) -> dict:
         from apps.ai.overview.service import queue_overview_for_chunk_set
 
         queue_overview_for_chunk_set(outcome.chunk_set_id)
-        embed_chunk_set.delay(outcome.record_id)
+        from django.db import transaction
+        pinned = str(extraction.source_revision) if extraction.source_revision else None
+        ChunkSet.objects.filter(pk=outcome.chunk_set_id).update(source_revision=extraction.source_revision)
+        transaction.on_commit(lambda: embed_chunk_set.delay(
+            outcome.record_id, chunk_set_id=outcome.chunk_set_id, source_revision=pinned,
+        ))
 
     return {
         "record_id": outcome.record_id,
@@ -248,7 +268,7 @@ def _run_ingestion(self, extraction, force: bool) -> dict:
 
 
 @shared_task(bind=True, max_retries=3)
-def chunk_extraction(self, extraction_id: int, *, force: bool = False):
+def chunk_extraction(self, extraction_id: int, source_revision=None, *, force: bool = False):
     """Chunk one extraction and make the result its record's active chunk set.
 
     Keyed on the extraction, not on the record or the upload it hangs off
@@ -259,13 +279,17 @@ def chunk_extraction(self, extraction_id: int, *, force: bool = False):
     the corpus by reading ``PdfExtraction.kind``; this task's only job is to
     chunk what it is handed.
     """
-    from apps.documents.models import PdfExtraction
+    from django.db import transaction
+    from apps.documents.tasks import _locked_extraction
 
-    extraction = PdfExtraction.objects.filter(pk=extraction_id).first()
-    if not extraction:
-        return None  # deleted between the task being queued and running
-
-    return _run_ingestion(self, extraction, force)
+    with transaction.atomic():
+        extraction = _locked_extraction(extraction_id)
+        if not extraction or str(extraction.source_revision) != str(source_revision):
+            return None
+        if extraction.status != "done":
+            from apps.ai.ingestion.pipeline import IngestionError
+            raise IngestionError("Extraction must complete before chunking.")
+        return _run_ingestion(self, extraction, force)
 
 
 #: For unexpected errors only; a vendor failure is a recorded fallback route.

@@ -40,9 +40,12 @@ def test_existing_papers_come_through_unanswered_and_refused():
 
         executor = MigrationExecutor(connection)
         executor.migrate(_MIGRATE_TO)
+        MigratedRecord = executor.loader.project_state(_MIGRATE_TO).apps.get_model("records", "Record")
 
         for pk in (published.pk, draft.pk):
-            record = Record.objects.get(pk=pk)
+            # Read exactly the schema under test, then exercise the live
+            # derived policy in memory without querying newer columns.
+            record = Record(**MigratedRecord.objects.filter(pk=pk).values().get())
             assert record.embargo_state == EmbargoState.UNKNOWN
             assert record.embargo_answered_at is None
             assert record.embargo_answered_by is None
@@ -50,7 +53,7 @@ def test_existing_papers_come_through_unanswered_and_refused():
             assert record.embargo_released_at is None
             assert record.embargo_released_by is None
 
-        decision = decision_for_record(Record.objects.get(pk=published.pk))
+        decision = decision_for_record(Record(**MigratedRecord.objects.filter(pk=published.pk).values().get()))
         assert decision.allowed is False
         assert decision.reasons == (Reason.EMBARGO_UNKNOWN,)
     finally:

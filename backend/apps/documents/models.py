@@ -1,7 +1,14 @@
 from django.db import models
+import uuid
+from pathlib import Path
 from django.utils import timezone
 
 from core.enums import DocumentRequestItemState, DocumentRequestState, Party
+from .phases import ExtractionPhase
+
+
+def attachment_path(instance, filename):
+    return f"documents/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
 
 
 class UploadSlot(models.Model):
@@ -42,7 +49,7 @@ class RecordUpload(models.Model):
     """
     record      = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="uploads")
     slot        = models.ForeignKey(UploadSlot, on_delete=models.CASCADE, related_name="uploads")
-    file        = models.FileField(upload_to="documents/")
+    file        = models.FileField(upload_to=attachment_path)
     version     = models.PositiveIntegerField(default=1)
     status      = models.ForeignKey(
         UploadStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploads"
@@ -128,6 +135,7 @@ class PdfExtraction(models.Model):
     STATUS = [
         ("queued",  "Queued"),
         ("running", "Running"),
+        ("retrying", "Retrying"),
         ("done",    "Done"),
         ("failed",  "Failed"),
     ]
@@ -140,6 +148,10 @@ class PdfExtraction(models.Model):
         null=True, blank=True,
     )
     status         = models.CharField(max_length=10, choices=STATUS, default="queued", db_index=True)
+    source_revision = models.UUIDField(null=True, blank=True, editable=False)
+    source_file = models.CharField(max_length=255, blank=True, editable=False)
+    attempt = models.UUIDField(null=True, blank=True, editable=False)
+    phase = models.CharField(max_length=24, choices=ExtractionPhase.choices, default=ExtractionPhase.QUEUED)
     # The RAG corpus boundary, stored on the row the chunker reads (IR-239).
     # Defaults to SUPPLEMENTARY so the failure mode is closed: a row whose
     # creator forgot to say what it holds is left out of the corpus rather
@@ -213,7 +225,7 @@ class RecordFile(models.Model):
     `attachments.py`).
     """
     record      = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="files")
-    file        = models.FileField(upload_to="record_files/")
+    file        = models.FileField(upload_to=attachment_path)
     filename    = models.CharField(max_length=300)
     uploaded_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="record_files"

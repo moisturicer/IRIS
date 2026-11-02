@@ -90,7 +90,7 @@ def queued_chunkings(monkeypatch):
     such a row is not chunked -- a fact about its ``kind``, not about which
     task read it."""
     calls = []
-    monkeypatch.setattr(tasks, "_queue_chunk_extraction", calls.append)
+    monkeypatch.setattr(tasks, "_queue_chunk_extraction", lambda extraction_id, revision=None: calls.append(extraction_id))
     return calls
 
 
@@ -198,8 +198,8 @@ def test_the_pdf_bytes_and_filename_reach_the_extractor(monkeypatch, upload, ext
 
 
 def test_a_re_extraction_clears_a_previous_error(monkeypatch, upload, extraction):
-    extraction.status = "failed"
-    extraction.error = "Docling-serve unreachable"
+    extraction.status = "retrying"
+    extraction.error = "PDF reading failed. Retry extraction or enter details manually."
     extraction.save(update_fields=["status", "error"])
 
     _run(monkeypatch, FakeExtractor(), upload.id)
@@ -241,7 +241,8 @@ def test_a_failed_extraction_is_recorded_and_retried(monkeypatch, upload, extrac
 
     extraction.refresh_from_db()
     assert extraction.status == "failed"
-    assert str(error) in extraction.error
+    assert extraction.error == "PDF reading failed. Retry extraction or enter details manually."
+    assert str(error) not in extraction.error
     assert result.failed()
 
 

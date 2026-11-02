@@ -105,6 +105,10 @@ GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in en
 #: Sites where a bare literal is correct and must stay. Each entry needs a
 #: reason -- an allowlist without one is just a silenced test.
 ALLOWED = {
+    # IR-831: ExtractionPhase declares processing vocabulary. Its "reading"
+    # is Docling reading a PDF, not a person's ReadingStatus on a saved paper.
+    # Keep the exemption on this narrow declaration module, not the task body.
+    "documents/phases.py",
     # (IR-227) Replaces the entry for the deleted `seed_test_users.py`. Every
     # *workflow* value in this seeder is an enum member -- it drives the real
     # services, so it has to be. The two literals here are the demo students'
