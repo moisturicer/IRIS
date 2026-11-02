@@ -95,7 +95,7 @@ An item is **Done** only when the following hold. This is the same list the repo
 ### Required when applicable
 
 - [ ] Tests added or updated, **and executed, with evidence** (CI run, or recorded output)
-- [ ] Requirements traceability updated — `docs/testing/TRACEABILITY.md`
+- [ ] Requirements traceability updated — `docs/testing/traceability/IR-XXX.md`, and the row in `docs/testing/TRACEABILITY.md` if a status changed
 - [ ] Documentation updated
 - [ ] Security implications addressed and stated
 - [ ] Database migrations included and tested on a realistic copy

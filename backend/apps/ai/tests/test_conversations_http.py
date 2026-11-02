@@ -655,6 +655,7 @@ class ReplayingATurnTests:
         assert turn["partial"] is False
 
 
+@pytest.mark.slow
 class LongConversationTests:
     def test_a_conversation_well_past_five_turns_succeeds(
         self, embedder, space, client_for
