@@ -2546,6 +2546,54 @@ NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECK
 
 **Status.** Implemented; awaiting review.
 
+## IR-728 — Investigate and answer using one bounded model Conversation
+
+**Basis and scope.** IR-728 under IR-714; authority ADR-049 §9, §13–16. One named AGENT responsibility searches, reads, plans and drafts in a single ordered model/tool Conversation, under a new pin pair (`agent-research-1` prompt, `research-1` tools). IR-727's `agent-direct-1`/`none-1` pin keeps its one-turn behaviour. Built on IR-732 (merged as #448).
+
+**Code.**
+- **Loop** (`ai/agent/executor.py`). Each gathering turn is fitted (IR-732), recorded as a `model` journal event `{purpose: "agent", phase, step}` before it is sent, then sent. Tool groups run in model order and are packed whole; a call past the tool bound is answered `tool_limit`, not run. Research closes at the step, tool-call, no-progress (consecutive turns with no new passage or outline), time (`final_seconds` before the deadline) or allowance bound. The final turn keeps the tools declared with `tool_choice: "none"` and a closing note. Only a turn that ended on its tool calls has them run, so a truncated one is refused whole, and every send is bounded by the run's deadline even without admission. Only a completed turn that passes the checks is delivered: a tool-only, truncated, reasoning-only, malformed or failing draft is `unavailable`, and IR-729 adds the repair. The reader's question is sent verbatim; earlier Turns precede it as text, with their delivered `[n]` markers removed.
+- **Bounds and allowance** (`ai/agent/budget.py`). `Bounds` per depth (`ordinary`, `deep`), required, with no defaults. `deep` is the larger profile, chosen by the existing `depth` field. Nothing selects an engine or provider. `Budget` counts reported usage and, where usage is missing, the estimate and the cap. A gathering turn is sent only while that turn, a final answer after one more result, and one repair all fit the AskRun's persisted token and cost allowance, costed at the pinned model's admission `Price`. A paid provider without a price is `price_unknown`.
+- **Tools** (`ai/agent/tools.py`). `search`, `open_passage`, `read_page` and `outline` over IR-719's tools return original passages; none calls a model. `update_plan` keeps up to 12 steps with stable ids (none dropped or reused) and a revision, and journals the application's own execution counts. `update_focus` records selected/excluded papers by run handle. `ask_clarification` ends the run with a clarification Turn and is not offered right after one. Undeclared argument keys (a scope, a reader, a limit) are refused, and `semantic_search` is not offered.
+- **Checks** (`ai/agent/assurance.py`). These port IR-512's rules to passage handles: a cited handle must be one this run was shown, with no other bracket labels; numbers must come from cited text, pages, titles or tool coverage; marked titles must be papers the run saw; exhaustive or screening language is refused; and citing a paper the reader excluded is refused. Numbers, titles and completeness are checked whenever the run has repository context (evidence read or papers recalled), including follow-ups and clarifications answered without a tool, and numbers from earlier checked Turns count as supported. Each cited passage is reopened just before commit and must still resolve to the same source revision. Citations are renumbered `[1]…` and bound to Record, page, quote and revision.
+- **Persistence** (`ai/runs/migrations/0004_agent.sql`, so `runs_config.SCHEMA` is now `0004_agent.sql`). `conversation.state` (shown order, selections, exclusions as Record ids) is advanced only by a committed Turn. `turn.kind` is `answer` or `clarification`. A claim carries the depth, allowance, remaining time, up to 20 earlier Turns and the state. `ResearchTools.recall` reissues handles only for shown papers still readable in scope, and `ResearchTools.journal` writes run events under the grant (False once the run has ended). Deletion clears the state.
+
+**Tests.** `apps/ai/tests/test_ai_runtime_agent_loop_contract.py` (41, no database, recording provider, in-memory research tools) covers:
+- a direct question answered in one turn with tools offered;
+- a search-then-answer exchange keeping the call, result, opaque artifact and question unchanged;
+- parallel results in order;
+- one purpose and one instruction set across every attempt;
+- no-progress, step, tool-call, time, token and cost bounds each closing research with the final answer kept, and an allowance too small for the final answer sending nothing;
+- tool-only, truncated final and truncated gathering turns never delivered;
+- Stop between steps admitting no further attempt;
+- five failing drafts and a source replaced before commit;
+- five argument forms that would widen scope, forge identity or extend allowance, all refused;
+- stable plan ids with revisions and execution counts, and plan updates not counting as progress;
+- the follow-up state and selection, the previous state kept when nothing is cited, and one clarification, never two in a row;
+- research without profiles being unsupported.
+- the review fixes: calls in a truncated turn never run; no second clarification even with no history carried; a tool-free follow-up still checked; prior markers stripped; an excluded paper's citation refused; a run ending during the recheck reported as such; a hung send stopped by the deadline.
+
+Four mutations (finalization `tool_choice`, the checks, the no-progress bound, the repair reserve) each failed the suite.
+
+`apps/ai/tests/test_ai_runtime_agent_loop_db.py` (4, real PostgreSQL, restricted runtime login, Django-issued grants) is the ticket's demonstration:
+- A two-paper question through the routes; "Tell me about the second one" resolved from the shown order, selected, then forced into a no-progress loop. The result is three gathering turns, one final turn, a cited answer about the second paper only, one purpose and identical instructions and tools on every request, and a selection that survives into the next Turn. Removing state persistence fails it.
+- Paper Chat refusing a widened search and citing only its Record.
+- An invalid draft committing no Turn.
+- An admitted run whose every ledger reservation is purpose `agent`, version `agent-research-1`.
+
+IR-722's run tests pass with the schema pin literal moved to `0004_agent.sql`, a deliberate change.
+
+**Evidence (2026-11-02).** `python -m pytest -q -rA apps/ai/tests/test_ai_runtime_*.py` from `backend/`, against the dev Postgres container, run alone: 161 passed, 0 failed, 0 skipped (contract and DB suites, IR-728's included). The full backend suite fails in Django-side suites (Ask IRIS HTTP, records, documents, reviews, throttle and production-settings tests) on this machine both with and without IR-728's files on a clean `HEAD` worktree, from local `backend/.env` values (for example an LLM provider pin that IR-489 refuses). No non-test module under `backend/` imports `ai/`, and no AI-runtime test failed.
+
+**Not done here.**
+- No repair: IR-729 owns it, so an invalid draft ends `unavailable`.
+- Under admission, IR-725's guard still withholds Record evidence from any paid provider. A paid research run therefore stops at its second attempt, and the AskRun's `max_attempts` bounds provider attempts as well as claims.
+- No route or worker builds the agent executor or its profiles; the reader UI and plan display are IR-730.
+- Exact count and resolve tools are IR-750; full-paper reading is IR-733; durable exchange checkpoints are IR-724; removing revoked evidence from earlier Turns is IR-721.
+- The recheck before commit and the commit are separate transactions.
+- The Budget starts from zero on each claim, so a re-claimed run could spend its allowance again; resuming without restarting the allowance is IR-724.
+- `0004_agent.sql` has been applied only to the test database, migrated from empty through 0001–0003, not yet to a copy of the dev database.
+
+**Status.** Implemented; awaiting review.
 
 ## IR-769 - Institution copy and entry-screen links
 

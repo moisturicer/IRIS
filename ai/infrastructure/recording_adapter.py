@@ -2,7 +2,8 @@
 
 Replays scripted wire responses through a real dialect and records every
 outgoing payload. A scripted exception is raised after recording, and
-`HANG` never answers (IR-725). No network.
+`HANG` never answers (IR-725). A callable is given the payload and returns
+the response, so a script can cite what the tools returned (IR-728). No network.
 """
 
 from __future__ import annotations
@@ -56,6 +57,8 @@ class RecordingAgentProvider(LLMProvider):
         if not self.responses:
             raise UnsupportedCapability("script_exhausted")
         response = self.responses.pop(0)
+        if callable(response):
+            response = response(payload)
         if response is HANG:
             await asyncio.Event().wait()
         if isinstance(response, Exception):

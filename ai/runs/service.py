@@ -16,7 +16,7 @@ from ai.admission import scope as admission
 from ai.research.tools import ResearchTools
 from ai.runs import config as runs_config
 from ai.runs.dispatch import Notifier, PollingNotifier
-from ai.runs.executor import Executor, Unavailable
+from ai.runs.executor import Executor, RunContext, Unavailable
 from ai.runs.store import Claim, Fenced, RunStore
 
 log = logging.getLogger(__name__)
@@ -84,7 +84,13 @@ class RunService:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id)
             # Every provider attempt inside is admitted against this run (IR-725).
             with admission.bound(admission.RunBinding(run_id, claim.fence)):
-                result = await self.executor.answer(claim.question, tools)
+                if getattr(self.executor, "takes_context", False):
+                    result = await self.executor.answer(claim.question, tools, context=RunContext(
+                        allowance=claim.allowance, remaining_seconds=claim.remaining_seconds,
+                        depth=claim.depth, prior=claim.prior, state=claim.state or {},
+                    ))
+                else:
+                    result = await self.executor.answer(claim.question, tools)
         except Unavailable as refused:
             # Operators get the code; readers only see `unavailable`.
             log.info("run %s unavailable: %s", run_id, refused.code)
