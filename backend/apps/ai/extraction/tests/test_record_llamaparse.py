@@ -180,3 +180,48 @@ def test_latest_is_refused_before_anything_is_sent(tmp_path):
         record("figures", PDF, tmp_path, api=api, downloads=downloads, version="latest")
 
     assert fake.requests == []
+
+
+def test_a_null_usage_records_unknown_credits_rather_than_failing(tmp_path):
+    fake = FakeLlamaParse()
+    respond = fake.__call__
+
+    def usage_null(request):
+        response = respond(request)
+        if "expand" in request.url.params:
+            body = response.json()
+            body["job"]["usage"] = None
+            return httpx.Response(200, json=body)
+        return response
+
+    api, downloads = _clients(usage_null)
+    target = record(
+        "figures", PDF, tmp_path, api=api, downloads=downloads, version=VERSION,
+        sleep=lambda _: None,
+    )
+
+    assert json.loads((target / "manifest.json").read_text())["credits"] is None
+    assert fake.deleted == ["dfl-1"]
+
+
+def _refusing_delete(fake):
+    def handler(request):
+        if request.method == "DELETE":
+            return httpx.Response(500, text="nope")
+        return fake(request)
+
+    return handler
+
+
+def test_a_refused_delete_fails_the_recording(tmp_path):
+    api, downloads = _clients(_refusing_delete(FakeLlamaParse()))
+
+    with pytest.raises(RecordingFailed, match="may remain"):
+        record("figures", PDF, tmp_path, api=api, downloads=downloads, sleep=lambda _: None)
+
+
+def test_a_refused_delete_does_not_hide_the_jobs_own_failure(tmp_path):
+    api, downloads = _clients(_refusing_delete(FakeLlamaParse(statuses=("FAILED",))))
+
+    with pytest.raises(RecordingFailed, match="ended FAILED"):
+        record("figures", PDF, tmp_path, api=api, downloads=downloads, sleep=lambda _: None)

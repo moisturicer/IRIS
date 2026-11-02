@@ -28,13 +28,17 @@ LLAMAPARSE_API_KEY=... python -m apps.ai.extraction.tests.fixtures.record_llamap
 ```
 
 - Pass fixture names to record only some of them, e.g. `figures two_columns`.
-- `--version` pins a different dated release. `latest` is refused.
+- `--version` pins a different dated release. `latest` is refused. The
+  default, `2026-09-28`, is the first release the docs name for watermark
+  text. It has not been checked against a live account; LlamaParse rejects an
+  unpublished date before parsing.
 - `--base-url` picks the region. The default is North America. Region is still an open condition of ADR-056.
 
 The script uploads each PDF, starts the job, polls it, then downloads the
 result, the boxes and the figure images. It deletes the uploaded file in a
-`finally` block, so the file is removed even when the job fails. The request
-sets `disable_cache`.
+`finally` block, so the file is removed even when the job fails, and a refused
+delete fails the run. The request sets `disable_cache`. Table quality flags and
+watermark text have no request option: they arrive in `items` and `metadata`.
 
 Never commit the key, and never record a third-party paper here.
 
@@ -48,7 +52,9 @@ Four PDFs, **6 pages** in all. Per page, from LlamaParse's pricing page
 | `agentic` | 10 (3 for a page Cost Optimizer sends to `cost_effective`) |
 | `layout` images | +3 |
 | High-effort confidence | +5 |
-| Granular boxes | not published |
+| Granular boxes, chart parsing | not priced on that page |
 
-So about **108 credits ($0.14)** at most, before granular boxes. The real
-figure is in each `manifest.json` and in `OPEN_CONDITIONS.md`.
+So about **108 credits ($0.14)**, plus whatever granular boxes and chart
+parsing add. The real figure is in each `manifest.json` and in
+`OPEN_CONDITIONS.md`. If billing has not reported credits by the time the
+result is fetched, the manifest records `null` rather than lose a paid run.

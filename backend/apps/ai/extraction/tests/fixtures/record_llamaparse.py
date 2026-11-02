@@ -99,7 +99,7 @@ def record(
         images = target / "images"
         images.mkdir(parents=True, exist_ok=True)
         for image in (result.get("images_content_metadata") or {}).get("images", []):
-            (images / image["filename"]).write_bytes(_download(downloads, image["presigned_url"]))
+            (images / Path(image["filename"]).name).write_bytes(_download(downloads, image["presigned_url"]))
         grounded = ((result.get("result_content_metadata") or {}).get("grounded_items") or {})
         if grounded.get("presigned_url"):
             (target / "grounded_items.jsonl").write_bytes(
@@ -117,13 +117,24 @@ def record(
                 "request": request,
                 "expand": list(EXPAND),
                 "job_id": job_id,
-                "credits": result["job"].get("usage", {}).get("credits"),
+                "credits": _credits(result),
                 "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             },
         )
         return target
     finally:
-        api.delete(f"/api/v1/beta/files/{file_id}")
+        _delete(api, file_id, failing=sys.exc_info()[1] is not None)
+
+
+def _delete(api: httpx.Client, file_id: str, *, failing: bool) -> None:
+    """ADR-056 decision 7; never hides the error that is already in flight."""
+    try:
+        deleted = api.delete(f"/api/v1/beta/files/{file_id}")
+        _check(deleted, f"delete file {file_id}")
+    except (httpx.HTTPError, RecordingFailed) as error:
+        if not failing:
+            raise RecordingFailed(f"uploaded file {file_id} may remain: {error}") from error
+        print(f"uploaded file {file_id} may remain: {error}", file=sys.stderr)
 
 
 def _wait(api: httpx.Client, job_id: str, sleep: Callable[[float], None]) -> None:
@@ -147,10 +158,14 @@ def _result_with_credits(api: httpx.Client, job_id: str, sleep: Callable[[float]
         fetched = api.get(f"/api/v2/parse/{job_id}", params={"expand": ",".join(EXPAND)})
         _check(fetched, "fetch result")
         result = fetched.json()
-        if (result["job"].get("usage") or {}).get("credits") is not None:
+        if _credits(result) is not None:
             return result
         sleep(_POLL_SECONDS)
     return result
+
+
+def _credits(result: dict) -> float | None:
+    return (result["job"].get("usage") or {}).get("credits")
 
 
 def _download(downloads: httpx.Client, url: str) -> bytes:
