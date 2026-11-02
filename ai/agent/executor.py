@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 
 from ai.admission.errors import AdmissionDenied
+from ai.agent.context import FittedAgentProvider, OverCapacity, Reserves
 from ai.agent.protocol import AgentRequest, NotFinal, Pin, User, final_answer
 from ai.domain.ports import LLMProvider, TransientProviderError, UnsupportedCapability
 from ai.runs import config as runs_config
@@ -34,9 +35,16 @@ class AgentExecutor:
     version = "1"
     reserved_units = 0
 
-    def __init__(self, provider: LLMProvider, pin: Pin):
+    def __init__(self, provider: LLMProvider, pin: Pin, reserves: Reserves):
         self.provider = provider
         self.pin = pin
+        #: Every request is fitted to the pinned model's verified capacity (IR-732).
+        self.sender = FittedAgentProvider(provider, reserves)
+
+    @property
+    def capacity_status(self):
+        """The last request's capacity status, or None before any."""
+        return self.sender.statuses[-1] if self.sender.statuses else None
 
     def supported(self) -> bool:
         return (all(getattr(self.pin, k) == v for k, v in SUPPORTED.items())
@@ -53,7 +61,10 @@ class AgentExecutor:
             raise Unavailable("not_admitted")
         request = AgentRequest(pin=self.pin, instructions=INSTRUCTIONS, history=(User(question),))
         try:
-            turn = await self.provider.converse(request)
+            turn = await self.sender.converse(request)
+        except OverCapacity as refused:
+            # The status, numbers only, is logged by the sender.
+            raise Unavailable(refused.code) from None
         except UnsupportedCapability:
             raise Unavailable("unsupported_pin") from None
         except AdmissionDenied as refused:

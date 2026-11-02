@@ -19,6 +19,7 @@ from ai.agent.protocol import Pin  # noqa: E402
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
 from ai.runs.store import RunStore  # noqa: E402
 from .corpus import make_user  # noqa: E402
+from .test_ai_runtime_context_contract import MILLION, RESERVES  # noqa: E402
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -41,11 +42,12 @@ def reply(content, **message):
 
 
 def recording(*responses):
-    return RecordingAgentProvider(responses=list(responses), capabilities=("continuation",))
+    return RecordingAgentProvider(responses=list(responses), capabilities=("continuation",),
+                                  capacities={"scripted-model": MILLION})
 
 
 def use_agent(holder, runtime_dsn, provider, pin=PIN):
-    holder["service"] = service(runtime_dsn, AgentExecutor(provider, pin))
+    holder["service"] = service(runtime_dsn, AgentExecutor(provider, pin, RESERVES))
 
 
 def test_a_direct_question_completes_and_reopens_with_its_pin(api, runtime):
@@ -86,7 +88,7 @@ def test_an_unsupported_pin_ends_unavailable_with_no_turn(api, runtime):
 
 def test_a_run_is_never_continued_under_another_pin(runtime):
     reader = make_user("agent-repinned@cit.edu")
-    admitted_by = service(runtime, AgentExecutor(recording(), PIN), notifier=Quiet())
+    admitted_by = service(runtime, AgentExecutor(recording(), PIN, RESERVES), notifier=Quiet())
     run_, created = asyncio_run(admitted_by.submit(
         session(reader), key="agent-repinned", question="Q?", conversation_id=None,
         base_revision=None,
@@ -94,7 +96,7 @@ def test_a_run_is_never_continued_under_another_pin(runtime):
     assert created and run_["state"] == "queued"
     upgraded = Pin(**{**PIN.as_dict(), "requires": PIN.requires, "prompt_version": "agent-direct-2"})
     provider = recording(reply("Would be the wrong interpretation."))
-    worker = service(runtime, AgentExecutor(provider, upgraded), notifier=Quiet())
+    worker = service(runtime, AgentExecutor(provider, upgraded, RESERVES), notifier=Quiet())
     assert asyncio_run(worker.run_next())
     status = asyncio_run(RunStore(runtime).status(session(reader), run_["id"]))
     assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
@@ -138,7 +140,7 @@ def asyncio_run(coro):
 
 def test_an_agent_run_is_not_answered_by_a_worker_without_its_pin(runtime):
     reader = make_user("agent-unpinned-worker@cit.edu")
-    admitted_by = service(runtime, AgentExecutor(recording(), PIN), notifier=Quiet())
+    admitted_by = service(runtime, AgentExecutor(recording(), PIN, RESERVES), notifier=Quiet())
     run_, _ = asyncio_run(admitted_by.submit(
         session(reader), key="agent-unpinned", question="Q?", conversation_id=None,
         base_revision=None,
