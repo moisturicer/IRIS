@@ -2541,3 +2541,6 @@ NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECK
 
 NFR-A1: muted text on stone-100 now uses the existing stone-600 utility in the reading header, single-version label, PDF zoom, Paper Chat heading context, review workspace heading and inactive My Reviews counts. Real Chromium measured the affected pair at 4.3977:1 before and 6.9934:1 after (AA minimum 4.5:1). The existing IR-414 browser pre-pass is the acceptance check; see [executed evidence and limits](evidence/IR-770/README.md). Human approval remains outstanding.
 
+## IR-98 — The test plan describes the testing IRIS does
+
+`TEST_PLAN.md` now lists the tooling and levels in use, and §9 lists what testing does not establish yet. `SECURITY.md` §11 gives each risk a reason and stays the one register. Documentation only: no test or requirement status changes.
