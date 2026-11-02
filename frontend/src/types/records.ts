@@ -50,6 +50,9 @@ export interface RecordListItem {
   authors:               Author[];
 }
 
+/** The catalogue metadata kept with an unsent comparison (IR-574). */
+export type ComparisonRecord = Pick<RecordListItem, "id" | "title" | "origin" | "classification_name">;
+
 export interface DiscoverInterestOption { id: number; name: string }
 export interface DiscoverInterests {
   classifications: DiscoverInterestOption[];

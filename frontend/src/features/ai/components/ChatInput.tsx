@@ -1,10 +1,12 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { CHAT_COLUMN } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
 
 interface ChatInputProps {
   onSend:    (text: string) => void;
   disabled?: boolean;
+  sendDisabled?: boolean;
+  children?: ReactNode;
   placeholder?: string;
   /** The box's accessible name, when the placeholder is shortened for a narrow page. */
   label?: string;
@@ -17,14 +19,14 @@ interface ChatInputProps {
   onDraftChange?: (text: string) => void;
 }
 
-export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraftChange }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, sendDisabled, children, placeholder, label, draft, onDraftChange }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
   const text = draft ?? ownText;
   const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
 
   const submit = () => {
     const trimmed = text.trim();
-    if (!trimmed || disabled) return;
+    if (!trimmed || disabled || sendDisabled) return;
     onSend(trimmed);
     setText("");
   };
@@ -46,6 +48,7 @@ export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraft
       onSubmit={handleSubmit}
       className="shrink-0 border-t border-stone-200/80 px-4 sm:px-6 py-4"
     >
+      {children && <div className={`mb-3 ${CHAT_COLUMN}`}>{children}</div>}
       <div className={`flex gap-2 items-end ${CHAT_COLUMN}`}>
         <textarea
           value={text}
@@ -61,7 +64,7 @@ export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraft
         />
         <button
           type="submit"
-          disabled={disabled || !text.trim()}
+          disabled={disabled || sendDisabled || !text.trim()}
           className="shrink-0 w-12 h-12 rounded-full bg-[#6B0F12] text-white flex items-center justify-center
             hover:bg-[#7d1215] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
           aria-label="Send message"
