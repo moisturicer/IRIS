@@ -821,7 +821,7 @@ export default function PaperViewPage() {
         onChoose={chooseVersion}
       />
     ) : latestVersion ? (
-      <span className="shrink-0 text-small font-semibold text-stone-500">v{latestVersion.number}</span>
+      <span className="shrink-0 text-small font-semibold text-stone-600">v{latestVersion.number}</span>
     ) : null;
 
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;

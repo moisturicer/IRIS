@@ -2537,3 +2537,7 @@ NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECK
 **Browser evidence (2026-11-02).** Headless Chromium, login and signup at 1440px and 360px: one account-switch link; Help, Data privacy and Terms open and close; no horizontal overflow. Desktop and phone screenshots visually inspected. TypeScript checks pass. Full frontend suite and independent AI-assisted standards/spec review are recorded in the PR before handoff.
 
 **Boundaries.** Existing `DataNotice.tsx` and `lib/dpaTerms.ts` legal wording is unchanged; Terms explicitly says institutional review is pending. No policy approval is implied. Ask IRIS copy remains unchanged and is flagged for Jive in the Jira comment. No backend, workflow, office configuration or deployment changes. Human approval and merge remain outstanding.
+## IR-770 — Paper View and My Reviews contrast (2026-11-02)
+
+NFR-A1: muted text on stone-100 now uses the existing stone-600 utility in the reading header, single-version label, PDF zoom, Paper Chat heading context, review workspace heading and inactive My Reviews counts. Real Chromium measured the affected pair at 4.3977:1 before and 6.9934:1 after (AA minimum 4.5:1). The existing IR-414 browser pre-pass is the acceptance check; see [executed evidence and limits](evidence/IR-770/README.md). Human approval remains outstanding.
+
