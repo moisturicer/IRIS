@@ -123,7 +123,9 @@ python manage.py seed_demo                # accounts + Discover catalogue + ever
                                           # "no embargo" (IR-815), except one kept under a future
                                           # date so the refusal can be seen; the draft stays
                                           # unanswered for Publish. Re-running answers for papers
-                                          # an older run left Unknown.
+                                          # an older run left Unknown. Verified 2026-11-02 on a
+                                          # copy of one developer's dev database: it answered 17
+                                          # of 18, left the draft, and a second run answered none.
 python manage.py load_corpus <dir> --dry-run             # bulk-load PDFs as Records (IR-313).
                                    # One subfolder per category; each becomes a Classification.
                                    # Defaults: record type "Thesis / Research", status "published"
