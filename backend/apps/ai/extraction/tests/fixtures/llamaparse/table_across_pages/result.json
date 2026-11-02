@@ -1,0 +1,485 @@
+{
+  "job": {
+    "user_metadata": null,
+    "id": "pjb-t9fiowtpnht65mqa1mrxkbxsfh05",
+    "created_at": "2026-11-02T15:06:54.243504Z",
+    "updated_at": "2026-11-02T15:06:59.159349Z",
+    "project_id": "736ceb96-4c70-415d-a239-339e306e8a0d",
+    "status": "COMPLETED",
+    "error_message": null,
+    "name": "table_across_pages.pdf",
+    "tier": "agentic",
+    "usage": {
+      "credits": 33.0
+    }
+  },
+  "result_content_metadata": {
+    "grounded_items": {
+      "size_bytes": 8706,
+      "exists": true
+    }
+  },
+  "text": null,
+  "markdown": {
+    "pages": [
+      {
+        "page_number": 1,
+        "markdown": "## **Measurements**\n\nThe table below continues onto the next page.\n\n<table><thead><tr><th>Sample</th><th>Mass</th></tr></thead><tbody><tr><td>Row 01</td><td>401 g</td></tr><tr><td>Row 02</td><td>402 g</td></tr><tr><td>Row 03</td><td>403 g</td></tr><tr><td>Row 04</td><td>404 g</td></tr><tr><td>Row 05</td><td>405 g</td></tr><tr><td>Row 06</td><td>406 g</td></tr><tr><td>Row 07</td><td>407 g</td></tr><tr><td>Row 08</td><td>408 g</td></tr><tr><td>Row 09</td><td>409 g</td></tr><tr><td>Row 10</td><td>410 g</td></tr><tr><td>Row 11</td><td>411 g</td></tr><tr><td>Row 12</td><td>412 g</td></tr><tr><td>Row 13</td><td>413 g</td></tr><tr><td>Row 14</td><td>414 g</td></tr><tr><td>Row 15</td><td>415 g</td></tr><tr><td>Row 16</td><td>416 g</td></tr><tr><td>Row 17</td><td>417 g</td></tr><tr><td>Row 18</td><td>418 g</td></tr><tr><td>Row 19</td><td>419 g</td></tr><tr><td>Row 20</td><td>420 g</td></tr><tr><td>Row 21</td><td>421 g</td></tr><tr><td>Row 22</td><td>422 g</td></tr><tr><td>Row 23</td><td>423 g</td></tr><tr><td>Row 24</td><td>424 g</td></tr><tr><td>Row 25</td><td>425 g</td></tr><tr><td>Row 26</td><td>426 g</td></tr><tr><td>Row 27</td><td>427 g</td></tr><tr><td>Row 28</td><td>428 g</td></tr><tr><th>Row 29</th><th>429 g</th></tr><tr><td>Row 30</td><td>430 g</td></tr></tbody></table>",
+        "header": "IRIS contract fixture",
+        "footer": "Page 1",
+        "success": true
+      },
+      {
+        "page_number": 2,
+        "markdown": "IRIS contract fixture\n\nThe paragraph after the table.",
+        "footer": "Page 2",
+        "success": true
+      }
+    ]
+  },
+  "items": {
+    "pages": [
+      {
+        "page_number": 1,
+        "items": [
+          {
+            "type": "header",
+            "md": "IRIS contract fixture",
+            "bbox": [
+              {
+                "x": 72.73,
+                "y": 38.1,
+                "w": 69.2,
+                "h": 6.04
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "IRIS contract fixture",
+                "bbox": [
+                  {
+                    "x": 72.73,
+                    "y": 38.1,
+                    "w": 69.2,
+                    "h": 6.04,
+                    "confidence": 0.844,
+                    "start_index": 0,
+                    "end_index": 20,
+                    "label": "header"
+                  }
+                ],
+                "value": "IRIS contract fixture"
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "md": "## **Measurements**",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 72.07,
+                "w": 97.92,
+                "h": 12.11,
+                "confidence": 0.581,
+                "start_index": 0,
+                "end_index": 18,
+                "label": "paragraph_title"
+              }
+            ],
+            "level": 2,
+            "value": "Measurements"
+          },
+          {
+            "type": "text",
+            "md": "The table below continues onto the next page.",
+            "bbox": [
+              {
+                "x": 70.99,
+                "y": 95.83,
+                "w": 205.63,
+                "h": 11.09,
+                "confidence": 0.969,
+                "start_index": 0,
+                "end_index": 44,
+                "label": "text"
+              }
+            ],
+            "value": "The table below continues onto the next page."
+          },
+          {
+            "type": "table",
+            "md": "| Sample | Mass  |\n| ------ | ----- |\n| Row 01 | 401 g |\n| Row 02 | 402 g |\n| Row 03 | 403 g |\n| Row 04 | 404 g |\n| Row 05 | 405 g |\n| Row 06 | 406 g |\n| Row 07 | 407 g |\n| Row 08 | 408 g |\n| Row 09 | 409 g |\n| Row 10 | 410 g |\n| Row 11 | 411 g |\n| Row 12 | 412 g |\n| Row 13 | 413 g |\n| Row 14 | 414 g |\n| Row 15 | 415 g |\n| Row 16 | 416 g |\n| Row 17 | 417 g |\n| Row 18 | 418 g |\n| Row 19 | 419 g |\n| Row 20 | 420 g |\n| Row 21 | 421 g |\n| Row 22 | 422 g |\n| Row 23 | 423 g |\n| Row 24 | 424 g |\n| Row 25 | 425 g |\n| Row 26 | 426 g |\n| Row 27 | 427 g |\n| Row 28 | 428 g |\n| Row 29 | 429 g |\n| Row 30 | 430 g |",
+            "bbox": [
+              {
+                "x": 77.87,
+                "y": 122.63,
+                "w": 66.02,
+                "h": 569.56,
+                "confidence": 0.9,
+                "start_index": 0,
+                "end_index": 568,
+                "label": "table"
+              },
+              {
+                "x": 78.26,
+                "y": 82.82,
+                "w": 65.63,
+                "h": 29.37,
+                "confidence": 0.9,
+                "start_index": 0,
+                "end_index": 55,
+                "label": "table"
+              }
+            ],
+            "rows": [
+              [
+                "Sample",
+                "Mass"
+              ],
+              [
+                "Row 01",
+                "401 g"
+              ],
+              [
+                "Row 02",
+                "402 g"
+              ],
+              [
+                "Row 03",
+                "403 g"
+              ],
+              [
+                "Row 04",
+                "404 g"
+              ],
+              [
+                "Row 05",
+                "405 g"
+              ],
+              [
+                "Row 06",
+                "406 g"
+              ],
+              [
+                "Row 07",
+                "407 g"
+              ],
+              [
+                "Row 08",
+                "408 g"
+              ],
+              [
+                "Row 09",
+                "409 g"
+              ],
+              [
+                "Row 10",
+                "410 g"
+              ],
+              [
+                "Row 11",
+                "411 g"
+              ],
+              [
+                "Row 12",
+                "412 g"
+              ],
+              [
+                "Row 13",
+                "413 g"
+              ],
+              [
+                "Row 14",
+                "414 g"
+              ],
+              [
+                "Row 15",
+                "415 g"
+              ],
+              [
+                "Row 16",
+                "416 g"
+              ],
+              [
+                "Row 17",
+                "417 g"
+              ],
+              [
+                "Row 18",
+                "418 g"
+              ],
+              [
+                "Row 19",
+                "419 g"
+              ],
+              [
+                "Row 20",
+                "420 g"
+              ],
+              [
+                "Row 21",
+                "421 g"
+              ],
+              [
+                "Row 22",
+                "422 g"
+              ],
+              [
+                "Row 23",
+                "423 g"
+              ],
+              [
+                "Row 24",
+                "424 g"
+              ],
+              [
+                "Row 25",
+                "425 g"
+              ],
+              [
+                "Row 26",
+                "426 g"
+              ],
+              [
+                "Row 27",
+                "427 g"
+              ],
+              [
+                "Row 28",
+                "428 g"
+              ],
+              [
+                "Row 29",
+                "429 g"
+              ],
+              [
+                "Row 30",
+                "430 g"
+              ]
+            ],
+            "html": "<table><thead><tr><th>Sample</th><th>Mass</th></tr></thead><tbody><tr><td>Row 01</td><td>401 g</td></tr><tr><td>Row 02</td><td>402 g</td></tr><tr><td>Row 03</td><td>403 g</td></tr><tr><td>Row 04</td><td>404 g</td></tr><tr><td>Row 05</td><td>405 g</td></tr><tr><td>Row 06</td><td>406 g</td></tr><tr><td>Row 07</td><td>407 g</td></tr><tr><td>Row 08</td><td>408 g</td></tr><tr><td>Row 09</td><td>409 g</td></tr><tr><td>Row 10</td><td>410 g</td></tr><tr><td>Row 11</td><td>411 g</td></tr><tr><td>Row 12</td><td>412 g</td></tr><tr><td>Row 13</td><td>413 g</td></tr><tr><td>Row 14</td><td>414 g</td></tr><tr><td>Row 15</td><td>415 g</td></tr><tr><td>Row 16</td><td>416 g</td></tr><tr><td>Row 17</td><td>417 g</td></tr><tr><td>Row 18</td><td>418 g</td></tr><tr><td>Row 19</td><td>419 g</td></tr><tr><td>Row 20</td><td>420 g</td></tr><tr><td>Row 21</td><td>421 g</td></tr><tr><td>Row 22</td><td>422 g</td></tr><tr><td>Row 23</td><td>423 g</td></tr><tr><td>Row 24</td><td>424 g</td></tr><tr><td>Row 25</td><td>425 g</td></tr><tr><td>Row 26</td><td>426 g</td></tr><tr><td>Row 27</td><td>427 g</td></tr><tr><td>Row 28</td><td>428 g</td></tr><tr><th>Row 29</th><th>429 g</th></tr><tr><td>Row 30</td><td>430 g</td></tr></tbody></table>",
+            "csv": "\"Sample\",\"Mass\"\n\"Row 01\",\"401 g\"\n\"Row 02\",\"402 g\"\n\"Row 03\",\"403 g\"\n\"Row 04\",\"404 g\"\n\"Row 05\",\"405 g\"\n\"Row 06\",\"406 g\"\n\"Row 07\",\"407 g\"\n\"Row 08\",\"408 g\"\n\"Row 09\",\"409 g\"\n\"Row 10\",\"410 g\"\n\"Row 11\",\"411 g\"\n\"Row 12\",\"412 g\"\n\"Row 13\",\"413 g\"\n\"Row 14\",\"414 g\"\n\"Row 15\",\"415 g\"\n\"Row 16\",\"416 g\"\n\"Row 17\",\"417 g\"\n\"Row 18\",\"418 g\"\n\"Row 19\",\"419 g\"\n\"Row 20\",\"420 g\"\n\"Row 21\",\"421 g\"\n\"Row 22\",\"422 g\"\n\"Row 23\",\"423 g\"\n\"Row 24\",\"424 g\"\n\"Row 25\",\"425 g\"\n\"Row 26\",\"426 g\"\n\"Row 27\",\"427 g\"\n\"Row 28\",\"428 g\"\n\"Row 29\",\"429 g\"\n\"Row 30\",\"430 g\"\n",
+            "merged_from_pages": [
+              1,
+              2
+            ],
+            "parse_concerns": [
+              {
+                "type": "layout_lvm_disagreement",
+                "details": "layout detected [code, footer, paragraph_title, text, header] but no table/form"
+              }
+            ]
+          },
+          {
+            "type": "footer",
+            "md": "Page 1",
+            "bbox": [
+              {
+                "x": 290.69,
+                "y": 752.26,
+                "w": 23.09,
+                "h": 7.49
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "Page 1",
+                "bbox": [
+                  {
+                    "x": 290.69,
+                    "y": 752.26,
+                    "w": 23.09,
+                    "h": 7.49,
+                    "confidence": 0.813,
+                    "start_index": 0,
+                    "end_index": 5,
+                    "label": "footer"
+                  }
+                ],
+                "value": "Page 1"
+              }
+            ]
+          }
+        ],
+        "page_width": 612.0,
+        "page_height": 792.0,
+        "success": true
+      },
+      {
+        "page_number": 2,
+        "items": [
+          {
+            "type": "text",
+            "md": "IRIS contract fixture",
+            "bbox": [
+              {
+                "x": 72.73,
+                "y": 38.1,
+                "w": 69.2,
+                "h": 6.04,
+                "confidence": 0.844,
+                "start_index": 0,
+                "end_index": 20,
+                "label": "header"
+              }
+            ],
+            "value": "IRIS contract fixture"
+          },
+          {
+            "type": "table",
+            "md": "",
+            "bbox": [
+              {
+                "x": 78.26,
+                "y": 82.82,
+                "w": 65.63,
+                "h": 29.37,
+                "confidence": 0.9,
+                "start_index": 0,
+                "end_index": 55,
+                "label": "table"
+              }
+            ],
+            "rows": [],
+            "html": "",
+            "csv": "",
+            "merged_into_page": 1
+          },
+          {
+            "type": "text",
+            "md": "The paragraph after the table.",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 139.39,
+                "w": 132.81,
+                "h": 12.8,
+                "confidence": 0.875,
+                "start_index": 0,
+                "end_index": 29,
+                "label": "text"
+              }
+            ],
+            "value": "The paragraph after the table."
+          },
+          {
+            "type": "footer",
+            "md": "Page 2",
+            "bbox": [
+              {
+                "x": 290.69,
+                "y": 752.26,
+                "w": 24.27,
+                "h": 7.49
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "Page 2",
+                "bbox": [
+                  {
+                    "x": 290.69,
+                    "y": 752.26,
+                    "w": 24.27,
+                    "h": 7.49,
+                    "confidence": 0.813,
+                    "start_index": 0,
+                    "end_index": 5,
+                    "label": "footer"
+                  }
+                ],
+                "value": "Page 2"
+              }
+            ]
+          }
+        ],
+        "page_width": 612.0,
+        "page_height": 792.0,
+        "success": true
+      }
+    ]
+  },
+  "metadata": {
+    "pages": [
+      {
+        "page_number": 1,
+        "confidence": 1.0,
+        "printed_page_number": "1",
+        "original_orientation_angle": 0,
+        "cost_optimized": false,
+        "triggered_auto_mode": false
+      },
+      {
+        "page_number": 2,
+        "confidence": 1.0,
+        "printed_page_number": "2",
+        "original_orientation_angle": 0,
+        "cost_optimized": false,
+        "triggered_auto_mode": false
+      }
+    ],
+    "document": {
+      "confidence": 1.0,
+      "confidence_breakdown": {
+        "min_page_score": 1.0,
+        "scored_pages": 2,
+        "total_pages": 2
+      }
+    }
+  },
+  "forms": null,
+  "markdown_full": null,
+  "text_full": null,
+  "images_content_metadata": {
+    "total_count": 0,
+    "images": []
+  },
+  "job_metadata": {
+    "state_transitions": {
+      "pending_at": "2026-11-02T15:06:54.238324Z",
+      "throttled_at": "2026-11-02T15:06:54.437223Z",
+      "running_at": "2026-11-02T15:06:54.649486Z",
+      "completed_at": "2026-11-02T15:06:59.160409Z",
+      "failed_at": null,
+      "cancelled_at": null
+    },
+    "latency": {
+      "decode_ms": 732,
+      "agent_ms": 2191,
+      "output_ms": 129,
+      "page_throttle_wall_ms": 0,
+      "page_throttle_sum_ms": 0,
+      "page_throttle_max_ms": 0,
+      "page_throttle_waits": 1,
+      "job_throttle_ms": 0,
+      "total_ms": 4740
+    },
+    "quarantine": null,
+    "pdf-pages": 2,
+    "pdf-real-pages": 2,
+    "pdf-rawTextLength": 760,
+    "pdf-mdLength": 1346,
+    "pdf-time": 2573,
+    "pdf-ocrTime": 0,
+    "pdf-image-convertTime": 0,
+    "pdf-pdfToHTMLTime": 0,
+    "pdf-llmTime": 281,
+    "pdf-inputTokens": 13633,
+    "pdf-outputTokens": 987,
+    "pdf-image-ocr-count": 0,
+    "pdf-image-ocr-failed-count": 0,
+    "pdf-image-ocr-success-count": 2,
+    "pdf-image-ocr-empty-count": 2,
+    "pdf-image-ocr-hadText-count": 0,
+    "pdf-image-ocr-pixels": 15827200,
+    "pdf-multimodal-time": 0,
+    "pdf-multimodal-pdf2Image": 0,
+    "pdf-high-res-ocr": 2
+  },
+  "raw_parameters": null,
+  "debug": null
+}

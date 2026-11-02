@@ -7,6 +7,12 @@ are both built against these files, so CI never calls the vendor.
 The PDFs are synthetic, written from `../layouts.py`. They are not Manuscripts,
 so the consent and embargo gate does not apply.
 
+Recorded on 2026-11-02 in IR-841's development checkout, using IR-849's
+script, and committed here for IR-840's shape tests. The four raw results,
+grounding files and manifests are copied without edits. No image crops were
+returned. The run cost 93 credits for six pages; see `OPEN_CONDITIONS.md` for
+the observed formula, confidence and Figure limitations.
+
 **Do not hand-edit a recording.** If IR-840 or IR-841 finds the format wrong,
 re-record it here.
 
@@ -30,7 +36,7 @@ LLAMAPARSE_API_KEY=... python -m apps.ai.extraction.tests.fixtures.record_llamap
 - Pass fixture names to record only some of them, e.g. `figures two_columns`.
 - `--version` pins a different dated release. `latest` is refused. The
   default, `2026-09-28`, is the first release the docs name for watermark
-  text. It has not been checked against a live account; LlamaParse rejects an
+  text, and was accepted for these recordings. LlamaParse rejects an
   unpublished date before parsing.
 - `--base-url` picks the region. The default is North America. Region is still an open condition of ADR-056.
 

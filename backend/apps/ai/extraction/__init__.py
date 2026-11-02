@@ -27,7 +27,8 @@ from .ports import (
     classify,
 )
 from .selection import current_extractor, use_extractor, verify_extraction_configuration
-from .serialization import document_from_json, document_to_json
+from .serialization import document_from_json, document_to_json, read_document
+from .shaping import shape_llamaparse
 
 __all__ = [
     # port
@@ -51,6 +52,8 @@ __all__ = [
     # persistence and derivation
     "document_to_json",
     "document_from_json",
+    "read_document",
+    "shape_llamaparse",
     "flatten_for_search",
     "extraction_hash",
 ]
