@@ -45,7 +45,7 @@ ADR-051 made consent to AI a per-paper act, withdrawable per paper. None of that
 
 ### Embargo and the third-party reader
 
-14. **The embargo question still stands, for every paper,** whatever the person answered here. ADR-052 is unchanged.
+14. **The embargo question still stands, for every paper,** whatever the person answered here. ADR-052 is unchanged. It is also how an author protects work they may want to patent: the IP question stays in Details, so the embargo question has to say that it covers this.
 15. **Reading a paper is an outside call, so the gate decides it.** A paper the gate refuses isn't sent to the third-party reader. While an embargo is active or hasn't been released, nothing goes to any third party and the author fills in the details. A release then sends the paper on, reading included (ADR-052 decision 10).
 16. **When the gate allows it, everything runs at upload.** With Yes and no embargo, reading, indexing and the AI Overview start as soon as the file lands.
 
@@ -72,6 +72,8 @@ ADR-051 made consent to AI a per-paper act, withdrawable per paper. None of that
 
 **Changing the answer only when a new notice appears.** No Settings control to build. Rejected: someone who clicked Yes by mistake could wait indefinitely, and the National Privacy Commission says people can withdraw consent after giving it.
 
+**Ask the IP question before upload too.** The IP mark would then count before anything leaves. Rejected: the author is responsible for protecting their work, and answering Yes to the embargo does that with no second question.
+
 **Indexing waits until submission.** A wrong file or abandoned draft would send nothing. Rejected: it needs its own rule, and uploads already start indexing.
 
 **Read every paper with the third party, then gate only the AI.** Every paper would have its passages ready. Rejected: an embargoed paper would leave IRIS at upload, which is exactly what its embargo is for.
@@ -94,7 +96,7 @@ A person answers once, in one place, and can change it. Asking before any upload
 - **Withdrawal only reaches forward, and this is the main legal risk.** After a switch to No, earlier papers keep going to AI companies every time someone asks a question, and the person can't stop that. The National Privacy Commission says people can withdraw consent, so CIT-U's data protection officer may object. This needs IR-123's review before real papers are collected.
 - **A co-owner's No can be overruled.** If the Contact person said Yes, a co-owner who said No still has that paper's text sent.
 - **A wrong file or abandoned draft goes out** for a person who said Yes with no embargo, as soon as it lands, and it is billed.
-- **The IP mark comes too late for what runs at upload.** It is set in Details, after the file lands, so a paper later marked as IP has already been sent, unless its owner also answered Yes to the embargo.
+- **The IP mark protects nothing already sent.** It is set in Details, after the file lands. Keeping possible IP away from AI is the author's responsibility: they answer Yes to the embargo, and the question says so. A student who doesn't will have their paper sent, and sharing an invention before filing can hurt a later patent claim.
 - **A No is visible.** Any reader opening a No paper's AI Overview learns that its owner did not consent.
 - **Everyone is interrupted by each new notice,** even for a typo, as ADR-051 decision 17 already accepts.
 - **A graduate's papers stay under the notice they last answered,** indefinitely.
