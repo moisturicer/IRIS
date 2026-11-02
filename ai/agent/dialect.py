@@ -40,6 +40,8 @@ class ChatCompletions:
             else:
                 messages.append(cls._assistant(entry))
         payload: dict = {"model": request.pin.model, "messages": messages}
+        if request.max_output_tokens is not None:
+            payload["max_tokens"] = request.max_output_tokens
         if request.tools:
             payload["tools"] = [
                 {"type": "function", "function": {

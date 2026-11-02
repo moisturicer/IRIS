@@ -12,6 +12,7 @@ import uuid
 
 import asyncpg
 
+from ai.admission import scope as admission
 from ai.research.tools import ResearchTools
 from ai.runs import config as runs_config
 from ai.runs.dispatch import Notifier, PollingNotifier
@@ -81,7 +82,9 @@ class RunService:
             return
         try:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id)
-            result = await self.executor.answer(claim.question, tools)
+            # Every provider attempt inside is admitted against this run (IR-725).
+            with admission.bound(admission.RunBinding(run_id, claim.fence)):
+                result = await self.executor.answer(claim.question, tools)
         except Unavailable as refused:
             # Operators get the code; readers only see `unavailable`.
             log.info("run %s unavailable: %s", run_id, refused.code)

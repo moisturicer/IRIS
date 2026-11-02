@@ -13,10 +13,12 @@ makes IR-133's with-and-without comparison possible at all.
 
 from __future__ import annotations
 
+from contextlib import nullcontext
 from dataclasses import replace
 from typing import Callable, Optional, Sequence
 
 from apps.ai.policy import decision_for_record
+from apps.ai.policy.outbound import Dependency, OutboundGuard, Withheld
 from apps.ai.providers.noop import NoOpReranker
 from apps.ai.providers.ports import Reranker
 from apps.records.models import Record
@@ -98,6 +100,13 @@ class RerankingRetriever(Retriever):
         allowed = {rid for rid, record in records.items() if self._permits(record)}
         return [c for c in candidates if c.record_id in allowed]
 
+    def _fence(self, user, candidates):
+        """Recheck the gate as the rerank request leaves (IR-720)."""
+        if not self._gate_runs:
+            return nullcontext()
+        guard = OutboundGuard(principal=user, permits=self._permits)
+        return guard.fence(lambda: {Dependency.metadata(c.record_id) for c in candidates})
+
     # -- caching ------------------------------------------------------------
 
     def _cache_key(self, question: str, candidates: Sequence[RetrievedChunk]):
@@ -178,10 +187,18 @@ class RerankingRetriever(Retriever):
         if self._cache is not None and key in self._cache:
             order = self._cache[key]
         else:
-            ranked = self._reranker.rerank(question, [c.content for c in candidates])
-            order = [(item.index, item.score) for item in ranked]
-            if self._cache is not None:
-                self._cache[key] = order
+            try:
+                with self._fence(user, candidates):
+                    ranked = self._reranker.rerank(question, [c.content for c in candidates])
+                order = [(item.index, item.score) for item in ranked]
+                if self._cache is not None:
+                    self._cache[key] = order
+            except Withheld as refused:
+                # Nothing was sent: keep recall order over what is still permitted.
+                if not refused.authorization.provider_refused:
+                    candidates = list(refused.authorization.retain(
+                        candidates, lambda c: {Dependency.metadata(c.record_id)}))
+                order = [(index, c.score) for index, c in enumerate(candidates)]
 
         # `replace`, not a field-by-field rebuild: this decorator changes the
         # score and nothing else, and listing every other field here is how a

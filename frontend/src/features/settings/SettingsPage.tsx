@@ -2,6 +2,8 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { TONES } from "@/components/ui/statusTones";
 import { useAuth } from "@/hooks/useAuth";
 import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
@@ -116,7 +118,7 @@ function Field({
 
 const inputClass =
   "w-full px-3 py-2 rounded-lg border border-stone-200 text-[14px] text-stone-900 " +
-  "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40";
+  FOCUS_RING;
 
 const readOnlyClass =
   "w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-[14px] text-stone-500";
@@ -126,13 +128,12 @@ function Notice({ tone, children }: { tone: "ok" | "error"; children: React.Reac
     <p
       role="status"
       className={cn(
-        "text-[13px] rounded-lg px-3 py-2 border",
-        tone === "ok"
-          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-          : "bg-red-50 text-red-700 border-red-200",
+        "text-[13px] rounded-lg px-3 py-2 flex items-start gap-2",
+        tone === "ok" ? TONES.settled : TONES.active,
       )}
     >
-      {children}
+      <i className={cn("fas mt-0.5 shrink-0", tone === "ok" ? "fa-check" : "fa-circle-exclamation")} aria-hidden />
+      <span>{children}</span>
     </p>
   );
 }
@@ -219,7 +220,7 @@ function ProfileTab({ user, onSaved }: { user: NonNullable<ReturnType<typeof use
               label="Institutional email"
               hint={
                 <span className="flex items-center gap-1.5">
-                  <i className="fas fa-circle-check text-emerald-600 text-[12px]" aria-hidden />
+                  <i className="fas fa-circle-check text-stone-900 text-[12px]" aria-hidden />
                   {user.is_verified ? "Verified · " : ""}
                   Managed by CIT-U. Your email is your sign-in identity and the name attached to
                   every clearance decision, so it cannot be changed here.
@@ -244,7 +245,7 @@ function ProfileTab({ user, onSaved }: { user: NonNullable<ReturnType<typeof use
             </Field>
           </div>
 
-          <div className="flex items-center gap-2 mt-5 pt-4 border-t border-stone-100">
+          <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-stone-100">
             {ok && <Notice tone="ok">Profile saved.</Notice>}
             {error && <Notice tone="error">{error}</Notice>}
             <div className="ml-auto flex items-center gap-2">
@@ -339,7 +340,7 @@ function SecurityTab() {
           </Field>
         </div>
 
-        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-stone-100">
+        <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-stone-100">
           {error && <Notice tone="error">{error}</Notice>}
           <button
             type="submit"
@@ -370,7 +371,7 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
           <i
             className={cn(
               "fas text-[15px] mt-0.5",
-              user.consent_given ? "fa-circle-check text-emerald-600" : "fa-circle-exclamation text-amber-600",
+              user.consent_given ? "fa-circle-check text-stone-900" : "fa-circle-exclamation text-stone-600",
             )}
             aria-hidden
           />
@@ -458,7 +459,7 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
           <ul className="mt-5 space-y-2">
             {capabilities.map((c) => (
               <li key={c} className="flex items-start gap-2.5 text-[13px] text-stone-700">
-                <i className="fas fa-check text-emerald-600 text-[12px] mt-0.5 shrink-0" aria-hidden />
+                <i className="fas fa-check text-stone-900 text-[12px] mt-0.5 shrink-0" aria-hidden />
                 <span>{c}</span>
               </li>
             ))}

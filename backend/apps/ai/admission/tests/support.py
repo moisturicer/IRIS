@@ -99,7 +99,7 @@ class MeteredAdapter(ToolCallingLLM):
     def _send(self) -> None:
         if self._fail_before_send is not None:
             raise self._fail_before_send
-        mark_sent()
+        mark_sent(model=self.model)
         self.sent += 1
         if self._fail_after_send is not None:
             raise self._fail_after_send

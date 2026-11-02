@@ -6,6 +6,10 @@ class UnsupportedCapability(Exception):
     """The provider cannot serve this request; nothing is substituted."""
 
 
+class TransientProviderError(Exception):
+    """A sent attempt failed in a way another attempt may not (IR-725)."""
+
+
 class LLMProvider(ABC):
     """
     Abstract Base Class for LLM providers (e.g. OpenAI).

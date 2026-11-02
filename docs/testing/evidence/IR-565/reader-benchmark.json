@@ -1,0 +1,176 @@
+{
+  "baseline": "8636a5c2",
+  "fixture": "100 pages, 35 selectable lines/page, landscape page 40, needle on page 90",
+  "viewport": "360x700",
+  "browser": "156.0.8078.4",
+  "results": [
+    {
+      "arm": "before",
+      "target": 1,
+      "repetition": 1,
+      "readiness": {
+        "ms": 1441.1000000089407,
+        "loaded": 100
+      },
+      "peakCanvases": 101,
+      "liveCanvases": 101,
+      "liveTextLayers": 100,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "before",
+      "target": 1,
+      "repetition": 2,
+      "readiness": {
+        "ms": 1002.8999999910593,
+        "loaded": 100
+      },
+      "peakCanvases": 101,
+      "liveCanvases": 101,
+      "liveTextLayers": 100,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "before",
+      "target": 1,
+      "repetition": 3,
+      "readiness": {
+        "ms": 746.7000000029802,
+        "loaded": 100
+      },
+      "peakCanvases": 101,
+      "liveCanvases": 101,
+      "liveTextLayers": 100,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "after",
+      "target": 1,
+      "repetition": 1,
+      "readiness": {
+        "ms": 793,
+        "loaded": 25
+      },
+      "peakCanvases": 7,
+      "liveCanvases": 7,
+      "liveTextLayers": 6,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "after",
+      "target": 1,
+      "repetition": 2,
+      "readiness": {
+        "ms": 880.1000000089407,
+        "loaded": 25
+      },
+      "peakCanvases": 7,
+      "liveCanvases": 7,
+      "liveTextLayers": 6,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "after",
+      "target": 1,
+      "repetition": 3,
+      "readiness": {
+        "ms": 893.5999999940395,
+        "loaded": 25
+      },
+      "peakCanvases": 7,
+      "liveCanvases": 7,
+      "liveTextLayers": 6,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "before",
+      "target": 60,
+      "repetition": 1,
+      "readiness": {
+        "ms": 1623.6000000089407,
+        "loaded": 100
+      },
+      "peakCanvases": 101,
+      "liveCanvases": 101,
+      "liveTextLayers": 100,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "before",
+      "target": 60,
+      "repetition": 2,
+      "readiness": {
+        "ms": 1442,
+        "loaded": 100
+      },
+      "peakCanvases": 101,
+      "liveCanvases": 101,
+      "liveTextLayers": 100,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "before",
+      "target": 60,
+      "repetition": 3,
+      "readiness": {
+        "ms": 1427.9000000059605,
+        "loaded": 100
+      },
+      "peakCanvases": 101,
+      "liveCanvases": 101,
+      "liveTextLayers": 100,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "after",
+      "target": 60,
+      "repetition": 1,
+      "readiness": {
+        "ms": 631.4000000059605,
+        "loaded": 25
+      },
+      "peakCanvases": 8,
+      "liveCanvases": 8,
+      "liveTextLayers": 7,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "after",
+      "target": 60,
+      "repetition": 2,
+      "readiness": {
+        "ms": 701,
+        "loaded": 17
+      },
+      "peakCanvases": 8,
+      "liveCanvases": 8,
+      "liveTextLayers": 7,
+      "find90": true,
+      "errors": []
+    },
+    {
+      "arm": "after",
+      "target": 60,
+      "repetition": 3,
+      "readiness": {
+        "ms": 742.1000000089407,
+        "loaded": 25
+      },
+      "peakCanvases": 8,
+      "liveCanvases": 8,
+      "liveTextLayers": 7,
+      "find90": true,
+      "errors": []
+    }
+  ]
+}

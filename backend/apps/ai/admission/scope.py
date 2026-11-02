@@ -161,8 +161,17 @@ def attempt_usage(usage: AttemptUsage) -> Iterator[AttemptUsage]:
 
 @contextmanager
 def before_send(guard: Callable) -> Iterator[None]:
-    """A workload's permission/context check immediately before each transport."""
-    token = _send_guard.set(guard)
+    """A workload's permission/context check immediately before each transport.
+
+    Nested guards all run, outermost first: an inner one never shadows another.
+    """
+    outer = _send_guard.get()
+
+    def chained(model):
+        outer(model)
+        guard(model)
+
+    token = _send_guard.set(guard if outer is None else chained)
     try:
         yield
     finally:

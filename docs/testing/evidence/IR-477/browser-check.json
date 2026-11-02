@@ -1,0 +1,173 @@
+{
+  "issue": "IR-477",
+  "commit": "4abe60afd5ebbeb162a6a658ab209f3711cce44e",
+  "date": "2026-11-01",
+  "browser": "156.0.8078.4",
+  "mode": "Headless Chromium, reduced motion, viewport 360x740",
+  "fixture": "Full PaperViewPage, actual AuthorReviewWorkspace/ResizeObserver and PaperPdfReader/pdf.js rendering. Browser-intercepted auth, record and conversation responses; synthetic valid 3-page PDF (600x1600 points). Tracker deliberately responds 503. No database or provider writes. CDN icon CSS aborted because request stalled.",
+  "tolerancePx": 1,
+  "measurements": [
+    {
+      "case": "review-400",
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "scrollY": 1490,
+      "toolbar": {
+        "top": 64,
+        "bottom": 122,
+        "height": 58,
+        "width": 328
+      },
+      "bar": {
+        "top": 628,
+        "bottom": 740,
+        "height": 112,
+        "width": 328
+      },
+      "passage": {
+        "top": 170.140625,
+        "bottom": 570.140625,
+        "height": 400,
+        "width": 259.1875
+      },
+      "page": {
+        "top": 83.75,
+        "bottom": 947.75,
+        "height": 864,
+        "width": 324
+      }
+    },
+    {
+      "case": "review-480",
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "scrollY": 1512,
+      "toolbar": {
+        "top": 64,
+        "bottom": 122,
+        "height": 58,
+        "width": 328
+      },
+      "bar": {
+        "top": 628,
+        "bottom": 740,
+        "height": 112,
+        "width": 328
+      },
+      "passage": {
+        "top": 148.140625,
+        "bottom": 628.140625,
+        "height": 480,
+        "width": 259.1875
+      },
+      "page": {
+        "top": 61.75,
+        "bottom": 925.75,
+        "height": 864,
+        "width": 324
+      }
+    },
+    {
+      "case": "review-600",
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "scrollY": 1538,
+      "toolbar": {
+        "top": 64,
+        "bottom": 122,
+        "height": 58,
+        "width": 328
+      },
+      "bar": {
+        "top": 628,
+        "bottom": 740,
+        "height": 112,
+        "width": 328
+      },
+      "passage": {
+        "top": 122.140625,
+        "bottom": 722.140625,
+        "height": 600,
+        "width": 259.1875
+      },
+      "page": {
+        "top": 35.75,
+        "bottom": 899.75,
+        "height": 864,
+        "width": 324
+      }
+    },
+    {
+      "case": "paper-480",
+      "viewport": {
+        "width": 360,
+        "height": 740
+      },
+      "scrollY": 0,
+      "toolbar": {
+        "top": 173,
+        "bottom": 221,
+        "height": 48,
+        "width": 360
+      },
+      "bar": null,
+      "passage": {
+        "top": 268.796875,
+        "bottom": 739.90625,
+        "height": 471.109375,
+        "width": 254.390625
+      },
+      "page": {
+        "top": 184,
+        "bottom": 1032,
+        "height": 848,
+        "width": 318
+      }
+    }
+  ],
+  "find": {
+    "case": "find-under-bar",
+    "before": {
+      "x": 50.390625,
+      "y": 680.125,
+      "width": 67.85679626464844,
+      "height": 10.796875
+    },
+    "after": {
+      "x": 50.390625,
+      "y": 223.125,
+      "width": 67.85679626464844,
+      "height": 12
+    },
+    "scrollBefore": 1520,
+    "scrollAfter": 1976,
+    "toolbar": {
+      "x": 16,
+      "y": 64,
+      "width": 328,
+      "height": 110
+    },
+    "bar": {
+      "x": 16,
+      "y": 628,
+      "width": 328,
+      "height": 112
+    },
+    "text": "nferences\nBT\nBrowser Tester\nStudent\nBack\nBack to answer\nOverview\nPaper\nReview\nFiles\n\nAdded Sep 1, 2026\n·\n0 views\n\nFlood Prediction in the Mananga Catchment\nPublished\nThesis/Research\nApplied Research\nRD\nR. Dela Cruz\nCompleted 2026\nView\nSave\nCite\nShare\nPage 2 / 3\n2 of 3\nIR-477 synthetic browser paper - page 1\n\n\nuniquefind477\nIR-477 synthetic browser paper - page 2\n\n\nuniquefind477\nIR-477 synthetic browser paper - page 3\n\n\nuniquefind477\nAsk about this paper\nTIMELINE\n\nCould not load the review timeline.\n\nTry again\nRequest Revision…\nRequest documents"
+  },
+  "review": {
+    "standards": "No findings",
+    "spec": "No confirmed findings; direct-arrival timing checked in browser"
+  },
+  "notes": [
+    "Real narrow Review toolbar is 58px high with Find closed, so 400px and 450px retain 48px context. 480px exercises context reduction; static geometry tests assume a taller two-row toolbar.",
+    "The Paper tab uses its existing contained full-screen reader on this viewport; no Review action bar is present.",
+    "Find control invoked through its DOM click handler because the existing page header covers its sticky toolbar at this viewport; this check verifies Find scrolling geometry, not toolbar hit-target accessibility."
+  ]
+}

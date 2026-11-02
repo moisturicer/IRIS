@@ -30,6 +30,10 @@ RELEASED = "released"
 
 _STATES = [(s, s.title()) for s in (OPEN, SETTLED, ABANDONED, RELEASED)]
 
+#: Reservation owners: Django's admission, or the AI runtime's (IR-725).
+DJANGO = "django"
+AI = "ai"
+
 
 class ProviderCampaign(models.Model):
     key = models.CharField(max_length=64, unique=True)
@@ -84,6 +88,12 @@ class ProviderReservation(models.Model):
     charge_active_ms = models.BigIntegerField()
     #: 1 while it counts as a physical attempt; 0 once released unsent.
     charge_attempts = models.PositiveSmallIntegerField(default=1)
+    #: The runtime that wrote the row and alone settles it (IR-725).
+    owner = models.CharField(max_length=16, default=DJANGO, db_default=DJANGO)
+    #: Why the attempt was made (answer, repair, compaction, ...) and the
+    #: prompt or contract version it ran under. Never a prompt body.
+    purpose = models.CharField(max_length=32, blank=True, default="", db_default="")
+    purpose_version = models.CharField(max_length=64, blank=True, default="", db_default="")
 
     class Meta:
         indexes = [

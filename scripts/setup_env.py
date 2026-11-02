@@ -129,6 +129,21 @@ def set_docling_variant(refresh: bool) -> str | None:
     return f"docling  {variant}  ({'NVIDIA GPU detected' if variant == 'docling-gpu' else 'no NVIDIA GPU found, CPU fallback'})"
 
 
+def set_redis_password() -> str | None:
+    """Give the repo-root .env a REDIS_PASSWORD if it lacks one (IR-669)."""
+    text = ROOT_ENV.read_text(encoding="utf-8") if ROOT_ENV.exists() else ""
+    if re.search(r"^REDIS_PASSWORD=\S", text, re.MULTILINE):
+        return None
+    # URL-safe, because it goes inside every Redis URL.
+    line = f"REDIS_PASSWORD={secrets.token_urlsafe(24)}"
+    if re.search(r"^REDIS_PASSWORD=[ \t]*$", text, re.MULTILINE):
+        text = re.sub(r"^REDIS_PASSWORD=[ \t]*$", line, text, count=1, flags=re.MULTILINE)
+    else:
+        text = text.rstrip("\n") + f"\n\n# The password both Compose stacks give Redis (IR-669).\n{line}\n"
+    ROOT_ENV.write_text(text, encoding="utf-8")
+    return f"updated  {ROOT_ENV.relative_to(REPO_ROOT)}  (generated REDIS_PASSWORD)"
+
+
 def recovery_secrets() -> dict[str, str]:
     """Fresh values for ADR-045 §8's two recovery secrets (IR-642)."""
     return {
@@ -218,6 +233,12 @@ def main() -> int:
         did_something = True
         source = "copied from backend/.env" if from_backend else "generated"
         print(f"created  {ROOT_ENV.relative_to(REPO_ROOT)}  ({source})")
+
+    # --- redis password ---------------------------------------------------
+    message = set_redis_password()
+    if message:
+        did_something = True
+        print(message)
 
     # --- docling variant (GPU or CPU) -------------------------------------
     message = set_docling_variant(refresh="--refresh-gpu" in sys.argv[1:])
