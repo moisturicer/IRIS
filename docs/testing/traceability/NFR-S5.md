@@ -2,6 +2,8 @@
 
 [Back to the matrix](../TRACEABILITY.md)
 
+**IR-97, 2026-11-02:** Evidence link: [CI run 40794738484](https://github.com/moisturicer/IRIS/actions/runs/40794738484).
+
 ## NFR-S5
 
 **Requirement:** Audit immutability

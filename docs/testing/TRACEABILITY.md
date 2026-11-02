@@ -38,11 +38,15 @@ Change a row here only when the requirement's status changes. To see every note 
 
 > **CI evidence dated before 2026-09-06 does not mean the test ran.** The workflow executed `pytest` with no database service, and `conftest.py` skips every `TransactionTestCase` — which DRF's `APITestCase` is — when Postgres is unreachable. Every database-backed test in the repo was collected, skipped, and reported green. IR-165 added the service; IR-163 made a wholesale skip fail the run rather than pass it. **Treat any "CI green" evidence in the rows below that predates those two as unverified**, and re-establish it from a run that provably executed. This is recorded rather than swept, per the source-of-truth rule.
 
+> **Labels (IR-97, 2026-11-02):** every `FR-` and `NFR-` label used in the ADRs, code and engineering docs has one row. Labels found only in the frozen SRS have none.
+>
 > **This document is itself out of date in places** and its header still names `../SRS.md` as the baseline, which [`../../CLAUDE.md`](../../CLAUDE.md) has since frozen in favour of `docs/adr/`. Recorded rather than silently reconciled, per the source-of-truth rule. Rows below are corrected as the work that touches them lands, not in one sweep.
 
 | Req | Requirement | Details | Status |
 |---|---|---|---|
 | FR-M2-01 | Record submission | [details](traceability/FR-M2-01.md) | **IMPLEMENTED** |
+| FR-M2-02/03 | Download and delete request queues | [details](traceability/FR-M2-02-03.md) | **PARTIAL** |
+| FR-M2-04 | Bulk import from a template | [details](traceability/FR-M2-04.md) | **IMPLEMENTED** |
 | FR-M3-01 | PDF text extraction | [details](traceability/FR-M3-01.md) | **IMPLEMENTED** |
 | **IR-116** | End-to-end ingestion on a real thesis — its exit criterion (fifty chunks from a real submission, read by a person) | [details](traceability/IR-116.md) | **IMPLEMENTED** |
 | **IR-290** | Formulas recovered as LaTeX — extends FR-M3-01 (stable label only, per the frozen-SRS rule) | [details](traceability/IR-290.md) | **PARTIAL** |
@@ -53,6 +57,9 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-638** | A cell value the system cannot accept skips its import row and says why | [details](traceability/IR-638.md) | **IMPLEMENTED** |
 | **IR-667** | System settings are readable and writable by RDCO only; a PATCH cannot create a key; every change is audited | [details](traceability/IR-667.md) | **IMPLEMENTED** |
 | FR-M3-02 | Semantic indexing | [details](traceability/FR-M3-02.md) | **PARTIAL** |
+| FR-M3-03 | Vector embeddings | [details](traceability/FR-M3-03.md) | **PARTIAL** |
+| FR-M4-01 | RAG chatbot (Ask IRIS) | [details](traceability/FR-M4-01.md) | **PARTIAL** |
+| FR-M4-02 | Summarization (AI Overview) | [details](traceability/FR-M4-02.md) | **IMPLEMENTED** |
 | **IR-334** | Citation regions reach the wire, the manuscript is servable again, generation actually streams, and the AI Overview is generated once — … | [details](traceability/IR-334.md) | **IMPLEMENTED** |
 | **IR-378** | Inference tasks and Profiles — a caller names a task instead of asking for "the LLM" — no FR- id; part C of IR-375's spec, and the expand … | [details](traceability/IR-378.md) | **IMPLEMENTED** |
 | **IR-335** | PDF.js reader with citation highlighting, centred Paper View, markdown overview — the frontend consumer of IR-334's wire contract | [details](traceability/IR-335.md) | **IMPLEMENTED** |
@@ -112,11 +119,18 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-645** | A refused session's 401 says why it ended — no FR- id; subtask 1 of IR-644 (account-security findings, 2026-10-30), extends NFR-S2 (IR-166) | [details](traceability/IR-645.md) | **IMPLEMENTED** |
 | **FR-M5-01** | Hierarchical submission workflow | [details](traceability/FR-M5-01.md) | **VERIFIED** |
 | FR-M5-03 | Explicit document requests, distinct from resubmission | [details](traceability/FR-M5-03.md) | **IMPLEMENTED** |
+| FR-M5-05 | IP type on published records | [details](traceability/FR-M5-05.md) | **IMPLEMENTED** |
 | FR-M6-01 | Authentication | [details](traceability/FR-M6-01.md) | **PARTIAL** |
 | FR-M6-02 | DPA consent | [details](traceability/FR-M6-02.md) | **IMPLEMENTED** |
-| FR-M6-03 | Role-based access control | [details](traceability/FR-M6-03.md) | **PARTIAL** |
+| FR-M6-03 | Role-based access control | [details](traceability/FR-M6-03.md) | **IMPLEMENTED** |
+| FR-M6-05 | Session monitoring for administrators | [details](traceability/FR-M6-05.md) | **IMPLEMENTED** |
+| FR-M6-06 | Data privacy consent at signup | [details](traceability/FR-M6-06.md) | **PARTIAL** |
 | FR-M7-01 | KPI dashboard | [details](traceability/FR-M7-01.md) | **DROPPED** |
-| FR-M2-06/07 | Institutional / personal storage | [details](traceability/FR-M2-06-07.md) | **WITHDRAWN** |
+| FR-M7-02 | Not defined outside the frozen SRS | [details](traceability/FR-M7-02.md) | **BLOCKED** |
+| FR-M8-01 | Not defined outside the frozen SRS | [details](traceability/FR-M8-01.md) | **BLOCKED** |
+| FR-M8-02 | Audit log: read-only, 12-month retention | [details](traceability/FR-M8-02.md) | **PARTIAL** |
+| FR-M8-03 | Embedding index administration | [details](traceability/FR-M8-03.md) | **IMPLEMENTED** |
+| FR-M2-06/07 | Institutional / personal storage | [details](traceability/FR-M2-06-07.md) | **DEFERRED** ([ADR-001](../adr/001-mvp-scope-boundary.md)) |
 | **ADR-019** | Persisted conversation history — no FR- id exists for this; ADR-019 is the requirement, and ADR-019 §Related Requirements says so explicitly | [details](traceability/ADR-019.md) | **IMPLEMENTED** |
 | **ADR-026 §12-§15 · ADR-027 §9** | Retry, multi-part questions, Listing questions and reader-feedback privacy — no FR- id exists for these; the ADRs are the requirement, and … | [details](traceability/ADR-026-12-15-ADR-027-9.md) | **NOT STARTED** |
 | **ADR-026 §7-§8 (amended) · §13 · ADR-015 rule 3 note** | Conversational memory correctness — no FR- id exists for it; the ADRs are the requirement. Resolution runs on every follow-up and a Turn's … | [details](traceability/ADR-026-7-8-amended-13-ADR-015-rule-3-note.md) | See details |
@@ -152,12 +166,13 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-S6 | Account protection | [details](traceability/NFR-S6.md) | **PARTIAL** |
 | NFR-P1 | 100 concurrent sessions | [details](traceability/NFR-P1.md) | **NOT STARTED** |
 | NFR-P2…P5 | Performance and processing | [details](traceability/NFR-P2-P5.md) | **NOT STARTED** |
+| NFR-R1 | Uptime | [details](traceability/NFR-R1.md) | **NOT STARTED** |
 | NFR-R2 | Graceful degradation | [details](traceability/NFR-R2.md) | **IMPLEMENTED** |
 | NFR-R3, R4 | Reliability and recovery | [details](traceability/NFR-R3-R4.md) | **NOT STARTED** |
 | NFR-U1 | General usability | [details](traceability/NFR-U1.md) | **NOT STARTED** |
 | **NFR-U2** | Submission in under 10 min, 5 of 5 participants | [details](traceability/NFR-U2.md) | **NOT STARTED** |
 | **IR-326** | Streaming Ask IRIS endpoint — no FR- id; part C of IR-323's "event-shaped answer path", under ADR-028 (one deterministic retrieval call … | [details](traceability/IR-326.md) | **IMPLEMENTED** |
-| NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **NOT STARTED** |
+| NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
 
 ---
