@@ -8,8 +8,11 @@ def _send_to_ai_if_permitted(record_id: int) -> None:
     from apps.ai.overview.service import overview_for
     from apps.records.models import Record
 
+    from apps.documents.sources import read_awaiting
+
     record = Record.objects.get(pk=record_id)
     if default_permits(record):
+        read_awaiting(record_id)
         index_record.delay(record_id)
         overview_for(record, retry=True)
 

@@ -44,10 +44,19 @@ def verify_extraction_configuration() -> None:
 
 
 def current_extractor() -> StructuredExtractor:
+    """The configured Extractor; one that leaves campus comes admitted (IR-850)."""
+    from apps.ai.admission.extraction import AdmittedExtractor
+
+    from .gate import leaves_campus
+
     if _installed is not None:
-        return _installed
-    verify_extraction_configuration()
-    return BACKENDS[settings.EXTRACTION_BACKEND]()
+        adapter = _installed
+    else:
+        verify_extraction_configuration()
+        adapter = BACKENDS[settings.EXTRACTION_BACKEND]()
+    if leaves_campus(adapter) and not isinstance(adapter, AdmittedExtractor):
+        return AdmittedExtractor(adapter)
+    return adapter
 
 
 @contextmanager
