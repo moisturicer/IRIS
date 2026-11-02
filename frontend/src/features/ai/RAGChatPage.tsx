@@ -38,6 +38,8 @@ import { SourceContextPanel, SourcePassages } from "./components/SourceContextPa
 import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useConversationClient } from "./conversation/useConversationClient";
+import { runtimeReaderEnabled } from "@/api/runtimeReader";
+import { RuntimeReader } from "./components/RuntimeReader";
 
 /** History or sources: the two panels that sit beside the answer, or open over it (IR-570). */
 type AskPanel = "history" | "sources";
@@ -81,6 +83,31 @@ function useLegacyConversationsNotice() {
 }
 
 export default function RAGChatPage() {
+  const rawId = useParams().conversationId;
+  if (runtimeReaderEnabled && (!rawId || /^[0-9a-f-]{36}$/i.test(rawId))) return <RuntimeAskPage />;
+  return <LegacyRAGChatPage />;
+}
+
+function RuntimeAskPage() {
+  const { conversationId } = useParams();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const rawRecord = params.get("record");
+  const recordId = rawRecord && /^[1-9]\d*$/.test(rawRecord) ? Number(rawRecord) : undefined;
+  if (rawRecord !== null && (!recordId || !Number.isSafeInteger(recordId))) {
+    return <p role="alert" className="p-6">This paper could not be opened.</p>;
+  }
+  return <div className="flex h-full min-h-0 flex-col">
+    <header className="flex items-center justify-between gap-4 border-b border-stone-200 px-6 py-4">
+      <h1 className="font-display text-2xl text-stone-900">Ask IRIS</h1>
+      <button type="button" className="min-h-11 text-sm text-brand underline" onClick={() => navigate("/ai")}>New conversation</button>
+    </header>
+    <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
+      onConversation={id => { if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true }); }} />
+  </div>;
+}
+
+function LegacyRAGChatPage() {
   const [searchParams] = useSearchParams();
   const recordParam = searchParams.get("record");
   const routeId = parseConversationParam(useParams().conversationId);
