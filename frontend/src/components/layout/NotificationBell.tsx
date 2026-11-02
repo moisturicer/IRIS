@@ -41,6 +41,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
   const items = useNotificationsStore((s) => s.items);
   const markReadInStore = useNotificationsStore((s) => s.markRead);
   const markAllReadInStore = useNotificationsStore((s) => s.markAllRead);
+  const unreadBadge = unreadCount > 9 ? "9+" : String(unreadCount);
 
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -90,7 +91,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
+        aria-label={unreadCount > 0 ? `Notifications, ${unreadBadge} unread` : "Notifications"}
         aria-expanded={open}
         aria-haspopup="true"
         title="Notifications"
@@ -99,7 +100,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
         <i className="fas fa-bell text-[15px]" aria-hidden />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[17px] h-[17px] px-1 rounded-full bg-brand text-white text-[11px] font-bold flex items-center justify-center">
-            {unreadCount > 9 ? "9+" : unreadCount}
+            {unreadBadge}
           </span>
         )}
       </button>
