@@ -187,6 +187,9 @@ class Record(models.Model):
     abstract_file      = models.FileField(
         upload_to=abstract_file_path, max_length=255, null=True, blank=True
     )
+    manuscript_revision = models.UUIDField(null=True, blank=True, editable=False)
+    manuscript_sha256 = models.CharField(max_length=64, blank=True, editable=False, db_index=True)
+    manuscript_filename = models.CharField(max_length=255, blank=True, editable=False)
     classification     = models.ForeignKey(
         Classification, on_delete=models.SET_NULL, null=True, blank=True, related_name="records"
     )
@@ -417,6 +420,9 @@ class RecordVersion(models.Model):
     manuscript = models.FileField(
         upload_to=abstract_file_path, max_length=255, null=True, blank=True,
     )
+    manuscript_revision = models.UUIDField(null=True, blank=True, editable=False)
+    manuscript_sha256 = models.CharField(max_length=64, blank=True, editable=False)
+    manuscript_filename = models.CharField(max_length=255, blank=True, editable=False)
     cause      = models.CharField(max_length=16, choices=VersionCause.choices)
     created_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,

@@ -285,6 +285,27 @@ class ExtractionFollowsSubmissionTests(NewVersionTestBase):
 
     EXTRACT = "apps.documents.tasks.extract_manuscript_text.delay"
 
+    def test_submitted_chunks_stay_active_until_the_revised_source_is_submitted(self):
+        from apps.ai.models import ChunkSet
+        from apps.documents.models import PdfExtraction
+        record = self.itso_cleared_and_ierc_asked()
+        submitted_chunks = ChunkSet.objects.create(
+            record=record, extraction_hash="prior", strategy_id="fixture", options={},
+            content_hash="prior", is_active=True,
+        )
+        self.assertEqual(self.upload_manuscript(record).status_code, 200)
+        record.refresh_from_db()
+        submitted_chunks.refresh_from_db()
+        self.assertTrue(submitted_chunks.is_active)
+        extraction = PdfExtraction.objects.get(record=record)
+        self.assertEqual(extraction.source_revision, record.manuscript_revision)
+        self.assertEqual(extraction.phase, "awaiting_submission")
+        with patch(self.EXTRACT) as extract, self.captureOnCommitCallbacks(execute=True):
+            self.submitted(record)
+        submitted_chunks.refresh_from_db()
+        self.assertFalse(submitted_chunks.is_active)
+        extract.assert_called_once_with(record.pk, str(record.manuscript_revision))
+
     def test_an_unsubmitted_revision_is_not_extracted(self):
         record = self.itso_cleared_and_ierc_asked()
 
@@ -301,7 +322,7 @@ class ExtractionFollowsSubmissionTests(NewVersionTestBase):
         with patch(self.EXTRACT) as extract, self.captureOnCommitCallbacks(execute=True):
             self.submitted(record)
 
-        extract.assert_called_once_with(record.pk)
+        extract.assert_called_once_with(record.pk, str(record.manuscript_revision))
 
     def test_a_metadata_only_version_extracts_nothing(self):
         record = self.itso_cleared_and_ierc_asked()
@@ -329,7 +350,8 @@ class ExtractionFollowsSubmissionTests(NewVersionTestBase):
             response = self.upload_manuscript(record)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        extract.assert_called_once_with(record.pk)
+        record.refresh_from_db()
+        extract.assert_called_once_with(record.pk, str(record.manuscript_revision))
 
 
 # --- AC: nothing changed -----------------------------------------------------------------

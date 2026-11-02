@@ -675,6 +675,9 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         if "owner_emails" in validated_data:
             raise serializers.ValidationError({"owner_emails": "Save the draft before editing its owners."})
         authors_data = validated_data.pop("authors", [])
+        from apps.documents.sources import manuscript_changes
+        if validated_data.get("abstract_file"):
+            validated_data.update(manuscript_changes(None, validated_data["abstract_file"]))
         record = super().create(validated_data)
         if authors_data:
             self._sync_authors(record, authors_data)
@@ -686,6 +689,13 @@ class RecordWriteSerializer(serializers.ModelSerializer):
 
         owners = validated_data.pop("owner_emails", None)
         authors_data = validated_data.pop("authors", None)
+        if "abstract_file" in validated_data:
+            from apps.documents.sources import manuscript_changes
+            changes = manuscript_changes(instance, validated_data["abstract_file"])
+            if changes is None:
+                validated_data.pop("abstract_file")
+            else:
+                validated_data.update(changes)
         if self._details_changed(instance, validated_data, authors_data):
             # What a new version answers a revision request with, when no file
             # changed (IR-273). Only a real change: saving the same details
@@ -710,7 +720,7 @@ class RecordWriteSerializer(serializers.ModelSerializer):
     def _details_changed(instance, validated_data, authors_data) -> bool:
         """Does this update change a detail? The manuscript is not one (IR-273)."""
         for field, value in validated_data.items():
-            if field == "abstract_file":
+            if field in {"abstract_file", "manuscript_revision", "manuscript_sha256", "manuscript_filename"}:
                 continue
             if getattr(instance, field) != value:
                 return True

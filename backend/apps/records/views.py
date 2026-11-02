@@ -93,7 +93,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
-        if self.action in ("metadata_suggestions", "related_research"):
+        if self.action in ("metadata_suggestions", "retry_extraction", "related_research"):
             # The Publish dialog's prefill is the manuscript's own text, offered
             # to the person publishing it (IR-406; IR-374 spec Appendix D:
             # "the owner through visible_to(), with a 404 otherwise").
@@ -161,6 +161,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # is exactly [IsAuthenticated]. See tests.py::DeadPermissionKwargSweepTests.
         return super().get_permissions()
 
+    @transaction.atomic
     def perform_create(self, serializer):
         from .models import RecordOwner
         record = serializer.save(
@@ -199,28 +200,15 @@ class RecordViewSet(viewsets.ModelViewSet):
         self._queue_manuscript_extraction_if_present(serializer, record)
 
     def _queue_manuscript_extraction_if_present(self, serializer, record):
-        # abstract_file is the manuscript (see RecordWriteSerializer). Any
-        # save that changes it -- create or update -- must reach the chunker
-        # (IR-195 / ADR-013's 2026-09-08 amendment), the same way
-        # SubmitDocumentView does for a supplementary upload. "in
-        # validated_data" rather than diffing old vs. new: a client
-        # re-sending an unchanged file is rare enough that re-running
-        # extraction on it costs nothing, and the alternative (comparing
-        # file contents) costs a read on every save just to skip the common
-        # case.
-        #
-        # Except an owner's revised manuscript, which waits for its version
-        # (IR-273): reviewers are served the submitted one meanwhile, and the
-        # chunks Ask IRIS answers from must be the same file.
+        # The canonical writer removes unchanged bytes from validated_data.
+        # A changed revision is extracted only at the submission boundary.
         if "abstract_file" not in serializer.validated_data:
             return
 
-        from .services import queue_manuscript_extraction
+        from apps.documents.sources import reset_manuscript
         from .versions import manuscript_awaits_submission
 
-        if manuscript_awaits_submission(record):
-            return
-        queue_manuscript_extraction(record)
+        reset_manuscript(record, defer=manuscript_awaits_submission(record))
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -661,6 +649,24 @@ class RecordViewSet(viewsets.ModelViewSet):
         from .metadata_suggestions import suggestions_payload
 
         return Response(suggestions_payload(self.get_object()))
+
+    @action(detail=True, methods=["post"], url_path="retry-extraction")
+    @transaction.atomic
+    def retry_extraction(self, request, pk=None):
+        from apps.documents.models import PdfExtraction
+        from apps.documents.sources import reset_manuscript
+        from .metadata_suggestions import suggestions_payload
+        from .versions import manuscript_awaits_submission
+
+        record = self.get_object()
+        record = Record.objects.select_for_update().get(pk=record.pk)
+        extraction = PdfExtraction.objects.filter(record=record, status="failed").first()
+        if not extraction or manuscript_awaits_submission(record):
+            return Response({"detail": "There is no failed extraction to retry."}, status=400)
+        if str(request.data.get("manuscript_revision")) != str(record.manuscript_revision):
+            return Response({"detail": "The manuscript has changed. Check its status again."}, status=409)
+        reset_manuscript(record, retry=True)
+        return Response(suggestions_payload(record), status=202)
 
     @action(detail=True, methods=["get", "post"], url_path="document-requests")
     def document_requests(self, request, pk=None):

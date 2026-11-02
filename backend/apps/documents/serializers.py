@@ -105,10 +105,16 @@ class PdfExtractionSerializer(serializers.ModelSerializer):
     because "what produced this?" is the question an operator asks about a
     bad extraction, and the ticket asks for it to be observable.
     """
+    manuscript_revision = serializers.UUIDField(source="source_revision", read_only=True)
+    retryable = serializers.SerializerMethodField()
+
+    def get_retryable(self, obj):
+        return obj.status == "failed"
+
     class Meta:
         model  = PdfExtraction
         fields = [
             "id", "upload", "status", "extractor",
-            "celery_task_id", "error", "created_at", "completed_at",
+            "manuscript_revision", "phase", "retryable", "created_at", "completed_at",
         ]
         read_only_fields = fields

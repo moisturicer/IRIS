@@ -324,6 +324,8 @@ def embed_active_chunk_set(
     force: bool = False,
     space_id: Optional[int] = None,
     permits: DisclosurePredicate = default_permits,
+    chunk_set_id=None,
+    source_revision=None,
 ) -> EmbeddingOutcome:
     """Embed the chunks of ``record_id``'s active chunk set that lack a vector.
 
@@ -348,6 +350,13 @@ def embed_active_chunk_set(
     space = _checked_space(provider, space_id)
 
     chunks = pending_chunks(record_id, space.id, force=force)
+    if chunk_set_id is not None and (
+        any(chunk.chunk_set_id != chunk_set_id for chunk in chunks)
+        or not ChunkSet.objects.filter(pk=chunk_set_id, record_id=record_id,
+                                       is_active=True, source_revision=source_revision).exists()
+    ):
+        return EmbeddingOutcome(record_id=record_id, space_id=space.id,
+                                refused=True, reason="The manuscript source has changed.")
     total = active_chunks(record_id).count()
     if not chunks:
         # Nothing to pay for, so nothing to check a gate about and no reason
@@ -386,16 +395,22 @@ def embed_active_chunk_set(
             f"chunks of record {record_id}. Vectors are matched positionally."
         )
 
-    ChunkEmbedding.objects.bulk_create(
-        (
-            ChunkEmbedding(chunk=chunk, space=space, embedding=vector)
-            for chunk, vector in zip(chunks, vectors)
-        ),
-        # A second worker that embedded the same chunk while this one was
-        # waiting on the vendor has written an identical vector under the
-        # same (chunk, space) key. Losing the race is not an error.
-        ignore_conflicts=True,
-    )
+    from django.db import transaction
+    with transaction.atomic():
+        Record.objects.select_for_update().get(pk=record_id)
+        if chunk_set_id is not None and not ChunkSet.objects.filter(
+            pk=chunk_set_id, record_id=record_id, is_active=True, source_revision=source_revision,
+        ).exists():
+            return EmbeddingOutcome(record_id=record_id, space_id=space.id,
+                                    refused=True, reason="The manuscript source has changed.")
+        ChunkEmbedding.objects.bulk_create(
+            (
+                ChunkEmbedding(chunk=chunk, space=space, embedding=vector)
+                for chunk, vector in zip(chunks, vectors)
+            ),
+            # A second worker may already have written this same vector.
+            ignore_conflicts=True,
+        )
     return EmbeddingOutcome(
         record_id=record_id,
         space_id=space.id,

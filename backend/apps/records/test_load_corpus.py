@@ -24,7 +24,9 @@ from apps.records.management.commands.load_corpus import DEFAULT_OWNER_EMAIL
 from apps.records.models import Classification, Record, RecordOwner, RecordType
 from core.enums import PipelineStatus
 
-FAKE_PDF = b"%PDF-1.7 fake bytes"
+from apps.documents.testing import real_pdf_bytes
+
+FAKE_PDF = real_pdf_bytes()
 
 
 def _write(root: Path, category: str, filename: str, content: bytes = FAKE_PDF) -> Path:
@@ -153,7 +155,7 @@ class LoadCorpusTests(_LoadsCorpus):
         mock_delay = self.load(str(self.root))
 
         record = Record.objects.get(title="Paper")
-        mock_delay.assert_called_once_with(record.id)
+        mock_delay.assert_called_once_with(record.id, str(record.manuscript_revision))
 
     def test_a_non_pdf_file_is_skipped_not_fatal(self):
         _write(self.root, "econometrics", "Paper.pdf")

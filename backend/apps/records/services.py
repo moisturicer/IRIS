@@ -266,16 +266,8 @@ def queue_manuscript_extraction(record: Record) -> None:
     """
     from django.db import transaction
 
-    from apps.documents.models import DocumentKind, PdfExtraction
-    from apps.documents.tasks import extract_manuscript_text
+    from apps.documents.sources import reset_manuscript
 
-    if not record.abstract_file:
-        return
-    # kind, explicitly: abstract_file *is* the manuscript, and IR-239 moved
-    # that judgement onto the row so the chunker reads it there rather than
-    # inferring it from which task was queued.
-    PdfExtraction.objects.update_or_create(
-        record=record,
-        defaults={"status": "queued", "error": "", "kind": DocumentKind.MANUSCRIPT},
-    )
-    transaction.on_commit(lambda: extract_manuscript_text.delay(record.id))
+    with transaction.atomic():
+        record = Record.objects.select_for_update().get(pk=record.pk)
+        reset_manuscript(record)

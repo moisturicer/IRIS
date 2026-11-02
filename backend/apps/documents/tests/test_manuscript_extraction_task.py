@@ -64,7 +64,7 @@ def queued_chunkings(monkeypatch):
     """Patched below the kind guard (IR-239), so the guard still runs and
     what these tests assert is a consequence of the row's ``kind``."""
     calls = []
-    monkeypatch.setattr(tasks, "_queue_chunk_extraction", calls.append)
+    monkeypatch.setattr(tasks, "_queue_chunk_extraction", lambda extraction_id, revision=None: calls.append(extraction_id))
     return calls
 
 
@@ -134,7 +134,8 @@ def test_a_failed_extraction_is_recorded_and_retried(monkeypatch, record, extrac
 
     extraction.refresh_from_db()
     assert extraction.status == "failed"
-    assert str(error) in extraction.error
+    assert extraction.error == "PDF reading failed. Retry extraction or enter details manually."
+    assert str(error) not in extraction.error
     assert result.failed()
 
 

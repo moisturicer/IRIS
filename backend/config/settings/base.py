@@ -1292,3 +1292,9 @@ USE_TZ = True
 
 # TODO: configure django-storages for S3 in production
 # TODO: configure Sentry in production settings
+# ADR-053: missing limits disable PDF intake rather than permit an unlimited parser.
+PDF_VALIDATION_WALL_SECONDS = config("PDF_VALIDATION_WALL_SECONDS", default="", cast=lambda v: float(v) if v else None)
+PDF_VALIDATION_MEMORY_MIB = config("PDF_VALIDATION_MEMORY_MIB", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_PAGES = config("PDF_VALIDATION_MAX_PAGES", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_OBJECTS = config("PDF_VALIDATION_MAX_OBJECTS", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_DEPTH = config("PDF_VALIDATION_MAX_DEPTH", default="", cast=lambda v: int(v) if v else None)

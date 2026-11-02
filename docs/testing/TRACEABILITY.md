@@ -2513,3 +2513,9 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 ## IR-617 — Threat model and ASVS Level 1 checklist (NFR-S1…S6)
 
 NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECKLIST.md), against the threats in [ADR-053](../adr/053-threat-model.md). Both are drafts until Ashlee Sean reviews them, and ADR-053 needs acceptance by a named person. Gaps are ticketed, IR-819 to IR-829, apart from TLS.
+## IR-831 — Bounded PDF intake and accepted Manuscript identity
+
+The [approved Publish contract, IR-830](https://citiris.atlassian.net/browse/IR-830) requires consistent PDF-content acceptance, bounded parsing and source-bound extraction without changing version/submission or disclosure rules. Implementation: `documents/validators.py`, isolated `pdf_inspection.py`, `documents/sources.py`, current Record writer, extraction/chunk/embedding task fences and additive source/phase migrations. Operational contract and the later AI-owned writer transfer: [`PDF_INTAKE.md`](../engineering/PDF_INTAKE.md).
+
+Behavioral evidence: `apps/documents/tests/test_bounded_pdf.py` (real small PDFs and actual subprocess resource refusals); `test_accepted_source.py` (authenticated upload/status across four routes, idempotency, preserved refusal, current-source/attempt fencing with independent PostgreSQL workers, removal and owner-only explicit retry); extraction/kind tests; `records/test_load_corpus.py`; `reviews/test_new_version.py` (submitted research remains active until the revised source is submitted). Existing failure-message expectations are deliberately changed to safe fixed text, and task handoff assertions now include the pinned revision. This does not implement IR-832/833/834, malware scanning, historical fingerprint backfill or production enablement. The PR records executed evidence and any environment/baseline failures; review remains a human gate.
+

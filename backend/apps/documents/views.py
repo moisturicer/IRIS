@@ -3,12 +3,13 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
+from django.db import transaction
 from core.permissions import IsStaff, owns_or_staffs_record
 from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile, PdfExtraction, DocumentKind
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
-from .validators import pdf_upload_problem
+from .validators import is_pdf_upload, pdf_upload_problem
 
 
 def authorize_record_documents(request, record_id):
@@ -141,6 +142,7 @@ class SubmitDocumentView(APIView):
     """
     permission_classes = [IsAuthenticated]
 
+    @transaction.atomic
     def post(self, request):
         from .tasks import extract_pdf_text
 
@@ -156,11 +158,6 @@ class SubmitDocumentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # --- Format and size (one rule with the manuscript's, IR-408) ---
-        problem = pdf_upload_problem(file)
-        if problem:
-            return Response({"detail": problem}, status=status.HTTP_400_BAD_REQUEST)
-
         # --- Authorization (IR-153) ---
         # Before this, any authenticated account could upload a PDF into any
         # record. Checked after the cheap format/size validation but before
@@ -174,7 +171,6 @@ class SubmitDocumentView(APIView):
             # ADR-022 §3.2. One transaction from resolving the item to marking
             # it uploaded, with the item locked, so two uploads cannot both
             # answer it and the request cannot close in between.
-            from django.db import transaction
             from .requests import (
                 DocumentRequestError, fulfil_item, may_fulfil, resolve_item_for_upload,
             )
@@ -190,6 +186,9 @@ class SubmitDocumentView(APIView):
             try:
                 with transaction.atomic():
                     item, slot = resolve_item_for_upload(record, item_id, slot_id)
+                    problem = pdf_upload_problem(file)
+                    if problem:
+                        return Response({"file": [problem], "detail": problem}, status=400)
                     upload = create_upload(record, slot, file, uploaded_by=request.user)
                     fulfil_item(item, upload, uploaded_by=request.user)
             except DocumentRequestError as exc:
@@ -198,6 +197,9 @@ class SubmitDocumentView(APIView):
             slot, missing = _slot_for_record(record, slot_id)
             if missing:
                 return missing
+            problem = pdf_upload_problem(file)
+            if problem:
+                return Response({"file": [problem], "detail": problem}, status=400)
             upload = _store_slot_upload(record, slot, file, request.user)
 
         # --- Create extraction tracker and queue the background task ---
@@ -208,7 +210,7 @@ class SubmitDocumentView(APIView):
         extraction = PdfExtraction.objects.create(
             upload=upload, kind=DocumentKind.SUPPLEMENTARY
         )
-        extract_pdf_text.delay(upload.id)
+        transaction.on_commit(lambda: extract_pdf_text.delay(upload.id))
 
         return Response(
             {
@@ -358,7 +360,7 @@ class RecordUploadCreateView(APIView):
 
         problem = pdf_upload_problem(file)
         if problem:
-            return Response({"detail": problem}, status=400)
+            return Response({"file": [problem], "detail": problem}, status=400)
 
         upload = _store_slot_upload(record, slot, file, request.user)
         create_audit_event(
@@ -456,6 +458,10 @@ class RecordFileUploadView(APIView):
                 {"detail": "Only an office taking part in this record's review may attach a file."},
                 status=status.HTTP_403_FORBIDDEN,
             )
+        if is_pdf_upload(file):
+            problem = pdf_upload_problem(file)
+            if problem:
+                return Response({"file": [problem], "detail": problem}, status=400)
         record_file = RecordFile.objects.create(
             record=record,
             file=file,
