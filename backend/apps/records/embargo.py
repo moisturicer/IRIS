@@ -72,9 +72,10 @@ def record_answer(record: Record, answer: EmbargoAnswer, *, actor) -> None:
     """
     Store `answer` with who gave it and when, replacing any answer before it.
 
-    Only ever on a draft: before submission the answer is the owners' to change
-    freely (§5). After it, changing an embargo is a separate act (IR-812), because
-    this would let an owner end one with no release (§6).
+    For a person, only ever on a draft: before submission the answer is the owners'
+    to change freely (§5). After it, changing an embargo is a separate act (IR-812),
+    because this would let an owner end one with no release (§6). The test-data
+    commands also call this on a paper past draft, and only one with no answer yet.
     """
     record.embargoed_until = answer.until
     record.embargo_answered_at = timezone.now()

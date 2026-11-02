@@ -8,6 +8,8 @@ Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off
 
 **Revised 2026-09-21 — permits a development-only disclosure bypass (IR-317).** Adds §A development bypass below. The gate itself is unchanged; what is added is a narrow, loud, `DEBUG`-only way to stand beside it while [IR-250](https://citiris.atlassian.net/browse/IR-250) waits on decisions CIT-U has to make. Recorded by an agent and awaiting a reviewer's acceptance.
 
+**§A development bypass removed 2026-11-02 ([IR-815](https://citiris.atlassian.net/browse/IR-815)), as its last line requires.** [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) supplied the embargo fact, and test data now answers for itself. §A stays below as the record of why it existed.
+
 **Amended by [ADR-054](054-each-person-answers-whether-ai-may-use-their-papers.md), 2026-11-02:** the gate's consent input is now the answer a paper keeps from its Contact person's AI consent, not a per-paper stamp at submission.
 
 **Amended by [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md), 2026-11-01:** it answers IR-250's questions. Every paper states its embargo at submission, an embargo date is a reminder rather than an end, and only a person's release opens the gate. Requirement 1's "embargo date" below reads with that in mind.

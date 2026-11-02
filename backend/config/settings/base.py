@@ -1032,24 +1032,6 @@ AI_EVIDENCE_AREA_TERMS = config(
     cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
 )
 
-# ---- The development disclosure bypass (IR-317, ADR-015) -----------------
-#
-# Stands beside ADR-015's disclosure gate — it does not replace it and it
-# encodes no policy. The gate refuses a record with no embargo answer (ADR-052),
-# and seeded and loaded records carry none until IR-815 gives them one, so with
-# this off they cannot be indexed and Ask IRIS answers "no readable sources";
-# turning it on is how the feature is clicked through in a browser meanwhile.
-# Deliberately named for what it is: a rule that merely sounds defensible
-# ("published records are not embargoed") would read as somebody's decision,
-# and this cannot.
-#
-# `apps.ai.policy.bypass` raises `ImproperlyConfigured` at startup when this is
-# set while DEBUG is off, so it takes the service down rather than quietly
-# disabling a control. IR-815 deletes it.
-AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = config(
-    "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", default=False, cast=bool
-)
-
 # ---- Embedding spend (IR-282) -------------------------------------------
 #
 # Indexing is metered per token, and `AI_CHUNK_MAX_TOKENS` counts whitespace

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it), and IR-816 adds the question itself. Decision 2 is amended and decision 18 added in the Amendment below. The acts, the reminders and the bypass's removal are still to come.
+**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it), IR-816 adds the question itself, and IR-815 adds decisions 16 and 17: test data answers for itself, and IR-317's bypass is gone. Decision 2 is amended and decision 18 added in the Amendment below. The acts, the reminders and the bypass's removal are still to come.
 
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
