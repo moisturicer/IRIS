@@ -30,6 +30,7 @@ any offer until IR-507 narrowed them to owners, and an owner's edit to where
 import shutil
 import tempfile
 
+import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.test import override_settings
@@ -333,6 +334,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         response = self.client.get(reverse("record-detail", args=[record.pk]))
         return response.status_code, (response.data if response.status_code == 200 else None)
 
+    @pytest.mark.slow
     def test_each_role_and_state_matches_the_endpoints(self):
         probes = self._probes()
         for state, row in self.EXPECTED.items():

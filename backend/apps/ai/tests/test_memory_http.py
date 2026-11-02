@@ -38,7 +38,7 @@ from .corpus import (
     root_with,
 )
 
-pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
+pytestmark = [pytest.mark.db_required, pytest.mark.django_db, pytest.mark.slow]
 
 #: The verbatim window these tests run under, in estimated tokens (IR-449).
 #:
