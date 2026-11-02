@@ -54,6 +54,10 @@ import PaperViewPage from "./PaperViewPage";
 import { citationNavigationState } from "@/lib/citedPage";
 import { formatDate } from "@/lib/utils";
 
+vi.mock("@/config/institution", () => ({
+  INSTITUTION: { name: "Example Research University", shortName: "ERU", logo: "example.png", emailDomain: "example.edu" },
+}));
+
 const RECORD_ID = 7;
 const PAPER_URL = "https://iris.test/media/manuscripts/thesis.pdf";
 const ASSIGNED_ADVISER_ID = 30;
@@ -318,6 +322,13 @@ function renderPaper(route: string, state?: unknown) {
 function renderPaperView() {
   return renderPaper(`/records/${RECORD_ID}`);
 }
+
+it("names the configured institution on an institutional paper", async () => {
+  shownRecord = { ...record, origin: "institutional" };
+  signInAs(99, "Student");
+  renderPaperView();
+  expect(await screen.findByText("Example Research University")).toBeVisible();
+});
 
 describe("arriving from a citation", () => {
   beforeEach(() => {
@@ -1035,7 +1046,7 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     expect(screen.getByRole("heading", { level: 1, name: record.title })).toHaveAttribute("title", record.title);
     expect(screen.getByText("v1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-    expect(screen.queryByText("Cebu Institute of Technology – University")).not.toBeInTheDocument();
+    expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
   });
 
@@ -2858,7 +2869,7 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.getByText("Published 2017")).toBeInTheDocument();
     expect(screen.getByText("Completed 2020")).toBeInTheDocument();
     expect(screen.getByText("Imported reference")).toBeInTheDocument();
-    expect(screen.queryByText("Cebu Institute of Technology – University")).not.toBeInTheDocument();
+    expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
   });
 
   it("holds governance and documents in Record details, beside the page", async () => {

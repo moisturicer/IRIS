@@ -2526,3 +2526,14 @@ NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECK
 **Not done here.** No real adapter declares a capacity yet, so no vendor's window is verified; compaction (IR-734) does not exist, so `compaction_required` is only reachable when a caller opts in. The status is logged, not persisted or shown to readers (IR-735). `Capacity` is what an adapter declares; nothing yet checks a declaration against the vendor. Repacking withholds greedily in call order, not the best subset. With compaction available, a single result that does not fit is still withheld by marker; compaction is requested only when the group cannot be answered. Repacking means withholding whole results by marker; ranged continuations of a long result are IR-733. The executor still sends one turn with no tools; the tool loop that will call `pack` is IR-728.
 
 **Status.** Implemented; awaiting review.
+
+
+## IR-769 - Institution copy and entry-screen links
+
+**Basis.** ADR-005 and IR-769, including the requested login/signup footer and duplicate-link changes. Neutral copy replaces deployment-specific wording in discovery examples, opportunities, help and related research. Paper View uses Record identifiers; Paper View, metadata origin, account details and APA/MLA/BibTeX citations read the shared institution configuration.
+
+**Verification.** Rendered UI tests in `config/institution.test.tsx` use Example Research University / ERU to demonstrate account details, metadata labels and all three citation formats follow a different deployment. `PaperViewPage.test.tsx` checks the configured institution and does not attribute external references to it. Login/signup tests check one account-switch link, Help, privacy/terms dialogs, preserved input, Escape/focus return and blocking accessibility rules. Shared-footer assertions in EmailVerifyPage/PendingApprovalPage and the rotating DiscoverSearchComposer expectation are deliberately updated for the new requirements.
+
+**Browser evidence (2026-11-02).** Headless Chromium, login and signup at 1440px and 360px: one account-switch link; Help, Data privacy and Terms open and close; no horizontal overflow. Desktop and phone screenshots visually inspected. TypeScript checks pass. Full frontend suite and independent AI-assisted standards/spec review are recorded in the PR before handoff.
+
+**Boundaries.** Existing `DataNotice.tsx` and `lib/dpaTerms.ts` legal wording is unchanged; Terms explicitly says institutional review is pending. No policy approval is implied. Ask IRIS copy remains unchanged and is flagged for Jive in the Jira comment. No backend, workflow, office configuration or deployment changes. Human approval and merge remain outstanding.
