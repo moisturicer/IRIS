@@ -2,6 +2,8 @@ version: "3.9"
 
 services:
   db:
+    networks:
+      - private
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
@@ -25,6 +27,8 @@ services:
         max-file: "3"
 
   redis:
+    networks:
+      - private
     image: redis:7-alpine
     restart: unless-stopped
     # A password in both stacks (IR-669). redis-server stays the command so the
@@ -45,6 +49,8 @@ services:
         max-file: "3"
 
   migrate:
+    networks:
+      - private
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -65,6 +71,9 @@ services:
         condition: service_healthy
 
   backend:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -113,6 +122,8 @@ services:
           memory: 1G
 
   docling:
+    networks:
+      - private
     # Variant (GPU or CPU) is chosen once by scripts/setup_env.py, which writes
     # DOCLING_VARIANT to the repo-root .env. Sizing, workers, the VRAM cap and
     # the reasoning are in docling/compose.yml and
@@ -124,6 +135,9 @@ services:
       - DOCLING_SERVE_ENABLE_UI=0
 
   ai-gateway:
+    networks:
+      - private
+      - egress
     build:
       context: ./ai
       dockerfile: Dockerfile
@@ -153,6 +167,9 @@ services:
           memory: 1g
 
   celery-default:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -191,6 +208,8 @@ services:
         condition: service_completed_successfully
 
   celery-extraction:
+    networks:
+      - private
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -238,6 +257,9 @@ services:
         condition: service_completed_successfully
 
   celery-embedding:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -280,6 +302,9 @@ services:
   # much shadow traffic competes with readers at the vendor, which has no
   # priority mechanism. Idle unless AI_EVIDENCE_DECISION=shadow.
   celery-shadow:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -318,6 +343,8 @@ services:
         condition: service_completed_successfully
 
   celery-beat:
+    networks:
+      - private
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -345,6 +372,8 @@ services:
         condition: service_completed_successfully
 
   frontend:
+    networks:
+      - private
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -377,6 +406,9 @@ services:
   # and TRUSTED_PROXY_COUNT=2. Certificates persist in caddy_data, so a restart
   # doesn't request new ones.
   caddy:
+    networks:
+      - private
+      - egress
     image: caddy:2.11-alpine
     restart: unless-stopped
     ports:
@@ -400,6 +432,14 @@ services:
         limits:
           cpus: '0.5'
           memory: 256M
+
+# IR-825: `private` has no route to the internet, which contains a compromised
+# parser, database or cache. Only services that call a vendor, send mail or get
+# certificates also join `egress`. docs/security/SECURITY.md §7 lists why each does.
+networks:
+  private:
+    internal: true
+  egress:
 
 volumes:
   postgres_data:
