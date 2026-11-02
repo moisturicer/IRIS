@@ -174,7 +174,7 @@ def test_the_original_deadline_allowance_and_versions_are_persisted(api):
     assert run_["allowance"] == LIMITS.allowance()
     assert run_["pinned"] == {
         "executor": "deterministic", "executor_version": "1",
-        "protocol": "runs-1", "schema": "0003_dispatch.sql",
+        "protocol": "runs-1", "schema": "0004_agent.sql",
     }
     assert run_["version"] >= 1
     created = run_["created_at"]

@@ -201,7 +201,7 @@ export default function LoginPage() {
 
   return (
     <EntryFrame
-      crossLink={{ prompt: "New to IRIS?", label: "Create an account", to: "/signup" }}
+      help
       lede={{
         headline: <>Your research has <span className="text-brand">a place.</span></>,
         sentence:

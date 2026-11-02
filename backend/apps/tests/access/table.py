@@ -128,6 +128,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "DELETE": _case(OWNER_ACTS, kwargs=RECORD),
     }),
     "record-submit": Entry({"POST": _case(OWNER_ACTS, kwargs=RECORD, data={})}),
+    # A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
+    "record-embargo-answer": Entry({"POST": _case(
+        OWNER_ACTS, kwargs=RECORD, data={"embargoed": False},
+    )}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),

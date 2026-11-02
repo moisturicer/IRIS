@@ -54,6 +54,8 @@ class ChatCompletions:
                     "name": t.name, "description": t.description, "parameters": t.parameters,
                 }} for t in request.tools
             ]
+            if request.tool_choice == "none":
+                payload["tool_choice"] = "none"
         return payload
 
     @staticmethod

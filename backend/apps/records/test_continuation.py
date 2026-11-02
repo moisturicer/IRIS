@@ -7,17 +7,21 @@ At the REST seam IR-255 confirmed, on IR-271's accept: a Proposal reaches
 One class per acceptance criterion.
 """
 
+from datetime import timedelta
+
 from django.db import IntegrityError, transaction
 from django.forms.models import model_to_dict
 from django.urls import reverse
+from django.utils import timezone
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITransactionTestCase, APIClient
 
 from apps.documents.testing import real_pdf_bytes
 from apps.records.models import Classification, Record, RecordOwner, RecordType
+from apps.records.testing import answered_no_embargo
 from apps.reviews.test_decisions import DecisionTestBase
-from core.enums import PipelineStatus, RecordTypeName
+from core.enums import EmbargoState, PipelineStatus, RecordTypeName
 
 PROPOSAL = RecordTypeName.PROPOSAL
 
@@ -155,12 +159,26 @@ class ContinueCreatesALinkedDraftTests(ContinuationTestBase):
 
         self.assertEqual(self.snapshot(proposal), before)
 
+    def test_the_child_answers_the_embargo_question_for_itself(self):
+        """ADR-052's Amendment: a Continuation is its own paper, so an embargo on
+        its Proposal is not carried over, and Publish asks again."""
+        proposal = self.accepted_proposal()
+        Record.objects.filter(pk=proposal.pk).update(
+            embargo_answered_at=timezone.now(),
+            embargoed_until=timezone.localdate() + timedelta(days=30),
+        )
+
+        child_id = self.continue_as(proposal, self.owner).data["id"]
+
+        self.assertEqual(Record.objects.get(pk=child_id).embargo_state, EmbargoState.UNKNOWN)
+
     @override_settings(STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}})
     def test_the_child_requires_its_own_manuscript_then_enters_at_its_adviser(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         proposal = self.accepted_proposal()
         child_id = self.continue_as(proposal, self.owner).data["id"]
+        answered_no_embargo(child_id)
         submit = reverse("record-submit", args=[child_id])
         response = self.post(submit, self.owner, {"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)

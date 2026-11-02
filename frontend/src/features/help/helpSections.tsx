@@ -119,7 +119,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     shownTo: (r) => canAccess(r.role, "opportunities"),
     body: (
       <p>
-        Calls for papers and conferences open to the CIT-U research community. RDCO and Advisers
+        Calls for papers and conferences open to your institution's research community. RDCO and Advisers
         post them and keep them up to date.
       </p>
     ),
@@ -131,9 +131,15 @@ export const HELP_SECTIONS: HelpSection[] = [
     body: (
       <>
         <p>
-          Choose <strong>Publish</strong> on Discover to start a record. Pick its type (Proposal,
-          Thesis / Research or Project), fill in its details, name your Adviser and upload the
-          manuscript. Your Adviser cannot also be one of the record&rsquo;s owners.
+          Choose <strong>Publish</strong> on Discover to start a record. IRIS asks first whether the
+          paper is under an embargo. Then pick its type (Proposal, Thesis / Research or Project),
+          fill in its details, name your Adviser and upload the manuscript. Your Adviser cannot also
+          be one of the record&rsquo;s owners.
+        </p>
+        <p>
+          An embargo keeps a paper&rsquo;s text from going to outside AI companies. It doesn&rsquo;t
+          hide the paper from people who can read it in IRIS.
+          Its date doesn&rsquo;t end the embargo, and text already sent can&rsquo;t be recalled.
         </p>
         <p>
           Once submitted, the record goes to your Adviser first. If anyone reviewing it asks for a

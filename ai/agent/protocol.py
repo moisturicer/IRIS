@@ -125,6 +125,8 @@ class AgentRequest:
     tools: tuple[ToolSpec, ...] = ()
     #: The completion cap sent, which admission reserved (IR-725).
     max_output_tokens: int | None = None
+    #: "none" keeps the tools declared but closes research (IR-728).
+    tool_choice: str = "auto"
 
 
 class IncompatibleContinuation(Exception):

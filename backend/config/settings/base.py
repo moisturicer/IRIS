@@ -256,7 +256,7 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "form-action 'self'",
     "frame-ancestors 'none'",
 ])
-# Report-only until the manual walk-through in docs/testing/TRACEABILITY.md
+# Report-only until the manual walk-through in docs/testing/traceability/
 # (IR-663) shows no violation. Enforcing is a reviewed change to this line,
 # and to frontend/security-headers.conf, never an environment variable.
 CONTENT_SECURITY_POLICY_REPORT_ONLY = True

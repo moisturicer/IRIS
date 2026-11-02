@@ -30,11 +30,13 @@ any offer until IR-507 narrowed them to owners, and an owner's edit to where
 import shutil
 import tempfile
 
+import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.test import override_settings
 from django.urls import reverse
 
+from apps.records.testing import answered_no_embargo
 from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import AssignmentState, Party, RecordTypeName, ResubmissionRequestState, SeatState
@@ -73,7 +75,10 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # --- the states ------------------------------------------------------------------
 
     def draft(self):
-        return self.make_record()
+        record = self.make_record()
+        # So a refusal on submit is about who is asking, not a missing answer.
+        answered_no_embargo(record.pk)
+        return record
 
     def with_adviser_unopened(self):
         return self.new_model()
@@ -333,6 +338,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         response = self.client.get(reverse("record-detail", args=[record.pk]))
         return response.status_code, (response.data if response.status_code == 200 else None)
 
+    @pytest.mark.slow
     def test_each_role_and_state_matches_the_endpoints(self):
         probes = self._probes()
         for state, row in self.EXPECTED.items():

@@ -27,11 +27,14 @@ PDF_TEST_LIMITS = {
     "PDF_VALIDATION_MAX_DEPTH": 100,
 }
 
+from testing import run_lock
 from testing.harness import (
     HarnessMode,
     harness_decision,
     strict_mode_requested,
 )
+
+pytest_plugins = ["testing.slow_tests"]
 
 
 def pytest_configure(config):
@@ -294,6 +297,7 @@ def pytest_collection_modifyitems(config, items):
         pytest.exit(decision.reason, returncode=1)
 
     if decision.mode is HarnessMode.FULL:
+        _hold_the_run_lock(config, items)
         return
 
     skip = pytest.mark.skip(reason=decision.reason)
@@ -308,3 +312,33 @@ def pytest_collection_modifyitems(config, items):
         # these hit the database in setUp with no marker to opt in with).
         if "db_required" in item.keywords or _needs_a_real_database(item):
             item.add_marker(skip)
+
+
+def _hold_the_run_lock(config, items):
+    needs_database = any(
+        "db_required" in item.keywords or "django_db" in item.keywords
+        or _needs_a_real_database(item)
+        for item in items
+    )
+    if not run_lock.should_lock(
+        environ=os.environ,
+        collect_only=config.option.collectonly,
+        xdist_worker=hasattr(config, "workerinput"),
+        needs_database=needs_database,
+    ):
+        return
+    from django.conf import settings
+
+    try:
+        connection = run_lock.connect_to_maintenance_database(settings.DATABASES["default"])
+        config._iris_run_lock = run_lock.acquire(connection)
+    except run_lock.ConcurrentTestRun as refused:
+        pytest.exit(str(refused), returncode=1)
+    os.environ[run_lock.HELD_ENV_VAR] = "1"
+
+
+def pytest_unconfigure(config):
+    connection = getattr(config, "_iris_run_lock", None)
+    if connection is not None:
+        connection.close()
+        os.environ.pop(run_lock.HELD_ENV_VAR, None)

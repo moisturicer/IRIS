@@ -251,10 +251,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def get_embargo(self, obj):
         from core.permissions import may_read_embargo
 
+        from .embargo import state_payload
+
         if not may_read_embargo(self._viewer(), obj):
             return None
-        until = obj.embargoed_until
-        return {"state": obj.embargo_state.value, "until": until.isoformat() if until else None}
+        return state_payload(obj)
 
     def _workflow(self, obj):
         """

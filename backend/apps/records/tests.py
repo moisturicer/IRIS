@@ -20,6 +20,7 @@ from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.records.models import RecordVersion
 from apps.documents.testing import real_pdf_bytes
 from .models import DeleteRequest, Record, RecordOwner, RecordType
+from .testing import answered_no_embargo
 from apps.reviews.test_decisions import DecisionTestBase
 
 MANUSCRIPT_BYTES = real_pdf_bytes()
@@ -64,7 +65,8 @@ class SubmitOwnershipTests(APITestCase):
         # gate before the permission check it exists to exercise ever ran.
         # Changed deliberately, not to make a red test green: the assertions
         # are untouched, and consent has its own suite in
-        # `DpaConsentAtSubmitTests` below.
+        # `DpaConsentAtSubmitTests` below. The embargo answer likewise (IR-816).
+        answered_no_embargo(self.record.id)
         return self.client.post(
             reverse("record-submit", args=[self.record.id]),
             {"dpa_accepted": True},
@@ -691,6 +693,7 @@ class DpaConsentAtSubmitTests(APITestCase):
         self.assertEqual(self.record.pipeline_status, "draft")
 
     def test_consent_is_stamped_with_who_and_when(self):
+        answered_no_embargo(self.record.id)
         response = self._post({"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()

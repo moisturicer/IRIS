@@ -272,9 +272,25 @@ export interface PaperDetails {
   due_dates: PaperDueDate[] | null;
 }
 
+/** Where a paper's embargo stands (ADR-052 §3). A date never moves it: a person does. */
+export type EmbargoState = "unknown" | "none" | "active" | "released";
+
+export interface RecordEmbargo {
+  state: EmbargoState;
+  until: string | null;
+}
+
+/** What `POST /records/<id>/embargo-answer/` takes. */
+export interface EmbargoAnswer {
+  embargoed:       boolean;
+  embargoed_until: string | null;
+}
+
 export interface RecordDetail extends RecordListItem {
   /** Added in IR-686; absent only when using an older API. */
   paper_details?: PaperDetails;
+  /** Null for anyone but the owners, the Adviser and office staff (ADR-052 §18). */
+  embargo?: RecordEmbargo | null;
   lineage?: {
     derived_from: { id: number; title: string; record_type_name: string | null } | null;
     continued_as: { id: number; title: string; record_type_name: string | null } | null;
