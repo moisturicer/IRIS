@@ -8,6 +8,8 @@ Accepted — 2026-09-02. **Revised 2026-09-04:** dropped the governance-sign-off
 
 **Revised 2026-09-21 — permits a development-only disclosure bypass (IR-317).** Adds §A development bypass below. The gate itself is unchanged; what is added is a narrow, loud, `DEBUG`-only way to stand beside it while [IR-250](https://citiris.atlassian.net/browse/IR-250) waits on decisions CIT-U has to make. Recorded by an agent and awaiting a reviewer's acceptance.
 
+**Amended by [ADR-054](054-each-person-answers-whether-ai-may-use-their-papers.md), 2026-11-02:** the gate's consent input is now the answer a paper keeps from its Contact person's AI consent, not a per-paper stamp at submission.
+
 **Amended by [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md), 2026-11-01:** it answers IR-250's questions. Every paper states its embargo at submission, an embargo date is a reminder rather than an end, and only a person's release opens the gate. Requirement 1's "embargo date" below reads with that in mind.
 
 **Revised 2026-09-20 — pins the reranker.** This ADR always said "Voyage rerank" without naming a model, and the deployed `.env` had drifted to `rerank-3` while the code default and every docstring referencing it said `rerank-2` — an undocumented choice contradicting a stale one, neither written down. Decided in a live operator session (manual end-to-end verification against a real dev corpus, this ADR's first): **`rerank-3`**, same price as `rerank-2` ($0.05/M tokens either way), so the choice was about not leaving code and environment disagreeing rather than about cost. The code default and `.env.example` are updated to match; nothing about the vendor, the embedding model, the store or the disclosure gate changes.
