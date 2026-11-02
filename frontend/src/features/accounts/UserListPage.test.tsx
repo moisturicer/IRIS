@@ -54,6 +54,46 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
+describe("the users table", () => {
+  it("names the table and every column for assistive technology", async () => {
+    renderScreen(<UserListPage />);
+
+    const table = await screen.findByRole("table", { name: "User accounts" });
+    const headers = within(table).getAllByRole("columnheader");
+    expect(headers).toHaveLength(5);
+    for (const header of headers) expect(header).toHaveAttribute("scope", "col");
+    expect(within(table).getByRole("columnheader", { name: "Actions" })).toBeInTheDocument();
+  });
+
+  it("announces loading and the new page when pagination changes", async () => {
+    const firstPage = Array.from({ length: 20 }, (_, index) =>
+      user({ id: 100 + index, email: `person${index + 1}@cit.edu` }),
+    );
+    userList.mockResolvedValueOnce({ data: { count: 25, results: firstPage } });
+
+    renderScreen(<UserListPage />);
+
+    const status = screen.getByRole("status", { name: "User accounts status" });
+    await waitFor(() => {
+      expect(status).toHaveTextContent("User accounts: showing 1–20 of 25. Page 1 of 2.");
+    });
+
+    let resolvePageTwo!: (value: ReturnType<typeof listing>) => void;
+    userList.mockImplementationOnce(() => new Promise((resolve) => {
+      resolvePageTwo = resolve;
+    }));
+
+    await userEvent.click(screen.getByRole("button", { name: "Next page" }));
+    await waitFor(() => expect(status).toHaveTextContent("Loading User accounts."));
+
+    resolvePageTwo({ data: { count: 25, results: [STUDENT, ADVISER] } });
+    await waitFor(() => {
+      expect(status).toHaveTextContent("User accounts: showing 21–25 of 25. Page 2 of 2.");
+    });
+    expect(userList).toHaveBeenLastCalledWith({ page: 2, search: "" });
+  });
+});
+
 describe("the Coordinator badge", () => {
   it("is shown on coordinators and on nobody else", async () => {
     renderScreen(<UserListPage />);

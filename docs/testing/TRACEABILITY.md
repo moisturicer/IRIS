@@ -34,6 +34,25 @@ has no application route and its endpoint returns active sessions only; no
 expired-session behavior or navigation was added. Full-suite results and review
 are recorded in the PR. This is implementation evidence, not human sign-off.
 
+## IR-748 · User List and Audit Log tables are readable by screen readers (NFR-A1)
+
+The shared `DataTable` now requires a caller-supplied caption, gives every column
+header `scope="col"`, and exposes one named polite live status for loading,
+empty results and completed page changes. Its loading spinner is decorative
+because the live status owns the announcement. The stale sorting TODO is removed;
+sorting remains out of scope. User List names its table `User accounts` and gives
+the actions column an accessible header; Audit Log names its table
+`Audit log events`.
+
+**Evidence (2026-11-02):** `UserListPage.test.tsx` and `AuditLogPage.test.tsx`
+query the tables and controls through role and accessible name, assert captions,
+header scope and live-status wording, and retain axe checks for no serious or
+critical violation. The full frontend suite passed **129 files / 1,652 tests**.
+`npm run lint` completed with **0 errors / 3 pre-existing warnings**; `npm run
+build` passed (`tsc && vite build`). See
+[`evidence/IR-748/README.md`](evidence/IR-748/README.md). This is automated
+implementation evidence, not human WCAG conformance sign-off.
+
 ## IR-123 · Disclosure notice describes external AI processing (FR-M6-02)
 
 The shared notice describes manuscript extraction, external Voyage AI embedding
