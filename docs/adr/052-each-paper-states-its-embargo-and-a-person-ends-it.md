@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it). The form, the acts, the reminders and the bypass's removal are still to come.
+**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it), and IR-816 adds the question itself. Decision 2 is amended and decision 18 added in the Amendment below. The acts, the reminders and the bypass's removal are still to come.
 
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
@@ -66,10 +66,6 @@ Development runs through IR-317's bypass, which refuses to start with `DEBUG` of
 16. **Test data answers the question itself.** `seed_demo` answers "no" for most papers and gives one demo paper a future date. `load_corpus` takes the same answer. The development database's 40 proxy papers are marked once.
 17. **IR-317's bypass is deleted in the same change:** the setting, its startup check, `index_with_disclosure_bypass` and the status flag, as ADR-015 requires.
 
-### Who can see it
-
-18. **Owners, the Adviser and office staff see an embargo's state and date on the record.** Other readers of a published paper don't, because that a paper is under an agreement isn't theirs to learn from it.
-
 ## Alternatives Considered
 
 **The date ends the embargo by itself.** It needs nobody to act. Rejected: text sent to a vendor can't be recalled, so a patent or agreement that runs late would leak with nobody having chosen it. The worst case of a person releasing is a paper missing from Ask IRIS, which anyone responsible can fix.
@@ -131,3 +127,19 @@ The evaluation's 40 proxy papers keep working once they're marked. Runs from the
 ## Related Tasks
 
 IR-250 (builds this) · IR-317 (the bypass it removes) · IR-127 (the gate) · IR-226 (the consent precedent) · IR-630 and IR-631 (blocked by it) · IR-720 (uses its facts) · IR-278 (real papers) · IR-791 (consent withdrawal, which uses the same gate)
+
+## Amendment — 2026-11-02 (IR-816): the question comes first, and who can see the answer
+
+**What this supersedes.** Decision 2's "at submission: a toggle and a date on the publish form, beside the IP question", and the word "toggle" in decision 5. Everything else stands. Decided by Hermoine Zozobrado. Decision 18 was accepted separately on 2026-11-02.
+
+**Decision 2, as amended.** Every paper answers one question first, before its file is uploaded. Publish opens on it, alone, as a required No or Yes with a date. No records "no embargo", and Yes requires a date. It starts unanswered, because "no embargo" can send text out and must be something a person chose. The answer is saved before the file is sent, with who gave it and when, the way consent is, and a first submission with no answer is refused. Under Yes, nothing is filled in from the paper's content at upload.
+
+**Decision 18.** Owners, the Adviser and office staff see an embargo's state and date on the record. Other readers of a published paper don't, because that a paper is under an agreement isn't theirs to learn from it.
+
+**Why.**
+
+- AI that fills in fields at upload is planned, and it has to know the answer before the file arrives. It still needs consent, which stays on the last step, so the gate refuses it until then.
+- The IP question sits behind More details, which starts closed. A toggle there that started off would record "no embargo" for a student who never saw it, and text can't be recalled.
+- A toggle's answer saved only at submission is lost when a student closes the dialog and comes back, which can turn a Yes into a No.
+
+**What it costs.** One more screen and one more click on every submission. Under Yes, authors type their own title and abstract. The server does not refuse a file on an unanswered draft: Publish's order enforces "answer first", and the gate still refuses an unanswered paper.

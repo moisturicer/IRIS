@@ -16,6 +16,8 @@ from rest_framework.test import APITransactionTestCase, APIClient
 
 from apps.documents.testing import real_pdf_bytes
 from apps.records.models import Classification, Record, RecordOwner, RecordType
+from apps.records.testing import answered_no_embargo
+from apps.records.testing import answered_no_embargo
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import PipelineStatus, RecordTypeName
 
@@ -161,6 +163,7 @@ class ContinueCreatesALinkedDraftTests(ContinuationTestBase):
 
         proposal = self.accepted_proposal()
         child_id = self.continue_as(proposal, self.owner).data["id"]
+        answered_no_embargo(child_id)
         submit = reverse("record-submit", args=[child_id])
         response = self.post(submit, self.owner, {"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)

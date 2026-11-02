@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 import type {
-  RecordListItem, RecordDetail, RecordFormData, MyResearchItem,
+  RecordListItem, RecordDetail, RecordFormData, MyResearchItem, EmbargoAnswer, RecordEmbargo,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
@@ -187,6 +187,9 @@ export const recordsApi = {
   // that already carries consent ignores the value, so passing it is always safe.
   submit:         (id: number, dpaAccepted: boolean) =>
     apiClient.post<{ detail: string }>(`/records/${id}/submit/`, { dpa_accepted: dpaAccepted }),
+  // Publish's first question, saved before the file is sent (ADR-052 §2).
+  answerEmbargo:  (id: number, answer: EmbargoAnswer) =>
+    apiClient.post<RecordEmbargo>(`/records/${id}/embargo-answer/`, answer),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),

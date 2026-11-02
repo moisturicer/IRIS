@@ -348,7 +348,7 @@ Administration (RDCO) — unchanged
 
 ### 4.4 Publish dialog
 
-**Pattern: one dialog, three steps, with a slim progress indicator.**
+**Pattern: one dialog, three steps, with a slim progress indicator.** Since IR-816 the dialog opens on one question before these steps: whether the paper is under an embargo (ADR-052, Amendment 2026-11-02).
 
 It is not a long form, and not a full-page wizard. Three steps is the fewest that keep upload, confirmation and consent separate. Each step fits one screen at 1280×720 without scrolling the dialog body, except Details, whose body may scroll while its actions stay pinned in the dialog footer. *(Amended 2026-10-06, IR-408: Details measured about 100 px over at 1280×720 with every essential field shown, and the lead accepted a scrolling body over hiding an essential field.)*
 

@@ -15,6 +15,7 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from core.enums import (
     DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
+    EmbargoState,
     IPType,
     PipelineStatus,
     RecordTypeName,
@@ -145,7 +146,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "destroy"):
+        if self.action in ("update", "partial_update", "submit", "embargo_answer", "destroy"):
             return [IsAuthenticated(), IsRecordOwner()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
@@ -353,19 +354,22 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        # The embargo answer (ADR-052 §2). Parsed here too, so a bad one refuses
-        # before anything is written. No answer leaves the paper Unknown and so
-        # blocked from the AI; IR-816 makes the form send one, then requires it.
-        embargo_answer = embargo.answer_from(request.data)
+        # The embargo answer (ADR-052 §2). Publish saved it through `embargo-answer/`
+        # before the file was sent. Refused like consent, before anything is written,
+        # so nothing enters review unanswered. A new Version goes through its own
+        # action and is not asked again.
+        if record.embargo_state == EmbargoState.UNKNOWN:
+            return Response(
+                {"embargoed": embargo.ANSWER_REQUIRED},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
-            # Consent, embargo answer, assignment, entry seat and v1 commit together.
+            # Consent, assignment, entry seat and v1 commit together.
             with transaction.atomic():
                 if not record.dpa_accepted:
                     record.dpa_accepted_at = timezone.now()
                     record.dpa_accepted_by = request.user
                     record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-                if embargo_answer is not None:
-                    embargo.record_answer(record, embargo_answer, actor=request.user)
                 enter_at_adviser(record, actor=request.user)
         except RoutingError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -381,6 +385,35 @@ class RecordViewSet(viewsets.ModelViewSet):
             {"detail": "Record submitted successfully. The adviser has been notified."},
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["post"], url_path="embargo-answer")
+    @transaction.atomic
+    def embargo_answer(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-answer/  {"embargoed": bool, "embargoed_until": date}
+
+        A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
+        It is saved before the file is sent, so nothing that runs at upload can
+        act on a paper whose answer the server doesn't have yet. Draft only:
+        after submission an embargo changes by its own acts (IR-812).
+        """
+        record = self.get_object()  # enforces IsRecordOwner object permission
+        Record.objects.select_for_update().get(pk=record.pk)
+        record = self.get_object()
+
+        if record.pipeline_status != PipelineStatus.DRAFT:
+            return Response(
+                {"detail": "This paper has been submitted, so its embargo can't be answered here."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        answer = embargo.answer_from(request.data)
+        if answer is None:
+            return Response(
+                {"embargoed": embargo.ANSWER_REQUIRED},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        embargo.record_answer(record, answer, actor=request.user)
+        return Response(embargo.state_payload(record))
 
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):

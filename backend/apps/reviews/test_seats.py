@@ -18,6 +18,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.records.models import Record, RecordOwner, RecordType
+from apps.records.testing import answered_no_embargo
+from apps.records.testing import answered_no_embargo
 from apps.reviews import seats
 from apps.reviews.models import (
     RecordAssignment,
@@ -125,6 +127,7 @@ class EntrySeatAndPoolTests(SeatTestBase):
         record = self.make_record(
             RecordTypeName.PROPOSAL, PipelineStatus.DRAFT, adviser=self.adviser,
         )
+        answered_no_embargo(record.pk)
         self.client.force_authenticate(self.owner)
         response = self.client.post(
             reverse("record-submit", args=[record.pk]), {"dpa_accepted": True}, format="json",
