@@ -47,6 +47,7 @@ from core.enums import (
     PipelineStatus,
     DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
+    ReadingStatus,
     RecordTypeName,
     RequestStatus,
     ReviewDecision,
@@ -90,6 +91,13 @@ GOVERNED_ENUMS = (
     # IR-645: why a sign-in ended. Its "locked" was also `LockUserView`'s
     # response wording, rewritten there rather than allowing the whole module.
     SessionEndReason,
+    # IR-566: a reader's status on a saved Record (ADR-044 §2), governed from
+    # the start. Its "completed" collides only with `ai/models/shadow.py`,
+    # already allowed below as a Celery job's own lifecycle.
+    ReadingStatus,
+    # `EmbargoState` (IR-811) is left out on purpose: its "unknown" and "none"
+    # mean unrelated things in more than twenty places, and each of those files
+    # would be exempted from every other governed value to allow them.
 )
 
 GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in enum}
@@ -179,6 +187,10 @@ ALLOWED = {
     # "missing" is a report key, three times: cases with no reported count,
     # no assessment and no latency. A list, not an item's state.
     "ai/evaluation/milestone.py",
+    # (IR-606) "missing" labels unreported usage in replay evidence;
+    # "open" is a provider reservation awaiting settlement. Neither is a
+    # document-request item or request state.
+    "ai/evaluation/replay.py",
     # "missing" reads that report key from milestone.py to print it.
     "ai/management/commands/eval_pilot_milestone.py",
     # (IR-500) A research tool call's outcome: "rejected" means a malformed
@@ -187,6 +199,15 @@ ALLOWED = {
     # (IR-546) A listing candidate's state ("pending" until screened). Not a
     # person's request awaiting a decision. Same shape as embedding_space.py.
     "ai/answers/events.py",
+    # (IR-688) `RequestStatus.CANCELLED` is a reader withdrawing a download
+    # request. Each file below spells a queued Ask IRIS question's own
+    # `cancelled` (an `AskRun` the asker stopped, ADR-040), which predates it:
+    # another concept, one string. Same shape as embedding_space.py.
+    "ai/controller/loop.py",
+    "ai/durable.py",
+    "ai/evaluation/capacity.py",
+    "ai/models/queued.py",
+    "ai/public.py",
 }
 
 
@@ -384,6 +405,13 @@ class EnumsMatchTheDatabaseTests(TestCase):
         field = Record._meta.get_field("pipeline_status")
         self.assertEqual(list(field.choices), list(PipelineStatus.choices))
         self.assertEqual(field.default, PipelineStatus.DRAFT)
+
+    def test_reading_status_choices_come_from_the_enum(self):
+        from apps.library.models import SavedRecord
+
+        field = SavedRecord._meta.get_field("reading_status")
+        self.assertEqual(list(field.choices), list(ReadingStatus.choices))
+        self.assertTrue(field.null)
 
     def test_review_choices_come_from_the_enums(self):
         from apps.reviews.models import Review

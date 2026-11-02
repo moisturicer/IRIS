@@ -9,14 +9,14 @@ on who decides:
   *Accepted*, its resting state) or *reject*. RDCO has no Proposal role, and a
   Proposal is never routed, so the Adviser's seat is the only one it has.
 - **A Thesis/Research or Project, by its Adviser**, while their own seat is
-  open (no specialist path): *publish* or *reject*. RDCO is never involved.
-- **A Thesis/Research or Project, by RDCO**, on the specialist path, holding
-  the hand-back's seat: *publish*, *keep unlisted* (`completed`) or *reject*.
+  open: *reject* only. The Adviser accepts by sending it to RDCO (ADR-047 §1).
+- **A Thesis/Research or Project, by RDCO**, holding RDCO's seat: *publish*,
+  *keep unlisted* (`completed`) or *reject*. Only RDCO publishes (ADR-047 §5).
 
 *Reject* is the same act on every record: `rejected`, shown as *Archived*,
 terminal.
 
-Accept & route (IR-261) is not a Decision. It is an acceptance that closes
+Accept & send to RDCO is not a Decision. It is an acceptance that closes
 nothing; it shares only the rule that it is refused while a revision request
 is open (`revisions.decision_blocked_reason`).
 
@@ -82,6 +82,7 @@ from core.enums import (
     Party,
     PipelineStatus,
     RecordTypeName,
+    ResubmissionRequestState,
     ReviewDecision,
     RoleName,
     SeatState,
@@ -109,9 +110,9 @@ OUTCOMES = {
 DECIDABLE_TYPES = (RecordTypeName.PROPOSAL, *routing.ROUTABLE_TYPES)
 
 #: Who may take which outcome on a Thesis/Research or Project, in the order
-#: the action bar offers them. RDCO alone keeps a record unlisted (§3).
+#: the action bar offers them. Only RDCO publishes or keeps one unlisted (ADR-047 §5).
 OUTCOMES_FOR = {
-    str(Party.ADVISER): (PUBLISH, REJECT),
+    str(Party.ADVISER): (REJECT,),
     str(Party.RDCO): (PUBLISH, KEEP_UNLISTED, REJECT),
 }
 
@@ -203,8 +204,8 @@ def _refusal(record, user) -> str:
         if proposal:
             return "This proposal is no longer in your review, so there is nothing to decide."
         return (
-            "You have already accepted this record and sent it for specialist "
-            "review, so RDCO decides it now."
+            "You have already accepted this record and sent it to RDCO, "
+            "so RDCO decides it now."
         )
     if proposal:
         return "Only the proposal's Adviser decides it (ADR-032 §2)."
@@ -233,6 +234,8 @@ def _blocked_reason(record, seat) -> Optional[str]:
     """Why the seated decider cannot decide yet, or None."""
     if seat is not None and seat.state == SeatState.ASSIGNED:
         return "Open the review first."
+    if seat is not None and seat.assignment.party == Party.RDCO:
+        return None
     return revisions.decision_blocked_reason(record)
 
 
@@ -272,7 +275,8 @@ def closes_payload(record, decider_seat) -> dict:
     assignments = []
     for assignment, open_seats in _closing(record):
         holders = [
-            s.reviewer.get_full_name() for s in open_seats if s.pk != decider_seat.pk
+            (s.reviewer.get_full_name() or s.reviewer.email) if s.reviewer else "Former reviewer"
+            for s in open_seats if s.pk != decider_seat.pk
         ]
         if assignment.pk == decider_seat.assignment_id and not holders:
             continue  # the decider's own turn, with nobody else on it, simply completes
@@ -282,6 +286,14 @@ def closes_payload(record, decider_seat) -> dict:
     return {
         "assignments": assignments,
         "document_requests": _open_document_requests(record).count(),
+        "revision_requests": [
+            {"id": r.pk, "party": r.party, "label": _label(r.party), "reason": r.reason}
+            for r in revisions.open_requests(record)
+        ] if decider_seat.assignment.party == Party.RDCO else [],
+        "findings": [
+            {"party": r.stage, "label": _label(r.stage), "comment": r.comment}
+            for r in record.reviews.filter(status=ReviewDecision.NEGATIVE_FINDING)
+        ],
     }
 
 
@@ -301,29 +313,27 @@ def decision_token(record) -> str:
         ReviewerSeat.objects.filter(
             assignment__record=record, assignment__state=AssignmentState.ACTIVE,
             state__in=OPEN_SEAT_STATES,
-        ).values_list("pk", "state")
+        ).values_list("pk", "state", "reviewer_id")
     )
     requests = sorted(_open_document_requests(record).values_list("pk", flat=True))
-    facts = f"{version.pk if version else 0}|{active}|{open_seats}|{requests}"
+    revision_requests = list(revisions.open_requests(record).values_list("pk", "reason"))
+    findings = list(record.reviews.filter(status=ReviewDecision.NEGATIVE_FINDING).order_by("pk").values_list("pk", "comment"))
+    facts = f"{version.pk if version else 0}|{active}|{open_seats}|{requests}|{revision_requests}|{findings}"
     return hashlib.sha256(facts.encode()).hexdigest()[:16]
 
 
 # --- what record detail tells Paper View ------------------------------------------------
 
 def author_hints(record) -> list[str]:
-    """The author's ADR-018 flags, as the routing dialog words them (ADR-032 §3)."""
-    return [
-        routing._HINT_TEXT[office]
-        for office, field in routing._HINT_FIELD.items()
-        if getattr(record, field, False)
-    ]
+    """The author's flags, as the routing dialog words them (ADR-032 §3)."""
+    return [text for field, _, text in routing._AUTHOR_FLAGS if getattr(record, field, False)]
 
 
 def decision_flags(record, user) -> dict:
     """
     `decision` on record detail (IR-270): the outcomes the viewer may take, why
     not yet, what deciding would close, the staleness token, and -- for the
-    Adviser -- the author's hints the publish confirmation shows. A rendering
+    Adviser -- the author's hints the send-to-RDCO dialog shows. A rendering
     hint; `decide/` re-checks all of it.
     """
     empty = {
@@ -337,7 +347,7 @@ def decision_flags(record, user) -> dict:
         return empty
     seat = _decider_seat(record, user, party)
     # The hints say which offices the author thought were needed: a question
-    # for the Adviser deciding whether to route, which a Proposal never is.
+    # for the Adviser sending it to RDCO, which a Proposal never is.
     routable = type_name_of(record) in routing.ROUTABLE_TYPES
     return {
         "party": party,
@@ -394,10 +404,11 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         if outcome == ACCEPT:
             raise DecisionError(
                 "A Thesis or Project is accepted by publishing it, keeping it unlisted "
-                "or routing it, never left merely accepted."
+                "or sending it to RDCO, never left merely accepted."
             )
         raise DecisionError(
-            "Only RDCO may accept a record and keep it unlisted, after specialist review."
+            "Only RDCO publishes a Thesis/Research or Project or keeps it unlisted. "
+            "Accept it by sending it to RDCO (ADR-047)."
         )
     comment = comment.strip() if isinstance(comment, str) else ""
     if outcome == REJECT and not comment:
@@ -424,7 +435,7 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
 
     # Seats are closed here rather than through `seats.complete_seat()` and
     # `seats.withdraw()`: those run the office completion rule and its
-    # hand-back, which must not fire on a record the Decision is ending, and
+    # notices, which must not fire on a record the Decision is ending, and
     # `withdraw()` is a coordinator's act with a coordinator's checks.
     now = timezone.now()
     cut_off = []  # reviewers whose open seat the decision withdrew
@@ -434,7 +445,7 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         ReviewerSeat.objects.filter(pk__in=[s.pk for s in others]).update(
             state=SeatState.WITHDRAWN, closed_by_decision=review,
         )
-        cut_off.extend(s.reviewer for s in others)
+        cut_off.extend(s.reviewer for s in others if s.reviewer is not None)
         _close_assignment(
             assignment, actor, now, review,
             AssignmentState.COMPLETED if own else AssignmentState.WITHDRAWN,
@@ -453,13 +464,27 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         request.save(update_fields=["state", "closed_at", "closed_by_decision"])
         audit.document_request_withdrawn(request, actor, closed_by=audit.BY_DECISION)
 
+    closed_revisions = list(revisions.open_requests(record).select_for_update())
+    for request in closed_revisions:
+        request.state = ResubmissionRequestState.WITHDRAWN
+        request.resolved_at = now
+        request.resolved_by = actor
+        request.closed_by_decision = review
+        request.save(update_fields=["state", "resolved_at", "resolved_by", "closed_by_decision"])
+        audit.revision_request_withdrawn(request, actor, closed_by=audit.BY_DECISION)
+    if closed_revisions:
+        from apps.records.versions import restore_submitted_manuscript
+
+        restore_submitted_manuscript(record)
+
     # The one status write of a Decision (module note, point 4).
     record.pipeline_status = new_status
     record.save(update_fields=["pipeline_status", "updated_at"])
     if new_status in PUBLICLY_VISIBLE_STATUSES:
         audit.published(record, actor, party=party)
 
-    _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off)
+    _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off,
+            closed_revisions=[{"id": r.pk, "label": _label(r.party)} for r in closed_revisions])
     return review
 
 
@@ -479,7 +504,7 @@ def withdrawn_by_label(review) -> str:
     return f"{DECIDER_NAME[str(review.stage)]} {OUTCOME_PHRASE[outcome]}"
 
 
-def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off):
+def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off, closed_revisions):
     from apps.notifications.services import notify_decided
 
     transaction.on_commit(lambda: notify_decided(
@@ -490,4 +515,5 @@ def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off):
         reason=review.comment,
         closed_requests=closed_requests,
         cut_off=cut_off,
+        closed_revisions=closed_revisions,
     ))

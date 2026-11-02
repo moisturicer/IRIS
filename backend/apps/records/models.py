@@ -14,6 +14,7 @@ from django.contrib.postgres.indexes import GinIndex
 # and avoids a rename that has nothing to do with this ticket.
 from core.enums import (  # noqa: F401
     PUBLICLY_VISIBLE_STATUSES,
+    EmbargoState,
     IPType,
     PipelineStatus,
     RequestStatus,
@@ -90,16 +91,6 @@ class PublicationLevel(models.Model):
 
 
 class ConferenceLevel(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    def __str__(self): return self.name
-
-
-class BudgetType(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    def __str__(self): return self.name
-
-
-class CollaborationType(models.Model):
     name = models.CharField(max_length=100, unique=True)
     def __str__(self): return self.name
 
@@ -265,7 +256,8 @@ class Record(models.Model):
     details_edited_at    = models.DateTimeField(null=True, blank=True)
 
     # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
-    # `RecordViewSet.submit` and by nothing else -- neither field is writable
+    # `RecordViewSet.submit`, and for test data by `seed_demo` and
+    # `corpus_clearance` -- neither field is writable
     # through a serializer, because a consent record the subject can set on
     # themselves through the ordinary update path is not evidence of anything.
     #
@@ -296,6 +288,51 @@ class Record(models.Model):
         describes. Serializers expose this; nothing writes it.
         """
         return self.dpa_accepted_at is not None
+
+    # The paper's embargo answer (ADR-052). Its own fact: separate from status,
+    # IP and consent, because a published paper can still be under an agreement.
+    # Stamped by `apps.records.embargo` and by nothing else; none of these is
+    # writable through a serializer.
+    #
+    # **The answer's timestamp is what makes a blank date mean "no embargo".**
+    # An unanswered paper stores a blank date too, and it must stay refused.
+    embargoed_until = models.DateField(
+        null=True, blank=True,
+        help_text="The date to review the embargo. A reminder: it never ends the embargo.",
+    )
+    embargo_answered_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When the embargo question was answered. Null means never, so the paper stays blocked.",
+    )
+    embargo_answered_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="embargo_answered_records",
+        help_text="Who answered. SET_NULL so a deleted account cannot erase the timestamp.",
+    )
+    embargo_released_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When a person ended the embargo. Null means it has not been released.",
+    )
+    embargo_released_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="embargo_released_records",
+        help_text="Who released it. SET_NULL so a deleted account cannot erase the timestamp.",
+    )
+
+    @property
+    def embargo_state(self) -> EmbargoState:
+        """Where the embargo stands (ADR-052 §3).
+
+        Derived, never stored, so it cannot drift from the stamps it describes,
+        and it reads no clock: a passed date stays `ACTIVE` until a person acts.
+        """
+        if self.embargo_answered_at is None:
+            return EmbargoState.UNKNOWN
+        if self.embargo_released_at is not None:
+            return EmbargoState.RELEASED
+        if self.embargoed_until is not None:
+            return EmbargoState.ACTIVE
+        return EmbargoState.NONE
 
     # Soft delete
     is_deleted  = models.BooleanField(default=False, db_index=True)
@@ -331,6 +368,21 @@ class Record(models.Model):
             models.UniqueConstraint(
                 fields=["derived_from"],
                 name="record_one_continuation",
+            ),
+            # Rows that would read as something nobody said (ADR-052 §3).
+            models.CheckConstraint(
+                condition=(
+                    models.Q(embargoed_until__isnull=True)
+                    | models.Q(embargo_answered_at__isnull=False)
+                ),
+                name="record_embargo_date_needs_answer",
+            ),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(embargo_released_at__isnull=True)
+                    | models.Q(embargoed_until__isnull=False)
+                ),
+                name="record_embargo_release_needs_date",
             ),
         ]
 
@@ -443,21 +495,11 @@ class Conference(models.Model):
     level  = models.ForeignKey(ConferenceLevel, on_delete=models.SET_NULL, null=True, blank=True)
 
 
-class Budget(models.Model):
-    record          = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="budgets")
-    allocation      = models.DecimalField(max_digits=14, decimal_places=2, null=True, blank=True)
-    funding_source  = models.CharField(max_length=300, blank=True)
-    budget_type     = models.ForeignKey(BudgetType, on_delete=models.SET_NULL, null=True, blank=True)
-
-
-class Collaboration(models.Model):
-    record         = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="collaborations")
-    industry       = models.CharField(max_length=300, blank=True)
-    institution    = models.CharField(max_length=300, blank=True)
-    collab_type    = models.ForeignKey(CollaborationType, on_delete=models.SET_NULL, null=True, blank=True)
-
-
 # ---- Download / Delete requests -----------------------------------------
+
+#: The longest note a reader or RDCO may leave on a download request (IR-688).
+DOWNLOAD_NOTE_MAX_LENGTH = 500
+
 
 class DownloadRequest(models.Model):
     STATUS = RequestStatus.choices
@@ -472,6 +514,22 @@ class DownloadRequest(models.Model):
     )
     created_at  = models.DateTimeField(auto_now_add=True)
     reviewed_at = models.DateTimeField(null=True, blank=True)
+    # When an approval stops letting the requester download (ADR-048). Expired
+    # is worked out from this, not stored.
+    grant_expires_at = models.DateTimeField(null=True, blank=True)
+    # Why the reader asks (IR-688). Required of every new request; blank only
+    # on requests made before notes existed.
+    note = models.CharField(max_length=DOWNLOAD_NOTE_MAX_LENGTH, blank=True, default="")
+    # RDCO's reason for a decline or a revocation (IR-688). An approval takes
+    # none. Blank on a decline made before notes existed: "No note recorded".
+    rdco_note = models.CharField(max_length=DOWNLOAD_NOTE_MAX_LENGTH, blank=True, default="")
+    # A revocation keeps `reviewed_by`/`reviewed_at` as the approval's.
+    revoked_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="revoked_download_requests",
+    )
+    revoked_at   = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
 
 
 class DeleteRequest(models.Model):

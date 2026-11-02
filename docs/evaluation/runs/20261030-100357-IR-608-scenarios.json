@@ -1,0 +1,729 @@
+{
+  "commit": "v0.1.0-1164-gbe347bc0-dirty",
+  "schema_version": 1,
+  "issue": "IR-608",
+  "git_commit": "v0.1.0-1164-gbe347bc0-dirty",
+  "providers": "fake",
+  "capacity_fit": false,
+  "scenarios": {
+    "access_and_recovery": {
+      "kind": "deterministic_provider_contract",
+      "suites": [
+        "apps/ai/evaluation/tests/test_scenario_http.py",
+        "apps/ai/tests/test_controller_http.py",
+        "apps/ai/tests/test_controller_security_http.py",
+        "apps/ai/tests/test_public_protocol_http.py",
+        "apps/ai/tests/test_public_history_http.py",
+        "apps/ai/research/tests/test_general_tools.py"
+      ],
+      "status": "measured",
+      "passed": true,
+      "tests": 69,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "checks": [
+        {
+          "name": "apps.ai.evaluation.tests.test_scenario_http.test_private_and_foreign_data_never_enter_review_evidence",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.evaluation.tests.test_scenario_http.test_revocation_between_turns_removes_old_answer_from_reopened_evidence",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.evaluation.tests.test_scenario_http.test_controlled_outcomes[candidates_without_passages]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.evaluation.tests.test_scenario_http.test_controlled_outcomes[no_candidates]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.evaluation.tests.test_scenario_http.test_controlled_outcomes[rejected_arguments]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.evaluation.tests.test_scenario_http.test_controlled_outcomes[failure_after_evidence]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_request_needing_no_tool_is_composed_by_the_answer_model_not_the_planner[ai-ask]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_request_needing_no_tool_is_composed_by_the_answer_model_not_the_planner[ai-ask-stream]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_discovery_then_a_simpler_rewording_keeps_the_papers_shown",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_ceremony_tool_and_a_malformed_call_are_rejected_and_stop_the_run",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_repeated_call_that_adds_nothing_stops_before_the_round_limit",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_searches_that_find_nothing_new_stop_as_no_progress",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_the_round_limit_stops_research_and_still_answers",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_the_tool_call_limit_stops_a_round_and_still_answers",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_no_research_starts_when_the_answer_reserve_cannot_be_met",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_an_unset_limit_refuses_without_calling_any_model",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_paper_chat_searches_only_its_paper",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_failed_tool_and_a_planner_outage_keep_the_supported_parts",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_clarification_is_composed_and_kept_pending",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_queued_run_keeps_the_controller_it_was_pinned_to_after_a_rollback",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_run_pinned_to_the_legacy_engine_never_reaches_the_controller",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_run_pinned_to_an_engine_this_code_lacks_ends_without_a_turn",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_follow_up_compares_the_papers_shown_by_their_displayed_order",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_paper_revoked_mid_run_reaches_neither_the_planner_nor_the_answer",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_http.test_a_count_over_a_population_that_changed_mid_run_is_not_composed",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_security_http.test_changed_source_never_reaches_later_planning_or_composition[rechunk]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_security_http.test_changed_source_never_reaches_later_planning_or_composition[metadata]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_security_http.test_revoked_metadata_fact_during_answer_is_not_published",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_controller_security_http.test_document_instructions_cannot_enable_web_or_widen_paper_scope",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_a_supported_summary_is_public_and_internals_are_absent[ai-ask]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_a_supported_summary_is_public_and_internals_are_absent[ai-ask-stream]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_the_legacy_body_is_unchanged_and_carries_no_summary",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_activity_is_neutral_lifecycle_state_and_never_repeats",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_an_unsupported_or_narrating_summary_is_omitted[I called search_research twice to find this.]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_an_unsupported_or_narrating_summary_is_omitted[The planner chose the listing route before answering.]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_an_unsupported_or_narrating_summary_is_omitted[Reached 97% accuracy.]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_an_unsupported_or_narrating_summary_is_omitted[The Mananga catchment study by Acme Corp proves it.]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_raw_think_tags_never_reach_the_answer_or_the_summary",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_a_reasoning_only_completion_is_unavailable_not_a_blank_answer",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_a_streamed_reasoning_only_reply_is_unavailable_in_the_public_protocol",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_protocol_http.test_an_unknown_protocol_is_refused",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_history_http.test_old_turns_are_projected_without_raw_internals_and_stay_stored",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_history_http.test_a_stored_summary_follows_the_turn_and_is_withheld_when_a_cited_source_is_gone",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_history_http.test_the_header_selects_the_protocol_and_an_unknown_one_is_refused",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_history_http.test_replay_and_reconnect_are_public_and_never_repeat_activity_or_the_final_event",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_history_http.test_the_legacy_replay_is_unchanged_without_the_protocol",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_public_history_http.test_a_queued_submission_streams_public_frames_from_the_first_event",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_the_general_set_is_the_five_spec_tools",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_unknown_fields_and_another_runs_handle_fail_predictably",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_an_exact_title_resolves_on_the_fast_path",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_an_alias_is_an_ambiguity_group_beside_a_clear_title_and_an_unknown",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_a_hidden_or_withheld_paper_looks_exactly_like_an_unknown_one",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_duplicate_titles_are_ambiguous_not_merged",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_ordinals_resolve_only_against_the_presented_list",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_ordinals_resolve_from_stored_conversation_state",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_a_stale_state_revision_resolves_no_ordinal",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_another_readers_conversation_presents_nothing",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_resolution_needs_a_reference",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_discovery_needs_no_titles_and_is_never_exhaustive",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_an_exactly_named_paper_leads_apart_from_related_candidates",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_passage_search_honours_issued_records_and_real_metadata_filters",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_paper_chat_scope_cannot_be_widened_by_search",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_a_continuation_pages_the_same_ranking_and_is_bound_to_its_query",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_a_visibility_change_makes_a_continuation_stale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_a_metadata_count_is_exact_over_distinct_visible_records",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_ai_readability_is_reported_apart_from_the_count",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_there_is_no_topic_count_and_facets_take_no_filters",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_no_tool_result_carries_reader_prose_or_raw_ids",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.research.tests.test_general_tools.test_the_authenticated_command_runs_the_general_tools_as_its_user",
+          "status": "measured",
+          "passed": true
+        }
+      ],
+      "reason": null
+    },
+    "durability": {
+      "kind": "postgres_independent_processes_scripted_provider",
+      "suites": [
+        "apps/ai/tests/test_durable_processes.py",
+        "apps/ai/tests/test_durable_ask_http.py",
+        "apps/ai/tests/test_conversation_state.py"
+      ],
+      "status": "measured",
+      "passed": true,
+      "tests": 66,
+      "failed": 0,
+      "errors": 0,
+      "skipped": 0,
+      "checks": [
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_request_identity_follows_the_same_queued_run",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_cancelled_request_identity_does_not_report_pending",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_submit_disconnect_reconnect_and_one_final_turn",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_the_whole_journal_replays_from_the_start_or_a_last_event_id",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_a_redelivery_after_success_writes_nothing",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_a_restarted_worker_fences_out_the_attempt_it_replaced",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_a_deleted_conversation_is_not_resurrected",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_a_conversation_deleted_mid_answer_stays_deleted",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_reasoning_never_enters_the_journal",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_replay_rechecks_what_the_reader_may_see_now",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_someone_elses_run_is_indistinguishable_from_a_missing_one",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_one_conversation_answers_one_question_at_a_time",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_a_done_whose_turn_is_gone_still_ends_the_stream",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_a_run_past_its_deadline_ends_without_an_answer",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.QueuedQuestionTests.test_a_run_no_worker_picks_up_is_expired_by_its_reader",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_an_opened_conversation_names_its_unfinished_run",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_cancel_commits_one_terminal_state_and_suppresses_the_late_answer",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_cancel_after_completion_keeps_the_answer",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_a_cancelled_queued_run_is_never_started",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_a_cancelled_run_admits_no_new_provider_attempt",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_retry_is_a_linked_run_with_its_own_deadline_and_reset_progress",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_only_a_run_that_ended_without_its_answer_can_be_retried",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_a_partial_answer_is_not_retried_into_a_second_turn",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_a_stopped_run_stops_being_offered_once_a_later_answer_exists",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_retry_waits_for_the_conversations_other_run",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_someone_elses_run_cannot_be_cancelled_or_retried",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.OwnedRunLifecycleTests.test_a_deleted_conversations_runs_stay_deleted",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.NotQueuedTests.test_with_the_switch_off_nothing_is_queued",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.NotQueuedTests.test_a_one_off_question_is_answered_in_the_request",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_ask_http.test_the_journal_keeps_routing_decisions_but_not_router_probabilities",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.TransitionTests.test_a_topic_change_drops_choices_made_under_the_old_topic",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.TransitionTests.test_restating_the_same_topic_keeps_the_selection",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.TransitionTests.test_find_another_excludes_everything_already_shown",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.TransitionTests.test_compare_those_two_selects_from_what_was_shown",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.TransitionTests.test_an_ordinal_beyond_what_was_shown_selects_nothing",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.TransitionTests.test_a_selection_must_come_from_what_was_shown",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.TransitionTests.test_showing_new_papers_resolves_a_pending_clarification",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.TransitionTests.test_the_request_and_the_retrieval_query_are_kept_apart",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.DeliveredTurnTests.test_a_delivered_listing_records_the_order_it_was_shown_in",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.DeliveredTurnTests.test_an_undelivered_turn_advances_nothing[partial]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.DeliveredTurnTests.test_an_undelivered_turn_advances_nothing[unavailable]",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.DeliveredTurnTests.test_meshkv_follow_ups_keep_the_topic_and_the_pair",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.DeliveredTurnTests.test_an_answer_citing_papers_never_shown_clears_the_order",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.DeliveredTurnTests.test_retrieved_but_unshown_candidates_cannot_be_ordinals",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.DeliveredTurnTests.test_find_another_after_a_listing",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.DeliveredTurnTests.test_deleting_the_conversation_deletes_its_state",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.RevocationTests.test_a_revoked_paper_keeps_its_position_but_resolves_to_nothing",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.RevocationTests.test_another_readers_snapshot_reveals_nothing_they_cannot_read",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.RevocationTests.test_a_changed_source_version_is_reported_stale",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.RevocationTests.test_history_and_recall_drop_a_turn_whose_source_was_revoked",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.ReconstructionTests.test_history_before_state_existed_is_rebuilt_without_being_written",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.ReconstructionTests.test_ambiguous_old_history_stays_unresolved",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.ReconstructionTests.test_the_first_new_turn_builds_on_the_reconstruction",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.RevisionTests.test_a_stale_revision_does_not_overwrite_newer_state",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.RevisionTests.test_a_fenced_attempt_leaves_the_state_untouched",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.HandleTests.test_handles_are_reissued_per_run_and_never_for_revoked_papers",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.ContextAssemblyTests.test_context_names_the_request_and_bounds_older_turns",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.ContextAssemblyTests.test_a_revoked_dependency_removes_the_older_summary",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.HttpTests.test_each_answered_question_advances_one_revision",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.HttpTests.test_a_revoked_turn_never_reaches_the_answering_prompt",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_processes.test_superseded_process_cannot_admit_append_finish_or_write_a_turn",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_processes.test_cancel_in_another_process_fences_new_paid_calls_and_all_writes",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_processes.test_crash_redelivery_and_duplicate_delivery_commit_exactly_one_final_turn",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_processes.test_real_controller_crash_retains_shared_spend_and_rebuilds_evidence",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_durable_processes.test_concurrent_independent_workers_do_not_overwrite_conversation_revision",
+          "status": "measured",
+          "passed": true
+        },
+        {
+          "name": "apps.ai.tests.test_conversation_state.ConcurrencyTests.test_two_simultaneous_completions_cannot_both_apply_stale_state",
+          "status": "measured",
+          "passed": true
+        }
+      ],
+      "reason": null
+    },
+    "browser": {
+      "status": "not_measured",
+      "passed": false,
+      "kind": "manual_browser",
+      "reason": "browser_exercise_not_supplied"
+    }
+  },
+  "enablement_blocked": true
+}

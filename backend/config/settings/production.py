@@ -14,10 +14,14 @@ from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401,F403
 from .base import csv_list, required
-from .validation import production_problems
+from .validation import production_problems, recovery_transport_problems
 
 DEBUG = False
 
+# TLS ends in a proxy in front of nginx, so Django only ever sees plain HTTP and
+# would redirect every request to HTTPS, forever, without this (IR-662). nginx
+# sets the header on every proxied request; see frontend/nginx.conf.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = True
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True
@@ -35,6 +39,14 @@ ALLOWED_HOSTS = required("ALLOWED_HOSTS", cast=csv_list)
 # localhost entry in a production allowlist.
 CORS_ALLOWED_ORIGINS = required("CORS_ALLOWED_ORIGINS", cast=csv_list)
 
+# How many proxies a client passes through is a per-deployment fact too. Wrong,
+# the sign-in lockout counts the wrong address (IR-656), so nothing guesses it.
+TRUSTED_PROXY_COUNT = required("TRUSTED_PROXY_COUNT", cast=int)
+if TRUSTED_PROXY_COUNT < 1:
+    raise ImproperlyConfigured(
+        "TRUSTED_PROXY_COUNT must be at least 1: production always runs behind nginx."
+    )
+
 # ---- Startup checks ------------------------------------------------------
 
 _problems = production_problems(
@@ -44,6 +56,10 @@ _problems = production_problems(
     # Absent is the point — `globals()` rather than a reference, so this reads
     # False when no settings module defines it and stays honest if one does.
     cors_allow_all_origins=globals().get("CORS_ALLOW_ALL_ORIGINS", False),
+) + recovery_transport_problems(
+    frontend_url=FRONTEND_URL,  # noqa: F405
+    email_host=EMAIL_HOST, email_user=EMAIL_HOST_USER,  # noqa: F405
+    email_password=EMAIL_HOST_PASSWORD, sender=DEFAULT_FROM_EMAIL,  # noqa: F405
 )
 
 if _problems:

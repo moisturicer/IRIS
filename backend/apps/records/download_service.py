@@ -1,10 +1,336 @@
-"""Resolve record files for approved download requests."""
+"""Decide download requests, say who may download, and resolve record files."""
 import re
+from dataclasses import dataclass
+from datetime import timedelta
 from pathlib import Path
 
-from django.http import FileResponse
+from django.conf import settings
+from django.db import transaction
+from django.utils import timezone
 
+from apps.audit.models import AuditEvent
+from apps.audit.services import create_audit_event
 from apps.documents.models import RecordUpload
+from apps.notifications.services import notify_download_reviewed, notify_download_revoked
+from core.enums import RequestStatus
+from core.permissions import is_record_owner, is_record_participant, office_parties_of
+
+from .models import DOWNLOAD_NOTE_MAX_LENGTH as NOTE_MAX_LENGTH
+from .models import DownloadRequest
+from .watermark import CopyIdentity
+
+
+class OwnDownloadRequest(Exception):
+    """RDCO may not decide a request they made themselves."""
+
+
+class DownloadRequestAlreadyDecided(Exception):
+    """Only a pending request can be decided or cancelled."""
+
+
+class GrantNotLive(Exception):
+    """Only an approved, unexpired grant can be revoked."""
+
+
+class NoteRequired(Exception):
+    """A decline or a revocation says why (ADR-048, decision 4)."""
+
+
+def _clean_note(note) -> str:
+    # It arrives straight from the request body, so it may be any JSON value.
+    note = note.strip() if isinstance(note, str) else ""
+    if not note:
+        raise NoteRequired("Say why, in a note the reader will see.")
+    if len(note) > NOTE_MAX_LENGTH:
+        raise NoteRequired(f"Keep the note to {NOTE_MAX_LENGTH} characters.")
+    return note
+
+
+def decide_download_request(download_request, reviewer, *, approved: bool, note: str = "") -> None:
+    """
+    Record RDCO's decision and tell the requester (IR-674). Every route that
+    decides a request comes through here, so its rules cannot drift apart. The
+    row lock makes two simultaneous decisions one decision and one refusal.
+    A decline needs a note and an approval takes none (IR-688).
+    """
+    note = "" if approved else _clean_note(note)
+    with transaction.atomic():
+        current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
+        if current.requested_by_id == reviewer.pk:
+            raise OwnDownloadRequest("You cannot decide your own download request.")
+        if current.status != RequestStatus.PENDING:
+            raise DownloadRequestAlreadyDecided("This request has already been reviewed.")
+        download_request.status = RequestStatus.APPROVED if approved else RequestStatus.DECLINED
+        download_request.reviewed_by = reviewer
+        download_request.reviewed_at = timezone.now()
+        download_request.rdco_note = note
+        if approved:
+            download_request.grant_expires_at = (
+                download_request.reviewed_at + timedelta(days=settings.DOWNLOAD_GRANT_DAYS)
+            )
+        download_request.save(
+            update_fields=["status", "reviewed_by", "reviewed_at", "grant_expires_at", "rdco_note"],
+        )
+    notify_download_reviewed(download_request, reviewed_by=reviewer, approved=approved)
+
+
+def cancel_download_request(download_request, user) -> None:
+    """
+    The requester withdraws a pending request (IR-688). It leaves RDCO's queue
+    and the reader may ask again. Nobody is notified; the act is audited.
+    The caller has already narrowed the lookup to the user's own requests.
+    """
+    with transaction.atomic():
+        current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
+        if current.requested_by_id != user.pk:
+            raise OwnDownloadRequest("You can cancel only your own download request.")
+        if current.status != RequestStatus.PENDING:
+            raise DownloadRequestAlreadyDecided("Only a pending request can be cancelled.")
+        download_request.status = RequestStatus.CANCELLED
+        download_request.cancelled_at = timezone.now()
+        download_request.save(update_fields=["status", "cancelled_at"])
+        create_audit_event(
+            AuditEvent.DOWNLOAD_REQUEST_CANCELLED, user, record=download_request.record,
+            metadata={"request": download_request.pk},
+        )
+
+
+def revoke_download_grant(download_request, reviewer, *, note: str) -> None:
+    """
+    RDCO ends a live grant early, saying why (IR-688). The reader can no longer
+    download, is told in-app and by email, and may ask again.
+    """
+    note = _clean_note(note)
+    with transaction.atomic():
+        current = DownloadRequest.objects.select_for_update().get(pk=download_request.pk)
+        if current.requested_by_id == reviewer.pk:
+            raise OwnDownloadRequest("You cannot revoke your own download access.")
+        if not grant_is_live(current):
+            raise GrantNotLive("Only an approved, unexpired grant can be revoked.")
+        download_request.status = RequestStatus.REVOKED
+        download_request.revoked_by = reviewer
+        download_request.revoked_at = timezone.now()
+        download_request.rdco_note = note
+        download_request.save(update_fields=["status", "revoked_by", "revoked_at", "rdco_note"])
+        create_audit_event(
+            AuditEvent.DOWNLOAD_GRANT_REVOKED, reviewer, record=download_request.record,
+            metadata={"request": download_request.pk, "requested_by": download_request.requested_by_id},
+        )
+    notify_download_revoked(download_request, revoked_by=reviewer)
+
+
+def grant_is_live(download_request) -> bool:
+    """An approved, unrevoked request whose grant has not expired."""
+    expires = download_request.grant_expires_at
+    return (
+        download_request.status == RequestStatus.APPROVED
+        and expires is not None
+        and expires > timezone.now()
+    )
+
+
+def download_exemption(user, record) -> str | None:
+    """Why `user` needs no request to download `record`, or None (ADR-048, decision 2)."""
+    if is_record_owner(user, record):
+        return "record_owner"
+    if record.adviser_id == user.pk:
+        return "record_adviser"
+    if office_parties_of(user):
+        return "office_staff"
+    if is_record_participant(user, record):
+        return "assigned_reviewer"
+    return None
+
+
+@dataclass(frozen=True)
+class DownloadAccess:
+    """May this reader download this record, and on what basis or why not?"""
+
+    allowed: bool
+    source: str = ""  # "exempt" or "grant", when allowed
+    exemption: str | None = None
+    request: DownloadRequest | None = None
+    refusal: str = ""  # A key of DOWNLOAD_REFUSALS, when not allowed
+
+
+#: Each refusal's `code` in the 403, and what the reader is told.
+DOWNLOAD_REFUSALS = {
+    "request_needed": "Request a download of this paper to save a copy.",
+    "request_pending": "Your download request is waiting for RDCO's decision.",
+    "request_declined": "Your download request was declined. You may request again.",
+    "request_revoked": "Your download access was revoked. You may request again.",
+    "grant_expired": "Your download access has expired. You may request again.",
+}
+
+_REFUSAL_BY_STATUS = {
+    RequestStatus.DECLINED: "request_declined",
+    RequestStatus.REVOKED: "request_revoked",
+    RequestStatus.APPROVED: "grant_expired",
+}
+
+
+def download_access(user, record) -> DownloadAccess:
+    """
+    The one answer to "may this reader save a copy?" (ADR-048).
+
+    The reader's newest decided request is the one that counts, so revoking it
+    is not undone by an older approval. A pending request does not end a live
+    grant, and is what the reader hears about when no grant is live.
+    """
+    exemption = download_exemption(user, record)
+    if exemption:
+        return DownloadAccess(allowed=True, source="exempt", exemption=exemption)
+
+    # A cancelled request was withdrawn before anyone decided it: as if never made.
+    requests = list(
+        DownloadRequest.objects.filter(record=record, requested_by=user)
+        .exclude(status=RequestStatus.CANCELLED)
+        .order_by("-created_at", "-pk")
+    )
+    decided = next((r for r in requests if r.status != RequestStatus.PENDING), None)
+    if decided and grant_is_live(decided):
+        return DownloadAccess(allowed=True, source="grant", request=decided)
+    pending = next((r for r in requests if r.status == RequestStatus.PENDING), None)
+    if pending:
+        return DownloadAccess(allowed=False, refusal="request_pending", request=pending)
+    if decided is None:
+        return DownloadAccess(allowed=False, refusal="request_needed")
+    return DownloadAccess(allowed=False, refusal=_REFUSAL_BY_STATUS[decided.status], request=decided)
+
+
+#: The paper page's state for each refusal (IR-677).
+_STATE_BY_REFUSAL = {
+    "request_needed": "none",
+    "request_pending": RequestStatus.PENDING.value,
+    "request_declined": RequestStatus.DECLINED.value,
+    "request_revoked": RequestStatus.REVOKED.value,
+    "grant_expired": "expired",
+}
+
+#: What an allowed reader is told, by `DownloadAccess.source`.
+DOWNLOAD_ALLOWANCES = {
+    "exempt": "You may download a copy of this paper. It will carry your name.",
+    "grant": "RDCO approved your download request. Each copy will carry your name.",
+}
+
+
+def download_state(user, record) -> dict:
+    """
+    `download_access` for the paper page (IR-677): which control to show and
+    the server's words for it, so the browser never decides access itself.
+    Only the viewer's own request is ever named.
+    """
+    access = download_access(user, record)
+    if access.allowed:
+        state = "exempt" if access.source == "exempt" else "granted"
+        message = DOWNLOAD_ALLOWANCES[access.source]
+    else:
+        state = _STATE_BY_REFUSAL[access.refusal]
+        message = DOWNLOAD_REFUSALS[access.refusal]
+    granted = state == "granted"
+    ended_by_rdco = state in (RequestStatus.DECLINED.value, RequestStatus.REVOKED.value)
+    return {
+        "state": state,
+        "allowed": access.allowed,
+        "message": message,
+        "grant_expires_at": access.request.grant_expires_at if granted else None,
+        "request": access.request.pk if access.request else None,
+        # Why RDCO declined or revoked it (IR-688); "" on a decline made before
+        # notes existed, which the page shows as "No note recorded".
+        "rdco_note": access.request.rdco_note if ended_by_rdco else "",
+    }
+
+
+def reader_request_rows(user) -> list[dict]:
+    """
+    The reader's own download requests for My Library (IR-743), newest first,
+    each with its state and what the reader may do about it -- worked out here
+    so the browser never decides access itself. Cancelled requests are left
+    out (withdrawn, as if never made), and so is any request on a record the
+    reader can no longer read: the one visibility predicate (IR-153).
+
+    Which request counts comes from `download_access`, the same answer the
+    paper page gives, so the two screens cannot disagree. The counted request
+    carries the paper page's state and its action; every other row is history.
+    A pending request may always be withdrawn.
+    """
+    from .models import Record
+
+    requests = list(
+        DownloadRequest.objects.filter(requested_by=user, record__in=Record.objects.visible_to(user))
+        .exclude(status=RequestStatus.CANCELLED)
+        .select_related("record")
+        .order_by("-created_at", "-pk")
+    )
+    access_by_record = {}
+    for request in requests:
+        if request.record_id not in access_by_record:
+            access_by_record[request.record_id] = download_access(user, request.record)
+
+    rows = []
+    for request in requests:
+        access = access_by_record[request.record_id]
+        counted = access.request is not None and access.request.pk == request.pk
+        state = _counted_state(access) if counted else _history_state(request)
+        if request.status == RequestStatus.PENDING:
+            actions = ["cancel"]
+        elif counted:
+            actions = _READER_ACTIONS[state]
+        else:
+            actions = []
+        rows.append({
+            "id": request.pk,
+            "record": request.record_id,
+            "record_title": request.record.title,
+            "note": request.note,
+            "created_at": request.created_at,
+            "state": state,
+            "grant_expires_at": request.grant_expires_at if state == _GRANTED else None,
+            "rdco_note": request.rdco_note if state in _ENDED_BY_RDCO else "",
+            "actions": actions,
+        })
+    return rows
+
+
+_GRANTED = "granted"
+_EXPIRED = "expired"
+_ENDED_BY_RDCO = (RequestStatus.DECLINED.value, RequestStatus.REVOKED.value)
+
+
+def _counted_state(access: DownloadAccess) -> str:
+    """The paper page's state for the request `download_access` counts."""
+    if access.allowed:
+        return _GRANTED  # a counted request is only ever allowed as a grant
+    return _STATE_BY_REFUSAL[access.refusal]
+
+
+def _history_state(request) -> str:
+    """
+    A request that no longer decides access. A superseded approval reads as
+    expired even before its date: a newer decision ended it.
+    """
+    if request.status == RequestStatus.APPROVED:
+        return _EXPIRED
+    return request.status  # pending, declined or revoked
+
+
+_READER_ACTIONS = {
+    RequestStatus.PENDING.value: ["cancel"],
+    _GRANTED: ["download"],
+    RequestStatus.DECLINED.value: ["request_again"],
+    RequestStatus.REVOKED.value: ["request_again"],
+    _EXPIRED: ["request_again"],
+}
+
+
+def copy_identity(user, access: DownloadAccess) -> CopyIdentity:
+    """What a copy made under `access` says about who it was made for (IR-676)."""
+    return CopyIdentity(
+        name=user.get_full_name(),
+        email=user.email,
+        date=timezone.localdate().isoformat(),
+        basis=f"request #{access.request.pk}" if access.request else access.exemption.replace("_", " "),
+    )
 
 
 def manuscript_download_name(record, stored_name: str, *, version=None) -> str:
@@ -36,8 +362,8 @@ def has_record_download_file(record) -> bool:
 
 def resolve_record_download_file(record):
     """
-    Pick the best available PDF for download.
-    Watermarking is not applied here — see download_service TODO when SRS requires it.
+    Pick the best available PDF for download. It comes back unmarked: the
+    download route is what marks a copy that leaves IRIS (`watermark.py`).
     """
     if record.abstract_file:
         return record.abstract_file.open("rb"), _manuscript_download_name(record)
@@ -66,10 +392,3 @@ def resolve_served_manuscript(record, user):
     if served and served.name != (record.abstract_file.name or None):
         return served.open("rb"), manuscript_download_name(record, served.name)
     return resolve_record_download_file(record)
-
-
-def file_response_for_record(record) -> FileResponse | None:
-    handle, filename = resolve_record_download_file(record)
-    if not handle:
-        return None
-    return FileResponse(handle, as_attachment=True, filename=filename)

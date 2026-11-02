@@ -21,7 +21,6 @@ from apps.reviews.models import (
     RecordClearance,
     Review,
     ReviewerSeat,
-    RoutingEvent,
 )
 from core.enums import (
     AssignmentState,
@@ -34,7 +33,6 @@ from core.enums import (
     SeatSource,
     SeatState,
     TrackerPartyState,
-    WorkflowState,
 )
 
 from .test_routing import RoutingTestBase
@@ -235,36 +233,18 @@ class FindingTests(OfficeReviewTestBase):
 
 # --- AC: hand-back ---------------------------------------------------------------------------
 
-class HandBackTests(OfficeReviewTestBase):
+class OfficeCompletionNotifiesRdcoTests(OfficeReviewTestBase):
 
-    def test_rdco_opens_only_once_both_offices_have_completed(self):
+    def test_rdco_holds_the_record_before_and_after_both_offices_complete(self):
         record = self.routed(Party.ITSO, Party.IERC)
-        self.opened_seat(record, Party.ITSO, self.itso)
-        self.opened_seat(record, Party.IERC, self.ierc)
-
-        self.cleared(record, self.itso)
-        self.assertFalse(self.rdco_assignments(record).exists())
-
-        with self.captureOnCommitCallbacks(execute=True):
-            response = self.cleared(record, self.ierc)
-
         rdco = self.rdco_assignments(record).get()
-        self.assertEqual(rdco.state, AssignmentState.ACTIVE)
-        self.assertFalse(rdco.seats.exists(), "RDCO's assignment is a pool")
-        self.assertIsNone(rdco.opened_by)
-        self.assertEqual(response.data["workflow_state"], WorkflowState.FINAL_REVIEW)
-
-        # Nobody routed it: one movement with no actor, from IERC to RDCO.
-        event = RoutingEvent.objects.get(record=record, to_party=Party.RDCO)
-        self.assertEqual((event.actor, event.from_party), (None, Party.IERC))
-
-        # RDCO's members hear it as a pool broadcast; the owners hear it too.
-        self.assertTrue(Notification.objects.filter(
-            record=record, broadcast_to_role__name=RoleName.RDCO,
-        ).exists())
-        self.assertTrue(Notification.objects.filter(
-            record=record, recipient=self.owner, message__contains="RDCO",
-        ).exists())
+        for party, reviewer in ((Party.ITSO, self.itso), (Party.IERC, self.ierc)):
+            self.opened_seat(record, party, reviewer)
+            with self.captureOnCommitCallbacks(execute=True):
+                self.cleared(record, reviewer)
+            self.assertEqual(self.rdco_assignments(record).get().pk, rdco.pk)
+            self.assertTrue(Notification.objects.filter(record=record, recipient=self.rdco,
+                message__contains=f"{party.upper()} finished").exists())
 
     def test_the_owners_hear_each_office_finish_and_no_single_verdict(self):
         record = self.routed(Party.IERC)
@@ -286,24 +266,38 @@ class HandBackTests(OfficeReviewTestBase):
 
 # --- AC: no early or spurious hand-back ----------------------------------------------------
 
-class NoSpuriousHandBackTests(OfficeReviewTestBase):
+class RdcoAssignmentLifetimeTests(OfficeReviewTestBase):
 
-    def test_no_rdco_while_any_specialist_is_still_active(self):
+    def test_rdco_remains_active_while_a_specialist_is_still_active(self):
         record = self.routed(Party.ITSO, Party.IERC, Party.KTTO)
         for party, user in ((Party.ITSO, self.itso), (Party.IERC, self.ierc)):
             self.opened_seat(record, party, user)
             self.cleared(record, user)
 
-        self.assertEqual(self.active(record), {Party.KTTO})
-        self.assertFalse(self.rdco_assignments(record).exists())
+        self.assertEqual(self.active(record), {Party.RDCO, Party.KTTO})
+        self.assertTrue(self.rdco_assignments(record).exists())
 
-    def test_no_rdco_on_a_record_no_office_was_routed_to(self):
+    def test_rdco_is_awaited_while_the_adviser_holds_a_thesis(self):
+        """Only RDCO publishes one (ADR-047 §5), so it is never "not required" in review."""
         record = self.new_model()
 
         self.assertFalse(self.rdco_assignments(record).exists())
         row = self.rows(self.tracker(record))[Party.RDCO]
+        self.assertEqual(row["state"], TrackerPartyState.AWAITING)
+
+    def test_rdco_is_not_required_once_the_adviser_rejects(self):
+        record = self.new_model()
+        seats.open_review(self.assignment(record, Party.ADVISER).seats.get(), self.adviser)
+        self.client.force_authenticate(self.adviser)
+        token = self.client.get(reverse("record-detail", args=[record.pk])).data["decision"]["token"]
+        response = self.post(
+            reverse("record-decide", args=[record.pk]), self.adviser,
+            {"outcome": "reject", "comment": "Out of scope.", "token": token},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+
+        row = self.rows(self.tracker(record))[Party.RDCO]
         self.assertEqual(row["state"], TrackerPartyState.NOT_REQUIRED)
-        self.assertEqual(row["state_label"], "Not required")
 
     def test_never_on_a_proposal(self):
         """
@@ -329,10 +323,10 @@ class NoSpuriousHandBackTests(OfficeReviewTestBase):
         self.opened_seat(record, Party.ITSO, self.itso)
         self.cleared(record, self.itso)
         rdco = self.rdco_assignments(record).get()
-        seats.claim(rdco, self.rdco)
+        rdco.seats.get(reviewer=self.rdco)
 
         # RDCO sends it back to ITSO for another look, naming a reviewer.
-        response = self.route(record, self.rdco, [{"party": Party.ITSO, "nominee": self.itso2.pk}])
+        response = self.route(record, self.rdco, [{"party": Party.ITSO, "nominees": [self.itso2.pk]}])
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         seat = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.itso2)
         seats.open_review(seat, self.itso2)
@@ -441,8 +435,8 @@ class LatestRoundWinsTests(OfficeReviewTestBase):
 
     def route_back_to_itso(self, record):
         rdco = self.rdco_assignments(record).get()
-        seats.claim(rdco, self.rdco)
-        response = self.route(record, self.rdco, [{"party": Party.ITSO, "nominee": self.itso2.pk}])
+        rdco.seats.get(reviewer=self.rdco)
+        response = self.route(record, self.rdco, [{"party": Party.ITSO, "nominees": [self.itso2.pk]}])
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         seat = ReviewerSeat.objects.get(assignment__record=record, reviewer=self.itso2)
         seats.open_review(seat, self.itso2)
@@ -502,7 +496,7 @@ class WithdrawalTests(OfficeReviewTestBase):
 
         self.assertEqual(self.assignment(record, Party.ITSO).state, AssignmentState.ACTIVE)
         self.assertEqual(self.clearance(record, Party.ITSO), ClearanceStatus.PENDING)
-        self.assertFalse(self.rdco_assignments(record).exists())
+        self.assertTrue(self.rdco_assignments(record).exists())
         self.assertTrue(self.rows(self.tracker(record))[Party.ITSO]["in_pool"])
 
 
@@ -510,10 +504,10 @@ class WithdrawalTests(OfficeReviewTestBase):
 
 class StripTests(OfficeReviewTestBase):
 
-    def test_rdco_reads_waiting_once_an_office_holds_the_record(self):
+    def test_rdco_reads_active_while_an_office_holds_the_record(self):
         record = self.routed(Party.ITSO)
         row = self.rows(self.tracker(record))[Party.RDCO]
-        self.assertEqual(row["state"], TrackerPartyState.AWAITING)
+        self.assertEqual(row["state"], TrackerPartyState.ACTIVE)
 
     def test_a_pool_is_marked_and_a_seated_office_is_not(self):
         record = self.routed(Party.ITSO, Party.IERC)
@@ -532,8 +526,8 @@ class StripTests(OfficeReviewTestBase):
             self.assertEqual(len(seats_row), 1, participant.email)
             self.assertEqual(seats_row[0]["state"], SeatState.IN_REVIEW)
 
-        # RDCO staff can see the record but have taken no part in its review.
-        row = self.rows(self.tracker(record, self.rdco))[Party.ITSO]
+        # A KTTO member whose office is uninvolved sees no private review content.
+        row = self.rows(self.tracker(record, self.ktto))[Party.ITSO]
         self.assertIsNone(row["seats"])
 
 

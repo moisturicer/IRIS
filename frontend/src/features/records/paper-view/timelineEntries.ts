@@ -143,13 +143,15 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       // The owner, who is not a party: no party is named.
       actor: first.resolved_by,
       party: null,
-      act: first.state_label,
+      act: first.withdrawn_by_decision ?? first.state_label,
       status: null,
       note: null,
       details: [
         first.state === "resubmitted"
           ? `Answers ${requests} for changes from ${from}`
-          : `Closes ${requests} for changes from ${from}, unanswered`,
+          : first.withdrawn_by_decision
+            ? `Withdraws ${requests} for changes from ${from}; superseded by the Decision`
+            : `Closes ${requests} for changes from ${from}, unanswered`,
       ],
       version: null,
     });

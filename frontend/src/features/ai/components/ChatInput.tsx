@@ -69,11 +69,6 @@ export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraft
           <i className="fas fa-arrow-up text-[15px]" aria-hidden />
         </button>
       </div>
-      {/* Keyboard hints mean nothing on a touch screen, where the line would
-          only push the composer up under the software keyboard (IR-570). */}
-      <p className={`text-[12px] text-stone-400 text-center mt-2 [@media(pointer:coarse)]:hidden ${CHAT_COLUMN}`}>
-        Enter to send · Shift+Enter for new line
-      </p>
       <AskIrisNotice className={`text-center mt-1.5 ${CHAT_COLUMN}`} />
     </form>
   );

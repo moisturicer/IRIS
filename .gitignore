@@ -39,6 +39,8 @@ staticfiles/
 
 # ── Node / React ──────────────────────────────────────────────────────────
 node_modules/
+# frontend/scripts/benchmark-reader.mjs's scratch; it removes its own on exit (IR-565)
+.reader-benchmark-*/
 dist/
 dist-ssr/
 *.local
@@ -98,3 +100,11 @@ docker-compose.override.yml
 .impeccable/mocks/
 .impeccable/questions/
 .impeccable/config.local.json
+
+# IR-631 core-journey harness: generated per-run secrets and Playwright output
+e2e/node_modules/
+e2e/.env.e2e
+e2e/.env.e2e.local
+e2e/test-results/
+e2e/playwright-report/
+e2e/.auth/

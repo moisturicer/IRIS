@@ -1,6 +1,8 @@
 /**
  * Shown to a signed-in user who has no role yet. Replaces the app shell: no
- * sidebar, no navigation, only the shared entry frame (IR-537).
+ * sidebar, no navigation, only the Dossier entry frame (IR-537, IR-710), under
+ * an "Account status" tab, with no lede and no masthead cross-link: the reader
+ * is already signed in, and Sign out is on the sheet.
  *
  * Every registration creates a role request that RDCO approves or declines,
  * and `role_request` on the user's own payload says which of the two it is
@@ -10,7 +12,7 @@
 import { useId } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { authApi } from "@/api/auth";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { Button } from "@/components/ui/Button";
 import type { OwnRoleRequest } from "@/types/auth";
 
@@ -28,20 +30,20 @@ function standingOf(request: OwnRoleRequest | null | undefined, email: string): 
   if (request?.status === "pending") {
     return {
       title: "Waiting for approval",
-      message: `RDCO is reviewing your request to join as ${withArticle(request.requested_role)}. You'll get an email at ${email} when they decide.`,
+      message: `An administrator is reviewing your request to join as ${withArticle(request.requested_role)}. You'll get an email at ${email} when they decide.`,
     };
   }
   if (request?.status === "declined") {
     return {
       title: "Request not approved",
-      message: `Your request to join as ${withArticle(request.requested_role)} was not approved. Contact RDCO or your department administrator if you think this is a mistake.`,
+      message: `Your request to join as ${withArticle(request.requested_role)} was not approved. Contact an administrator if you think this is a mistake.`,
     };
   }
   // No request: registered without a role, or approved and the role later
   // taken away. Neither "reviewing" nor "declined" would be true.
   return {
     title: "No role assigned",
-    message: "Your account doesn't have a role yet, so there is nothing for IRIS to open. Contact RDCO or your department administrator to have one assigned.",
+    message: "Your account doesn't have a role yet, so there is nothing for IRIS to open. Contact an administrator to have one assigned.",
   };
 }
 
@@ -65,7 +67,7 @@ export function PendingApprovalPage() {
   const { title, message } = standingOf(request, user.email);
 
   return (
-    <AuthLayout variant={request?.status === "declined" ? "declined" : "pending"}>
+    <EntryFrame tabs={<EntryTab>Account status</EntryTab>}>
       <h2 className="text-balance font-display text-display font-semibold text-stone-900">{title}</h2>
       <p className="mt-3 text-pretty text-body text-stone-700">{message}</p>
 
@@ -103,6 +105,6 @@ export function PendingApprovalPage() {
           </p>
         )}
       </div>
-    </AuthLayout>
+    </EntryFrame>
   );
 }

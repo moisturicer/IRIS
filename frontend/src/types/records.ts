@@ -204,7 +204,7 @@ export type Capability =
   | "request_revision"
   | "withdraw_revision"
   | "route"
-  | "accept_route"
+  | "send_to_rdco"
   | "accept_publish"
   | "accept_proposal"
   | "keep_unlisted"
@@ -239,7 +239,58 @@ export interface MetadataSuggestions {
   source:      "pdf_structure";
 }
 
+/** Server-filtered fields: null means withheld or not recorded. */
+export interface PaperPerson {
+  id: number;
+  name: string;
+  role: string;
+  office: string | null;
+  college: string | null;
+  department: string | null;
+  program: string | null;
+  email: string | null;
+}
+
+export interface PaperDueDate {
+  party: Party;
+  label: string;
+  due_at: string | null;
+  original_due_at: string | null;
+  is_overdue: boolean;
+  clock_paused: boolean;
+}
+
+export interface PaperDetails {
+  /** Null when the viewer may not read every owner's registration affiliation. */
+  colleges: string[] | null;
+  programs: string[] | null;
+  author_flags: { office: Party; label: string; hint: string }[];
+  researchers: PaperPerson[];
+  adviser: PaperPerson | null;
+  /** Review content: null means not disclosed, not an empty review. */
+  participants: PaperPerson[] | null;
+  due_dates: PaperDueDate[] | null;
+}
+
+/** Where a paper's embargo stands (ADR-052 §3). A date never moves it: a person does. */
+export type EmbargoState = "unknown" | "none" | "active" | "released";
+
+export interface RecordEmbargo {
+  state: EmbargoState;
+  until: string | null;
+}
+
+/** What `POST /records/<id>/embargo-answer/` takes. */
+export interface EmbargoAnswer {
+  embargoed:       boolean;
+  embargoed_until: string | null;
+}
+
 export interface RecordDetail extends RecordListItem {
+  /** Added in IR-686; absent only when using an older API. */
+  paper_details?: PaperDetails;
+  /** Null for anyone but the owners, the Adviser and office staff (ADR-052 §18). */
+  embargo?: RecordEmbargo | null;
   lineage?: {
     derived_from: { id: number; title: string; record_type_name: string | null } | null;
     continued_as: { id: number; title: string; record_type_name: string | null } | null;
@@ -295,14 +346,24 @@ export interface RecordDetail extends RecordListItem {
    */
   my_seats:             ReviewerSeat[];
   /**
+   * What stands between the viewer and their part of the review, in the
+   * server's words (ADR-032 §10 Amendment, IR-681). Null when the viewer may
+   * not read the review: not disclosed, which is not "nothing to say".
+   */
+  readiness?:           Readiness | null;
+  /** The viewer's own download state; null when signed out, absent on older APIs (IR-677). */
+  download?:            DownloadState | null;
+  /** A server-offered claim from the viewer's office Pool; absent on older APIs. */
+  review_claim?:        { assignment: number; label: string; party_label: string } | null;
+  /**
    * ADR-032's `is_record_participant`: an owner, or anyone who has ever held
    * a seat here -- so a reviewer whose part is done keeps Review and Files.
    */
   is_participant:       boolean;
   /**
-   * What the action bar may offer for routing (ADR-032 §4, IR-261): *Accept &
-   * route…* for the record's Adviser, and the office party *Route to office…*
-   * acts as for a seat holder. A rendering hint; the endpoints re-check it.
+   * What the action bar may offer for routing (ADR-047 §1–§3): *Accept & send
+   * to RDCO…* for the record's Adviser, and *Request review…* for an office
+   * seat holder. A rendering hint; the endpoints re-check it.
    */
   routing:              RoutingFlags;
   /**
@@ -320,7 +381,7 @@ export interface RecordDetail extends RecordListItem {
   revision:             RevisionFlags;
   /**
    * Decisions (IR-270): what the viewer may decide this record as -- the
-   * Adviser's *Accept & publish* or *Reject*, RDCO's three -- why not yet,
+   * Adviser's *Reject*, a Proposal Adviser's two, RDCO's three -- why not yet,
    * what deciding would close, and the token `decide/` checks so a stale
    * dialog never decides into a changed record. A rendering hint; the
    * endpoint re-checks it.
@@ -371,7 +432,7 @@ export interface DecisionFlags {
   closes:       DecisionCloses | null;
   /** Echoed to `decide/`: a record that moved since is refused with a 409. */
   token:        string | null;
-  /** The author's flags, for the Adviser's *Publish without specialist review?* */
+  /** The author's flags, shown in the Adviser's *Accept & send to RDCO* dialog. */
   author_hints: string[];
 }
 
@@ -380,6 +441,8 @@ export interface DecisionCloses {
   assignments:       { party: Party; label: string; holders: string[] }[];
   /** How many open document requests it would withdraw. */
   document_requests: number;
+  revision_requests?: { id: number; party: Party; label: string; reason: string }[];
+  findings?: { party: Party; label: string; comment: string }[];
 }
 
 export interface OfficeReviewFlags {
@@ -446,8 +509,14 @@ export interface AddReviewerOptions {
 }
 
 export interface RoutingFlags {
-  accept_and_route: boolean;
+  send_to_rdco: boolean;
   route_as:         Party | null;
+  /**
+   * Where onward *Route* may send this record, as the server's party graph
+   * has it (IR-685): *Request review* lists exactly these. Empty when the
+   * viewer cannot route.
+   */
+  targets:          { party: Party; label: string }[];
 }
 
 /** One office the routing dialog offers (`GET /records/<id>/route-options/`). */
@@ -465,14 +534,16 @@ export interface RouteTarget {
 export interface RouteOptions {
   from_party: Party;
   from_label: string;
-  /** True for the Adviser's *Accept & route*, false for onward routing. */
+  /** True for the Adviser's *Accept & send to RDCO*, false for onward routing. */
   accept:     boolean;
   targets:    RouteTarget[];
+  suggested_offices?: string[];
 }
 
-/** A routing request: one reason for the decision, at most one nominee per office. */
+/** A routing request: one reason for the decision, zero or several nominees per office. */
 export interface RouteRequest {
-  to:     { party: Party; nominee?: number }[];
+  to:     { party: Party; nominees?: number[] }[];
+  suggested_offices?: string[];
   reason: string;
 }
 
@@ -487,6 +558,27 @@ export type SeatSource = "entry" | "claimed" | "assigned" | "nominated" | "added
 export const OPEN_SEAT_STATES: readonly SeatState[] = ["assigned", "in_review"];
 
 /** One person reviewing a record for a party. Every seat endpoint answers with this. */
+export type ReadinessVerdict = "ready" | "blocked" | "waiting_on_you" | "none";
+
+/** One fact in Readiness. The browser renders `label` and never words its own. */
+export interface ReadinessItem {
+  kind:       string;
+  severity:   "blocker" | "info";
+  label:      string;
+  party:      string | null;
+  actor_name: string | null;
+  since:      string | null;
+  /** Due dates only; null on every other item. */
+  paused:     boolean | null;
+  action:     { kind: string; target: string | null } | null;
+}
+
+export interface Readiness {
+  verdict:  ReadinessVerdict;
+  headline: string;
+  items:    ReadinessItem[];
+}
+
 export interface ReviewerSeat {
   id:            number;
   assignment:    number;
@@ -497,6 +589,8 @@ export interface ReviewerSeat {
   reviewer_name: string | null;
   state:         SeatState;
   state_label:   string;
+  /** The viewer's own recorded verdict in the server's words; on my_seats. */
+  verdict_label?: string | null;
   source:        SeatSource;
   assigned_by:   number | null;
   assigned_at:   string | null;
@@ -661,6 +755,8 @@ export interface AssignmentExtension {
 }
 
 export interface TrackerSeat {
+  /** Stable identity for a server-projected profile card (IR-686). */
+  reviewer?: number | null;
   reviewer_name: string | null;
   state:         SeatState;
   state_label:   string;
@@ -683,6 +779,7 @@ export interface TrackerRoutingGroup {
 }
 
 export interface TrackerResubmission {
+  withdrawn_by_decision?: string | null;
   id:           number;
   party:        Party;
   label:        string;
@@ -808,6 +905,27 @@ export interface RecordType {
   name: string;
 }
 
+/**
+ * Where the viewer's own download of a record stands (IR-677, ADR-048), in
+ * the server's words. The page picks its control from `state` and never
+ * decides access itself; the download route re-checks everything.
+ */
+export interface DownloadState {
+  state:            "exempt" | "granted" | "none" | "pending" | "declined" | "revoked" | "expired";
+  allowed:          boolean;
+  /** Server-authored sentence explaining the state. */
+  message:          string;
+  /** When a live grant ends; null unless `state` is "granted". */
+  grant_expires_at: string | null;
+  /** The viewer's own request this state comes from, if any. */
+  request:          number | null;
+  /**
+   * RDCO's note when `state` is "declined" or "revoked" (IR-688); "" otherwise,
+   * and on a decline made before notes existed ("No note recorded").
+   */
+  rdco_note?:       string;
+}
+
 export interface DownloadRequest {
   id:                  number;
   record:              number;
@@ -815,10 +933,39 @@ export interface DownloadRequest {
   requested_by:        number;
   requested_by_name:   string | null;
   requested_by_email:  string | null;
-  status:              "pending" | "approved" | "declined";
+  /** Why the reader asks (IR-688). Blank only on requests made before notes. */
+  note:                string;
+  status:              "pending" | "approved" | "declined" | "revoked" | "cancelled";
+  /** RDCO's reason for a decline or a revocation; "" otherwise. */
+  rdco_note:           string;
   reviewed_by:         number | null;
   reviewed_at:         string | null;
+  grant_expires_at:    string | null;
+  /** Approved and unexpired: RDCO may still revoke it. Worked out by the server. */
+  grant_live:          boolean;
+  revoked_at:          string | null;
+  cancelled_at:        string | null;
   created_at:          string;
+}
+
+/**
+ * One of the reader's own download requests, for My Library (IR-743). The
+ * server works out `state` and `actions`, so the browser decides no access.
+ */
+export interface ReaderDownloadRequest {
+  id:               number;
+  record:           number;
+  record_title:     string;
+  /** Why the reader asked. Blank only on requests made before notes. */
+  note:             string;
+  created_at:       string;
+  state:            "pending" | "granted" | "declined" | "revoked" | "expired";
+  /** When a live grant ends; null unless `state` is "granted". */
+  grant_expires_at: string | null;
+  /** RDCO's reason when declined or revoked; "" otherwise, or when none was recorded. */
+  rdco_note:        string;
+  /** What this row offers. Only a record's newest request offers anything. */
+  actions:          ("cancel" | "download" | "request_again")[];
 }
 
 export interface DeleteRequest {

@@ -15,8 +15,8 @@ each call's model-visible envelope:
         --call search_research='{"query": "flooding", "target": "papers"}' \
         --call read_papers='{"records": ["R1-..."], "view": "outline"}'
 
-The disclosure gate in force applies: until IR-250 that withholds all
-content unless IR-317's development bypass is on.
+The disclosure gate applies, so a paper with no embargo answer (ADR-052) is
+withheld.
 """
 
 from __future__ import annotations

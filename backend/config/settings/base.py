@@ -7,7 +7,7 @@ from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
-from .validation import missing_required, non_blank
+from .validation import missing_required, non_blank, recovery_problems
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -79,6 +79,7 @@ LOCAL_APPS = [
     "apps.audit",
     "apps.ai",
     "apps.opportunities",
+    "apps.library",
 ]
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
@@ -87,6 +88,7 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "core.middleware.ContentSecurityPolicyMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -197,6 +199,10 @@ REST_FRAMEWORK = {
         "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
         "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
         "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
+        # Per client address (IR-661). A campus shares one, so these allow a
+        # class signing in together; the lockout still answers per account and address.
+        "auth_login": throttle_rate("API_THROTTLE_LOGIN", "300/hour"),
+        "auth_register": throttle_rate("API_THROTTLE_REGISTER", "60/hour"),
         # A page view reads a cached overview and polls while one is made: a
         # request budget of its own, so browsing never spends Ask IRIS's (IR-569).
         "ai_overview": "600/hour",
@@ -224,9 +230,43 @@ SIMPLE_JWT = {
 # signs itself out on the same figure: frontend/src/lib/activity.ts.
 SESSION_IDLE_TIMEOUT_MINUTES = config("SESSION_IDLE_TIMEOUT_MINUTES", default=30, cast=int)
 
+# ---- Browser security headers (IR-663, ASVS 14.4.3/4/6/7) ----------------
+#
+# Every response Django serves: the API, the admin, and WhiteNoise's static
+# files. The single-page app itself is served by nginx, which sends its own
+# copy from frontend/security-headers.conf. The first three are Django's
+# defaults, set here so a change to them is a visible decision.
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_REFERRER_POLICY = "same-origin"
+# Browsers ignore frame-ancestors in a report-only CSP, so this is what denies
+# framing until the CSP is enforced.
+X_FRAME_OPTIONS = "DENY"
+
+# Django renders no page but the admin, which loads only its own static files.
+# JSON is never rendered, so `default-src 'none'` costs the API nothing.
+CONTENT_SECURITY_POLICY = "; ".join([
+    "default-src 'none'",
+    "script-src 'self'",
+    "style-src 'self'",
+    "img-src 'self' data:",
+    "font-src 'self'",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'none'",
+    "form-action 'self'",
+    "frame-ancestors 'none'",
+])
+# Report-only until the manual walk-through in docs/testing/traceability/
+# (IR-663) shows no violation. Enforcing is a reviewed change to this line,
+# and to frontend/security-headers.conf, never an environment variable.
+CONTENT_SECURITY_POLICY_REPORT_ONLY = True
+
 # ---- CORS ---------------------------------------------------------------
 
 FRONTEND_URL = config("FRONTEND_URL", default="http://localhost:5173")
+
+# How long an approved download request lets its requester download (ADR-048).
+DOWNLOAD_GRANT_DAYS = config("DOWNLOAD_GRANT_DAYS", default=30, cast=int)
 
 # An explicit allowlist, always — there is no "allow all" switch in any
 # settings module, and production.py refuses to start if one reappears.
@@ -247,6 +287,7 @@ CORS_ALLOW_HEADERS = (*default_headers, "x-iris-idle-seconds")
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 EMAIL_HOST = config("EMAIL_HOST", default="smtp.gmail.com")
 EMAIL_PORT = config("EMAIL_PORT", default=587, cast=int)
+EMAIL_TIMEOUT = 30  # Bounded below the recovery worker's 120-second sending lease.
 EMAIL_USE_TLS = config("EMAIL_USE_TLS", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD", default="")
@@ -308,6 +349,15 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.reviews.tasks.send_deadline_notifications",
         "schedule": crontab(minute=0),
     },
+    # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
+    # re-enqueues recovery mail whose broker message was lost, schedules due
+    # retries, expires stale intents and purges terminal records. Its interval
+    # is RECOVERY_DISPATCH_INTERVAL_SECONDS, read where that setting is
+    # defined further down.
+    "recovery-dispatch": {
+        "task": "apps.accounts.recovery.tasks.dispatch_recovery_intents",
+        "schedule": 30.0,
+    },
 }
 
 # ---- Static / Media -----------------------------------------------------
@@ -360,14 +410,19 @@ WORKFLOW_TABLE = {
 LOGGING = {
     "version": 1,
     "disable_existing_loggers": False,
+    "filters": {"recovery_redaction": {"()": "core.logging.RecoveryRedaction"}},
     "formatters": {
         "standard": {"format": "%(asctime)s %(levelname)s %(name)s %(message)s"},
     },
     "handlers": {
-        "console": {"class": "logging.StreamHandler", "formatter": "standard"},
+        "console": {"class": "logging.StreamHandler", "formatter": "standard",
+                    "filters": ["recovery_redaction"]},
     },
     "root": {"handlers": ["console"], "level": "WARNING"},
     "loggers": {
+        "django.request": {"handlers": ["console"], "level": "WARNING", "propagate": False},
+        "django.server": {"handlers": ["console"], "level": "INFO", "propagate": False},
+        "uvicorn.access": {"handlers": ["console"], "level": "INFO", "propagate": False},
         "apps": {
             "handlers": ["console"],
             "level": config("APP_LOG_LEVEL", default="INFO"),
@@ -606,6 +661,33 @@ AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
 AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
 # Added to an attempt's own timeout to make its lease. Not a spending limit.
 AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
+# IR-717 (ADR-049 §6-7): Django-signed research grants, verified inside
+# PostgreSQL. Off by default; when on, every key below is required and
+# Django refuses to start without it. KEYS is kid:base64url-secret pairs
+# (32+ bytes each); ACTIVE_KEY signs, the others only verify while retiring.
+AI_RESEARCH_GRANTS = config("AI_RESEARCH_GRANTS", default=False, cast=bool)
+AI_RESEARCH_GRANT_KEYS = config("AI_RESEARCH_GRANT_KEYS", default="")
+AI_RESEARCH_GRANT_ACTIVE_KEY = config("AI_RESEARCH_GRANT_ACTIVE_KEY", default="")
+AI_RESEARCH_GRANT_AUDIENCE = config("AI_RESEARCH_GRANT_AUDIENCE", default="")
+AI_RESEARCH_GRANT_DEPLOYMENT = config("AI_RESEARCH_GRANT_DEPLOYMENT", default="")
+AI_RESEARCH_GRANT_TTL_SECONDS = config("AI_RESEARCH_GRANT_TTL_SECONDS", default=300, cast=int)
+# Who decides research reads (IR-718): `application` (visible_to) or
+# `database` (row policy over a restricted login). Off until cutover.
+AI_RESEARCH_READ_POLICY = config("AI_RESEARCH_READ_POLICY", default="application")
+AI_RESEARCH_DB_USER = config("AI_RESEARCH_DB_USER", default="")
+AI_RESEARCH_DB_PASSWORD = config("AI_RESEARCH_DB_PASSWORD", default="")
+# The restricted research login, as its own alias (like `admission`).
+if AI_RESEARCH_READ_POLICY == "database":
+    DATABASES["research"] = {
+        **DATABASES["default"],
+        "USER": AI_RESEARCH_DB_USER,
+        "PASSWORD": AI_RESEARCH_DB_PASSWORD,
+        "OPTIONS": {
+            **DATABASES["default"].get("OPTIONS", {}),
+            "connect_timeout": 5,
+            "application_name": "iris-research-read",
+        },
+    }
 AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
 AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
 AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)
@@ -950,24 +1032,6 @@ AI_EVIDENCE_AREA_TERMS = config(
     cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
 )
 
-# ---- The development disclosure bypass (IR-317, ADR-015) -----------------
-#
-# Stands beside ADR-015's disclosure gate — it does not replace it and it
-# encodes no policy. The gate refuses every record because `Record` carries no
-# embargo field (IR-250), so with this off nothing can be indexed and Ask IRIS
-# answers "no readable sources" to every question; turning it on is how the
-# feature is clicked through in a browser while CIT-U decides what an embargo
-# is. Deliberately named for what it is: a rule that merely sounds defensible
-# ("published records are not embargoed") would read as somebody's decision,
-# and this cannot.
-#
-# `apps.ai.policy.bypass` raises `ImproperlyConfigured` at startup when this is
-# set while DEBUG is off, so it takes the service down rather than quietly
-# disabling a control. IR-250 deletes it.
-AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = config(
-    "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", default=False, cast=bool
-)
-
 # ---- Embedding spend (IR-282) -------------------------------------------
 #
 # Indexing is metered per token, and `AI_CHUNK_MAX_TOKENS` counts whitespace
@@ -988,6 +1052,11 @@ AI_EMBEDDING_TOKEN_CEILING = config(
 # papers past voyage-context-4's 32k window (IR-423). 0 disables.
 AI_OVERVIEW_TOKEN_CEILING = config(
     "AI_OVERVIEW_TOKEN_CEILING", default=100_000, cast=int
+)
+# A `generating` overview claim older than this is re-queued on the next read
+# (IR-650): its task was lost. Longer than the task's retries. 0 disables.
+AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS = config(
+    "AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS", default=900, cast=int
 )
 # Full-paper briefs remain off pending acceptance of their proposed ADR.
 # Generation additionally requires enforced shared provider admission.
@@ -1118,14 +1187,83 @@ AI_CHUNK_EXCLUDE_SECTIONS = config(
     cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
 )
 
+# ---- Account recovery (ADR-045 §8, IR-642) --------------------------------
+#
+# The accepted defaults. Changing one is a security review and an updated test,
+# not a tuning knob. Every limit must be a positive whole number and both
+# secrets must be set, or Django refuses to start: a missing limit or key must
+# never quietly switch a protection off. Links are built on FRONTEND_URL only,
+# never on the request's Host.
+RECOVERY_RESET_TTL_SECONDS        = config("RECOVERY_RESET_TTL_SECONDS", default=1800, cast=int)
+RECOVERY_VERIFICATION_TTL_SECONDS = config("RECOVERY_VERIFICATION_TTL_SECONDS", default=86400, cast=int)
+RECOVERY_COOLDOWN_SECONDS         = config("RECOVERY_COOLDOWN_SECONDS", default=60, cast=int)
+RECOVERY_REQUEST_IP_10M           = config("RECOVERY_REQUEST_IP_10M", default=10, cast=int)
+RECOVERY_REQUEST_IP_DAY           = config("RECOVERY_REQUEST_IP_DAY", default=50, cast=int)
+RECOVERY_CONFIRM_IP_10M           = config("RECOVERY_CONFIRM_IP_10M", default=30, cast=int)
+RECOVERY_RECIPIENT_HOUR           = config("RECOVERY_RECIPIENT_HOUR", default=5, cast=int)
+RECOVERY_RECIPIENT_DAY            = config("RECOVERY_RECIPIENT_DAY", default=10, cast=int)
+RECOVERY_DISPATCH_INTERVAL_SECONDS = config("RECOVERY_DISPATCH_INTERVAL_SECONDS", default=30, cast=int)
+RECOVERY_INTENT_TTL_SECONDS       = config("RECOVERY_INTENT_TTL_SECONDS", default=600, cast=int)
+RECOVERY_MAIL_MAX_ATTEMPTS        = config("RECOVERY_MAIL_MAX_ATTEMPTS", default=4, cast=int)
+RECOVERY_RECORD_RETENTION_DAYS    = config("RECOVERY_RECORD_RETENTION_DAYS", default=7, cast=int)
+#: Delays before retries 1-3 of a transient SMTP failure. Fixed by ADR-045 §6.
+RECOVERY_MAIL_RETRY_DELAYS        = (30, 120, 300)
+
+#: Keys recipient and address identifiers in the limit counters. Separate from
+#: SECRET_KEY, so rotating one does not silently reset or expose the other.
+RECOVERY_COUNTER_HMAC_KEY = config("RECOVERY_COUNTER_HMAC_KEY", default="")
+#: Fernet keys, comma-separated. The first encrypts; every one decrypts, so a
+#: rotation keeps the old key listed until its pending intents have expired.
+RECOVERY_MAIL_ENCRYPTION_KEY = config("RECOVERY_MAIL_ENCRYPTION_KEY", default="", cast=csv_list)
+#: Addresses of the reverse proxy whose X-Forwarded-For is believed. Empty
+#: means none: the limits then count the connecting address, which a client
+#: cannot forge, rather than a header it can.
+RECOVERY_TRUSTED_PROXIES = config("RECOVERY_TRUSTED_PROXIES", default="", cast=csv_list)
+
+_recovery_problems = recovery_problems(
+    limits={
+        name: globals()[name]
+        for name in (
+            "RECOVERY_RESET_TTL_SECONDS", "RECOVERY_VERIFICATION_TTL_SECONDS",
+            "RECOVERY_COOLDOWN_SECONDS", "RECOVERY_REQUEST_IP_10M",
+            "RECOVERY_REQUEST_IP_DAY", "RECOVERY_CONFIRM_IP_10M",
+            "RECOVERY_RECIPIENT_HOUR", "RECOVERY_RECIPIENT_DAY",
+            "RECOVERY_DISPATCH_INTERVAL_SECONDS", "RECOVERY_INTENT_TTL_SECONDS",
+            "RECOVERY_MAIL_MAX_ATTEMPTS", "RECOVERY_RECORD_RETENTION_DAYS",
+        )
+    },
+    counter_hmac_key=RECOVERY_COUNTER_HMAC_KEY,
+    mail_encryption_keys=RECOVERY_MAIL_ENCRYPTION_KEY,
+    secret_key=SECRET_KEY,
+    retry_delays=RECOVERY_MAIL_RETRY_DELAYS,
+)
+if _recovery_problems:
+    raise ImproperlyConfigured(
+        "Account recovery is not configured (ADR-045 §8):\n  - "
+        + "\n  - ".join(_recovery_problems)
+    )
+del _recovery_problems
+CELERY_BEAT_SCHEDULE["recovery-dispatch"]["schedule"] = float(RECOVERY_DISPATCH_INTERVAL_SECONDS)
+
 # ---- Axes (brute force protection) --------------------------------------
 
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)
-AXES_LOCK_OUT_BY_COMBINATION_USER_AND_IP = True
+AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
+# How many proxies sit in front of Django, nginx included. Zero trusts no
+# forwarded address, which is development talking to Django directly (IR-656).
+TRUSTED_PROXY_COUNT = config("TRUSTED_PROXY_COUNT", default=0, cast=int)
+AXES_CLIENT_IP_CALLABLE = "apps.accounts.client_address.client_address"
+# The key axes reads the username from. It defaults to the user model's
+# USERNAME_FIELD (`email`), but LoginView authenticates with `username=`, so
+# axes found none and recorded every failure against no user at all (IR-555).
+AXES_USERNAME_FORM_FIELD = "username"
 AXES_RESET_ON_SUCCESS = True
 AXES_COOLOFF_TIME = timedelta(
     minutes=config("AXES_COOLOFF_TIME_MINUTES", default=10, cast=int)
 )
+# A JSON 429 naming the lock and when axes will admit the next attempt, so the
+# sign-in screen counts down to the server's time rather than its own (IR-555).
+AXES_LOCKOUT_CALLABLE = "apps.accounts.lockout.lockout_response"
 
 # ---- Internationalisation -----------------------------------------------
 

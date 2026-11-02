@@ -32,6 +32,12 @@ def rank_record_candidates(run: ToolRun, args: dict):
     The embedding request carries only the topic; retrieved passage text is
     gated by the retrieval stack. No record content is returned to a model here.
     """
+    fused, degraded, signals, _ = rank_with_passages(run, args)
+    return fused, degraded, signals
+
+
+def rank_with_passages(run: ToolRun, args: dict):
+    """`rank_record_candidates` plus the relevant passages it ranked on, best first."""
     topic = args["topic"]
     candidates = apply_filters(readable_records(run.ctx), args)
     degraded = False
@@ -60,15 +66,12 @@ def rank_record_candidates(run: ToolRun, args: dict):
         topic, run.ctx.user, limit=SIGNAL_DEPTH
     )
     degraded = degraded or passages.degraded
-    by_passage = list(
-        dict.fromkeys(
-            p.record_id for p in _relevant(passages) if p.record_id in allowed_ids
-        )
-    )
+    relevant = [p for p in _relevant(passages) if p.record_id in allowed_ids]
+    by_passage = list(dict.fromkeys(p.record_id for p in relevant))
 
     signals = {BY_VECTOR: by_vector, BY_KEYWORD: by_keyword, BY_PASSAGE: by_passage}
     fused = fuse_by_rank(signals.values(), key=lambda pk: pk)
-    return fused, degraded, signals
+    return fused, degraded, signals, relevant
 
 
 def find_records(run: ToolRun, args: dict) -> ToolResult:

@@ -270,7 +270,7 @@ class NeverPublicTests(ReviewCommentTestBase):
     def test_a_published_record_s_reader_gets_none_of_the_review_discussion(self):
         record = self.at_adviser_open()
         self.commented(record, self.owner, "Internal: the consent form is late.")
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
 
         # Every signed-in user reads a published record, and none of this.
         self.client.force_authenticate(self.reader)

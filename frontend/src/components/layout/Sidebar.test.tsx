@@ -181,6 +181,54 @@ describe("the sidebar's list", () => {
   });
 });
 
+/** `/dashboard/stats/` says this many of the user's records wait on them. */
+function waitingOnYou(needsActionMine: number) {
+  vi.mocked(apiClient.get).mockImplementation(((url: string) =>
+    Promise.resolve({
+      data: url === "/dashboard/stats/"
+        ? { needs_action_mine: needsActionMine }
+        : { count: 0, results: [] },
+    })) as never);
+}
+
+describe("the My Library dot (IR-534, B2)", () => {
+  it("appears when a record waits on you, and says so to a screen reader", async () => {
+    waitingOnYou(2);
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(
+      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
+    ).toBeInTheDocument();
+  });
+
+  it("is absent when nothing waits on you", async () => {
+    waitingOnYou(0);
+    signIn(ROLES.ADVISER, true);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    await vi.waitFor(() => expect(apiClient.get).toHaveBeenCalledWith("/dashboard/stats/"));
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getByRole("link", { name: "My Library" })).toBeInTheDocument();
+  });
+
+  it("stays named on the collapsed rail", async () => {
+    useUIStore.setState({ sidebarCollapsed: true });
+    waitingOnYou(1);
+    signIn(ROLES.STUDENT);
+    renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(
+      await within(nav).findByRole("link", { name: "My Library, something needs your action" }),
+    ).toBeInTheDocument();
+  });
+});
+
 describe("the account menu", () => {
   it("holds Settings & Profile, Help and Sign out", async () => {
     const user = userEvent.setup();
@@ -220,6 +268,24 @@ describe("the account menu", () => {
 
     expect(screen.queryByRole("button", { name: "Sign out" })).not.toBeInTheDocument();
     expect(trigger).toHaveFocus();
+  });
+
+  // IR-778, WCAG 2.5.3 Label in Name: a speech-input user says what the button
+  // shows, so its name must begin with the visible name and role, in order.
+  // The name is computed from that visible text, never set beside it in an
+  // `aria-label`: axe's `label-content-name-mismatch` flagged the old label in
+  // Chromium, but cannot see the mismatch under jsdom, which has no layout.
+  it.each([
+    ["expanded", false],
+    ["collapsed", true],
+  ])("is named by the name and role it shows (%s rail)", async (_, collapsed) => {
+    useUIStore.setState({ sidebarCollapsed: collapsed });
+    signIn(ROLES.STUDENT);
+    renderAt("/records/mine");
+
+    const trigger = await screen.findByRole("button", { name: /account menu/ });
+    expect(trigger).toHaveAccessibleName("Ana Adviser, Student, account menu");
+    expect(trigger).not.toHaveAttribute("aria-label");
   });
 
   it("signs out", async () => {

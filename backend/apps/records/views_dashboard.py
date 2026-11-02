@@ -1,7 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from django.db.models import Count
 from .models import Record
 from apps.reviews.models import ResubmissionRequest
 from core.enums import (
@@ -9,12 +8,40 @@ from core.enums import (
     PUBLICLY_VISIBLE_STATUSES,
     PipelineStatus,
     ResubmissionRequestState,
+    WorkflowState,
 )
 
 #: The statuses that mean "somebody is still reviewing this". One since
 #: ADR-032: whoever holds a record, it is stored `in_review` (IR-260). The five
 #: fixed-pipeline stages it replaced were deleted by IR-274.
 IN_REVIEW_STATUSES = (PipelineStatus.IN_REVIEW,)
+
+#: The derived states that wait on the owner rather than a reviewer (IR-534,
+#: spec Appendix D · B2): a reviewer asked for a revision, or for a document.
+NEEDS_OWNER_ACTION = frozenset({
+    WorkflowState.AWAITING_RESUBMISSION.value,
+    WorkflowState.AWAITING_DOCUMENT.value,
+})
+
+
+def needs_action_count(user) -> int:
+    """
+    How many of `user`'s own records are waiting on them -- what the My
+    Library dot reads. The state is the tracker's own derivation
+    (`tracker.workflow_facts`), not a second rule: a record counts exactly
+    when My Library would show it as awaiting a resubmission or a document.
+    Only records in review can be in either state, so only those are read.
+    """
+    from apps.reviews.tracker import workflow_facts
+
+    in_review = (
+        Record.objects.filter(owners__user=user, pipeline_status__in=IN_REVIEW_STATUSES)
+        .distinct().select_related("record_type")
+    )
+    return sum(
+        1 for facts in workflow_facts(in_review).values()
+        if facts["workflow_state"] in NEEDS_OWNER_ACTION
+    )
 
 
 class DashboardStatsView(APIView):
@@ -41,62 +68,9 @@ class DashboardStatsView(APIView):
             "declined_mine":    ResubmissionRequest.objects.filter(
                 record_id__in=my_ids, state=ResubmissionRequestState.OPEN,
             ).values("record_id").distinct().count(),
+            # What is waiting on the owner (B2): the sidebar's My Library dot.
+            # Unlike `pending_mine`, which is "in review", this is actionable.
+            "needs_action_mine": needs_action_count(user),
             # Staff-only totals -- return 0 for students
             "total_published":  Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES).count() if request.user.role else 0,
         })
-
-
-class ClassificationChartView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        data = (
-            Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
-            .values("classification__name")
-            .annotate(count=Count("id"))
-            .order_by("-count")
-        )
-        return Response(list(data))
-
-
-class PSCEDChartView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        data = (
-            Record.objects.filter(pipeline_status__in=PUBLICLY_VISIBLE_STATUSES)
-            .values("psced__name")
-            .annotate(count=Count("id"))
-            .order_by("-count")
-        )
-        return Response(list(data))
-
-
-# TODO (M07 — FR-M7-01 PipelineProgressView):
-#   GET /dashboard/pipeline/<record_pk>/
-#   Returns the per-office clearance breakdown for a single record.
-#
-#   Permission: [IsAuthenticated]; 403 if request.user is not an owner of the record AND not staff.
-#
-#   Response:
-#     {
-#       "pipeline_status": str,        # e.g. "in_review"
-#       "clearances": [
-#         { "office": "itso",  "status": "pending" | "cleared" | "declined" },
-#         { "office": "ierc",  "status": "pending" | "cleared" | "declined" },
-#         { "office": "ktto",  "status": "pending" | "cleared" | "declined" },
-#       ]
-#     }
-#
-#   Note: RDCO does not have a RecordClearance row — its review is reflected
-#   in its assignment and Decision, not in a clearance row.
-#
-#   Implementation sketch:
-#     record = get_object_or_404(Record, pk=record_pk)
-#     if not (request.user.is_staff or record.owners.filter(user=request.user).exists()):
-#         return Response(status=403)
-#     clearances = RecordClearance.objects.filter(record=record)
-#     return Response({
-#         "pipeline_status": record.pipeline_status,
-#         "clearances": [{"office": c.office, "status": c.status} for c in clearances],
-#     })

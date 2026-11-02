@@ -18,8 +18,12 @@ from apps.accounts.models import Role, User
 from apps.notifications.models import Notification
 from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.records.models import RecordVersion
+from apps.documents.testing import real_pdf_bytes
 from .models import DeleteRequest, Record, RecordOwner, RecordType
+from .testing import answered_no_embargo
 from apps.reviews.test_decisions import DecisionTestBase
+
+MANUSCRIPT_BYTES = real_pdf_bytes()
 
 
 def make_user(email, role_name=None, **extra):
@@ -61,7 +65,8 @@ class SubmitOwnershipTests(APITestCase):
         # gate before the permission check it exists to exercise ever ran.
         # Changed deliberately, not to make a red test green: the assertions
         # are untouched, and consent has its own suite in
-        # `DpaConsentAtSubmitTests` below.
+        # `DpaConsentAtSubmitTests` below. The embargo answer likewise (IR-816).
+        answered_no_embargo(self.record.id)
         return self.client.post(
             reverse("record-submit", args=[self.record.id]),
             {"dpa_accepted": True},
@@ -312,7 +317,7 @@ class ManuscriptExtractionTriggerTests(APITestCase):
     def _patch_manuscript(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        file = SimpleUploadedFile("thesis.pdf", b"%PDF-1.7 fake bytes", content_type="application/pdf")
+        file = SimpleUploadedFile("thesis.pdf", MANUSCRIPT_BYTES, content_type="application/pdf")
         return self.client.patch(
             reverse("record-detail", args=[self.record.id]),
             {"abstract_file": file},
@@ -357,7 +362,7 @@ class ManuscriptExtractionTriggerTests(APITestCase):
 
         from django.core.files.uploadedfile import SimpleUploadedFile
 
-        file = SimpleUploadedFile("thesis.pdf", b"%PDF-1.7 fake bytes", content_type="application/pdf")
+        file = SimpleUploadedFile("thesis.pdf", MANUSCRIPT_BYTES, content_type="application/pdf")
         with patch("apps.documents.tasks.extract_manuscript_text.delay") as mock_delay:
             with self.captureOnCommitCallbacks(execute=True):
                 response = self.client.post(
@@ -404,7 +409,7 @@ class ManuscriptValidationTests(APITestCase):
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
         self.client.force_authenticate(self.owner)
 
-    def _file(self, name="thesis.pdf", content_type="application/pdf", body=b"%PDF-1.7 fake bytes"):
+    def _file(self, name="thesis.pdf", content_type="application/pdf", body=MANUSCRIPT_BYTES):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         return SimpleUploadedFile(name, body, content_type=content_type)
@@ -475,7 +480,7 @@ class LongManuscriptFilenameTests(APITestCase):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         long_stem = "A" * 145  # matches the reproduction's 145-149 char real filenames
-        file = SimpleUploadedFile(f"{long_stem}.pdf", b"%PDF-1.7 fake bytes", content_type="application/pdf")
+        file = SimpleUploadedFile(f"{long_stem}.pdf", MANUSCRIPT_BYTES, content_type="application/pdf")
 
         with patch("apps.documents.tasks.extract_manuscript_text.delay"):
             with self.captureOnCommitCallbacks(execute=True):
@@ -488,7 +493,7 @@ class LongManuscriptFilenameTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
         record = Record.objects.get(id=response.data["id"])
         self.assertLessEqual(len(record.abstract_file.name), 255)
-        self.assertEqual(record.abstract_file.read(), b"%PDF-1.7 fake bytes")
+        self.assertEqual(record.abstract_file.read(), MANUSCRIPT_BYTES)
 
     def test_the_download_name_is_rebuilt_from_the_title_not_the_random_stored_name(self):
         from django.core.files.base import ContentFile
@@ -686,6 +691,7 @@ class DpaConsentAtSubmitTests(APITestCase):
         self.assertEqual(self.record.pipeline_status, "draft")
 
     def test_consent_is_stamped_with_who_and_when(self):
+        answered_no_embargo(self.record.id)
         response = self._post({"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()

@@ -28,18 +28,16 @@ ADMIN_ROLES    = {ROLE_RDCO}
 # decides the specialist path, so authoring would mean deciding its own record.
 # RDCO files on behalf of others through the bulk import path instead.
 AUTHOR_ROLES   = {ROLE_STUDENT, ROLE_ADVISER}
-# Who may publish a Calls & Conferences opportunity (IR-121). Deliberately not
-# STAFF_ROLES: that set includes ITSO/IERC, who review clearances and have no
-# reason to post calls, and excludes Adviser, who is exactly the "teacher
-# posting a departmental call" the feature was asked for. Students never post.
-OPPORTUNITY_POSTER_ROLES = {ROLE_RDCO, ROLE_KTTO, ROLE_ADVISER}
+# Who may publish a Calls & Conferences opportunity (IR-121, narrowed by
+# IR-757). Deliberately not STAFF_ROLES: that set includes the clearing offices
+# (ITSO, IERC, KTTO), who do not post calls, and excludes Adviser, who is exactly
+# the "teacher posting a departmental call" the feature was asked for. Students
+# never post.
+OPPORTUNITY_POSTER_ROLES = {ROLE_RDCO, ROLE_ADVISER}
 # Who may correct or remove *someone else's* posting. Deliberately its own set
-# rather than a reference to ADMIN_ROLES: when IR-165 narrowed ADMIN_ROLES to
-# {RDCO}, borrowing it here would have silently stripped KTTO of the moderation
-# its own docstring promises -- a change to IR-121's behaviour with no ticket
-# behind it. An institutional noticeboard needs two people who can fix a
-# deadline when the poster is unavailable.
-OPPORTUNITY_MODERATOR_ROLES = {ROLE_RDCO, ROLE_KTTO}
+# rather than a reference to ADMIN_ROLES, so a change to who administers accounts
+# cannot silently change who may edit every call on the board.
+OPPORTUNITY_MODERATOR_ROLES = {ROLE_RDCO}
 
 
 def get_role_name(user) -> str:
@@ -129,20 +127,20 @@ class IsAdmin(BasePermission):
 
 class IsOpportunityPoster(BasePermission):
     """
-    Who may post a call, and who may then edit or delete one. See IR-121.
+    Who may post a call, and who may then edit or delete one. See IR-121, IR-757.
 
-    `has_permission` gates *posting* by role: RDCO, KTTO or Adviser (or Django
-    staff). `has_object_permission` gates *editing an existing posting*, and the
-    two are deliberately different — without the second, every Adviser in the
-    university could rewrite or delete RDCO's grant announcements, because they
-    share a role bucket. Role membership answers "may you post?", never "is this
-    yours?".
+    `has_permission` gates *posting* by role: RDCO or Adviser.
+    `has_object_permission` gates *editing an existing posting*, and the two are
+    deliberately different — without the second, every Adviser in the university
+    could rewrite or delete RDCO's grant announcements, because they share a role
+    bucket. Role membership answers "may you post?", never "is this yours?".
 
-    The rule mirrored the old record `IsOwnerOrStaff` (retired by IR-508): the person who posted it, or an
-    admin (RDCO/KTTO/Django staff) acting as a moderator. An Adviser can edit
-    only their own call; RDCO and KTTO can correct anyone's, which is what an
-    institutional noticeboard needs when a deadline changes and the poster is
-    unavailable. Narrow that to poster-only if the team prefers.
+    The rule mirrored the old record `IsOwnerOrStaff` (retired by IR-508): the
+    person who posted it, or RDCO acting as a moderator. An Adviser can edit only
+    their own call; RDCO can correct anyone's, which is what an institutional
+    noticeboard needs when a deadline changes and the poster is unavailable. A
+    role that can no longer post cannot change a call it posted earlier, because
+    `has_permission` runs first.
     """
     def has_permission(self, request, view):
         return get_role_name(request.user) in OPPORTUNITY_POSTER_ROLES
@@ -178,6 +176,19 @@ def owns_or_staffs_record(user, record) -> bool:
     if get_role_name(user) in STAFF_ROLES:
         return True
     return record.owners.filter(user=user).exists()
+
+
+def may_read_embargo(user, record) -> bool:
+    """
+    May `user` see where `record`'s embargo stands? Owners, the Adviser and
+    office staff (ADR-052, IR-811).
+
+    Reading a record is not enough: every signed-in user reads a published one,
+    and that a paper is under an agreement is not theirs to learn from it.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+    return record.adviser_id == user.pk or owns_or_staffs_record(user, record)
 
 
 def is_record_owner(user, record) -> bool:
@@ -343,8 +354,8 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
     # A seat still to work is a review to open (IR-274 retired `can_act`).
     if any(seat["state"] in OPEN_SEAT_STATES for seat in my_seats):
         offered.append("open_review")
-    if routing["accept_and_route"]:
-        offered.append("accept_route")
+    if routing["send_to_rdco"]:
+        offered.append("send_to_rdco")
     if routing["route_as"] is not None:
         offered.append("route")
     offered.extend(DECISION_CAPABILITY[outcome] for outcome in decision["outcomes"])

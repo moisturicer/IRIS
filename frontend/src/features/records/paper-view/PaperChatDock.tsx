@@ -404,7 +404,7 @@ export function PaperChatPanel({
         <div className="flex items-center gap-2">
           <AskIrisMark className="w-5 h-5 text-brand shrink-0" />
           <h2 id={headingId} className="font-display text-xl font-semibold text-stone-900 leading-none">Ask IRIS</h2>
-          <span className="px-1 rounded border border-stone-300 text-3xs font-semibold uppercase tracking-wider text-stone-500">
+          <span className="px-1 rounded border border-stone-300 text-3xs font-semibold uppercase tracking-wider text-stone-600">
             AI
           </span>
           <span className="flex-1" />
@@ -414,7 +414,7 @@ export function PaperChatPanel({
           </Button>
         </div>
 
-        <p className="mt-2 truncate text-2xs text-stone-500">
+        <p className="mt-2 truncate text-2xs text-stone-600">
           {pinned ? `Chatting about ${subject.title}` : record.title}
         </p>
         {viewingVersion != null && !pinned && (

@@ -218,7 +218,7 @@ export default function MyReviewsPage() {
                 {t.label}
                 {count != null && " "}
                 {count != null && (
-                  <span className={cn("ml-1 tabular-nums", active ? "text-white" : "text-stone-500")}>
+                  <span className={cn("ml-1 tabular-nums", active ? "text-white" : "text-stone-600")}>
                     {count}
                   </span>
                 )}

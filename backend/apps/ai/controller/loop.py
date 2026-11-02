@@ -22,6 +22,7 @@ from apps.ai.conversation_state import ContextState, committed_state
 from apps.ai.history import estimate_tokens
 from apps.ai.inference import InferenceTask
 from apps.ai.models import DocumentChunk
+from apps.ai.policy.outbound import Dependency, Withheld
 from apps.ai.providers.deadline import bounded, model_call_deadline
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.tool_calling import (
@@ -30,8 +31,9 @@ from apps.ai.providers.tool_calling import (
 from apps.ai.research.audit import RunAudit, Step, argument_digest
 from apps.ai.research.budget import BudgetExhausted
 from apps.ai.research.context import RunContext
+from apps.ai.research.ledger import PASSAGE
 from apps.ai.research.prompts import conversation_state, planner_history
-from apps.ai.research.registry import ToolRun, general_tools, sources_current
+from apps.ai.research.registry import ToolRun, general_tools, offered, sources_current
 from apps.ai.research.results import Status, ToolStatus, population_snapshot
 from apps.ai.research.synthesis import LedgerRetriever
 from apps.ai.research.tools.common import disclosable, visible_record_ids
@@ -40,7 +42,8 @@ from apps.ai.resilience.circuit import CircuitOpen
 from . import prompts
 from .budget import ControllerBudget, NotConfigured
 from .durable_budget import pinned, restore
-from .compose import CLARIFY, EVIDENCE, AnswerComposer, ReadyToCompose, cancelled
+from .compose import (CLARIFY, EVIDENCE, AnswerComposer, ReadyToCompose, abstract_source,
+                      cancelled, is_abstract)
 from .versions import CONTROLLER_ENGINE, pin
 
 logger = logging.getLogger(__name__)
@@ -70,6 +73,7 @@ class _Gathered:
     facts: set = field(default_factory=set)
     revoked: bool = False
     malformed: int = 0
+    refusals: int = 0
     stalls: int = 0
     history_ids: Optional[frozenset] = None
     context_changed: bool = False
@@ -93,7 +97,7 @@ class Controller:
         run = ToolRun.start(ctx, self.root, scoped_handles=True)
         run = replace(run, spend=restore(run.spend, protected_tokens=budget.reserved_tokens))
         audit = RunAudit(ctx, self.clock)
-        registry = general_tools()
+        registry = offered(general_tools())
         gathered = _Gathered([], set(), [], history_ids=frozenset(t.pk for t in asked.history))
         try:
             with model_call_deadline(ctx.budget.wall_clock_seconds, clock=self.clock):
@@ -153,15 +157,27 @@ class Controller:
             if (run.spend.remaining_prompt_tokens - estimate < budget.reserved_tokens
                     or seconds <= 0):
                 return prompts.Decision(), "answer_reserve"
+            sent = list(gathered.envelopes)
             try:
                 run.spend.charge_prompt_tokens(estimate)
                 started = self.clock()
-                completion = model.converse_with_tools(
-                    messages, tools,
-                    timeout_seconds=bounded(min(settings.AI_RESEARCH_PLAN_TIMEOUT_SECONDS, seconds)),
-                )
+                with run.ctx.outbound().fence(lambda: _envelope_dependencies(run, sent)):
+                    completion = model.converse_with_tools(
+                        messages, tools,
+                        timeout_seconds=bounded(min(settings.AI_RESEARCH_PLAN_TIMEOUT_SECONDS, seconds)),
+                    )
             except BudgetExhausted as exc:
                 return prompts.Decision(), str(exc)
+            except Withheld as refused:
+                # Nothing was sent. Rebuild without what lost permission, once.
+                audit.append(Step("plan", "refused"))
+                gathered.refusals += 1
+                if gathered.refusals >= 2:
+                    return prompts.Decision(), "source_unavailable"
+                gathered.envelopes[:] = refused.authorization.retain(
+                    gathered.envelopes, lambda e: _envelope_dependencies(run, (e,)))
+                previous, gathered.revoked = [], False
+                continue
             except (LLMUnavailable, CircuitOpen, TimeoutError):
                 audit.append(Step("plan", "unavailable"))
                 return prompts.Decision(), "planner_unavailable"
@@ -267,10 +283,12 @@ class Controller:
         envelopes = _current(run, gathered.envelopes)
         # Gated again here: access may have changed since the last tool call.
         passages = tuple(LedgerRetriever(run).retrieve(asked.question, run.ctx.user).passages)
+        passages += _abstracts(run, passages, envelopes)
         limitations = list(dict.fromkeys(gathered.limitations))
         if reason != "ready":
             limitations.append(f"stopped_{reason}")
         facts = tuple(dict(f) for e in envelopes for f in e.facts)
+        fact_dependencies = _envelope_dependencies(run, [e for e in envelopes if e.facts])
         history = list(planner_history(run.ctx))
         return ReadyToCompose(
             question=asked.question,
@@ -283,6 +301,8 @@ class Controller:
             stop_reason=reason, history=history, clarify_about=decision.about,
             repair_attempts=budget.repair_attempts, pins=pin(CONTROLLER_ENGINE),
             current=_still_current(run),
+            guard=run.ctx.outbound(),
+            dependencies=_dependencies_at_handoff(run, fact_dependencies),
         )
 
     @staticmethod
@@ -349,6 +369,37 @@ def _current(run, envelopes) -> list:
             and sources_current(run, e.source_items)]
 
 
+def _item_dependency(item) -> Dependency:
+    if item.kind == PASSAGE:
+        return Dependency.passage(item.record_id, item.chunk_set_hash or "")
+    return Dependency.abstract(item.record_id, item.record_title, item.text)
+
+
+def _envelope_dependencies(run, envelopes) -> set:
+    """Every source a planner payload carrying ``envelopes`` was built from."""
+    owners = {item.handle: item.record_id
+              for item in (*run.ledger.records(), *run.ledger.passages())}
+    found = {Dependency.metadata(owners[h]) for e in envelopes for h in _handles(e) if h in owners}
+    found.update(_item_dependency(item) for e in envelopes for item in e.source_items)
+    return found
+
+
+def _dependencies_at_handoff(run, fact_dependencies):
+    """Answer sources' reads, snapshotted now so a later eviction drops nothing."""
+    passages = {p.chunk_id: _item_dependency(p) for p in run.ledger.passages()}
+    records = {r.record_id: _item_dependency(r) for r in run.ledger.records()}
+
+    def dependencies(sources) -> set:
+        found = set(fact_dependencies)
+        for source in sources:
+            known = records.get(source.record_id) if is_abstract(source) else passages.get(source.chunk_id)
+            # A source the ledger never read has no version, so it never matches.
+            found.add(known or Dependency.passage(source.record_id, ""))
+        return found
+
+    return dependencies
+
+
 def _snapshots(envelope) -> set:
     return {f["provenance"]["snapshot"] for f in envelope.facts
             if f.get("provenance", {}).get("snapshot") is not None}
@@ -361,19 +412,54 @@ def _handles(envelope):
                 yield entry[key]
 
 
+#: Papers a search ranked highest; lower candidates are not evidence.
+ABSTRACT_SOURCES = 5
+
+
+def _abstracts(run, passages, envelopes) -> tuple:
+    """IR-703: a named or top-ranked paper with no passage read is a source by its abstract.
+
+    Best rank first and scored below every passage, so the input limit trims
+    abstracts before passages and the lowest-ranked abstract first.
+    """
+    named, searched = [], {}
+    for envelope in envelopes:
+        for item in envelope.items:
+            if not isinstance(item.get("record"), str):
+                continue
+            if "reference" in item:
+                named.append(item["record"])
+            elif isinstance(item.get("rank"), int):
+                searched[item["record"]] = min(item["rank"], searched.get(item["record"], item["rank"]))
+    # Papers the reader named lead, in the order named; then search rank.
+    ranks = {handle: position for position, handle in enumerate(dict.fromkeys(named), 1)}
+    for handle, rank in searched.items():
+        ranks.setdefault(handle, len(named) + rank)
+    read = {p.record_id for p in passages}
+    found = sorted((r for r in run.ledger.records() if r.handle in ranks
+                    and r.text.strip() and r.record_id not in read),
+                   key=lambda r: ranks[r.handle])[:ABSTRACT_SOURCES]
+    allowed = disclosable(run.ctx, {r.record_id for r in found})
+    return tuple(abstract_source(r, rank=ranks[r.handle]) for r in found
+                 if r.record_id in allowed and sources_current(run, (r,)))
+
+
 def _still_current(run):
-    """Chunk ids still readable, disclosable and in an active chunk set."""
+    """Source ids still readable, disclosable and at the version gathered."""
     def current(sources) -> set:
         allowed = disclosable(run.ctx, {s.record_id for s in sources})
         active = dict(DocumentChunk.objects.filter(
-            pk__in=[s.chunk_id for s in sources], chunk_set__is_active=True,
-            deleted_at__isnull=True,
+            pk__in=[s.chunk_id for s in sources if not is_abstract(s)],
+            chunk_set__is_active=True, deleted_at__isnull=True,
         ).values_list("pk", "chunk_set__content_hash"))
         original = {p.chunk_id: p for p in run.ledger.passages()}
+        abstracts = {r.record_id: r.text for r in run.ledger.records()}
         return {s.chunk_id for s in sources if s.record_id in allowed
                 and s.record_title == allowed[s.record_id].title
-                and s.chunk_id in original
-                and original[s.chunk_id].chunk_set_hash == active.get(s.chunk_id)}
+                and (abstracts.get(s.record_id) == allowed[s.record_id].abstract == s.content
+                     if is_abstract(s) else
+                     s.chunk_id in original
+                     and original[s.chunk_id].chunk_set_hash == active.get(s.chunk_id))}
     return current
 
 

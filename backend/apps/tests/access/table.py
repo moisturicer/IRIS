@@ -30,7 +30,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from .cells import (
-    ANON, DENY, DOWNLOAD_TOKEN, HIDE, OK, Call, Case, Ref, Upload, row,
+    ANON, DENY, HIDE, OK, Call, Case, Ref, Upload, row,
 
 )
 
@@ -128,15 +128,19 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "DELETE": _case(OWNER_ACTS, kwargs=RECORD),
     }),
     "record-submit": Entry({"POST": _case(OWNER_ACTS, kwargs=RECORD, data={})}),
+    # A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
+    "record-embargo-answer": Entry({"POST": _case(
+        OWNER_ACTS, kwargs=RECORD, data={"embargoed": False},
+    )}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
     "record-manuscript": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     # Earlier versions are review material: participants, or the pool of a
-    # party with an active assignment (IR-479). RDCO holds none on `record`.
+    # party with an active assignment (IR-479). ADR-047 makes RDCO active on `record`.
     "record-version-manuscript": Entry({
         "GET": _case(
-            row(ANON, HIDE, OK, OK, OK, OK, OK, HIDE, HIDE),
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE),
             kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
         ),
     }),
@@ -160,10 +164,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # staff a party that took part -- the Adviser, ITSO's whole pool. RDCO
     # took no part in `record`, so sees it but not its requests.
     "record-document-requests": Entry({
-        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, DENY, HIDE), kwargs=RECORD),
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE), kwargs=RECORD),
         # Asked by an active assignment the caller can staff: ITSO's, here.
         "POST": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=RECORD,
+            row(ANON, HIDE, DENY, DENY, OK, OK, OK, OK, HIDE), kwargs=RECORD,
             data={"message": "Please attach it.", "items": [{"label": "Endorsement"}]},
         ),
     }),
@@ -175,7 +179,7 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "POST": _case(
             row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, DENY, HIDE),
             kwargs={"pk": Ref("at_adviser")},
-            data={"to": [{"party": "itso"}], "reason": "Possible IP."},
+            data={"to": [{"party": "rdco"}], "reason": "Possible IP."},
         ),
     }),
     "record-decide": Entry({
@@ -207,17 +211,17 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # The review discussion (IR-419, ADR-032 §7): read under `may_read_review`
     # (participants, and the pool of a party holding the record now), written by
     # participants alone, so ITSO's unseated pool reads and is refused. RDCO
-    # holds no assignment on `record`. An edit is its author's: the owner's here.
+    # holds an assignment from the Adviser’s send (ADR-047), but this account has no Seat. An edit is its author’s.
     "record-review-comments": Entry({
-        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE), kwargs=RECORD),
         "POST": _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE),
             kwargs=RECORD, data={"body": "Which version is this?"},
         ),
     }),
     "record-review-comment": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, HIDE, HIDE),
+            row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
             data={"body": "Is the signed endorsement enough?"},
         ),
@@ -230,28 +234,42 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # -- download requests ------------------------------------------------
     "download-requests": Entry({
         "GET": _case(RDCO_ONLY),
-        "POST": _case(SIGNED_IN, data={"record": Ref("published")}),
+        "POST": _case(SIGNED_IN, data={"record": Ref("published"), "note": "For my thesis."}),
     }),
+    # IR-743: every reader's own requests; anyone else's are never listed.
+    "download-requests-mine": Entry({"GET": _case(SIGNED_IN)}),
     "download-request-detail": Entry({
         "GET": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}),
         "PATCH": _case(
-            RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={"action": "decline"},
+            RDCO_ONLY, kwargs={"pk": Ref("download_request")},
+            data={"action": "decline", "note": "Not now."},
         ),
     }),
     "download-request-approve": Entry({
         "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={}),
     }),
     "download-request-decline": Entry({
-        "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={}),
+        "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_request")}, data={"note": "Not now."}),
     }),
-    # The token is the credential: no account is needed, and none is enough.
-    "download-redeem": Entry({
+    # IR-688: RDCO ends `other`'s live grant, with a note.
+    "download-request-revoke": Entry({
+        "POST": _case(RDCO_ONLY, kwargs={"pk": Ref("download_grant")}, data={"note": "Misused."}),
+    }),
+    # IR-688: only the requester (`other`) cancels their own pending request;
+    # everyone else's lookup is narrowed to their own, so it is hidden.
+    "download-request-cancel": Entry({
+        "POST": _case(
+            row(ANON, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+            kwargs={"pk": Ref("download_request")}, data={},
+        ),
+    }),
+    # Exempt readers and grant holders (ADR-048). `other` holds a grant on
+    # `published`; the role-less superuser holds none and is exempt from nothing.
+    "record-download": Entry({
         "GET": [
-            Case(Call(query={"token": DOWNLOAD_TOKEN}), row(OK, OK, OK, OK, OK, OK, OK, OK, OK),
-                 label="an approved request's token"),
-            Case(Call(query={"token": "forged"}),
-                 row(DENY, DENY, DENY, DENY, DENY, DENY, DENY, DENY, DENY),
-                 label="a forged token"),
+            Case(Call(kwargs={"pk": Ref("published")}), row(ANON, OK, OK, OK, OK, OK, OK, OK, DENY),
+                 label="a published record"),
+            Case(Call(kwargs=RECORD), READS_RECORD, label="a record in review"),
         ],
     }),
 
@@ -270,8 +288,6 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "psced": Entry({"GET": _case(SIGNED_IN)}),
     "record-types": Entry({"GET": _case(SIGNED_IN)}),
     "dashboard-stats": Entry({"GET": _case(SIGNED_IN)}),
-    "chart-classifications": Entry({"GET": _case(SIGNED_IN)}),
-    "chart-psced": Entry({"GET": _case(SIGNED_IN)}),
 }
 
 
@@ -324,10 +340,10 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     }),
 
     # -- office acts on documents ----------------------------------------
-    # An office taking part files its own supplementary file (IR-474).
+    # An office taking part files its own supplementary file (IR-474); RDCO is now active by ADR-047.
     "record-file-upload": Entry(
         {"POST": _case(
-            row(ANON, DENY, DENY, DENY, OK, OK, OK, DENY, DENY),
+            row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY),
             data={"record": Ref("record"), "file": Upload("note.pdf")}, format="multipart",
         )},
         waiver=DOCUMENTS_EXCEPTION,
@@ -390,6 +406,12 @@ ACCOUNTS = {
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # ADR-045: both recovery endpoints are anonymous and ignore incidental
+    # credentials. Confirmation checks the link, not the caller's role.
+    "password-reset-request": Entry({"POST": _case(PUBLIC, data={"email": "unknown@cit.edu"})}),
+    "password-reset-confirm": Entry({"POST": _case(PUBLIC, data={
+        "token": "x" * 43, "new_password": "Recovery-test-42", "confirm_password": "Recovery-test-42",
+    })}),
     "user-list": Entry({"GET": _case(RDCO_ONLY)}),
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
@@ -409,7 +431,7 @@ ACCOUNTS = {
     "college-list": Entry({"GET": _case(PUBLIC)}),
     "department-list": Entry({"GET": _case(PUBLIC)}),
     "course-list": Entry({"GET": _case(PUBLIC)}),
-    "system-setting": Entry({"GET": _case(SIGNED_IN, kwargs={"key": "matrix-setting"}),
+    "system-setting": Entry({"GET": _case(RDCO_ONLY, kwargs={"key": "matrix-setting"}),
                              "PATCH": _case(RDCO_ONLY, kwargs={"key": "matrix-setting"}, data={"value": "updated"})}),
 }
 
@@ -454,6 +476,9 @@ AI = {
     "ai-ask-run-stream": Entry({"GET": _case(PRIVATE, kwargs={"pk": Ref("ask_run")})}),
     "ai-ask-run-cancel": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-retry": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
+    "ai-ask-run-grant": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
+    "ai-ask-run-grant-renew": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
+    "ai-runtime-grant": Entry({"POST": _case(SIGNED_IN, data={})}),
     "ai-embed-record": Entry({"POST": _case(OFFICE_ONLY, kwargs=RECORD, data={})}),
     "ai-embed-all": Entry({"POST": _case(OFFICE_ONLY, data={})}),
     "ai-embed-jobs": Entry({"GET": _case(OFFICE_ONLY)}),
@@ -480,6 +505,17 @@ OPPORTUNITIES = {
     "opportunity-calendar": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("opportunity")})}),
     "api-root": Shadowed(by="opportunity-list", why="The empty-prefix list matches before the router root."),
 }
+LIBRARY = {
+    # IR-566, ADR-044 §3-§5: the owner is the caller, so the list is anyone's
+    # own. Saving rechecks `visible_to()`, so an unreadable Record is the same
+    # 404 as a missing one; unsaving deletes only one's own row and answers 204
+    # for hidden or missing ids alike.
+    "library-saves": Entry({"GET": _case(SIGNED_IN)}),
+    "library-save": Entry({
+        "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),
+        "DELETE": _case(SIGNED_IN, kwargs={"record_id": Ref("record")}),
+    }),
+}
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "records": RECORDS, "documents": DOCUMENTS_APP, "accounts": ACCOUNTS,
     "reviews": REVIEWS, "ai": AI, "notifications": NOTIFICATIONS,
@@ -488,5 +524,6 @@ TABLE: dict[str, dict[str, Entry | Shadowed]] = {
         "audit-export": Entry({"GET": _case(RDCO_ONLY)}),
     },
     "opportunities": OPPORTUNITIES,
+    "library": LIBRARY,
 }
 DECLARED = TABLE

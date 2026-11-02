@@ -348,7 +348,7 @@ Administration (RDCO) — unchanged
 
 ### 4.4 Publish dialog
 
-**Pattern: one dialog, three steps, with a slim progress indicator.**
+**Pattern: one dialog, three steps, with a slim progress indicator.** Since IR-816 the dialog opens on one question before these steps: whether the paper is under an embargo (ADR-052, Amendment 2026-11-02).
 
 It is not a long form, and not a full-page wizard. Three steps is the fewest that keep upload, confirmation and consent separate. Each step fits one screen at 1280×720 without scrolling the dialog body, except Details, whose body may scroll while its actions stay pinned in the dialog footer. *(Amended 2026-10-06, IR-408: Details measured about 100 px over at 1280×720 with every essential field shown, and the lead accepted a scrolling body over hiding an essential field.)*
 
@@ -1428,6 +1428,8 @@ The ADR-032 vertical tickets are created later, per the hold recorded on IR-255.
 | **IR-372** Paper tab = reader + Ask IRIS docked right, full width | The Paper tab's layout rule and the dock preference behaviour | Overview (was Abstract), Review and Files sections | The Paper section is unchanged, and the Review section has no chat, so IR-372's rule is not stretched. Correct the card's stale "left" wording |
 
 **Net:** the redesign adds sections and slots *around* the IR-350 family's work and changes none of its behaviour. No reader or chat ticket is duplicated.
+
+*Amended 2026-11-01 (IR-477):* the Review section now gives the reader its action bar's measured height (`PaperPdfReader`'s `bottomInset`, below `reading-wide` only), so a citation lands, and find counts a match in view, above the bar rather than under it. This is a deliberate exception to "reuses `PaperPdfReader` unchanged"; the Paper tab passes no inset, and its landing is unchanged.
 
 ## Appendix L — Duplication check: F/B tickets against the seven ADR-032 tickets
 

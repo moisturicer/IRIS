@@ -45,7 +45,7 @@ The product name for IRIS's retrieval-augmented chat/search feature (`apps/ai`, 
 _Avoid_: RAG chat, chatbot (fine in casual conversation, but "Ask IRIS" is the product-facing name used in the UI and should be used in specs/tickets too).
 
 **AI Overview**:
-An AI-generated account of a Record's content, grounded in that Record's own passages and cached per active `ChunkSet`. Shown on the record's detail page. Deliberately distinct from **Abstract** (below) — the Abstract is what the author wrote, the AI Overview is what IRIS derived, and the two must never be presented as interchangeable.
+An AI-generated account of a Record's content, grounded in the whole Record (every chunk of its active `ChunkSet`, in order, with no retrieval) rather than in retrieved passages, and cached per active `ChunkSet`. Shown on the record's detail page. Deliberately distinct from **Abstract** (below) — the Abstract is what the author wrote, the AI Overview is what IRIS derived, and the two must never be presented as interchangeable.
 _Avoid_: AI Summary (the earlier name for this, now retired — the code, the API field and the UI all say Overview), Summary alone (ambiguous next to Abstract), DocumentSummary (an internal name that no longer matches the model).
 
 **Manuscript**:
@@ -65,7 +65,7 @@ A quoted span of a Record's text that an Ask IRIS answer is grounded in, carryin
 _Avoid_: Chunk (the internal retrieval unit — correct in code, wrong in UI copy and specs aimed at a reader), snippet, excerpt, source (a Passage cites a source; it is not itself the source).
 
 **Figure**:
-A picture inside a Record's document — a chart, diagram, schematic or photograph — identified by the page and the rectangle it occupies rather than by any text it contains. Distinct from its **caption**, which is the text labelling it and is read as ordinary prose, and from a [[Passage]], which is quoted text a reader can check. A Figure is shown to a reader; it is not quoted, and IRIS makes no claim about what it depicts.
+A picture inside a Record's document — a chart, diagram, schematic or photograph — identified by the page and the rectangle it occupies rather than by any text it contains. Distinct from its **caption**, which is the text labelling it and is read as ordinary prose, and from a [[Passage]], which is quoted text a reader can check. A Figure is shown to a reader and is not quoted. IRIS stores a machine-written description of it for retrieval only: the description is never shown and never cited as a Passage, so IRIS makes no claim to a reader about what a Figure depicts (ADR-056).
 _Avoid_: Image (the rendering of a Figure, not the Figure itself), picture (the extractor's word), diagram or chart (kinds of Figure, not synonyms for it), figure caption used to mean the Figure.
 
 **Formula**:
@@ -110,7 +110,7 @@ _Avoid_: Trends or gaps alone (each is one question asked of a landscape, not th
 
 **Collaboration opt-in**:
 A Record owner's explicit, separate permission for their Proposal to be surfaced to another researcher working in a similar area. Its own decision, deliberately not the Data Privacy Act acceptance a submission already carries — accepting terms for how data is processed is a different act from agreeing that strangers may be told your unsubmitted work exists, and someone may reasonably say yes to one and no to the other. An opt-in permits an introduction; it never makes a Record readable.
-_Avoid_: Consent alone (ambiguous next to the DPA acceptance the disclosure gate reads), DPA consent, sharing, visibility (an opt-in changes neither).
+_Avoid_: Consent alone (ambiguous next to AI consent), DPA consent, sharing, visibility (an opt-in changes neither).
 
 **Novelty check**:
 Comparing a newly submitted Proposal against work the institution has already completed, to tell a proposer that something close to their idea has been done here before. Distinct from collaboration matching, which compares one Proposal against other Proposals: a Novelty check looks only at finished work that is already in the public catalogue, so it discloses nothing and needs no [[Collaboration opt-in]].
@@ -119,11 +119,21 @@ _Avoid_: Duplicate detection (that is about two Proposals overlapping with each 
 ### Review workflow
 
 **Specialist office**:
-ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (IP, ethics, commercialisation). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
+ITSO, IERC or KTTO: an office a Record is routed to for a question only it can answer (technical review, ethics compliance, the commercial potential of IP). Each is staffed by several people. RDCO is an office but not a specialist office; it decides, it does not clear.
 _Avoid_: Clearing office, department, Party (the code's word, which also covers the Adviser and RDCO).
 
+**ITSO**:
+The Innovation & Technology Support Office, which handles technical review of research outputs. Questions about IP go to [[KTTO]].
+_Avoid_: IP office.
+
+**IERC**:
+The Institutional Ethics Review Committee, responsible for ethics compliance review of research submissions.
+
+**KTTO**:
+The Knowledge and Technology Transfer Office, which evaluates the commercialisation potential of IP submissions.
+
 **Specialist path**:
-A Thesis/Research or Project that its Adviser accepted and routed to at least one [[Specialist office]]. The only path on which RDCO takes part; the alternative is the Adviser's accept & publish, where RDCO is never involved.
+A Thesis/Research or Project that RDCO sent to at least one [[Specialist office]]. Otherwise RDCO decides it alone.
 _Avoid_: Full review, RDCO path.
 
 **Pool**:
@@ -139,7 +149,7 @@ One person's part in an office's review of a Record: "this member is reviewing i
 _Avoid_: Assignment (the office holding the Record, not a person), reviewer slot.
 
 **Finding**:
-A [[Seat]] holder's recorded negative verdict on a Record, always with a written reason. A Finding never rejects and never sends the Record back: specialist offices cannot do either. It travels to RDCO, which decides.
+A [[Seat]] holder's recorded negative verdict on a Record, always with a written reason. A Finding never rejects and never sends the Record back: specialist offices cannot do either. RDCO sees it and decides.
 _Avoid_: Rejection, decline, negative review, Not cleared (an office's outcome, not one reviewer's verdict).
 
 **Clearance**:
@@ -147,7 +157,7 @@ A [[Specialist office]]'s outcome on a Record, *Cleared* or *Not cleared*, settl
 _Avoid_: Approval (an office clears its own question; it does not approve the Record), office decision.
 
 **Hand-back**:
-IRIS opening RDCO's [[Pool]] on a Record when the last active specialist office finishes. Happens only on the [[Specialist path]]; nobody routes to RDCO by hand.
+A retired step: IRIS opening RDCO's [[Pool]] on a Record when the last active specialist office finished. RDCO now holds the Record from the moment its Adviser sends it, and an office finishing only notifies RDCO.
 _Avoid_: Route to RDCO, escalation, final routing.
 
 **Review round**:
@@ -171,20 +181,28 @@ Telling an office's coordinators that its [[Due date]] has passed. Only a notifi
 _Avoid_: Using it for the [[Hand-back]] to RDCO, auto-escalation (suggests the Record moves).
 
 **Revision request**:
-One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and nobody can decide it; the party that asked cannot finish its own review either. Answered by the next Version, or withdrawn by the party that asked. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
+One party asking a Record's owners to revise the Record itself, made against one [[Version]] and always with a reason. Each party holds at most one open at a time, whichever of its reviewers asked. While any is open the Record waits on its author and only RDCO can decide it; the party that asked cannot finish its own review either. Answered by the next Version, withdrawn by the party that asked, or withdrawn by RDCO's [[Decision]]. Distinct from a document request, which asks for a missing file and leaves the Record as it is.
 _Avoid_: Resubmission request (the code's name for it), decline or sent back (the retired pipeline's words), changes requested (how a party with an open Revision request is shown, not the request itself).
 
 **Decision**:
-An act that ends a Record's review: accept & publish, keep [[Unlisted]] or reject, made by the Adviser or by RDCO, and a Proposal's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. It is refused while any [[Revision request]] is open. Accept & route is not a Decision: it is an acceptance that sends the Record on to [[Specialist office]]s, closes nothing, and is refused while a Revision request is open, as a Decision is.
+An act that ends a Record's review: on a Thesis/Research or Project, accept & publish or keep [[Unlisted]] by RDCO alone, or reject by RDCO or the Adviser; on a Proposal, its Adviser's accept or reject. It closes every other piece of open work on the Record, with that work's history kept. An Adviser's Decision is refused while any [[Revision request]] is open; RDCO's withdraws them. Accept & send to RDCO is not a Decision: it is how an Adviser accepts a Thesis/Research or Project, it closes nothing, and it is refused while a Revision request is open.
 _Avoid_: Final decision, approval, verdict (one reviewer's own conclusion, which a Decision also records).
 
 **Accepted**:
 A Proposal its Adviser accepted: its resting state. It is not published, and nothing further is decided on it.
 _Avoid_: Approved (the stored name), ongoing, completed (the state of the retired *complete* act).
 
+**Continuation**:
+The Thesis/Research or Project a researcher starts from their own [[Accepted]] Proposal, carrying it forward into a manuscript submission with its own [[Manuscript]] and its own review. A Proposal has at most one Continuation, and each names the other; a reader is shown that link only when they may open the Record it names.
+_Avoid_: Child record, child manuscript, derived record, fork, follow-up.
+
 **Unlisted**:
 A Thesis/Research or Project that RDCO accepted but kept out of Discover and Ask IRIS, for example ahead of a patent filing. Its owners and reviewers can still open it.
 _Avoid_: Completed (the code's status name), embargoed, hidden.
+
+**Embargo**:
+A hold that stops a Record's text going to outside AI companies, for a reason such as a sponsor's agreement or a journal that publishes first. Its date is a reminder, and it ends only when the Adviser or RDCO releases it. It doesn't hide the Record from readers in IRIS, which is what [[Unlisted]] does.
+_Avoid_: Expired (an embargo doesn't expire), hidden, private.
 
 **Archived**:
 How a rejected Record is shown to readers. It is terminal: the owner cannot answer it with a new [[Version]] and must submit a new Record.
@@ -194,10 +212,24 @@ _Avoid_: Closed, deleted, declined (the retired pipeline's word for a revision r
 A numbered snapshot of what a Record put in front of its reviewers: the [[Manuscript]] as it stood when the Record was submitted (v1) or resubmitted (each later one). A resubmission that changed only the details still makes a Version, pointing at the same Manuscript as the one before, because a reviewer asked for it. A review is made against one Version. Earlier Versions are review material: only the Record's participants see them, and a reader of a published paper sees the paper. A history may start after v1 where the earlier Versions were never recorded; none is made up to fill the gap.
 _Avoid_: Revision (the act that produces a Version, not the Version), file version or upload version (the per-slot numbering of supplementary files, a different thing), draft (the Record's state before it is submitted).
 
+**Review discussion**:
+The private conversation on a submitted Record between its owners and everyone who has held a [[Seat]] on it, shown in its review timeline. Never mixed with [[Comment]]s.
+_Avoid_: Comments (the public thread), notes, chat.
+
+### Comments
+
+**Comment**:
+A message in a published paper's public thread, written by any signed-in account. Only its writer edits or deletes it; RDCO or the [[System Admin]] may also delete it, and the writer is then told why. A deleted Comment that has replies stays in place as a marker with its words gone. Comments exist only on published papers, never on drafts, papers under review or Proposals.
+_Avoid_: Public discussion (the ADR's name for the thread), post, review comment.
+
+**Comment report**:
+A reader telling RDCO that a [[Comment]] needs attention, with a reason. Only RDCO sees reports; the Comment's writer never learns one was made.
+_Avoid_: Flag, complaint.
+
 ### Library
 
 **Library**:
-A reader's private collection of [[Saved Record]]s. It belongs to the reader's account, and nobody else can see it.
+A reader's private collection of [[Saved Record]]s and [[Saved Call]]s. It belongs to the reader's account, and nobody else can see it.
 _Avoid_: Repository, catalogue (that is Discover), collection, bookshelf.
 
 **Saved Record**:
@@ -215,3 +247,97 @@ _Avoid_: Collection, list, tag.
 **Reading history**:
 The papers recently opened in this browser. It is not part of the [[Library]], never leaves the browser, and is cleared on sign-out.
 _Avoid_: Recently viewed, activity, reading log.
+
+### People
+
+**Profile**:
+A page about one account that any signed-in user can open: their name, affiliation and role, the photo, bio, research interests and ORCID iD they chose to add, the published papers they own or advised, and their [[Collaborator]]s. It never shows their email address.
+_Avoid_: Account (the sign-in identity), user page, bio.
+
+**Collaborator**:
+Another account that shared a published paper with this person, as a co-owner, as its Adviser, or as an advisee. Byline authors without an account are not collaborators.
+_Avoid_: Co-author (a byline name, not an account), team member.
+
+**Contact person**:
+The one owner of a Record who gets its review emails, and whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; any owner can choose another. Their email is shown only where a decision says so, never on their Profile.
+_Avoid_: Representative, group leader, primary author (authors are byline names, not accounts).
+
+### Downloads
+
+**Download**:
+Saving a copy of a published paper's [[Manuscript]] to take out of IRIS. Distinct from reading it inside IRIS, which stays open to every reader who can see the paper.
+_Avoid_: Export, access, view.
+
+**Download request**:
+A reader asking RDCO to [[Download]] one published paper, always with a note saying why. RDCO alone approves or declines it, and a decline always carries a note. A reader holds at most one pending request per paper; a declined or expired one may be made again. The paper's owners, its Adviser, office staff and its assigned reviewers download without one.
+_Avoid_: Access request (the old page's name), download link.
+
+**Download grant**:
+What an approved [[Download request]] gives its reader: they may download that paper while signed in, as often as they like, until the grant expires or RDCO revokes it with a note. It is never a link, and nothing emailed works on its own.
+_Avoid_: Download link, token, download permission.
+
+### Discover
+
+**View**:
+One account's first opening of a published paper. A paper's views are the number of distinct accounts that have opened it since it was published: opening it again never adds one, and its owners never count. Which accounts viewed a paper is used only to count them and is never shown.
+_Avoid_: Access (the audit log's word for one opening), hit, read, reader count.
+
+**Trending**:
+Published papers ordered by the [[View]]s they gained in the last 30 days, then by all-time views, then newest first. Distinct from Most Viewed, which orders by all-time views alone.
+_Avoid_: Popular, hot, most viewed.
+
+### Calls & Conferences
+
+**Call**:
+An invitation to submit papers on the Calls & Conferences board, to a conference, congress, symposium, workshop, journal or book. It has a paper deadline, one or more [[Area]]s and, when there is an event, the event's dates. RDCO or an Adviser posts it. An Adviser changes only the Calls they posted; RDCO can change any.
+_Avoid_: Opportunity (the code's name, which readers never see), announcement, posting.
+
+**Call request**:
+An Adviser's [[Call]] waiting for RDCO to confirm or reject it. Only that Adviser and RDCO can see it, and it becomes public only once confirmed.
+_Avoid_: Post request, pending post, submission (that is a Record's).
+
+**Saved Call**:
+A [[Call]] a reader has kept in their [[Library]]. A reader saves a Call at most once, and it stays saved after the Call is over, until the reader removes it or RDCO deletes the Call.
+_Avoid_: Bookmark, reminder.
+
+### Accounts
+
+**Sign in**:
+Entering IRIS with an existing account's CIT-U email and password.
+_Avoid_: Login, log in, sign on.
+
+**Register**:
+Asking for an IRIS account as a Student or an [[Adviser]], with a CIT-U email address. A registrant cannot sign in until they verify their email, and gets their role only once RDCO approves the request. A registration nobody verifies is eventually deleted, and registering again replaces it.
+_Avoid_: Sign up, signup, create account (the screen's title, not the act).
+
+**Adviser**:
+The role of the person who reviews their advisees' Records first and routes them onward. It is a role someone asks for when they register, not a job title.
+_Avoid_: Faculty, faculty adviser, professor.
+
+**RDCO**:
+The Research and Development Coordinating Office, responsible for final approval and archiving of all research and IP submissions. It is the highest office staff role and runs the research workflow: it approves roles, manages accounts and office coordinators, and answers download and delete requests. It is not the [[System Admin]].
+_Avoid_: Admin, administrator.
+
+**System Admin**:
+The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments and publishing [[Notice]]s with RDCO. Nobody can ask for it; developers set up the first one.
+_Avoid_: Admin (on its own), administrator, superuser.
+
+**Account deletion**:
+Removing a person from IRIS at their own request, once the System Admin confirms it and nobody is waiting on them. Their personal details go and they can't sign in. A published paper keeps their name as an Author or as Adviser, and elsewhere they show as "Former user".
+_Avoid_: Closure, close account, deactivate.
+
+**Notice**:
+The text a person answers to give Signup consent and AI consent. RDCO or the System Admin publishes each new version by pasting it, and a published version never changes.
+_Avoid_: Terms, DPA terms, privacy policy (a document the university writes).
+
+**Signup consent**:
+A person's acceptance of the Notice, which having an account requires. Withdrawing it means Account deletion.
+_Avoid_: Consent (on its own), terms.
+
+**AI consent**:
+A person's Yes or No to AI using their papers, asked with the Notice. A No leaves their account as it was. A Record takes its Contact person's answer when it is created and keeps it, so a later change only reaches later Records, unless a person going from No to Yes chooses to include their earlier ones.
+_Avoid_: Consent (on its own), Submission consent (the per-paper version this replaced), DPA acceptance, Discoverable (a separate decision).
+
+**Retention period**:
+How long IRIS keeps one kind of personal data before erasing it for good. The System Admin enters it once the data protection officer approves it, and a blank period erases nothing.
+_Avoid_: Expiry, TTL.

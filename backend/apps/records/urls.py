@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import RecordViewSet, DownloadRequestViewSet, DeleteRequestViewSet, DownloadRedeemView
+from .views import RecordViewSet, DownloadRequestViewSet, DeleteRequestViewSet
 from . import views_reference
 
 router = DefaultRouter()
@@ -8,12 +8,14 @@ router.register(r"", RecordViewSet, basename="record")
 
 urlpatterns = [
     path("", include(router.urls)),
-    path("download/", DownloadRedeemView.as_view(), name="download-redeem"),
     path("download-requests/", include([
         path("", DownloadRequestViewSet.as_view({"get": "list", "post": "create"}), name="download-requests"),
+        path("mine/", DownloadRequestViewSet.as_view({"get": "mine"}), name="download-requests-mine"),
         path("<int:pk>/", DownloadRequestViewSet.as_view({"get": "retrieve", "patch": "partial_update"}), name="download-request-detail"),
         path("<int:pk>/approve/", DownloadRequestViewSet.as_view({"post": "approve"}), name="download-request-approve"),
         path("<int:pk>/decline/", DownloadRequestViewSet.as_view({"post": "decline"}), name="download-request-decline"),
+        path("<int:pk>/revoke/", DownloadRequestViewSet.as_view({"post": "revoke"}), name="download-request-revoke"),
+        path("<int:pk>/cancel/", DownloadRequestViewSet.as_view({"post": "cancel"}), name="download-request-cancel"),
     ])),
     path("delete-requests/", include([
         # Read and decided only: a request is raised by DELETE /records/<id>/ (IR-496).

@@ -1,0 +1,236 @@
+[
+  {
+    "url": "/review",
+    "title": "IRIS",
+    "body": "IRIS\n\n1\n\nResearch-to-IP Platform\n\nDiscover\nAsk IRIS\nMy Library\nMy Reviews\nCalls & Conferences\nAA\nAna Adviser\n,\nAdviser\n, account menu\nHome\n/\nMy Review",
+    "pairs": [
+      {
+        "text": "Research-to-IP Platform",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Adviser",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "What you need to review, what you have opened, and what you have finished.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "In review 0",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "0",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Done 17",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "17",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Longest waiting",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Overdue only",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Thesis / ResearchWaiting 6 days",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 7.629256919887909
+      },
+      {
+        "text": "ProposalWaiting 6 days",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 7.629256919887909
+      }
+    ],
+    "violations": []
+  },
+  {
+    "url": "/records/18?section=review",
+    "title": "IRIS",
+    "body": "IRIS\n\n1\n\nResearch-to-IP Platform\n\nDiscover\nAsk IRIS\nMy Library\nMy Reviews\nCalls & Conferences\nAA\nAna Adviser\n,\nAdviser\n, account menu\nBack\n[DEMO] New ",
+    "pairs": [
+      {
+        "text": "Research-to-IP Platform",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Adviser",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Back",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "v1",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Overview",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "Files",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "Review workspace / current record",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Your readiness",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Timeline",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Open the review first.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 7.629256919887909
+      },
+      {
+        "text": "Open the review first.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 7.629256919887909
+      }
+    ],
+    "violations": []
+  },
+  {
+    "url": "/records/20?section=paper",
+    "title": "IRIS",
+    "body": "IRIS\n\n1\nDiscover\nAsk IRIS\nMy Library\nMy Reviews\nCalls & Conferences\nAA\nAna Adviser\n,\nAdviser\n, account menu\nBack\nWhere Do Long Captions Fail Position ",
+    "pairs": [
+      {
+        "text": "Adviser",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(255, 255, 255)",
+        "ratio": 4.797580078171407
+      },
+      {
+        "text": "Back",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "v1",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Overview",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "Review",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "Files",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(231, 229, 228)",
+        "ratio": 6.0764476275281085
+      },
+      {
+        "text": "140%",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Download",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "AI",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Where Do Long Captions Fail Position Aware Diagnosis and Reinforcement Learning for Detailed Image C",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(245, 245, 244)",
+        "ratio": 6.99340896974032
+      },
+      {
+        "text": "Answers come from this paper’s own text, with citations that open the passage.",
+        "fg": "rgb(87, 83, 78)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 7.304814479614014
+      },
+      {
+        "text": "Enter to send · Shift+Enter for a new line",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 4.59355777241922
+      },
+      {
+        "text": "Ask IRIS can make mistakes. Check important details against the cited papers.",
+        "fg": "rgb(120, 113, 108)",
+        "bg": "rgb(250, 250, 249)",
+        "ratio": 4.59355777241922
+      }
+    ],
+    "violations": []
+  }
+]

@@ -1,16 +1,41 @@
 from abc import ABC, abstractmethod
 from typing import List
 
+
+class UnsupportedCapability(Exception):
+    """The provider cannot serve this request; nothing is substituted."""
+
+
+class TransientProviderError(Exception):
+    """A sent attempt failed in a way another attempt may not (IR-725)."""
+
+
 class LLMProvider(ABC):
     """
     Abstract Base Class for LLM providers (e.g. OpenAI).
     """
+
     @abstractmethod
     async def generate_response(self, prompt: str, context: str = "") -> str:
         """
         Generate a response based on the prompt and context.
         """
         pass
+
+    def accepts(self, pin) -> bool:
+        """Whether this provider serves an AGENT `Pin` exactly (IR-727)."""
+        return False
+
+    def capacity(self, pin):
+        """The verified `ai.agent.context.Capacity` for a pin; None is unknown (IR-732)."""
+        return None
+
+    async def converse(self, request):
+        """One AGENT model turn for an `ai.agent.protocol.AgentRequest`.
+
+        Concrete so existing adapters stay valid; they refuse.
+        """
+        raise UnsupportedCapability("converse")
 
 class EmbeddingProvider(ABC):
     """

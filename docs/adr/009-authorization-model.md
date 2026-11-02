@@ -4,6 +4,8 @@
 
 Accepted — 2026-09-01
 
+[ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01 and not built yet, adds a seventh role, the System Admin, and moves the Audit Log and system settings to it. It keeps decision 2: Django's `is_staff` and `is_superuser` grant nothing in this API.
+
 ## Context
 
 IRIS enforces role-based access across six roles (Student, Adviser, RDCO, KTTO, ITSO, IERC) and object-level ownership on records, documents and files. `core/permissions.py` declares eleven permission classes, of which five are referenced nowhere.

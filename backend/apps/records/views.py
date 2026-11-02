@@ -3,8 +3,7 @@ from io import BytesIO
 from rest_framework import viewsets, mixins, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponse
 from django.utils import timezone
@@ -12,16 +11,17 @@ from django.db import transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import SearchFilter, OrderingFilter
-import jwt
 
 from core.enums import (
     DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
+    EmbargoState,
     IPType,
     PipelineStatus,
+    RecordTypeName,
     RequestStatus,
 )
-from . import lifecycle
+from . import embargo, lifecycle
 from core.permissions import (
     IsAdmin,
     IsAuthor,
@@ -29,8 +29,15 @@ from core.permissions import (
     IsRecordOwner,
     IsStaff,
 )
-from .download_service import file_response_for_record
-from .download_tokens import make_download_token, verify_download_token
+from .download_service import (
+    DownloadRequestAlreadyDecided,
+    GrantNotLive,
+    NoteRequired,
+    OwnDownloadRequest,
+    cancel_download_request,
+    decide_download_request,
+    revoke_download_grant,
+)
 # PUBLICLY_VISIBLE_STATUSES is imported from core.enums above, not from
 # .models: IR-153 added it to this line while IR-135 moved the definition into
 # core.enums, and taking it from both was a redefinition. The models module
@@ -45,11 +52,10 @@ from .serializers import (
     DeleteRequestSerializer,
 )
 from .filters import RecordFilter
-from .services import soft_delete_record, parse_excel_import
+from .services import ImportChoices, check_import_row, soft_delete_record, parse_excel_import
 from apps.notifications.services import (
     notify_new_record,
     notify_download_request,
-    notify_download_reviewed,
     notify_delete_approved,
     notify_delete_declined,
 )
@@ -140,7 +146,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "destroy"):
+        if self.action in ("update", "partial_update", "submit", "embargo_answer", "destroy"):
             return [IsAuthenticated(), IsRecordOwner()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
@@ -348,6 +354,15 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+        # The embargo answer (ADR-052 §2). Publish saved it through `embargo-answer/`
+        # before the file was sent. Refused like consent, before anything is written,
+        # so nothing enters review unanswered. A new Version goes through its own
+        # action and is not asked again.
+        if record.embargo_state == EmbargoState.UNKNOWN:
+            return Response(
+                {"embargoed": embargo.ANSWER_REQUIRED},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         try:
             # Consent, assignment, entry seat and v1 commit together.
             with transaction.atomic():
@@ -362,10 +377,43 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Notify the correct party — never raises (wrapped inside the service)
         notify_new_record(record, submitted_by=request.user)
 
+        from apps.ai.tasks import send_to_ai_on_commit
+
+        send_to_ai_on_commit(record.pk)
+
         return Response(
             {"detail": "Record submitted successfully. The adviser has been notified."},
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["post"], url_path="embargo-answer")
+    @transaction.atomic
+    def embargo_answer(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-answer/  {"embargoed": bool, "embargoed_until": date}
+
+        A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
+        It is saved before the file is sent, so nothing that runs at upload can
+        act on a paper whose answer the server doesn't have yet. Draft only:
+        after submission an embargo changes by its own acts (IR-812).
+        """
+        record = self.get_object()  # enforces IsRecordOwner object permission
+        Record.objects.select_for_update().get(pk=record.pk)
+        record = self.get_object()
+
+        if record.pipeline_status != PipelineStatus.DRAFT:
+            return Response(
+                {"detail": "This paper has been submitted, so its embargo can't be answered here."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        answer = embargo.answer_from(request.data)
+        if answer is None:
+            return Response(
+                {"embargoed": embargo.ANSWER_REQUIRED},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        embargo.record_answer(record, answer, actor=request.user)
+        return Response(embargo.state_payload(record))
 
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):
@@ -412,6 +460,67 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
+        response["Cache-Control"] = "private, no-store"
+        return response
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        """
+        GET /records/<id>/download/ -- save a copy of the manuscript (ADR-048).
+
+        For a reader who is exempt or holds a live grant. Anyone else who can
+        see the record gets a 403 whose `code` says why; `get_object()` has
+        already given everyone else the 404 of a missing record. The copy is
+        marked with who it was made for, or not served at all (IR-676).
+        """
+        from .download_service import (
+            DOWNLOAD_REFUSALS,
+            copy_identity,
+            download_access,
+            resolve_served_manuscript,
+        )
+        from .watermark import WatermarkFailed, watermark_pdf
+
+        record = self.get_object()
+        access = download_access(request.user, record)
+        if not access.allowed:
+            return Response(
+                {"detail": DOWNLOAD_REFUSALS[access.refusal], "code": access.refusal},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        handle, filename = resolve_served_manuscript(record, request.user)
+        if handle is None:
+            return Response(
+                {"detail": "No paper has been uploaded for this record."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        metadata = {"source": access.source}
+        if access.request:
+            metadata["request"] = access.request.pk
+        if access.exemption:
+            metadata["exemption"] = access.exemption
+
+        with handle:
+            source = handle.read()
+        try:
+            marked = watermark_pdf(source, copy_identity(request.user, access))
+        except WatermarkFailed:
+            create_audit_event(
+                "DOWNLOAD", request.user, record=record,
+                metadata={**metadata, "outcome": "watermark_failed"},
+            )
+            return Response(
+                {
+                    "detail": "A copy of this paper could not be prepared. Please contact RDCO.",
+                    "code": "watermark_failed",
+                },
+                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            )
+
+        create_audit_event("DOWNLOAD", request.user, record=record, metadata=metadata)
+        response = FileResponse(marked, content_type="application/pdf", as_attachment=True, filename=filename)
+        response["Cache-Control"] = "private, no-store"  # This copy names one reader
         return response
 
     @action(
@@ -456,6 +565,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
+        response["Cache-Control"] = "private, no-store"
         return response
 
     @action(detail=True, methods=["get"])
@@ -469,11 +579,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         narrower second visibility rule — and of the module IR-285 deleted.
 
         **Empty until the corpus is indexed.** A record with no vector has no
-        neighbours, and today no record has one: the disclosure gate refuses
-        every record while `Record` carries no embargo field (IR-250). That is
-        a visible behaviour change from keyword matching, and it is the
-        intended one — a keyword fallback would hide "nothing is indexed"
-        behind plausible results.
+        neighbours, and the disclosure gate refuses a record with no embargo
+        answer (ADR-052). That is a visible behaviour change from keyword
+        matching, and it is the intended one — a keyword fallback would hide
+        "nothing is indexed" behind plausible results.
         """
         from apps.ai.presentation import record_card
         from apps.ai.similarity import similar_records
@@ -698,8 +807,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         from apps.reviews.tracker import tracker_payload
 
         record = self.get_object()
+        extra = {"suggested_offices": request.data.get("suggested_offices")} if self.action == "accept_and_route" else {}
         _, refused = self._routing_refusal(lambda: act(
             record, request.user, to=request.data.get("to"), reason=request.data.get("reason"),
+            **extra,
         ))
         if refused is not None:
             return refused
@@ -710,10 +821,11 @@ class RecordViewSet(viewsets.ModelViewSet):
     def accept_and_route(self, request, pk=None):
         """
         POST /records/<id>/accept-and-route/
-        `{"to": [{"party": "itso", "nominee"?: user_id}, ...], "reason": str}`
+        `{"to": [{"party": "rdco", "nominees"?: [user_id, ...]}], "reason": str}`
 
-        The record's Adviser accepts a Thesis/Research or Project and routes it
-        to ITSO, IERC and/or KTTO (ADR-032 §3). Answers with the tracker.
+        The Adviser sends a Thesis/Research or Project to RDCO (ADR-047).
+        Optional suggested_offices are hints, never specialist requests.
+        Answers with the tracker.
         """
         from apps.reviews import routing
 
@@ -1095,14 +1207,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         Creates published records from each valid row and returns a plaintext log.
         Legacy imports bypass the review pipeline — staff is the implicit reviewer.
 
-        Rows are independent, and a row is saved whole or not at all: its
-        Record, primary owner and authors share one savepoint, so a failed
-        write leaves nothing of it behind (IR-637).
+        Rows are independent. A row whose values cannot be accepted is skipped
+        with every reason (`check_import_row`, IR-638), and a row is saved
+        whole or not at all: its Record, primary owner and authors share one
+        savepoint, so a failed write leaves nothing of it behind (IR-637).
         """
         from django.db import transaction
 
         from .models import Author, RecordOwner
-        from .models import RecordType, Classification, PSCEDClassification
 
         file = request.FILES.get("file")
         if not file:
@@ -1125,38 +1237,20 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         created = 0
         failed  = len(parse_errors)
+        choices = ImportChoices()
 
         for row in rows:
+            values, problems = check_import_row(row, choices)
+            if problems:
+                log_lines.append(f"Row {row['row_num']}: skipped — {'; '.join(problems)}.")
+                failed += 1
+                continue
             try:
-                record_type = RecordType.objects.filter(
-                    name__iexact=row["record_type_name"]
-                ).first()
-
-                classification = (
-                    Classification.objects.filter(name__iexact=row["classification_name"]).first()
-                    if row["classification_name"] else None
-                )
-                psced = (
-                    PSCEDClassification.objects.filter(name__iexact=row["psced_name"]).first()
-                    if row["psced_name"] else None
-                )
-
                 with transaction.atomic():
                     record = Record.objects.create(
-                        title                = row["title"],
-                        origin               = row["origin"],
-                        publication_year     = row["publication_year"],
-                        abstract             = row["abstract"],
-                        year_accomplished    = row["year_accomplished"],
-                        year_completed       = row["year_completed"],
-                        record_type          = record_type,
-                        classification       = classification,
-                        psced                = psced,
-                        is_ip                = row["is_ip"],
-                        for_commercialization= row["for_commercialization"],
-                        community_extension  = row["community_extension"],
-                        added_by             = request.user,
-                        pipeline_status      = lifecycle.LEGACY_IMPORT_STATUS,
+                        **values,
+                        added_by        = request.user,
+                        pipeline_status = lifecycle.LEGACY_IMPORT_STATUS,
                     )
                     RecordOwner.objects.create(record=record, user=request.user, is_primary=True)
                     for author_name in row["authors"]:
@@ -1242,7 +1336,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "This study proposes a tamper-proof academic credential system using distributed ledger technology.",
             2024,
             2024,
-            "Thesis/Research",
+            RecordTypeName.THESIS_RESEARCH,
             "Applied Sciences",
             "Information and Communication Technologies",
             "FALSE",
@@ -1261,7 +1355,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "Optional",
             "e.g. 2024",
             "e.g. 2024",
-            "Proposal / Thesis/Research / Project",
+            "Project, Proposal or Thesis / Research",
             "Exact name from the system",
             "Exact name from the system",
             "TRUE or FALSE",
@@ -1316,10 +1410,14 @@ class MyRecordsViewSet(mixins.ListModelMixin, mixins.RetrieveModelMixin, viewset
 
 class DownloadRequestViewSet(viewsets.ModelViewSet):
     """
-    GET    /download-requests/                    -- staff: all requests
+    GET    /download-requests/                    -- RDCO: all requests
     POST   /download-requests/                    -- authenticated user requests download
-    POST   /download-requests/<id>/approve/       -- staff: approve, email requester
-    POST   /download-requests/<id>/decline/       -- staff: decline, in-app notify requester
+    POST   /download-requests/<id>/approve/       -- RDCO: grant, email requester
+    POST   /download-requests/<id>/decline/       -- RDCO: decline with a `note`, notify requester
+    PATCH  /download-requests/<id>/               -- RDCO: the same decision, by `action`
+    POST   /download-requests/<id>/revoke/        -- RDCO: end a live grant with a `note` (IR-688)
+    POST   /download-requests/<id>/cancel/        -- the requester: withdraw their own pending request
+    GET    /download-requests/mine/               -- the reader: their own requests (IR-743)
     """
     serializer_class = DownloadRequestSerializer
     queryset         = DownloadRequest.objects.select_related("record", "requested_by")
@@ -1329,12 +1427,16 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
         # Anyone may *request* a download; only RDCO acts on the queue. This was
         # IsStaff, which is all four offices -- so ITSO or IERC could approve
         # release of a document from a record routed to neither of them (IR-165).
-        if self.action == "create":
+        if self.action in ("create", "cancel", "mine"):
             return [IsAuthenticated()]
         return [IsAuthenticated(), IsAdmin()]
 
     def get_queryset(self):
         qs = super().get_queryset()
+        if self.action == "cancel":
+            # Only one's own request, whatever one's role: anyone else's is a
+            # 404 identical to a missing one (IR-688).
+            qs = qs.filter(requested_by=self.request.user)
         status_filter = self.request.query_params.get("status")
         if status_filter:
             qs = qs.filter(status=status_filter)
@@ -1343,12 +1445,19 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         record = serializer.validated_data["record"]
         user   = self.request.user
+        from rest_framework.exceptions import ValidationError
+
+        from .download_service import download_access
+
         if DownloadRequest.objects.filter(
             record=record, requested_by=user, status=RequestStatus.PENDING
         ).exists():
-            from rest_framework.exceptions import ValidationError
             raise ValidationError(
                 {"record": ["You already have a pending download request for this record."]}
+            )
+        if download_access(user, record).source == "grant":
+            raise ValidationError(
+                {"record": ["You can already download this record."]}
             )
         dr = serializer.save(requested_by=user)
         notify_download_request(dr.record, requested_by=user)
@@ -1361,99 +1470,71 @@ class DownloadRequestViewSet(viewsets.ModelViewSet):
                 {"detail": "Provide action: 'approve' or 'decline'."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        if instance.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": "This request has already been reviewed."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        instance.reviewed_by = request.user
-        instance.reviewed_at = timezone.now()
-        instance.status = (
-            RequestStatus.APPROVED if action == "approve" else RequestStatus.DECLINED
+        response = self._refusal(
+            decide_download_request, instance, request.user,
+            approved=action == "approve", note=request.data.get("note"),
         )
-        instance.save(update_fields=["status", "reviewed_by", "reviewed_at"])
+        if response is not None:
+            return response
+        return Response(self.get_serializer(instance).data)
 
-        data = self.get_serializer(instance).data
-        if action == "approve":
-            token = make_download_token(
-                download_request_id=instance.id,
-                record_id=instance.record_id,
-                user_id=instance.requested_by_id,
-            )
-            data["download_url"] = f"{settings.FRONTEND_URL.rstrip('/')}/download?token={token}"
-        return Response(data)
-
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
+    @action(detail=True, methods=["post"])
     def approve(self, request, pk=None):
         """POST /download-requests/<id>/approve/ — set approved, notify requester with email."""
-        dr = self.get_object()
-        if dr.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        dr.status      = RequestStatus.APPROVED
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        notify_download_reviewed(dr, reviewed_by=request.user, approved=True)
-        return Response({"detail": "Download request approved. The requester has been notified."})
+        response = self._refusal(decide_download_request, self.get_object(), request.user, approved=True)
+        return response or Response(
+            {"detail": "Download request approved. The requester has been notified."}
+        )
 
-    @action(detail=True, methods=["post"], permission_classes=[IsAuthenticated, IsStaff])
+    @action(detail=True, methods=["post"])
     def decline(self, request, pk=None):
-        """POST /download-requests/<id>/decline/ — set declined, notify requester in-app."""
-        dr = self.get_object()
-        if dr.status != RequestStatus.PENDING:
-            return Response(
-                {"detail": f"Request is already '{dr.status}'."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        dr.status      = RequestStatus.DECLINED
-        dr.reviewed_by = request.user
-        dr.reviewed_at = timezone.now()
-        dr.save(update_fields=["status", "reviewed_by", "reviewed_at"])
-        notify_download_reviewed(dr, reviewed_by=request.user, approved=False)
-        return Response({"detail": "Download request declined. The requester has been notified."})
+        """POST /download-requests/<id>/decline/ {note} — set declined, notify requester."""
+        response = self._refusal(
+            decide_download_request, self.get_object(), request.user,
+            approved=False, note=request.data.get("note"),
+        )
+        return response or Response(
+            {"detail": "Download request declined. The requester has been notified."}
+        )
 
+    @action(detail=True, methods=["post"])
+    def revoke(self, request, pk=None):
+        """POST /download-requests/<id>/revoke/ {note} — end a live grant, notify the reader."""
+        download_request = self.get_object()
+        response = self._refusal(
+            revoke_download_grant, download_request, request.user, note=request.data.get("note"),
+        )
+        return response or Response(self.get_serializer(download_request).data)
 
-class DownloadRedeemView(APIView):
-    """
-    GET /records/download/?token=<jwt>
-    Redeem an approved download JWT and stream the record PDF.
-    """
-    permission_classes = [AllowAny]
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        """POST /download-requests/<id>/cancel/ — the requester withdraws a pending request."""
+        download_request = self.get_object()
+        response = self._refusal(cancel_download_request, download_request, request.user)
+        return response or Response(self.get_serializer(download_request).data)
 
-    def get(self, request):
-        token = request.query_params.get("token")
-        if not token:
-            return Response({"detail": "token is required."}, status=status.HTTP_400_BAD_REQUEST)
+    @action(detail=False, methods=["get"])
+    def mine(self, request):
+        """
+        GET /download-requests/mine/ — the reader's own requests, newest first
+        (IR-743). Only ever the caller's own, whatever their role, so anyone
+        else's request is invisible; RDCO's queue stays the list above.
+        """
+        from .download_service import reader_request_rows
+        return Response(reader_request_rows(request.user))
 
+    @staticmethod
+    def _refusal(act, download_request, user, **kwargs):
+        """Run `act`; its refusal as a Response, or None once it is done."""
         try:
-            claims = verify_download_token(token)
-        except jwt.ExpiredSignatureError:
-            return Response({"detail": "Download link has expired."}, status=status.HTTP_403_FORBIDDEN)
-        except jwt.InvalidTokenError:
-            return Response({"detail": "Invalid download link."}, status=status.HTTP_403_FORBIDDEN)
-
-        try:
-            dl_request = DownloadRequest.objects.select_related("record").get(
-                pk=claims["drid"], status=RequestStatus.APPROVED
-            )
-        except DownloadRequest.DoesNotExist:
-            return Response({"detail": "Download request not found or not approved."}, status=404)
-
-        if dl_request.record_id != claims["rid"] or dl_request.requested_by_id != claims["uid"]:
-            return Response({"detail": "Invalid download link."}, status=status.HTTP_403_FORBIDDEN)
-
-        response = file_response_for_record(dl_request.record)
-        if not response:
-            return Response(
-                {"detail": "No downloadable file is available for this record."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        # TODO(SRS): apply per-user watermark (email, date) before streaming when required
-        return response
+            act(download_request, user, **kwargs)
+        except OwnDownloadRequest as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except NoteRequired as exc:
+            return Response({"note": [str(exc)]}, status=status.HTTP_400_BAD_REQUEST)
+        except (DownloadRequestAlreadyDecided, GrantNotLive) as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return None
 
 
 class DeleteRequestViewSet(viewsets.ReadOnlyModelViewSet):

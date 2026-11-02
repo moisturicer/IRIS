@@ -2,6 +2,8 @@ version: "3.9"
 
 services:
   db:
+    networks:
+      - private
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
@@ -25,10 +27,18 @@ services:
         max-file: "3"
 
   redis:
+    networks:
+      - private
     image: redis:7-alpine
     restart: unless-stopped
+    # A password in both stacks (IR-669). redis-server stays the command so the
+    # image's entrypoint still drops root.
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}"]
+    environment:
+      REDISCLI_AUTH: ${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      # redis-cli exits 0 on a refused command, so read the answer.
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -39,6 +49,8 @@ services:
         max-file: "3"
 
   migrate:
+    networks:
+      - private
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -59,6 +71,9 @@ services:
         condition: service_healthy
 
   backend:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -80,12 +95,12 @@ services:
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       # Django's cache (IR-132). Database 1, so flushing the Celery
       # broker on 0 cannot take the query-embedding cache with it.
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - DOCLING_API_URL=http://docling:5001
       - AI_GATEWAY_URL=http://ai-gateway:8001
     depends_on:
@@ -107,6 +122,8 @@ services:
           memory: 1G
 
   docling:
+    networks:
+      - private
     # Variant (GPU or CPU) is chosen once by scripts/setup_env.py, which writes
     # DOCLING_VARIANT to the repo-root .env. Sizing, workers, the VRAM cap and
     # the reasoning are in docling/compose.yml and
@@ -118,6 +135,9 @@ services:
       - DOCLING_SERVE_ENABLE_UI=0
 
   ai-gateway:
+    networks:
+      - private
+      - egress
     build:
       context: ./ai
       dockerfile: Dockerfile
@@ -147,6 +167,9 @@ services:
           memory: 1g
 
   celery-default:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -170,12 +193,12 @@ services:
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       # Django's cache (IR-132). Database 1, so flushing the Celery
       # broker on 0 cannot take the query-embedding cache with it.
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
     depends_on:
       db:
         condition: service_healthy
@@ -185,6 +208,8 @@ services:
         condition: service_completed_successfully
 
   celery-extraction:
+    networks:
+      - private
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -208,12 +233,12 @@ services:
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       # Django's cache (IR-132). Database 1, so flushing the Celery
       # broker on 0 cannot take the query-embedding cache with it.
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - DOCLING_API_URL=http://docling:5001
       # Read by config.settings.base.DOCLING_TIMEOUT_SECONDS. Replaces
       # EXTRACTION_TIMEOUT, which was declared here and read by nothing.
@@ -232,6 +257,9 @@ services:
         condition: service_completed_successfully
 
   celery-embedding:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -255,12 +283,12 @@ services:
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       # Django's cache (IR-132). Database 1, so flushing the Celery
       # broker on 0 cannot take the query-embedding cache with it.
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - AI_GATEWAY_URL=http://ai-gateway:8001
     depends_on:
       db:
@@ -274,6 +302,9 @@ services:
   # much shadow traffic competes with readers at the vendor, which has no
   # priority mechanism. Idle unless AI_EVIDENCE_DECISION=shadow.
   celery-shadow:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -297,12 +328,12 @@ services:
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
       - DB_PASSWORD=${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}
-      - REDIS_URL=redis://redis:6379/0
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       # Django's cache (IR-132). Database 1, so flushing the Celery
       # broker on 0 cannot take the query-embedding cache with it.
-      - REDIS_CACHE_URL=redis://redis:6379/1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
     depends_on:
       db:
         condition: service_healthy
@@ -312,6 +343,8 @@ services:
         condition: service_completed_successfully
 
   celery-beat:
+    networks:
+      - private
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -325,7 +358,7 @@ services:
       - ./backend/.env
     environment:
       - DJANGO_SETTINGS_MODULE=config.settings.production
-      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - DB_HOST=db
       - DB_NAME=${DB_NAME:?set DB_NAME in the repo-root .env}
       - DB_USER=${DB_USER:?set DB_USER in the repo-root .env}
@@ -339,15 +372,19 @@ services:
         condition: service_completed_successfully
 
   frontend:
+    networks:
+      - private
     build:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      # 8080, not 80: the runtime image is nginx-unprivileged, which
-      # listens on 8080 because it does not run as root. Mapping 80:80
-      # made the frontend unreachable even when it started (IR-156).
-      - "80:8080"
+    # Not published (IR-847): Caddy is the only way in. nginx listens on 8080
+    # because the runtime image is nginx-unprivileged (IR-156).
+    # Set in the repo-root .env (IR-668). No allowlist closes /django-admin/ to
+    # everyone. The proxy count must match backend/.env's.
+    environment:
+      - DJANGO_ADMIN_ALLOWED_NETWORKS=${DJANGO_ADMIN_ALLOWED_NETWORKS:-}
+      - TRUSTED_PROXY_COUNT=${TRUSTED_PROXY_COUNT:-}
     # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
     # longer serves /media/, so the web container has no reason to be able to
     # read uploaded documents at all.
@@ -365,6 +402,47 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  # TLS (IR-847, ADR-056). Needs a public IRIS_DOMAIN with ports 80 and 443 open,
+  # and TRUSTED_PROXY_COUNT=2. Certificates persist in caddy_data, so a restart
+  # doesn't request new ones.
+  caddy:
+    networks:
+      - private
+      - egress
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - IRIS_DOMAIN=${IRIS_DOMAIN:?set IRIS_DOMAIN in the repo-root .env}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+# IR-825: `private` has no route to the internet, which contains a compromised
+# parser, database or cache. Only services that call a vendor, send mail or get
+# certificates also join `egress`. docs/security/SECURITY.md §7 lists why each does.
+networks:
+  private:
+    internal: true
+  egress:
+
 volumes:
   postgres_data:
   media_files:
+  caddy_data:
+  caddy_config:

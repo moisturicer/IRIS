@@ -21,8 +21,10 @@ from rest_framework import status
 
 from apps.audit.models import AuditEvent
 from apps.audit.services import create_audit_event
+from apps.documents.testing import real_pdf_bytes
 from apps.documents.models import DocumentRequest, DocumentRequestItem, UploadSlot
 from apps.records.models import Record
+from apps.records.testing import answered_no_embargo
 from apps.reviews.models import RecordAssignment, ResubmissionRequest, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from apps.reviews.test_new_version import RESTART_ALL, NewVersionTestBase, _pdf
@@ -102,7 +104,10 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
         return ReviewerSeat.objects.get(pk=response.data["id"])
 
     def claimed_and_opened(self, record, party, user):
-        seat = self.claim(record, party, user)
+        # The Adviser now nominates RDCO before any specialist is requested.
+        seat = self.assignment(record, party).seats.filter(reviewer=user).first()
+        if seat is None:
+            seat = self.claim(record, party, user)
         self.open_seat(seat, user)
         return seat
 
@@ -119,7 +124,7 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
         with self.captureOnCommitCallbacks(execute=True):
             response = self.client.post(
                 SUBMIT_DOCUMENT,
-                {"record": record.pk, "file": _pdf(b"%PDF-1.4 requested", "form.pdf"), **target},
+                {"record": record.pk, "file": _pdf(real_pdf_bytes(b"requested"), "form.pdf"), **target},
                 format="multipart",
             )
         return self.ok(response, status.HTTP_201_CREATED)
@@ -140,6 +145,7 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
         return self.ok(response, status.HTTP_200_OK)
 
     def submit_via_api(self, record):
+        answered_no_embargo(record.pk)
         response = self.post(reverse("record-submit", args=[record.pk]), self.owner,
                              {"dpa_accepted": True})
         return self.ok(response, status.HTTP_200_OK)
@@ -171,7 +177,7 @@ class EntryAndRoutingTests(AuditTestBase):
 
         self.assertEqual(
             self.types(record)[1:],  # after SUBMITTED
-            ["DECISION_RECORDED", "ASSIGNMENT_CLOSED", "ROUTED", "ROUTED"],
+            ["DECISION_RECORDED", "ASSIGNMENT_CLOSED", "SEAT_NOMINATED", "ROUTED", "ROUTED", "ROUTED"],
         )
         decision = self.one(record, AuditEvent.DECISION_RECORDED)
         self.assertEqual(decision["user"], self.adviser.pk)
@@ -184,22 +190,22 @@ class EntryAndRoutingTests(AuditTestBase):
         routed = [row["metadata"] for row in self.events(record, AuditEvent.ROUTED)]
         self.assertEqual(
             sorted((m["from_party"], m["to_party"], m["opened"], m["hand_back"]) for m in routed),
-            [(Party.ADVISER, Party.IERC, True, False), (Party.ADVISER, Party.ITSO, True, False)],
+            [(Party.ADVISER, Party.RDCO, True, False), (Party.RDCO, Party.IERC, True, False), (Party.RDCO, Party.ITSO, True, False)],
         )
-        self.assertEqual(len({m["group"] for m in routed}), 1, "one movement, one group")
+        self.assertEqual(len({m["group"] for m in routed}), 2, "Adviser send and RDCO routing are distinct movements")
 
     def test_a_nominee_is_named_on_the_route_and_seated_as_nominated(self):
         record = self.new_model()
         self.adviser_seat(record)
 
-        self.ok(self.accept(record, [{"party": Party.ITSO, "nominee": self.itso.pk}]))
+        self.ok(self.accept(record, [{"party": Party.RDCO, "nominees": [self.rdco.pk]}]))
 
-        self.assertEqual(self.one(record, AuditEvent.ROUTED)["metadata"]["nominee"], self.itso.pk)
+        self.assertEqual(self.one(record, AuditEvent.ROUTED)["metadata"]["nominees"], [self.rdco.pk])
         nominated = self.one(record, AuditEvent.SEAT_NOMINATED)
         self.assertEqual(nominated["user"], self.adviser.pk)
         self.assertEqual(
             (nominated["metadata"]["party"], nominated["metadata"]["reviewer"]),
-            (Party.ITSO, self.itso.pk),
+            (Party.RDCO, self.rdco.pk),
         )
 
     def test_routing_to_a_party_already_holding_the_record_starts_no_clock(self):
@@ -207,7 +213,7 @@ class EntryAndRoutingTests(AuditTestBase):
         self.claimed_and_opened(record, Party.ITSO, self.itso)
         self.ok(self.route(record, self.itso, [{"party": Party.IERC}]))
 
-        self.ok(self.route(record, self.itso, [{"party": Party.IERC, "nominee": self.ierc.pk}]))
+        self.ok(self.route(record, self.itso, [{"party": Party.IERC, "nominees": [self.ierc.pk]}]))
 
         to_ierc = [
             row["metadata"]["opened"] for row in self.events(record, AuditEvent.ROUTED)
@@ -215,18 +221,13 @@ class EntryAndRoutingTests(AuditTestBase):
         ]
         self.assertEqual(to_ierc, [True, False])
 
-    def test_the_hand_back_to_rdco_is_a_routing_movement_nobody_made(self):
+    def test_office_completion_creates_no_routing_or_hand_back_event(self):
         record = self.routed(Party.ITSO)
         self.claimed_and_opened(record, Party.ITSO, self.itso)
-
+        before = self.events(record, AuditEvent.ROUTED)
         self.cleared(record, self.itso)
-
-        hand_back = self.events(record, AuditEvent.ROUTED)[-1]
-        self.assertIsNone(hand_back["user"])
-        self.assertEqual(
-            {k: hand_back["metadata"][k] for k in ("from_party", "to_party", "opened", "hand_back")},
-            {"from_party": Party.ITSO, "to_party": Party.RDCO, "opened": True, "hand_back": True},
-        )
+        self.assertEqual(self.events(record, AuditEvent.ROUTED), before)
+        self.assertFalse(any(e["metadata"]["hand_back"] for e in before))
 
 
 class OfficeVerdictTests(AuditTestBase):
@@ -267,15 +268,15 @@ class DecisionTests(AuditTestBase):
     def test_publish_writes_the_decision_and_published(self):
         record = self.at_adviser()
 
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
 
         self.assertEqual(
             {k: self.final(record)["metadata"][k] for k in ("party", "outcome", "final", "version")},
-            {"party": Party.ADVISER, "outcome": "publish", "final": True, "version": 1},
+            {"party": Party.RDCO, "outcome": "publish", "final": True, "version": 1},
         )
         published = self.one(record, AuditEvent.PUBLISHED)
-        self.assertEqual(published["user"], self.adviser.pk)
-        self.assertEqual(published["metadata"], {"party": Party.ADVISER, "version": 1})
+        self.assertEqual(published["user"], self.rdco.pk)
+        self.assertEqual(published["metadata"], {"party": Party.RDCO, "version": 1})
 
     def test_keep_unlisted_writes_the_decision_only(self):
         record = self.at_rdco()
@@ -352,7 +353,7 @@ class RevisionTests(AuditTestBase):
         row = self.one(record, AuditEvent.REVISION_REQUEST_WITHDRAWN)
         self.assertEqual(
             row["metadata"],
-            {"party": Party.IERC, "request": request.pk, "closed_by": "requesting_party"},
+            {"party": Party.IERC, "request": request.pk, "closed_by": "requesting_party", "closed_by_decision": False, "decision": None},
         )
 
 
@@ -422,7 +423,8 @@ class SeatTests(AuditTestBase):
 
         seat_rows = [
             row for row in self.events(record)
-            if row["event_type"].startswith("SEAT_") or row["event_type"] == "REVIEWER_ADDED"
+            if (row["event_type"].startswith("SEAT_") or row["event_type"] == "REVIEWER_ADDED")
+            and row["metadata"]["party"] == Party.ITSO
         ]
         self.assertEqual(
             [(row["event_type"], row["user"], row["metadata"]["seat"], row["metadata"]["reviewer"])
@@ -472,17 +474,17 @@ class RecordWithdrawnTests(AuditTestBase):
         self.assertEqual(withdrawn["user"], self.owner.pk)
         self.assertEqual(
             withdrawn["metadata"],
-            {"version": 1, "closed_parties": [Party.IERC, Party.ITSO]},
+            {"version": 1, "closed_parties": [Party.IERC, Party.ITSO, Party.RDCO]},
         )
         closed = {
             row["metadata"]["party"]: row["metadata"]["how"]
             for row in self.events(record, AuditEvent.ASSIGNMENT_CLOSED)
             if row["metadata"]["party"] != Party.ADVISER
         }
-        self.assertEqual(closed, {Party.ITSO: "withdrawn", Party.IERC: "withdrawn"})
+        self.assertEqual(closed, {Party.ITSO: "withdrawn", Party.IERC: "withdrawn", Party.RDCO: "withdrawn"})
         self.assertEqual(
             self.one(record, AuditEvent.REVISION_REQUEST_WITHDRAWN)["metadata"],
-            {"party": Party.IERC, "request": revision.pk, "closed_by": "record_withdrawn"},
+            {"party": Party.IERC, "request": revision.pk, "closed_by": "record_withdrawn", "closed_by_decision": False, "decision": None},
         )
         documents = self.one(record, AuditEvent.DOCUMENT_REQUEST_WITHDRAWN)["metadata"]
         self.assertEqual(
@@ -605,7 +607,7 @@ class TransactionTests(AuditTestBase):
         with self.captureOnCommitCallbacks(execute=True):
             with self.assertRaisesRegex(RuntimeError, "outer rollback"):
                 with transaction.atomic():
-                    self.decided(record, self.adviser, "publish")
+                    self.publish_via_rdco(record)
                     self.assertIn("PUBLISHED", self.types(record))
                     raise RuntimeError("outer rollback")
 
@@ -659,11 +661,11 @@ class AuditFailureTests(AuditTestBase):
 
         with patch.object(AuditEvent, "save", _fail_insert):
             with self.assertLogs("apps.audit.services", level="ERROR") as logs:
-                response = self.accept(record, [{"party": Party.ITSO}])
+                response = self.accept(record, [{"party": Party.RDCO}])
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(
-            RecordAssignment.objects.get(record=record, party=Party.ITSO).state,
+            RecordAssignment.objects.get(record=record, party=Party.RDCO).state,
             AssignmentState.ACTIVE,
         )
         self.assertEqual(

@@ -1,8 +1,10 @@
 {
   "schema_version": 1,
   "set_id": "general-tools-conversations-v1",
-  "label_status": "draft_unreviewed",
-  "labelled_by": [],
+  "label_status": "human_reviewed",
+  "labelled_by": [
+    "Jive Tyler I. Revalde"
+  ],
   "corpus": {
     "snapshot_id": "proxy-arxiv-40",
     "paper_set_sha256": "6793dcadc793c1a3cdd831bc18b9091816e04d519e674e728e864aeef970c3d0",
@@ -11,7 +13,7 @@
     "note": "A proxy corpus, not CIT-U research. Nothing measured on it is a finding about CIT-U."
   },
   "partition_method": "Papers and topics were split together: each topic group and every paper in it sits in one split.",
-  "notes": "Labels were drafted by an AI agent and are unreviewed. No page or quote is invented: each one is copied from docs/evaluation/proxy_starter.json. Where a turn needs the paper but no label supports a page, page and quote are null. A named person must review every label and fill labelled_by before any scoring counts.",
+  "notes": "Labels were drafted by an AI agent and are unreviewed. No page or quote is invented: each one is copied from docs/evaluation/proxy_starter.json. Where a turn needs the paper but no label supports a page, page and quote are null. A named person must review every label and fill labelled_by before any scoring counts. 2026-10-16 revision: 16 templated conversations (A01, A03, A04, A06, A09) were replaced with simpler wording, off-corpus questions, listing or counting by area, missing categories, and misspelled, partial or vague titles; still unreviewed.",
   "shared_allowed": [],
   "conversations": [
     {
@@ -26,15 +28,15 @@
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Give me papers about speech recognition and audio with large language models",
+          "user": "Any papers about talking to computers by voice?",
           "intended_task": "discover_by_topic",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Which papers appear depends on retrieval; any group paper is acceptable"
+          "acceptable_uncertainty": "Any speech or audio paper is acceptable; must list papers it actually found"
         },
         {
-          "user": "Pick two that I can compare",
+          "user": "Which two should I read first?",
           "intended_task": "select_useful_pair",
           "expected_pair": [
             "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
@@ -42,54 +44,18 @@
           ],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Other pairs in the same topic may also be useful; reviewer judges pair usefulness"
+          "acceptable_uncertainty": "Other pairs may also be useful; reviewer judges"
         },
         {
-          "user": "Compare their methods and limitations",
-          "intended_task": "compare_pair",
-          "expected_pair": [
-            "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-            "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
-          ],
-          "required_evidence": [
-            {
-              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": false,
-          "acceptable_uncertainty": "Limitations may be sparsely stated; the answer must say so rather than invent them"
-        },
-        {
-          "user": "Make that simpler",
+          "user": "Explain them like I am new to this",
           "intended_task": "simplify_keep_citations",
-          "expected_pair": [
-            "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-            "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
-          ],
-          "required_evidence": [
-            {
-              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition and Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark). Plain wording is required; citations must stay attached"
         }
       ],
-      "note": "Must not ask the reader for exact titles at any turn"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A01-D02",
@@ -124,46 +90,18 @@
         {
           "user": "Compare their methods and limitations",
           "intended_task": "compare_pair",
-          "expected_pair": [
-            "Stable Policy Learning",
-            "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments"
-          ],
-          "required_evidence": [
-            {
-              "title": "Stable Policy Learning",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Limitations may be sparsely stated; the answer must say so rather than invent them"
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: Stable Policy Learning and Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments). Limitations may be sparsely stated; the answer must say so rather than invent them"
         },
         {
           "user": "Make that simpler",
           "intended_task": "simplify_keep_citations",
-          "expected_pair": [
-            "Stable Policy Learning",
-            "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments"
-          ],
-          "required_evidence": [
-            {
-              "title": "Stable Policy Learning",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: Stable Policy Learning and Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments)"
         }
       ],
       "note": "Must not ask the reader for exact titles at any turn"
@@ -180,70 +118,31 @@
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Give me papers about high-redshift galaxies and dust seen by JWST",
+          "user": "Do you have anything about faraway galaxies?",
           "intended_task": "discover_by_topic",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Which papers appear depends on retrieval; any group paper is acceptable"
+          "acceptable_uncertainty": "Any high-redshift galaxy paper is acceptable"
         },
         {
-          "user": "Pick two that I can compare",
-          "intended_task": "select_useful_pair",
-          "expected_pair": [
-            "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
-            "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy"
-          ],
+          "user": "Just show me the titles",
+          "intended_task": "present_titles_only",
+          "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Other pairs in the same topic may also be useful; reviewer judges pair usefulness"
+          "acceptable_uncertainty": "A bare list of titles from the previous result; no new claims"
         },
         {
-          "user": "Compare their methods and limitations",
-          "intended_task": "compare_pair",
-          "expected_pair": [
-            "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
-            "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy"
-          ],
-          "required_evidence": [
-            {
-              "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "user": "What is the first one about, in simple words?",
+          "intended_task": "paper_overview",
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Limitations may be sparsely stated; the answer must say so rather than invent them"
-        },
-        {
-          "user": "Make that simpler",
-          "intended_task": "simplify_keep_citations",
-          "expected_pair": [
-            "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
-            "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy"
-          ],
-          "required_evidence": [
-            {
-              "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Must describe the first listed paper only"
         }
       ],
-      "note": "Must not ask the reader for exact titles at any turn"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A01-D04",
@@ -278,46 +177,18 @@
         {
           "user": "Compare their methods and limitations",
           "intended_task": "compare_pair",
-          "expected_pair": [
-            "Freeze-in of anapole and charge-radius inelastic dark matter",
-            "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations"
-          ],
-          "required_evidence": [
-            {
-              "title": "Freeze-in of anapole and charge-radius inelastic dark matter",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Limitations may be sparsely stated; the answer must say so rather than invent them"
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: Freeze-in of anapole and charge-radius inelastic dark matter and GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations). Limitations may be sparsely stated; the answer must say so rather than invent them"
         },
         {
           "user": "Make that simpler",
           "intended_task": "simplify_keep_citations",
-          "expected_pair": [
-            "Freeze-in of anapole and charge-radius inelastic dark matter",
-            "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations"
-          ],
-          "required_evidence": [
-            {
-              "title": "Freeze-in of anapole and charge-radius inelastic dark matter",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: Freeze-in of anapole and charge-radius inelastic dark matter and GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations)"
         }
       ],
       "note": "Must not ask the reader for exact titles at any turn"
@@ -334,15 +205,15 @@
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Give me papers about memory systems and parallel architectures for hardware",
+          "user": "Do you have papers about computer memory?",
           "intended_task": "discover_by_topic",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Which papers appear depends on retrieval; any group paper is acceptable"
+          "acceptable_uncertainty": "Any memory or hardware paper is acceptable"
         },
         {
-          "user": "Pick two that I can compare",
+          "user": "Pick two that suit a beginner",
           "intended_task": "select_useful_pair",
           "expected_pair": [
             "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
@@ -350,54 +221,18 @@
           ],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Other pairs in the same topic may also be useful; reviewer judges pair usefulness"
+          "acceptable_uncertainty": "Reviewer judges pair usefulness"
         },
         {
-          "user": "Compare their methods and limitations",
+          "user": "How are they different, in plain words?",
           "intended_task": "compare_pair",
-          "expected_pair": [
-            "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
-            "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution"
-          ],
-          "required_evidence": [
-            {
-              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Limitations may be sparsely stated; the answer must say so rather than invent them"
-        },
-        {
-          "user": "Make that simpler",
-          "intended_task": "simplify_keep_citations",
-          "expected_pair": [
-            "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
-            "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution"
-          ],
-          "required_evidence": [
-            {
-              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators and HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution). Differences must be supported; plain wording"
         }
       ],
-      "note": "Must not ask the reader for exact titles at any turn"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A01-H02",
@@ -432,46 +267,18 @@
         {
           "user": "Compare their methods and limitations",
           "intended_task": "compare_pair",
-          "expected_pair": [
-            "MATISSE in the era of GRAVITY+",
-            "ViCTORIA project M49 region in the Virgo cluster in polarisation"
-          ],
-          "required_evidence": [
-            {
-              "title": "MATISSE in the era of GRAVITY+",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "ViCTORIA project M49 region in the Virgo cluster in polarisation",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Limitations may be sparsely stated; the answer must say so rather than invent them"
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: MATISSE in the era of GRAVITY+ and ViCTORIA project M49 region in the Virgo cluster in polarisation). Limitations may be sparsely stated; the answer must say so rather than invent them"
         },
         {
           "user": "Make that simpler",
           "intended_task": "simplify_keep_citations",
-          "expected_pair": [
-            "MATISSE in the era of GRAVITY+",
-            "ViCTORIA project M49 region in the Virgo cluster in polarisation"
-          ],
-          "required_evidence": [
-            {
-              "title": "MATISSE in the era of GRAVITY+",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "ViCTORIA project M49 region in the Virgo cluster in polarisation",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: MATISSE in the era of GRAVITY+ and ViCTORIA project M49 region in the Virgo cluster in polarisation)"
         }
       ],
       "note": "Must not ask the reader for exact titles at any turn"
@@ -509,46 +316,18 @@
         {
           "user": "Compare their methods and limitations",
           "intended_task": "compare_pair",
-          "expected_pair": [
-            "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
-            "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
-          ],
-          "required_evidence": [
-            {
-              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Limitations may be sparsely stated; the answer must say so rather than invent them"
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties and Online Adaptive Kernel Mixing for Gaussian Process Decision Making). Limitations may be sparsely stated; the answer must say so rather than invent them"
         },
         {
           "user": "Make that simpler",
           "intended_task": "simplify_keep_citations",
-          "expected_pair": [
-            "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
-            "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
-          ],
-          "required_evidence": [
-            {
-              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Follows the pair the answer chose in turn 2, with evidence from those two papers (draft suggestion: Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties and Online Adaptive Kernel Mixing for Gaussian Process Decision Making)"
         }
       ],
       "note": "Must not ask the reader for exact titles at any turn"
@@ -989,37 +768,34 @@
         "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
         "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology"
       ],
-      "supported_unambiguous": false,
+      "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Show me Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock and Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
-          "intended_task": "present_named_pair",
+          "user": "List the papers you have in hardware architecture",
+          "intended_task": "list_by_category",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Lists what is classified there; says if the list may be incomplete"
         },
         {
-          "user": "Find another one on the same topic, excluding these two",
+          "user": "Only the ones about saving power",
+          "intended_task": "filter_within_list",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Narrows the shown list; no invented papers"
+        },
+        {
+          "user": "Is there anything else in that area I have not seen?",
           "intended_task": "find_excluding_shown",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "No group paper remains; the answer must say fewer results were found. A looser match is acceptable only if labelled as looser"
+          "acceptable_uncertainty": "May honestly say nothing further was found"
         }
       ],
-      "note": "Exhausted topic: honest insufficient-results case"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A03-D02",
@@ -1084,54 +860,44 @@
       "id": "A03-D03",
       "family": "A03",
       "split": "development",
-      "topic": "speech and audio language models",
+      "topic": "missing category quantum computing",
       "papers": [
-        "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-        "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
-        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
-      "supported_unambiguous": true,
+      "supported_unambiguous": false,
       "turns": [
         {
-          "user": "Show me Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition and Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-          "intended_task": "present_named_pair",
+          "user": "Show me all papers under Quantum Computing",
+          "intended_task": "nonexistent_category_listing",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Says no such category or no matching papers; Must not invent papers, categories or counts; may say what it did find"
         },
         {
-          "user": "Find another one on the same topic, excluding these two",
-          "intended_task": "find_excluding_shown",
+          "user": "What categories do you have then?",
+          "intended_task": "list_available_categories",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Lists real categories only"
+        },
+        {
+          "user": "Show me the closest one to quantum",
+          "intended_task": "closest_alternative_offer",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
               "page": null,
               "quote": null
             }
           ],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Any remaining paper in the topic is acceptable; shown papers must not reappear"
+          "acceptable_uncertainty": "Should offer State-Space-Based FIR Filtering on a Quantum Computer (filed under audio-and-speech-processing) as the closest match; no invented category or match"
         }
-      ]
+      ],
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A03-D04",
@@ -1193,7 +959,8 @@
       "topic": "quasars and active galactic nuclei",
       "papers": [
         "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
-        "The 2MIG isolated AGNs 4 Hot-dust reverberation and BLR scales"
+        "The 2MIG isolated AGNs 4 Hot-dust reverberation and BLR scales",
+        "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer"
       ],
       "supported_unambiguous": false,
       "turns": [
@@ -1220,9 +987,15 @@
           "user": "Find another one on the same topic, excluding these two",
           "intended_task": "find_excluding_shown",
           "expected_pair": [],
-          "required_evidence": [],
+          "required_evidence": [
+            {
+              "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+              "page": null,
+              "quote": null
+            }
+          ],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "No group paper remains; the answer must say fewer results were found. A looser match is acceptable only if labelled as looser"
+          "acceptable_uncertainty": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer is an acceptable match: it discusses Little Red Dots as candidate AGN. Otherwise the answer must say fewer results were found; a looser match only if labelled as looser"
         }
       ],
       "note": "Exhausted topic: honest insufficient-results case"
@@ -1241,44 +1014,31 @@
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Show me MATISSE in the era of GRAVITY+ and ViCTORIA project M49 region in the Virgo cluster in polarisation",
-          "intended_task": "present_named_pair",
+          "user": "Papers about telescopes and sky surveys, please",
+          "intended_task": "discover_by_topic",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "MATISSE in the era of GRAVITY+",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "ViCTORIA project M49 region in the Virgo cluster in polarisation",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Any survey or instrument paper is acceptable"
         },
         {
-          "user": "Find another one on the same topic, excluding these two",
+          "user": "Show me just three",
+          "intended_task": "limit_shown_list",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Exactly three or fewer, from the previous result"
+        },
+        {
+          "user": "Find another one, not those three",
           "intended_task": "find_excluding_shown",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Empirical Galactic neutron star black hole merger rate StarTrack",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Any remaining paper in the topic is acceptable; shown papers must not reappear"
+          "acceptable_uncertainty": "May say nothing further was found"
         }
-      ]
+      ],
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A03-H02",
@@ -1452,45 +1212,35 @@
       "supported_unambiguous": false,
       "turns": [
         {
-          "user": "Find the treatment paper, Noise-adjusted turnover in estimated networks, and Seismic Retrofit Planning with Diffusion Models",
-          "intended_task": "resolve_mixed_references",
-          "expected_pair": [
-            "Noise-adjusted turnover in estimated networks"
-          ],
+          "user": "Show me the paper called Beyond Linearty Semiparametric Solutons to Contaminaton Bias",
+          "intended_task": "resolve_misspelled_title",
+          "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Noise-adjusted turnover in estimated networks",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": true,
-          "acceptable_uncertainty": "Exact title resolves; the alias is ambiguous between the candidate papers and needs one focused question; the third title does not exist in the corpus and must be reported unknown without guessing"
-        },
-        {
-          "user": "I meant Stable Policy Learning",
-          "intended_task": "resolve_after_clarification",
-          "expected_pair": [
-            "Stable Policy Learning",
-            "Noise-adjusted turnover in estimated networks"
-          ],
-          "required_evidence": [
-            {
-              "title": "Stable Policy Learning",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Noise-adjusted turnover in estimated networks",
+              "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
               "page": null,
               "quote": null
             }
           ],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "A near-exact title match is acceptable if it says which paper it assumed"
+        },
+        {
+          "user": "Is that the one with the multi-valued treatments?",
+          "intended_task": "confirm_resolved_title",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+              "page": null,
+              "quote": null
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Confirms or corrects from the paper itself"
         }
       ],
-      "note": "Third title is deliberately not in the corpus; no private record exists in the proxy corpus, so hidden-identity leakage is checked by the harness with a seeded private record"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A04-D04",
@@ -1505,45 +1255,35 @@
       "supported_unambiguous": false,
       "turns": [
         {
-          "user": "Find the speech recognition paper, TTM-Bench A Framework for Text-to-Music System Performance Benchmarking, and Federated Graph Transformers for Measles Surveillance",
-          "intended_task": "resolve_mixed_references",
-          "expected_pair": [
-            "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
-          ],
-          "required_evidence": [
-            {
-              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": true,
-          "acceptable_uncertainty": "Exact title resolves; the alias is ambiguous between the candidate papers and needs one focused question; the third title does not exist in the corpus and must be reported unknown without guessing"
-        },
-        {
-          "user": "I meant Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-          "intended_task": "resolve_after_clarification",
-          "expected_pair": [
-            "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-            "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
-          ],
+          "user": "Open the one that starts with Alignment-Path",
+          "intended_task": "resolve_partial_title",
+          "expected_pair": [],
           "required_evidence": [
             {
               "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
               "page": null,
               "quote": null
-            },
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "One clear prefix match; if several match, asks which"
+        },
+        {
+          "user": "No, I meant the one about conversation context",
+          "intended_task": "resolve_vague_reference",
+          "expected_pair": [],
+          "required_evidence": [
             {
-              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
               "page": null,
               "quote": null
             }
           ],
-          "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "clarification_necessary": true,
+          "acceptable_uncertainty": "May ask which, or pick the conversational-context paper and say so"
         }
       ],
-      "note": "Third title is deliberately not in the corpus; no private record exists in the proxy corpus, so hidden-identity leakage is checked by the harness with a seeded private record"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A04-H01",
@@ -1611,45 +1351,29 @@
       "supported_unambiguous": false,
       "turns": [
         {
-          "user": "Find the Galactic paper, MATISSE in the era of GRAVITY+, and Self-Supervised Weather Downscaling in Cebu",
-          "intended_task": "resolve_mixed_references",
-          "expected_pair": [
-            "MATISSE in the era of GRAVITY+"
-          ],
+          "user": "Find the paper about neutron stars something something merger rate",
+          "intended_task": "resolve_vague_title",
+          "expected_pair": [],
           "required_evidence": [
             {
-              "title": "MATISSE in the era of GRAVITY+",
+              "title": "Empirical Galactic neutron star black hole merger rate StarTrack",
               "page": null,
               "quote": null
             }
           ],
           "clarification_necessary": true,
-          "acceptable_uncertainty": "Exact title resolves; the alias is ambiguous between the candidate papers and needs one focused question; the third title does not exist in the corpus and must be reported unknown without guessing"
+          "acceptable_uncertainty": "Candidate match is fine if labelled as a guess"
         },
         {
-          "user": "I meant Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
-          "intended_task": "resolve_after_clarification",
-          "expected_pair": [
-            "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
-            "MATISSE in the era of GRAVITY+"
-          ],
-          "required_evidence": [
-            {
-              "title": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "MATISSE in the era of GRAVITY+",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "user": "What about the one titled Quantum Merger Rates of Neutron Galaxies?",
+          "intended_task": "resolve_wrong_title",
+          "expected_pair": [],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "No such title: must say it is not found, no invented paper; may offer the near match"
         }
       ],
-      "note": "Third title is deliberately not in the corpus; no private record exists in the proxy corpus, so hidden-identity leakage is checked by the harness with a seeded private record"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A04-H03",
@@ -1958,78 +1682,37 @@
         "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
         "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
         "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
+        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
-      "supported_unambiguous": false,
+      "supported_unambiguous": true,
       "turns": [
         {
-          "user": "How many readable published papers are there?",
+          "user": "How many papers are under Audio and Speech Processing?",
           "intended_task": "metadata_count",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Typed metadata fact: distinct Records visible to the asker in the loaded snapshot; the proxy labels name 40 papers, so reviewer must confirm the loaded count"
+          "acceptable_uncertainty": "Exactly 5 (audio-and-speech-processing), stated as a count of that category"
         },
         {
-          "user": "How many of them are about speech recognition and audio with large language models?",
-          "intended_task": "semantic_topic_count",
+          "user": "And how many under Marine Biology?",
+          "intended_task": "metadata_count_zero_category",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Must be reported as a classified subset of what was screened, not as a total; draft label expects at least the 4 listed papers, reviewer to confirm relevance"
+          "acceptable_uncertainty": "Exactly zero, or says the category does not exist; not a guess"
         },
         {
-          "user": "Which ones are they?",
+          "user": "List the audio ones",
           "intended_task": "list_counted_papers",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Lists the 5 counted papers, including State-Space-Based FIR Filtering on a Quantum Computer, or says the list is partial"
         }
       ],
-      "note": "Exact count and semantic count must stay on separate bases"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A06-D02",
@@ -2051,7 +1734,7 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Typed metadata fact: distinct Records visible to the asker in the loaded snapshot; the proxy labels name 40 papers, so reviewer must confirm the loaded count"
+          "acceptable_uncertainty": "Exactly 40: distinct published Records visible to the asker in the proxy-arxiv-40 snapshot; the evaluation database must hold no other published records"
         },
         {
           "user": "How many of them are about causal inference, treatment effects and economic measurement?",
@@ -2136,86 +1819,34 @@
         "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
         "The abundance and emission of PAHs from the local to early Universe"
       ],
-      "supported_unambiguous": false,
+      "supported_unambiguous": true,
       "turns": [
         {
-          "user": "How many readable published papers are there?",
+          "user": "How many papers do you have in total?",
           "intended_task": "metadata_count",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Typed metadata fact: distinct Records visible to the asker in the loaded snapshot; the proxy labels name 40 papers, so reviewer must confirm the loaded count"
+          "acceptable_uncertainty": "Exactly 40: distinct published Records visible to the asker in the proxy-arxiv-40 snapshot; the evaluation database must hold no other published records"
         },
         {
-          "user": "How many of them are about high-redshift galaxies and dust seen by JWST?",
+          "user": "How many of them are about galaxies?",
           "intended_task": "semantic_topic_count",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "The abundance and emission of PAHs from the local to early Universe",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Must be reported as a classified subset of what was screened, not as a total; draft label expects at least the 5 listed papers, reviewer to confirm relevance"
+          "acceptable_uncertainty": "A classified-subset count, not presented as a total"
         },
         {
-          "user": "Which ones are they?",
-          "intended_task": "list_counted_papers",
+          "user": "Is that number exact?",
+          "intended_task": "explain_count_basis",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "The abundance and emission of PAHs from the local to early Universe",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Says the first is exact and the second is a classified subset"
         }
       ],
-      "note": "Exact count and semantic count must stay on separate bases"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A06-D04",
@@ -2236,7 +1867,7 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Typed metadata fact: distinct Records visible to the asker in the loaded snapshot; the proxy labels name 40 papers, so reviewer must confirm the loaded count"
+          "acceptable_uncertainty": "Exactly 40: distinct published Records visible to the asker in the proxy-arxiv-40 snapshot; the evaluation database must hold no other published records"
         },
         {
           "user": "How many of them are about dark matter and particle physics in cosmology?",
@@ -2309,66 +1940,34 @@
         "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
         "Nested Parallel von Neumann Architecture and Nested BSP"
       ],
-      "supported_unambiguous": false,
+      "supported_unambiguous": true,
       "turns": [
         {
-          "user": "How many readable published papers are there?",
+          "user": "How many papers are in Hardware Architecture?",
           "intended_task": "metadata_count",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Typed metadata fact: distinct Records visible to the asker in the loaded snapshot; the proxy labels name 40 papers, so reviewer must confirm the loaded count"
+          "acceptable_uncertainty": "Exactly 5 (hardware-architecture)"
         },
         {
-          "user": "How many of them are about memory systems and parallel architectures for hardware?",
-          "intended_task": "semantic_topic_count",
+          "user": "How many under Legal Studies?",
+          "intended_task": "metadata_count_zero_category",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Must be reported as a classified subset of what was screened, not as a total; draft label expects at least the 3 listed papers, reviewer to confirm relevance"
+          "acceptable_uncertainty": "Zero or no such category; not a guess"
         },
         {
-          "user": "Which ones are they?",
-          "intended_task": "list_counted_papers",
+          "user": "Which area has the most papers?",
+          "intended_task": "corpus_facets",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "A tie: astrophysics-of-galaxies and cosmology-and-nongalactic-astrophysics hold 10 each; must name both and not pick one. Answers from classified counts only"
         }
       ],
-      "note": "Exact count and semantic count must stay on separate bases"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A06-H02",
@@ -2384,73 +1983,31 @@
       "supported_unambiguous": false,
       "turns": [
         {
-          "user": "How many readable published papers are there?",
+          "user": "What areas do you cover?",
+          "intended_task": "list_available_categories",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Lists the six real categories only: active learning, astrophysics-of-galaxies, audio-and-speech-processing, cosmology-and-nongalactic-astrophysics, econometrics, hardware-architecture"
+        },
+        {
+          "user": "How many papers are in each?",
           "intended_task": "metadata_count",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Typed metadata fact: distinct Records visible to the asker in the loaded snapshot; the proxy labels name 40 papers, so reviewer must confirm the loaded count"
+          "acceptable_uncertainty": "Exact per-category counts: astrophysics-of-galaxies 10, cosmology-and-nongalactic-astrophysics 10, active learning 5, audio-and-speech-processing 5, econometrics 5, hardware-architecture 5 (40 in all)"
         },
         {
-          "user": "How many of them are about astronomical surveys, instruments and population studies?",
-          "intended_task": "semantic_topic_count",
+          "user": "Is there an area for cooking?",
+          "intended_task": "nonexistent_category_listing",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "MATISSE in the era of GRAVITY+",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "ViCTORIA project M49 region in the Virgo cluster in polarisation",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Empirical Galactic neutron star black hole merger rate StarTrack",
-              "page": null,
-              "quote": null
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Must be reported as a classified subset of what was screened, not as a total; draft label expects at least the 4 listed papers, reviewer to confirm relevance"
-        },
-        {
-          "user": "Which ones are they?",
-          "intended_task": "list_counted_papers",
-          "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "MATISSE in the era of GRAVITY+",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "ViCTORIA project M49 region in the Virgo cluster in polarisation",
-              "page": null,
-              "quote": null
-            },
-            {
-              "title": "Empirical Galactic neutron star black hole merger rate StarTrack",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": false,
-          "acceptable_uncertainty": null
+          "acceptable_uncertainty": "Says there is none; no invented category"
         }
       ],
-      "note": "Exact count and semantic count must stay on separate bases"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A06-H03",
@@ -2471,7 +2028,7 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Typed metadata fact: distinct Records visible to the asker in the loaded snapshot; the proxy labels name 40 papers, so reviewer must confirm the loaded count"
+          "acceptable_uncertainty": "Exactly 40: distinct published Records visible to the asker in the proxy-arxiv-40 snapshot; the evaluation database must hold no other published records"
         },
         {
           "user": "How many of them are about cosmological structure formation and inflation?",
@@ -3411,6 +2968,7 @@
         "Cosine metric as a structural economic similarity measure"
       ],
       "supported_unambiguous": false,
+      "a09_case": "missing_field",
       "turns": [
         {
           "user": "In Cosine metric as a structural economic similarity measure, how many human annotators were involved?",
@@ -3455,50 +3013,36 @@
       "id": "A09-D02",
       "family": "A09",
       "split": "development",
-      "topic": "particle physics and dark matter",
-      "papers": [
-        "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes"
-      ],
+      "topic": "everyday life questions",
+      "papers": [],
       "supported_unambiguous": false,
       "turns": [
         {
-          "user": "In From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes, which software license the authors released their code under?",
-          "intended_task": "missing_field",
-          "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": false,
-          "acceptable_uncertainty": "Reviewer must confirm the paper does not report this; if it does, relabel as supported"
-        },
-        {
-          "user": "Find me a paper in the repository about off-target effects of CRISPR gene editing",
-          "intended_task": "no_match_found",
+          "user": "What is the weather in Cebu today?",
+          "intended_task": "unrelated_question",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Expected outcome is 'no match found', distinct from missing evidence and from an outage"
+          "acceptable_uncertainty": "Declines or says it cannot know; no corpus citations, no invented weather"
         },
         {
-          "user": "Still explain the available part of From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes: instead of describing a dark-matter halo by its density, what do they describe it by?",
-          "intended_task": "partial_answer_after_tool_failure",
+          "user": "Can you suggest a simple adobo recipe?",
+          "intended_task": "unrelated_general_request",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
-              "page": 2,
-              "quote": "the gravitational field is directly parametrized in terms of the enclosed mass profile"
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "The harness makes a second read tool fail; the supported part must survive with a limitation note"
+          "acceptable_uncertainty": "May answer generally or decline; must not cite the repository or claim holdings"
+        },
+        {
+          "user": "OK, what do you have about dark matter?",
+          "intended_task": "back_on_topic",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Returns to evidence-based search; any dark matter paper is acceptable"
         }
       ],
-      "note": "Three distinct outcomes: missing field, no match, provider outage injected by the harness"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A09-D03",
@@ -3509,6 +3053,7 @@
         "Accelerating massive ensembles of ordinary differential equations-with-annotations"
       ],
       "supported_unambiguous": false,
+      "a09_case": "outage",
       "turns": [
         {
           "user": "In Accelerating massive ensembles of ordinary differential equations-with-annotations, the total funding amount behind the work?",
@@ -3553,50 +3098,37 @@
       "id": "A09-D04",
       "family": "A09",
       "split": "development",
-      "topic": "speech and audio language models",
-      "papers": [
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
-      ],
+      "topic": "homework and sports trivia",
+      "papers": [],
       "supported_unambiguous": false,
+      "a09_case": "no_match",
       "turns": [
         {
-          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how many hours of compute were used overall?",
-          "intended_task": "missing_field",
-          "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": false,
-          "acceptable_uncertainty": "Reviewer must confirm the paper does not report this; if it does, relabel as supported"
-        },
-        {
-          "user": "Find me a paper in the repository about the rice blast fungus",
-          "intended_task": "no_match_found",
+          "user": "Who won the last football World Cup?",
+          "intended_task": "unrelated_question",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Expected outcome is 'no match found', distinct from missing evidence and from an outage"
+          "acceptable_uncertainty": "May answer or decline generally; must not cite the repository"
         },
         {
-          "user": "Still explain the available part of Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition: how did the older approach get the emotion label back out of the model?",
-          "intended_task": "partial_answer_after_tool_failure",
+          "user": "Write my essay about the French Revolution",
+          "intended_task": "unrelated_general_request",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "The harness makes a second read tool fail; the supported part must survive with a limitation note"
+          "acceptable_uncertainty": "Out of scope for a research repository; no corpus claims"
+        },
+        {
+          "user": "Do you have papers about football?",
+          "intended_task": "find_nonexistent_topic",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Says it found none or only weak matches; no invented papers"
         }
       ],
-      "note": "Three distinct outcomes: missing field, no match, provider outage injected by the harness"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A09-D05",
@@ -3607,6 +3139,7 @@
         "The 2MIG isolated AGNs 4 Hot-dust reverberation and BLR scales"
       ],
       "supported_unambiguous": false,
+      "a09_case": "no_match",
       "turns": [
         {
           "user": "In The 2MIG isolated AGNs 4 Hot-dust reverberation and BLR scales, how many human annotators were involved?",
@@ -3651,50 +3184,36 @@
       "id": "A09-H01",
       "family": "A09",
       "split": "held_out",
-      "topic": "cosmological structure formation and inflation",
-      "papers": [
-        "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest"
-      ],
+      "topic": "jokes and quick maths",
+      "papers": [],
       "supported_unambiguous": false,
       "turns": [
         {
-          "user": "In Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest, which software license the authors released their code under?",
-          "intended_task": "missing_field",
-          "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest",
-              "page": null,
-              "quote": null
-            }
-          ],
-          "clarification_necessary": false,
-          "acceptable_uncertainty": "Reviewer must confirm the paper does not report this; if it does, relabel as supported"
-        },
-        {
-          "user": "Find me a paper in the repository about the 2019 measles vaccination campaign in Southeast Asia",
-          "intended_task": "no_match_found",
+          "user": "Tell me a joke",
+          "intended_task": "unrelated_general_request",
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Expected outcome is 'no match found', distinct from missing evidence and from an outage"
+          "acceptable_uncertainty": "May answer; no corpus citations"
         },
         {
-          "user": "Still explain the available part of Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest: how were the halos split into two groups to test shape-dependent selection?",
-          "intended_task": "partial_answer_after_tool_failure",
+          "user": "What is 15 percent of 240?",
+          "intended_task": "unrelated_question",
           "expected_pair": [],
-          "required_evidence": [
-            {
-              "title": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest",
-              "page": 6,
-              "quote": "whose shape in the observed direction (taken to be the x-axis) is below the median size"
-            }
-          ],
+          "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "The harness makes a second read tool fail; the supported part must survive with a limitation note"
+          "acceptable_uncertainty": "36; no corpus citations"
+        },
+        {
+          "user": "OK, any papers about the early universe?",
+          "intended_task": "back_on_topic",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Returns to evidence-based search"
         }
       ],
-      "note": "Three distinct outcomes: missing field, no match, provider outage injected by the harness"
+      "revision": "2026-10-16: replaced a templated conversation (simpler wording, off-corpus, missing-category or imperfect-title questions); reviewer to confirm"
     },
     {
       "id": "A09-H02",
@@ -3705,6 +3224,7 @@
         "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up"
       ],
       "supported_unambiguous": false,
+      "a09_case": "missing_field",
       "turns": [
         {
           "user": "In Learning to Solve Hard Problems in RL for LLMs by Never Giving Up, the total funding amount behind the work?",

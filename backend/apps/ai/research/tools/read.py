@@ -8,6 +8,7 @@ without replaying its prefix. Every read checks the active version and gate.
 from __future__ import annotations
 
 import hashlib
+from dataclasses import replace
 
 from apps.ai.briefs import cached_brief
 from apps.ai.comparison.service import table_fields
@@ -238,6 +239,16 @@ def passage(run: ToolRun, record, chunk, version: str):
         record_title=record.title, text=chunk.content, page=chunk.source_page,
         context_path=tuple(chunk.context_path or ()), score=READ_SCORE,
     )
+
+
+def without_brief(tool: Tool) -> Tool:
+    """`read_papers` offered with no brief view, while briefs are off (IR-703)."""
+    views = [v for v in VIEWS if v != "brief"]
+    properties = {**tool.parameters["properties"], "view": {"type": "string", "enum": views}}
+    description = tool.description.replace(
+        "view=brief returns a cached whole-paper brief when one exists. ", "")
+    return replace(tool, description=description,
+                   parameters={**tool.parameters, "properties": properties})
 
 
 READ_PAPERS = Tool(

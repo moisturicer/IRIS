@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { auditApi } from "@/api/audit";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import AuditLogPage from "./AuditLogPage";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 
@@ -24,6 +24,10 @@ it("shows labelled workflow details and grouped filters with the API actor name"
   expect(screen.getByRole("group", { name: "Workflow" })).toBeInTheDocument();
   expect(screen.getByRole("option", { name: "Assignment Deadline Extended" })).toBeInTheDocument();
   expect(screen.getByRole("link", { name: "Water study" })).toHaveAttribute("href", "/records/3");
+  const table = screen.getByRole("table", { name: "Audit log events" });
+  for (const header of within(table).getAllByRole("columnheader")) {
+    expect(header).toHaveAttribute("scope", "col");
+  }
   const { readFileSync } = await vi.importActual<{ readFileSync: (path: string, encoding: string) => string }>("node:fs");
   const backendAuditModel = readFileSync("../backend/apps/audit/models.py", "utf8");
   const choices = [...backendAuditModel.matchAll(/^\s+\(([A-Z_]+),\s+"([^"]+)"\),/gm)];
@@ -32,6 +36,27 @@ it("shows labelled workflow details and grouped filters with the API actor name"
     expect(screen.getByRole("option", { name })).toHaveValue(type);
   }
   await expectNoBlockingA11yViolations(container);
+});
+
+
+it("announces loading and an empty result set through a named polite status", async () => {
+  let resolveList!: (value: Awaited<ReturnType<typeof auditApi.list>>) => void;
+  vi.mocked(auditApi.list).mockImplementationOnce(() => new Promise((resolve) => {
+    resolveList = resolve;
+  }));
+
+  renderScreen(<AuditLogPage />);
+
+  const status = screen.getByRole("status", { name: "Audit log events status" });
+  expect(status).toHaveAttribute("aria-live", "polite");
+  expect(status).toHaveTextContent("Loading Audit log events.");
+
+  resolveList(
+  { data: { count: 0, results: [] } } as unknown as Awaited<ReturnType<typeof auditApi.list>>,
+);
+  await waitFor(() => expect(status).toHaveTextContent("Audit log events has no results."));
+  expect(screen.getByRole("table", { name: "Audit log events" })).toBeInTheDocument();
+  expect(screen.getByText("No records found.")).toBeInTheDocument();
 });
 
 it("applies filters on the first page and exports all matching rows with the same filters", async () => {
@@ -74,3 +99,4 @@ it("downloads the CSV returned by the API", async () => {
   expect(click).toHaveBeenCalledOnce();
   expect(click.mock.instances[0]).toHaveAttribute("download", "iris-audit.csv");
 });
+

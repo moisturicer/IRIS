@@ -256,13 +256,13 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     expect(onChanged).toHaveBeenCalledOnce();
   });
 
-  // IR-261: the Adviser's filled action is Accept & route; an office keeps
-  // Request documents filled, with Route to office beside it.
+  // ADR-047: the Adviser's filled action is Accept & send to RDCO; an office
+  // keeps Request documents filled, with Request review beside it.
   it("orders the routing actions so each viewer's primary is the right one", async () => {
-    const { unmount } = renderBar(["accept_route", "request_document"]);
+    const { unmount } = renderBar(["send_to_rdco", "request_document"]);
     let bar = screen.getByRole("toolbar", { name: "Review actions" });
     expect(within(bar).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
-      "Accept & route…",
+      "Accept & send to RDCO…",
       "Request documents",
     ]);
     unmount();
@@ -271,11 +271,11 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     bar = screen.getByRole("toolbar", { name: "Review actions" });
     expect(within(bar).getAllByRole("button").map((b) => b.textContent?.trim())).toEqual([
       "Request documents",
-      "Route to office…",
+      "Request review…",
     ]);
 
-    await userEvent.click(within(bar).getByRole("button", { name: "Route to office…" }));
-    expect(screen.getByRole("dialog", { name: "Route to office" })).toBeInTheDocument();
+    await userEvent.click(within(bar).getByRole("button", { name: "Request review…" }));
+    expect(screen.getByRole("dialog", { name: "Request review" })).toBeInTheDocument();
   });
 
   // IR-272: accepting is a decision, so an open revision request disables it
@@ -293,15 +293,15 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     renderScreen(
       <ReviewActionBar
         record={asked}
-        can={new Set<Capability>(["accept_route", "withdraw_revision"])}
+        can={new Set<Capability>(["send_to_rdco", "withdraw_revision"])}
         onChanged={onChanged}
       />,
     );
 
-    const accept = screen.getByRole("button", { name: "Accept & route…" });
+    const accept = screen.getByRole("button", { name: "Accept & send to RDCO…" });
     expect(accept).toBeDisabled();
     expect(accept).toHaveAccessibleDescription("Waiting on the author: IERC asked for a revision.");
-    expect(buttonNames()).toEqual(["Accept & route…", "Withdraw revision request"]);
+    expect(buttonNames()).toEqual(["Accept & send to RDCO…", "Withdraw revision request"]);
 
     await userEvent.click(screen.getByRole("button", { name: "Withdraw revision request" }));
     const confirm = screen.getByRole("dialog", { name: "Withdraw the revision request?" });
@@ -312,18 +312,18 @@ describe("the real actions (REVIEW_ACTIONS)", () => {
     expect(onChanged).toHaveBeenCalledOnce();
   });
 
-  // IR-270: a decider's primary is Accept & publish, and Reject is the last
-  // of the dialogs; an open revision request holds all three Decisions.
-  it("orders the Decisions so publishing is primary and rejecting comes last", async () => {
-    const { unmount } = renderBar(["reject", "request_document", "accept_route", "request_revision", "accept_publish"]);
+  // ADR-047: the Adviser's primary is Accept & send to RDCO, RDCO's is Accept
+  // & publish, and Reject is the last of the dialogs for both.
+  it("orders the Decisions so each decider's acceptance is primary and rejecting comes last", async () => {
+    const { unmount } = renderBar(["reject", "request_document", "send_to_rdco", "request_revision"]);
     expect(buttonNames()).toEqual([
-      "Accept & publish…", "Accept & route…", "Request Revision…", "Request documents", "Reject…",
+      "Accept & send to RDCO…", "Request Revision…", "Request documents", "Reject…",
     ]);
     unmount();
 
     renderBar(["reject", "route", "keep_unlisted", "request_document", "accept_publish"]);
     expect(buttonNames()).toEqual([
-      "Accept & publish…", "Keep unlisted…", "Request documents", "Route to office…", "Reject…",
+      "Accept & publish…", "Keep unlisted…", "Request documents", "Request review…", "Reject…",
     ]);
     await userEvent.click(screen.getByRole("button", { name: "Keep unlisted…" }));
     expect(screen.getByRole("dialog", { name: "Accept and keep unlisted?" })).toBeInTheDocument();

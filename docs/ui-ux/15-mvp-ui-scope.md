@@ -289,6 +289,10 @@ the same no-server-state caveat as My Library.
 
 **Redesigned by [IR-530](https://citiris.atlassian.net/browse/IR-530) (2026-10-11).** The board is one column grouped by deadline (within a week, within a month, later, recently closed), date-ordered inside each group. RDCO, KTTO and Advisers can now post, edit and delete calls from the page. Before that, the only route was Django admin. Whether the page offers those actions comes from two server fields, `can_post` on the list and `can_edit` per call, both decided by `IsOpportunityPoster`, so the screen compares no role names. The page also reads every page of the list now; it used to stop at the first 20 calls. Still no requirement, so `TRACEABILITY.md` still does not change.
 
+**Narrowed by [IR-757](https://citiris.atlassian.net/browse/IR-757) (2026-11-01).** Only RDCO and Advisers post calls now, as decided by Hermoine Zozobrado. KTTO no longer posts or moderates: a call it posted earlier stays on the board, and only RDCO can change it. An Adviser still changes only their own calls. Still no requirement, so `TRACEABILITY.md` still does not change.
+
+**Outside the MVP (2026-11-01).** Hermoine Zozobrado decided the board is outside the MVP, which answers the scope question IR-121 left open. It is tagged `post-mvp-candidate` and stays visible during the pilot, but no validation session tests it. [ADR-050](../adr/050-calls-for-papers-and-rdco-confirmation.md), Accepted 2026-11-01, narrows it to calls for papers and has RDCO confirm an Adviser's post, to be built after the MVP (spec [IR-758](https://citiris.atlassian.net/browse/IR-758)).
+
 **One criterion met, one recommended for a human to close out.** This was open against IR-86 (now
 **[IR-160](https://citiris.atlassian.net/browse/IR-160)** — *Reduce the pilot surface to 16
 screens*), whose acceptance criteria were *"16 routes remain"* and *"Every remaining nav item leads

@@ -30,7 +30,7 @@ class TransitionTransactionTests(DecisionTestBase):
             with self.captureOnCommitCallbacks(execute=True) as callbacks:
                 with self.assertRaisesRegex(RuntimeError, "outer rollback"):
                     with transaction.atomic():
-                        response = self.accept(record, [{"party": Party.ITSO}])
+                        response = self.accept(record, [{"party": Party.RDCO}])
                         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
                         self.assertEqual(Notification.objects.filter(record=record).count(), before[-1])
                         raise RuntimeError("outer rollback")
@@ -41,13 +41,13 @@ class TransitionTransactionTests(DecisionTestBase):
         self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
 
     def test_publish_rolls_back_its_review_and_notification(self):
-        record = self.at_adviser()
+        record = self.at_rdco()
         before = self.counts(record)
         with patch("apps.accounts.tasks.send_email_task.delay") as send_email:
             with self.captureOnCommitCallbacks(execute=True) as callbacks:
                 with self.assertRaisesRegex(RuntimeError, "outer rollback"):
                     with transaction.atomic():
-                        response = self.decide(record, self.adviser, "publish")
+                        response = self.decide(record, self.rdco, "publish")
                         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
                         self.assertEqual(Notification.objects.filter(record=record).count(), before[-1])
                         raise RuntimeError("outer rollback")

@@ -408,3 +408,14 @@ describe("timelineEntries", () => {
     expect(timelineEntries(tracker({ review_comments: null }))).toEqual([]);
   });
 });
+
+it("names RDCO's Decision when it overrides a revision request", () => {
+  const entries = timelineEntries(tracker({ resubmissions: [resubmission({
+    state: "withdrawn", state_label: "Withdrawn", resolved_at: "2026-11-01T08:00:00Z",
+    resolved_by: "RDCO reviewer", withdrawn_by_decision: "RDCO published the record",
+  })] }));
+  const closed = entries.find((e) => e.kind === "revision_resolved")!;
+  expect(closed.act).toBe("RDCO published the record");
+  expect(closed.details[0]).toContain("superseded by the Decision");
+  expect(closed.details[0]).not.toContain("unanswered");
+});

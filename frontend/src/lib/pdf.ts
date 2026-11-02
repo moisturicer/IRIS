@@ -31,10 +31,30 @@ export interface LoadedPdf {
   destroy: () => Promise<void>;
 }
 
-export async function loadPdfDocument(data: ArrayBuffer): Promise<LoadedPdf> {
+/**
+ * Opens a PDF from its bytes. `destroy` is safe to call more than once: only
+ * the first call releases the document (IR-565).
+ *
+ * Aborting `signal` while the document is still opening releases it at once
+ * and rejects, so a reader that moved to another record or version does not
+ * leave pdf.js parsing a file nobody will read.
+ */
+export async function loadPdfDocument(data: ArrayBuffer, signal?: AbortSignal): Promise<LoadedPdf> {
   const task = pdfjsLib.getDocument({ data });
-  const document = await task.promise;
-  return { document, destroy: () => task.destroy() };
+  let released: Promise<void> | null = null;
+  const destroy = () => (released ??= task.destroy());
+  const onAbort = () => void destroy();
+  if (signal?.aborted) onAbort();
+  signal?.addEventListener("abort", onAbort, { once: true });
+  try {
+    const document = await task.promise;
+    return { document, destroy };
+  } catch (error) {
+    await destroy();
+    throw error;
+  } finally {
+    signal?.removeEventListener("abort", onAbort);
+  }
 }
 
 /** A page's size in CSS pixels at a given zoom. */

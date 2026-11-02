@@ -1,0 +1,41 @@
+{
+  "fixture": "Synthetic isolated ReviewDetails component; actual page breakpoints covered by page tests",
+  "results": [
+    {
+      "width": 1600,
+      "card": {
+        "x": 1360,
+        "y": 768,
+        "width": 224,
+        "height": 116
+      },
+      "escape": "passed",
+      "outsideClick": "passed",
+      "focusReturn": "passed"
+    },
+    {
+      "width": 1100,
+      "card": {
+        "x": 860,
+        "y": 768,
+        "width": 224,
+        "height": 116
+      },
+      "escape": "passed",
+      "outsideClick": "passed",
+      "focusReturn": "passed"
+    },
+    {
+      "width": 375,
+      "card": {
+        "x": 135,
+        "y": 768,
+        "width": 224,
+        "height": 116
+      },
+      "escape": "passed",
+      "outsideClick": "passed",
+      "focusReturn": "passed"
+    }
+  ]
+}

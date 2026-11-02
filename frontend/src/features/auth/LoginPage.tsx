@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { FormikHelpers } from "formik";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthAlert } from "@/components/auth/AuthAlert";
-import { AuthLayout } from "@/components/auth/AuthLayout";
+import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { cn } from "@/lib/utils";
 import { AccountLockedModal } from "@/components/auth/AccountLockedModal";
 import { LoginForm, type LoginFormValues } from "@/components/auth/LoginForm";
 import {
@@ -18,16 +20,24 @@ import {
   sessionEndMessage,
   setLockoutUntil,
 } from "@/lib/authSession";
-import { getRoleDashboardPath } from "@/lib/roleDashboard";
+import { landingPathFor } from "@/lib/landing";
 import { safeRedirectPath } from "@/lib/redirectTarget";
-import { classifyLoginFailure, type LoginFailure } from "./loginFailure";
+import { classifyLoginFailure, type AccountLock, type LoginFailure } from "./loginFailure";
 
-const LOCKOUT_MS = 15 * 60 * 1000;
+/**
+ * How long the browser's own lock lasts, after `LOGIN_FAILURE_LIMIT` rejected
+ * credentials in this tab (NFR-S6). It is this lock's only: a server lock's
+ * time comes from the server, and replaces this one when both apply (IR-555).
+ */
+const CLIENT_LOCKOUT_MS = 15 * 60 * 1000;
 
 /** Every failure but a lock, which opens its own dialog instead. */
 type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
 
 export default function LoginPage() {
+  // The submitting button may lose focus when Formik disables it, before the
+  // lock reply arrives. Keep its actual element as the dialog's return target.
+  const signInRef = useRef<HTMLButtonElement>(null);
   const navigate       = useNavigate();
   const location       = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,12 +45,12 @@ export default function LoginPage() {
   const [loginAlert, setLoginAlert]     = useState<LoginAlert | null>(null);
   const [failedAttempts, setFailedAttempts] = useState(0);
   const [lockoutOpen, setLockoutOpen]   = useState(false);
-  const [lockoutUntil, setLockoutUntilState] = useState<number | undefined>();
+  const [lock, setLock]                 = useState<AccountLock | null>(null);
   const [lockoutIdentifier, setLockoutIdentifier] = useState("");
   const [identifier, setIdentifier] = useState("");
   /**
    * The page this visitor asked for before they were sent here, or `null` to
-   * use the role's normal landing page (IR-236).
+   * use the normal landing page (IR-236, IR-534).
    *
    * **Captured once, on mount, on purpose.** The guard passes it in router
    * state, and `dismissSessionAlert` below navigates to clear that state — so
@@ -57,6 +67,11 @@ export default function LoginPage() {
     const fromState = (location.state as { from?: unknown } | null)?.from;
     return safeRedirectPath(fromState) ?? safeRedirectPath(searchParams.get("next"));
   });
+  // IR-642: Settings sends a person here after changing their password,
+  // which ends every session. Read once, like `redirectTo`.
+  const [passwordChanged] = useState(
+    () => (location.state as { reason?: string } | null)?.reason === "password_changed",
+  );
   const sessionExpiredFromState =
     (location.state as { reason?: string } | null)?.reason === "session_expired";
   // Why the server ended the session (IR-645); inactivity when it did not say.
@@ -79,7 +94,7 @@ export default function LoginPage() {
     const until = getLockoutUntil(identifier);
     if (until) {
       setLockoutIdentifier(identifier);
-      setLockoutUntilState(until);
+      setLock({ by: "attempts", unlockAt: until });
       setLockoutOpen(true);
     }
     setFailedAttempts(getLoginAttempts(identifier));
@@ -100,17 +115,25 @@ export default function LoginPage() {
     }
   };
 
-  const openLockout = (forIdentifier: string, untilMs: number) => {
-    setLockoutUntil(forIdentifier, untilMs);
+  const openLockout = (forIdentifier: string, next: AccountLock) => {
+    // Only a lock with a known end is remembered, so the dialog can reopen on
+    // it in this tab; RDCO's lock and a lock with no time are asked of the
+    // server again on the next attempt.
+    if (next.by === "attempts" && next.unlockAt !== null) {
+      setLockoutUntil(forIdentifier, next.unlockAt);
+    }
     setLockoutIdentifier(forIdentifier);
-    setLockoutUntilState(untilMs);
+    setLock(next);
     setLockoutOpen(true);
     setLoginAlert(null);
   };
 
   const closeLockout = () => {
     setLockoutOpen(false);
-    if (lockoutIdentifier && lockoutUntil && lockoutUntil <= Date.now()) {
+    if (
+      lockoutIdentifier && lock?.by === "attempts" && lock.unlockAt !== null &&
+      lock.unlockAt <= Date.now()
+    ) {
       clearLockout(lockoutIdentifier);
     }
   };
@@ -124,7 +147,7 @@ export default function LoginPage() {
     const loginId = data.identifier.trim();
 
     if (isAccountLocked(loginId)) {
-      openLockout(loginId, getLockoutUntil(loginId)!);
+      openLockout(loginId, { by: "attempts", unlockAt: getLockoutUntil(loginId)! });
       setSubmitting(false);
       return;
     }
@@ -135,21 +158,22 @@ export default function LoginPage() {
       clearLockout(loginId);
       login(res.data.user, res.data.access, res.data.refresh);
       // Back to the page they asked for, or -- when they simply came to sign
-      // in, or asked for somewhere `safeRedirectPath` refused -- the landing
-      // page their role has always had.
-      navigate(redirectTo ?? getRoleDashboardPath(res.data.user.role_name), { replace: true });
+      // in, or asked for somewhere `safeRedirectPath` refused -- My Reviews
+      // when they have review work, otherwise Discover (IR-534).
+      navigate(redirectTo ?? landingPathFor(res.data.user), { replace: true });
     } catch (err: unknown) {
       const failure = classifyLoginFailure(err);
 
       if (failure.kind === "locked") {
-        openLockout(loginId, Date.now() + LOCKOUT_MS);
+        openLockout(loginId, failure.lock);
         return;
       }
 
-      // Neither of these judged the password, so neither counts towards the
-      // lock: an unverified account is not a wrong guess, and a server that
-      // could not be reached rejected nothing (IR-536).
-      if (failure.kind === "unverified" || failure.kind === "unreachable") {
+      // None of these judged the password, so none counts towards the lock: an
+      // unverified account is not a wrong guess, a server that could not be
+      // reached rejected nothing (IR-536), and a rate limit counts the address
+      // a whole campus may share (IR-661).
+      if (failure.kind === "unverified" || failure.kind === "unreachable" || failure.kind === "throttled") {
         setLoginAlert(failure);
         return;
       }
@@ -158,7 +182,7 @@ export default function LoginPage() {
       setFailedAttempts(attempts);
 
       if (attempts >= LOGIN_FAILURE_LIMIT) {
-        openLockout(loginId, Date.now() + LOCKOUT_MS);
+        openLockout(loginId, { by: "attempts", unlockAt: Date.now() + CLIENT_LOCKOUT_MS });
         return;
       }
 
@@ -176,16 +200,29 @@ export default function LoginPage() {
   const attemptsLeft = LOGIN_FAILURE_LIMIT - failedAttempts;
 
   return (
-    <AuthLayout
-      variant="login"
+    <EntryFrame
+      help
+      lede={{
+        headline: <>Your research has <span className="text-brand">a place.</span></>,
+        sentence:
+          "IRIS brings research submission, review, approval, and discovery into one connected workspace. From initial submission to institutional clearance and publication, every step has its place.",
+      }}
+      tabs={<EntryTab>Sign in</EntryTab>}
       before={
         <AccountLockedModal
           open={lockoutOpen}
           onClose={closeLockout}
-          unlockAt={lockoutUntil}
+          lock={lock}
+          returnTo={signInRef.current}
         />
       }
     >
+
+      {passwordChanged && (
+        <AuthAlert variant="warning" title="Password changed">
+          You were signed out on every device. Sign in again with your new password.
+        </AuthAlert>
+      )}
 
       {sessionAlert && (
         <AuthAlert
@@ -197,9 +234,9 @@ export default function LoginPage() {
         </AuthAlert>
       )}
 
-      <h2 className="text-balance font-display text-display font-semibold text-stone-900">Welcome Back</h2>
+      <h2 className="text-balance font-display text-display font-semibold text-stone-900">Welcome back</h2>
       <p className="mt-2 mb-section text-body text-stone-600">
-        Please enter your credentials to access your records.
+        Sign in to access your research workspace.
       </p>
 
       {loginAlert?.kind === "credentials" && (
@@ -232,6 +269,12 @@ export default function LoginPage() {
         </AuthAlert>
       )}
 
+      {loginAlert?.kind === "throttled" && (
+        <AuthAlert variant="error" title="Unable to sign in">
+          {loginAlert.message}
+        </AuthAlert>
+      )}
+
       {loginAlert?.kind === "other" && (
         <AuthAlert variant="error" title="Unable to sign in">
           {loginAlert.detail}
@@ -239,6 +282,7 @@ export default function LoginPage() {
       )}
 
       <LoginForm
+        submitRef={signInRef}
         onSubmit={handleLogin}
         disabled={lockoutOpen}
         showCredentialsError={showFieldError}
@@ -246,11 +290,17 @@ export default function LoginPage() {
       />
 
       <p className="mt-5 text-center text-sm text-stone-600">
-        No account?{" "}
-        <Link to="/signup" className="text-brand font-semibold hover:underline">
-          Sign up
+        New to IRIS?{" "}
+        <Link
+          to="/signup"
+          className={cn(
+            "inline-flex min-h-11 min-w-11 items-center justify-center rounded text-brand font-semibold hover:underline",
+            FOCUS_RING,
+          )}
+        >
+          Create an account
         </Link>
       </p>
-    </AuthLayout>
+    </EntryFrame>
   );
 }

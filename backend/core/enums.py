@@ -384,12 +384,31 @@ class RequestStatus(models.TextChoices):
     `DownloadRequest.status`, `DeleteRequest.status`, `RoleRequest.status`.
 
     One enum for all three because it is genuinely one concept -- asked,
-    granted, refused -- not three that happen to share strings.
+    granted, refused -- not three that happen to share strings. `REVOKED` is a
+    grant withdrawn early and `CANCELLED` a pending request its maker withdrew;
+    only a download request has either (ADR-048, IR-688).
     """
 
     PENDING = "pending", "Pending"
     APPROVED = "approved", "Approved"
     DECLINED = "declined", "Declined"
+    REVOKED = "revoked", "Revoked"
+    CANCELLED = "cancelled", "Cancelled"
+
+
+class ReadingStatus(models.TextChoices):
+    """
+    Where a reader is with a saved Record: `SavedRecord.reading_status`
+    (IR-566, ADR-044 §2).
+
+    At most one per reader and Record, which the nullable column enforces.
+    Null means saved with no status. Private to the reader: never a
+    discovery signal or a count.
+    """
+
+    WANT_TO_READ = "want_to_read", "Want to read"
+    READING = "reading", "Reading"
+    COMPLETED = "completed", "Completed"
 
 
 class SessionEndReason(models.TextChoices):
@@ -406,6 +425,7 @@ class SessionEndReason(models.TextChoices):
     IDLE = "idle", "Inactive too long"
     LOCKED = "locked", "Account locked"
     PASSWORD_CHANGED = "password_changed", "Password changed"
+    REVOKED = "revoked", "Revoked by an administrator"
 
 
 class IPType(models.TextChoices):
@@ -415,6 +435,21 @@ class IPType(models.TextChoices):
     COPYRIGHT = "copyright", "Copyright"
     TRADE_SECRET = "trade_secret", "Trade Secret"
     UTILITY_MODEL = "utility_model", "Utility Model"
+
+
+class EmbargoState(models.TextChoices):
+    """
+    Where a paper's embargo stands (ADR-052 §3). `Record.embargo_state`.
+
+    Derived from the answer stored on the record, never stored itself, and read
+    by the disclosure gate. Only `NONE` and `RELEASED` let text reach an AI
+    company. A date never moves a paper out of `ACTIVE`: a person does (§9).
+    """
+
+    UNKNOWN = "unknown", "Not answered"
+    NONE = "none", "No embargo"
+    ACTIVE = "active", "Under embargo"
+    RELEASED = "released", "Embargo released"
 
 
 class RoleName(models.TextChoices):
@@ -460,3 +495,38 @@ class RecordTypeName(models.TextChoices):
     PROPOSAL = "Proposal", "Proposal"
     THESIS_RESEARCH = "Thesis / Research", "Thesis / Research"
     PROJECT = "Project", "Project"
+
+
+class RecoveryPurpose(models.TextChoices):
+    """What a recovery token or email is for. Immutable once written.
+
+    `email_verification` is ADR-045's second journey (IR-643): the schema
+    carries it so both journeys share one contract, and nothing in IR-642
+    issues it. `password_changed` is the non-secret notice sent after a reset;
+    it never has a token.
+    """
+    PASSWORD_RESET     = "password_reset", "Password reset"
+    EMAIL_VERIFICATION = "email_verification", "Email verification"
+    PASSWORD_CHANGED   = "password_changed", "Password changed notice"
+
+
+class RecoveryDeliveryStatus(models.TextChoices):
+    PENDING    = "pending"     # admitted; no token yet
+    ISSUED     = "issued"      # token issued; mail owed
+    SENT       = "sent"        # SMTP accepted it
+    FAILED     = "failed"      # permanent rejection, or attempts exhausted
+    SUPERSEDED = "superseded"  # a newer request for this recipient won
+    EXPIRED    = "expired"     # not issued within RECOVERY_INTENT_TTL_SECONDS
+    INELIGIBLE = "ineligible"  # no eligible account: nothing is sent
+    WITHDRAWN  = "withdrawn"   # its token stopped being usable before sending
+
+
+class RecoveryAuditOutcome(models.TextChoices):
+    """Coarse recovery audit outcomes (ADR-045), separate from review decisions."""
+
+    ADMITTED = "admitted", "Admitted"
+    SUPPRESSED = "suppressed", "Suppressed"
+    REJECTED = "rejected", "Rejected"
+    COMPLETED = "completed", "Completed"
+    SENT = "sent", "Sent"
+    FAILED = "failed", "Failed"

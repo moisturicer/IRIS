@@ -1,4 +1,7 @@
+import { INSTITUTION } from "@/config/institution";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { StatusScreen } from "@/components/shared/StatusScreen";
+import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { seatsApi } from "@/api/reviews";
@@ -59,7 +62,7 @@ import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
 import { EditDetailsDialog } from "./EditDetailsDialog";
 import { NewVersionDialog, newVersionSummary } from "./NewVersionDialog";
-import { ReviewSection } from "./ReviewSection";
+import { ReviewWorkspace } from "./ReviewWorkspace";
 import { REVIEW_ACTIONS } from "./reviewActions";
 import { VersionBanner, VersionPicker } from "./VersionPicker";
 import { OVERVIEW_ASIDE_MAX_HEIGHT, OVERVIEW_ASIDE_TOP, readingTier, type ReadingTier } from "./paneLayout";
@@ -69,6 +72,7 @@ import { useFragmentFocus } from "./useFragmentFocus";
 import { useCitationReference, type CitationResolution } from "./useCitationReference";
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
+import { PaperDownloadControl } from "./PaperDownloadControl";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
 // Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
@@ -237,7 +241,7 @@ function SimilarPapers({ recordId }: { recordId: number }) {
             className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
           >
             <p className="text-2xs font-semibold tracking-wider text-stone-500 mb-2">
-              CIT-U #{item.id}
+              Record #{item.id}
             </p>
             <p className="font-display text-lg font-semibold text-stone-900 leading-snug line-clamp-3 group-hover:text-brand transition-colors duration-200">
               {item.title}
@@ -337,6 +341,9 @@ export default function PaperViewPage() {
   const [newVersionDone, setNewVersionDone] = useState<string | null>(null);
   /** Bumped when a document request changes, so the tracker reloads. */
   const [trackerVersion, setTrackerVersion] = useState(0);
+  // The author's Review tab action bar, stuck over the bottom of the screen
+  // below `reading-wide`: the reader lands citations above it (IR-477).
+  const [reviewBarInset, setReviewBarInset] = useState(0);
   // A My Library link names the request it answers as `#fragment` (IR-625).
   useFragmentFocus(location.hash, record != null);
 
@@ -580,6 +587,17 @@ export default function PaperViewPage() {
     window.setTimeout(() => setShareState("idle"), 2500);
   };
 
+  /** The viewer's download state may have moved (IR-677): re-read the record. */
+  const reloadRecord = async () => {
+    if (!id) return;
+    try {
+      const { data } = await recordsApi.detail(Number(id));
+      setRecord(data);
+    } catch {
+      // The control keeps its last state; a reload catches up.
+    }
+  };
+
   /** A document or request changed: re-read what derives from it. */
   const handleDocumentRequestChanged = async () => {
     setTrackerVersion((v) => v + 1);
@@ -600,41 +618,30 @@ export default function PaperViewPage() {
 
   if (!record && loadFailed) {
     return (
-      <div role="alert" className="max-w-md mx-auto text-center py-20">
-        <i className="fas fa-circle-exclamation text-3xl text-stone-300 mb-3" aria-hidden />
-        <h1 className="text-heading font-bold text-stone-800">We couldn't load this record</h1>
-        <p className="text-small text-stone-600 mt-1">Check your connection and try again.</p>
-        <button
-          type="button"
-          onClick={() => setAttempt((n) => n + 1)}
-          className={cn(PILL_PRIMARY, FOCUS_RING, "mt-4")}
-        >
-          Try again
-        </button>
-      </div>
+      <StatusScreen
+        tone="error"
+        icon="fa-circle-exclamation"
+        title="We couldn't load this record"
+        message="Check your connection and try again."
+        actions={
+          <button
+            type="button"
+            onClick={() => setAttempt((n) => n + 1)}
+            className={cn(PILL_PRIMARY, FOCUS_RING)}
+          >
+            Try again
+          </button>
+        }
+      />
     );
   }
 
-  if (!record) {
-    return (
-      <div className="max-w-md mx-auto text-center py-20">
-        <i className="fas fa-file-circle-question text-3xl text-stone-300 mb-3" aria-hidden />
-        <h1 className="text-heading font-bold text-stone-800">Record not available</h1>
-        <p className="text-sm text-stone-500 mt-1">
-          It may have been withdrawn, or you may not have access to it.
-        </p>
-        <Link
-          to="/"
-          className="inline-block mt-4 px-4 py-2 rounded-lg bg-brand text-white text-sm font-bold hover:bg-brand-light transition-colors"
-        >
-          Back to Discover
-        </Link>
-      </div>
-    );
-  }
+  // Missing and refused alike (IR-153), on the shared Not found screen (IR-745).
+  if (!record) return <NotFoundScreen subject="Record" />;
 
   const can = capabilitiesFor(record);
   const userIsOwner = isOwner(record, viewer);
+  const reviewerWorkspace = onReviewTab && !userIsOwner;
   const participant = isParticipant(record, viewer);
   const reviewing = isReviewing(record, viewer);
 
@@ -739,8 +746,22 @@ export default function PaperViewPage() {
           scrollToPage={viewedVersion ? null : landingPage}
           highlightRegions={highlightRegions}
           navKey={arrivalKey.current}
-          contained={onPaperTab || tier === "wide"}
-          fill={onPaperTab}
+          contained={onPaperTab || reviewerWorkspace || tier === "wide"}
+          fill={onPaperTab || reviewerWorkspace}
+          bottomInset={onReviewTab ? reviewBarInset : 0}
+          downloadControl={
+            // An earlier version is not offered as a copy: the download route
+            // serves only the current paper, and every copy must be marked.
+            viewedVersion ? undefined : (
+              <PaperDownloadControl
+                recordId={record.id}
+                recordTitle={record.title}
+                download={record.download}
+                fill={onPaperTab || reviewerWorkspace}
+                onChanged={reloadRecord}
+              />
+            )
+          }
         />
       </Suspense>
     </>
@@ -800,7 +821,7 @@ export default function PaperViewPage() {
         onChoose={chooseVersion}
       />
     ) : latestVersion ? (
-      <span className="shrink-0 text-small font-semibold text-stone-500">v{latestVersion.number}</span>
+      <span className="shrink-0 text-small font-semibold text-stone-600">v{latestVersion.number}</span>
     ) : null;
 
   const tabId = (s: PaperSection) => `${tabsId}-${s}`;
@@ -822,12 +843,12 @@ export default function PaperViewPage() {
       ref={observeWorkspace}
       className={cn(
         "relative [container-type:inline-size] [container-name:reading]",
-        onPaperTab && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
+        (onPaperTab || reviewerWorkspace) && "flex flex-col h-[calc(100dvh-3.5rem)] md:h-dvh overflow-hidden",
       )}
     >
       <ReadingHeader
         inert={chatModal}
-        className={cn(!onPaperTab && "sticky top-0 z-30")}
+        className={cn(!onPaperTab && !reviewerWorkspace && "sticky top-0 z-30")}
         sections={sections}
         section={section}
         onSelect={(s) => setViewParam("section", s)}
@@ -836,12 +857,12 @@ export default function PaperViewPage() {
         panelId={arriving ? undefined : `${tabsId}-panel`}
         onBack={() => navigate(-1)}
         onBackToAnswer={backToAnswer}
-        title={!onPaperTab ? undefined : arriving ? null : record.title}
-        version={onPaperTab ? paperVersion : undefined}
+        title={!onPaperTab && !reviewerWorkspace ? undefined : arriving ? null : record.title}
+        version={onPaperTab || reviewerWorkspace ? paperVersion : undefined}
       />
       <div
         className={cn(
-          onPaperTab
+          onPaperTab || reviewerWorkspace
             ? "flex-1 min-h-0 flex"
             : onReviewTab
               ? "px-4 sm:px-7 pt-6 pb-7"
@@ -852,7 +873,7 @@ export default function PaperViewPage() {
           {...(chatModal ? { inert: "" } : {})}
           className={cn(
             "min-w-0",
-            onPaperTab && "flex-1 flex flex-col",
+            (onPaperTab || reviewerWorkspace) && "flex-1 min-h-0 flex flex-col",
             // Its own container, so the rail and the page read the room the
             // panel leaves them (IR-569), as the reader reads the paper's.
             !onPaperTab && !onReviewTab && "flex-1 [container-type:inline-size] [container-name:overview]",
@@ -861,7 +882,7 @@ export default function PaperViewPage() {
 
           <div
             className={cn(
-              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
+              onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "grid gap-8 items-start",
               !onPaperTab && !onReviewTab && cn("px-4 sm:pl-14 sm:pr-8 pt-8 pb-12", PAGE_WIDTH.standard),
               // Wide: the page takes the width it has, with what the record is
               // held under beside it while there is room, and under it when
@@ -885,7 +906,7 @@ export default function PaperViewPage() {
           <div
             className={cn(
               "min-w-0",
-              onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
+              onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8",
               // The Overview reads in one column, up to 60rem, set against
               // what is beside it (Ask IRIS, or the rail) with the room left
               // over on its left (IR-569).
@@ -895,7 +916,7 @@ export default function PaperViewPage() {
             {/* Editorial header (IR-356): what it is, who wrote it, then
                 what to do with it. Not in Paper mode, where the record bar
                 holds the paper in one line (IR-569). */}
-            {!onPaperTab && (
+            {!onPaperTab && !reviewerWorkspace && (
             <header className="space-y-5">
               <p className="flex items-center gap-x-2 text-small text-stone-500">
                 <span>Added {formatDate(record.created_at)}</span>
@@ -945,7 +966,7 @@ export default function PaperViewPage() {
                 <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
                   {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
-                  {record.origin === "institutional" && <span>Cebu Institute of Technology – University</span>}
+                  {record.origin === "institutional" && <span>{INSTITUTION.name}</span>}
                   {record.publication_year && <span>Published {record.publication_year}</span>}
                   {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
                 </div>
@@ -1045,7 +1066,7 @@ export default function PaperViewPage() {
               id={`${tabsId}-panel`}
               role="tabpanel"
               aria-labelledby={tabId(section)}
-              className={onPaperTab ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
+              className={onPaperTab || reviewerWorkspace ? "flex-1 min-h-0 flex flex-col" : "space-y-8"}
             >
             {section === "paper" && reader()}
 
@@ -1206,8 +1227,11 @@ export default function PaperViewPage() {
             )}
 
             {section === "review" && (
-              <ReviewSection
+              <ReviewWorkspace
                 record={record}
+                authorView={userIsOwner}
+                onOpenReview={openReview}
+                onBarInset={setReviewBarInset}
                 can={can}
                 reader={sections.includes("paper") ? reader() : null}
                 timelineVersion={trackerVersion}

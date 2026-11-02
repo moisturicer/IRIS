@@ -11,6 +11,11 @@ on:
   # is gated now, whatever it is based on.
   pull_request:
 
+# PR updates replace obsolete evidence; each main push retains its own run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 # CI is evidence, not decoration.
 # Application boot was restored by IR-155 (not IR-57, which no longer
 # exists) and the Docker stack by IR-156 (not IR-58). Both original keys
@@ -19,9 +24,13 @@ on:
 # Do not weaken a gate to make it green — fix the defect it is reporting.
 
 jobs:
-  backend:
-    name: Backend
+  backend-tests:
+    name: Backend tests (${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     # A hang must fail, not bill. Before IR-251 this job had no bound, so a
     # 4h31m test run reported success and the default 6-hour cap was the only
     # thing that would ever have stopped it. The suite's honest runtime is
@@ -67,7 +76,9 @@ jobs:
           cache: pip
 
       - name: Install dependencies
-        run: pip install -r requirements/development.txt
+        # ai/requirements.txt too: test_ai_runtime_runs_db.py drives the
+        # gateway's run routes against this job's PostgreSQL (IR-722).
+        run: pip install -r requirements/development.txt -r ../ai/requirements.txt
 
       - name: Static check for undefined names
         # Catches the class of defect that currently stops the app importing.
@@ -96,6 +107,9 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
           SECRET_KEY: ci-only-not-a-real-secret
+          # ADR-045 §8 (IR-642): Django refuses to start without these. Throwaway values.
+          RECOVERY_COUNTER_HMAC_KEY: ci-only-not-a-real-counter-key
+          RECOVERY_MAIL_ENCRYPTION_KEY: ZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmQ=
           DEBUG: 'False'
           DB_NAME: iris
           DB_USER: iris
@@ -112,12 +126,19 @@ jobs:
         # if the bad configuration is ever accepted.
         env:
           DJANGO_SETTINGS_MODULE: config.settings.production
+          FRONTEND_URL: https://iris.example.edu
+          EMAIL_HOST_USER: ci@example.edu
+          EMAIL_HOST_PASSWORD: ci-only-not-a-real-password
           SECRET_KEY: ci-only-not-a-real-secret
+          # ADR-045 §8 (IR-642): Django refuses to start without these. Throwaway values.
+          RECOVERY_COUNTER_HMAC_KEY: ci-only-not-a-real-counter-key
+          RECOVERY_MAIL_ENCRYPTION_KEY: ZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmQ=
           DB_NAME: iris
           DB_USER: iris
           DB_PASSWORD: iris
           DB_HOST: localhost
           DB_PORT: '5432'
+          TRUSTED_PROXY_COUNT: '2'
         run: |
           ALLOWED_HOSTS=iris.example.edu           CORS_ALLOWED_ORIGINS=https://iris.example.edu             python -c "import django; django.setup(); from django.conf import settings; assert settings.DEBUG is False; assert settings.ALLOWED_HOSTS == ['iris.example.edu']; print('production settings boot OK')"
           ! ALLOWED_HOSTS=             CORS_ALLOWED_ORIGINS=https://iris.example.edu             python -c "import django; django.setup()"
@@ -132,6 +153,9 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
           SECRET_KEY: ci-only-not-a-real-secret
+          # ADR-045 §8 (IR-642): Django refuses to start without these. Throwaway values.
+          RECOVERY_COUNTER_HMAC_KEY: ci-only-not-a-real-counter-key
+          RECOVERY_MAIL_ENCRYPTION_KEY: ZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmQ=
           DB_NAME: iris
           DB_USER: iris
           DB_PASSWORD: iris
@@ -143,6 +167,9 @@ jobs:
         env:
           DJANGO_SETTINGS_MODULE: config.settings.development
           SECRET_KEY: ci-only-not-a-real-secret
+          # ADR-045 §8 (IR-642): Django refuses to start without these. Throwaway values.
+          RECOVERY_COUNTER_HMAC_KEY: ci-only-not-a-real-counter-key
+          RECOVERY_MAIL_ENCRYPTION_KEY: ZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmQ=
           DB_NAME: iris
           DB_USER: iris
           DB_PASSWORD: iris
@@ -176,7 +203,12 @@ jobs:
         # because the run reported no per-test timing at all. A suite that
         # cannot say which test was slow cannot be fixed from its own
         # evidence.
-        run: pytest -ra --durations=25 --junitxml=pytest-results.xml
+        # Separate runners isolate cluster-wide role changes and schema rewinds.
+        # Keep modules intact; no tests are omitted by a hand-maintained path list.
+        run: >-
+          python -m pytest -p testing.ci_sharding
+          --ci-shard=${{ matrix.shard }} --ci-shards=4
+          -ra --durations=25 --junitxml=pytest-results.xml
 
       - name: Report authorization matrix duration
         if: always()
@@ -196,6 +228,58 @@ jobs:
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as summary:
                   summary.write(line + "\n")
           PY
+
+      - name: Keep backend test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-tests-${{ matrix.shard }}
+          path: backend/pytest-results.xml
+          if-no-files-found: error
+
+  # Retain the required check's name. Failure, cancellation or skipped shards
+  # must not turn into a successful merge gate.
+  backend:
+    name: Backend
+    needs: backend-tests
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every backend shard
+        env:
+          RESULT: ${{ needs.backend-tests.result }}
+        run: test "$RESULT" = success
+
+  # The gateway has its own requirements and pytest.ini, so the backend job's
+  # collection never reaches ai/tests (IR-844). That left the gateway's service
+  # authentication test (ADR-014 precondition 1) out of CI. pytest exits 5 when
+  # it collects nothing, so an empty run fails this job too.
+  ai-gateway:
+    name: AI gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          # 3.11, matching ai/Dockerfile.
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            ai/requirements.txt
+            ai/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Tests
+        run: python -m pytest -ra
 
   frontend:
     name: Frontend
@@ -271,6 +355,8 @@ jobs:
             echo "DB_NAME=iris"
             echo "DB_USER=iris"
             echo "DB_PASSWORD=ci-only-not-a-real-secret"
+            echo "REDIS_PASSWORD=ci-only-not-a-real-secret"
+            echo "IRIS_DOMAIN=localhost"
           } > .env
 
       - name: Validate development stack
@@ -291,22 +377,140 @@ jobs:
       - name: Build the backend image
         run: docker compose -f docker-compose.yml build backend
 
+      # IR-847: the real Caddy with the real Caddyfile, in front of a stand-in that
+      # echoes the forwarded headers. A local certificate replaces ACME, because
+      # a test has no public domain.
+      - name: Caddy serves HTTPS only, with strong TLS
+        run: |
+          docker network create iris-tls
+          docker run -d --name frontend --network iris-tls python:3.11-alpine python -c '
+          import http.server
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  body = ("xff=%s proto=%s" % (self.headers.get("X-Forwarded-For"), self.headers.get("X-Forwarded-Proto"))).encode()
+                  self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+          http.server.HTTPServer(("0.0.0.0", 8080), H).serve_forever()
+          '
+          image=$(docker compose -f docker-compose.prod.yml config --images | grep '^caddy')
+          docker run -d --name iris-caddy --network iris-tls -p 18080:80 -p 18443:443 \
+            -e IRIS_DOMAIN=localhost -e IRIS_CADDY_OPTIONS=local_certs \
+            -v "$PWD/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" "$image"
+          trap 'docker logs frontend; docker logs iris-caddy; docker rm -f iris-caddy frontend; docker network rm iris-tls' EXIT
+          ready=
+          for i in $(seq 1 30); do curl -sk -o /dev/null https://localhost:18443/ && { ready=1; break; }; sleep 1; done
+          [ -n "$ready" ] || { echo "::error::Caddy did not answer within 30s"; exit 1; }
+
+          redirect=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:18080/x)
+          echo "plain HTTP: $redirect"
+          case "$redirect" in 30[18]\ https://localhost*/x) ;; *) echo "::error::plain HTTP did not redirect to HTTPS"; exit 1 ;; esac
+
+          echo_back=$(curl -sk -H 'X-Forwarded-For: 203.0.113.9' -H 'X-Forwarded-Proto: http' https://localhost:18443/)
+          echo "forged headers: $echo_back"
+          case "$echo_back" in *203.0.113.9*) echo "::error::Caddy passed on a forged X-Forwarded-For"; exit 1 ;; esac
+          case "$echo_back" in *proto=https*) ;; *) echo "::error::Caddy did not set X-Forwarded-Proto: https"; exit 1 ;; esac
+
+          probe() { openssl s_client -connect localhost:18443 -servername localhost "$@" </dev/null 2>&1; }
+          for version in -tls1_2 -tls1_3; do
+            result=$(probe "$version" | grep -E '^ *(New, |Cipher is)|Cipher is' | head -1)
+            echo "$version: $result"
+            case "$result" in *TLS*|*ECDHE*) ;; *) echo "::error::$version was refused"; exit 1 ;; esac
+          done
+          for refused in "-tls1 -cipher ALL:@SECLEVEL=0" "-tls1_1 -cipher ALL:@SECLEVEL=0" "-tls1_2 -cipher AES128-SHA" "-tls1_2 -cipher DES-CBC3-SHA:@SECLEVEL=0"; do
+            # shellcheck disable=SC2086
+            if probe $refused | grep -qE 'Cipher is [A-Z0-9]'; then
+              probe $refused | grep -E 'Cipher is'
+              echo "::error::Caddy accepted $refused"; exit 1
+            fi
+            echo "refused as it should be: $refused"
+          done
+
+      # IR-663: the real nginx, with the real config and snippet mounted where
+      # the frontend image puts them, answers with the security headers on the
+      # SPA route, an asset, a 404 and the legacy activation path. A stand-in
+      # index.html replaces the build; `backend` resolves to the runner so the
+      # proxy locations load, and nothing here is proxied. `nginx -t` first, so
+      # a config error fails with nginx's own message.
+      - name: nginx sends the browser security headers
+        run: |
+          mkdir -p "$RUNNER_TEMP/html/assets"
+          echo '<!doctype html><title>IRIS</title>' > "$RUNNER_TEMP/html/index.html"
+          echo 'export {};' > "$RUNNER_TEMP/html/assets/app.js"
+          echo 'export {};' > "$RUNNER_TEMP/html/assets/pdf.worker.min-x.mjs"
+          image=nginxinc/nginx-unprivileged:1.25-alpine
+          mounts="-v $PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+                  -v $PWD/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
+                  -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
+                  -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"
+          docker run --rm --add-host backend:127.0.0.1 $mounts "$image" nginx -t
+          docker run -d --name iris-nginx --add-host backend:127.0.0.1 -p 8080:8080 $mounts "$image"
+          trap 'docker logs iris-nginx; docker rm -f iris-nginx' EXIT
+          ready=
+          for i in $(seq 1 20); do curl -s -o /dev/null localhost:8080/ && { ready=1; break; }; sleep 1; done
+          [ -n "$ready" ] || { echo "::error::nginx did not answer within 20s"; exit 1; }
+          status=0
+          for path in / /discover /assets/app.js /assets/pdf.worker.min-x.mjs /assets/missing.js /activate/x; do
+            headers=$(curl -s -D - -o /dev/null "localhost:8080$path" || true)
+            echo "== $path"; echo "$headers"
+            for expected in \
+              'x-content-type-options: nosniff' \
+              'referrer-policy: same-origin' \
+              'x-frame-options: DENY' \
+              "content-security-policy-report-only: default-src 'self'; script-src 'self';"; do
+              echo "$headers" | grep -qiF "$expected" || { echo "::error::$path lacks '$expected'"; status=1; }
+            done
+          done
+          # A module worker runs only when served as JavaScript.
+          type=$(curl -s -o /dev/null -w '%{content_type}' localhost:8080/assets/pdf.worker.min-x.mjs || true)
+          echo "== .mjs Content-Type: $type"
+          case "$type" in
+            application/javascript*|text/javascript*) ;;
+            *) echo "::error::the pdf.js worker (.mjs) is served as '$type'"; status=1 ;;
+          esac
+          exit $status
+
+      # IR-668: the default is deny, the allowlist reads the real client, and
+      # IRIS's own /admin/... pages are not refused.
+      - name: nginx closes /django-admin/ unless allowlisted
+        run: sh scripts/check_django_admin_allowlist.sh
+
       # IR-620: beat's only job is ADR-043's hourly deadline task. Booting it
       # proves the service starts and loads that entry; validating the file
       # alone would not. --no-deps skips db and migrate, which beat does not
       # touch until a worker runs the task. The secret is the same throwaway
       # the Backend job uses. `timeout` ends the run, so its exit code is not
       # the verdict: the two greps are.
+      # IR-825: the real production networks. The control proves the probe can
+      # succeed, so a failure on `private` means no route, not a broken probe.
+      - name: Private services have no route to the internet
+        run: |
+          compose="docker compose -p iris-net -f docker-compose.prod.yml"
+          trap '$compose down -v' EXIT
+          $compose up --no-start --no-deps redis caddy
+          $compose start redis
+          url=https://example.com
+          docker run --rm --network iris-net_egress alpine:3.20 wget -q -T 15 -O /dev/null "$url"
+          echo "egress network reaches the internet, as it should"
+          if docker run --rm --network iris-net_private alpine:3.20 wget -q -T 8 -O /dev/null "$url"; then
+            echo "::error::the private network reached the internet"; exit 1
+          fi
+          if $compose exec -T redis wget -q -T 8 -O /dev/null "$url"; then
+            echo "::error::redis reached the internet"; exit 1
+          fi
+          echo "private network and redis have no route out, as they should"
+
       - name: Boot celery-beat and see its schedule
         run: |
           docker compose -f docker-compose.yml up -d redis
           docker compose -f docker-compose.yml run --rm --no-deps \
             -e SECRET_KEY=ci-only-not-a-real-secret \
+            -e RECOVERY_COUNTER_HMAC_KEY=ci-only-not-a-real-counter-key \
+            -e RECOVERY_MAIL_ENCRYPTION_KEY=ZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmRmZGZkZmQ= \
             celery-beat sh -c 'timeout 30 celery -A config beat -l debug --schedule=/tmp/celerybeat-schedule' \
             > beat.log 2>&1 || true
           cat beat.log
           grep -q 'beat: Starting' beat.log
           grep -q 'deadline-notifications apps.reviews.tasks.send_deadline_notifications' beat.log
+          grep -q 'recovery-dispatch apps.accounts.recovery.tasks.dispatch_recovery_intents' beat.log
 
   security:
     name: Security

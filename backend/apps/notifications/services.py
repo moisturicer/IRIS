@@ -13,6 +13,7 @@ import logging
 
 from django.conf import settings
 from django.db import transaction
+from django.utils import timezone
 from core.enums import Party, RecordTypeName, RoleName
 from core.utils import send_email_async
 from .models import Notification, NotificationType
@@ -192,7 +193,7 @@ def notify_routed(
 
 
 def notify_office_completed(
-    record, *, actor, office_label, outcome_label, handed_back, rdco_holding, rdco_holders,
+    record, *, actor, office_label, outcome_label, rdco_holding, rdco_holders,
 ):
     """
     A specialist office finished its review round (ADR-032 §3-§4, IR-269).
@@ -200,12 +201,8 @@ def notify_office_completed(
     - The owners hear the office's outcome. A single reviewer's verdict is
       not announced: it shows on the record, and the office's outcome is the
       fact the author can act on.
-    - On the hand-back, every RDCO member hears, in-app and by email: RDCO's
-      pool is shared work, as an office pool is in `notify_routed`. The owners
-      hear that the record is with RDCO.
-    - When RDCO already holds the record -- it routed it back for another
-      look -- RDCO's seat holders hear that the office finished, or the whole
-      office when nobody there is seated yet.
+    - RDCO already holds the record. Its seated reviewers hear each office
+      finish; if it is still in RDCO's Pool, the office hears it instead.
     """
     try:
         notif_type = NotificationType.objects.get_or_create(name="Office Review Complete")[0]
@@ -214,22 +211,13 @@ def notify_office_completed(
         owners = [o.user for o in record.owners.select_related("user").all()]
 
         message = f'{office_label} finished its review of "{title}": {outcome_label}.'
-        if handed_back:
-            message += " It is now with RDCO for its final decision."
         for owner in owners:
             Notification.objects.create(
                 sender=actor, recipient=owner, record=record,
                 notif_type=notif_type, message=message,
             )
 
-        rdco_message = None
-        if handed_back:
-            rdco_message = (
-                f'Every office has finished reviewing "{title}". It is in RDCO\'s '
-                f"pool for its final decision until someone claims it."
-            )
-        elif rdco_holding:
-            rdco_message = f'{office_label} finished its review of "{title}": {outcome_label}.'
+        rdco_message = f'{office_label} finished its review of "{title}": {outcome_label}.' if rdco_holding else None
         if rdco_message is None:
             return
 
@@ -255,8 +243,7 @@ def notify_office_completed(
             )
         if emails:
             send_email_async(
-                subject=f"[IRIS] For final review: {title[:60]}" if handed_back
-                else f"[IRIS] {office_label} finished: {title[:60]}",
+                subject=f"[IRIS] {office_label} finished: {title[:60]}",
                 message=f"Hello,\n\n{rdco_message}\n\n{url}\n\n-- The IRIS Team",
                 recipient_list=emails,
             )
@@ -264,7 +251,7 @@ def notify_office_completed(
         _log_failure("notify_office_completed", record=record)
 
 
-def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off):
+def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off, closed_revisions=()):
     """
     A Decision ended the record's review (ADR-032 §2-§3; IR-270, IR-271).
 
@@ -299,6 +286,11 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
                 if closed_requests == 1 else
                 " Its open document requests are withdrawn, so nothing more is needed."
             )
+
+        if closed_revisions:
+            message += " RDCO withdrew revision requests: " + ", ".join(
+                f"#{r['id']} from {r['label']}" for r in closed_revisions
+            ) + ". No response to those requests is required."
 
         notif_type = NotificationType.objects.get_or_create(name="Record Decided")[0]
         owners = list(record.owners.select_related("user").all())
@@ -583,22 +575,21 @@ def notify_role_request(user, requested_role):
 
 
 def notify_download_request(record, requested_by):
-    """Broadcast to KTTO and RDCO when a user requests to download a record's files."""
+    """Broadcast to RDCO, who alone decides, when a user requests a record's files."""
     try:
         notif_type = _get_type("Download Request Submitted")
-        for role_name in (RoleName.KTTO, RoleName.RDCO):
-            role = _role(role_name)
-            if role:
-                Notification.objects.create(
-                    sender=requested_by,
-                    broadcast_to_role=role,
-                    record=record,
-                    notif_type=notif_type,
-                    message=(
-                        f"{requested_by.get_full_name()} has requested to download "
-                        f'files for record "{record.title}".'
-                    ),
-                )
+        role = _role(RoleName.RDCO)
+        if role:
+            Notification.objects.create(
+                sender=requested_by,
+                broadcast_to_role=role,
+                record=record,
+                notif_type=notif_type,
+                message=(
+                    f"{requested_by.get_full_name()} has requested to download "
+                    f'files for record "{record.title}".'
+                ),
+            )
     except Exception:
         _log_failure("notify_download_request", record=record)
 
@@ -612,7 +603,11 @@ def notify_download_reviewed(download_request, reviewed_by, approved: bool):
 
         if approved:
             notif_type = _get_type("Download Request Approved")
-            message    = f'Your download request for "{record.title}" has been approved.'
+            expires    = timezone.localtime(download_request.grant_expires_at).strftime("%d %B %Y")
+            message    = (
+                f'Your download request for "{record.title}" has been approved. '
+                f"You can download it until {expires}."
+            )
             Notification.objects.create(
                 sender=reviewed_by,
                 recipient=requester,
@@ -624,23 +619,71 @@ def notify_download_reviewed(download_request, reviewed_by, approved: bool):
                 subject=f"[IRIS] Download request approved: {record.title[:60]}",
                 message=(
                     f"Hello {requester.first_name},\n\n"
-                    f'Your request to download files for "{record.title}" has been approved.\n\n'
-                    f"You can access the record here:\n{url}\n\n"
+                    f'Your request to download "{record.title}" has been approved.\n\n'
+                    f"You can download it from the record's page, while signed in, until {expires}:\n{url}\n\n"
                     f"-- The IRIS Team"
                 ),
                 recipient_list=[requester.email],
             )
         else:
-            notif_type = _get_type("Download Request Declined")
+            # RDCO's note travels with the decline (IR-688). The email links to
+            # the record, never to a file (ADR-048, decision 6).
+            note = download_request.rdco_note
             Notification.objects.create(
                 sender=reviewed_by,
                 recipient=requester,
                 record=record,
-                notif_type=notif_type,
-                message=f'Your download request for "{record.title}" has been declined.',
+                notif_type=_get_type("Download Request Declined"),
+                message=(
+                    f'Your download request for "{record.title}" has been declined. '
+                    f"RDCO's note: {note}"
+                ),
+            )
+            send_email_async(
+                subject=f"[IRIS] Download request declined: {record.title[:60]}",
+                message=(
+                    f"Hello {requester.first_name},\n\n"
+                    f'Your request to download "{record.title}" has been declined.\n\n'
+                    f"RDCO's note:\n{note}\n\n"
+                    f"You may request again from the record's page:\n{url}\n\n"
+                    f"-- The IRIS Team"
+                ),
+                recipient_list=[requester.email],
             )
     except Exception:
         _log_failure("notify_download_reviewed", request=download_request)
+
+
+def notify_download_revoked(download_request, revoked_by):
+    """Tell the reader RDCO ended their download access early, and why (IR-688)."""
+    try:
+        requester = download_request.requested_by
+        record    = download_request.record
+        note      = download_request.rdco_note
+        Notification.objects.create(
+            sender=revoked_by,
+            recipient=requester,
+            record=record,
+            notif_type=_get_type("Download Access Revoked"),
+            message=(
+                f'Your download access to "{record.title}" has been revoked. '
+                f"RDCO's note: {note}"
+            ),
+        )
+        send_email_async(
+            subject=f"[IRIS] Download access revoked: {record.title[:60]}",
+            message=(
+                f"Hello {requester.first_name},\n\n"
+                f'RDCO has revoked your access to download "{record.title}". '
+                f"You can no longer download it.\n\n"
+                f"RDCO's note:\n{note}\n\n"
+                f"You may request again from the record's page:\n{_record_url(record)}\n\n"
+                f"-- The IRIS Team"
+            ),
+            recipient_list=[requester.email],
+        )
+    except Exception:
+        _log_failure("notify_download_revoked", request=download_request)
 
 
 def notify_delete_approved(delete_request, reviewed_by):

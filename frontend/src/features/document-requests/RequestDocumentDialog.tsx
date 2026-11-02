@@ -1,6 +1,7 @@
-import { useEffect, useId, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { recordsApi } from "@/api/records";
+import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { DocumentRequestItemInput, DocumentRequestSlot, Party } from "@/types/records";
 
 import { errorDetail } from "@/lib/errorDetail";
@@ -57,13 +58,13 @@ export function RequestDocumentDialog({
     };
   }, [recordId]);
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !sending) onClose();
-    };
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+  // Escape, focus in, Tab kept inside, focus back to the opener (IR-158) —
+  // the same hook as `Modal`. Escape still does nothing while sending.
+  const panelRef = useRef<HTMLDivElement>(null);
+  const closeUnlessSending = useCallback(() => {
+    if (!sending) onClose();
   }, [onClose, sending]);
+  useDialogFocus(true, panelRef, closeUnlessSending);
 
   const toggle = (id: number) =>
     setChosen((prev) => {
@@ -107,10 +108,12 @@ export function RequestDocumentDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
       <div
+        ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto"
+        className="bg-white rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto outline-none"
       >
         <form onSubmit={submit} noValidate className="p-6 space-y-4">
           <div>

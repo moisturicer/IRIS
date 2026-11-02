@@ -1,8 +1,8 @@
 import { apiClient } from "./client";
 import type {
-  RecordListItem, RecordDetail, RecordFormData, MyResearchItem,
+  RecordListItem, RecordDetail, RecordFormData, MyResearchItem, EmbargoAnswer, RecordEmbargo,
   Classification, PSCEDClassification, RecordType,
-  DownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
+  DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
   DiscoverInterests, ForYouPage, MetadataSuggestions,
@@ -165,14 +165,24 @@ export const recordsApi = {
    * do double duty: `Blob.arrayBuffer()` feeds pdf.js, and the same URL
    * backs a "download"/"open in new tab" link with no second request.
    */
-  manuscriptBlob: (id: number) =>
-    apiClient.get<Blob>(`/records/${id}/manuscript/`, { responseType: "blob" }),
+  manuscriptBlob: (id: number, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<Blob>(`/records/${id}/manuscript/`, { responseType: "blob", signal: options.signal }),
   /**
    * An earlier version's manuscript (IR-416), fetched the same way and for
    * the same reason. Participants only: anyone else gets a 404.
    */
-  versionManuscriptBlob: (id: number, version: number) =>
-    apiClient.get<Blob>(`/records/${id}/versions/${version}/manuscript/`, { responseType: "blob" }),
+  versionManuscriptBlob: (id: number, version: number, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<Blob>(`/records/${id}/versions/${version}/manuscript/`, {
+      responseType: "blob",
+      signal: options.signal,
+    }),
+  /**
+   * A saved copy of the paper (IR-675, IR-676): marked with who it was made
+   * for, and refused with a 403 `code` unless the viewer is exempt or holds a
+   * live grant. Every saved copy goes through here, never the reader's bytes.
+   */
+  downloadCopy:   (id: number) =>
+    apiClient.get<Blob>(`/records/${id}/download/`, { responseType: "blob" }),
   delete:         (id: number) => apiClient.delete(`/records/${id}/`),
   // `dpaAccepted` is required, not optional (IR-226). The backend refuses a
   // submit without consent, and an optional flag would let a future caller
@@ -180,6 +190,9 @@ export const recordsApi = {
   // that already carries consent ignores the value, so passing it is always safe.
   submit:         (id: number, dpaAccepted: boolean) =>
     apiClient.post<{ detail: string }>(`/records/${id}/submit/`, { dpa_accepted: dpaAccepted }),
+  // Publish's first question, saved before the file is sent (ADR-052 §2).
+  answerEmbargo:  (id: number, answer: EmbargoAnswer) =>
+    apiClient.post<RecordEmbargo>(`/records/${id}/embargo-answer/`, answer),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),
@@ -196,14 +209,21 @@ export const recordsApi = {
   recordTypes:     () => apiClient.get<PaginatedResponse<RecordType>>("/records/record-types/"),
 
   // Download requests
-  requestDownload:         (recordId: number) =>
-    apiClient.post("/records/download-requests/", { record: recordId }),
+  requestDownload:         (recordId: number, note: string) =>
+    apiClient.post("/records/download-requests/", { record: recordId, note }),
   listDownloadRequests:    (params?: Record<string, unknown>) =>
     apiClient.get<PaginatedResponse<DownloadRequest>>("/records/download-requests/", { params }),
   approveDownloadRequest:  (id: number) =>
     apiClient.post(`/records/download-requests/${id}/approve/`),
-  declineDownloadRequest:  (id: number) =>
-    apiClient.post(`/records/download-requests/${id}/decline/`),
+  declineDownloadRequest:  (id: number, note: string) =>
+    apiClient.post(`/records/download-requests/${id}/decline/`, { note }),
+  revokeDownloadRequest:   (id: number, note: string) =>
+    apiClient.post<DownloadRequest>(`/records/download-requests/${id}/revoke/`, { note }),
+  cancelDownloadRequest:   (id: number) =>
+    apiClient.post<DownloadRequest>(`/records/download-requests/${id}/cancel/`),
+  /** The signed-in reader's own requests, newest first (IR-743). */
+  myDownloadRequests:      () =>
+    apiClient.get<ReaderDownloadRequest[]>("/records/download-requests/mine/"),
 
   // Delete requests: raised by `delete` above (DELETE /records/<id>/), then only
   // read and decided here. The queue has no create or update route (IR-496).
@@ -213,12 +233,4 @@ export const recordsApi = {
     apiClient.post(`/records/delete-requests/${id}/approve/`),
   declineDeleteRequest:    (id: number) =>
     apiClient.post(`/records/delete-requests/${id}/decline/`),
-
-  // Combined decide helper (approve or decline in one call)
-  decideDownloadRequest:   (id: number, action: "approve" | "decline") =>
-    apiClient.post<{ download_url?: string }>(`/records/download-requests/${id}/${action}/`),
-
-  // Redeem a one-time download token
-  redeemDownloadToken:     (token: string) =>
-    apiClient.get(`/records/download/${token}/`, { responseType: "blob" }),
 };

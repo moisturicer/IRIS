@@ -1,0 +1,60 @@
+{
+  "operator": "",
+  "timestamp_utc": "",
+  "git_commit": "",
+  "browser": "",
+  "viewport": "",
+  "conversation_id": null,
+  "checks": {
+    "live": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "reopened": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "copied": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "exported": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "paper_chat": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "mobile": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "keyboard": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "accessible_summary": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "ask_notice_before_submit": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    },
+    "paper_notice_before_submit": {
+      "status": "not_measured",
+      "passed": false,
+      "evidence_ref": null
+    }
+  }
+}

@@ -18,11 +18,11 @@ import { Route, Routes, useLocation } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
-import { getRoleDashboardPath } from "@/lib/roleDashboard";
+import { landingPathFor } from "@/lib/landing";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { FIXTURE_ROLE, makeUser } from "@/test/authFixtures";
-import { renderScreen, screen, userEvent, waitFor } from "@/test/render";
+import { makeUser } from "@/test/authFixtures";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 
 import LoginPage from "./LoginPage";
 
@@ -83,6 +83,98 @@ describe("the login screen", () => {
 });
 
 /**
+ * The Dossier frame (IR-706; IR-704 stories 1-5, 12, 58).
+ *
+ * The masthead is the page's one visible `<h1>`, and both logos are inside it,
+ * so its accessible name says whose system this is.
+ */
+describe("the frame sign in opens in", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("names IRIS and the pilot institution in the masthead, the page's only top-level heading", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const [masthead, ...others] = screen.getAllByRole("heading", { level: 1 });
+    expect(others).toEqual([]);
+    expect(masthead).toHaveAccessibleName(/IRIS/);
+    expect(masthead).toHaveAccessibleName(/Cebu Institute of Technology/);
+    expect(screen.getByRole("heading", { level: 2, name: "Welcome back" })).toBeInTheDocument();
+  });
+
+  it("offers one Create an account link under the form and Help in the masthead", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const links = screen.getAllByRole("link", { name: "Create an account" });
+    expect(links).toHaveLength(1);
+    links.forEach((link) => expect(link).toHaveAttribute("href", "/signup"));
+    expect(within(screen.getByRole("banner")).getByRole("link", { name: "Help" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /sign up/i })).not.toBeInTheDocument();
+  });
+
+  it("labels the sheet with one Sign in tab that is not a control", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    expect(screen.getByText("Sign in")).toBeInTheDocument();
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
+  });
+
+  it("says what IRIS is in one plain sentence under the headline, naming no institution (IR-768)", () => {
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    expect(screen.getByText(/Your research has/)).toHaveTextContent("Your research has a place.");
+    expect(screen.getByText(/^IRIS brings research submission, review, approval, and discovery/)).toBeInTheDocument();
+    expect(document.body).not.toHaveTextContent(/CIT-U/);
+  });
+
+  it("opens privacy and terms from the footer without clearing sign-in details", async () => {
+    const user = userEvent.setup();
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveTextContent("© 2026 IRIS · Research and IP disclosure");
+    expect(footer).not.toHaveTextContent(/Pilot institution/);
+    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "reader@example.edu");
+    await user.click(within(footer).getByRole("link", { name: "Data privacy" }));
+    expect(screen.getByRole("dialog", { name: "Data privacy" })).toHaveTextContent("What IRIS keeps when you register");
+    await user.keyboard("{Escape}");
+    expect(within(footer).getByRole("link", { name: "Data privacy" })).toHaveFocus();
+    await user.click(within(footer).getByRole("link", { name: "Terms" }));
+    expect(screen.getByRole("dialog", { name: "Terms" })).toHaveTextContent(/pending institutional review/i);
+    await user.click(screen.getByRole("button", { name: "Close dialog" }));
+    expect(screen.getByRole("textbox", { name: "Email Address" })).toHaveValue("reader@example.edu");
+  });
+
+  it("announces a failed sign-in once, by the banner, and only marks the fields", async () => {
+    vi.spyOn(authApi, "login").mockRejectedValueOnce(
+      Object.assign(new Error("Request failed with status code 401"), {
+        isAxiosError: true,
+        response: { status: 401, data: { detail: "Invalid credentials." }, headers: {} },
+      }),
+    );
+    const user = userEvent.setup();
+    const { container } = renderScreen(<LoginPage />, { route: "/login" });
+
+    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "student@cit.edu");
+    await user.type(screen.getByLabelText("Password"), "IrisDemo123!");
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("Invalid email or password");
+    // One live region in the whole page: the banner. The fields say nothing.
+    // `aria-live` has no role to query by, so the live-region semantics are
+    // read as attributes -- still the accessible tree, never a class or test id.
+    expect(container.ownerDocument.querySelectorAll('[role="alert"], [role="status"], [aria-live]')).toHaveLength(1);
+    const email = screen.getByRole("textbox", { name: "Email Address" });
+    expect(email).toBeInvalid();
+    expect(email).not.toHaveAccessibleDescription();
+    expect(screen.getByLabelText("Password")).toBeInvalid();
+    expect(screen.getByLabelText("Password")).not.toHaveAccessibleDescription();
+  });
+});
+
+/**
  * Where a successful sign-in lands (IR-236).
  *
  * The destination is the whole point of the ticket, and it is also the one
@@ -94,12 +186,12 @@ describe("where the login screen sends you", () => {
   const KTTO_USER = makeUser();
 
   /**
-   * The landing page this role has always had. Read from `roleDashboard.ts`
+   * The landing page this user gets by default. Read from `landing.ts`
    * rather than hardcoded, so these tests assert "fell back to the existing
    * default" -- which is the acceptance criterion -- instead of quietly
    * becoming a second, competing definition of where KTTO lands.
    */
-  const ROLE_DEFAULT = getRoleDashboardPath(FIXTURE_ROLE);
+  const ROLE_DEFAULT = landingPathFor(KTTO_USER);
 
   function acceptAnyPassword() {
     return vi.spyOn(authApi, "login").mockResolvedValue({
@@ -401,16 +493,46 @@ describe("what a failed sign-in says", () => {
   });
 
   it("says 'Unable to sign in' with the server's detail for anything else", async () => {
-    failSignInWith(
-      serverReplied(429, { detail: "Request was throttled. Expected available in 30 seconds." }),
-    );
+    failSignInWith(serverReplied(400, { detail: "This sign-in could not be read." }));
     renderScreen(<LoginPage />, { route: "/login" });
 
     await signIn();
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Unable to sign in");
-    expect(alert).toHaveTextContent("Request was throttled. Expected available in 30 seconds.");
+    expect(alert).toHaveTextContent("This sign-in could not be read.");
+  });
+
+  it("says how long to wait when the rate limit answers (IR-661)", async () => {
+    failSignInWith(
+      serverReplied(429, { detail: "Request was throttled. Expected available in 1800 seconds." }),
+    );
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    await signIn();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Too many requests");
+    expect(alert).toHaveTextContent("about 30 minutes");
+    expect(alert).not.toHaveTextContent("throttled");
+  });
+
+  it("never locks the account because the rate limit answered (IR-661)", async () => {
+    // A campus shares one address, so a throttle says nothing about this password.
+    const throttled = () => serverReplied(429, { detail: "Request was throttled. Expected available in 30 seconds." });
+    failSignInWith(throttled(), throttled(), throttled());
+    renderScreen(<LoginPage />, { route: "/login" });
+
+    const user = await signIn();
+    await screen.findByRole("alert");
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+    await user.click(screen.getByRole("button", { name: "Sign In" }));
+
+    await waitFor(() => {
+      expect(authApi.login).toHaveBeenCalledTimes(3);
+    });
+    expect(screen.queryByRole("dialog", { name: "Account Locked" })).not.toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Too many requests");
   });
 
   it("has no serious or critical accessibility violations while an error shows", async () => {
@@ -422,45 +544,138 @@ describe("what a failed sign-in says", () => {
 
     await expectNoBlockingA11yViolations(container);
   });
+
+  /**
+   * Which lock it is, and when it lifts (IR-555). The dialog used to say "try
+   * again in 15:00" for every lock. axes lifts after its own cool-off, and
+   * RDCO's manual lock never lifts on its own, so the dialog now counts down
+   * only to a time the server gave it.
+   */
+  describe("the locked dialog", () => {
+    it("moves focus inside, traps Tab, and returns focus when Escape closes it", async () => {
+      // jsdom has no layout; report a visible rect for the browser focus trap.
+      vi.spyOn(HTMLElement.prototype, "getClientRects").mockReturnValue([{}] as unknown as DOMRectList);
+      failSignInWith(serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" }));
+      renderScreen(<LoginPage />, { route: "/login" });
+      const user = await signIn();
+      await screen.findByRole("dialog", { name: "Account Locked" });
+
+      const close = screen.getByRole("button", { name: "Close" });
+      expect(close).toHaveFocus();
+      await user.tab();
+      expect(close).toHaveFocus();
+      await user.tab({ shift: true });
+      expect(close).toHaveFocus();
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Sign In" })).toHaveFocus();
+    });
+
+    it("counts down to the server's unlock_at for an axes lockout", async () => {
+      const unlockAt = new Date(Date.now() + 90_000).toISOString();
+      failSignInWith(
+        serverReplied(429, {
+          detail: "Account locked: too many failed sign-in attempts.",
+          code: "too_many_attempts",
+          unlock_at: unlockAt,
+        }),
+      );
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/try again in 1:(29|30)/i);
+    });
+
+    it("says an administrator locked it and shows no countdown for an admin lock", async () => {
+      failSignInWith(serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" }));
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/An administrator has locked this account/);
+      expect(dialog).not.toHaveTextContent(/try again in|\d+:\d\d/i);
+    });
+
+    it("shows no countdown for the plain-text 429 an older server sends", async () => {
+      failSignInWith(serverReplied(429, "Account locked: too many login attempts."));
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/too many failed sign-in attempts/i);
+      expect(dialog).not.toHaveTextContent(/\d+:\d\d/);
+    });
+
+    it("keeps the browser's own 15-minute countdown for its own lock", async () => {
+      failSignInWith(
+        serverReplied(401, { detail: "Invalid credentials." }),
+        serverReplied(401, { detail: "Invalid credentials." }),
+        serverReplied(401, { detail: "Invalid credentials." }),
+      );
+      renderScreen(<LoginPage />, { route: "/login" });
+
+      const user = await signIn();
+      await screen.findByRole("alert");
+      await user.click(screen.getByRole("button", { name: "Sign In" }));
+      await screen.findByText(/2 of 3/);
+      await user.click(screen.getByRole("button", { name: "Sign In" }));
+
+      const dialog = await screen.findByRole("dialog", { name: "Account Locked" });
+      expect(dialog).toHaveTextContent(/try again in (15:00|14:59)/i);
+    });
+
+    it.each([
+      ["an axes lockout", serverReplied(429, { code: "too_many_attempts", detail: "Locked.", unlock_at: new Date(Date.now() + 60_000).toISOString() })],
+      ["an RDCO lock", serverReplied(403, { detail: "Account is locked.", code: "locked_by_admin" })],
+    ])("has no serious or critical accessibility violations for %s", async (_label, error) => {
+      failSignInWith(error);
+      const { container } = renderScreen(<LoginPage />, { route: "/login" });
+
+      await signIn();
+      await screen.findByRole("dialog", { name: "Account Locked" });
+
+      await expectNoBlockingA11yViolations(container);
+    });
+  });
 });
 
 /**
- * "Forgot password?" (IR-536). It was a toast-only dead end; IRIS has no
- * self-service reset, so it now says so, in place, and says who resets one.
+ * "Forgot password?" (IR-536, then IR-642). IR-536 replaced a toast-only dead
+ * end with a disclosure naming RDCO, because there was no self-service reset.
+ * ADR-045 adds one, so the control is now a link to it; RDCO stays in the
+ * recovery email and the confirmation as support guidance.
  */
 describe("forgot password", () => {
   afterEach(() => {
     useUIStore.setState({ toasts: [] });
   });
 
-  it("is a disclosure that answers in place, without a toast", async () => {
+  it("is a link to the self-service reset, reachable by keyboard", async () => {
     const user = userEvent.setup();
-    renderScreen(<LoginPage />, { route: "/login" });
+    renderScreen(
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/password/forgot" element={<p>forgot screen</p>} />
+      </Routes>,
+      { route: "/login" },
+    );
 
-    const trigger = screen.getByRole("button", { name: "Forgot password?" });
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    const link = screen.getByRole("link", { name: "Forgot password?" });
+    expect(link).toHaveAttribute("href", "/password/forgot");
     expect(screen.queryByText(/no self-service password reset/i)).not.toBeInTheDocument();
 
-    trigger.focus();
+    link.focus();
     await user.keyboard("{Enter}");
-
-    expect(trigger).toHaveAttribute("aria-expanded", "true");
-    const answer = screen.getByRole("region", { name: "Forgot password?" });
-    expect(answer).toHaveTextContent(/no self-service password reset/i);
-    expect(answer).toHaveTextContent("RDCO");
-    expect(trigger).toHaveAttribute("aria-controls", answer.id);
+    expect(screen.getByText("forgot screen")).toBeInTheDocument();
     expect(useUIStore.getState().toasts).toHaveLength(0);
-
-    await user.keyboard("{Enter}");
-    expect(trigger).toHaveAttribute("aria-expanded", "false");
   });
 
-  it("has no serious or critical accessibility violations when open", async () => {
-    const user = userEvent.setup();
+  it("has no serious or critical accessibility violations", async () => {
     const { container } = renderScreen(<LoginPage />, { route: "/login" });
-
-    await user.click(screen.getByRole("button", { name: "Forgot password?" }));
-
     await expectNoBlockingA11yViolations(container);
   });
 });
@@ -482,8 +697,9 @@ describe("why the session ended", () => {
     {
       code: "session_ended_password_changed",
       title: "Password Changed",
-      text: /your password was changed/,
+      text: /your password was changed on another device/,
     },
+    { code: "session_ended_revoked", title: "Session Ended", text: /An administrator ended this session/ },
   ];
 
   it.each(cases)("says why for $code", async ({ code, title, text }) => {

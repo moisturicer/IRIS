@@ -1,0 +1,2682 @@
+{
+  "base": "http://localhost:5174",
+  "api": "http://localhost:5174 (dev proxy)",
+  "frontendRef": "a9df3d9f",
+  "backendRef": "0fd6967b (main checkout, feature/IR-566-account-saved-records; ai 0034/0035 unapplied)",
+  "ranAt": "2026-11-01T08:24:53.471Z",
+  "browser": "chromium 156.0.8078.4",
+  "viewports": [
+    {
+      "name": "360",
+      "width": 360,
+      "height": 740,
+      "scale": 1,
+      "keyboard": true
+    },
+    {
+      "name": "768",
+      "width": 768,
+      "height": 1024,
+      "scale": 1
+    },
+    {
+      "name": "1280",
+      "width": 1280,
+      "height": 800,
+      "scale": 1,
+      "keyboard": true
+    },
+    {
+      "name": "1745",
+      "width": 1745,
+      "height": 982,
+      "scale": 1
+    },
+    {
+      "name": "1280@200%",
+      "width": 640,
+      "height": 360,
+      "scale": 2
+    }
+  ],
+  "results": [
+    {
+      "role": null,
+      "name": "Sign in",
+      "url": "/login",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/login",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 7,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Sign_in__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Create account",
+      "url": "/signup",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/signup",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 8,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Create_account__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Forgot password",
+      "url": "/password/forgot",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/password/forgot",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 3,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Forgot_password__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Sign in",
+      "url": "/login",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/login",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Sign_in__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Create account",
+      "url": "/signup",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/signup",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Create_account__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Forgot password",
+      "url": "/password/forgot",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/password/forgot",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Forgot_password__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Sign in",
+      "url": "/login",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/login",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 7,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Sign_in__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Create account",
+      "url": "/signup",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/signup",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 8,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Create_account__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Forgot password",
+      "url": "/password/forgot",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/password/forgot",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 3,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Forgot_password__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Sign in",
+      "url": "/login",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/login",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Sign_in__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Create account",
+      "url": "/signup",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/signup",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Create_account__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Forgot password",
+      "url": "/password/forgot",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/password/forgot",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Forgot_password__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Sign in",
+      "url": "/login",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/login",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Sign_in__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Create account",
+      "url": "/signup",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/signup",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Create_account__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": null,
+      "name": "Forgot password",
+      "url": "/password/forgot",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/password/forgot",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Forgot_password__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Discover",
+      "url": "/",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 45,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Discover__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Publish dialog",
+      "url": "/?publish=new",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/?publish=new",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 2,
+        "cycled": true,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Publish_dialog__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "My Library",
+      "url": "/records/mine",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/mine",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 29,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/My_Library__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Overview (published)",
+      "url": "/records/20",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 2,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Overview_published__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Paper (published)",
+      "url": "/records/20?section=paper",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20?section=paper",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 4,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Paper_published__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Review (owner, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".-ml-1 > span"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 8,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Review_owner_in_review__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/1",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 2,
+          "targets": [
+            ".uppercase",
+            ".mt-2"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 7,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Ask_IRIS__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Settings & Profile",
+      "url": "/settings",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/settings",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 17,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [
+          "input \"\" under label"
+        ],
+        "invisible": []
+      },
+      "shot": "shots/Settings_Profile__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Notifications",
+      "url": "/notifications",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/notifications",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 40,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Notifications__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Help",
+      "url": "/help",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/help",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 4,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Help__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Calls & Conferences",
+      "url": "/opportunities",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/opportunities",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 10,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Calls_Conferences__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Discover",
+      "url": "/",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Discover__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Publish dialog",
+      "url": "/?publish=new",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/?publish=new",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Publish_dialog__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "My Library",
+      "url": "/records/mine",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/mine",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/My_Library__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Overview (published)",
+      "url": "/records/20",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".-ml-1 > span"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Overview_published__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Paper (published)",
+      "url": "/records/20?section=paper",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20?section=paper",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 2,
+          "targets": [
+            ".uppercase",
+            ".pt-3 > .mt-2"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Paper_published__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Review (owner, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".-ml-1 > span"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_owner_in_review__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/1",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 2,
+          "targets": [
+            ".uppercase",
+            ".mt-2"
+          ]
+        }
+      ],
+      "shot": "shots/Ask_IRIS__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Settings & Profile",
+      "url": "/settings",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/settings",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Settings_Profile__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Notifications",
+      "url": "/notifications",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/notifications",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Notifications__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Help",
+      "url": "/help",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/help",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Help__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Calls & Conferences",
+      "url": "/opportunities",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/opportunities",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Calls_Conferences__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Discover",
+      "url": "/",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".inset-0"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 44,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Discover__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Publish dialog",
+      "url": "/?publish=new",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/?publish=new",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 2,
+        "cycled": true,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Publish_dialog__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "My Library",
+      "url": "/records/mine",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/mine",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 30,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/My_Library__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Overview (published)",
+      "url": "/records/20",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".-ml-1 > span"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 16,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Overview_published__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Paper (published)",
+      "url": "/records/20?section=paper",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20?section=paper",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 5,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-small.text-stone-500",
+            ".w-10"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 18,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Paper_published__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Review (owner, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".-ml-1 > span"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 13,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Review_owner_in_review__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/1",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".mt-0\\.5.block.text-\\[12px\\]",
+            ".uppercase.tracking-wider.text-\\[12px\\]",
+            ".mt-2"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 16,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Ask_IRIS__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Settings & Profile",
+      "url": "/settings",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/settings",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 22,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [
+          "input \"\" under label"
+        ],
+        "invisible": []
+      },
+      "shot": "shots/Settings_Profile__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Notifications",
+      "url": "/notifications",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/notifications",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 45,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Notifications__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Help",
+      "url": "/help",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/help",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 9,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Help__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Calls & Conferences",
+      "url": "/opportunities",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/opportunities",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 15,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Calls_Conferences__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Discover",
+      "url": "/",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".inset-0"
+          ]
+        }
+      ],
+      "shot": "shots/Discover__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Publish dialog",
+      "url": "/?publish=new",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/?publish=new",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Publish_dialog__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "My Library",
+      "url": "/records/mine",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/mine",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/My_Library__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Overview (published)",
+      "url": "/records/20",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".-ml-1 > span"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Overview_published__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Paper (published)",
+      "url": "/records/20?section=paper",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20?section=paper",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 5,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-small.text-stone-500",
+            ".w-10"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Paper_published__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Review (owner, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".-ml-1 > span"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_owner_in_review__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/1",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 5,
+          "targets": [
+            ".mt-0\\.5.block.text-\\[12px\\]",
+            ".uppercase.tracking-wider.text-\\[12px\\]",
+            ".py-3\\.5.hover\\:border-brand\\/40.hover\\:text-brand:nth-child(3)"
+          ]
+        }
+      ],
+      "shot": "shots/Ask_IRIS__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Settings & Profile",
+      "url": "/settings",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/settings",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Settings_Profile__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Notifications",
+      "url": "/notifications",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/notifications",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Notifications__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Help",
+      "url": "/help",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/help",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Help__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Calls & Conferences",
+      "url": "/opportunities",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/opportunities",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Calls_Conferences__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Discover",
+      "url": "/",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Discover__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Publish dialog",
+      "url": "/?publish=new",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/?publish=new",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Publish_dialog__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "My Library",
+      "url": "/records/mine",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/mine",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/My_Library__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Overview (published)",
+      "url": "/records/20",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Paper_View_Overview_published__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Paper (published)",
+      "url": "/records/20?section=paper",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/20?section=paper",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 2,
+          "targets": [
+            ".uppercase",
+            ".pt-3 > .mt-2"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Paper_published__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Paper View · Review (owner, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            ".-ml-1 > span"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_owner_in_review__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/1",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 2,
+          "targets": [
+            ".uppercase",
+            ".mt-2"
+          ]
+        }
+      ],
+      "shot": "shots/Ask_IRIS__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Settings & Profile",
+      "url": "/settings",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/settings",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Settings_Profile__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Notifications",
+      "url": "/notifications",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/notifications",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Notifications__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Help",
+      "url": "/help",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/help",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Help__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Calls & Conferences",
+      "url": "/opportunities",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/opportunities",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Calls_Conferences__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "My Reviews (adviser)",
+      "url": "/review",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            "#\\:rb\\:-tab-done > .ml-1.tabular-nums.text-stone-500"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 10,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/My_Reviews_adviser__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "Paper View · Review (adviser, submitted)",
+      "url": "/records/18?section=review",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/18?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-stone-500.text-small",
+            "div > .tracking-wider.uppercase.text-stone-500"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 10,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [
+          "textarea \"\" under p in footer"
+        ],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Review_adviser_submitted__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "My Reviews (adviser)",
+      "url": "/review",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            "#\\:r25\\:-tab-done > .ml-1.tabular-nums.text-stone-500"
+          ]
+        }
+      ],
+      "shot": "shots/My_Reviews_adviser__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "Paper View · Review (adviser, submitted)",
+      "url": "/records/18?section=review",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/18?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-small.text-stone-500",
+            "div > .tracking-wider.uppercase"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_adviser_submitted__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "My Reviews (adviser)",
+      "url": "/review",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            "#\\:r3t\\:-tab-done > .ml-1.tabular-nums.text-stone-500"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 8,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/My_Reviews_adviser__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "Paper View · Review (adviser, submitted)",
+      "url": "/records/18?section=review",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/18?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-stone-500.text-small",
+            "div > .tracking-wider.uppercase.text-stone-500"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 17,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Review_adviser_submitted__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "My Reviews (adviser)",
+      "url": "/review",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            "#\\:r6p\\:-tab-done > .ml-1.tabular-nums.text-stone-500"
+          ]
+        }
+      ],
+      "shot": "shots/My_Reviews_adviser__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "Paper View · Review (adviser, submitted)",
+      "url": "/records/18?section=review",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/18?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-stone-500.text-small",
+            "div > .tracking-wider.uppercase.text-stone-500"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_adviser_submitted__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "My Reviews (adviser)",
+      "url": "/review",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 1,
+          "targets": [
+            "#\\:rb\\:-tab-done > .ml-1.tabular-nums.text-stone-500"
+          ]
+        }
+      ],
+      "shot": "shots/My_Reviews_adviser__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "adviser",
+      "name": "Paper View · Review (adviser, submitted)",
+      "url": "/records/18?section=review",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/18?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-stone-500.text-small",
+            "div > .tracking-wider.uppercase.text-stone-500"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_adviser_submitted__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "My Reviews (office)",
+      "url": "/review",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 11,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/My_Reviews_office__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "Office console",
+      "url": "/review/office",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/office",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 4,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Office_console__360.jpg",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ]
+    },
+    {
+      "role": "itso",
+      "name": "Paper View · Review (office, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-small.text-stone-500",
+            "div > .tracking-wider.uppercase"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 11,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Review_office_in_review__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "My Reviews (office)",
+      "url": "/review",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/My_Reviews_office__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "Office console",
+      "url": "/review/office",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/office",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Office_console__768.jpg",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ]
+    },
+    {
+      "role": "itso",
+      "name": "Paper View · Review (office, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-stone-500.text-small",
+            "div > .tracking-wider.uppercase.text-stone-500"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_office_in_review__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "My Reviews (office)",
+      "url": "/review",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 17,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/My_Reviews_office__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "Office console",
+      "url": "/review/office",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/office",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 10,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Office_console__1280.jpg",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ]
+    },
+    {
+      "role": "itso",
+      "name": "Paper View · Review (office, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-stone-500.text-small",
+            "div > .tracking-wider.uppercase.text-stone-500"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 17,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Paper_View_Review_office_in_review__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "My Reviews (office)",
+      "url": "/review",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/My_Reviews_office__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "Office console",
+      "url": "/review/office",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/office",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Office_console__1745.jpg",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ]
+    },
+    {
+      "role": "itso",
+      "name": "Paper View · Review (office, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-stone-500.text-small",
+            "div > .tracking-wider.uppercase.text-stone-500"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_office_in_review__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "My Reviews (office)",
+      "url": "/review",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/My_Reviews_office__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso",
+      "name": "Office console",
+      "url": "/review/office",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/office",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Office_console__1280_200pct.jpg",
+      "consoleErrors": [
+        "Failed to load resource: the server responded with a status of 403 (Forbidden)"
+      ]
+    },
+    {
+      "role": "itso",
+      "name": "Paper View · Review (office, in review)",
+      "url": "/records/17?section=review",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/17?section=review",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "color-contrast",
+          "impact": "serious",
+          "help": "Elements must meet minimum color contrast ratio thresholds",
+          "count": 3,
+          "targets": [
+            ".-ml-1 > span",
+            ".gap-2\\.5 > .shrink-0.text-small.text-stone-500",
+            "div > .tracking-wider.uppercase"
+          ]
+        },
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "help": "Scrollable region must have keyboard access",
+          "count": 1,
+          "targets": [
+            ".review-pane-body"
+          ]
+        }
+      ],
+      "shot": "shots/Paper_View_Review_office_in_review__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "My Reviews (office coordinator)",
+      "url": "/review",
+      "viewport": "360",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "Office console (coordinator)",
+      "url": "/review/office",
+      "viewport": "360",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "My Reviews (office coordinator)",
+      "url": "/review",
+      "viewport": "768",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "Office console (coordinator)",
+      "url": "/review/office",
+      "viewport": "768",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "My Reviews (office coordinator)",
+      "url": "/review",
+      "viewport": "1280",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "Office console (coordinator)",
+      "url": "/review/office",
+      "viewport": "1280",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "My Reviews (office coordinator)",
+      "url": "/review",
+      "viewport": "1745",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "Office console (coordinator)",
+      "url": "/review/office",
+      "viewport": "1745",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "My Reviews (office coordinator)",
+      "url": "/review",
+      "viewport": "1280@200%",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "itso.coordinator",
+      "name": "Office console (coordinator)",
+      "url": "/review/office",
+      "viewport": "1280@200%",
+      "error": "sign-in failed: login throttled (429) for itso.coordinator@cit.edu"
+    },
+    {
+      "role": "rdco",
+      "name": "Users",
+      "url": "/admin/users",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/users",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 39,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Users__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Role requests",
+      "url": "/admin/role-requests",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/role-requests",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 3,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Role_requests__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Download requests",
+      "url": "/admin/download-requests",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/download-requests",
+      "overflow": {
+        "px": 68,
+        "offenders": [
+          "button.ml-auto.flex.items-center"
+        ]
+      },
+      "axe": [],
+      "keyboard": {
+        "stops": 8,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Download_requests__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Delete requests",
+      "url": "/admin/delete-requests",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/delete-requests",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 7,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Delete_requests__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Audit log",
+      "url": "/admin/audit",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/audit",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 23,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Audit_log__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Workflow analytics",
+      "url": "/review/analytics",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/analytics",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "scrollable-region-focusable",
+          "impact": "serious",
+          "help": "Scrollable region must have keyboard access",
+          "count": 2,
+          "targets": [
+            "section[aria-labelledby=\"open-now\"] > .overflow-x-auto",
+            "section[aria-labelledby=\"time-in-stage\"] > .overflow-x-auto"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 9,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Workflow_analytics__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Import records",
+      "url": "/records/import",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/import",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "label",
+          "impact": "critical",
+          "help": "Form elements must have labels",
+          "count": 1,
+          "targets": [
+            "textarea"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 5,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Import_records__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Users",
+      "url": "/admin/users",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/users",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Users__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Role requests",
+      "url": "/admin/role-requests",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/role-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Role_requests__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Download requests",
+      "url": "/admin/download-requests",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/download-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Download_requests__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Delete requests",
+      "url": "/admin/delete-requests",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/delete-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Delete_requests__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Audit log",
+      "url": "/admin/audit",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/audit",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Audit_log__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Workflow analytics",
+      "url": "/review/analytics",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/analytics",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Workflow_analytics__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Import records",
+      "url": "/records/import",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/import",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "label",
+          "impact": "critical",
+          "help": "Form elements must have labels",
+          "count": 1,
+          "targets": [
+            "textarea"
+          ]
+        }
+      ],
+      "shot": "shots/Import_records__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Users",
+      "url": "/admin/users",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/users",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 51,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Users__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Role requests",
+      "url": "/admin/role-requests",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/role-requests",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 15,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Role_requests__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Download requests",
+      "url": "/admin/download-requests",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/download-requests",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 20,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Download_requests__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Delete requests",
+      "url": "/admin/delete-requests",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/delete-requests",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 19,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Delete_requests__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Audit log",
+      "url": "/admin/audit",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/audit",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 35,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Audit_log__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Workflow analytics",
+      "url": "/review/analytics",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/analytics",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 18,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Workflow_analytics__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Import records",
+      "url": "/records/import",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/import",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "label",
+          "impact": "critical",
+          "help": "Form elements must have labels",
+          "count": 1,
+          "targets": [
+            "textarea"
+          ]
+        }
+      ],
+      "keyboard": {
+        "stops": 17,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Import_records__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Users",
+      "url": "/admin/users",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/users",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Users__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Role requests",
+      "url": "/admin/role-requests",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/role-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Role_requests__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Download requests",
+      "url": "/admin/download-requests",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/download-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Download_requests__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Delete requests",
+      "url": "/admin/delete-requests",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/delete-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Delete_requests__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Audit log",
+      "url": "/admin/audit",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/audit",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Audit_log__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Workflow analytics",
+      "url": "/review/analytics",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/analytics",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Workflow_analytics__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Import records",
+      "url": "/records/import",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/import",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "label",
+          "impact": "critical",
+          "help": "Form elements must have labels",
+          "count": 1,
+          "targets": [
+            "textarea"
+          ]
+        }
+      ],
+      "shot": "shots/Import_records__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Users",
+      "url": "/admin/users",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/users",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Users__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Role requests",
+      "url": "/admin/role-requests",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/role-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Role_requests__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Download requests",
+      "url": "/admin/download-requests",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/download-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Download_requests__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Delete requests",
+      "url": "/admin/delete-requests",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/delete-requests",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Delete_requests__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Audit log",
+      "url": "/admin/audit",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/admin/audit",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Audit_log__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Workflow analytics",
+      "url": "/review/analytics",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/review/analytics",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Workflow_analytics__1280_200pct.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "rdco",
+      "name": "Import records",
+      "url": "/records/import",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/records/import",
+      "overflow": null,
+      "axe": [
+        {
+          "id": "label",
+          "impact": "critical",
+          "help": "Form elements must have labels",
+          "count": 1,
+          "targets": [
+            "textarea"
+          ]
+        }
+      ],
+      "shot": "shots/Import_records__1280_200pct.jpg",
+      "consoleErrors": []
+    }
+  ],
+  "interactions": [
+    {
+      "role": "adviser",
+      "name": "Review interactions (adviser, submitted)",
+      "url": "/records/18?section=review",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "actions": [
+        "Accept…",
+        "Request Revision…",
+        "Request documents",
+        "Reject…"
+      ],
+      "arrowKeysMove": null,
+      "arrowKeysWrap": null,
+      "lastEntryCovered": false,
+      "dialogOpened": true,
+      "focusMovesIn": true,
+      "tabStaysIn": true,
+      "escapeCloses": true,
+      "focusReturns": true
+    },
+    {
+      "role": "adviser",
+      "name": "Review interactions (adviser, submitted)",
+      "url": "/records/18?section=review",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "actions": [
+        "Accept…",
+        "Request Revision…",
+        "Request documents",
+        "Reject…"
+      ],
+      "arrowKeysMove": null,
+      "arrowKeysWrap": null,
+      "lastEntryCovered": false,
+      "dialogOpened": true,
+      "focusMovesIn": true,
+      "tabStaysIn": true,
+      "escapeCloses": true,
+      "focusReturns": true
+    },
+    {
+      "role": "adviser",
+      "name": "Review interactions (adviser, submitted)",
+      "url": "/records/18?section=review",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "actions": [
+        "Accept…",
+        "Request Revision…",
+        "Request documents",
+        "Reject…"
+      ],
+      "arrowKeysMove": null,
+      "arrowKeysWrap": null,
+      "lastEntryCovered": false,
+      "dialogOpened": true,
+      "focusMovesIn": true,
+      "tabStaysIn": true,
+      "escapeCloses": true,
+      "focusReturns": true
+    },
+    {
+      "role": "ierc",
+      "name": "Review interactions (office, clearance pending)",
+      "url": "/records/14?section=review",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "actions": [
+        "Clear…",
+        "Record finding…",
+        "Request Revision…",
+        "Request documents"
+      ],
+      "arrowKeysMove": true,
+      "arrowKeysWrap": true,
+      "lastEntryCovered": false,
+      "dialogOpened": true,
+      "focusMovesIn": true,
+      "tabStaysIn": true,
+      "escapeCloses": true,
+      "focusReturns": true
+    },
+    {
+      "role": "ierc",
+      "name": "Review interactions (office, clearance pending)",
+      "url": "/records/14?section=review",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "actions": [
+        "Clear…",
+        "Record finding…",
+        "Request Revision…",
+        "Request documents"
+      ],
+      "arrowKeysMove": true,
+      "arrowKeysWrap": true,
+      "lastEntryCovered": false,
+      "dialogOpened": true,
+      "focusMovesIn": true,
+      "tabStaysIn": true,
+      "escapeCloses": true,
+      "focusReturns": true
+    },
+    {
+      "role": "ierc",
+      "name": "Review interactions (office, clearance pending)",
+      "url": "/records/14?section=review",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "actions": [
+        "Clear…",
+        "Record finding…",
+        "Request Revision…",
+        "Request documents"
+      ],
+      "arrowKeysMove": true,
+      "arrowKeysWrap": true,
+      "lastEntryCovered": false,
+      "dialogOpened": true,
+      "focusMovesIn": true,
+      "tabStaysIn": true,
+      "escapeCloses": true,
+      "focusReturns": true
+    }
+  ]
+}

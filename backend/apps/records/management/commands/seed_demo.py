@@ -48,14 +48,18 @@ Refuses to run with `DEBUG` off unless `--force`, because these are
 known-password accounts.
 """
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import College, Course, Role, StudentProfile, User
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.records import lifecycle
+from apps.records.embargo import EmbargoAnswer, record_answer
 from apps.records.models import (
     Author,
     Classification,
@@ -63,7 +67,7 @@ from apps.records.models import (
     RecordOwner,
     RecordType,
 )
-from core.enums import IPType, Office, RecordTypeName, RoleName
+from core.enums import IPType, Office, PipelineStatus, RecordTypeName, RoleName
 
 #: The convention that already existed, kept deliberately (see module docstring).
 PASSWORD = "IrisDemo123!"
@@ -153,10 +157,18 @@ _PREFIX = "[DEMO]"
 
 FLAGSHIP_TITLE = f"{_PREFIX} Declined by IERC, ITSO and KTTO preserved"
 RESUBMITTED_TITLE = f"{_PREFIX} Resubmitted, ITSO and KTTO preserved"
-NEW_MODEL_TITLE = f"{_PREFIX} New model: Thesis at its Adviser, ready to accept and route"
-AT_RDCO_TITLE = f"{_PREFIX} New model: Thesis ITSO cleared, in RDCO's pool to decide"
-PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} New model: Proposal at its Adviser, ready to accept or reject"
+NEW_MODEL_TITLE = f"{_PREFIX} Thesis at its Adviser, ready to accept and send to RDCO"
+IN_RDCO_POOL_TITLE = f"{_PREFIX} Thesis in RDCO's pool, Adviser suggests ITSO and IERC"
+RDCO_DECIDES_EARLY_TITLE = f"{_PREFIX} Project with IERC and KTTO still reviewing, RDCO can decide"
+AT_RDCO_TITLE = f"{_PREFIX} Thesis ITSO cleared, RDCO's turn to decide"
+PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} Proposal at its Adviser, ready to accept or reject"
 AWAITING_DOCUMENT_TITLE = f"{_PREFIX} Adviser requested a supporting document"
+
+#: The one paper under embargo, so the blocked state can be seen (ADR-052
+#: decision 16). This one because RDCO's warning (IR-818) needs a paper in front
+#: of RDCO. A date always ahead, so the demo never reads as overdue.
+EMBARGOED_TITLE = AT_RDCO_TITLE
+EMBARGO_DAYS_AHEAD = 365
 
 
 class Command(BaseCommand):
@@ -173,7 +185,7 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--accounts-only", action="store_true",
-            help="Seed the seven accounts and stop. Replaces seed_demo_users.py.",
+            help="Seed the eleven accounts and stop. Replaces seed_demo_users.py.",
         )
 
     def handle(self, *args, **options):
@@ -196,6 +208,7 @@ class Command(BaseCommand):
             self._seed_classifications()
             self._seed_catalogue(users)
             self._seed_workflow(users)
+            self._answer_for_papers_seeded_earlier()
 
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Demo data ready."))
@@ -204,6 +217,9 @@ class Command(BaseCommand):
             self.stdout.write(f"  Drive the preservation demo on: '{FLAGSHIP_TITLE}'")
             self.stdout.write("    (upload a document as the student first -- resubmission requires one)")
             self.stdout.write(f"  Already-preserved badges render on: '{RESUBMITTED_TITLE}'")
+            self.stdout.write(f"  Pick the offices as RDCO on: '{IN_RDCO_POOL_TITLE}'")
+            self.stdout.write(f"  Decide early as RDCO on: '{RDCO_DECIDES_EARLY_TITLE}'")
+            self.stdout.write(f"  Under embargo, so the AI refuses it: '{EMBARGOED_TITLE}'")
 
     # -- phase 1: accounts -------------------------------------------------
 
@@ -279,11 +295,13 @@ class Command(BaseCommand):
     # -- phase 3: the Discover catalogue -----------------------------------
 
     def _seed_catalogue(self, users):
-        """Published records reached through an Adviser's decision."""
+        """Published records: the Adviser sends each to RDCO, which publishes it (ADR-047)."""
         from apps.reviews import seats
         from apps.reviews.decisions import PUBLISH, decide, decision_token
+        from apps.reviews.models import RecordAssignment
+        from apps.reviews.routing import accept_and_route
 
-        adviser = users[RoleName.ADVISER]
+        adviser, rdco = users[RoleName.ADVISER], users[RoleName.RDCO]
         for (title, classification_name, type_name, year, is_ip, ip_type,
              commercial, extension, college_code, author_names) in CATALOGUE:
 
@@ -315,7 +333,13 @@ class Command(BaseCommand):
 
             entry = self._submit(record, owner)
             seats.open_review(entry.seats.get(), adviser)
-            decide(record, adviser, outcome=PUBLISH, token=decision_token(record))
+            accept_and_route(
+                record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}],
+                reason="Ready for publication.",
+            )
+            rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+            seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+            decide(record, rdco, outcome=PUBLISH, token=decision_token(record))
             self._done(record)
 
     # -- phase 4: one record per workflow state ----------------------------
@@ -331,6 +355,8 @@ class Command(BaseCommand):
             self._scenario_new_model_at_adviser,
             self._scenario_awaiting_document,
             self._scenario_new_model_at_rdco,
+            self._scenario_in_rdco_pool,
+            self._scenario_rdco_decides_early,
             self._scenario_new_model_proposal_at_adviser,
         ):
             scenario(users)
@@ -367,10 +393,39 @@ class Command(BaseCommand):
         """Submit through the same adviser-first service as the API."""
         from apps.reviews.routing import enter_at_adviser
 
+        record_answer(record, self._embargo_answer(record), actor=owner)
         record.dpa_accepted_at = timezone.now()
         record.dpa_accepted_by = owner
         record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
         return enter_at_adviser(record, owner)
+
+    def _embargo_answer(self, record: Record) -> EmbargoAnswer:
+        if record.title == EMBARGOED_TITLE:
+            return EmbargoAnswer(until=timezone.localdate() + timedelta(days=EMBARGO_DAYS_AHEAD))
+        return EmbargoAnswer(until=None)
+
+    def _answer_for_papers_seeded_earlier(self):
+        """
+        Answer for this command's own papers that an older run left Unknown.
+
+        A second run creates nothing, so without this a database seeded before
+        the question existed would keep answering "no readable sources". Named
+        by title and origin together, so a paper from anywhere else doesn't get an
+        answer nobody gave. The draft stays for Publish to ask.
+        """
+        catalogue = [entry[0] for entry in CATALOGUE]
+        earlier = (
+            Record.objects.filter(
+                Q(title__startswith=_PREFIX) | Q(title__in=catalogue),
+                origin=Record.Origin.SYNTHETIC,
+                embargo_answered_at__isnull=True,
+            )
+            .exclude(pipeline_status=PipelineStatus.DRAFT)
+            .select_related("added_by")
+        )
+        for record in earlier:
+            record_answer(record, self._embargo_answer(record), actor=record.added_by)
+            self.stdout.write(f"  ~ {record.title[:58]} (embargo answered)")
 
     @transaction.atomic
     def _scenario_draft(self, users):
@@ -402,7 +457,7 @@ class Command(BaseCommand):
         from apps.reviews.decisions import KEEP_UNLISTED, decide, decision_token
         from apps.reviews.models import RecordAssignment
         from apps.reviews.office_review import CLEARED, record_office_review
-        from apps.reviews.routing import accept_and_route
+        from apps.reviews.routing import accept_and_route, route
 
         student, adviser, ktto, rdco = (
             users[RoleName.STUDENT], users[RoleName.ADVISER],
@@ -410,20 +465,23 @@ class Command(BaseCommand):
         )
         record = self._make(
             "Project kept unlisted after KTTO", RecordTypeName.PROJECT, student,
-            adviser=adviser, requested_ktto=True,
+            adviser=adviser, for_commercialization=True,
         )
         if record:
             entry = self._submit(record, student)
             seats.open_review(entry.seats.get(), adviser)
             accept_and_route(
-                record, adviser, to=[{"party": "ktto", "nominee": ktto.pk}],
-                reason="KTTO should assess commercialisation potential.",
+                record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}],
+                reason="RDCO should assess which institutional reviews are needed.",
             )
+            rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+            seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+            route(record, rdco, to=[{"party": "ktto", "nominees": [ktto.pk]}], reason="Commercialisation review.")
             assignment = RecordAssignment.objects.get(record=record, party="ktto", state="active")
             seats.open_review(assignment.seats.get(reviewer=ktto), ktto)
             record_office_review(record, ktto, outcome=CLEARED, comment="Assessment complete.")
             rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
-            seats.open_review(seats.claim(rdco_assignment, rdco), rdco)
+
             decide(record, rdco, outcome=KEEP_UNLISTED, token=decision_token(record))
             self._done(record)
 
@@ -454,29 +512,33 @@ class Command(BaseCommand):
         from apps.reviews.models import RecordAssignment
         from apps.reviews.office_review import CLEARED, record_office_review
         from apps.reviews.revisions import request_revision
-        from apps.reviews.routing import accept_and_route
+        from apps.reviews.routing import accept_and_route, route
 
         student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
         record = self._make(
             title, RecordTypeName.PROJECT, student, adviser=adviser,
-            requested_itso=True, requested_ierc=True, requested_ktto=True,
+            requires_ethics_review=True, for_commercialization=True,
         )
         if not record:
             return None
 
         entry = self._submit(record, student)
         seats.open_review(entry.seats.get(), adviser)
-        accept_and_route(
-            record, adviser,
-            to=[{"party": str(party), "nominee": users[role].pk} for party, role in (
+        rdco = users[RoleName.RDCO]
+        accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="Institutional review.")
+        rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+        seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+        route(
+            record, rdco,
+            to=[{"party": str(party), "nominees": [users[role].pk]} for party, role in (
                 (Office.ITSO, RoleName.ITSO),
                 (Office.IERC, RoleName.IERC),
                 (Office.KTTO, RoleName.KTTO),
             )],
-            reason="The project needs prior-art, ethics and commercialisation review.",
+            reason="The project needs technical, ethics and commercialisation review.",
         )
         for office, role, comment in (
-            (Office.ITSO, RoleName.ITSO, "Prior-art search complete; no conflict."),
+            (Office.ITSO, RoleName.ITSO, "Technical review complete; no issues found."),
             (Office.KTTO, RoleName.KTTO, "Commercialisation potential noted."),
         ):
             reviewer = users[role]
@@ -561,19 +623,14 @@ class Command(BaseCommand):
         A Thesis/Research on the adviser-first model, at its Adviser (IR-261).
 
         Entered through `routing.enter_at_adviser`, as every submission is.
-        This one is where *Accept & route…* is demoed (as adviser@cit.edu).
+        This one is where *Accept & send to RDCO…* is demoed (as adviser@cit.edu).
         """
-        from apps.reviews.routing import enter_at_adviser
-
         record = self._make(
             NEW_MODEL_TITLE, RecordTypeName.THESIS_RESEARCH, users[RoleName.STUDENT],
-            adviser=users[RoleName.ADVISER], requested_itso=True,
+            adviser=users[RoleName.ADVISER], is_ip=True,
         )
         if record:
-            record.dpa_accepted_at = timezone.now()
-            record.dpa_accepted_by = users[RoleName.STUDENT]
-            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-            enter_at_adviser(record, users[RoleName.STUDENT])
+            self._submit(record, users[RoleName.STUDENT])
             self._done(record)
 
     @transaction.atomic
@@ -583,62 +640,126 @@ class Command(BaseCommand):
         through `routing.enter_at_adviser`; adviser@cit.edu opens the review and
         demos *Accept* and *Reject*, which a Proposal's Adviser alone decides.
         """
-        from apps.reviews.routing import enter_at_adviser
-
         student = users[RoleName.STUDENT]
         record = self._make(
             PROPOSAL_AT_ADVISER_TITLE, RecordTypeName.PROPOSAL, student,
             adviser=users[RoleName.ADVISER],
         )
         if record:
-            record.dpa_accepted_at = timezone.now()
-            record.dpa_accepted_by = student
-            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-            enter_at_adviser(record, student)
+            self._submit(record, student)
             self._done(record)
 
     @transaction.atomic
     def _scenario_new_model_at_rdco(self, users):
         """
-        A Thesis/Research on the specialist path, in RDCO's pool (IR-270).
+        A Thesis/Research with RDCO's review open after ITSO cleared it.
 
-        Every step is the real act: it enters at its Adviser, who opens the
-        review and accepts & routes it to ITSO, nominating ITSO's account; ITSO
-        opens and clears it, and the hand-back opens RDCO's pool. Nobody at
-        RDCO is seated, so the demo starts with *Claim review* as rdco@cit.edu,
-        then *Accept & publish*, *Keep unlisted* or *Reject*.
+        The Adviser sends it to RDCO; RDCO requests ITSO's review. Office
+        completion leaves RDCO's existing turn open, ready for a Decision.
         """
         from apps.reviews import seats
-        from apps.reviews.models import ReviewerSeat
+        from apps.reviews.models import RecordAssignment, ReviewerSeat
         from apps.reviews.office_review import CLEARED, record_office_review
-        from apps.reviews.routing import accept_and_route, enter_at_adviser
+        from apps.reviews.routing import accept_and_route, route
 
         student, adviser, itso = (
             users[RoleName.STUDENT], users[RoleName.ADVISER], users[RoleName.ITSO],
         )
         record = self._make(
             AT_RDCO_TITLE, RecordTypeName.THESIS_RESEARCH, student,
-            adviser=adviser, requested_itso=True,
+            adviser=adviser,
         )
         if not record:
             return
-        record.dpa_accepted_at = timezone.now()
-        record.dpa_accepted_by = student
-        record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-        entry = enter_at_adviser(record, student)
+        entry = self._submit(record, student)
         seats.open_review(entry.seats.get(), adviser)
-        accept_and_route(
-            record, adviser,
-            to=[{"party": "itso", "nominee": itso.pk}],
-            reason="The prototype's sensor fusion method may be patentable.",
-        )
+        rdco = users[RoleName.RDCO]
+        accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="The sensor fusion method needs technical review.")
+        rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+        seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+        route(record, rdco, to=[{"party": "itso", "nominees": [itso.pk]}], reason="Review the sensor fusion method.")
         seat = ReviewerSeat.objects.get(
             assignment__record=record, assignment__party="itso", reviewer=itso,
         )
         seats.open_review(seat, itso)
         record_office_review(
             record, itso, outcome=CLEARED,
-            comment="No prior art found; no filing needed before publication.",
+            comment="Technical review complete; no issues found.",
+        )
+        self._done(record)
+
+    @transaction.atomic
+    def _scenario_in_rdco_pool(self, users):
+        """
+        RDCO's first step (ADR-047 §1): a Thesis/Research nobody at RDCO has
+        claimed yet. The author flagged KTTO and the Adviser suggests ITSO and
+        IERC, so rdco@cit.edu claims it and picks the offices. A suggestion
+        requests nothing, so no office holds it yet.
+        """
+        from apps.reviews import seats
+        from apps.reviews.routing import accept_and_route
+
+        student, adviser = users[RoleName.STUDENT], users[RoleName.ADVISER]
+        record = self._make(
+            IN_RDCO_POOL_TITLE, RecordTypeName.THESIS_RESEARCH, student,
+            adviser=adviser, for_commercialization=True,
+        )
+        if record:
+            entry = self._submit(record, student)
+            seats.open_review(entry.seats.get(), adviser)
+            accept_and_route(
+                record, adviser, to=[{"party": "rdco"}],
+                reason="The method needs technical review, and the study involved human participants.",
+                suggested_offices=["itso", "ierc"],
+            )
+            self._done(record)
+
+    @transaction.atomic
+    def _scenario_rdco_decides_early(self, users):
+        """
+        RDCO deciding with work still open (ADR-047 §3 and §5). RDCO asked one
+        ITSO officer, IERC's whole office and two KTTO officers. ITSO recorded a
+        finding, and IERC and KTTO have not finished. rdco@cit.edu's Decision
+        dialog names both offices and the finding before anything closes.
+        """
+        from apps.reviews import seats
+        from apps.reviews.models import RecordAssignment
+        from apps.reviews.office_review import FINDING, record_office_review
+        from apps.reviews.routing import accept_and_route, route
+
+        student, adviser, rdco, itso, ktto = (
+            users[RoleName.STUDENT], users[RoleName.ADVISER], users[RoleName.RDCO],
+            users[RoleName.ITSO], users[RoleName.KTTO],
+        )
+        record = self._make(
+            RDCO_DECIDES_EARLY_TITLE, RecordTypeName.PROJECT, student, adviser=adviser,
+            requires_ethics_review=True, for_commercialization=True,
+        )
+        if not record:
+            return
+        entry = self._submit(record, student)
+        seats.open_review(entry.seats.get(), adviser)
+        accept_and_route(
+            record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}],
+            reason="Ready for institutional review.",
+        )
+        rdco_assignment = RecordAssignment.objects.get(record=record, party="rdco", state="active")
+        seats.open_review(rdco_assignment.seats.get(reviewer=rdco), rdco)
+        ktto_coordinator = User.objects.get(email="ktto.coordinator@cit.edu")
+        route(
+            record, rdco,
+            to=[
+                {"party": "itso", "nominees": [itso.pk]},
+                {"party": "ierc"},
+                {"party": "ktto", "nominees": [ktto.pk, ktto_coordinator.pk]},
+            ],
+            reason="The project needs technical, ethics and commercialisation review.",
+        )
+        itso_assignment = RecordAssignment.objects.get(record=record, party="itso", state="active")
+        seats.open_review(itso_assignment.seats.get(reviewer=itso), itso)
+        record_office_review(
+            record, itso, outcome=FINDING,
+            comment="The reported results could not be reproduced from the method described.",
         )
         self._done(record)
 

@@ -6,7 +6,8 @@
  * What is under test is this component's own logic around it -- fetching
  * through `apiClient` (never a bare URL, which would 401 against the
  * authenticated manuscript endpoint), landing on the cited passage, drawing
- * regions on the right page and no other, and the zoom/download affordances.
+ * regions on the right page and no other, the zoom affordances, and the
+ * download control the caller hands it.
  *
  * Every query goes through the accessible tree, by role and accessible name.
  */
@@ -19,11 +20,17 @@ import type { TextRun } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 
 import { PaperPdfReader } from "./PaperPdfReader";
+import { useAuthStore } from "@/store/auth.store";
 import { PANE_TOP_PX, READER_TOOLBAR_TOP_PX } from "./paneLayout";
+import { MAX_LIVE_PAGES } from "./readerGeometry";
 
 const manuscriptBlob = vi.fn();
+const versionManuscriptBlob = vi.fn();
 vi.mock("@/api/records", () => ({
-  recordsApi: { manuscriptBlob: (...args: unknown[]) => manuscriptBlob(...(args as [])) },
+  recordsApi: {
+    manuscriptBlob: (...args: unknown[]) => manuscriptBlob(...(args as [])),
+    versionManuscriptBlob: (...args: unknown[]) => versionManuscriptBlob(...(args as [])),
+  },
 }));
 
 const loadPdfDocument = vi.fn();
@@ -87,8 +94,8 @@ function pdfBlob() {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  // jsdom has no `URL.createObjectURL`/`revokeObjectURL` -- the reader uses
-  // both for the download affordance.
+  // jsdom has no `URL.createObjectURL`/`revokeObjectURL`; stubbed so
+  // nothing the reader renders trips over them.
   URL.createObjectURL = vi.fn(() => "blob:mock-url");
   URL.revokeObjectURL = vi.fn();
   manuscriptBlob.mockResolvedValue({ data: pdfBlob() });
@@ -124,7 +131,8 @@ describe("loading the paper", () => {
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
     );
 
-    await waitFor(() => expect(manuscriptBlob).toHaveBeenCalledWith(7));
+    // With an abort signal (IR-565): a reader that moves on cancels the fetch.
+    await waitFor(() => expect(manuscriptBlob).toHaveBeenCalledWith(7, { signal: expect.any(AbortSignal) }));
   });
 
   it("shows an error state rather than an empty reader when the fetch fails", async () => {
@@ -174,9 +182,8 @@ describe("landing on a cited passage (IR-354)", () => {
   const PASSAGE_HIGH: Region[] = [{ page: 2, left: 0.1, top: 0.02, right: 0.9, bottom: 0.05 }];
 
   /**
-   * The reader's parts. The paper is found by its role and name; the toolbar
-   * and the pane have neither, so they are reached from what does -- the
-   * toolbar is what holds the Download control, the pane what holds both.
+   * The reader's parts, found by role and name; the pane has neither, so it
+   * is reached from the paper it holds.
    */
   async function openReader(contained = false) {
     const view = render(
@@ -187,7 +194,7 @@ describe("landing on a cited passage (IR-354)", () => {
     return {
       ...view,
       area,
-      toolbar: screen.getByRole("button", { name: "Download" }).parentElement as HTMLElement,
+      toolbar: screen.getByRole("toolbar", { name: "Paper tools" }),
       pane: area.parentElement as HTMLElement,
     };
   }
@@ -210,6 +217,9 @@ describe("landing on a cited passage (IR-354)", () => {
       scrollBy = vi.fn();
       vi.stubGlobal("scrollBy", scrollBy);
     });
+
+    /** The window scrolls that land a citation, as against keeping the reader's place. */
+    const landings = () => scrollBy.mock.calls.filter(([arg]) => typeof arg === "object");
 
     async function openAt() {
       const reader = await openReader();
@@ -253,6 +263,24 @@ describe("landing on a cited passage (IR-354)", () => {
       );
     });
 
+    it("ends a tall passage above a bar stuck over the window's bottom, giving up context first (IR-477)", async () => {
+      vi.stubGlobal("innerHeight", 740);
+      const { rerender } = await openAt();
+      // 500px of passage from 1500 + 100 = 1600. The band runs from under the
+      // toolbar (READER_TOOLBAR_TOP_PX + 44 = 108) to the bar's top, 740 - 112 =
+      // 628: 520px. With 48px of context its end would be 28px under the bar,
+      // so it keeps only the 20px that fit.
+      const TALL: Region[] = [{ page: 2, left: 0.1, top: 0.1, right: 0.9, bottom: 0.6 }];
+      rerender(
+        <PaperPdfReader recordId={7} scrollToPage={2} highlightRegions={TALL} navKey="followed" bottomInset={112} />,
+      );
+
+      const bandTop = READER_TOOLBAR_TOP_PX + 44;
+      await waitFor(() =>
+        expect(scrollBy).toHaveBeenCalledWith({ top: 1600 - bandTop - 20, behavior: "smooth" }),
+      );
+    });
+
     it("lands again when the same citation is followed a second time", async () => {
       const { rerender } = await openAt();
       follow(rerender, PASSAGE_LOW, "first");
@@ -269,7 +297,7 @@ describe("landing on a cited passage (IR-354)", () => {
       const pane = measurePaneAs(602);
       const { rerender } = await openAt();
       follow(rerender, PASSAGE_LOW);
-      await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(1));
+      await waitFor(() => expect(landings()).toHaveLength(1));
 
       // The window's scrollbar appears once the pages are in, the pane
       // narrows, and the paper refits -- which moves the passage, and
@@ -282,8 +310,10 @@ describe("landing on a cited passage (IR-354)", () => {
       act(() => pane.resizeTo(585));
       expect(await screen.findByText("194%")).toBeInTheDocument();
 
-      // From where the passage is now: 1456 + 0.85 * 970 = 2280.5.
-      await waitFor(() => expect(scrollBy).toHaveBeenCalledTimes(2));
+      // From where the passage is now: 1456 + 0.85 * 970 = 2280.5. The
+      // reader's place is also kept through the refit (`scrollBy(0, n)`,
+      // IR-352); the landing comes after it, so it is the last word.
+      await waitFor(() => expect(landings()).toHaveLength(2));
       expect(scrollBy).toHaveBeenLastCalledWith({ top: 2280.5 - (READER_TOOLBAR_TOP_PX + 44) - 48, behavior: "smooth" });
     });
 
@@ -384,25 +414,34 @@ describe("zoom controls", () => {
   });
 });
 
-describe("downloading the paper", () => {
-  it("offers a download once the file has loaded, with no second request", async () => {
+describe("saving a copy (IR-677)", () => {
+  // The reader used to save the bytes it had fetched. Under ADR-048 every
+  // saved copy goes through the download route, which marks it (IR-676), so
+  // the reader holds the caller's control and saves nothing itself.
+  it("shows the caller's download control in its toolbar", async () => {
     render(
-      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+      <PaperPdfReader
+        recordId={7}
+        scrollToPage={null}
+        highlightRegions={[]}
+        navKey="a"
+        downloadControl={<button type="button">Request download</button>}
+      />,
     );
+    await screen.findByText("Page 1 / 3");
 
-    const button = await screen.findByRole("button", { name: /download/i });
-    await userEvent.click(button);
-
-    expect(downloadBlob).toHaveBeenCalledTimes(1);
-    expect(manuscriptBlob).toHaveBeenCalledTimes(1);
+    const toolbar = screen.getByRole("toolbar", { name: "Paper tools" });
+    expect(within(toolbar).getByRole("button", { name: "Request download" })).toBeInTheDocument();
   });
 
-  it("disables download until the file has loaded", () => {
+  it("offers no download of its own", async () => {
     render(
       <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
     );
+    await screen.findByText("Page 1 / 3");
 
-    expect(screen.getByRole("button", { name: /download/i })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /download/i })).not.toBeInTheDocument();
+    expect(downloadBlob).not.toHaveBeenCalled();
   });
 });
 
@@ -708,9 +747,9 @@ describe("find in this paper (IR-353)", () => {
     [line("A robot arm, and another ROBOT.", 0.5)],
   ];
 
-  async function openPaper() {
+  async function openPaper(bottomInset?: number) {
     paperText = PAPER;
-    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" bottomInset={bottomInset} />);
     await screen.findByText("Page 1 / 3");
   }
 
@@ -733,8 +772,8 @@ describe("find in this paper (IR-353)", () => {
     }));
   }
 
-  /** The reader's toolbar: what holds the Download control. */
-  const toolbar = () => screen.getByRole("button", { name: "Download" }).parentElement as HTMLElement;
+  /** The reader's toolbar. */
+  const toolbar = () => screen.getByRole("toolbar", { name: "Paper tools" });
 
   it("is a find of its own in the reader's toolbar, apart from the header's search", async () => {
     await openPaper();
@@ -889,6 +928,28 @@ describe("find in this paper (IR-353)", () => {
     expect(scrollBy).not.toHaveBeenCalled();
   });
 
+  it("treats a match under a bar stuck over the window's bottom as out of view, and scrolls to it (IR-477)", async () => {
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    vi.stubGlobal("innerHeight", 740);
+    // The Review tab's action bar covers the bottom 112px of a 740px window.
+    await openPaper(112);
+    const input = await openFind();
+    // Page 1's first line is at 600 + 100 = 700px: inside the window, under the bar.
+    placePages([
+      { top: 600, height: 1000 },
+      { top: 1616, height: 1000 },
+      { top: 2632, height: 1000 },
+    ]);
+    vi.spyOn(toolbar(), "getBoundingClientRect").mockReturnValue(box(READER_TOOLBAR_TOP_PX, 96));
+
+    await userEvent.type(input, "vision");
+
+    await waitFor(() =>
+      expect(scrollBy).toHaveBeenCalledWith({ top: 700 - (READER_TOOLBAR_TOP_PX + 96) - 48, behavior: "auto" }),
+    );
+  });
+
   it("closes on Esc, clearing its highlights and returning focus", async () => {
     await openPaper();
     await userEvent.type(await openFind(), "robot");
@@ -941,5 +1002,302 @@ describe("find in this paper (IR-353)", () => {
     await waitFor(() => expect(findStatus()).toHaveTextContent("1 of 3"));
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+/**
+ * A long manuscript (IR-565): a 100-page paper opens at its first or cited
+ * page without waiting for the other 99, and only a bounded window of pages
+ * around the view is ever painted.
+ */
+describe("a long manuscript (IR-565)", () => {
+  /** A 100-page paper whose pages load only when `loads` says so. */
+  function longPaper(loads: (n: number) => boolean = () => true) {
+    const doc = fakeDocument(100);
+    doc.getPage.mockImplementation((n: number) =>
+      loads(n) ? Promise.resolve(fakePage(n)) : new Promise(() => {}),
+    );
+    loadPdfDocument.mockResolvedValue({ document: doc, destroy });
+    return doc;
+  }
+
+  /** Whether a canvas render was started for `pageNumber`. */
+  const painted = (pageNumber: number) =>
+    renderPageToCanvas.mock.calls.some(([page]) => (page as { pageNumber: number }).pageNumber === pageNumber);
+
+  it("shows the cited page before the rest of the paper has loaded", async () => {
+    longPaper((n) => n === 60);
+    render(<PaperPdfReader recordId={7} scrollToPage={60} highlightRegions={[]} navKey="a" />);
+
+    expect(await screen.findByText("Page 1 / 100")).toBeInTheDocument();
+    await waitFor(() => expect(painted(60)).toBe(true));
+  });
+
+  it("shows the first page before the rest of the paper has loaded, when nothing is cited", async () => {
+    longPaper((n) => n === 1);
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+
+    expect(await screen.findByText("Page 1 / 100")).toBeInTheDocument();
+    await waitFor(() => expect(painted(1)).toBe(true));
+  });
+
+  it("waits for a newly cited page to paint before navigating to it", async () => {
+    let finishPage: () => void = () => {};
+    longPaper();
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    renderPageToCanvas.mockImplementation((page: { pageNumber: number }) => ({
+      promise: page.pageNumber === 60 ? new Promise<void>((resolve) => { finishPage = resolve; }) : Promise.resolve(),
+      cancel: vi.fn(),
+    }));
+    const { rerender } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+    await screen.findByText("Page 1 / 100");
+    scrollBy.mockClear();
+
+    rerender(<PaperPdfReader recordId={7} scrollToPage={60} highlightRegions={[]} navKey="b" />);
+    await waitFor(() => expect(painted(60)).toBe(true));
+    expect(scrollBy).not.toHaveBeenCalled();
+
+    await act(async () => finishPage());
+    await waitFor(() => expect(scrollBy).toHaveBeenCalled());
+  });
+
+  /**
+   * The canvases the reader holds at once: a render started and not yet
+   * cancelled is a page on a canvas. `peak` is the most there ever were.
+   */
+  function trackCanvases() {
+    const live = new Map<number, number>();
+    let peak = 0;
+    renderPageToCanvas.mockImplementation((page: { pageNumber: number }) => {
+      live.set(page.pageNumber, (live.get(page.pageNumber) ?? 0) + 1);
+      peak = Math.max(peak, live.size);
+      return {
+        promise: Promise.resolve(),
+        cancel: () => {
+          const left = (live.get(page.pageNumber) ?? 1) - 1;
+          if (left > 0) live.set(page.pageNumber, left);
+          else live.delete(page.pageNumber);
+        },
+      };
+    });
+    return {
+      pages: () => [...live.keys()].sort((a, b) => a - b),
+      peak: () => peak,
+    };
+  }
+
+  /** Gives all 100 pages a box: 1000px tall, 16px apart, `pageAtTop` at the window's top. */
+  function placeAll(pageAtTop: number) {
+    screen.getAllByRole("group", { name: /^Page \d+$/ }).forEach((page, i) => {
+      const top = (i + 1 - pageAtTop) * 1016;
+      vi.spyOn(page, "getBoundingClientRect").mockImplementation(() => box(top, 1000));
+    });
+  }
+
+  /** As `placeAll`, then tells the reader the window scrolled. */
+  function scrollTo(pageAtTop: number) {
+    placeAll(pageAtTop);
+    fireEvent.scroll(window);
+  }
+
+  /** Lets the reader's next-frame measurement run. */
+  const nextFrames = () => act(() => new Promise((resolve) => setTimeout(resolve, 50)));
+
+  it("paints only the pages around the view, not all 100", async () => {
+    longPaper();
+    const canvases = trackCanvases();
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 100");
+
+    // Every page has its box, so the paper scrolls its full length...
+    await waitFor(() => expect(screen.getAllByRole("group", { name: /^Page \d+$/ })).toHaveLength(100));
+    // ...but only the first page and the two after it are painted.
+    await waitFor(() => expect(canvases.pages()).toEqual([1, 2, 3]));
+    expect(canvases.peak()).toBeLessThanOrEqual(MAX_LIVE_PAGES);
+  });
+
+  it("moves the painted pages with the reader, dropping the ones left behind", async () => {
+    longPaper();
+    const canvases = trackCanvases();
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 100");
+    await waitFor(() => expect(screen.getAllByRole("group", { name: /^Page \d+$/ })).toHaveLength(100));
+
+    scrollTo(50);
+
+    expect(await screen.findByText("Page 50 / 100")).toBeInTheDocument();
+    // Page 50 fills the 768px window; two pages either side are kept ready.
+    await waitFor(() => expect(canvases.pages()).toEqual([48, 49, 50, 51, 52]));
+    expect(canvases.peak()).toBeLessThanOrEqual(MAX_LIVE_PAGES);
+  });
+
+  it("finds text on a page far from the view, and paints that page before going there", async () => {
+    longPaper();
+    const canvases = trackCanvases();
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    paperText = Array.from({ length: 100 }, (_, i) => (i === 89 ? [line("The needle is here.", 0.5)] : []));
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 100");
+
+    await userEvent.click(screen.getByRole("button", { name: "Find in this paper" }));
+    await userEvent.type(await screen.findByRole("searchbox", { name: "Find in this paper" }), "needle");
+
+    await waitFor(() => expect(within(screen.getByRole("search")).getByRole("status")).toHaveTextContent("1 of 1"));
+    const landing = scrollBy.mock.invocationCallOrder[scrollBy.mock.calls.findIndex(([arg]) => typeof arg === "object")];
+    const paint = renderPageToCanvas.mock.invocationCallOrder[
+      renderPageToCanvas.mock.calls.findIndex(([page]) => (page as { pageNumber: number }).pageNumber === 90)
+    ];
+    expect(landing).toBeDefined();
+    expect(paint).toBeLessThan(landing);
+    // The page's text layer is there to mark the match in.
+    const page90 = screen.getByRole("group", { name: "Page 90" });
+    expect(await within(page90).findByText("needle")).toBeInTheDocument();
+    expect(canvases.peak()).toBeLessThanOrEqual(MAX_LIVE_PAGES);
+  });
+
+  it("does not pull the reader back as the rest of a paper of one page size loads", async () => {
+    let releaseRest: () => void = () => {};
+    const rest = new Promise<void>((resolve) => {
+      releaseRest = resolve;
+    });
+    const doc = longPaper();
+    doc.getPage.mockImplementation((n: number) =>
+      n === 1 ? Promise.resolve(fakePage(n)) : rest.then(() => fakePage(n)),
+    );
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 100");
+    // The reader is measured at the top of page 1...
+    scrollTo(1);
+    await nextFrames();
+
+    // ...then moved instantly, as a reduced-motion landing does, and the
+    // other pages arrive before the next scroll is measured. Each is the size
+    // it was estimated at, so nothing above the reader moved.
+    placeAll(40);
+    await act(async () => releaseRest());
+    await nextFrames();
+
+    expect(scrollBy.mock.calls.filter(([arg]) => typeof arg === "number")).toEqual([]);
+  });
+
+  it("forgets a find landing when find closes before its page has painted", async () => {
+    longPaper();
+    const scrollBy = vi.fn();
+    vi.stubGlobal("scrollBy", scrollBy);
+    let firstPaintOf90 = true;
+    renderPageToCanvas.mockImplementation((page: { pageNumber: number }) => {
+      const stalls = page.pageNumber === 90 && firstPaintOf90;
+      if (stalls) firstPaintOf90 = false;
+      return { promise: stalls ? new Promise<void>(() => {}) : Promise.resolve(), cancel: vi.fn() };
+    });
+    paperText = Array.from({ length: 100 }, (_, i) => (i === 89 ? [line("The needle is here.", 0.5)] : []));
+    render(<PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 100");
+    await userEvent.click(screen.getByRole("button", { name: "Find in this paper" }));
+    await userEvent.type(await screen.findByRole("searchbox", { name: "Find in this paper" }), "needle");
+    await waitFor(() => expect(within(screen.getByRole("search")).getByRole("status")).toHaveTextContent("1 of 1"));
+
+    // Page 90 never finishes painting, so find has not moved the reader...
+    await userEvent.keyboard("{Escape}");
+    // ...and once find is closed, the reader scrolling there on their own
+    // paints it without being jumped to the old match.
+    scrollTo(89);
+    await waitFor(() =>
+      expect(renderPageToCanvas.mock.calls.filter(([page]) => (page as { pageNumber: number }).pageNumber === 90)).toHaveLength(2),
+    );
+    await nextFrames();
+
+    expect(scrollBy.mock.calls.filter(([arg]) => typeof arg === "object")).toEqual([]);
+  });
+});
+
+/**
+ * Moving to another record or version (IR-565): what was loading for the old
+ * one stops, and the document it opened is released exactly once.
+ */
+describe("leaving a paper for another", () => {
+  it("discards the previous account's document and Find state when the session changes", async () => {
+    const { unmount } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+    await screen.findByText("Page 1 / 3");
+    await userEvent.click(screen.getByRole("button", { name: "Find in this paper" }));
+    await userEvent.type(screen.getByRole("searchbox", { name: "Find in this paper" }), "old account");
+
+    act(() => useAuthStore.setState((state) => ({ sessionEpoch: state.sessionEpoch + 1 })));
+
+    await waitFor(() => expect(manuscriptBlob).toHaveBeenCalledTimes(2));
+    expect(destroy).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("searchbox", { name: "Find in this paper" })).not.toBeInTheDocument();
+    unmount();
+  });
+
+  it("aborts a fetch still in flight, and opens nothing for it", async () => {
+    manuscriptBlob.mockImplementation(
+      (_id: number, { signal }: { signal: AbortSignal }) =>
+        new Promise((_, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")))),
+    );
+    versionManuscriptBlob.mockResolvedValue({ data: pdfBlob() });
+    const { rerender } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+    await waitFor(() => expect(manuscriptBlob).toHaveBeenCalledTimes(1));
+    const { signal } = manuscriptBlob.mock.calls[0][1] as { signal: AbortSignal };
+
+    rerender(<PaperPdfReader recordId={7} version={2} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+
+    expect(signal.aborted).toBe(true);
+    expect(await screen.findByText("Page 1 / 3")).toBeInTheDocument();
+    expect(versionManuscriptBlob).toHaveBeenCalledWith(7, 2, { signal: expect.any(AbortSignal) });
+    expect(loadPdfDocument).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases each version's document exactly once", async () => {
+    const releaseCurrent = vi.fn(() => Promise.resolve());
+    const releaseEarlier = vi.fn(() => Promise.resolve());
+    loadPdfDocument
+      .mockResolvedValueOnce({ document: fakeDocument(3), destroy: releaseCurrent })
+      .mockResolvedValueOnce({ document: fakeDocument(5), destroy: releaseEarlier });
+    versionManuscriptBlob.mockResolvedValue({ data: pdfBlob() });
+    const { rerender, unmount } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+    await screen.findByText("Page 1 / 3");
+
+    rerender(<PaperPdfReader recordId={7} version={2} scrollToPage={null} highlightRegions={[]} navKey="a" />);
+    await screen.findByText("Page 1 / 5");
+    expect(releaseCurrent).toHaveBeenCalledTimes(1);
+    expect(releaseEarlier).not.toHaveBeenCalled();
+
+    unmount();
+    expect(releaseCurrent).toHaveBeenCalledTimes(1);
+    expect(releaseEarlier).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases a document that finished opening after the reader moved on, once", async () => {
+    let open: (loaded: unknown) => void = () => {};
+    loadPdfDocument.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          open = resolve;
+        }),
+    );
+    const { unmount } = render(
+      <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />,
+    );
+    await waitFor(() => expect(loadPdfDocument).toHaveBeenCalledTimes(1));
+    const [, signal] = loadPdfDocument.mock.calls[0] as [ArrayBuffer, AbortSignal];
+
+    unmount();
+    expect(signal.aborted).toBe(true);
+    await act(async () => open({ document: fakeDocument(3), destroy }));
+
+    expect(destroy).toHaveBeenCalledTimes(1);
   });
 });

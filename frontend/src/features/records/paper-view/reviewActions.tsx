@@ -93,26 +93,27 @@ function RequestDocumentAction({ record, onClose, onDone }: ReviewActionDialogPr
   );
 }
 
-/** The Adviser accepts the work and routes it to offices (ADR-032 §3, IR-261). */
-function AcceptAndRouteAction({ record, onClose, onDone }: ReviewActionDialogProps) {
+/** The Adviser accepts the work and sends it to RDCO (ADR-047). */
+function SendToRdcoAction({ record, onClose, onDone }: ReviewActionDialogProps) {
   return (
     <RouteDialog
       recordId={record.id}
       mode="accept"
+      authorHints={record.decision?.author_hints ?? []}
       onClose={onClose}
       onRouted={(offices) => onDone(`Accepted and sent to ${joinLabels(offices)}.`)}
     />
   );
 }
 
-/** An office seat holder routes onward; their own review continues (ADR-032 §4). */
+/** An office seat holder requests another office; their own review continues (ADR-047 §2–§3). */
 function RouteAction({ record, onClose, onDone }: ReviewActionDialogProps) {
   return (
     <RouteDialog
       recordId={record.id}
       mode="route"
       onClose={onClose}
-      onRouted={(offices) => onDone(`Sent to ${joinLabels(offices)}.`)}
+      onRouted={(offices) => onDone(`Requested ${joinLabels(offices)}.`)}
     />
   );
 }
@@ -155,7 +156,7 @@ function AddReviewerAction({ record, onClose, onDone }: ReviewActionDialogProps)
   );
 }
 
-/** The Adviser, or RDCO, accepts and publishes the record (ADR-032 §3, IR-270). */
+/** RDCO accepts and publishes the record; only RDCO publishes (ADR-047 §5). */
 function AcceptAndPublishAction({ record, onClose, onDone }: ReviewActionDialogProps) {
   return <DecisionDialog record={record} outcome="publish" onClose={onClose} onDone={onDone} />;
 }
@@ -196,12 +197,11 @@ const officeReviewBlocked = (record: RecordDetail) => record.office_review.block
 
 /**
  * Order matters: the bar fills its first granted action. A Proposal's Adviser
- * has *Accept* as primary (IR-271). The Adviser's and RDCO's primary on a
- * Thesis or Project is *Accept & publish* (IR-270: most theses need no office),
- * then RDCO's *Keep unlisted* and the Adviser's *Accept & route*. An office
- * reviewer's is *Clear*, with *Record finding* beside it (ui-ux/16's order),
- * then *Request Revision*, *Request documents*, *Add reviewer* and *Route to
- * office*. *Reject* is the last of the dialogs. A reviewer whose party has
+ * has *Accept* as primary (IR-271). RDCO's primary on a Thesis or Project is
+ * *Accept & publish*, then *Keep unlisted*; the Adviser's is *Accept & send to
+ * RDCO*, since only RDCO publishes (ADR-047). An office reviewer's is *Clear*,
+ * with *Record finding* beside it (ui-ux/16's order), then *Request Revision*,
+ * *Request documents*, *Add reviewer* and *Request review*. *Reject* is the last of the dialogs. A reviewer whose party has
  * already asked for a revision is offered *Withdraw revision request* instead,
  * last of all. *Clear* and *Record finding* share one capability,
  * `office_review` (ADR-032 §10 Amendment, 2026-10-08).
@@ -233,12 +233,12 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
   },
   {
     kind: "dialog",
-    capability: "accept_route",
-    label: "Accept & route…",
+    capability: "send_to_rdco",
+    label: "Accept & send to RDCO…",
     icon: "fa-share-from-square",
     // Accepting is a decision: refused while a revision request is open (IR-272).
     blockedReason: (record) => record.revision.decision_blocked,
-    Dialog: AcceptAndRouteAction,
+    Dialog: SendToRdcoAction,
   },
   {
     kind: "dialog",
@@ -282,7 +282,7 @@ export const REVIEW_ACTIONS: readonly ReviewAction[] = [
   {
     kind: "dialog",
     capability: "route",
-    label: "Route to office…",
+    label: "Request review…",
     icon: "fa-route",
     Dialog: RouteAction,
   },

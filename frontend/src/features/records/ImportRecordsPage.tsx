@@ -33,12 +33,12 @@ export default function ImportRecordsPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
         {/* Instructions */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <p className="text-[14px] font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <i className="fas fa-info-circle text-[#6B0F12]" aria-hidden /> Instructions
+        <div className="bg-white rounded-xl border border-stone-200 p-6">
+          <p className="text-[14px] font-semibold text-stone-800 mb-3 flex items-center gap-2">
+            <i className="fas fa-info-circle text-brand" aria-hidden /> Instructions
           </p>
-          <ol className="list-decimal pl-4 space-y-2 text-[14px] text-gray-600">
-            <li>Follow the data entry format -- <button onClick={handleDownloadTemplate} className="text-[#6B0F12] font-semibold hover:underline">download template here</button>.</li>
+          <ol className="list-decimal pl-4 space-y-2 text-[14px] text-stone-600">
+            <li>Follow the data entry format -- <button onClick={handleDownloadTemplate} className="text-brand font-semibold hover:underline">download template here</button>.</li>
             <li>To add a new entry, duplicate a row and replace the values.</li>
             <li>The migration stops when it reads a merged cell containing <strong>END OF RECORDS</strong>.</li>
             <li>Press <strong>Generate</strong> to import.</li>
@@ -46,18 +46,18 @@ export default function ImportRecordsPage() {
         </div>
 
         {/* Upload */}
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <p className="text-[14px] font-semibold text-gray-800 mb-3 flex items-center gap-2">
-            <i className="fas fa-file-upload text-[#6B0F12]" aria-hidden /> Upload Spreadsheet
+        <div className="bg-white rounded-xl border border-stone-200 p-6">
+          <p className="text-[14px] font-semibold text-stone-800 mb-3 flex items-center gap-2">
+            <i className="fas fa-file-upload text-brand" aria-hidden /> Upload Spreadsheet
           </p>
           <label
-            className="block border-2 border-dashed border-gray-200 rounded-xl p-6 text-center cursor-pointer hover:border-[#6B0F12] transition-colors"
+            className="block border-2 border-dashed border-stone-200 rounded-xl p-6 text-center cursor-pointer hover:border-brand transition-colors"
           >
-            <i className="fas fa-cloud-upload-alt text-3xl text-gray-300 mb-2" aria-hidden />
-            <p className="text-[14px] font-semibold text-gray-600">
+            <i className="fas fa-cloud-upload-alt text-3xl text-stone-300 mb-2" aria-hidden />
+            <p className="text-[14px] font-semibold text-stone-600">
               {file ? file.name : "Click to choose a file"}
             </p>
-            <p className="text-[12px] text-gray-500 mt-1">Supports .xls and .xlsx</p>
+            <p className="text-[12px] text-stone-500 mt-1">Supports .xls and .xlsx</p>
             <input
               type="file"
               accept=".xls,.xlsx"
@@ -69,7 +69,7 @@ export default function ImportRecordsPage() {
           <button
             onClick={handleImport}
             disabled={!file || loading}
-            className="mt-4 w-full bg-[#6B0F12] text-white py-2.5 rounded-lg text-[14px] font-semibold hover:bg-[#7d1215] disabled:opacity-50"
+            className="mt-4 w-full bg-brand text-white py-2.5 rounded-lg text-[14px] font-semibold hover:bg-brand-light disabled:opacity-50"
           >
             <i className="fas fa-cogs mr-1.5" aria-hidden />
             {loading ? "Importing..." : "Generate"}
@@ -78,15 +78,15 @@ export default function ImportRecordsPage() {
       </div>
 
       {/* Log */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <p className="text-[14px] font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <i className="fas fa-terminal text-[#6B0F12]" aria-hidden /> Import Log
+      <div className="bg-white rounded-xl border border-stone-200 p-6">
+        <p className="text-[14px] font-semibold text-stone-800 mb-3 flex items-center gap-2">
+          <i className="fas fa-terminal text-brand" aria-hidden /> Import Log
         </p>
         <textarea
           readOnly
           rows={8}
           value={log}
-          className="w-full font-mono text-[13px] bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-600 resize-y"
+          className="w-full font-mono text-[13px] bg-stone-50 border border-stone-200 rounded-lg p-3 text-stone-600 resize-y"
         />
       </div>
     </div>

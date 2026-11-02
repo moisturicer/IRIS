@@ -1,6 +1,7 @@
 import { forwardRef, useEffect, useState } from "react";
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import { apiClient } from "@/api/client";
+import { dashboardApi } from "@/api/dashboard";
 import { useAuth } from "@/hooks/useAuth";
 import { useRole } from "@/hooks/useRole";
 import { selectSidebarCollapsed, useUIStore } from "@/store/ui.store";
@@ -10,13 +11,19 @@ import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { NotificationBell } from "./NotificationBell";
 import { AccountMenu } from "./AccountMenu";
 import { navFor, canAccess, NAV_SECTION_ORDER, type NavEntry, type NavSectionName } from "@/lib/access";
-import irisLogo from "@/assets/images/iris_logo.png";
+import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 
 interface NavItem {
   to:     string;
   label:  string;
   icon:   string;
   badge?: number;
+  /**
+   * An attention dot with no number, for something that is waiting on the
+   * user rather than a count worth reading (IR-534). The string is what a
+   * screen reader hears in its place.
+   */
+  dot?: string;
 }
 
 // There is no `comingSoon` flag. Nav items are derived from `lib/access.ts`,
@@ -26,6 +33,7 @@ interface NavItem {
 
 function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed: boolean; onNavigate?: () => void }) {
   const badge = item.badge != null && item.badge > 0 ? item.badge : null;
+  const dot = badge == null ? item.dot : undefined;
   return (
     <li>
       <NavLink
@@ -72,9 +80,18 @@ function NavItemLink({ item, collapsed, onNavigate }: { item: NavItem; collapsed
                 <span className="sr-only">, {badge} waiting</span>
               </span>
             )}
+            {dot != null && (
+              <>
+                <span
+                  aria-hidden
+                  className={cn("h-2 w-2 flex-shrink-0 rounded-full bg-brand", collapsed && "md:hidden")}
+                />
+                <span className="sr-only">, {dot}</span>
+              </>
+            )}
             {/* The rail has no room for the number, so a dot marks it; the
                 count itself is still read out from the sr-only badge above. */}
-            {collapsed && badge != null && (
+            {collapsed && (badge != null || dot != null) && (
               <span aria-hidden className="absolute right-2 top-1.5 hidden h-2 w-2 rounded-full bg-brand ring-2 ring-white md:block" />
             )}
           </>
@@ -149,6 +166,8 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   const collapsed = useUIStore(selectSidebarCollapsed);
   const toggleCollapsed = useUIStore((s) => s.toggleSidebarCollapsed);
   const [roleRequestBadge, setRoleRequestBadge] = useState(0);
+  const [needsAction, setNeedsAction] = useState(false);
+  const { pathname, search } = useLocation();
 
   // Every nav decision comes from lib/access.ts, the same map the router gates
   // on, and My Reviews from the same `review_access` flag its route reads.
@@ -162,11 +181,29 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       .catch(() => {});
   }, [roleName]);
 
+  // My Library's dot: some record of the user's waits on them -- a revision or
+  // a document was asked for (B2, `needs_action_mine`). Asked again whenever
+  // the address changes, query string included -- Paper View's sections are
+  // `?section=` -- so answering the request clears it without a reload.
+  // A failed read shows no dot rather than a stale one.
+  useEffect(() => {
+    let live = true;
+    dashboardApi
+      .stats()
+      .then(({ data }) => { if (live) setNeedsAction((data.needs_action_mine ?? 0) > 0); })
+      .catch(() => { if (live) setNeedsAction(false); });
+    return () => { live = false; };
+  }, [pathname, search]);
+
   // Badges are the only per-item state the map does not carry: the map answers
   // "may this role open it", never "how many are waiting". Role requests are
   // the one count that is someone's to act on.
   const BADGES: Partial<Record<NavEntry["key"], number | undefined>> = {
     roleRequests: roleRequestBadge,
+  };
+  // A dot, not a count: what matters is that something waits (spec §4.2).
+  const DOTS: Partial<Record<NavEntry["key"], string | undefined>> = {
+    library: needsAction ? "something needs your action" : undefined,
   };
 
   const groups = NAV_SECTION_ORDER
@@ -174,7 +211,7 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
       section,
       items: nav
         .filter((entry) => entry.section === section)
-        .map((entry): NavItem => ({ to: entry.to, label: entry.label, icon: entry.icon, badge: BADGES[entry.key] })),
+        .map((entry): NavItem => ({ to: entry.to, label: entry.label, icon: entry.icon, badge: BADGES[entry.key], dot: DOTS[entry.key] })),
     }))
     // A group with nothing in it for this role is not rendered at all, which is
     // what keeps an empty "Administration" heading off a student's sidebar.
@@ -208,20 +245,17 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
             title={collapsed ? "Open sidebar" : "Collapse sidebar"}
             className={cn("hidden h-9 w-9 flex-shrink-0 rounded-lg md:block", FOCUS_RING)}
           >
-            <img src={irisLogo} alt="" className="h-9 w-9 object-contain" />
+            <IrisMark className="h-9 w-9 text-brand" />
           </button>
-          <img
-            src={irisLogo}
-            alt=""
-            className="h-9 w-9 flex-shrink-0 object-contain md:hidden"
-          />
+          <IrisMark className="h-9 w-9 flex-shrink-0 text-brand md:hidden" />
           <p
             className={cn(
-              "min-w-0 flex-1 font-display text-title font-semibold leading-none tracking-widest text-brand",
+              "min-w-0 flex-1 leading-none text-brand",
               collapsed && "md:sr-only",
             )}
           >
-            IRIS
+            <IrisWordmark className="h-4 w-auto" />
+            <span className="sr-only">IRIS</span>
           </p>
           {/* Desktop only: below md the phone bar carries the bell, and a
               second one in the drawer would put two on screen at once. */}

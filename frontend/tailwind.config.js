@@ -3,40 +3,6 @@ import defaultColors from "tailwindcss/colors";
 import plugin from "tailwindcss/plugin";
 
 /**
- * The entry panel's shelf (IR-586): each volume rises onto the shelf in turn,
- * `SHELF_STEP_MS` after the one to its left. Generated rather than written
- * out, because the entry frame takes no inline style to carry a per-volume
- * delay. The fill is `backwards` so a volume waits unseen through its delay,
- * and once it has landed the animation lets go of `transform`, leaving the
- * hover lift free to move it. Nothing of it runs under reduced motion.
- */
-const SHELF_VOLUMES = 24;
-const SHELF_STEP_MS = 35;
-
-const shelfRise = plugin(({ addBase, addComponents }) => {
-  const stagger = Object.fromEntries(
-    Array.from({ length: SHELF_VOLUMES - 1 }, (_, i) => [
-      `.shelf-rise > :nth-child(${i + 2})`,
-      { animationDelay: `${(i + 1) * SHELF_STEP_MS}ms` },
-    ]),
-  );
-  // In the base layer rather than `theme.keyframes`: Tailwind emits a theme
-  // keyframe only beside an `animate-*` utility that names it, and none does.
-  addBase({
-    "@keyframes shelve": {
-      "0%":   { opacity: "0", transform: "translateY(1.5rem)" },
-      "100%": { opacity: "1", transform: "translateY(0)" },
-    },
-  });
-  addComponents({
-    "@media (prefers-reduced-motion: no-preference)": {
-      ".shelf-rise > *": { animation: "shelve 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards" },
-      ...stagger,
-    },
-  });
-});
-
-/**
  * The record page's workspace tiers (IR-569): container queries on the
  * `reading` container, so the layout follows the content width, not the
  * window. `paneLayout.ts` holds the same numbers for React.
@@ -62,10 +28,11 @@ export default {
 
   theme: {
     extend: {
-      // A window too short for the entry panel's shelf to carry its spine
-      // titles clear of their gold bands (IR-535). Height, not width.
+      // A phone too narrow for register's three folder tabs to carry their
+      // names (IR-711): below 390px they overran a 320 or 360px screen, so
+      // the tabs other than the current one show only their mark there.
       screens: {
-        short: { raw: "(max-height: 680px)" },
+        narrow: { raw: "(max-width: 389.98px)" },
       },
 
       // The one cap for an app page (IR-519): PageContainer's "standard" width.
@@ -309,8 +276,22 @@ export default {
           "0%":   { opacity: "0", transform: "translateX(-1.5rem)" },
           "100%": { opacity: "1", transform: "translateX(0)" },
         },
+        // The entry folder's sheet settles once on load (IR-704). Opacity and
+        // transform only, and only through `motion-safe:`.
+        "sheet-settle": {
+          "0%":   { opacity: "0", transform: "translateY(0.5rem)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        // Register's steps cross-fade on change (IR-707). Opacity only, and
+        // only through `motion-safe:`.
+        "step-fade": {
+          "0%":   { opacity: "0" },
+          "100%": { opacity: "1" },
+        },
       },
       animation: {
+        "sheet-settle": "sheet-settle 280ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
+        "step-fade": "step-fade 150ms ease-out backwards",
         "panel-in": "panel-in 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "panel-in-start": "panel-in-start 320ms cubic-bezier(0.22, 1, 0.36, 1) backwards",
         "fade-in-up": "fade-in-up 0.3s ease-out",
@@ -325,7 +306,6 @@ export default {
     // Without it they emit no CSS and Preflight flattens every heading,
     // list and table. @tailwindcss/forms is still not needed.
     typography,
-    shelfRise,
     readingTiers,
   ],
 };

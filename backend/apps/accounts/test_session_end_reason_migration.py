@@ -16,7 +16,6 @@ from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.utils import timezone
 
-from apps.accounts.models import User
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 
@@ -31,8 +30,10 @@ def test_existing_sessions_keep_their_state_and_get_no_reason():
 
     try:
         OldUserSession = old_apps.get_model("accounts", "UserSession")
-        # Through the current model: only `accounts_usersession` is rewound.
-        user = User.objects.create_user(email="pre@cit.edu", password="pw12345!")
+        # Recovery adds a User column after this historical schema. Use its
+        # historical User too, so this fixture never writes a future column.
+        OldUser = old_apps.get_model("accounts", "User")
+        user = OldUser.objects.create(email="pre@cit.edu", password="!")
         now = timezone.now()
         live = OldUserSession.objects.create(user_id=user.pk, created_at=now, last_activity_at=now)
         ended = OldUserSession.objects.create(

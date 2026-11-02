@@ -10,11 +10,15 @@
 
 ## 1 · Current state — stated plainly
 
-**The backend harness exists (IR-82):** `pytest.ini` + `conftest.py`, with DB-required tests skipping cleanly when no Postgres is reachable — **except where `IRIS_REQUIRE_DB` is set, which CI does, and where that same condition fails the run instead (IR-163).** Skipping is a convenience for a laptop with no database running; in CI it is how a suite reports success having executed nothing, which is what happened to the authorization suite until IR-165. The decision lives in `backend/testing/harness.py` and is covered by `apps/tests/test_harness.py`. Coverage is concentrated where the RAG pipeline was built out — `apps/ai` (chunking, extraction, ingestion, repositories) and `apps/documents` — plus an import smoke test (`apps/tests/test_boot.py`) and targeted authorization tests in `apps/records`.
+**Backend.** `pytest.ini` + `conftest.py` (IR-82), with Hypothesis available for property tests. Tests that need a database skip when no Postgres is reachable, unless `IRIS_REQUIRE_DB` is set. CI sets it, so there a missing database fails the run (IR-163). `backend/testing/harness.py` makes that decision and `apps/tests/test_harness.py` covers it.
 
-**The frontend still has zero automated tests.** No test runner is installed; `npm run lint` and `npm run build` are the only automated frontend checks.
+**Frontend.** `npm test` runs Vitest under jsdom, querying by role and accessible name, with axe-core failing on serious and critical findings (IR-210). jsdom can't check colour contrast, so contrast stays manual.
 
-Backend and frontend workflow-layer coverage (clearance transitions, resubmission policy, remaining authorization gaps) is thinner than the RAG-side coverage — see `docs/testing/TRACEABILITY.md` for what is and isn't demonstrated per requirement. **A requirement is not satisfied because code exists for it; it is satisfied when a test demonstrates it and the evidence is recorded.**
+**Browser journeys.** Playwright specs in `e2e/` drive one production-settings build (IR-631). They're started by hand and aren't a PR gate. See [`CORE_JOURNEYS.md`](CORE_JOURNEYS.md). `docs/testing/runs/` holds only the template, so no run record is committed there.
+
+**AI gateway.** `ai/tests` has its own `pytest.ini` and requirements, and the CI `AI gateway` job runs it (IR-844).
+
+[`TRACEABILITY.md`](TRACEABILITY.md) says what is demonstrated for each requirement. **A requirement is not satisfied because code exists for it; it is satisfied when a test demonstrates it and the evidence is recorded.**
 
 ---
 
@@ -38,14 +42,18 @@ A passing test suite says nothing about whether the contribution is better than 
 
 | Level | Scope | Where |
 |---|---|---|
-| **Import smoke** | The application imports and the URLconf resolves | `backend/` |
-| **Unit** | One function or class, no database where avoidable | `backend/apps/*/tests/` |
-| **Integration** | Service functions against a real database — workflow transitions, clearance state | `backend/apps/*/tests/` |
-| **API / authorization** | Endpoint behaviour per role, per ownership | `backend/apps/*/tests/` |
+| **Import smoke** | The application imports and the URLconf resolves | `backend/apps/tests/test_boot.py` |
+| **Unit** | One function or class, no database where avoidable | `backend/apps/**/tests/`, `frontend/src/**/*.test.*` |
+| **Integration** | Service functions against real PostgreSQL with pgvector: workflow transitions, clearance state | `backend/apps/**/tests/` |
+| **API / authorization** | Endpoint behaviour per role and ownership, including the route matrix (IR-615, IR-616) | `backend/apps/*/tests/`, `backend/apps/tests/test_access_matrix.py` |
+| **Frontend component and accessibility** | Rendered behaviour through the accessible tree, plus axe-core | `frontend/src/**/*.test.*` |
+| **AI gateway** | The gateway's service authentication, run configuration and embedding contract, no database | `ai/tests` |
 | **Frontend build** | Types compile, lint passes | `frontend/` |
-| **Deployment smoke** | Post-deploy checks against a running instance | manual, scripted later |
+| **Configuration** | Compose files validate, the backend image builds, the real nginx sends its headers, celery-beat boots | CI `Docker Compose` job |
+| **Security gates** | Secret scan, dependency audit, SAST | CI `Security` job, §6 |
+| **Browser journey** | Core journeys on one production-settings build, with axe and 360 px checks | `e2e/`, started by hand |
 
-**Deliberately excluded:** end-to-end browser automation, load-testing infrastructure, mutation testing, a frontend test harness (P3). Each is defensible on its own and unaffordable together against the semester budget.
+**Not used:** load-testing infrastructure and mutation testing. A deployed instance has no scripted post-deploy check.
 
 ---
 
@@ -54,7 +62,7 @@ A passing test suite says nothing about whether the contribution is better than 
 Not everything is worth testing equally. In order:
 
 1. **Import smoke.** One test (`apps/tests/test_boot.py`), already in place.
-2. **Authorization matrix.** Role × action × ownership. This is where twelve live defects are, and where a regression is a confidentiality breach rather than a bug.
+2. **Authorization matrix.** Role × action × ownership. A regression here is a confidentiality breach rather than a bug.
 3. **Workflow transitions across both resubmission policies.** The thesis contribution. Must be correct under `PRESERVE` **and** `RESTART_ALL`, or the comparison is invalid.
 4. **Clearance state serialization.** That `preserved` is true only after a genuine resubmission.
 5. **Transaction boundaries.** A forced mid-transition failure leaves no partial write.
@@ -96,12 +104,20 @@ cd backend && python -m pytest apps/ai apps/documents   # RAG pipeline suites
 # skipping it. Use this before claiming a suite passed.
 cd backend && IRIS_REQUIRE_DB=1 python -m pytest -ra
 
+# AI gateway (its own requirements: pip install -r ai/requirements-dev.txt)
+cd ai && python -m pytest -ra
+
 # frontend
 cd frontend && npm run lint
+cd frontend && npm test
 cd frontend && npm run build
+
+# browser journeys: see e2e/README.md
 ```
 
-CI runs on every push and pull request to `feat/rag-service` and `main` — see [`.github/workflows/ci.yml`](../../.github/workflows/ci.yml). `ci.yml`'s own comment records that it is expected to stay red until IR-57 (application boot) and IR-58 (Docker stack) land — do not weaken a gate to make it green.
+CI runs on every pull request and every push to `main` ([`ci.yml`](../../.github/workflows/ci.yml)). Backend tests run in four shards, and the `Backend` check passes only when all four succeed (IR-810). Do not weaken a gate to make it green.
+
+The core journeys are a separate workflow, [`core-journeys.yml`](../../.github/workflows/core-journeys.yml), started by hand on one commit.
 
 ### Security gate — dependency audits (IR-613)
 
@@ -173,14 +189,28 @@ The registry rulesets are fetched at run time and are not versioned: pinning sem
 
 ## 8 · NFR verification
 
-Non-functional requirements are verified as part of the Weeks 8-15 evidence work, not by unit tests.
+Non-functional requirements need their own evidence, and most of it can't come from unit tests.
 
 | Group | NFRs | How |
 |---|---|---|
-| Security | NFR-S1…S6 | Authorization matrix tests + manual verification of session expiry and audit immutability |
-| Performance | NFR-P1…P5 | Measured against the deployed instance, including the 100-concurrent-session target |
+| Security | NFR-S1…S6 | [`SECURITY_CHECKLIST.md`](SECURITY_CHECKLIST.md): authorization matrix tests + manual verification of session expiry and audit immutability |
+| Performance | NFR-P1…P5 | Measured in a controlled development or test stack under IR-95. No application target is agreed yet, and nothing has been measured on a deployed instance |
 | Usability | NFR-U1, **NFR-U2** | Task-based testing. **NFR-U2 requires 5 of 5 participants to complete a submission in under 10 minutes** |
-| Accessibility | NFR-U3 | axe-core in CI, keyboard walkthrough, screen reader pass, **no horizontal scroll at 360 px** |
-| Reliability | NFR-R2…R4 | Failure injection and a rehearsed restore |
+| Accessibility | NFR-U3 | axe-core in CI and the browser journeys, 360 px checks in the journeys, plus a manual keyboard and screen reader pass. **No horizontal scroll at 360 px** |
+| Reliability | NFR-R2…R4 | Failure injection. Restore needs a rehearsal that hasn't happened (IR-167) |
 
 Each records its evidence in [`TRACEABILITY.md`](TRACEABILITY.md). **An NFR with no evidence is reported as unverified, not as met.**
+
+---
+
+## 9 · What testing does not establish yet
+
+These are limits on the evidence. Security risks, with severity and reason, are in the one register: [`SECURITY.md`](../security/SECURITY.md) §11.
+
+| Limit | Why | Ticket |
+|---|---|---|
+| Capacity and response times are unmeasured | No agreed target and no measurement | [IR-95](https://citiris.atlassian.net/browse/IR-95) |
+| Some security checklist items need a check by hand, and nobody has done it | Reading the code can't settle them | [IR-829](https://citiris.atlassian.net/browse/IR-829) |
+| Restore is unrehearsed | No backups exist to restore | [IR-167](https://citiris.atlassian.net/browse/IR-167) |
+| Real Ask IRIS answers aren't driven by the journeys | Every question answers "no readable sources" until the embargo work lands | [IR-250](https://citiris.atlassian.net/browse/IR-250) |
+| TLS is untested end to end | CI tests Caddy with a local certificate, journeys turn it off and send `X-Forwarded-Proto: https`, and nothing is deployed | [IR-847](https://citiris.atlassian.net/browse/IR-847) |

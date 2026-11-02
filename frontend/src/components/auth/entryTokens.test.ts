@@ -8,14 +8,18 @@
  * cream) and the cream canvas. This guard reads the entry frame's files as text
  * and fails naming each one.
  *
- * Tickets IR-537 to IR-540 add their screens here as they adopt the frame.
+ * Tickets IR-537 to IR-540 added their screens here as they adopted the frame,
+ * IR-706 the Dossier frame (`EntryFrame`) that replaced it, and IR-707 its
+ * stepper (`EntrySteps`). IR-711 deleted the split frame (`AuthLayout`,
+ * `AuthBrandPanel`), so only the Dossier frame and its screens remain.
  */
 import { describe, expect, it } from "vitest";
 
 const ENTRY_FRAME = [
-  "src/components/auth/AuthBrandPanel.tsx",
-  "src/components/auth/AuthLayout.tsx",
+  "src/components/auth/EntryFrame.tsx",
+  "src/components/auth/EntrySteps.tsx",
   "src/features/auth/DataNotice.tsx",
+  "src/features/auth/EmailVerifyPage.tsx",
   "src/features/auth/LoginPage.tsx",
   "src/features/auth/PendingApprovalPage.tsx",
   "src/features/auth/SignupPage.tsx",
@@ -70,6 +74,26 @@ describe("what counts as a raw value", () => {
   });
 });
 
+/**
+ * Every animation that would still run under reduced motion: an `animate-`
+ * utility not behind `motion-safe:` (IR-707: the sheet's settle and the step
+ * cross-fade). `animate-spin` is exempt, because a spinner says work is in
+ * progress and stopping it would say the opposite.
+ */
+function unsafeMotion(source: string): string[] {
+  return [...source.matchAll(/(?<![\w-])((?:[\w-]+:)*)animate-([\w-]+)/g)]
+    .filter(([, variants, name]) => name !== "spin" && !variants.split(":").includes("motion-safe"))
+    .map((m) => m[0]);
+}
+
+describe("what counts as unsafe motion", () => {
+  it("catches an animation not behind motion-safe, and lets the safe ones and the spinner through", () => {
+    expect(
+      unsafeMotion('className="animate-step-fade md:animate-sheet-settle motion-safe:animate-step-fade md:motion-safe:animate-x animate-spin"'),
+    ).toEqual(["animate-step-fade", "md:animate-sheet-settle"]);
+  });
+});
+
 describe("the entry frame", () => {
   it.each(ENTRY_FRAME)("reads %s", (path) => {
     expect(SOURCES[path]).toBeDefined();
@@ -77,5 +101,9 @@ describe("the entry frame", () => {
 
   it.each(ENTRY_FRAME)("%s carries no raw value", (path) => {
     expect(rawValues(SOURCES[path] ?? "")).toEqual([]);
+  });
+
+  it.each(ENTRY_FRAME)("%s animates nothing under reduced motion", (path) => {
+    expect(unsafeMotion(SOURCES[path] ?? "")).toEqual([]);
   });
 });

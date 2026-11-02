@@ -31,7 +31,6 @@
     "react-hook-form": "^7.52.0",
     "react-markdown": "^10.1.0",
     "react-router-dom": "^6.23.1",
-    "recharts": "^2.12.7",
     "rehype-highlight": "^7.0.2",
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",

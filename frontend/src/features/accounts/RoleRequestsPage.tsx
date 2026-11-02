@@ -6,17 +6,22 @@ import { useEffect, useState } from "react";
 import { accountsApi }   from "@/api/accounts";
 import { useUIStore }    from "@/store/ui.store";
 import { PageHeader }    from "@/components/layout/PageHeader";
-import { Badge }         from "@/components/ui/Badge";
 import { Button }        from "@/components/ui/Button";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
+import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
+import { TONES } from "@/components/ui/statusTones";
 import type { RoleRequest } from "@/types/auth";
 import { Skeleton } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/shared/EmptyState";
 
 export default function RoleRequestsPage() {
   const addToast = useUIStore((s) => s.addToast);
 
   const [requests,  setRequests]  = useState<RoleRequest[]>([]);
   const [loading,   setLoading]   = useState(true);
+  // A failed load is not an empty queue (IR-745): "All caught up!" after an
+  // error would tell RDCO there is nothing to decide when there may be.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [target,    setTarget]    = useState<{ req: RoleRequest; action: "approve" | "decline" } | null>(null);
   const [_acting,   setActing]    = useState(false);
 
@@ -24,8 +29,11 @@ export default function RoleRequestsPage() {
     setLoading(true);
     accountsApi
       .roleRequests()
-      .then(({ data }) => setRequests(data.results))
-      .catch(() => addToast({ type: "error", message: "Failed to load role requests." }))
+      .then(({ data }) => {
+        setRequests(data.results);
+        setLoadFailed(false);
+      })
+      .catch(() => setLoadFailed(true))
       .finally(() => setLoading(false));
   };
 
@@ -58,57 +66,61 @@ export default function RoleRequestsPage() {
 
       {loading ? (
         <Skeleton />
+      ) : loadFailed ? (
+        <EmptyState
+          framed
+          tone="error"
+          icon="fa-circle-exclamation"
+          title="Couldn't load role requests"
+          message="Check your connection and try again."
+          action={<Button variant="outline" size="sm" onClick={load}>Try again</Button>}
+        />
       ) : requests.length === 0 ? (
-        <div className="bg-white rounded-xl border border-gray-200 py-16 text-center">
-          <i className="fas fa-check-circle text-[32px] text-green-400 mb-3 block" aria-hidden />
-          <p className="text-[15px] font-medium text-gray-700">All caught up!</p>
-          <p className="text-[13px] text-gray-500 mt-1">No pending role requests.</p>
+        <div className="bg-white rounded-xl border border-stone-200 py-16 text-center">
+          <i className="fas fa-check-circle text-[32px] text-stone-500 mb-3 block" aria-hidden />
+          <p className="text-[15px] font-medium text-stone-700">All caught up!</p>
+          <p className="text-[13px] text-stone-500 mt-1">No pending role requests.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
           <table className="w-full text-[14px]">
             <thead>
-              <tr className="border-b border-gray-100 bg-gray-50">
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">User</th>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Requested Role</th>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Submitted</th>
-                <th className="text-left px-5 py-3 font-semibold text-gray-600">Status</th>
+              <tr className="border-b border-stone-100 bg-stone-50">
+                <th className="text-left px-5 py-3 font-semibold text-stone-600">User</th>
+                <th className="text-left px-5 py-3 font-semibold text-stone-600">Requested Role</th>
+                <th className="text-left px-5 py-3 font-semibold text-stone-600">Submitted</th>
+                <th className="text-left px-5 py-3 font-semibold text-stone-600">Status</th>
                 <th className="px-5 py-3" />
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+            <tbody className="divide-y divide-stone-100">
               {requests.map((req) => (
-                <tr key={req.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={req.id} className="hover:bg-stone-50 transition-colors">
                   <td className="px-5 py-3.5">
-                    <div className="font-medium text-gray-900">{req.user_name}</div>
+                    <div className="font-medium text-stone-900">{req.user_name}</div>
                   </td>
                   <td className="px-5 py-3.5">
-                    <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold bg-red-50 text-[#6B0F12] border border-red-100">
+                    <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[12px] font-semibold ${TONES.active}`}>
                       {req.role_name}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5 text-gray-500">
+                  <td className="px-5 py-3.5 text-stone-500">
                     {new Date(req.created_at).toLocaleDateString("en-PH", {
                       year: "numeric", month: "short", day: "numeric",
                     })}
                   </td>
                   <td className="px-5 py-3.5">
-                    <Badge variant={
-                      req.status === "approved" ? "success"
-                      : req.status === "declined" ? "danger"
-                      : "neutral"
-                    }>
-                      {req.status.charAt(0).toUpperCase() + req.status.slice(1)}
-                    </Badge>
+                    <RequestStatusChip state={req.status} />
                   </td>
                   <td className="px-5 py-3.5">
                     {req.status === "pending" && (
                       <div className="flex gap-2 justify-end">
                         <Button
                           size="sm"
+                          variant="outline"
                           onClick={() => setTarget({ req, action: "approve" })}
                         >
-                          Approve
+                          <i className="fas fa-check" aria-hidden /> Approve
                         </Button>
                         <Button
                           size="sm"

@@ -444,16 +444,65 @@ before its `declared_at`, so a confirmatory figure cannot come from data seen
 before the plan. The 200 decisions that circulated during design is an
 exploratory planning estimate with no statistical basis and is not used.
 
+## Clearing the proxy corpus (IR-815)
+
+The disclosure gate refuses a paper nobody has answered for (ADR-052), and a
+loaded test paper has no owner to ask. These steps answer for test papers only: a
+CIT-U paper gets its answer from its owners, through Publish. Both commands refuse
+with `DEBUG` off, and `--force` doesn't change that. `load_corpus` also refuses
+`--clear-for-ai` with `--origin institutional`, and `mark_corpus_cleared` leaves
+such a paper Unknown and names it. Neither can recognise a real paper whose origin
+was never declared, so don't point them at one.
+
+**A database that already holds the proxy papers**, once:
+
+```bash
+python manage.py migrate
+python manage.py mark_corpus_cleared --dry-run   # how many; with none, it says whose papers are waiting
+python manage.py mark_corpus_cleared             # --owner-email if loaded under another account
+python manage.py backfill_embeddings --dry-run   # what any missing vectors would cost
+python manage.py backfill_embeddings             # only if that shows some; spends Voyage credits
+```
+
+Marking sends nothing to anyone, and never answers for a draft. A paper that
+already has both vectors needs no backfill, and the dry run counts nothing for it.
+An AI Overview someone opened before marking stays `unavailable` until it's
+retried.
+
+**Loading papers fresh**, answering as they load:
+
+```bash
+python manage.py load_corpus <dir> --origin imported_reference --clear-for-ai --dry-run
+python manage.py load_corpus <dir> --origin imported_reference --clear-for-ai
+# Once the workers have extracted and chunked them:
+python manage.py backfill_embeddings --dry-run
+python manage.py backfill_embeddings
+```
+
+After chunking, the worker embeds each paper's chunks, which **spends Voyage
+credits**, and queues its AI Overview, which **spends model credits** if
+`LLM_SUMMARY_MODEL` is set. Retrieval still can't find the paper until the backfill
+adds its title-and-abstract vector, because that's what its first stage ranks. A
+paper the load finds already there is skipped, so mark those with the first set of
+steps.
+
+**`seed_demo`** answers for its own papers. On a database seeded earlier, run it
+again.
+
+Run files from before this have `"disclosure_bypass": true` in their provenance:
+they measured the same papers with the gate stepped around, through IR-317's
+bypass, now deleted. Later files don't have the key.
+
 ## What blocks a real number today
 
 - **The corpus has no Voyage vectors.** Every vector observed so far came from
   the deterministic fake. Indexing is `manage.py backfill_embeddings` (measured
-  on the dev database: 26 records, 1,236 chunks, ~381,073 tokens).
-- **The disclosure gate refuses every record** until `Record` carries an embargo
-  field (IR-250), so the final set is empty and final-set recall is 0. Use
-  `AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT` / `manage.py
-  index_with_disclosure_bypass` (IR-317, development only) meanwhile. The
-  command warns when it sees this.
+  on the dev database: 26 records, 1,236 chunks, ~381,073 tokens; a proxy number that decides
+  engineering and is never cited as a finding about CIT-U research, per ADR-023).
+- **The disclosure gate refuses a paper nobody has answered for** (ADR-052), so
+  until they're marked the final set is empty and final-set recall is 0. See
+  [Clearing the proxy corpus](#clearing-the-proxy-corpus-ir-815). The command
+  warns when it sees this.
 - **Passage selection does not exist yet** (IR-397), so final-set recall today
   differs from recall@10 only by the gate and the source cap. The number is
   reported anyway: the seam it measures is `apps/ai/answers/selection.py`, and

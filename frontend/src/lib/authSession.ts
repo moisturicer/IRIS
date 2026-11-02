@@ -1,6 +1,6 @@
 import { safeRedirectPath, wholePath } from "@/lib/redirectTarget";
 
-/** SRS FR-M1-01: lock account after 3 consecutive failed logins */
+/** The browser's own lock (NFR-S6): this many rejected credentials in a tab lock it. */
 export const LOGIN_FAILURE_LIMIT = 3;
 
 const ATTEMPT_KEY_PREFIX = "iris_login_attempts:";
@@ -71,7 +71,11 @@ export const SESSION_END_MESSAGES = {
   },
   session_ended_password_changed: {
     title: "Password Changed",
-    text: "You were signed out because your password was changed. Please sign in with your new password.",
+    text: "You were signed out because your password was changed on another device. Please sign in with your new password.",
+  },
+  session_ended_revoked: {
+    title: "Session Ended",
+    text: "An administrator ended this session. Please sign in again, or contact an administrator if you did not expect this.",
   },
 } as const;
 

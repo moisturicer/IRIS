@@ -1,3 +1,4 @@
+import { INSTITUTION } from "@/config/institution";
 import React from "react";
 import { parseISO, isValid, format } from "date-fns";
 import type { Author, RecordListItem } from "@/types/records";
@@ -174,25 +175,6 @@ export function metaBadges(
   return badges;
 }
 
-/* ────────────────────────────────────────────────────────────────────────────
- * Per-browser starred papers and collections
- *
- * Owned by `lib/recordLibrary` and re-exported here so the Discover save
- * dropdown and My Library read and write exactly the same state. There is no
- * server-side bookmark endpoint — see that module for why.
- * ──────────────────────────────────────────────────────────────────────────*/
-
-export {
-  DEFAULT_COLLECTIONS,
-  getStarredIds,
-  isStarred,
-  toggleStarred,
-  getCollections,
-  saveCollections,
-  toggleRecordInCollection,
-  addCollection,
-} from "@/lib/recordLibrary";
-export type { Collection } from "@/lib/recordLibrary";
 
 /* ────────────────────────────────────────────────────────────────────────────
  * Citation building
@@ -202,7 +184,6 @@ export type CitationStyle = "APA" | "MLA" | "BibTeX";
 
 export const CITATION_STYLES: CitationStyle[] = ["APA", "MLA", "BibTeX"];
 
-const INSTITUTION = "Cebu Institute of Technology – University";
 
 function authorNames(record: RecordListItem): string[] {
   return (record.authors ?? [])
@@ -233,7 +214,7 @@ export function buildCitation(record: RecordListItem, style: CitationStyle): str
   const names = authorNames(record);
   const year = String(recordYear(record) ?? "n.d.");
   const title = record.title.trim();
-  const institution = record.origin === "institutional" ? ` ${INSTITUTION}.` : "";
+  const institution = record.origin === "institutional" ? ` ${INSTITUTION.name}.` : "";
 
   if (style === "APA") {
     const authors =
@@ -260,7 +241,7 @@ export function buildCitation(record: RecordListItem, style: CitationStyle): str
     `  title        = {${title}},`,
     ...(names.length > 0 ? [`  author       = {${names.join(" and ")}},`] : []),
     `  year         = {${year}},`,
-    ...(record.origin === "institutional" ? [`  institution  = {${INSTITUTION}},`] : []),
+    ...(record.origin === "institutional" ? [`  institution  = {${INSTITUTION.name}},`] : []),
     `  note         = {IRIS record ${record.id}}`,
     `}`,
   ].join("\n");

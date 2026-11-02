@@ -42,6 +42,7 @@ from apps.ai.models import (
 from apps.ai.presentation import answer_body, answer_mode
 from apps.ai.regions import normalized_regions, regions_wire
 from apps.records.models import Record
+from apps.ai.grants.reads import research_records
 
 logger = logging.getLogger(__name__)
 
@@ -365,14 +366,14 @@ def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
         for row in (*turn.listing.get("records", []), *turn.listing.get("candidates", []))
     }
     visible_titles = dict(
-        Record.objects.visible_to(user)
+        research_records(user)
         .filter(pk__in={citation.record_id for citation in all_citations} | listed)
         .values_list("pk", "title")
     )
     # A candidate listing's quotes are checked against the text as it is now.
     listing_records = {
         record.pk: record
-        for record in Record.objects.visible_to(user).filter(pk__in=listed).only("title", "abstract")
+        for record in research_records(user).filter(pk__in=listed).only("title", "abstract")
     } if any("candidates" in turn.listing for turn in turns) else {}
     live_chunks = {
         chunk.pk: chunk
@@ -444,6 +445,14 @@ def _for_reader(turns: list, user, *, public: bool = False) -> list[dict]:
             body["comparison"] = comparison
     if public:
         for turn, body in zip(turns, bodies):
+            if any(c.record_id not in visible_titles for c in turn.citations.all()):
+                # Removing the citation alone still exposes prose derived from it.
+                body.update(answer=None, message="The answer sources are no longer readable.",
+                            reasoning=None, state="unavailable", degraded=True,
+                            question="", resolved_question=None)
+                body.pop("comparison", None)
+                body.pop("listing", None)
+                continue
             # A degraded historical pointer proves access, not the version
             # that supported the analysis. Never revive its derived summary.
             current = all(c.chunk_id in live_chunks for c in turn.citations.all())

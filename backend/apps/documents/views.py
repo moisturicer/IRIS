@@ -356,6 +356,10 @@ class RecordUploadCreateView(APIView):
         if missing:
             return missing
 
+        problem = pdf_upload_problem(file)
+        if problem:
+            return Response({"detail": problem}, status=400)
+
         upload = _store_slot_upload(record, slot, file, request.user)
         create_audit_event(
             "UPLOAD", request.user, record=record,

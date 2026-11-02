@@ -1,10 +1,16 @@
+import { INSTITUTION } from "@/config/institution";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { TONES } from "@/components/ui/statusTones";
 import { useAuth } from "@/hooks/useAuth";
 import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
+import { AboutYouPanel } from "./AboutYouPanel";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
+import { Panel } from "./settingsParts";
 
 /**
  * Settings & Profile.
@@ -97,18 +103,6 @@ export default function SettingsPage() {
 /* Shared                                                                     */
 /* -------------------------------------------------------------------------- */
 
-function Panel({
-  title, caption, children,
-}: { title: string; caption: string; children: React.ReactNode }) {
-  return (
-    <section className="bg-white rounded-xl border border-stone-200 p-5 sm:p-6">
-      <h2 className="text-[12px] font-bold uppercase tracking-wider text-stone-500">{title}</h2>
-      <p className="text-[13px] text-stone-500 mt-1">{caption}</p>
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-}
-
 function Field({
   label, children, hint,
 }: { label: string; children: React.ReactNode; hint?: React.ReactNode }) {
@@ -125,7 +119,7 @@ function Field({
 
 const inputClass =
   "w-full px-3 py-2 rounded-lg border border-stone-200 text-[14px] text-stone-900 " +
-  "focus:outline-none focus:ring-2 focus:ring-brand/20 focus:border-brand/40";
+  FOCUS_RING;
 
 const readOnlyClass =
   "w-full px-3 py-2 rounded-lg border border-stone-200 bg-stone-50 text-[14px] text-stone-500";
@@ -135,13 +129,12 @@ function Notice({ tone, children }: { tone: "ok" | "error"; children: React.Reac
     <p
       role="status"
       className={cn(
-        "text-[13px] rounded-lg px-3 py-2 border",
-        tone === "ok"
-          ? "bg-emerald-50 text-emerald-800 border-emerald-200"
-          : "bg-red-50 text-red-700 border-red-200",
+        "text-[13px] rounded-lg px-3 py-2 flex items-start gap-2",
+        tone === "ok" ? TONES.settled : TONES.active,
       )}
     >
-      {children}
+      <i className={cn("fas mt-0.5 shrink-0", tone === "ok" ? "fa-check" : "fa-circle-exclamation")} aria-hidden />
+      <span>{children}</span>
     </p>
   );
 }
@@ -205,78 +198,82 @@ function ProfileTab({ user, onSaved }: { user: NonNullable<ReturnType<typeof use
     .join(" · ");
 
   return (
-    <form onSubmit={save}>
-      <Panel
-        title="Profile — shown on records you author"
-        caption="This identity is attached to disclosures, paper citations and clearances."
-      >
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_1fr] gap-4">
-          <Field label="First name">
-            <input className={inputClass} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </Field>
-          <Field label="M.I.">
-            <input className={inputClass} value={middle} onChange={(e) => setMiddle(e.target.value)} maxLength={20} />
-          </Field>
-          <Field label="Last name">
-            <input className={inputClass} value={lastName} onChange={(e) => setLastName(e.target.value)} />
-          </Field>
-        </div>
-
-        <div className="mt-4">
-          <Field
-            label="Institutional email"
-            hint={
-              <span className="flex items-center gap-1.5">
-                <i className="fas fa-circle-check text-emerald-600 text-[12px]" aria-hidden />
-                {user.is_verified ? "Verified · " : ""}
-                Managed by CIT-U. Your email is your sign-in identity and the name attached to
-                every clearance decision, so it cannot be changed here.
-              </span>
-            }
-          >
-            <input className={readOnlyClass} value={user.email} readOnly aria-readonly />
-          </Field>
-        </div>
-
-        <div className="mt-4">
-          <Field
-            label={user.course_name ? "College · Department · Course" : "College · Department"}
-            hint="Recorded by the university. Ask RDCO if this is wrong — it is not self-service, because it determines how your disclosures are routed."
-          >
-            <input
-              className={readOnlyClass}
-              value={affiliation || "Not recorded for this account"}
-              readOnly
-              aria-readonly
-            />
-          </Field>
-        </div>
-
-        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-stone-100">
-          {ok && <Notice tone="ok">Profile saved.</Notice>}
-          {error && <Notice tone="error">{error}</Notice>}
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={reset}
-              disabled={!dirty || saving}
-              className="px-3.5 py-2 rounded-lg text-[13px] font-semibold text-stone-600
-                border border-stone-200 hover:bg-stone-50 disabled:opacity-40"
-            >
-              Discard
-            </button>
-            <button
-              type="submit"
-              disabled={!dirty || saving}
-              className="px-4 py-2 rounded-lg text-[13px] font-bold uppercase tracking-wider
-                bg-brand text-white hover:bg-brand-light disabled:opacity-40"
-            >
-              {saving ? "Saving..." : "Save changes"}
-            </button>
+    <div className="space-y-4">
+      <form onSubmit={save}>
+        <Panel
+          title="Profile — shown on records you author"
+          caption="This identity is attached to disclosures, paper citations and clearances."
+        >
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_1fr] gap-4">
+            <Field label="First name">
+              <input className={inputClass} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+            </Field>
+            <Field label="M.I.">
+              <input className={inputClass} value={middle} onChange={(e) => setMiddle(e.target.value)} maxLength={20} />
+            </Field>
+            <Field label="Last name">
+              <input className={inputClass} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+            </Field>
           </div>
-        </div>
-      </Panel>
-    </form>
+
+          <div className="mt-4">
+            <Field
+              label="Institutional email"
+              hint={
+                <span className="flex items-center gap-1.5">
+                  <i className="fas fa-circle-check text-stone-900 text-[12px]" aria-hidden />
+                  {user.is_verified ? "Verified · " : ""}
+                  Managed by {INSTITUTION.name}. Your email is your sign-in identity and the name attached to
+                  every clearance decision, so it cannot be changed here.
+                </span>
+              }
+            >
+              <input className={readOnlyClass} value={user.email} readOnly aria-readonly />
+            </Field>
+          </div>
+
+          <div className="mt-4">
+            <Field
+              label={user.course_name ? "College · Department · Course" : "College · Department"}
+              hint="Recorded by the university. Ask RDCO if this is wrong — it is not self-service, because it determines how your disclosures are routed."
+            >
+              <input
+                className={readOnlyClass}
+                value={affiliation || "Not recorded for this account"}
+                readOnly
+                aria-readonly
+              />
+            </Field>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-stone-100">
+            {ok && <Notice tone="ok">Profile saved.</Notice>}
+            {error && <Notice tone="error">{error}</Notice>}
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={reset}
+                disabled={!dirty || saving}
+                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold text-stone-600
+                  border border-stone-200 hover:bg-stone-50 disabled:opacity-40"
+              >
+                Discard
+              </button>
+              <button
+                type="submit"
+                disabled={!dirty || saving}
+                className="px-4 py-2 rounded-lg text-[13px] font-bold uppercase tracking-wider
+                  bg-brand text-white hover:bg-brand-light disabled:opacity-40"
+              >
+                {saving ? "Saving..." : "Save changes"}
+              </button>
+            </div>
+          </div>
+        </Panel>
+      </form>
+
+      <AboutYouPanel user={user} onSaved={onSaved} />
+    </div>
   );
 }
 
@@ -285,16 +282,16 @@ function ProfileTab({ user, onSaved }: { user: NonNullable<ReturnType<typeof use
 /* -------------------------------------------------------------------------- */
 
 function SecurityTab() {
+  const navigate = useNavigate();
+  const { logout } = useAuth();
   const [oldPassword,     setOldPassword]     = useState("");
   const [newPassword,     setNewPassword]     = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [saving, setSaving] = useState(false);
-  const [ok,     setOk]     = useState(false);
   const [error,  setError]  = useState<string | null>(null);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setOk(false);
     setError(null);
 
     if (newPassword !== confirmPassword) return setError("New passwords do not match.");
@@ -304,10 +301,11 @@ function SecurityTab() {
     setSaving(true);
     try {
       await authApi.changePassword({ old_password: oldPassword, new_password: newPassword });
-      setOk(true);
-      setOldPassword("");
-      setNewPassword("");
-      setConfirmPassword("");
+      // ADR-045 §4 (IR-642): the change has ended every session, this one
+      // included, so the next request would fail. Sign out here and say why.
+      logout();
+      navigate("/login", { replace: true, state: { reason: "password_changed" } });
+      return;
     } catch (err: unknown) {
       const res = (err as {
         response?: { data?: { detail?: string; old_password?: string[]; new_password?: string[] } };
@@ -343,8 +341,7 @@ function SecurityTab() {
           </Field>
         </div>
 
-        <div className="flex items-center gap-2 mt-5 pt-4 border-t border-stone-100">
-          {ok && <Notice tone="ok">Password changed.</Notice>}
+        <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-stone-100">
           {error && <Notice tone="error">{error}</Notice>}
           <button
             type="submit"
@@ -375,7 +372,7 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
           <i
             className={cn(
               "fas text-[15px] mt-0.5",
-              user.consent_given ? "fa-circle-check text-emerald-600" : "fa-circle-exclamation text-amber-600",
+              user.consent_given ? "fa-circle-check text-stone-900" : "fa-circle-exclamation text-stone-600",
             )}
             aria-hidden
           />
@@ -401,7 +398,10 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
         </p>
       </Panel>
 
-      <Panel title="What you agreed to" caption="The full notice, as shown at registration.">
+      <Panel
+        title="Current disclosure notice"
+        caption="This is the current notice for research disclosures. Your account consent record does not confirm that you accepted this revised notice or its external AI processing terms."
+      >
         <div className="space-y-5 max-h-[420px] overflow-y-auto scrollbar-thin pr-1">
           {DPA_SECTIONS.map((section) => (
             <div key={section.title}>
@@ -460,7 +460,7 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
           <ul className="mt-5 space-y-2">
             {capabilities.map((c) => (
               <li key={c} className="flex items-start gap-2.5 text-[13px] text-stone-700">
-                <i className="fas fa-check text-emerald-600 text-[12px] mt-0.5 shrink-0" aria-hidden />
+                <i className="fas fa-check text-stone-900 text-[12px] mt-0.5 shrink-0" aria-hidden />
                 <span>{c}</span>
               </li>
             ))}

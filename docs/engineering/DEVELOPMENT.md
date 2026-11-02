@@ -46,6 +46,12 @@ keys into your local `backend/.env` and restart backend processes to use them.
 also work). Invalid values stop startup and name the offending key.
 The separate AI overview budget is unchanged.
 
+Login and registration have budgets of their own (IR-661): `API_THROTTLE_LOGIN`
+(`300/hour`) and `API_THROTTLE_REGISTER` (`60/hour`), same format. They count per
+client address, read as `TRUSTED_PROXY_COUNT` says, and do not spend the anonymous
+budget. A refusal is a 429 with `Retry-After`. The axes lockout is separate and
+still answers per account and address.
+
 A 429 recovers after its `Retry-After` window. **Production must wait out
 that window.** Locally, after changing a limit, old counters can still lock
 an account out. Open `docker compose exec backend python manage.py shell`
@@ -74,6 +80,36 @@ the numeric user id, and `iris` if you customized the prefix). Anonymous
 budgets are keyed by IP.
 
 ---
+
+### Password recovery (IR-642)
+
+Run `python scripts/setup_env.py` before starting this revision. It adds missing
+recovery HMAC and mail-encryption keys to `backend/.env` without replacing
+existing values. Both keys are required at startup. Production also requires
+a fixed HTTPS `FRONTEND_URL` origin and populated SMTP configuration. Retain old
+mail-encryption keys until every pending or issued payload using them is terminal;
+an issued token can outlive the ten-minute request-intent lifetime.
+
+Apply accounts migration `0014_account_recovery` and audit migration
+`0009_recovery_event_types` before serving requests, then restart backend,
+Celery workers and beat together. This rollout deliberately signs out existing
+JWT holders: old access/refresh tokens lack the new credential version. Password
+reset and authenticated password change end every device session. A profile edit
+already in flight may finish, but cannot restore pre-reset credentials.
+
+Recovery uses the `default` worker queue and beat's thirty-second dispatcher.
+The HTTP request commits an encrypted delivery intent; neither SMTP nor account
+lookup runs on that path. Broker loss is recovered from the intent. SMTP uses
+a thirty-second timeout, up to four attempts, and the same single-use link on
+retry. Monitor aggregate failed-intent counts and the age of pending work;
+neither logs nor alerts should contain recipients, bodies or links.
+
+Development mail stays in memory, so recovery and legacy activation links are
+never printed to container logs. To exercise actual delivery, configure
+`EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend` and a development
+SMTP server. Production continues to use SMTP. Verification resend and legacy
+activation retirement remain IR-643; this rollout implements password recovery.
+No production deployment was performed.
 
 ## 3 · Repository layout
 
@@ -252,7 +288,8 @@ Compose needs its own file because `${DB_PASSWORD}` in a compose file is interpo
 **`docker compose up` fails by name without the root `.env`** — every reference is written `${DB_NAME:?set DB_NAME in the repo-root .env}`, which is the intended behaviour, not a bug to work around:
 
 ```bash
-python scripts/setup_env.py   # creates both, never overwrites either
+python scripts/setup_env.py   # creates both; never overwrites, except to add
+                              # missing recovery secrets to backend/.env (IR-642)
 ```
 
 It derives the repo-root `.env` from your existing `backend/.env` when you have
@@ -279,6 +316,17 @@ cp backend/.env.example backend/.env
 **Rules**
 - Never commit a real secret. If one is committed, **rotate it** — removing it from the diff is not enough
 - The application fails to start on a missing required secret rather than defaulting silently. `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have **no defaults**: `config/settings/base.py`'s `required()` raises `ImproperlyConfigured` naming the variable, and a value set to the empty string counts as missing
+- Production must run with `TRUSTED_PROXY_COUNT` set to the number of proxies in front of Django, nginx included (IR-656). `apps/accounts/client_address.py` reads the sign-in lockout's client address from it.
+- Compose publishes development Postgres and Redis on `127.0.0.1` only, and Redis requires `REDIS_PASSWORD` in both stacks (IR-669). `python scripts/setup_env.py` generates it in the repo-root `.env` when it is missing. **After pulling this change, run that script again**, or Compose stops by name. If a local Postgres or Redis already holds the port, Compose stops with "ports are not available": set `DB_HOST_PORT` or `REDIS_HOST_PORT` in the repo-root `.env`. A Django or Celery run on the host keeps using `backend/.env`. To point it at Compose's Redis, use `redis://:<REDIS_PASSWORD>@localhost:<port>/0`.
+- To test from a phone on the same network, publish the frontend for that session in the gitignored `docker-compose.override.yml`, then delete the file. Anyone on that network can reach the frontend meanwhile, so use it on a network you trust. This recipe hasn't been run on a phone yet.
+
+  ```yaml
+  services:
+    frontend:
+      ports: !override
+        - "5173:5173"
+  ```
+- `/django-admin/` answers 403 in production unless the client is in `DJANGO_ADMIN_ALLOWED_NETWORKS` (IR-668). Set it in the repo-root `.env`, as addresses or CIDRs separated by spaces or commas: `DJANGO_ADMIN_ALLOWED_NETWORKS=203.0.113.0/24, 198.51.100.7`. Empty allows nobody. With a value set, also put `TRUSTED_PROXY_COUNT` in that `.env`, matching `backend/.env`, because nginx reads the client address the same way. A bad value, `/0` or a missing count stops the frontend container. Restart it after a change: `docker compose -f docker-compose.prod.yml up -d frontend`. Port 80 must be reachable only from the TLS proxy, or a client could forge its address (IR-662). Development has no nginx, so it is unaffected. **Django serves its admin at `/admin/` until IR-782 moves it, and that path is not restricted until then.**
 - Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`. `config/settings/production.py` re-reads the last two without base's `localhost` default and refuses to start on an empty, `*` or non-https value
 
 `CORS_ALLOW_ALL_ORIGINS` is **gone** from every settings module (IR-154 — earlier text here attributing this to IR-61 is superseded; IR-61 was replaced by IR-154). It was set in development and, combined with `CORS_ALLOW_CREDENTIALS`, permitted any origin to make authenticated requests on a logged-in user's behalf. `development.py` now lists its dev origins explicitly, and `production.py` refuses to start if the setting reappears anywhere.
@@ -293,9 +341,39 @@ cp backend/.env.example backend/.env
 cd backend && python -m pytest -q
 cd backend && python -m pytest apps/reviews -v
 cd backend && python -m pytest apps/ai apps/documents   # the RAG pipeline suites
+cd backend && python -m pytest -m "not slow"           # skip the slowest tests locally (IR-835)
 ```
 
-**Frontend still has no test runner** — `npm test` is not wired up, deliberately deferred (P3). `npm run lint` and `npm run build` (`tsc && vite build`) are the only automated frontend checks.
+**One run per Postgres server (IR-835).** Two runs sharing one server slow each
+other several-fold (measured: 24 minutes alone, about two hours shared), and two
+checkouts with the same `DB_NAME` fight over one test database. A run that needs
+the database takes a session advisory lock in the server's `postgres` database;
+a second run exits at once naming the holder's pid and directory. The lock dies
+with its connection, so a crashed run leaves nothing to clean up. Collect-only
+runs and pytest runs started from inside a locked run do not take it.
+
+**`slow` (IR-835)** marks every `*_migration.py` test automatically (each migrates
+the schema backwards and forwards) and a few tests marked by hand. `-m "not slow"`
+saves about five minutes locally. CI selects nothing and runs all of them.
+
+**Backend CI (IR-810)** runs the complete pytest collection across four isolated
+runners/PostgreSQL services. Whole test modules stay together, assigned by test
+count; tests within a shard retain collection order. This avoids sharing the
+database roles and migration state that integration tests mutate. The required
+`Backend` check passes only when all four shards succeed. Each shard retains
+its JUnit report as a `backend-tests-N` artifact and logs its slowest 25 tests.
+Static/configuration/migration checks and `IRIS_REQUIRE_DB=1` remain enabled.
+PR updates cancel that PR's obsolete run; main push runs remain independent.
+
+The optional plugin is loaded only in CI (ordinary local pytest remains serial).
+The shard regression tests execute actual pytest subprocesses and verify that
+their union runs every collected test once, preserving module order. Shard
+balance currently uses counts; use the reports to judge elapsed time before
+claiming a speedup or changing the partition policy.
+
+**AI gateway:** CI's `AI gateway` job runs `ai/tests` with `ai/requirements-dev.txt` (IR-844). Run it with `cd ai && python -m pytest -ra`.
+
+**Frontend:** CI runs `npm run lint`, `npm test` (Vitest with axe-core, IR-210) and `npm run build`.
 
 Rules: **never modify a test to make it pass**; if the test is wrong, fix it deliberately and say so in the PR. A requirement is not satisfied because code exists — only when a test demonstrates it and the evidence is recorded.
 
@@ -311,27 +389,9 @@ Rules: **never modify a test to make it pass**; if the test is wrong, fix it del
 6. Move the item to **In Review** only when the conditions in `DEFINITION_OF_DONE.md` §2 hold
 7. Address review; merge on approval
 
-### Merge conflicts in the traceability matrix
+### Recording traceability
 
-`docs/testing/TRACEABILITY.md` stores each requirement as one table row on a
-single line thousands of characters long. Git merges by line, so two branches
-that each append a note to the same requirement conflict on the whole row even
-though they edited different sentences. It is almost never a real disagreement.
-
-When that file is the conflict, resolve it a cell at a time:
-
-```bash
-python scripts/resolve_traceability.py   # mid-merge, after the conflict appears
-git commit --no-edit
-```
-
-The script takes whichever side changed a cell when only one did, and replays
-both sides' inserts in offset order when both did, so every note keeps the
-position its author chose. Everything outside a conflict block is git's own
-merge and is left alone. It refuses — exits non-zero, leaves the markers — if
-either side rewrote or deleted existing text, or if the conflict is not made
-only of table rows. **Read what it produced before committing**; it is a
-mechanical merge, not a review.
+Add `docs/testing/traceability/IR-XXX.md` for your ticket, and change a row in `docs/testing/TRACEABILITY.md` only when a requirement's status changes ([ADR-055](../adr/055-traceability-evidence-lives-in-one-file-per-ticket.md)). A conflict on a row is then a real disagreement, so read both sides. A branch that appended to the old file should move its entry into its own file when it merges `main`.
 
 Fixing the row format so this stops happening is IR-276.
 

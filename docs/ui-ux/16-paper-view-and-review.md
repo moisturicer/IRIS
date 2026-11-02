@@ -82,6 +82,27 @@ Choosing an older version swaps the manuscript and shows a banner: *"You are vie
 
 ## 4 · Review mode
 
+**Routing amendment, 2026-11-01 (IR-767, ADR-047):** The Adviser’s *Accept & route* becomes *Accept & send to RDCO* (`send_to_rdco`). Its only target is RDCO, either its Pool or selected officers. Suggested specialist offices are labelled as suggestions and route nothing. Office requests offer whole offices or multiple named officers, with a reason. RDCO’s confirmation lists open office reviews, document and Revision requests and recorded Findings; RDCO may decide now and the closed work retains its history. **Only RDCO publishes** (ADR-047 as amended): the Adviser’s *Accept & publish* is removed, so the Adviser’s primary is *Accept & send to RDCO…*, with RDCO ticked, the pool-or-officers note and the author’s flags beside the suggestions, as in the [prototype](prototypes/review-workspace.html). An office’s *Route to office…* is labelled *Request review…*, and its dialog’s button *Send request*. RDCO’s confirmation opens with the prototype’s executive-Decision warning when it closes open reviews or withdraws Revision requests.
+
+
+**Amendment, proposed 2026-10-30, accepted 2026-10-31 by Lee Jasmin Adolfo (IR-679): Phase 1 review workspace.** Acceptance is recorded in [ADR-032 §7 and §10](../adr/032-adviser-first-review-and-office-reviewer-pools.md) and on [PR #363](https://github.com/moisturicer/IRIS/pull/363). Until implemented, the two-column description below remains the current behavior. The following replaces the Review mode regions, party status placement and action-bar placement; existing acts and dialogs remain.
+
+| Region | Phase 1 content |
+|---|---|
+| Paper, remaining width (50% by default) | Whole Manuscript, using the existing Paper reader |
+| Review pane, 30% by default | Conversation: existing timeline, Readiness panel, then record comment box. Footer: viewer's verdict in words and one filled primary action. Changes and Threads tabs are absent. |
+| Details sidebar, 20% by default | Reviewers by party, then Researchers, Adviser, Classification, Flagged by the authors, Keywords, Version, Due dates, Documents and Participants |
+
+Reviewers replaces the separate status strip in Review mode. People show an icon and state in words; an unclaimed Pool shows the office and that nobody has claimed it. **Request review** and **Add a colleague** remain separate controls backed by the existing dialogs and endpoints. Allowed targets and controls come from the server's routing and capability flags. Every person opens a profile card with only information the viewer may already read; Escape or an outside click closes it and returns focus.
+
+**Readiness** leads with the server's verdict in words and lists each fact with its server-authored label, who/which party and since when where available, and an allowed link to what clears it. Real blockers use maroon; information uses an outline; neither relies on colour alone. Its contract and invariants live in ADR-032 §10: `ready` exactly when a Decision would be accepted for the same state, every `decision.blocked` reason represented, and `null` when `may_read_review` refuses the viewer. Review-only sidebar content is withheld under the same predicate. The browser derives no verdict or blocker wording.
+
+**Resizing and narrow workspaces.** Breakpoints measure the workspace container. Clamp the review pane to 320px–half that width; clamp the sidebar to 220–420px and at least 40px narrower than the pane; cap the pane so the paper retains 480px. Below 1200px, Details becomes a tab in the review pane. Below 900px, the pane becomes a drawer over the paper with **Back to paper**, and resize edges are hidden. Edges are keyboard-focusable separators with their current width, arrow keys move 24px, and double click restores that column's default. One browser-storage key remembers widths, with safe defaults if storage is unavailable. Use maroon/stone/white/ink, Garamond headings, hairlines, and 36px pointer/44px touch controls.
+
+Read mode, Ask IRIS's entry point and the author's existing view stay unchanged. The [prototype](prototypes/review-workspace.html) also illustrates later phases, which are excluded here: Changes, Threads, review submissions, resolution, suggested wording and notification subscriptions. ADR-047's routing change, accepted 2026-11-01, is separate and is not implemented by this amendment.
+
+**Existing layout, retained until the accepted amendment is implemented:**
+
 ```
 ┌──────────────────────────────┬──────────────────────────────────────┐
 │                              │ Adviser ✓ · ITSO ● · IERC ● ·        │
@@ -94,7 +115,7 @@ Choosing an older version swaps the manuscript and shows a banner: *"You are vie
 │                              │  ↩ Revision requested (Adviser)      │
 │                              │  ◦ v2 submitted                      │
 │                              │  ✓ Adviser accepted · routed to      │
-│                              │    ITSO, IERC — "possible IP"        │
+│                              │    ITSO, IERC — "tech review"        │
 │                              │  💬 comment box                      │
 ├──────────────────────────────┴──────────────────────────────────────┤
 │ ACTION BAR — only the capabilities this user has                    │
@@ -130,9 +151,9 @@ Each entry carries its version tag. The comment box is at the bottom, as on GitH
 | Seat | Buttons (capability) |
 |---|---|
 | Adviser on a **Proposal** | **Request revision** (`request_revision`) · **Reject** (`reject`) · **Accept** (`accept_proposal`) · Request document |
-| Adviser on a **Thesis / Project** | Request revision · Reject (`reject`) · **Accept & publish** (`accept_publish`) · **Accept & route…** (`accept_route`) · Request document |
+| Adviser on a **Thesis / Project** | Request revision · Reject (`reject`) · **Accept & send to RDCO…** (`send_to_rdco`) · Request document. No *Accept & publish* (ADR-047, amended 2026-11-01) |
 | ITSO / IERC / KTTO | **Clear** · **Record finding** (both `office_review`; ADR-032 §10 *Amendment* 2026-10-08) · Request revision · Request document · **Add reviewer** (`add_reviewer`) · **Route to office…** (`route`) |
-| RDCO | Request revision · Reject (`reject`) · **Accept & publish** (`accept_publish`) · **Accept, keep unlisted** (`keep_unlisted`) · Route to office… · Request document |
+| RDCO | Request revision · Reject (`reject`) · **Accept & publish** (`accept_publish`) · **Accept, keep unlisted** (`keep_unlisted`) · Request review… · Request document |
 
 > **Amended 2026-10-09 (IR-270).** `final_decide` is renamed `keep_unlisted`, the act it grants, and Reject gets its own key, `reject`. The bar's order puts *Accept & publish* first (the primary) and *Reject* last; RDCO's *Route to office…* follows *Request document*, as it does for an office (ADR-032 §10, IR-270 deviation note). A rejected record reads **Archived**, and a Thesis or Project RDCO kept unlisted reads **Unlisted**. The three Decisions open one dialog each rather than `ConfirmDialog`, because each takes text (a reject's required reason, an accept's optional comment) and must keep it through a stale record. Each still states its consequence first.
 

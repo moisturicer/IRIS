@@ -21,6 +21,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from apps.ai.extraction import ExtractedDocument
 from apps.ai.chunking.document import HEADING, PARAGRAPH, DocumentElement, NormalizedDocument
 from apps.documents import tasks
+from apps.documents.testing import real_pdf_bytes
 from apps.documents.models import DocumentKind, PdfExtraction, RecordUpload, UploadSlot
 from apps.records.models import Record, RecordType
 
@@ -174,7 +175,7 @@ def test_the_submit_endpoint_marks_what_it_writes(record, upload, tmp_path, sett
                 "record": record.pk,
                 "slot": upload.slot.pk,
                 "file": SimpleUploadedFile(
-                    "clearance.pdf", b"%PDF-1.4 x", content_type="application/pdf"
+                    "clearance.pdf", real_pdf_bytes(), content_type="application/pdf"
                 ),
             },
             format="multipart",

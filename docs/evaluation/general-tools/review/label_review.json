@@ -1,0 +1,1044 @@
+{
+  "set_id": "general-tools-conversations-v1",
+  "reviewer": "Jive Tyler I. Revalde",
+  "fixture": false,
+  "corpus": {
+    "snapshot_id": "proxy-arxiv-40",
+    "paper_set_sha256": "6793dcadc793c1a3cdd831bc18b9091816e04d519e674e728e864aeef970c3d0",
+    "source_kind": "proxy",
+    "source": "docs/evaluation/proxy_starter.json (40 openly licensed arXiv papers)",
+    "note": "A proxy corpus, not CIT-U research. Nothing measured on it is a finding about CIT-U."
+  },
+  "set_digests": {
+    "development": "e7b8e94b58a5502c436594d117b21f5a9e857b435ae093e26bfb39f3716d1c2f",
+    "held_out": "1b20a3cb8fc257ec43fc957f208f5f3ce490d95a03213e0283183ffccb73aca6"
+  },
+  "conversations": {
+    "A01-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A01-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A01-D03": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "FIX: turn 3 pins evidence to 'Exploring the observed properties of JWST Little Red Dots…', but the first listed paper depends on what turn 1 returns. Remove that required_evidence entry (the tolerance already says 'the first listed paper only'), then mark Corrected."
+    },
+    "A01-D04": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Depending on the chosen pair in turn 2, turn 3 and 4 follows the comparison."
+    },
+    "A01-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A01-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A01-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A02-D01": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A02-D02": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A02-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A02-D04": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A02-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A02-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A02-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A03-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "VERIFY IN DATABASE before confirming: I could not see the loaded categories or counts (corpus PDFs not on disk, Postgres down). Confirm a category named 'Hardware Architecture' exists and holds both adiabatic-logic papers."
+    },
+    "A03-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A03-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": true,
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "VERIFY IN DATABASE before confirming: I could not see the loaded categories or counts (corpus PDFs not on disk, Postgres down). Confirm no 'Quantum Computing' category exists (watch for 'Quantum Physics'). FIX: turn 3's tolerance allows 'say none fits', but 'State-Space-Based FIR Filtering on a Quantum Computer' is in the corpus. Change the tolerance to expect that paper as the closest match, then mark Corrected."
+    },
+    "A03-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal. Page and quote verified against that record."
+    },
+    "A03-D05": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "CORRECTED by AI: turn 2 accepts the JWST Little Red Dots paper as an AGN match (168 AGN mentions in its chunks); paper added to the papers list."
+    },
+    "A03-H01": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations; ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation. Page and quote verified against that record."
+    },
+    "A03-H02": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies; Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations. Page and quote verified against that record."
+    },
+    "A04-D01": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A04-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A04-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A04-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Fine. Turn 2 has one clear match; the tolerance accepts either asking or picking."
+    },
+    "A04-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Fine. Minor: only MeshKV has 'KV Cache' in its title, so clarification may not be strictly necessary; the tolerance accepts asking."
+    },
+    "A04-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Consider: clarification_necessary is true, but 'neutron stars… merger rate' matches one paper; the tolerance accepts a labelled guess. Asking could be scored as unnecessary clarification. Title label is shortened; the database title is: Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations. Page and quote verified against that record."
+    },
+    "A04-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A05-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A05-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A05-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A05-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A05-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A05-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A05-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A06-D01": {
+      "status": "corrected",
+      "checks": {
+        "category_names": true,
+        "exact_counts": true,
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "CORRECTED by AI: turn 1 expects exactly 5 (audio-and-speech-processing); turn 3 lists all 5 including the quantum FIR paper, which was added to the papers list. Verified in DB; no Marine Biology category."
+    },
+    "A06-D02": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": true,
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "CORRECTED by AI: turn 1 now expects exactly 40 (the proxy-arxiv-40 snapshot). The evaluation database must hold no other published records; the dev database currently has 8 seed_demo records published, which would make it 48."
+    },
+    "A06-D03": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": true,
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "CORRECTED by AI: turn 1 now expects exactly 40 (the proxy-arxiv-40 snapshot). The evaluation database must hold no other published records; the dev database currently has 8 seed_demo records published, which would make it 48."
+    },
+    "A06-D04": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": true,
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "CORRECTED by AI: turn 1 now expects exactly 40 (the proxy-arxiv-40 snapshot). The evaluation database must hold no other published records; the dev database currently has 8 seed_demo records published, which would make it 48."
+    },
+    "A06-H01": {
+      "status": "corrected",
+      "checks": {
+        "category_names": true,
+        "exact_counts": true,
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "CORRECTED by AI: turn 1 expects 5 (hardware-architecture); turn 3 is a tie, astrophysics-of-galaxies and cosmology-and-nongalactic-astrophysics at 10 each, and must name both. Verified in DB; no Legal Studies."
+    },
+    "A06-H02": {
+      "status": "corrected",
+      "checks": {
+        "category_names": true,
+        "exact_counts": true,
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "CORRECTED by AI: turn 1 lists the six proxy categories; turn 2 gives their counts (10, 10, 5, 5, 5, 5 = 40). Verified in DB; no cooking category."
+    },
+    "A06-H03": {
+      "status": "corrected",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": true,
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "CORRECTED by AI: turn 1 now expects exactly 40 (the proxy-arxiv-40 snapshot). The evaluation database must hold no other published records; the dev database currently has 8 seed_demo records published, which would make it 48."
+    },
+    "A07-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: both report CER, but on different test sets (AISHELL/LibriSpeech/WenetSpeech vs KeSpeech/CV-Yue). No shared number."
+    },
+    "A07-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Checked metric vocabulary in chunks: different measures or datasets, no shared number."
+    },
+    "A07-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: both report PFAL gate energy, but at different clocks, voltages and loads (one with a real P-QVCO near 3 GHz, the other in aJ from waveform sweeps). No directly comparable number; the label holds."
+    },
+    "A07-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Checked metric vocabulary in chunks: different measures or datasets, no shared number."
+    },
+    "A07-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Checked metric vocabulary in chunks: different measures or datasets, no shared number."
+    },
+    "A07-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Checked metric vocabulary in chunks: different measures or datasets, no shared number. Title label is shortened; the database title is: ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation. Page and quote verified against that record."
+    },
+    "A07-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: both touch Branin, but one reports hypervolume and the other log regret. No shared number."
+    },
+    "A08-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A08-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A08-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A08-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal. Page and quote verified against that record."
+    },
+    "A08-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A08-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies. Page and quote verified against that record."
+    },
+    "A08-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A09-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: the paper never mentions annotators. Page and quote verified in the database chunks."
+    },
+    "A09-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": "not_applicable",
+        "supported_unambiguous": true
+      },
+      "notes": "No a09_case tag: off-topic questions, not one of the three A09 outcomes. Acceptable."
+    },
+    "A09-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: no funding or grant amount ('budget' appears only as GPU power budget). Page and quote verified in the database chunks."
+    },
+    "A09-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": "not_applicable",
+        "supported_unambiguous": true
+      }
+    },
+    "A09-D05": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: no human annotators ('annotated' refers to figure labels). Title label is shortened; the database title is: The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations. Page and quote verified against that record."
+    },
+    "A09-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": "not_applicable",
+        "supported_unambiguous": true
+      },
+      "notes": "No a09_case tag: off-topic questions. 15% of 240 = 36 is correct."
+    },
+    "A09-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: no funding amount ('budget' means sampling budget). Page and quote verified in the database chunks."
+    },
+    "A10-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: the trap percentage appears nowhere in the paper. Page and quote verified in the database chunks."
+    },
+    "A10-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: the trap percentage appears nowhere in the paper. Page and quote verified in the database chunks."
+    },
+    "A10-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: the trap percentage appears nowhere in the paper. Page and quote verified in the database chunks."
+    },
+    "A10-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: the trap percentage appears nowhere in the paper. Page and quote verified in the database chunks."
+    },
+    "A10-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: the trap percentage appears nowhere in the paper. Page and quote verified in the database chunks."
+    },
+    "A10-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: the trap percentage appears nowhere in the paper. Title label is shortened; the database title is: Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations. Page and quote verified against that record."
+    },
+    "A10-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Verified in chunks: the trap percentage appears nowhere in the paper. Page and quote verified in the database chunks."
+    },
+    "A11-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A11-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A11-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A11-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal. Page and quote verified against that record."
+    },
+    "A11-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A11-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A11-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A12-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A12-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A12-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A12-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A12-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A12-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation. Page and quote verified against that record."
+    },
+    "A12-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A13-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A13-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A13-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Wording is odd ('which paper…' inside a single-paper question) but this conversation tests presentation, not the answer. Page and quote verified in the database chunks."
+    },
+    "A13-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A13-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A13-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations. Page and quote verified against that record."
+    },
+    "A13-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A14-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A14-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A14-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A14-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A14-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A14-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies. Page and quote verified against that record."
+    },
+    "A14-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Page and quote verified in the database chunks."
+    },
+    "A15-D01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A15-D02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A15-D03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A15-D04": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A15-H01": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A15-H02": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      }
+    },
+    "A15-H03": {
+      "status": "confirmed",
+      "checks": {
+        "category_names": "not_applicable",
+        "exact_counts": "not_applicable",
+        "paper_page_facts": true,
+        "supported_unambiguous": true
+      },
+      "notes": "Title label is shortened; the database title is: Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies. Page and quote verified against that record."
+    }
+  }
+}

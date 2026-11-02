@@ -6,7 +6,7 @@ from apps.documents.validators import pdf_upload_problem
 from apps.reviews.clearance_state import clearance_payload, record_versions, resubmission_payload
 
 from .models import (
-    Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
+    DOWNLOAD_NOTE_MAX_LENGTH, Record, RecordOwner, Author, DownloadRequest, DeleteRequest,
     Classification, PSCEDClassification, RecordType,
 )
 
@@ -162,6 +162,20 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return has_record_download_file(obj)
 
+    # Where the viewer's own download stands (IR-677, ADR-048). Null for an
+    # anonymous viewer, who cannot ask.
+    download            = serializers.SerializerMethodField()
+
+    def get_download(self, obj):
+        from .download_service import download_state
+
+        viewer = self._viewer()
+        if viewer is None or not viewer.is_authenticated:
+            return None
+        state = download_state(viewer, obj)
+        expires = state["grant_expires_at"]
+        return {**state, "grant_expires_at": serializers.DateTimeField().to_representation(expires) if expires else None}
+
     ai_hook             = serializers.SerializerMethodField()
     # Paper View's byline credits the adviser by name (IR-472). It rides on
     # the record's own visibility: whoever may read the record may read this.
@@ -183,6 +197,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # review at all -- an owner, or anyone who has ever held a seat
     # (ADR-032 §4, §10; IR-415).
     my_seats             = serializers.SerializerMethodField()
+    review_claim         = serializers.SerializerMethodField()
     is_participant       = serializers.SerializerMethodField()
     # What Paper View's action bar may offer for routing (ADR-032 §4, IR-261):
     # `{accept_and_route: bool, route_as: party | null}`. A rendering hint;
@@ -209,6 +224,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # assembles it from the blocks above. A rendering hint; every action
     # endpoint re-checks its own predicate, so the server stays authoritative.
     capabilities         = serializers.SerializerMethodField()
+    # What stands between the viewer and their part of the review, in words
+    # (ADR-032 §10 Amendment, IR-679/IR-681). Read from the blocks above;
+    # `None` -- not disclosed -- to a viewer who may not read the review.
+    readiness            = serializers.SerializerMethodField()
     # The record's versions, for the header's version picker (IR-416).
     # Participants only, like `reviews`.
     versions             = serializers.SerializerMethodField()
@@ -222,6 +241,21 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # `{derived_from, continued_as}`: the Proposal this continues and what
     # continues it (ADR-032 §6, IR-417), each only if the viewer may open it.
     lineage              = serializers.SerializerMethodField()
+    # The review sidebar's paper details and profile cards (IR-686);
+    # participants and due dates are `None` to a viewer refused the review.
+    paper_details        = serializers.SerializerMethodField()
+    # `{state, until}` (ADR-052 §3, IR-811); `None` to anyone but the owners, the
+    # Adviser and office staff.
+    embargo              = serializers.SerializerMethodField()
+
+    def get_embargo(self, obj):
+        from core.permissions import may_read_embargo
+
+        from .embargo import state_payload
+
+        if not may_read_embargo(self._viewer(), obj):
+            return None
+        return state_payload(obj)
 
     def _workflow(self, obj):
         """
@@ -289,6 +323,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
 
         return is_record_participant(self._viewer(), obj)
 
+    def get_review_claim(self, obj):
+        from apps.reviews.seats import claim_offer
+
+        return self._once(obj, "review_claim", lambda: claim_offer(obj, self._viewer()))
+
     def get_routing(self, obj):
         from apps.reviews.routing import routing_flags
 
@@ -321,6 +360,23 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             office_review=self.get_office_review(obj), revision=self.get_revision(obj),
             decision=self.get_decision(obj),
         )
+
+    def get_readiness(self, obj):
+        from apps.reviews import readiness, routing
+
+        def compute():
+            readable = self._readable(obj)
+            in_review = routing.is_in_review(obj)
+            return readiness.build_readiness(
+                user=self._viewer(), readable=readable, in_review=in_review,
+                decision=self.get_decision(obj), revision=self.get_revision(obj),
+                office_review=self.get_office_review(obj), my_seats=self.get_my_seats(obj),
+                review_claim=self.get_review_claim(obj),
+                facts=readiness.readiness_facts(obj, self._viewer())
+                if readable and in_review else {"assignments": [], "document_requests": []},
+            )
+
+        return self._once(obj, "readiness", compute)
 
     def get_reviews(self, obj):
         """
@@ -363,6 +419,14 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         if not self._readable(obj):
             return None
         return versions_payload(obj)
+
+    def get_paper_details(self, obj):
+        from .paper_details import paper_details
+
+        return paper_details(
+            obj, self._viewer(), readable=self._readable(obj),
+            deadlines=self._workflow(obj)["assignment_deadlines"],
+        )
 
     def get_manuscript_unsubmitted(self, obj):
         from .versions import manuscript_unsubmitted
@@ -476,18 +540,19 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "id", "title", "abstract", "abstract_file",
             "year_accomplished", "year_completed", "origin", "publication_year",
             "classification", "psced", "record_type",
-            "classification_name", "record_type_name", "file_count", "has_manuscript", "ai_hook",
+            "classification_name", "record_type_name", "file_count", "has_manuscript", "download", "ai_hook",
             "adviser", "adviser_name", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "stage_label", "is_deleted",
             "workflow_state", "workflow_state_label", "current_holders",
-            "can_request_document", "my_seats", "is_participant", "routing",
-            "office_review", "revision", "decision", "capabilities", "keywords",
+            "can_request_document", "my_seats", "review_claim", "is_participant", "routing",
+            "office_review", "revision", "decision", "capabilities", "readiness", "keywords",
             "dpa_accepted", "dpa_accepted_at",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
             "versions", "manuscript_unsubmitted", "submitter_status", "lineage",
+            "paper_details", "embargo",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as
@@ -673,16 +738,32 @@ class DownloadRequestSerializer(serializers.ModelSerializer):
     record_title         = serializers.CharField(source="record.title",                    read_only=True)
     requested_by_name    = serializers.SerializerMethodField()
     requested_by_email   = serializers.CharField(source="requested_by.email",              read_only=True)
+    # Why the reader asks (IR-688): required, plain text, at most 500 characters.
+    note                 = serializers.CharField(
+        max_length=DOWNLOAD_NOTE_MAX_LENGTH, allow_blank=False, trim_whitespace=True,
+    )
+    # Whether RDCO may still revoke it: approved and not yet expired. Worked
+    # out here so the queue never decides expiry itself.
+    grant_live           = serializers.SerializerMethodField()
 
     class Meta:
         model  = DownloadRequest
         fields = [
             "id", "record", "record_title",
             "requested_by", "requested_by_name", "requested_by_email",
-            "status", "reviewed_by", "reviewed_at", "created_at",
+            "note", "status", "rdco_note",
+            "reviewed_by", "reviewed_at", "grant_expires_at", "grant_live",
+            "revoked_at", "cancelled_at", "created_at",
         ]
         # A request is created pending; only the review actions move it.
-        read_only_fields = ["requested_by", "status", "reviewed_by", "reviewed_at"]
+        read_only_fields = [
+            "requested_by", "status", "rdco_note", "reviewed_by", "reviewed_at",
+            "grant_expires_at", "revoked_at", "cancelled_at",
+        ]
+
+    def get_grant_live(self, obj):
+        from .download_service import grant_is_live
+        return grant_is_live(obj)
 
     def get_requested_by_name(self, obj):
         if obj.requested_by:

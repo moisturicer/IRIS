@@ -84,12 +84,11 @@ A component library exists. Roughly a tenth of the product uses it.
 | Component | Lines | Verdict | Note |
 |---|---|---|---|
 | `ProtectedRoute` | 70 | **KEEP** | Its docstring is already correct: *"client-side RBAC (UX only)"* |
-| `AuthBrandPanel` | 200 | **KEEP** | Largest presentational component; login only. Not on the workflow spine, so leave it alone |
 | `LoginForm` | 127 | **FIX** | Errors must associate with fields |
 | `AccountLockedModal` | 76 | **KEEP** | |
 | `ForbiddenScreen` | 52 | **KEEP** | Needed by the *"reached a forbidden route by URL"* rule ([03](03-navigation.md) §4) |
 | `AuthAlert` | 51 | **KEEP** | |
-| `AuthLayout`, `AuthBootstrap` | 55 | **KEEP** | |
+| `EntryFrame`, `EntrySteps`, `AuthBootstrap` | — | **KEEP** | The entry screens' Dossier frame and register's stepper (IR-704). `AuthLayout` and `AuthBrandPanel` were deleted in IR-711 |
 | `DpaConsentModal` / `DpaConsentGate` | 153 | **KEEP** | FR-M6-02. Consent text must be readable, not click-through ([05](05-submission.md)) |
 | `DownloadRequestModal` | 81 | **DEFER** | The download-token flow is broken at import (`records/views.py:535–579`) |
 
@@ -173,7 +172,7 @@ The inventory is worth nothing without these.
 | `components/ui/pillStyles.ts` | `PILL_PRIMARY` / `PILL_SECONDARY` / `PILL_SELECTED`: the 44 px page-action pills, shared by buttons, router links and the Save trigger ([01](01-design-system.md) §0) |
 | `paper-view/headings.tsx` | `SectionHeading` (serif, reading column) and `RailHeading` (tracked capitals, side cards): one definition each |
 | `StatusBadge` | Revision requested / rejected / pending delete carry an icon (return arrow / ban / bin) as well as a tone and label |
-| `AskIrisEmblem` and the Ask IRIS line icons | Amber and green accents replaced by maroon shades and `currentColor`; the "IRIS AI" label marks AI content |
+| `AskIrisEmblem` and the Ask IRIS line icons | Amber and green accents replaced by maroon shades and `currentColor`; the "IRIS AI" label marks AI content. *Since IR-744 the emblem, mark and synthesis state draw the Folio Ribbon `AskIrisGlyph`* |
 
 ## IR-372 additions (2026-09-25)
 
@@ -208,8 +207,8 @@ The Publish dialog replaces Submit Disclosure ([`frontend_redesign_spec.md`](../
 
 | Component | Change |
 |---|---|
-| `features/publish/PublishDialog` | **New.** Opened by `/?publish=new` or `/?publish=<draftId>`, and hosted on the home route. It has three steps: Your manuscript · Details · Review & submit. Choosing the file creates the draft, titled from the file name, and the URL is rewritten to the draft's id. A reopened draft resumes at its first incomplete step. The confirmation names the server's `current_holders` |
-| `features/publish/ManuscriptStep`, `ReviewStep`, `PublishSuccess`, `draft.ts` | **New.** The steps, and the pure rules: the provisional title, where a draft resumes, and reading an API failure |
+| `features/publish/PublishDialog` | **New.** Opened by `/?publish=new` or `/?publish=<draftId>`, and hosted on the home route. It opens on the embargo question (ADR-052), then has three steps: Your manuscript · Details · Review & submit. Choosing the file creates the draft, titled from the file name, and the URL is rewritten to the draft's id. A reopened draft resumes at its first incomplete step. The confirmation names the server's `current_holders` |
+| `features/publish/EmbargoStep`, `ManuscriptStep`, `ReviewStep`, `PublishSuccess`, `draft.ts` | **New.** The steps, and the pure rules: the provisional title, where a draft resumes, and reading an API failure |
 | `features/records/metadata/MetadataForm` | **New, shared.** The metadata fields: title, abstract, adviser, authors and year, with More details holding field, PSCED and three hints. It renders inside the caller's form provider, so the caller decides what saving means. F5's *Edit details* reuses it |
 | `features/records/metadata/metadataSchema` | **New.** The adviser is required for every type and is never the signed-in user (ADR-032 §1). `HINTS` words the three hints once, for the form and the review. `metadataPayload` sends the hints as hints and never writes `requested_*` (the author picks no office, ADR-032; lead decision 2026-10-06), and leaves out a field whose list failed to load so a resumed draft keeps its value |
 | `features/records/metadata/AdviserCombobox` | **New.** A searchable adviser picker, following the ARIA 1.2 combobox pattern. The signed-in user is listed but cannot be chosen, and the option says why |
@@ -219,3 +218,11 @@ The Publish dialog replaces Submit Disclosure ([`frontend_redesign_spec.md`](../
 | `router/redirects.tsx` | **New.** The retired-URL table, one entry per URL, each followed by `redirects.test.tsx`. `/records/add` → `/?publish=new`. F1 adds the others |
 | ~~`AddRecordPage`~~, ~~`TypeRouteStep`~~, ~~`PaperDetailsStep`~~, ~~`lib/submissionRoutes`~~ | **Deleted.** `TitleAbstractStep`, `RecordDetailsStep` and `UploadsStep` stay until F5 deletes `EditRecordPage`, which still imports them |
 
+
+## IR-744 additions (2026-11-01)
+
+| Component | What it is |
+|---|---|
+| `components/brand/IrisBrand.tsx` | The Folio Ribbon identity: `IrisMark`, `IrisWordmark`, `IrisLoader` (storyboard loop, `role="status"` when labelled), `SearchGlyph` and `AskIrisGlyph` (`answering` writes its lines). All `currentColor` |
+| `components/brand/brandPaths.ts` | Generated path data, written by `docs/brand/folio-ribbon/final/build.py`; never edited by hand |
+| `Spinner` | `md`/`lg` render `IrisLoader` (28 / 40 px) and take a `label`; `sm` stays the button ring |

@@ -18,19 +18,20 @@ coordinator who is seated nowhere.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
 from apps.documents.models import RecordFile, RecordUpload, UploadSlot, UploadStatus
+from apps.documents.testing import real_pdf_bytes
 from apps.documents.requests import ItemSpec, create_request, requesting_party
-from apps.records.download_tokens import make_download_token
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
 from apps.records.models import DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
 from apps.reviews.models import ReviewComment, ReviewerSeat
-from apps.reviews.routing import accept_and_route, enter_at_adviser
+from apps.reviews.routing import accept_and_route, enter_at_adviser, route
 from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName
 
 #: The matrix's columns, in the order every table row lists them.
@@ -50,7 +51,7 @@ ROLES = (
 #: replaced by this one, and a refusal must read exactly like that response.
 MISSING_PK = 2_000_000_000
 
-PDF_BYTES = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n"
+PDF_BYTES = real_pdf_bytes()
 
 
 def pdf(name="paper.pdf") -> SimpleUploadedFile:
@@ -62,8 +63,6 @@ def pdf(name="paper.pdf") -> SimpleUploadedFile:
 class World:
     users: dict[str, User | None]
     objects: dict[str, object] = field(default_factory=dict)
-    #: The JWT a redeem link carries, for the approved download request.
-    download_token: str = ""
 
     def value(self, name: str, attr: str = "pk"):
         return getattr(self.objects[name], attr)
@@ -142,6 +141,7 @@ def _users() -> dict[str, User | None]:
         "unseated": _user("itso-pool@cit.edu", RoleName.ITSO),
         "coordinator": _user("itso-coordinator@cit.edu", RoleName.ITSO, is_office_coordinator=True),
         "rdco": seeded[RoleName.RDCO],
+        "routing_officer": _user("rdco-routing@cit.edu", RoleName.RDCO),
         "admin": admin,
     }
 
@@ -166,10 +166,11 @@ def _at_itso(title, users) -> Record:
     )
     entry = enter_at_adviser(record, owner)
     seats.open_review(entry.seats.get(), adviser)
-    accept_and_route(
-        record, adviser, to=[{"party": Party.ITSO, "nominee": itso.pk}],
-        reason="The method may be patentable.",
-    )
+    rdco = users["routing_officer"]
+    accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="Institutional review.")
+    rdco_seat = ReviewerSeat.objects.get(assignment__record=record, assignment__party="rdco", reviewer=rdco)
+    seats.open_review(rdco_seat, rdco)
+    route(record, rdco, to=[{"party": Party.ITSO, "nominees": [itso.pk]}], reason="The method may be patentable.")
     seat = ReviewerSeat.objects.get(
         assignment__record=record, assignment__party=Party.ITSO, reviewer=itso,
     )
@@ -227,14 +228,11 @@ def build_world() -> World:
         "Matrix: a published Thesis", owner, users["adviser"], status=PipelineStatus.PUBLISHED,
     )
     o["download_request"] = DownloadRequest.objects.create(
-        record=published, requested_by=other,
+        record=published, requested_by=other, note="For my thesis.",
     )
-    approved = DownloadRequest.objects.create(
-        record=published, requested_by=other,
-        status=RequestStatus.APPROVED,
-    )
-    world.download_token = make_download_token(
-        download_request_id=approved.pk, record_id=published.pk, user_id=other.pk,
+    o["download_grant"] = DownloadRequest.objects.create(
+        record=published, requested_by=other, status=RequestStatus.APPROVED, note="For my thesis.",
+        grant_expires_at=timezone.now() + timedelta(days=30),
     )
     pending = _record(
         "Matrix: a Thesis its owner asked to delete", owner, users["adviser"],
@@ -243,7 +241,6 @@ def build_world() -> World:
     o["delete_request"] = DeleteRequest.objects.create(
         record=pending, requested_by=owner, previous_pipeline_status=PipelineStatus.PUBLISHED,
     )
-    from datetime import timedelta
     from apps.accounts.models import RoleRequest, SystemSetting
     from apps.ai.models import AskRun, Conversation, ResearchRun, Turn
     from apps.notifications.models import Notification, NotificationType

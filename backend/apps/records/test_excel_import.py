@@ -7,6 +7,7 @@ production. The tests that should have shown it were skipped behind a
 `find_spec("pyexcel")` guard and were later deleted with the fixed-stage suites
 (IR-260). Nothing here is skipped: a missing dependency must fail the build.
 """
+from datetime import date
 from io import BytesIO
 from unittest.mock import patch
 
@@ -18,7 +19,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from core.enums import PipelineStatus, RecordTypeName
-from .models import Author, Record, RecordOwner, RecordType
+from .models import Author, Classification, PSCEDClassification, Record, RecordOwner, RecordType
 from .tests import make_user
 
 #: The importer's documented columns (`parse_excel_import`), not the template's
@@ -213,3 +214,166 @@ class ImportRowIsAllOrNothingTests(ImportTestCase):
         self.assertEqual((response.data["created"], response.data["skipped"]), (0, 1), response.data["log"])
         self.assertFalse(Record.objects.filter(title="Ownerless Record").exists())
         self.assertIn("✗  Row 2: not saved — Ownerless Record — owner write refused", response.data["log"])
+
+
+class ImportRefusesValuesItCannotAcceptTests(ImportTestCase):
+    """
+    The import publishes without review, so a value the system cannot accept
+    skips its row and says why, as a missing Title already does (IR-638).
+    """
+
+    def setUp(self):
+        super().setUp()
+        Classification.objects.get_or_create(name="Applied Sciences")
+        PSCEDClassification.objects.get_or_create(name="Information and Communication Technologies")
+        self.next_year = date.today().year + 1
+
+    def imported(self):
+        return set(Record.objects.filter(added_by=self.rdco).values_list("title", flat=True))
+
+    def test_a_year_that_is_not_a_number_skips_the_row_and_names_it(self):
+        response = self.post_rows(
+            row("Typo Year", None, "20O4"),
+            row("Underscore Year", None, "2_024"),
+            row("Good Year", None, 2004),
+        )
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 2), response.data["log"])
+        self.assertIn('Row 3: skipped — Year Accomplished "2_024" is not a year', response.data["log"])
+        self.assertIn(
+            f'Row 2: skipped — Year Accomplished "20O4" is not a year from 1900 to {self.next_year}.',
+            response.data["log"],
+        )
+        self.assertEqual(self.imported(), {"Good Year"})
+        self.assertEqual(Record.objects.get(title="Good Year").year_accomplished, 2004)
+
+    def test_a_year_outside_1900_to_next_year_skips_the_row(self):
+        response = self.post_rows(
+            row("Too Old", None, 1066),
+            row("Too New", None, None, self.next_year + 1),
+            row("Next Year Is Fine", None, self.next_year, self.next_year),
+            row("1900 Is Fine", None, 1900),
+        )
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (2, 2), response.data["log"])
+        self.assertIn(f'Row 2: skipped — Year Accomplished "1066" is not a year from 1900 to {self.next_year}.',
+                      response.data["log"])
+        self.assertIn(f'Row 3: skipped — Year Completed "{self.next_year + 1}" is not a year from 1900 to {self.next_year}.',
+                      response.data["log"])
+        self.assertEqual(self.imported(), {"Next Year Is Fine", "1900 Is Fine"})
+
+    def test_a_completion_before_the_accomplishment_skips_the_row(self):
+        response = self.post_rows(row("Backwards", None, 2022, 2020), row("Same Year", None, 2022, 2022))
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])
+        self.assertIn(
+            'Row 2: skipped — Year Completed "2020" is earlier than Year Accomplished "2022".',
+            response.data["log"],
+        )
+        self.assertEqual(self.imported(), {"Same Year"})
+
+    def test_an_unknown_record_type_skips_the_row_and_lists_the_accepted_names(self):
+        accepted = ", ".join(sorted(RecordType.objects.values_list("name", flat=True), key=str.lower))
+
+        response = self.post_rows(row("Short Form Type", None, None, None, "Thesis/Research"))
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (0, 1), response.data["log"])
+        self.assertIn(
+            f'Row 2: skipped — Record Type "Thesis/Research" is not one of: {accepted}.',
+            response.data["log"],
+        )
+        self.assertFalse(Record.objects.filter(title="Short Form Type").exists())
+
+    def test_names_match_ignoring_case_and_blank_names_keep_their_defaults(self):
+        response = self.post_rows(
+            row("Any Case", None, None, None, RecordTypeName.THESIS_RESEARCH.upper(),
+                "applied sciences", "INFORMATION AND COMMUNICATION TECHNOLOGIES"),
+            row("All Blank"),
+        )
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (2, 0), response.data["log"])
+        any_case = Record.objects.get(title="Any Case")
+        self.assertEqual(any_case.record_type.name, RecordTypeName.THESIS_RESEARCH)
+        self.assertEqual(any_case.classification.name, "Applied Sciences")
+        self.assertEqual(any_case.psced.name, "Information and Communication Technologies")
+        blank = Record.objects.get(title="All Blank")
+        # A blank Record Type keeps its documented default; blank names stay blank.
+        self.assertEqual(blank.record_type.name, RecordTypeName.PROJECT)
+        self.assertIsNone(blank.classification)
+        self.assertIsNone(blank.psced)
+
+    def test_an_unknown_classification_or_psced_skips_the_row_and_lists_the_accepted_names(self):
+        response = self.post_rows(
+            row("Unknown Classification", None, None, None, None, "Applied Science"),
+            row("Unknown PSCED", None, None, None, None, None, "ICT"),
+        )
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (0, 2), response.data["log"])
+        classifications = ", ".join(sorted(Classification.objects.values_list("name", flat=True), key=str.lower))
+        psced_names = ", ".join(sorted(PSCEDClassification.objects.values_list("name", flat=True), key=str.lower))
+        self.assertIn(
+            f'Row 2: skipped — Classification "Applied Science" is not one of: {classifications}.',
+            response.data["log"],
+        )
+        self.assertIn(
+            f'Row 3: skipped — PSCED Classification "ICT" is not one of: {psced_names}.',
+            response.data["log"],
+        )
+
+    def test_a_row_with_several_bad_cells_reports_every_one(self):
+        response = self.post_rows(
+            row(None, None, "20O4", 3024, "Thesis/Research", "Applied Science"),
+            row("Still Imported"),
+        )
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])
+        line = next(l for l in response.data["log"].splitlines() if l.startswith("Row 2:"))
+        for problem in (
+            "Title is required",
+            'Year Accomplished "20O4"',
+            'Year Completed "3024"',
+            'Record Type "Thesis/Research"',
+            'Classification "Applied Science"',
+        ):
+            self.assertIn(problem, line)
+        self.assertEqual(self.imported(), {"Still Imported"})
+
+    def test_the_template_imports_its_own_sample_row_and_not_its_notes_row(self):
+        """
+        The downloaded template's sample used a Record Type name the system
+        does not have, and its notes row imported as a record titled
+        "Required" (both seen in IR-315). The notes row's "e.g. 2024" is not a
+        year, so it is now skipped with its reasons.
+        """
+        template = self.client.get(reverse("record-download-template"))
+        self.assertEqual(template.status_code, status.HTTP_200_OK)
+
+        response = self.post(template.content, name="template.xlsx")
+
+        sample = Record.objects.get(title="Blockchain-Based Verification of Academic Credentials")
+        self.assertEqual(sample.record_type.name, RecordTypeName.THESIS_RESEARCH, response.data["log"])
+        self.assertFalse(Record.objects.filter(title="Required").exists())
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])
+        self.assertIn('Row 3: skipped — Year Accomplished "e.g. 2024"', response.data["log"])
+
+    def test_origin_and_publication_year_are_reported_with_the_rest_of_the_row(self):
+        wb = openpyxl.Workbook()
+        wb.active.append(["Title", "Year Accomplished", "Origin", "Publication Year"])
+        wb.active.append(["Three Bad Cells", "20O4", "guessed", "1999.5"])
+        wb.active.append(["Fine Reference", None, "imported_reference", 1687])
+        buffer = BytesIO()
+        wb.save(buffer)
+
+        response = self.post(buffer.getvalue())
+
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])
+        line = next(l for l in response.data["log"].splitlines() if "Row 2:" in l)
+        for column in ('Year Accomplished "20O4"', 'Origin "guessed"', 'Publication Year "1999.5"'):
+            self.assertIn(column, line)
+        self.assertEqual(Record.objects.get(title="Fine Reference").publication_year, 1687)
+
+    def test_a_year_too_long_to_be_a_number_is_a_skipped_row_not_a_crash(self):
+        response = self.post_rows(row("Endless Year", None, "9" * 400), row("Good Year", None, 2004))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((response.data["created"], response.data["skipped"]), (1, 1), response.data["log"])

@@ -14,4 +14,22 @@ export default [
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
     },
   },
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    ignores: ['src/**/*.test.{ts,tsx}', 'src/test/**'],
+    rules: {
+      // IR-207: inspect literals and template segments, including conditional
+      // classes and hover/responsive variants. Borders and rings remain legal.
+      'no-restricted-syntax': ['error',
+        {
+          selector: 'Literal[value=/(text|bg)-gold/]',
+          message: 'Gold is decoration only; use a readable IRIS text or fill token (IR-207).',
+        },
+        {
+          selector: 'TemplateElement[value.raw=/(text|bg)-gold/]',
+          message: 'Gold is decoration only; use a readable IRIS text or fill token (IR-207).',
+        },
+      ],
+    },
+  },
 ];

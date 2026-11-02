@@ -50,13 +50,13 @@ afterEach(() => {
 });
 
 describe("a pending request", () => {
-  it("says RDCO is reviewing it, for which role, and where the decision will be emailed", () => {
+  it("says an administrator is reviewing it, for which role, and where the decision will be emailed", () => {
     signInAs(PENDING);
 
     expect(screen.getByRole("heading", { level: 2, name: "Waiting for approval" })).toBeInTheDocument();
     expect(
       screen.getByText(
-        "RDCO is reviewing your request to join as an Adviser. You'll get an email at applicant@cit.edu when they decide.",
+        "An administrator is reviewing your request to join as an Adviser. You'll get an email at applicant@cit.edu when they decide.",
       ),
     ).toBeInTheDocument();
   });
@@ -88,18 +88,17 @@ describe("a declined request", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Request not approved" })).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Your request to join as a Student was not approved. Contact RDCO or your department administrator if you think this is a mistake.",
+        "Your request to join as a Student was not approved. Contact an administrator if you think this is a mistake.",
       ),
     ).toBeInTheDocument();
     expect(screen.queryByText(/reviewing/i)).not.toBeInTheDocument();
   });
 
-  it("does not let the brand panel promise the account will open", () => {
-    signInAs(DECLINED);
-
-    const panel = screen.getByRole("complementary", { name: "About IRIS" });
-    expect(panel).toHaveTextContent("Your account is registered, but RDCO did not approve it.");
-    expect(panel).not.toHaveTextContent(/opens once RDCO approves/);
+  // Was a check on the brand panel's declined copy (IR-537). The Dossier frame
+  // has no panel (IR-710), so the promise is now refused across the screen.
+  it("promises nowhere that the account will open", () => {
+    const { container } = signInAs(DECLINED);
+    expect(container.textContent).not.toMatch(/opens once RDCO approves/);
   });
 
   it("still shows who the person registered as", () => {
@@ -130,7 +129,7 @@ describe("no request at all", () => {
 
     expect(screen.getByRole("heading", { level: 2, name: "No role assigned" })).toBeInTheDocument();
     expect(screen.queryByText(/reviewing|not approved/i)).not.toBeInTheDocument();
-    expect(screen.getByText(/Contact RDCO or your department administrator/)).toBeInTheDocument();
+    expect(screen.getByText(/Contact an administrator/)).toBeInTheDocument();
   });
 });
 
@@ -158,12 +157,46 @@ describe("signing out", () => {
   });
 });
 
-describe("the shared entry frame", () => {
-  it("renders the screen inside it: the frame's heading, and its brand panel", () => {
-    signInAs(PENDING);
+/**
+ * The Dossier frame, without its lede (IR-710, IR-704 stories 52-53). Replaces
+ * IR-537's check for the split frame's `sr-only` heading and brand panel. The
+ * reader is signed in, so the masthead offers no sign-in or register link.
+ */
+describe.each([
+  { standing: "pending", request: PENDING, title: "Waiting for approval" },
+  { standing: "declined", request: DECLINED, title: "Request not approved" },
+  { standing: "no-request", request: null, title: "No role assigned" },
+])("the frame for a $standing account", ({ request, title }) => {
+  it("names IRIS and the pilot institution in the masthead, the page's only top-level heading", () => {
+    signInAs(request);
 
-    expect(screen.getByRole("heading", { level: 1, name: "IRIS · CIT-U Research Hub" })).toBeInTheDocument();
-    expect(screen.getByRole("complementary", { name: "About IRIS" })).toBeInTheDocument();
+    const [masthead, ...others] = screen.getAllByRole("heading", { level: 1 });
+    expect(others).toEqual([]);
+    expect(masthead).toHaveAccessibleName(/IRIS/);
+    expect(masthead).toHaveAccessibleName(/Cebu Institute of Technology/);
+    expect(screen.getByRole("heading", { level: 2, name: title })).toBeInTheDocument();
+  });
+
+  it("labels the sheet with an Account status tab, and draws no brand panel", () => {
+    signInAs(request);
+
+    expect(screen.getByText("Account status")).toBeInTheDocument();
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+  });
+
+  it("shows no headline, and no link to sign in or register", () => {
+    signInAs(request);
+
+    expect(screen.queryByText(/Your research has/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /sign in|create an account/i })).not.toBeInTheDocument();
+  });
+
+  it("offers privacy and terms in the shared entry footer", () => {
+    signInAs(request);
+
+    expect(screen.getByRole("contentinfo")).not.toHaveTextContent("Pilot institution:");
+    expect(screen.getByRole("link", { name: "Data privacy" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Terms" })).toBeInTheDocument();
   });
 });
 

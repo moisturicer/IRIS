@@ -367,6 +367,7 @@ class RoutingEvent(models.Model):
     )
     to_party   = models.CharField(max_length=20, choices=PARTY_CHOICES)
     reason     = models.TextField(blank=True)
+    suggested_offices = models.JSONField(default=list, blank=True)
     #: No default. The caller that routes to several parties must supply one
     #: shared value, and a default would silently split such a call apart.
     group_id   = models.UUIDField()
@@ -418,6 +419,10 @@ class ResubmissionRequest(models.Model):
         null=True, blank=True, related_name="resubmission_requests_resolved",
     )
     resolved_at  = models.DateTimeField(null=True, blank=True)
+    closed_by_decision = models.ForeignKey(
+        Review, on_delete=models.RESTRICT, null=True, blank=True,
+        related_name="closed_revision_requests",
+    )
 
     class Meta:
         ordering = ["record", "created_at"]

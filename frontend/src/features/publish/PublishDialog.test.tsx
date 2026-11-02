@@ -23,6 +23,7 @@ vi.mock("@/api/records", () => ({
     classifications: vi.fn(),
     pscedList: vi.fn(),
     create: vi.fn(),
+    answerEmbargo: vi.fn(),
     update: vi.fn(),
     uploadManuscript: vi.fn(),
     submit: vi.fn(),
@@ -92,6 +93,7 @@ function draftDetail(overrides: Record<string, unknown> = {}) {
     for_commercialization: false,
     pipeline_status: "draft",
     current_holders: [],
+    embargo: { state: "none", until: null },
     ...overrides,
   };
 }
@@ -121,6 +123,7 @@ beforeEach(() => {
   vi.mocked(recordsApi.pscedList).mockResolvedValue(page([{ id: 9, name: "Information Technology" }]) as never);
   vi.mocked(accountsApi.listAdvisers).mockResolvedValue(page(ADVISERS) as never);
   vi.mocked(recordsApi.create).mockResolvedValue({ data: { id: 42 } } as never);
+  vi.mocked(recordsApi.answerEmbargo).mockResolvedValue({ data: { state: "none", until: null } } as never);
   vi.mocked(recordsApi.update).mockResolvedValue({ data: { id: 42 } } as never);
   vi.mocked(recordsApi.uploadManuscript).mockResolvedValue({ data: { id: 42 } } as never);
   vi.mocked(recordsApi.submit).mockResolvedValue({ data: { detail: "Submitted." } } as never);
@@ -137,8 +140,17 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-function openNew() {
+function openAtQuestion() {
   return renderScreen(<PublishDialog />, { route: "/?publish=new" });
+}
+
+/** A new submission past its first question, answered No: at the manuscript step. */
+async function openNew() {
+  const view = openAtQuestion();
+  fireEvent.click(await screen.findByRole("radio", { name: /^No/ }));
+  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  await screen.findByRole("radio", { name: /Proposal/ });
+  return view;
 }
 
 it.each(["draft", "types"])("announces a rate limit while loading Publish %s", async (source) => {
@@ -215,8 +227,8 @@ async function completeDetails(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("opening", () => {
-  it("is a labelled dialog that starts at step 1 of 3", async () => {
-    openNew();
+  it("is a labelled dialog, and step 1 of 3 follows the embargo question", async () => {
+    await openNew();
 
     const dialog = await screen.findByRole("dialog", { name: "Publish your research" });
     expect(await within(dialog).findByRole("list", { name: "Publish steps" })).toBeInTheDocument();
@@ -225,13 +237,13 @@ describe("opening", () => {
 
   it("does not open for someone who cannot author a record", async () => {
     useAuthStore.setState({ user: makeUser({ role_name: ROLES.KTTO }) });
-    openNew();
+    openAtQuestion();
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("passes axe on the first step", async () => {
-    const { container } = openNew();
+    const { container } = await openNew();
     await screen.findByRole("radio", { name: /Proposal/ });
 
     await expectNoBlockingA11yViolations(container);
@@ -241,7 +253,7 @@ describe("opening", () => {
 describe("record types (invariant 7)", () => {
   it("offers Thesis / Research and Project directly, with no Proposal behind them", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
 
     await chooseType(user, /Project/);
     expect(screen.getByRole("radio", { name: /Project/ })).toBeChecked();
@@ -254,7 +266,7 @@ describe("record types (invariant 7)", () => {
 describe("a file drop", () => {
   it("creates exactly one draft, titled from the file name and typed", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
 
     await chooseType(user, /Thesis \/ Research/);
     dropFile(pdf());
@@ -266,7 +278,7 @@ describe("a file drop", () => {
   });
 
   it("is not possible before a type is chosen", async () => {
-    openNew();
+    await openNew();
     const zone = await screen.findByRole("button", { name: "Upload manuscript" });
 
     expect(zone).toHaveAttribute("aria-disabled", "true");
@@ -276,7 +288,7 @@ describe("a file drop", () => {
 
   it("refuses a file that is not a PDF before anything is sent", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
 
     await chooseType(user, /Project/);
     dropFile(new File(["x"], "notes.docx", { type: "application/msword" }));
@@ -297,7 +309,7 @@ describe("upload progress", () => {
       progress.report = options?.onProgress;
       return upload.promise as never;
     });
-    openNew();
+    await openNew();
 
     await chooseType(user, /Thesis \/ Research/);
     dropFile(pdf());
@@ -320,7 +332,7 @@ describe("a failed upload", () => {
     vi.mocked(recordsApi.uploadManuscript)
       .mockRejectedValueOnce({ response: { status: 500, data: { detail: "Storage is unavailable." } } })
       .mockResolvedValueOnce({ data: { id: 42 } } as never);
-    openNew();
+    await openNew();
 
     await chooseType(user, /Thesis \/ Research/);
     dropFile(pdf());
@@ -341,7 +353,7 @@ describe("a failed upload", () => {
     vi.mocked(recordsApi.uploadManuscript).mockRejectedValueOnce({
       response: { status: 400, data: { abstract_file: ["Only PDF files are accepted."] } },
     });
-    openNew();
+    await openNew();
 
     await chooseType(user, /Project/);
     dropFile(pdf());
@@ -355,7 +367,7 @@ describe("Continue on step 1", () => {
     const user = userEvent.setup();
     const upload = deferred<unknown>();
     vi.mocked(recordsApi.uploadManuscript).mockReturnValue(upload.promise as never);
-    openNew();
+    await openNew();
 
     await chooseType(user, /Thesis \/ Research/);
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
@@ -369,7 +381,7 @@ describe("Continue on step 1", () => {
 
   it("saves a changed type onto the draft", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
 
     await chooseType(user, /Thesis \/ Research/);
     dropFile(pdf());
@@ -386,7 +398,7 @@ describe("Continue on step 1", () => {
 describe("the adviser", () => {
   it("cannot be yourself, and the list says why", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     const combobox = screen.getByRole("combobox", { name: /Adviser/ });
@@ -402,7 +414,7 @@ describe("the adviser", () => {
 
   it("skips yourself when moving through the list by keyboard", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     const combobox = screen.getByRole("combobox", { name: /Adviser/ });
@@ -414,7 +426,7 @@ describe("the adviser", () => {
 
   it("is required for every type", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     await user.type(screen.getByRole("textbox", { name: /^Abstract/ }), COMPLETE.abstract);
@@ -429,7 +441,7 @@ describe("the adviser", () => {
 describe("Details", () => {
   it("starts with the provisional title and the author's own name", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     expect(screen.getByRole("textbox", { name: /^Title/ })).toHaveValue("My Clearance Study");
@@ -438,7 +450,7 @@ describe("Details", () => {
 
   it("patches the draft on Continue", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await user.click(screen.getByText("More details"));
     await user.click(screen.getByRole("checkbox", { name: /human participants/ }));
@@ -464,7 +476,7 @@ describe("Details", () => {
 
   it("links each error to its field and focuses the first", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await user.clear(screen.getByRole("textbox", { name: /^Title/ }));
     await user.click(screen.getByRole("button", { name: "Continue" }));
@@ -480,7 +492,7 @@ describe("Details", () => {
     const layout = pretendLaidOut();
     try {
       const user = userEvent.setup();
-      openNew();
+      await openNew();
       await completeManuscript(user);
 
       screen.getByText("More details").closest("summary")!.focus();
@@ -494,7 +506,7 @@ describe("Details", () => {
 
   it("passes axe with More details open", async () => {
     const user = userEvent.setup();
-    const { container } = openNew();
+    const { container } = await openNew();
     await completeManuscript(user);
     await user.click(screen.getByText("More details"));
 
@@ -505,7 +517,7 @@ describe("Details", () => {
 describe("the review", () => {
   it("shows every value entered, and Edit returns to its step", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
 
@@ -531,7 +543,7 @@ describe("the review", () => {
 
   it("opens More details from Edit hints", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
 
@@ -542,7 +554,7 @@ describe("the review", () => {
 
   it("asks for no supporting documents anywhere", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
 
@@ -553,7 +565,7 @@ describe("the review", () => {
 
   it("passes axe", async () => {
     const user = userEvent.setup();
-    const { container } = openNew();
+    const { container } = await openNew();
     await completeManuscript(user);
     await completeDetails(user);
 
@@ -564,7 +576,7 @@ describe("the review", () => {
 describe("submitting", () => {
   it("needs consent, and sends the DPA flag", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
 
@@ -584,7 +596,7 @@ describe("submitting", () => {
         data: { detail: "This record can't be submitted yet.", title: ["A record with this title already exists."] },
       },
     });
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
 
@@ -608,7 +620,7 @@ describe("a network failure", () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({ pipeline_status: "in_review", current_holders: [] }),
     } as never);
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
     await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
@@ -631,7 +643,7 @@ describe("success", () => {
         current_holders: [{ party: "intake", label: "Intake", opened_at: null, opened_by: null }],
       }),
     } as never);
-    const { container } = openNew();
+    const { container } = await openNew();
     await completeManuscript(user);
     await completeDetails(user);
     await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
@@ -651,7 +663,7 @@ describe("success", () => {
         current_holders: [{ party: "intake", label: "Intake", opened_at: null, opened_by: null }],
       }),
     } as never);
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
     await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
@@ -677,7 +689,7 @@ describe("success", () => {
         current_holders: [{ party: "adviser", label: "Adviser", opened_at: null, opened_by: null }],
       }),
     } as never);
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
     await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
@@ -691,13 +703,17 @@ describe("success", () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({
       data: draftDetail({ pipeline_status: "in_review", current_holders: [] }),
     } as never);
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await completeDetails(user);
     await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
     await user.click(await screen.findByRole("button", { name: "Publish another" }));
 
+    // From nothing, so the new paper is asked its own embargo question.
+    expect(await screen.findByRole("radio", { name: /^No/ })).not.toBeChecked();
+    await user.click(screen.getByRole("radio", { name: /^No/ }));
+    await user.click(screen.getByRole("button", { name: "Continue" }));
     expect(await screen.findByRole("radio", { name: /Proposal/ })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
@@ -769,7 +785,7 @@ describe("closing", () => {
   it("asks first while an upload is in flight", async () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.uploadManuscript).mockReturnValue(new Promise(() => {}) as never);
-    openNew();
+    await openNew();
 
     await chooseType(user, /Thesis \/ Research/);
     dropFile(pdf());
@@ -785,7 +801,7 @@ describe("closing", () => {
 
   it("closes at once when nothing is uploading", async () => {
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await screen.findByRole("radio", { name: /Proposal/ });
 
     await user.click(screen.getByRole("button", { name: "Close" }));
@@ -806,7 +822,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it("offers a chip only for a field the server found text for", async () => {
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     const title = await screen.findByRole("group", { name: "Suggested title" });
@@ -821,7 +837,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
       suggestions("ready", { title: FOUND_TITLE, abstract: FOUND_ABSTRACT }) as never,
     );
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     // The title is still the provisional one from the file name: the dialog
@@ -840,7 +856,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it("removes the chip on Dismiss and leaves the field alone", async () => {
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     await user.click(within(await screen.findByRole("group", { name: "Suggested title" })).getByRole("button", { name: "Dismiss" }));
@@ -852,7 +868,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it("never overwrites what the author typed, and offers Replace with suggestion instead", async () => {
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { abstract: FOUND_ABSTRACT }) as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await screen.findByRole("group", { name: "Suggested abstract" });
 
@@ -870,7 +886,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it("does not offer a suggestion back once it was used and then edited", async () => {
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { abstract: FOUND_ABSTRACT }) as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     await user.click(within(await screen.findByRole("group", { name: "Suggested abstract" })).getByRole("button", { name: "Use" }));
@@ -883,7 +899,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it("announces the prefill once, in a polite status line", async () => {
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     expect(await screen.findByText("Found a title in your PDF. Suggestions are shown under each field.", { selector: "[role=status]" })).toBeInTheDocument();
@@ -902,7 +918,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it("shows Reading your PDF… while pending, without disabling the fields", async () => {
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("pending") as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     expect(await screen.findAllByText("Reading your PDF…")).not.toHaveLength(0);
@@ -915,7 +931,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it("stops asking once the author leaves Details", async () => {
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("pending") as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await screen.findAllByText("Reading your PDF…");
     const asked = vi.mocked(recordsApi.metadataSuggestions).mock.calls.length;
@@ -930,7 +946,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it.each(["failed", "unsupported"])("shows the neutral line, not an error, on %s", async (state) => {
     vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions(state) as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
 
     expect(await screen.findByText(NEUTRAL)).toBeInTheDocument();
@@ -943,7 +959,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
       .mockResolvedValueOnce(suggestions("failed") as never)
       .mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await screen.findByText(NEUTRAL);
 
@@ -959,7 +975,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
       .mockResolvedValueOnce(suggestions("ready", { title: "The Old File's Title" }) as never)
       .mockResolvedValue(suggestions("ready", { title: FOUND_TITLE }) as never);
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await screen.findByText("The Old File's Title");
 
@@ -977,7 +993,7 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
   it("is never needed to submit: a failed suggestions request still lets the author finish", async () => {
     vi.mocked(recordsApi.metadataSuggestions).mockRejectedValue(new Error("Network Error"));
     const user = userEvent.setup();
-    openNew();
+    await openNew();
     await completeManuscript(user);
     await screen.findByText(NEUTRAL);
 
@@ -993,12 +1009,272 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
       suggestions("ready", { title: FOUND_TITLE, abstract: FOUND_ABSTRACT }) as never,
     );
     const user = userEvent.setup();
-    const { container } = openNew();
+    const { container } = await openNew();
     await completeManuscript(user);
     await screen.findByRole("group", { name: "Suggested abstract" });
 
     const dialog = screen.getByRole("dialog");
     expect(dialog).not.toHaveTextContent(/confiden|certain|\d+\s?%/i);
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+describe("the embargo question (ADR-052 decision 2)", () => {
+  const inDays = (days: number) => {
+    const day = new Date();
+    day.setDate(day.getDate() + days);
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+  };
+  const question = () => screen.findByRole("radiogroup", { name: /Is this paper under an embargo/ });
+  const continueButton = () => screen.getByRole("button", { name: "Continue" });
+  const dateField = () => screen.getByLabelText(/Date to review the embargo/);
+
+  /** Answer Yes with this date and continue to the manuscript step. */
+  async function answerYes(user: ReturnType<typeof userEvent.setup>, until: string) {
+    await question();
+    await user.click(screen.getByRole("radio", { name: /^Yes/ }));
+    fireEvent.change(dateField(), { target: { value: until } });
+    await user.click(continueButton());
+    await screen.findByRole("radio", { name: /Proposal/ });
+  }
+
+  it("is asked first and alone: no type, no file and no steps until it is answered", async () => {
+    const { container } = openAtQuestion();
+
+    await question();
+    expect(screen.queryByRole("radio", { name: /Proposal/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Upload manuscript" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("list", { name: "Publish steps" })).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("starts unanswered, says what an embargo does, and has no default", async () => {
+    openAtQuestion();
+
+    const group = await question();
+    expect(screen.getByRole("radio", { name: /^No/ })).not.toBeChecked();
+    expect(screen.getByRole("radio", { name: /^Yes/ })).not.toBeChecked();
+    expect(group).toHaveTextContent(/outside AI companies/);
+    expect(group).toHaveTextContent(/doesn't hide the paper/);
+    expect(group).toHaveTextContent(/can't be recalled/);
+    // The author protects possible IP by answering Yes, so Yes has to say it covers that.
+    expect(screen.getByRole("radio", { name: /may want to patent or protect/ })).not.toBeChecked();
+  });
+
+  it("refuses to continue with no answer, in words, and moves focus to it", async () => {
+    const user = userEvent.setup();
+    const { container } = openAtQuestion();
+    await question();
+
+    await user.click(continueButton());
+
+    expect(await screen.findByText("Say whether this paper is under embargo.")).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: /Proposal/ })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("radio", { name: /^No/ })).toHaveFocus());
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("asks for a date only under Yes, and requires one that has not passed", async () => {
+    const user = userEvent.setup();
+    const { container } = openAtQuestion();
+    await question();
+    expect(screen.queryByLabelText(/Date to review the embargo/)).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("radio", { name: /^Yes/ }));
+    await user.click(continueButton());
+    expect(await screen.findByText("Choose the date to review this embargo.")).toBeInTheDocument();
+    expect(dateField()).toHaveAttribute("aria-invalid", "true");
+
+    fireEvent.change(dateField(), { target: { value: inDays(-1) } });
+    await user.click(continueButton());
+    expect(await screen.findByText("The date to review this embargo cannot be in the past.")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+
+    fireEvent.change(dateField(), { target: { value: inDays(0) } });
+    await user.click(continueButton());
+    expect(await screen.findByRole("radio", { name: /Proposal/ })).toBeInTheDocument();
+  });
+
+  it("saves the answer before the file is sent, on the draft it creates", async () => {
+    const user = userEvent.setup();
+    await openNew();
+
+    await chooseType(user, /Thesis \/ Research/);
+    dropFile(pdf());
+    await screen.findByText(/uploaded/i, { selector: "p" });
+
+    expect(recordsApi.answerEmbargo).toHaveBeenCalledWith(42, { embargoed: false, embargoed_until: null });
+    const [created] = vi.mocked(recordsApi.create).mock.invocationCallOrder;
+    const [answered] = vi.mocked(recordsApi.answerEmbargo).mock.invocationCallOrder;
+    const [uploaded] = vi.mocked(recordsApi.uploadManuscript).mock.invocationCallOrder;
+    expect(created).toBeLessThan(answered);
+    expect(answered).toBeLessThan(uploaded);
+  });
+
+  it("sends a Yes with its date", async () => {
+    const user = userEvent.setup();
+    const until = inDays(90);
+    openAtQuestion();
+    await answerYes(user, until);
+
+    await chooseType(user, /Thesis \/ Research/);
+    dropFile(pdf());
+    await screen.findByText(/uploaded/i, { selector: "p" });
+
+    expect(recordsApi.answerEmbargo).toHaveBeenCalledWith(42, { embargoed: true, embargoed_until: until });
+  });
+
+  it("does not send the file when the answer could not be saved, and a retry saves it first", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.answerEmbargo).mockRejectedValueOnce(new Error("Network Error"));
+    await openNew();
+
+    await chooseType(user, /Thesis \/ Research/);
+    dropFile(pdf());
+
+    await screen.findByText(/couldn't reach IRIS/i);
+    expect(recordsApi.uploadManuscript).not.toHaveBeenCalled();
+    expect(recordsApi.create).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole("button", { name: "Retry upload" }));
+    await screen.findByText(/uploaded/i, { selector: "p" });
+    expect(recordsApi.answerEmbargo).toHaveBeenCalledTimes(2);
+    expect(recordsApi.create).toHaveBeenCalledTimes(1);
+    expect(recordsApi.uploadManuscript).toHaveBeenCalledTimes(1);
+  });
+
+  it("is not asked again on a draft that has an answer", async () => {
+    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE }) } as never);
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+
+    await screen.findByRole("heading", { name: "Manuscript" });
+    expect(screen.queryByRole("radiogroup", { name: /embargo/ })).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["no answer yet", { state: "unknown", until: null }],
+    ["a release to answer again", { state: "released", until: "2027-01-01" }],
+    ["nothing the API disclosed", null],
+  ])("asks first on a draft with %s, and saves the answer at once", async (_label, embargo) => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE, embargo }) } as never);
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+
+    await question();
+    await user.click(screen.getByRole("radio", { name: /^No/ }));
+    await user.click(continueButton());
+
+    await waitFor(() =>
+      expect(recordsApi.answerEmbargo).toHaveBeenCalledWith(42, { embargoed: false, embargoed_until: null }),
+    );
+    await screen.findByRole("radio", { name: /Proposal/ });
+  });
+
+  it("shows the answer on the review, and Edit goes back to the question", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.detail).mockResolvedValue({
+      data: draftDetail({ ...COMPLETE, embargo: { state: "active", until: "2099-03-01" } }),
+    } as never);
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+
+    const group = await screen.findByRole("region", { name: "Embargo" });
+    expect(group).toHaveTextContent("Mar 1, 2099");
+    await user.click(screen.getByRole("button", { name: "Edit embargo answer" }));
+
+    await question();
+    expect(screen.getByRole("radio", { name: /^Yes/ })).toBeChecked();
+    expect(dateField()).toHaveValue("2099-03-01");
+  });
+
+  it("lets a draft whose date has since passed through unchanged, not stuck on the question", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.detail).mockResolvedValue({
+      data: draftDetail({ ...COMPLETE, embargo: { state: "active", until: "2020-01-01" } }),
+    } as never);
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+
+    await screen.findByRole("region", { name: "Embargo" });
+    await user.click(screen.getByRole("button", { name: "Edit embargo answer" }));
+    await question();
+    await user.click(continueButton());
+
+    await screen.findByRole("radio", { name: /Proposal/ });
+    expect(recordsApi.answerEmbargo).not.toHaveBeenCalled();
+  });
+
+  it("says No on the review when the answer is no", async () => {
+    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE }) } as never);
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+
+    expect(await screen.findByRole("region", { name: "Embargo" })).toHaveTextContent(/No/);
+  });
+
+  it("saves a changed answer once, and saves nothing when it did not change", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE }) } as never);
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+    await screen.findByRole("region", { name: "Embargo" });
+
+    await user.click(screen.getByRole("button", { name: "Edit embargo answer" }));
+    await question();
+    await user.click(continueButton());
+    await screen.findByRole("radio", { name: /Proposal/ });
+    expect(recordsApi.answerEmbargo).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await question();
+    const until = inDays(30);
+    await answerYes(user, until);
+    expect(recordsApi.answerEmbargo).toHaveBeenCalledTimes(1);
+    expect(recordsApi.answerEmbargo).toHaveBeenCalledWith(42, { embargoed: true, embargoed_until: until });
+  });
+
+  it("puts the server's refusal on the date and stays on the question", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE, embargo: null }) } as never);
+    vi.mocked(recordsApi.answerEmbargo).mockRejectedValueOnce({
+      response: { status: 400, data: { embargoed_until: ["That date has already passed."] } },
+    });
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+    await question();
+
+    await user.click(screen.getByRole("radio", { name: /^Yes/ }));
+    fireEvent.change(dateField(), { target: { value: inDays(5) } });
+    await user.click(continueButton());
+
+    expect(await screen.findByText("That date has already passed.")).toBeInTheDocument();
+    expect(dateField()).toHaveAttribute("aria-invalid", "true");
+    expect(screen.queryByRole("radio", { name: /Proposal/ })).not.toBeInTheDocument();
+  });
+
+  describe("suggestions from the PDF", () => {
+    it("are not offered under an embargo, and the author fills the fields in", async () => {
+      const user = userEvent.setup();
+      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(
+        suggestions("ready", { title: "A found title that is long enough" }) as never,
+      );
+      openAtQuestion();
+      await answerYes(user, inDays(30));
+
+      await completeManuscript(user);
+
+      expect(recordsApi.metadataSuggestions).not.toHaveBeenCalled();
+      expect(screen.queryByText(/A found title/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/couldn't read details/)).not.toBeInTheDocument();
+    });
+
+    it("are offered with no embargo", async () => {
+      const user = userEvent.setup();
+      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(
+        suggestions("ready", { title: "A found title that is long enough" }) as never,
+      );
+      await openNew();
+
+      await completeManuscript(user);
+
+      await waitFor(() => expect(recordsApi.metadataSuggestions).toHaveBeenCalled());
+      expect(await screen.findByText(/A found title/)).toBeInTheDocument();
+    });
   });
 });

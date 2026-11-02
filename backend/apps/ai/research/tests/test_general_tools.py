@@ -216,6 +216,21 @@ def test_an_exactly_named_paper_leads_apart_from_related_candidates(mesh, embedd
     assert {i["match_kind"] for i in result.items[1:]} <= {"related"}
 
 
+def test_a_papers_search_keeps_the_top_papers_best_matching_passage(mesh, embedder, monkeypatch):
+    # IR-703: a paper with no abstract is still citable, with its page.
+    from apps.ai.research.tools import search
+
+    monkeypatch.setattr(search, "BEST_PASSAGES", 1)
+    result = invoke(general_run(mesh["student"], root(embedder)), "search_research",
+                    query="neural network rainfall flooding", target="papers")
+    passages = [e for e in result.public()["evidence"] if e["content_kind"] == "passage"]
+    assert len(passages) == 1 and passages[0]["page"] == 4
+    assert result.items[0]["ref"] == passages[0]["ref"]
+    assert passages[0]["record"] == result.items[0]["record"]
+    assert all("ref" not in item for item in result.items[1:])
+    assert mesh["draft"].title not in payload(result)
+
+
 def test_passage_search_honours_issued_records_and_real_metadata_filters(corpus, embedder):
     run = general_run(corpus["student"], root(embedder))
     pond = invoke(run, "resolve_papers", references=["Tilapia ponds"]).items[0]["record"]

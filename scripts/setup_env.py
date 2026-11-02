@@ -19,11 +19,16 @@ So the root `.env` is derived from `backend/.env` when one exists: the values
 then match the volume that is already on disk, and (2) cannot happen. Only a
 genuinely fresh checkout gets generated values.
 
-Never overwrites a file that exists. Safe to run repeatedly.
+Never overwrites a file that exists, with one exception: an existing
+backend/.env that lacks ADR-045's recovery secrets has them added, because
+Django refuses to start without them. A key that already has a value is never
+changed. Safe to run repeatedly.
 """
 
 from __future__ import annotations
 
+import base64
+import os
 import re
 import secrets
 import shutil
@@ -124,6 +129,54 @@ def set_docling_variant(refresh: bool) -> str | None:
     return f"docling  {variant}  ({'NVIDIA GPU detected' if variant == 'docling-gpu' else 'no NVIDIA GPU found, CPU fallback'})"
 
 
+def set_redis_password() -> str | None:
+    """Give the repo-root .env a REDIS_PASSWORD if it lacks one (IR-669)."""
+    text = ROOT_ENV.read_text(encoding="utf-8") if ROOT_ENV.exists() else ""
+    if re.search(r"^REDIS_PASSWORD=\S", text, re.MULTILINE):
+        return None
+    # URL-safe, because it goes inside every Redis URL.
+    line = f"REDIS_PASSWORD={secrets.token_urlsafe(24)}"
+    if re.search(r"^REDIS_PASSWORD=[ \t]*$", text, re.MULTILINE):
+        text = re.sub(r"^REDIS_PASSWORD=[ \t]*$", line, text, count=1, flags=re.MULTILINE)
+    else:
+        text = text.rstrip("\n") + f"\n\n# The password both Compose stacks give Redis (IR-669).\n{line}\n"
+    ROOT_ENV.write_text(text, encoding="utf-8")
+    return f"updated  {ROOT_ENV.relative_to(REPO_ROOT)}  (generated REDIS_PASSWORD)"
+
+
+def recovery_secrets() -> dict[str, str]:
+    """Fresh values for ADR-045 §8's two recovery secrets (IR-642)."""
+    return {
+        "RECOVERY_COUNTER_HMAC_KEY": secrets.token_urlsafe(48),
+        # A Fernet key: 32 random bytes, urlsafe base64.
+        "RECOVERY_MAIL_ENCRYPTION_KEY": base64.urlsafe_b64encode(os.urandom(32)).decode("ascii"),
+    }
+
+
+def add_recovery_secrets() -> str | None:
+    """Give backend/.env any recovery secret it lacks. Returns a message, or None.
+
+    Django refuses to start without them, so an existing development file
+    would stop booting on the pull that introduced them. A key that already
+    has a value is never touched; a blank one is filled; a missing one is added.
+    """
+    text = BACKEND_ENV.read_text(encoding="utf-8")
+    added = []
+    for key, value in recovery_secrets().items():
+        if re.search(rf"^{key}=\S", text, re.MULTILINE):
+            continue
+        # `[ \t]`, not `\s`: a blank value must not swallow the next line.
+        if re.search(rf"^{key}=[ \t]*$", text, re.MULTILINE):
+            text = re.sub(rf"^{key}=[ \t]*$", f"{key}={value}", text, count=1, flags=re.MULTILINE)
+        else:
+            text = text.rstrip("\n") + f"\n{key}={value}\n"
+        added.append(key)
+    if not added:
+        return None
+    BACKEND_ENV.write_text(text, encoding="utf-8")
+    return f"updated  {BACKEND_ENV.relative_to(REPO_ROOT)}  (generated {', '.join(added)})"
+
+
 def main() -> int:
     did_something = False
 
@@ -139,6 +192,7 @@ def main() -> int:
             "DB_NAME": "iris_local",
             "DB_USER": "iris_local",
             "DB_PASSWORD": secrets.token_urlsafe(24),
+            **recovery_secrets(),
         }
         for key, value in generated.items():
             text = text.replace(f"\n{key}=\n", f"\n{key}={value}\n")
@@ -155,6 +209,10 @@ def main() -> int:
         if missing:
             print(f"warning: {BACKEND_ENV.relative_to(REPO_ROOT)} has blank {', '.join(missing)}.")
             print("         These have no defaults since IR-154 - Django will refuse to start.")
+        message = add_recovery_secrets()
+        if message:
+            did_something = True
+            print(message)
 
     # --- repo-root .env ---------------------------------------------------
     if ROOT_ENV.exists():
@@ -175,6 +233,12 @@ def main() -> int:
         did_something = True
         source = "copied from backend/.env" if from_backend else "generated"
         print(f"created  {ROOT_ENV.relative_to(REPO_ROOT)}  ({source})")
+
+    # --- redis password ---------------------------------------------------
+    message = set_redis_password()
+    if message:
+        did_something = True
+        print(message)
 
     # --- docling variant (GPU or CPU) -------------------------------------
     message = set_docling_variant(refresh="--refresh-gpu" in sys.argv[1:])

@@ -160,10 +160,22 @@ def _brief_name(field: str):
     return name if name in FIELDS else None
 
 
+def _window():
+    profile = profile_for(InferenceTask.BRIEF)
+    return dict(profile.model_context_windows).get(profile.model)
+
+
+def extraction_configured() -> bool:
+    """Whether `_extract` can run at all: the brief model has a verified window."""
+    try:
+        return _window() is not None
+    except Exception:
+        return False
+
+
 def _extract(run: ToolRun, record, chunk_set, fields):
     """Verified fields by key, and whether the paper was only partly read."""
-    profile = profile_for(InferenceTask.BRIEF)
-    window = dict(profile.model_context_windows).get(profile.model)
+    window = _window()
     if window is None:
         return None, False
     keys = {f"field_{i}": name for i, name in enumerate(fields, 1)}

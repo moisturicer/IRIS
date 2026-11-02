@@ -19,6 +19,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordOwner, RecordType
+from apps.records.testing import answered_no_embargo
 from apps.reviews.models import RecordAssignment
 from core.enums import PipelineStatus, RecordTypeName, RoleName
 
@@ -62,6 +63,7 @@ class TrackerTestBase(APITestCase):
 
     def submitted(self, type_name, **extra):
         record = self.make_record(type_name, **extra)
+        answered_no_embargo(record.pk)
         self.client.force_authenticate(self.owner)
         response = self.client.post(
             reverse("record-submit", args=[record.pk]),
@@ -93,12 +95,19 @@ class TrackerTestBase(APITestCase):
         opened = self.client.post(f"/api/v1/seats/{seat.pk}/open/", {}, format="json")
         self.assertEqual(opened.status_code, status.HTTP_200_OK, opened.data)
         to = [
-            {"party": party, "nominee": getattr(self, party).pk}
+            {"party": party, "nominees": [getattr(self, party).pk]}
             for party in ("itso", "ierc", "ktto")
             if getattr(record, f"requested_{party}")
         ]
+        response = self.client.post(reverse("record-accept-and-route", args=[record.pk]),
+            {"to": [{"party": "rdco", "nominees": [self.rdco.pk]}], "reason": "Institutional review."}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        rdco_seat = RecordAssignment.objects.get(record=record, party="rdco", state="active").seats.get(reviewer=self.rdco)
+        self.client.force_authenticate(self.rdco)
+        opened = self.client.post(f"/api/v1/seats/{rdco_seat.pk}/open/", {}, format="json")
+        self.assertEqual(opened.status_code, 200, opened.data)
         response = self.client.post(
-            reverse("record-accept-and-route", args=[record.pk]),
+            reverse("record-route", args=[record.pk]),
             {"to": to, "reason": "Specialist review requested by the author."}, format="json",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)

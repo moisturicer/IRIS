@@ -24,9 +24,15 @@ class AuditEvent(models.Model):
     ROLE_CHANGE      = "ROLE_CHANGE"
     ACCOUNT_LOCKED   = "ACCOUNT_LOCKED"
     ACCOUNT_UNLOCKED = "ACCOUNT_UNLOCKED"
+    PASSWORD_CHANGED = "PASSWORD_CHANGED"
     SESSION_REVOKE   = "SESSION_REVOKE"
+    SYSTEM_SETTING_CHANGED = "SYSTEM_SETTING_CHANGED"
     QUESTION_INJECTION = "QUESTION_INJECTION"
     RESEARCH_METADATA_CORRECTED = "RESEARCH_METADATA_CORRECTED"
+    # Download requests (ADR-048 decision 9, IR-688). Metadata: `request`, the
+    # DownloadRequest id; a revocation adds `requested_by`, the reader's id.
+    DOWNLOAD_REQUEST_CANCELLED = "DOWNLOAD_REQUEST_CANCELLED"
+    DOWNLOAD_GRANT_REVOKED     = "DOWNLOAD_GRANT_REVOKED"
 
     # Workflow events (IR-144): one type per act, written by the workflow
     # services inside the act's own transaction (`apps.audit.workflow`). Their
@@ -56,6 +62,17 @@ class AuditEvent(models.Model):
     DOCUMENT_REQUEST_REJECTED  = "DOCUMENT_REQUEST_REJECTED"
     DOCUMENT_REQUEST_WITHDRAWN = "DOCUMENT_REQUEST_WITHDRAWN"
 
+    # Account recovery (ADR-045 §8, IR-642). Metadata is an allowlist --
+    # purpose, correlation_id, outcome, reason, attempt -- written only by
+    # `apps.accounts.recovery.audit`. Never an address, token or password.
+    RECOVERY_REQUESTED           = "RECOVERY_REQUESTED"
+    RECOVERY_SUPPRESSED          = "RECOVERY_SUPPRESSED"
+    RECOVERY_TOKEN_REJECTED      = "RECOVERY_TOKEN_REJECTED"
+    RECOVERY_EMAIL_SENT          = "RECOVERY_EMAIL_SENT"
+    RECOVERY_EMAIL_FAILED        = "RECOVERY_EMAIL_FAILED"
+    PASSWORD_RESET_COMPLETED     = "PASSWORD_RESET_COMPLETED"
+    EMAIL_VERIFICATION_COMPLETED = "EMAIL_VERIFICATION_COMPLETED"
+
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
         (LOGOUT,           "Logout"),
@@ -70,9 +87,13 @@ class AuditEvent(models.Model):
         (ROLE_CHANGE,      "Role Change"),
         (ACCOUNT_LOCKED,   "Account Locked"),
         (ACCOUNT_UNLOCKED, "Account Unlocked"),
+        (PASSWORD_CHANGED, "Password Changed"),
         (SESSION_REVOKE,   "Session Revoked"),
+        (SYSTEM_SETTING_CHANGED, "System Setting Changed"),
         (QUESTION_INJECTION, "Reader Question Injection Flagged"),
         (RESEARCH_METADATA_CORRECTED, "Research Metadata Corrected"),
+        (DOWNLOAD_REQUEST_CANCELLED, "Download Request Cancelled"),
+        (DOWNLOAD_GRANT_REVOKED,     "Download Access Revoked"),
         (SUBMITTED,                  "Submitted"),
         (ROUTED,                     "Routed"),
         (ASSIGNMENT_CLOSED,          "Assignment Closed"),
@@ -97,6 +118,13 @@ class AuditEvent(models.Model):
         (DOCUMENT_REQUEST_ACCEPTED,  "Requested Document Accepted"),
         (DOCUMENT_REQUEST_REJECTED,  "Requested Document Rejected"),
         (DOCUMENT_REQUEST_WITHDRAWN, "Document Request Withdrawn"),
+        (RECOVERY_REQUESTED,           "Recovery Requested"),
+        (RECOVERY_SUPPRESSED,          "Recovery Suppressed"),
+        (RECOVERY_TOKEN_REJECTED,      "Recovery Link Rejected"),
+        (RECOVERY_EMAIL_SENT,          "Recovery Email Sent"),
+        (RECOVERY_EMAIL_FAILED,        "Recovery Email Failed"),
+        (PASSWORD_RESET_COMPLETED,     "Password Reset Completed"),
+        (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

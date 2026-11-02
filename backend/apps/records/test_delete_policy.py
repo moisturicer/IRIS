@@ -43,7 +43,7 @@ class DeletePolicyTestBase(DecisionTestBase):
 
     def published(self):
         record = self.at_adviser()
-        self.decided(record, self.adviser, "publish")
+        self.publish_via_rdco(record)
         return record
 
     def rejected(self):

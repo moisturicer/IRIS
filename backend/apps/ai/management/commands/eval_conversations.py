@@ -11,6 +11,8 @@ calls no model. A run made with fake providers is a contract check, never
 quality evidence. Paid collection is not offered here.
 """
 
+from datetime import datetime, timezone
+
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai.evaluation.conversation_scoring import (
@@ -19,14 +21,18 @@ from apps.ai.evaluation.conversation_scoring import (
     ScoringError,
     calibrate_judge,
     check_conditions,
+    check_evidence,
     cost_latency,
+    diagnostic_stages,
     preference,
     score_reviews,
 )
 from apps.ai.evaluation.conversations import (
     DEFAULT_MIN_CONVERSATIONS,
+    check_label_review,
     check_lock,
     lock_record,
+    postdates_lock,
     validate_set,
 )
 from apps.ai.evaluation.runfile import file_digest, load_json, write_json, write_run
@@ -53,9 +59,15 @@ class Command(BaseCommand):
         parser.add_argument("--allow-draft", action="store_true",
                             help="Score a draft_unreviewed set as exploratory only.")
         parser.add_argument("--write-lock", help="Record the set's digests to this file.")
+        parser.add_argument("--label-review", help="A named person's label review of this "
+                            "set version. Required for a counted --score.")
         parser.add_argument("--min-conversations", type=int, default=DEFAULT_MIN_CONVERSATIONS)
         parser.add_argument("--runs", action="append", default=[], help="arm=run.json")
         parser.add_argument("--reviews")
+        parser.add_argument("--packets", action="append", default=[],
+                            help="Review packets from eval_review_packets; checks evidence.")
+        parser.add_argument("--counted", action="store_true",
+                            help="Refuse unless this is counted quality evidence.")
         parser.add_argument("--preferences")
         parser.add_argument("--judge")
         parser.add_argument("--mode", choices=MODES, default="architecture")
@@ -85,14 +97,33 @@ class Command(BaseCommand):
         w(f"digests development={report['digests']['development'][:16]} "
           f"held_out={report['digests']['held_out'][:16]}")
         mismatched = check_lock(data, load_json(options["lock"])) if options["lock"] else []
+        label = None
+        if options["label_review"]:
+            label = load_json(options["label_review"])
+            problems = check_label_review(data, label)
+            for problem in problems:
+                w(f"LABEL REVIEW {problem}")
+            if problems:
+                raise CommandError("the label review does not cover this set version")
+            w(f"label review by {label['reviewer']} covers every conversation"
+              + (" (development fixture: not a person's approval)" if label.get("fixture") else ""))
         for error in report["errors"]:
             w(f"ERROR {error}")
+        for blocker in report["lock_blockers"]:
+            w(f"LOCK BLOCKED {blocker}")
         if mismatched:
             w(f"LOCK MISMATCH {', '.join(mismatched)}")
         if report["errors"] or mismatched:
             raise CommandError("validation failed")
         if options["write_lock"]:
-            write_json(options["write_lock"], lock_record(data))
+            if report["lock_blockers"]:
+                raise CommandError("not locked: " + "; ".join(report["lock_blockers"]))
+            lock = {**lock_record(data), "locked_at": datetime.now(timezone.utc).isoformat()}
+            if label is not None:
+                lock["label_review"] = {"reviewer": label["reviewer"],
+                                        "fixture": bool(label.get("fixture")),
+                                        "sha256": file_digest(options["label_review"])}
+            write_json(options["write_lock"], lock)
             w(f"wrote lock {options['write_lock']}")
         w("valid" + ("" if report["ready"] else " (not ready: coverage gaps)"))
 
@@ -102,7 +133,8 @@ class Command(BaseCommand):
             raise CommandError("the set is invalid: " + "; ".join(report["errors"]))
         if not options["lock"]:
             raise CommandError("--score requires --lock")
-        mismatched = check_lock(data, load_json(options["lock"]))
+        lock = load_json(options["lock"])
+        mismatched = check_lock(data, lock)
         if mismatched:
             raise CommandError(f"the set no longer matches its lock: {', '.join(mismatched)}")
         draft = data["label_status"] != "human_reviewed"
@@ -118,8 +150,20 @@ class Command(BaseCommand):
         if not options["reviews"] or not runs:
             raise CommandError("--score needs --runs and --reviews")
         reviews = load_json(options["reviews"])
+        bundles = []
+        for path in options["packets"] or ():
+            loaded = load_json(path)
+            bundles.extend(loaded if isinstance(loaded, list) else [loaded])
+        reasons = self._not_counted(data, options, lock, runs, bundles, draft)
+        reasons += [f"{r.get('conversation')}: reviewer_kind is not stated"
+                    for r in reviews if r.get("arm") in runs and "reviewer_kind" not in r]
+        if options["counted"] and reasons:
+            raise CommandError("not a counted campaign: " + "; ".join(reasons))
+        self._check_freeze(data, lock, runs, reviews)
         try:
             check_conditions(runs, mode=options["mode"], set_digests=report["digests"])
+            if bundles:
+                check_evidence(reviews, bundles, runs)
             arms = {}
             for label, run in runs.items():
                 arm = run.get("arm") if options["mode"] == "architecture" else label
@@ -127,7 +171,8 @@ class Command(BaseCommand):
                                        min_examples=options["min_examples"],
                                        rubric_version=run["manifest"]["rubric_version"])
                 arms[label] = {"architecture": arm, "scores": scored,
-                               "cost_latency": cost_latency(run)}
+                               "cost_latency": cost_latency(run),
+                               "diagnostics": diagnostic_stages(run)}
             extras = {}
             if options["preferences"]:
                 extras["preference"] = preference(load_json(options["preferences"]))
@@ -138,20 +183,73 @@ class Command(BaseCommand):
                     items, adjudication=judge.get("adjudication") if isinstance(judge, dict) else None)
         except ScoringError as exc:
             raise CommandError(str(exc)) from None
-        blocked = [k for k, v in arms.items() if v["scores"]["enablement_blocked"]]
+        for label, entry in arms.items():
+            single = sorted(c for c, a in entry["scores"]["review_audit"].items()
+                            if a["resolution"] == "single")
+            if single:
+                reasons.append(f"{label}: {len(single)} conversations have one review, "
+                               f"not two ({', '.join(single[:5])})")
+        if options["counted"] and reasons:
+            raise CommandError("not a counted campaign: " + "; ".join(reasons))
+        blocked =[k for k, v in arms.items() if v["scores"]["enablement_blocked"]]
         out = write_run(options["out"], f"conversations-{data['set_id']}", {
             "set_id": data["set_id"], "set_sha256": file_digest(options["set"]),
             "label_status": data["label_status"], "exploratory_draft_labels": draft,
+            "counted": not reasons, "not_counted_reasons": reasons,
             "mode": options["mode"],
             "digests": report["digests"], "arms": arms, **extras,
             "enablement_blocked": bool(blocked), "blocked_arms": blocked,
         })
-        self._print(arms, extras, blocked, out, draft)
+        self._print(arms, extras, blocked, out, draft, reasons)
 
-    def _print(self, arms, extras, blocked, out, draft):
+    @staticmethod
+    def _not_counted(data, options, lock, runs, bundles, draft):
+        """Why this score is not counted quality evidence; empty means it is."""
+        reasons = []
+        if draft:
+            reasons.append("labels are draft_unreviewed")
+        if not options["label_review"]:
+            reasons.append("no label review was supplied")
+        else:
+            label = load_json(options["label_review"])
+            problems = check_label_review(data, label)
+            if problems:
+                raise CommandError("the label review does not cover this set version: "
+                                   + "; ".join(problems[:5]))
+            pinned = (lock.get("label_review") or {}).get("sha256")
+            if pinned and pinned != file_digest(options["label_review"]):
+                raise CommandError("the label review differs from the one recorded in the lock")
+            if label.get("fixture"):
+                reasons.append("the label review is a development fixture, not a person's approval")
+        if not bundles:
+            reasons.append("no review packets: evidence authorization is unchecked")
+        corpus = (data.get("corpus") or {}).get("paper_set_sha256")
+        for name, run in runs.items():
+            if run.get("providers") != "real":
+                reasons.append(f"{name}: fake providers are a contract check")
+            if run["manifest"].get("corpus_snapshot_digest") != corpus:
+                reasons.append(f"{name}: run corpus differs from the locked corpus snapshot")
+        return reasons
+
+    @staticmethod
+    def _check_freeze(data, lock, runs, reviews):
+        held = {c["id"] for c in data["conversations"] if c.get("split") == "held_out"}
+        froze = lock.get("locked_at")
+        for name, run in runs.items():
+            if not any(r.get("arm") == name and r.get("conversation") in held for r in reviews):
+                continue
+            if not postdates_lock(run["manifest"].get("timestamp_utc"), lock):
+                raise CommandError(f"{name}: held-out output must postdate the lock; prompts "
+                                   f"and rubric froze at {froze or 'no recorded time'}")
+            if run["manifest"].get("rubric_version") != lock.get("rubric_version"):
+                raise CommandError(f"{name}: rubric differs from the one that froze with the lock")
+
+    def _print(self, arms, extras, blocked, out, draft, reasons=()):
         w = self.stdout.write
         if draft:
             w("NOTE exploratory_draft_labels: labels are draft_unreviewed")
+        for reason in reasons:
+            w(f"NOT COUNTED {reason}")
         for label, entry in arms.items():
             scores = entry["scores"]
             w(f"== {label} ({entry['architecture']}) reviewers {', '.join(scores['reviewers'])}")
@@ -165,6 +263,11 @@ class Command(BaseCommand):
             for name, t in scores["targets"].items():
                 w(f"target {name} >= {t['target']}: {t['status']} "
                   f"[{t['label']}]")
+            w(f"reviews: {scores['double_reviewed']} double-reviewed, not reviewed: "
+              f"{', '.join(scores['not_reviewed']) or 'none'}")
+            stages = entry["diagnostics"]["stages"]
+            w("diagnostic stages (private, never a verdict): "
+              + (", ".join(f"{k}={v}" for k, v in sorted(stages.items())) or "none"))
             cl = entry["cost_latency"]
             w(f"capacity {cl['capacity']} ({cl['capacity_reason'] or 'ok'}); {cl['evidence']}")
             for cache in ("cold", "warm"):

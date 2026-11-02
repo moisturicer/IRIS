@@ -51,6 +51,7 @@ typography:
 rounded:
   thumb: "0.375rem"
   control: "0.75rem"
+  sheet: "1rem"
   card: "1.25rem"
   pill: "9999px"
 spacing:
@@ -123,11 +124,28 @@ components:
     textColor: "{colors.page-white}"
     rounded: "{rounded.pill}"
     size: "56px"
+  entry-masthead:
+    backgroundColor: "{colors.page-white}"
+    textColor: "{colors.binding-maroon}"
+  entry-sheet:
+    backgroundColor: "{colors.page-white}"
+    rounded: "{rounded.sheet}"
+    padding: "40px 44px"
+  entry-tab-current:
+    backgroundColor: "{colors.page-white}"
+    textColor: "{colors.binding-maroon}"
+    typography: "{typography.label}"
+    height: "44px"
+  entry-tab-completed:
+    backgroundColor: "{colors.bar-stone}"
+    textColor: "{colors.ink}"
+    typography: "{typography.label}"
+    height: "44px"
 ---
 
 # Design System: IRIS
 
-> **Authority.** `docs/adr/` and `docs/ui-ux/01-design-system.md` govern design decisions; `frontend/tailwind.config.js` defines the implemented tokens. This file is a derived summary, mostly of the record page (Paper and Overview, IR-569). Correct the design-system document and token source first, then update this summary and `.impeccable/design.json` when they disagree. A redesign refines this system; it does not replace its palette, type scale or webfont.
+> **Authority.** `docs/adr/` and `docs/ui-ux/01-design-system.md` govern design decisions; `frontend/tailwind.config.js` defines the implemented tokens. This file is a derived summary, mostly of the record page (Paper and Overview, IR-569), plus the entry screens' Dossier frame (IR-704). Correct the design-system document and token source first, then update this summary and `.impeccable/design.json` when they disagree. A redesign refines this system; it does not replace its palette, type scale or webfont.
 
 ## Overview
 
@@ -174,7 +192,7 @@ A monochrome stone volume with one maroon binding; no other hue exists in the in
 
 **The Four Inks Rule.** The palette is white, black, stone and maroon (with its tints, light and dark). `brand-400` to `brand-600` are bright reds, not maroon, and are never used. Status is carried by four tones plus a word, never by a new hue (`palette.test.ts` enforces this).
 
-Gold (`gold.DEFAULT`, about 2.8:1 on white) stays decorative, as on the logo. It is never text or the only status signal.
+Gold (`gold.DEFAULT`, about 2.8:1 on white) stays decorative. It is never text or the only status signal, and the Folio Ribbon logo does not use it.
 
 **The One Bright Object Rule.** On the reading surfaces, only the thing being read is white. Bars, toolbars and headers around it are stone.
 
@@ -239,6 +257,10 @@ Quiet and exact.
 - **Ghost** (Copy on the AI Overview, Close): no outline, Faint Ink, a Bar Stone wash and Ink text on hover.
 - **Focus:** a 2 px Binding Maroon ring with an offset on every interactive element (`FOCUS_RING` in `frontend/src/components/ui/interaction.ts`). That file also defines `COLOUR_TRANSITION` for the 150 ms hover/focus fade.
 
+### Save menu (IR-566)
+
+One bookmark control, an outlined icon on a Discover card and a pill on the Record page, filled once the paper is saved. Its menu has three sections divided by Rule Stone lines: **Reading status** (Want to read, Reading, Completed; choosing the checked one clears it but keeps the save), **Save to My Library / Remove from My Library**, and **Your folders**, which closes with one stone-500 line saying that saves follow the account and folders stay in this browser. A failed save or removal returns the previous state and says so in a `role="alert"` line where the reader acted, never silently. There is no Star: Save covers it.
+
 ### Section tabs
 The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone track in the record bar, with a Binding Maroon thumb that slides to the current one over 300 ms. The current label is white; the others are Quiet Ink and turn maroon on hover.
 
@@ -256,13 +278,27 @@ A white field with a Rule Stone outline and the control radius. Focus darkens th
 
 ### Navigation
 - **Record bar:** 56 px, Bar Stone, a Desk Stone hairline under it. Back (always labelled), a hairline divider, the paper's title on Paper, then the section tabs.
-- **Ask IRIS icon:** a 56 px Binding Maroon circle at the bottom right with the IRIS mark, shown only while the panel is closed, lifting 2 px on hover.
+- **Ask IRIS icon:** a 56 px Binding Maroon circle at the bottom right with the white Folio Ribbon Ask IRIS glyph, shown only while the panel is closed, lifting 2 px on hover.
 
 ### Ask IRIS panel (signature)
 A column on Endpaper behind one Rule Stone line, never a card. A Bar Stone header with the Garamond heading, an "AI" tag and the paper's title. Below it, the conversation, or a Garamond "Ask about this paper." with three outlined starter questions. At the bottom, the composer. It arrives from its edge (320 ms) and has dialog semantics only when it covers the paper.
 
 ### Overview sections (signature)
 Abstract, AI Overview, Related works and Comments, each under one Desk Stone hairline, each with a Garamond headline. The AI Overview has no card and no provenance label: just the heading with the IRIS mark, a ghost Copy, and the article. Comments are drawn and plainly closed (disabled field and Post, "Not open yet") until the feature exists.
+
+### Entry frame: the Dossier Folder (signature)
+Sign in, register, email verification and the pending and declined screens share one frame (`EntryFrame`, IR-704), read like a file handed across a registry desk.
+- **Masthead:** a white bar with a Desk Stone hairline under it, the page's one visible h1: the IRIS mark and maroon wordmark, a hairline divider and the CIT-U logo, both at their natural proportions. Sign in and register carry the link to each other here, at least 44 px, at every width.
+- **Lede** (sign in and register only): a Garamond 600 headline, 36 px on a phone to 60 px from `lg`, Ink with its last words in Binding Maroon, and one plain Body Ink sentence. Below `md` it is left-aligned and the sentence follows the folder, so the first field stays in the first screenful.
+- **Folder:** index tabs on the top edge of one Page White sheet (1 rem radius, `stone-200` border, card lift; the tabs' top corners are 0.75 rem), with a Bar Stone sheet offset behind it. The tab joined to the sheet is white with a 2 px maroon top edge and maroon label text. Sign in, verification and the pending screen have one tab that only labels the sheet.
+- **Register stepper:** completed tabs carry an Ink check and a solid Rule Stone outline on Bar Stone and link back; the current tab is joined to the sheet with a maroon number; tabs not started are dashed and cannot be reached. Below 390 px only the current tab shows its name, the others their mark.
+- **Footer:** CIT-U identity in 13 px Quiet Ink under a hairline, and no policy link until the policies exist.
+- **Motion:** the sheet settles once (280 ms, 0.5 rem rise and fade, a recorded exception to the 150–200 ms rule because it runs once on load) and register's steps cross-fade (150 ms), both only when motion is welcome.
+
+Replaced the split screen with its "shelf of bound work" brand panel (IR-535, IR-586), deleted in IR-711.
+
+### Identity (IR-744)
+**Folio Ribbon.** The mark is a serif I standing in the gutter of an open folio: four maroon pieces (two leaves, two ribbons), with the I as the white space between them. `IrisMark`, `IrisWordmark`, `IrisLoader`, `SearchGlyph` and `AskIrisGlyph` (`frontend/src/components/brand/IrisBrand.tsx`) fill with `currentColor`: maroon on white, white only on maroon. The loader replays the concept's storyboard (one leaf, its partner, the ribbons, then the I) on a 2 s loop; Ask IRIS answering writes its three lines in turn. Both fade instead under reduced motion. Assets and their build: `docs/brand/folio-ribbon/final/`.
 
 ## Do's and Don'ts
 
@@ -282,4 +318,4 @@ Abstract, AI Overview, Related works and Comments, each under one Desk Stone hai
 - **Don't** use a `lg:` (window) breakpoint to size or arrange anything on the record page.
 - **Don't** give reading text its own narrow measure inside the Overview column, or leave a gap between it and the Ask IRIS panel.
 - **Don't** add a label explaining how AI text was made, or an outlined button where a ghost one is enough.
-- **Don't** put a thick accent border on a rounded shape.
+- **Don't** put a thick accent border on a rounded shape. The one recorded exception is the entry folder's tab joined to the sheet (`EntryTab`, and register's current step), whose 2 px maroon top edge is the approved Dossier direction (the `border-accent-on-rounded` exception in `.impeccable/config.json`).

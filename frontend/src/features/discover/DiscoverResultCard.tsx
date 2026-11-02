@@ -1,5 +1,3 @@
-import { useState } from "react";
-
 import { ResearchCard } from "@/components/shared/ResearchCard";
 import { ResearchOriginBadge } from "@/components/shared/ResearchOriginBadge";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -13,10 +11,8 @@ import {
   formatAuthorList,
   highlightMatch,
   ipTypeLabel,
-  isStarred,
   indexedOnLabel,
   recordYearLabel,
-  toggleStarred,
 } from "./discoverUtils";
 
 interface DiscoverResultCardProps {
@@ -38,7 +34,6 @@ interface DiscoverResultCardProps {
  * counts do not exist, so views are the only figure.
  */
 export function DiscoverResultCard({ record, searchHighlight, onCite, reason, expanded = false, onNotInterested }: DiscoverResultCardProps) {
-  const [starred, setStarred] = useState(() => isStarred(record.id));
   const abstract = record.abstract?.trim() ?? "";
   const hook = cardHook({ abstract, ai_hook: record.ai_hook });
 
@@ -105,23 +100,6 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
       }
       actions={
         <>
-          <button
-            type="button"
-            onClick={() => setStarred(toggleStarred(record.id))}
-            aria-pressed={starred}
-            aria-label={starred ? "Starred" : "Star paper"}
-            title={starred ? "Starred" : "Star paper"}
-            className={cn(
-              "w-11 h-11 [@media(pointer:fine)]:w-9 [@media(pointer:fine)]:h-9 rounded-lg border bg-white flex items-center justify-center",
-              COLOUR_TRANSITION,
-              FOCUS_RING,
-              starred
-                ? "border-stone-300 bg-stone-100 text-brand"
-                : "border-stone-200 text-stone-600 hover:text-brand hover:border-stone-400 hover:bg-stone-50",
-            )}
-          >
-            <i className={cn(starred ? "fas" : "far", "fa-star text-[13px]")} aria-hidden />
-          </button>
           <PaperSaveDropdown record={record} />
           <button
             type="button"

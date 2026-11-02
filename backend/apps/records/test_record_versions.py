@@ -139,6 +139,13 @@ class VersionReadTests(OfficeReviewTestBase):
         self.assertEqual(missing.status_code, status.HTTP_404_NOT_FOUND)
         self.assertEqual(no_file.status_code, status.HTTP_404_NOT_FOUND)
 
+    def test_an_earlier_version_is_never_kept_in_a_browser_cache(self):
+        """As the current paper (IR-565): no authenticated PDF on disk after logout."""
+        response = self.get(version_manuscript_url(self.record, 1), self.owner)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+
     def test_reading_a_version_is_audited_with_its_number(self):
         self.get(version_manuscript_url(self.record, 1), self.owner)
 

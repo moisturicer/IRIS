@@ -27,6 +27,45 @@ class Settings(BaseSettings):
     # Models
     LLM_MODEL: str = "gpt-4o-mini"
     EMBEDDING_MODEL: str = "text-embedding-3-small"
+
+    # AI-owned runs (IR-722). The runtime login, and the maintenance login
+    # `python -m ai.runs.migrate` uses.
+    RUNS_DATABASE_URL: str = ""
+    RUNS_MIGRATION_DATABASE_URL: str = ""
+    # Only the deterministic executor exists; no paid work is possible.
+    RUNS_EXECUTOR: str = "deterministic"
+    # No defaults: unset limits refuse every submission.
+    RUNS_DEADLINE_SECONDS: int | None = None
+    RUNS_LEASE_SECONDS: int | None = None
+    RUNS_MAX_ATTEMPTS: int | None = None
+    RUNS_MAX_INPUT_TOKENS: int | None = None
+    RUNS_MAX_OUTPUT_TOKENS: int | None = None
+    RUNS_MAX_COST_USD: float | None = None
+    # Dispatch (IR-723); also required, none approved.
+    RUNS_DEEP_DEADLINE_SECONDS: int | None = None
+    RUNS_MAX_QUEUED: int | None = None
+    RUNS_MAX_ACTIVE_PER_READER: int | None = None
+    RUNS_MAX_RUNNING_PER_READER: int | None = None
+    RUNS_DEEP_CONCURRENCY: int | None = None
+    RUNS_WORKER_CONCURRENCY: int | None = None
+    RUNS_POLL_SECONDS: float | None = None
+    # Worker wakeups only; empty means workers poll PostgreSQL.
+    RUNS_REDIS_URL: str = ""
+    # Provider admission (IR-725): Django's names, one shared campaign.
+    # No defaults; unset refuses every paid attempt.
+    AI_ADMISSION_CAMPAIGN: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_ATTEMPTS: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_INPUT_TOKENS: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_OUTPUT_TOKENS: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_COST_USD: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_ACTIVE_MINUTES: str = ""
+    AI_ADMISSION_RESERVE_FRACTION: str = ""
+    AI_ADMISSION_RESERVE_RELEASED: str = ""
+    AI_ADMISSION_LANE_CONCURRENCY: str = ""
+    AI_ADMISSION_ACCOUNT_CONCURRENCY: str = ""
+    AI_ADMISSION_PRICES: str = ""
+    AI_ADMISSION_MAX_OUTPUT_TOKENS: str = ""
+    AI_ADMISSION_LEASE_GRACE_SECONDS: str = ""
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+from contextlib import nullcontext
 from dataclasses import dataclass, field, replace
 from typing import Callable, Optional, Protocol, Sequence
 
@@ -20,6 +21,7 @@ from apps.ai.answers.reasoning import without_leaked_reasoning
 from apps.ai.answers.service import UNAVAILABLE_TEXT, model_that_answered
 from apps.ai.controller.versions import ANSWER_PROMPT_VERSION, CONTROLLER_ENGINE
 from apps.ai.inference import InferenceTask
+from apps.ai.policy.outbound import OutboundGuard, Withheld
 from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.resilience.circuit import CircuitOpen
 from apps.ai.retrieval.ports import RetrievedChunk
@@ -104,6 +106,25 @@ _HELP = {
 }
 
 
+ABSTRACT_PATH = ("Abstract",)
+
+
+def abstract_source(record, *, rank: int = 1) -> RetrievedChunk:
+    """A found paper's abstract as a source (IR-703, ADR-042 amendment).
+
+    It has no chunk: the negative id keeps it distinct in memory and never
+    leaves the composer; its citation names the record and no page. A negative
+    score puts it below every passage, the better search rank higher.
+    """
+    return RetrievedChunk(chunk_id=-record.record_id, record_id=record.record_id,
+                          record_title=record.record_title, content=record.text,
+                          context_path=ABSTRACT_PATH, source_page=None, score=-float(rank))
+
+
+def is_abstract(source) -> bool:
+    return source.chunk_id is not None and source.chunk_id < 0
+
+
 @dataclass(frozen=True)
 class ReadyToCompose:
     """What the controller gathered; everything here is currently readable."""
@@ -131,6 +152,10 @@ class ReadyToCompose:
     #: Chunk ids among the given sources still readable and current; None
     #: treats every source as current.
     current: Optional[Callable[[Sequence[RetrievedChunk]], set]] = None
+    #: Rechecked before every physical attempt (IR-720); None sends unguarded.
+    guard: Optional[OutboundGuard] = None
+    #: The `Dependency` set behind the given sources and the computed facts.
+    dependencies: Optional[Callable[[Sequence[RetrievedChunk]], set]] = None
 
 
 class Composer(Protocol):
@@ -151,7 +176,8 @@ class AnswerComposer:
         if ready.intent == ANSWER and ready.basis == EVIDENCE and not live and not ready.facts:
             # An interrupted search did not establish that nothing matched.
             if ready.stop_reason in {"answer_reserve", "max_outer_rounds", "max_tool_calls",
-                                     "max_prompt_tokens", "wall_clock_seconds", "planner_unavailable"}:
+                                     "max_prompt_tokens", "wall_clock_seconds", "planner_unavailable",
+                                     "source_unavailable"}:
                 return _unavailable(())
             # Empty, withheld and irrelevant all read the same (ADR-042).
             return GroundedAnswer(NO_SOURCES_TEXT, (), state=NO_SOURCES, degraded=ready.degraded)
@@ -159,8 +185,23 @@ class AnswerComposer:
             llm = self.root.llm_for(InferenceTask.ANSWER)
         except (LLMUnavailable, CircuitOpen):
             return _unavailable(_live(ready, sources))
+        if sources:
+            sources = _fitted(ready, sources)
+            if not sources:
+                return _unavailable(live)
         system, prompt = _prompt(ready, sources)
-        raw = _draft(llm, system, prompt, ready)
+        try:
+            raw = _draft(llm, system, prompt, ready, sources)
+        except Withheld as refused:
+            # Nothing was sent: rebuild once from what is still permitted, or stop.
+            sources = _permitted(ready, sources, refused.authorization)
+            if sources is None:
+                return _unavailable(())
+            system, prompt = _prompt(ready, sources)
+            try:
+                raw = _draft(llm, system, prompt, ready, sources)
+            except Withheld:
+                return _unavailable(())
         if raw is None:
             return _unavailable(_live(ready, sources))
         if cancelled() or not _facts_current(ready) or not _context_current(ready):
@@ -170,7 +211,11 @@ class AnswerComposer:
         repairable = [i for i in issues if i.code not in FENCED]
         if (repairable and not any(i.code in FENCED for i in issues)
                 and ready.repair_attempts > 0 and not cancelled()):
-            again = _draft(llm, system, prompt + _feedback(draft, issues), ready)
+            try:
+                again = _draft(llm, system, prompt + _feedback(draft, issues), ready, sources)
+            except Withheld:
+                # The draft quotes a source that lost permission; never resend it.
+                again = None
             if again is not None:
                 if cancelled() or not _facts_current(ready) or not _context_current(ready):
                     return _unavailable(_live(ready, sources))
@@ -188,6 +233,7 @@ class AnswerComposer:
         cited = {c.chunk_id for c in citations}
         evidence = "\n".join(s.content for s in sources if s.chunk_id in cited)
         summary = "" if issues else safe_summary(draft.summary, text, evidence)
+        citations = tuple(replace(c, chunk_id=None) if is_abstract(c) else c for c in citations)
         return GroundedAnswer(
             text=text, citations=citations, sources=live, model=model_that_answered(llm),
             degraded=ready.degraded or bool(ready.limitations) or bool(issues),
@@ -224,24 +270,67 @@ def _prompt(ready: ReadyToCompose, sources) -> tuple[str, str]:
     return ANSWER_POLICY + CONTRACT, prompt
 
 
-def _draft(llm, system: str, prompt: str, ready) -> Optional[str]:
-    """One completion, or None on an outage or a reasoning-only reply."""
+def _draft(llm, system: str, prompt: str, ready, sources=()) -> Optional[str]:
+    """One completion, or None on an outage or a reasoning-only reply.
+
+    Raises `Withheld` when a source lost permission before an attempt was sent.
+    """
     try:
         if cancelled() or not _facts_current(ready) or not _context_current(ready):
             return None
         if (enforcing() and ready.answer_input_limit is not None
                 and admission_tokens(system, prompt) > ready.answer_input_limit):
+            logger.warning("controller answer prompt over its input limit; not sent")
             return None
         if ready.spend is not None:
             if ready.spend.remaining_seconds <= 0:
                 return None
             ready.spend.charge_prompt_tokens(estimate_tokens(system + prompt), answer=True)
-        raw = llm.generate(system=system, user=prompt)
+        with _fence(ready, sources):
+            raw = llm.generate(system=system, user=prompt)
+    except Withheld:
+        raise
     except (LLMUnavailable, CircuitOpen, TimeoutError, BudgetExhausted) as exc:
         logger.warning("controller answer unavailable: %s", type(exc).__name__)
         return None
     raw = without_leaked_reasoning(raw or "")
     return raw if raw.strip() else None
+
+
+def _fence(ready, sources):
+    if ready.guard is None or ready.dependencies is None:
+        return nullcontext()
+    return ready.guard.fence(lambda: ready.dependencies(sources))
+
+
+def _permitted(ready, sources, authorization) -> Optional[tuple]:
+    """Sources still permitted, or None when the answer cannot be rebuilt."""
+    if not ready.dependencies(()) <= authorization.permitted:
+        return None  # a computed fact depends on what was withheld
+    kept = authorization.retain(sources, lambda source: ready.dependencies((source,)))
+    if sources and not kept and ready.basis == EVIDENCE and not ready.facts:
+        return None
+    return kept
+
+
+def _fitted(ready, sources) -> tuple:
+    """The highest-ranked sources whose prompt fits the admitted input limit."""
+    limit = ready.answer_input_limit
+    if not enforcing() or limit is None:
+        return tuple(sources)
+    # Drop the lowest-scored first (ties: the latest gathered); keep gathered order.
+    drop_order = sorted(range(len(sources)), key=lambda i: (sources[i].score or 0, -i))
+    kept = list(sources)
+    for index in drop_order:
+        if admission_tokens(*_prompt(ready, tuple(kept))) <= limit:
+            break
+        kept.remove(sources[index])
+    if kept and admission_tokens(*_prompt(ready, tuple(kept))) > limit:
+        kept = []
+    if len(kept) < len(sources):
+        logger.warning("controller answer sources trimmed to the input limit: kept %d of %d",
+                       len(kept), len(sources))
+    return tuple(kept)
 
 
 def _feedback(draft, issues) -> str:

@@ -26,6 +26,7 @@ import {
   deadlineGroup,
   matchesQuery,
 } from "./opportunityUtils";
+import { SearchGlyph } from "@/components/brand/IrisBrand";
 
 /** A filter chip, as My Reviews draws them: soft maroon when on. */
 function chipClass(on: boolean) {
@@ -50,7 +51,7 @@ type FormTarget = null | "new" | Opportunity;
  * stay in a last group, so someone mid-application can still find the page,
  * until the server drops them a month after the deadline.
  *
- * RDCO, KTTO and Advisers post here, and change what they posted. The page
+ * RDCO and Advisers post here, and change what they posted. The page
  * offers that only when the server says so (`can_post`, `can_edit`); the API
  * is the boundary either way.
  *
@@ -223,7 +224,7 @@ export function CallsAndConferencesPage() {
     <div>
       <PageHeader
         title="Calls & Conferences"
-        description="Internal research calls, conference deadlines and funding windows, posted by CIT-U offices and advisers. Soonest deadline first."
+        description="Internal research calls, conference deadlines and funding windows, posted by institutional offices and advisers. Soonest deadline first."
         actions={postButton || undefined}
       />
 
@@ -243,7 +244,7 @@ export function CallsAndConferencesPage() {
               placeholder="Search calls"
               aria-label="Search calls by title, office or tag"
               disabled={loadFailed}
-              leading={<i className="fas fa-magnifying-glass text-xs" aria-hidden="true" />}
+              leading={<SearchGlyph className="h-3 w-3" />}
             />
           </div>
           <button
@@ -322,7 +323,7 @@ export function CallsAndConferencesPage() {
           message={
             canPost
               ? "Post the first internal call, conference deadline or funding window, and it appears here for everyone."
-              : "RDCO, KTTO and advisers post calls here as they open. Check back soon."
+              : "RDCO and advisers post calls here as they open. Check back soon."
           }
           action={postButton || undefined}
         />

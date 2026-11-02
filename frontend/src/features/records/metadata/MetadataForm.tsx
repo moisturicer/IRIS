@@ -13,6 +13,7 @@
  * `aria-describedby` and carry a glyph, not only a colour.
  */
 import { useState, type ReactNode } from "react";
+import { INSTITUTION } from "@/config/institution";
 import { Controller, useFormContext, type FieldErrors } from "react-hook-form";
 
 import { FieldError } from "@/components/ui/FieldError";
@@ -263,7 +264,7 @@ export function MetadataForm({
           <select id={ids.origin} {...register("origin")} className={fieldClasses(Boolean(errors.origin))}
             aria-invalid={Boolean(errors.origin) || undefined} aria-describedby={describedBy("origin")}>
             <option value="unknown">Unknown</option>
-            <option value="institutional">Institutional (CIT-U research)</option>
+            <option value="institutional">Institutional ({INSTITUTION.shortName} research)</option>
             <option value="imported_reference">Imported reference</option>
             <option value="synthetic">Synthetic (demonstration or test)</option>
           </select>

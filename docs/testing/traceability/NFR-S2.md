@@ -1,0 +1,15 @@
+# NFR-S2
+
+[Back to the matrix](../TRACEABILITY.md)
+
+**IR-97, 2026-11-02:** Evidence link: [CI run 40794738484](https://github.com/moisturicer/IRIS/actions/runs/40794738484).
+
+## NFR-S2
+
+**Requirement:** 30-minute inactivity expiry
+
+**Implementation:** **IR-166.** Sign-in opens a `UserSession` (`accounts/0011`) whose id rides in every token as `sid`. `apps/accounts/authentication.py` refuses a request or a refresh whose session has been idle past `SESSION_IDLE_TIMEOUT_MINUTES` (30) with `401 code: session_idle`, and ends it for good. Activity is the *user's*: the interface sends `X-IRIS-Idle-Seconds` (`frontend/src/lib/activity.ts`), so a poll from an untouched tab extends nothing. A request with no header counts as activity. ~~An access token with no `sid` is accepted for its own 30 minutes~~ — **superseded by IR-642 (ADR-045 §4):** an access or refresh token with no `sid` or no `cv` is now refused with `401 code: credentials_changed`; a refresh token with no `sid` was already refused. Idleness is judged from the *stored* activity, before the request in hand counts, so a click after a 31-minute absence does not excuse it; a 5-minute heartbeat (`GET /users/me/`, only when there is unreported input) keeps a user reading a request-free page signed in. The interface also signs itself out at 30 idle minutes (`AuthBootstrap`). The Ask IRIS streams use `fetch`, not `apiClient`, so they send the header and, on a 401, refresh once through the same `refreshSession()` and retry. A failed refresh (an idle session's included) logs out and redirects (IR-634). The refresh token's 7 days remain the absolute limit. Activity writes are throttled to one a minute, so a session can end up to a minute early, never late
+
+**Evidence:** `backend/apps/accounts/test_sessions.py` (18): 31 idle minutes refused and 29 not; **coming back after 31 minutes refused even though the request reports a fresh click**; refresh refused once idle; an ended session stays ended; **eight active hours not expired**; polling with a growing idle header expires at 31 minutes; background refresh does not extend; header absent, malformed or negative; logout ends the session; pre-IR-166 tokens. `frontend/src/lib/activity.test.ts` (17, including the heartbeat), `frontend/src/components/auth/AuthBootstrap.test.tsx` (3), `frontend/src/api/client.test.ts` (4) and `frontend/src/api/ai.test.ts`'s "a stream's session" block (4) for IR-634
+
+**Status:** **VERIFIED (IR-166, 2026-10-29).** CI run 40794738484 on `91a79b0`, merged as PR #307: backend **4298 passed, 0 failed**, all 18 session tests included; frontend job green, including both files above. The first run (40792870931) failed 4 of these tests, which exposed a real defect: a request was credited with its own reported activity before the idle check, so a user back from 31 minutes away was never expired. Fixed in `91a79b0` with the tests unchanged

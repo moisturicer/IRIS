@@ -1,0 +1,77 @@
+# IR-631 core-journey stack: the production compose file under production
+# settings, made runnable on one machine with nothing outside it.
+#
+#   node e2e/scripts/make-env.mjs
+#   docker compose -p iris-e2e --env-file e2e/.env.e2e \
+#     -f docker-compose.prod.yml -f docker-compose.e2e.yml up --build -d
+#
+# (`npm run stack:up` in e2e/ runs exactly that.) What this file changes, and
+# why each change is not a change to "normal application settings":
+#
+#   * env_file -> e2e/.env.e2e, generated per run. It replaces backend/.env so a
+#     developer's DEBUG=True and real provider keys never reach this stack.
+#     DJANGO_SETTINGS_MODULE stays config.settings.production.
+#   * mailpit is added and EMAIL_HOST points at it, so verification and
+#     recovery mail are readable by the run and never leave the stack.
+#   * the frontend publishes ${E2E_PORT} (default 8090) instead of 80, so this
+#     stack can run beside the development stack. Its own project name
+#     (-p iris-e2e) gives it its own volumes and a fresh database.
+#   * ai-gateway is behind a profile: ADR-014 forbids deploying it, ADR-024
+#     took the indexing path off it, and nothing in the journeys calls it.
+#     The frontend's start-order dependency on it is dropped to match.
+#
+# Not changed: the image builds, gunicorn + UvicornWorker, every Celery worker
+# and beat, Docling, nginx, migrations, feature flags (all at their defaults).
+# TLS is out of IR-631's scope, so caddy is behind a profile and the frontend
+# is published directly; see e2e/README.md, Limitations.
+
+x-e2e-env: &e2e-env
+  env_file: !override
+    - ./e2e/.env.e2e
+
+services:
+  migrate:
+    <<: *e2e-env
+  backend:
+    <<: *e2e-env
+  celery-default:
+    <<: *e2e-env
+  celery-extraction:
+    <<: *e2e-env
+  celery-embedding:
+    <<: *e2e-env
+  celery-shadow:
+    <<: *e2e-env
+  celery-beat:
+    <<: *e2e-env
+
+  ai-gateway:
+    profiles: ["ai-gateway"]
+
+  caddy:
+    profiles: ["tls"]
+
+  frontend:
+    # A published port needs a network with a route out (IR-825).
+    networks:
+      - private
+      - egress
+    ports: !override
+      - "${E2E_PORT:-8090}:8080"
+    depends_on: !override
+      - backend
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    networks:
+      - private
+      - egress
+    restart: unless-stopped
+    environment:
+      # Django sends EMAIL_HOST_USER/PASSWORD because production settings
+      # require them; Mailpit accepts any credentials over plain SMTP.
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+      MP_MAX_MESSAGES: "5000"
+    ports:
+      - "${E2E_MAIL_PORT:-8026}:8025"
