@@ -20,6 +20,7 @@ from ai.agent.protocol import (  # noqa: E402
     AgentRequest, Pin, StopReason, ToolCall, ToolGroup, ToolResult, User,
 )
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
+from .test_ai_runtime_context_contract import MILLION, RESERVES  # noqa: E402
 
 PIN = Pin(
     model="scripted-model", endpoint="scripted", adapter="recording", dialect=ChatCompletions.name,
@@ -34,7 +35,8 @@ def run(coro):
 
 def provider(*responses, **overrides):
     options = dict(endpoint="scripted", models=("scripted-model",),
-                   capabilities=("tools", "parallel_tools", "continuation"))
+                   capabilities=("tools", "parallel_tools", "continuation"),
+                   capacities={"scripted-model": MILLION, "other-model": MILLION})
     return RecordingAgentProvider(responses=list(responses), **{**options, **overrides})
 
 
@@ -110,7 +112,7 @@ def test_an_unanswered_or_reordered_tool_group_is_refused_before_sending():
 
 def agent(target, pin=PIN):
     from ai.agent.executor import AgentExecutor
-    return AgentExecutor(target, pin)
+    return AgentExecutor(target, pin, RESERVES)
 
 
 def test_the_original_question_reaches_the_model_unchanged_and_its_answer_is_final():

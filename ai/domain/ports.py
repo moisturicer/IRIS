@@ -26,6 +26,10 @@ class LLMProvider(ABC):
         """Whether this provider serves an AGENT `Pin` exactly (IR-727)."""
         return False
 
+    def capacity(self, pin):
+        """The verified `ai.agent.context.Capacity` for a pin; None is unknown (IR-732)."""
+        return None
+
     async def converse(self, request):
         """One AGENT model turn for an `ai.agent.protocol.AgentRequest`.
 

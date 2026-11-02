@@ -9,14 +9,15 @@ attempt within the same allowance; nothing retries out of sight.
 from __future__ import annotations
 
 import asyncio
-import json
 from dataclasses import replace
 from typing import Optional
 
+from ai.agent.dialect import serialize
 from ai.agent.protocol import ToolResult
 from ai.domain.ports import LLMProvider, TransientProviderError, UnsupportedCapability
 
-from . import scope
+from . import errors, scope
+from .errors import AdmissionDenied
 from .guard import SendGuard
 from .ledger import Ledger, Request, Usage, estimate_tokens
 
@@ -41,12 +42,24 @@ class AdmittedAgentProvider(LLMProvider):
     def accepts(self, pin) -> bool:
         return self.provider.accepts(pin)
 
+    def capacity(self, pin):
+        return self.provider.capacity(pin)
+
+    @property
+    def dialect(self):
+        return self.provider.dialect
+
     async def generate_response(self, prompt: str, context: str = "") -> str:
         raise UnsupportedCapability("generate_response")
 
     async def converse(self, request):
         if self.ledger.limits is not None:
-            request = replace(request, max_output_tokens=self.ledger.limits.max_output_tokens)
+            limit = self.ledger.limits.max_output_tokens
+            if request.max_output_tokens is None:
+                request = replace(request, max_output_tokens=limit)
+            elif request.max_output_tokens > limit:
+                # Lowering it would break the reserve it was fitted with (IR-732).
+                raise AdmissionDenied(errors.OUTPUT_CAP_EXCEEDED)
         for attempt in range(self.retries + 1):
             try:
                 return await self._attempt(request)
@@ -56,7 +69,7 @@ class AdmittedAgentProvider(LLMProvider):
 
     async def _attempt(self, request):
         binding = scope.current()
-        payload = json.dumps(self.provider.dialect.encode(request), default=str, ensure_ascii=False)
+        payload = serialize(self.provider.dialect.encode(request))
         ticket = await self.ledger.admit(Request(
             operation="llm", purpose=self.purpose, purpose_version=request.pin.prompt_version,
             lane=self.lane, account=self.provider.account, models=(request.pin.model,),
