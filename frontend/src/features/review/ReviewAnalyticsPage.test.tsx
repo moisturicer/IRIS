@@ -139,6 +139,24 @@ describe("ReviewAnalyticsPage", () => {
     expect(screen.getByText("No completed turns in this range.")).toBeInTheDocument();
   });
 
+  it("makes the overflowing analytics tables keyboard-scrollable (IR-774)", async () => {
+    renderScreen(<ReviewAnalyticsPage />);
+
+    const openTable = await screen.findByRole("table", { name: /open now/i });
+    const openRegion = openTable.parentElement;
+    expect(openRegion).toHaveAttribute("role", "region");
+    expect(openRegion).toHaveAttribute("tabindex", "0");
+    expect(openRegion).toHaveAccessibleName("Open now table");
+    expect(openRegion).toHaveClass("focus-visible:ring-2", "focus-visible:ring-brand");
+
+    const timeTable = screen.getByRole("table", { name: /time in stage/i });
+    const timeRegion = timeTable.parentElement;
+    expect(timeRegion).toHaveAttribute("role", "region");
+    expect(timeRegion).toHaveAttribute("tabindex", "0");
+    expect(timeRegion).toHaveAccessibleName("Time in stage table");
+    expect(timeRegion).toHaveClass("focus-visible:ring-2", "focus-visible:ring-brand");
+  });
+
   it("has no blocking accessibility violations", async () => {
     const { container } = renderScreen(<ReviewAnalyticsPage />);
     await screen.findByRole("table", { name: /open now/i });

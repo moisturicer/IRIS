@@ -228,7 +228,12 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
               ))}
             </div>
           </header>
-          <div className="review-pane-body">
+          <div
+            role="region"
+            aria-label="Review pane content"
+            tabIndex={0}
+            className={cn("review-pane-body", FOCUS_RING)}
+          >
             <div role="tabpanel" id={`${ids}-conversation`} aria-labelledby={`${ids}-tab-conversation`} hidden={tab !== "conversation"} className="p-4">
               {onAskAboutPaper && <button type="button" onClick={onAskAboutPaper} className={cn("review-control text-brand hover:underline", FOCUS_RING)}>Ask about this paper</button>}
               <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}

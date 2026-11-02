@@ -1976,6 +1976,17 @@ describe("the Review section (IR-412)", () => {
 
   const bar = () => screen.getByRole("toolbar", { name: "Review actions" });
 
+  it("makes the office review body a named keyboard-scrollable region (IR-774)", async () => {
+    workspaceAt(800);
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    const region = await screen.findByRole("region", { name: "Review pane content" });
+    expect(region).toHaveAttribute("tabindex", "0");
+    expect(region).toHaveClass("focus-visible:ring-2", "focus-visible:ring-brand");
+  });
+
   it("resizes by 24px with arrow keys and restores each column on double click (IR-681)", async () => {
     workspaceAt(1600);
     shownRecord = { ...inReview, ...reviewing };
