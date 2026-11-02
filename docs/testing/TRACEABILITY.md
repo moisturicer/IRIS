@@ -2611,3 +2611,10 @@ NFR-A1: muted text on stone-100 now uses the existing stone-600 utility in the r
 ## IR-98 — The test plan describes the testing IRIS does
 
 `TEST_PLAN.md` now lists the tooling and levels in use, and §9 lists what testing does not establish yet. `SECURITY.md` §11 gives each risk a reason and stays the one register. Documentation only: no test or requirement status changes.
+## IR-772 — Download Requests reflows at 360 px (2026-11-02)
+
+NFR-U3: the Download Requests filter toolbar gives Refresh a full-width phone row below `sm`, then restores the existing compact right-aligned placement from `sm` upward. The table keeps its own intentional horizontal scrolling.
+
+Browser evidence: the IR-414 Download-only Chromium pre-pass reports no page overflow at 360, 768, 1280, 1745 or 1280@200%; the 360 px keyboard walk records 9 stops, 0 missing indicators and 0 covered controls. See [executed evidence](evidence/IR-772/README.md).
+
+Focused regression: 6/6 passed. Full frontend suite: 129 files / 1,658 tests passed. TypeScript and production build pass; lint reports 0 errors and 3 pre-existing warnings. Human approval remains outstanding.
