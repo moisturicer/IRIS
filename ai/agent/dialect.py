@@ -6,6 +6,7 @@ read completely becomes a MALFORMED turn with no items, never a partial one.
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from ai.agent.protocol import (
@@ -17,6 +18,11 @@ FINISH = {
     "stop": StopReason.END, "length": StopReason.LENGTH,
     "tool_calls": StopReason.TOOLS, "content_filter": StopReason.FILTERED,
 }
+
+
+def serialize(payload: dict) -> str:
+    """The wire text; capacity fitting and admission both measure this (IR-732)."""
+    return json.dumps(payload, default=str, ensure_ascii=False)
 
 
 class _Malformed(Exception):

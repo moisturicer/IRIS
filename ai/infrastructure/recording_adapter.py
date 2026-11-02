@@ -2,7 +2,7 @@
 
 Replays scripted wire responses through a real dialect and records every
 outgoing payload. A scripted exception is raised after recording, and
-`HANG` never answers (IR-725). No network: real transport waits on IR-732.
+`HANG` never answers (IR-725). No network.
 """
 
 from __future__ import annotations
@@ -23,13 +23,16 @@ class RecordingAgentProvider(LLMProvider):
     paid = False
 
     def __init__(self, *, responses, endpoint="scripted", models=("scripted-model",),
-                 capabilities=(), data_policies=("no-training",), dialect=ChatCompletions):
+                 capabilities=(), data_policies=("no-training",), dialect=ChatCompletions,
+                 capacities=None):
         self.responses = list(responses)
         self.endpoint = endpoint
         self.models = frozenset(models)
         self.capabilities = frozenset(capabilities)
         self.data_policies = frozenset(data_policies)
         self.dialect = dialect
+        #: Declared per model; a model with none has unknown capacity (IR-732).
+        self.capacities = dict(capacities or {})
         self.requests: list[dict] = []
 
     def accepts(self, pin) -> bool:
@@ -38,6 +41,9 @@ class RecordingAgentProvider(LLMProvider):
             and pin.model in self.models and pin.dialect == self.dialect.name
             and pin.data_policy in self.data_policies and set(pin.requires) <= self.capabilities
         )
+
+    def capacity(self, pin):
+        return self.capacities.get(pin.model) if self.accepts(pin) else None
 
     async def generate_response(self, prompt: str, context: str = "") -> str:
         raise UnsupportedCapability("generate_response")
