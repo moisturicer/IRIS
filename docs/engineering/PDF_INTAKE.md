@@ -22,6 +22,8 @@ Explicit candidate profile (also in `backend/.env.example`):
 
 All limits must be positive and finite; integer limits must be integers. Partial/invalid configuration fails startup. With all five absent, startup reports `documents.W001` and PDF intake refuses processing. Non-Linux systems report `documents.W002` and also refuse processing. The example is a verified local candidate, not approval of production capacity or enablement. Tests supply a separate explicit synthetic profile.
 
+Apply the additive migrations before starting this release's web/worker processes. Drain or stop old unfenced extraction/chunk workers before admitting revisioned uploads; mixed old-worker/new-writer operation is unsupported. Restart workers on the same release. Existing legacy queue messages handled by the new worker cannot process a revisioned source without its pin. No rollout was performed for this ticket.
+
 ## Persistent identity and handoff
 
 The existing Record writer commits `abstract_file`, a fresh opaque `manuscript_revision` UUID, `manuscript_sha256` and the display name in one database transaction. The digest attests the original upload, separately from `PdfExtraction.content_hash`, which hashes normalized extraction output. Clients cannot set the digest or revision. An unchanged same-Record upload retains its file/revision and queues nothing. A refused replacement changes nothing.
