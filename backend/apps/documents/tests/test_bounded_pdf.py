@@ -123,6 +123,24 @@ def test_actual_child_hits_memory_limit():
         assert pdf_upload_problem(pdf_upload()) == "This PDF exceeds the processing limits."
 
 
+def test_child_memory_budget_uses_its_current_footprint_after_exec(tmp_path):
+    import subprocess
+    import sys
+    from pathlib import Path
+    from apps.documents import validators
+
+    source = tmp_path / "source.pdf"
+    source.write_bytes(pdf_upload().read())
+    inspector = Path(validators.__file__).with_name("pdf_inspection.py")
+    result = subprocess.run([
+        sys.executable, "-c",
+        "import os, sys; allocation = bytearray(300 * 1024 * 1024); "
+        "del allocation; os.execv(sys.executable, [sys.executable, '-I', *sys.argv[1:]])",
+        str(inspector), str(source), "256", "1000", "200000", "100",
+    ], capture_output=True, timeout=15, check=False)
+    assert result.returncode == 0
+
+
 def test_actual_child_hits_wall_limit():
     with override_settings(PDF_VALIDATION_WALL_SECONDS=0.001):
         assert pdf_upload_problem(pdf_upload()) == "This PDF exceeds the processing limits."

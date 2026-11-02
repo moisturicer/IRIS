@@ -106,14 +106,18 @@ def inspect(path, max_pages, max_objects, max_depth):
 
 def main():
     try:
+        import os
         import resource
 
         memory_mib, max_pages, max_objects, max_depth = map(int, sys.argv[2:])
         memory = memory_mib * 1024 * 1024
-        runtime_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
+        # Peak RSS survives exec and can describe the web worker's old peak.
+        # Compare this fresh interpreter's current address space to its cap.
+        with open("/proc/self/statm", encoding="ascii") as usage:
+            runtime_bytes = int(usage.read(128).split()[0]) * os.sysconf("SC_PAGE_SIZE")
         resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
-        # A cap below the Linux interpreter's own resident footprint cannot
+        # A cap below the Linux interpreter's own address space cannot
         # even import the parser reliably; that is a budget refusal, not bad PDF bytes.
         if runtime_bytes > memory:
             return 5
