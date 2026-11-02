@@ -142,10 +142,7 @@ class Command(BaseCommand):
 
         corpus = dict(data["corpus"])
         corpus["set_sha256"] = file_digest(options["set"])
-        corpus["authorization_policy_version"] = (
-            "Record.visible_to+development-disclosure-bypass"
-            if getattr(settings, "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", False)
-            else "Record.visible_to+disclosure-gate")
+        corpus["authorization_policy_version"] = "Record.visible_to+disclosure-gate"
         if attempt_reader:
             profiles = {task.value: profile_for(task) for task in
                         (InferenceTask.PLAN, InferenceTask.ANSWER)}

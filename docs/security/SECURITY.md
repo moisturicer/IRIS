@@ -115,7 +115,7 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 2. **Voyage's training opt-out**, an account setting. The repository can't show whether it was exercised (§11).
 3. **`VOYAGE_API_KEY` as a production secret.**
 
-`AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT` and `manage.py index_with_disclosure_bypass` exist for development only. Django refuses to start with the setting on and `DEBUG` off, and [IR-250](https://citiris.atlassian.net/browse/IR-250) deletes both.
+IR-317's development bypass is deleted ([IR-815](https://citiris.atlassian.net/browse/IR-815)), and the indexing path no longer accepts a substitute for the check. Test papers get an answer instead: `load_corpus --clear-for-ai` and `mark_corpus_cleared` refuse with `DEBUG` off, and `--force` doesn't change that. Neither answers for a paper declared `institutional`, but neither can recognise a real paper whose origin was never declared, so they depend on `DEBUG` and on who runs them. `seed_demo` answers only for its own synthetic papers, whose text it wrote.
 
 `apps/ai/policy/outbound.py` rechecks withheld or revoked sources before each provider attempt ([IR-720](https://citiris.atlassian.net/browse/IR-720), partially implemented and awaiting review). Retrieval is filtered by `visible_to(user)` before anything is scored.
 
@@ -162,7 +162,6 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 11 | Voyage's training opt-out has no recorded evidence | **Medium** | Nothing shows the vendor isn't training on unpublished text | [IR-827](https://citiris.atlassian.net/browse/IR-827) |
 | 12 | The ASVS checklist is a draft awaiting review | **Medium** | Its statuses come from reading code, and nobody has confirmed them | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
 | 13 | Development `backend`, `frontend` and `docling` listen on every interface | **Low** | Exposes development machines to their local network, not production | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
-| 14 | CI doesn't run `ai/tests`, including the gateway's service authentication test | **Medium** | A broken check could merge with green CI | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
 
 [`SECURITY_CHECKLIST.md`](../testing/SECURITY_CHECKLIST.md) lists further Level 1 gaps: [IR-819](https://citiris.atlassian.net/browse/IR-819), [IR-820](https://citiris.atlassian.net/browse/IR-820), [IR-821](https://citiris.atlassian.net/browse/IR-821), [IR-822](https://citiris.atlassian.net/browse/IR-822), [IR-823](https://citiris.atlassian.net/browse/IR-823), [IR-824](https://citiris.atlassian.net/browse/IR-824), [IR-825](https://citiris.atlassian.net/browse/IR-825).
 
@@ -185,6 +184,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | Locking an account or changing a password left sessions running | [IR-644](https://citiris.atlassian.net/browse/IR-644) |
 | Lockout counted the proxy's address, not the client's | [IR-656](https://citiris.atlassian.net/browse/IR-656) |
 | A revoked session's access token kept working | [IR-657](https://citiris.atlassian.net/browse/IR-657) |
+| CI didn't run `ai/tests`, including the gateway's service authentication test | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
 | Production HTTPS redirect loop behind the proxy | [IR-662](https://citiris.atlassian.net/browse/IR-662) |
 | No browser security headers | [IR-663](https://citiris.atlassian.net/browse/IR-663) |
 | Uploads accepted without checking the content was a PDF | [IR-665](https://citiris.atlassian.net/browse/IR-665) |

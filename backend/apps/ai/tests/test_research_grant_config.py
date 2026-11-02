@@ -38,7 +38,6 @@ def test_enabled_with_a_missing_or_bad_value_refuses_to_start(settings, name, va
 def test_django_startup_runs_the_check(settings):
     from django.apps import apps
 
-    settings.AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = False
     enable_grants(settings)
     settings.AI_RESEARCH_GRANT_KEYS = ""
     with pytest.raises(ImproperlyConfigured, match="AI_RESEARCH_GRANT_KEYS is required"):

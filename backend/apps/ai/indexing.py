@@ -33,7 +33,7 @@ what IR-282's backfill needs.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Sequence
+from typing import Optional, Sequence
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -42,13 +42,6 @@ from apps.ai.policy.disclosure import Decision
 from apps.ai.policy.outbound import Dependency, OutboundGuard, Withheld
 from apps.ai.providers.batching import window_for_embedding
 from apps.ai.providers.ports import EmbeddingProvider
-
-#: What a caller may inject in place of the gate. A ``Decision`` rather than a
-#: ``bool`` so a refusal carries its own explanation — see
-#: ``_require_disclosure``. ``apps.ai.policy.bypass.permit_everything`` is the
-#: only alternative in the tree (IR-317), and it is development-only.
-DisclosurePredicate = Callable[[Any], Decision]
-
 
 class EmbeddingRefused(Exception):
     """The disclosure policy will not let this record's content be sent.
@@ -181,16 +174,13 @@ def _checked_space(provider: EmbeddingProvider, space_id: Optional[int] = None):
 
 
 def default_permits(record) -> Decision:
-    """The real gate: ADR-015 §Security Impact, and the default everywhere here.
+    """The real gate: ADR-015 §Security Impact, and the only one here.
 
     **It refuses a record nobody has answered for**, because an undetermined
     embargo is treated as an embargo (ADR-052 §3) — the correct failure direction
     for a gate whose purpose is to stop content leaving. Nothing in this module
     works around it: the way around a fail-closed gate is to supply the missing
     fact.
-
-    A named function rather than an inline import, so the default in both
-    signatures below reads as "the gate" instead of as a lambda.
     """
     from apps.ai.policy import decision_for_record
 
@@ -207,16 +197,16 @@ def _withheld(record_id, space, refused) -> "EmbeddingOutcome":
     return EmbeddingOutcome(record_id=record_id, space_id=space.id, refused=True, reason=reason)
 
 
-def _require_disclosure(record, permits: DisclosurePredicate) -> None:
-    """Enforce ``permits`` for this record, or raise with the reason.
+def _require_disclosure(record) -> None:
+    """Enforce the gate for this record, or raise with the reason.
 
-    ``permits`` returns a ``Decision`` rather than a bare ``bool``, unlike the
-    query lane's predicate of the same name: a refusal here has to be
+    The gate returns a ``Decision`` rather than a bare ``bool``, unlike the
+    query lane's predicate: a refusal here has to be
     *reportable* — a backfill counts withheld records and prints why, and
     "refused" with no cause sends an operator to guess which of three
     independent inputs to fix.
     """
-    decision = permits(record)
+    decision = default_permits(record)
     if not decision:
         raise EmbeddingRefused(decision.explain())
 
@@ -227,14 +217,8 @@ def embed_record_summary(
     *,
     provider: Optional[EmbeddingProvider] = None,
     skip_existing: bool = False,
-    permits: DisclosurePredicate = default_permits,
 ) -> EmbeddingOutcome:
     """Embed a record's title and abstract into ``RecordEmbedding``.
-
-    ``permits`` defaults to the real gate and is injectable for the same
-    reason ``CompositionRoot(permits=...)`` is on the query side: the
-    development bypass (IR-317) is an argument a dev tool passes, never a
-    different default.
 
     ``skip_existing`` is off by default and on for a backfill. The task path
     is queued *because* a record changed, so re-embedding is the point; a
@@ -260,7 +244,7 @@ def embed_record_summary(
         return EmbeddingOutcome(record_id=record_id, space_id=space.id, skipped=1)
 
     try:
-        _require_disclosure(record, permits)
+        _require_disclosure(record)
     except EmbeddingRefused as exc:
         return EmbeddingOutcome(
             record_id=record_id, space_id=space.id, refused=True, reason=str(exc)
@@ -269,7 +253,7 @@ def embed_record_summary(
     text = f"{record.title}. {record.abstract}"
     sent = Dependency.abstract(record.pk, record.title, record.abstract)
     try:
-        with OutboundGuard(principal=None, permits=permits).fence(lambda: {sent}):
+        with OutboundGuard(principal=None, permits=default_permits).fence(lambda: {sent}):
             vector = provider.embed_documents([text])[0]
     except Withheld as refused:
         return _withheld(record_id, space, refused)
@@ -323,7 +307,6 @@ def embed_active_chunk_set(
     provider: Optional[EmbeddingProvider] = None,
     force: bool = False,
     space_id: Optional[int] = None,
-    permits: DisclosurePredicate = default_permits,
 ) -> EmbeddingOutcome:
     """Embed the chunks of ``record_id``'s active chunk set that lack a vector.
 
@@ -355,7 +338,7 @@ def embed_active_chunk_set(
         return EmbeddingOutcome(record_id=record_id, space_id=space.id, skipped=total)
 
     try:
-        _require_disclosure(Record.objects.get(pk=record_id), permits)
+        _require_disclosure(Record.objects.get(pk=record_id))
     except EmbeddingRefused as exc:
         return EmbeddingOutcome(
             record_id=record_id, space_id=space.id, refused=True, reason=str(exc)
@@ -372,7 +355,7 @@ def embed_active_chunk_set(
     }
     try:
         # Rechecked per window and per retry: a refusal mid-paper sends no more.
-        with OutboundGuard(principal=None, permits=permits).fence(lambda: versions):
+        with OutboundGuard(principal=None, permits=default_permits).fence(lambda: versions):
             vectors = [
                 vector
                 for group in provider.embed_document_chunks(windows)

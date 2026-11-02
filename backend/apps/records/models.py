@@ -256,7 +256,8 @@ class Record(models.Model):
     details_edited_at    = models.DateTimeField(null=True, blank=True)
 
     # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
-    # `RecordViewSet.submit` and by nothing else -- neither field is writable
+    # `RecordViewSet.submit`, and for test data by `seed_demo` and
+    # `corpus_clearance` -- neither field is writable
     # through a serializer, because a consent record the subject can set on
     # themselves through the ordinary update path is not evidence of anything.
     #

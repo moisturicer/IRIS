@@ -363,6 +363,8 @@ their union runs every collected test once, preserving module order. Shard
 balance currently uses counts; use the reports to judge elapsed time before
 claiming a speedup or changing the partition policy.
 
+**AI gateway:** CI's `AI gateway` job runs `ai/tests` with `ai/requirements-dev.txt` (IR-844). Run it with `cd ai && python -m pytest -ra`.
+
 **Frontend:** CI runs `npm run lint`, `npm test` (Vitest with axe-core, IR-210) and `npm run build`.
 
 Rules: **never modify a test to make it pass**; if the test is wrong, fix it deliberately and say so in the PR. A requirement is not satisfied because code exists — only when a test demonstrates it and the evidence is recorded.
@@ -379,27 +381,9 @@ Rules: **never modify a test to make it pass**; if the test is wrong, fix it del
 6. Move the item to **In Review** only when the conditions in `DEFINITION_OF_DONE.md` §2 hold
 7. Address review; merge on approval
 
-### Merge conflicts in the traceability matrix
+### Recording traceability
 
-`docs/testing/TRACEABILITY.md` stores each requirement as one table row on a
-single line thousands of characters long. Git merges by line, so two branches
-that each append a note to the same requirement conflict on the whole row even
-though they edited different sentences. It is almost never a real disagreement.
-
-When that file is the conflict, resolve it a cell at a time:
-
-```bash
-python scripts/resolve_traceability.py   # mid-merge, after the conflict appears
-git commit --no-edit
-```
-
-The script takes whichever side changed a cell when only one did, and replays
-both sides' inserts in offset order when both did, so every note keeps the
-position its author chose. Everything outside a conflict block is git's own
-merge and is left alone. It refuses — exits non-zero, leaves the markers — if
-either side rewrote or deleted existing text, or if the conflict is not made
-only of table rows. **Read what it produced before committing**; it is a
-mechanical merge, not a review.
+Add `docs/testing/traceability/IR-XXX.md` for your ticket, and change a row in `docs/testing/TRACEABILITY.md` only when a requirement's status changes ([ADR-055](../adr/055-traceability-evidence-lives-in-one-file-per-ticket.md)). A conflict on a row is then a real disagreement, so read both sides. A branch that appended to the old file should move its entry into its own file when it merges `main`.
 
 Fixing the row format so this stops happening is IR-276.
 
