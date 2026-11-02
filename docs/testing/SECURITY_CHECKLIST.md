@@ -158,7 +158,7 @@
 | 11.1.2 | the application will only process business logic flows with all steps being processed in realistic human time, i.e. transactions are not submitted too quickly. | Needs manual check | Not implemented as a rule. A person decides whether it applies. [IR-829](https://citiris.atlassian.net/browse/IR-829) |
 | 11.1.3 | the application has appropriate limits for specific business actions or transactions which are correctly enforced on a per user basis. | Pass | DRF throttles, per-reader run caps, provider admission |
 | 11.1.4 | the application has anti-automation controls to protect against excessive calls such as mass data exfiltration, business logic requests, file uploads or denial of service attacks. | Pass | `DEFAULT_THROTTLE_RATES`, `ai_query`, `apps/tests/test_throttle_configuration.py` |
-| 11.1.5 | the application has business logic limits or validation to protect against likely business risks or threats, identified using threat modeling or similar methodologies. | Partial | ADR-053 names the risks and is **Proposed** |
+| 11.1.5 | the application has business logic limits or validation to protect against likely business risks or threats, identified using threat modeling or similar methodologies. | Partial | ADR-053 names the risks and is **Accepted** |
 
 ## V12 · Files and Resources
 
