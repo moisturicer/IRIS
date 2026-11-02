@@ -1,4 +1,4 @@
-"""Shared, bounded PDF intake (ADR-053). No parser runs in the web worker."""
+"""Shared, bounded PDF intake (IR-830). No parser runs in the web worker."""
 import hashlib
 import math
 import os

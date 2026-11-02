@@ -1,4 +1,4 @@
-"""Accepted source identity, shared by the current writer and its workers (ADR-053)."""
+"""Accepted source identity, shared by the current writer and its workers (IR-830)."""
 import uuid
 
 from django.db import transaction

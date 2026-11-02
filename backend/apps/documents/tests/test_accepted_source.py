@@ -122,6 +122,8 @@ def test_replaced_source_cannot_finish_fail_retry_or_chunk_last(manuscript, monk
 
     assert status(client, record)["state"] == "ready"
     assert status(client, record)["suggestions"]["title"] == "Current manuscript"
+    assert client.post(reverse("record-retry-extraction", args=[record.pk]),
+                       {"manuscript_revision": first[1]}).status_code == 409
     extraction = PdfExtraction.objects.get(record=record)
     assert handoffs == [(extraction.pk, current[1])]
     assert chunk_extraction.apply(args=[extraction.pk, first[1]]).result is None

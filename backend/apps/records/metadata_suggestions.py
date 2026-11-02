@@ -59,7 +59,7 @@ def suggestions_payload(record) -> dict:
     Suggestions are only ever read from a ``ready`` structure; a ready one
     with no title or *Abstract* heading gives nulls.
 
-    Every value is bound to the currently accepted source revision (ADR-053).
+    Every value is bound to the currently accepted source revision (IR-830).
     """
     extraction = PdfExtraction.objects.filter(
         record=record, kind=DocumentKind.MANUSCRIPT,

@@ -1,4 +1,4 @@
-"""ADR-053: accepted PDF content, through the shared intake boundary."""
+"""IR-830: accepted PDF content, through the shared intake boundary."""
 from io import BytesIO
 
 import pytest
@@ -42,6 +42,26 @@ def test_embedded_files_are_refused():
     writer = PdfWriter()
     writer.add_blank_page(width=200, height=200)
     writer.add_attachment("readme.txt", b"attachment")
+    assert pdf_upload_problem(encoded(writer)) == "This PDF contains unsupported active content."
+
+
+def test_indirect_action_names_cannot_hide_launch_actions():
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.root_object[NameObject("/Action")] = DictionaryObject({
+        NameObject("/S"): writer._add_object(NameObject("/Launch")),
+        NameObject("/F"): TextStringObject("program.exe"),
+    })
+    assert pdf_upload_problem(encoded(writer)) == "This PDF contains unsupported active content."
+
+
+def test_extra_dictionary_type_cannot_hide_an_automatic_action():
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    writer.root_object[NameObject("/AA")] = DictionaryObject({
+        NameObject("/Type"): NameObject("/Anything"),
+        NameObject("/WC"): DictionaryObject({NameObject("/S"): NameObject("/Named"), NameObject("/N"): NameObject("/Print")}),
+    })
     assert pdf_upload_problem(encoded(writer)) == "This PDF contains unsupported active content."
 
 

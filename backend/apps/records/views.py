@@ -660,11 +660,11 @@ class RecordViewSet(viewsets.ModelViewSet):
 
         record = self.get_object()
         record = Record.objects.select_for_update().get(pk=record.pk)
+        if str(request.data.get("manuscript_revision")) != str(record.manuscript_revision):
+            return Response({"detail": "The manuscript has changed. Check its status again."}, status=409)
         extraction = PdfExtraction.objects.filter(record=record, status="failed").first()
         if not extraction or manuscript_awaits_submission(record):
             return Response({"detail": "There is no failed extraction to retry."}, status=400)
-        if str(request.data.get("manuscript_revision")) != str(record.manuscript_revision):
-            return Response({"detail": "The manuscript has changed. Check its status again."}, status=409)
         reset_manuscript(record, retry=True)
         return Response(suggestions_payload(record), status=202)
 
