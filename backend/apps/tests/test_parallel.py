@@ -113,3 +113,15 @@ def test_real_scheduler_preserves_modules_and_role_group(tmp_path):
         assert first == second
         workers[name] = first
     assert workers["test_research_grants_db"] == workers["test_research_reads"]
+
+
+def test_all_current_research_role_consumers_are_grouped():
+    import re
+
+    directory = Path(__file__).resolve().parents[1] / "ai" / "tests"
+    consumers = {
+        path.name for path in directory.glob("test_*.py")
+        if re.search(r"grant_db|probe_login|probe_credentials|provision_research_roles|test_ai_runtime_runs_db",
+                     path.read_text(encoding="utf-8"))
+    }
+    assert consumers <= ROLE_MODULES, "new role consumers must share the Postgres role scope"
