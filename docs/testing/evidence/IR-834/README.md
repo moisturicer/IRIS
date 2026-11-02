@@ -98,3 +98,9 @@ Not found in the Windows Downloads folder when this helper ran; copy these befor
 - `IR-834-360-details.png`
 - `IR-834-360-preview.png`
 - `IR-834-rejected-replacement.png`
+
+## CI runtime correction — 2026-11-02
+
+PR #475's initial Frontend job failed before collecting the PDF preview integration suite: `ReferenceError: Iterator is not defined` while importing `pdfjs-dist` through `src/lib/pdf.ts` ([failed run](https://github.com/moisturicer/IRIS/actions/runs/41462674177/job/125340111059)). The runner used Node v20.20.2. The committed lockfile declares `pdfjs-dist@6.3.289` requires Node >=22.13.0 or >=24; npm also warned about unsupported engines during installation.
+
+Frontend CI and the Docker builder now use Node 24. The core-journey workflow uses the same version so its install/build path does not retain Node 20. No test assertion or PDF implementation was weakened. Per the user's instruction, the new GitHub CI run supplies automated evidence; no repeated local suite is claimed.
