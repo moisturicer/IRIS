@@ -82,6 +82,18 @@ def test_opening_at_a_page_is_navigation_not_executable_content():
     assert pdf_upload_problem(encoded(writer)) is None
 
 
+def test_a_non_action_dictionary_may_use_s_for_an_image_stream():
+    from pypdf.generic import DecodedStreamObject
+    writer = PdfWriter()
+    writer.add_blank_page(width=200, height=200)
+    stream = DecodedStreamObject()
+    stream.set_data(b"scientific image data")
+    writer.root_object[NameObject("/AppData")] = DictionaryObject({
+        NameObject("/S"): writer._add_object(stream.flate_encode()),
+    })
+    assert pdf_upload_problem(encoded(writer)) is None
+
+
 @pytest.mark.parametrize("mime", ["application/octet-stream", "", None])
 def test_structurally_valid_pdf_with_generic_mime_is_accepted(mime):
     file = pdf_upload()

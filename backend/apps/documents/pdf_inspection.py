@@ -63,7 +63,7 @@ def inspect(path, max_pages, max_objects, max_depth):
                 action = resolved(obj.get("/S"))
                 if context in {"open_action", "automatic_action"} and action != "/GoTo":
                     raise ActiveContent
-                if action in {"/JavaScript", "/Launch", "/SubmitForm", "/ImportData",
+                if isinstance(action, str) and action in {"/JavaScript", "/Launch", "/SubmitForm", "/ImportData",
                               "/Rendition", "/Movie", "/Sound", "/GoToE"}:
                     raise ActiveContent
                 if action == "/URI":
