@@ -19,7 +19,6 @@ from rest_framework.test import APITestCase
 
 from apps.records.models import Record, RecordOwner, RecordType
 from apps.records.testing import answered_no_embargo
-from apps.records.testing import answered_no_embargo
 from apps.reviews import seats
 from apps.reviews.models import (
     RecordAssignment,

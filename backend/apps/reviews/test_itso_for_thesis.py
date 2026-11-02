@@ -9,7 +9,6 @@ from rest_framework import status
 
 from apps.records.models import Record, RecordType
 from apps.records.testing import answered_no_embargo
-from apps.records.testing import answered_no_embargo
 from apps.reviews import seats
 from apps.reviews.models import RecordAssignment, RecordClearance
 from core.enums import RecordTypeName

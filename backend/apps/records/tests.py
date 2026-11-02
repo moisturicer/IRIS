@@ -21,7 +21,6 @@ from apps.records.models import RecordVersion
 from apps.documents.testing import real_pdf_bytes
 from .models import DeleteRequest, Record, RecordOwner, RecordType
 from .testing import answered_no_embargo
-from .testing import answered_no_embargo
 from apps.reviews.test_decisions import DecisionTestBase
 
 MANUSCRIPT_BYTES = real_pdf_bytes()

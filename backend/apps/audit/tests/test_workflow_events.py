@@ -25,7 +25,6 @@ from apps.documents.testing import real_pdf_bytes
 from apps.documents.models import DocumentRequest, DocumentRequestItem, UploadSlot
 from apps.records.models import Record
 from apps.records.testing import answered_no_embargo
-from apps.records.testing import answered_no_embargo
 from apps.reviews.models import RecordAssignment, ResubmissionRequest, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from apps.reviews.test_new_version import RESTART_ALL, NewVersionTestBase, _pdf

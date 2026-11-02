@@ -46,7 +46,6 @@ export async function createDraft(owner: Client, opts: DraftOptions): Promise<nu
 
 export async function submit(owner: Client, recordId: number) {
   await owner.act(`/records/${recordId}/embargo-answer/`, { embargoed: false });
-  await owner.act(`/records/${recordId}/embargo-answer/`, { embargoed: false });
   return owner.act(`/records/${recordId}/submit/`, { dpa_accepted: true });
 }
 

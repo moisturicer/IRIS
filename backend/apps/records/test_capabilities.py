@@ -36,7 +36,6 @@ from django.test import override_settings
 from django.urls import reverse
 
 from apps.records.testing import answered_no_embargo
-from apps.records.testing import answered_no_embargo
 from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import AssignmentState, Party, RecordTypeName, ResubmissionRequestState, SeatState
