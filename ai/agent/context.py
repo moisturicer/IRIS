@@ -269,6 +269,11 @@ class FittedAgentProvider(LLMProvider):
     async def generate_response(self, prompt: str, context: str = "") -> str:
         raise UnsupportedCapability("generate_response")
 
+    def estimate(self, request) -> tuple[AgentRequest, Status]:
+        """`fit` without sending or recording it."""
+        return fit(request, self.provider.dialect, self.provider.capacity(request.pin), self.reserves,
+                   compaction=self.compaction)
+
     def pack(self, request, results) -> tuple[AgentRequest, Status]:
         """`pack` against the pinned model's capacity; the status is recorded."""
         return self._recorded(pack, request, results)

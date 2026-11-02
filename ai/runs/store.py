@@ -28,7 +28,7 @@ from dataclasses import dataclass
 
 import asyncpg
 
-from ai.runs.executor import Result
+from ai.runs.executor import PriorTurn, Result
 
 APP_NAME = "iris-ai-runs"
 ACTIVE = ("queued", "running")
@@ -39,6 +39,9 @@ RUN_COLUMNS = (
     " deadline_at, allowance, pinned, fence, version, turn_id, created_at, finished_at,"
     " depth, started_at"
 )
+
+#: Earlier Turns a claim carries, newest kept (IR-728).
+PRIOR_TURNS = 20
 
 ADMIT_LOCK = "iris_ai.admit"
 DISPATCH_LOCK = "iris_ai.dispatch"
@@ -90,6 +93,12 @@ class Claim:
     run_id: uuid.UUID | None = None
     #: The reader's stored grant, which the run's tools read under (IR-723).
     grant: str | None = None
+    depth: str = "ordinary"
+    allowance: dict | None = None
+    remaining_seconds: float = 0.0
+    #: Earlier Turns, oldest first, and the Conversation state they left (IR-728).
+    prior: tuple[PriorTurn, ...] = ()
+    state: dict | None = None
 
 
 def request_hash(question: str, conversation_id, base_revision) -> str:
@@ -289,7 +298,9 @@ class RunStore:
                 WHERE r.id = $1 AND c.id = r.conversation_id AND c.deleted_at IS NULL
                   AND r.state IN ('queued', 'running') AND r.deadline_at > now()
                   AND (r.lease_expires_at IS NULL OR r.lease_expires_at <= now())
-            RETURNING r.fence, r.question, r.allowance, r.pinned, r.reader_grant, c.scope_record_id""",
+            RETURNING r.fence, r.question, r.allowance, r.pinned, r.reader_grant, c.scope_record_id,
+                      r.depth, r.conversation_id, c.state,
+                      extract(epoch FROM r.deadline_at - now()) AS remaining""",
             run_id, worker, float(lease_seconds),
         )
         if row is None:
@@ -313,9 +324,17 @@ class RunStore:
             run_id, row["fence"], executor, reserved_units,
         )
         await self._journal(conn, run_id, "started", {"attempt": used + 1})
+        prior = await conn.fetch(
+            """SELECT question, answer, kind FROM iris_ai.turn
+                WHERE conversation_id = $1 ORDER BY ordinal DESC LIMIT $2""",
+            row["conversation_id"], PRIOR_TURNS,
+        )
         return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"],
                      scope_record_id=row["scope_record_id"], run_id=run_id,
-                     grant=row["reader_grant"])
+                     grant=row["reader_grant"], depth=row["depth"], allowance=row["allowance"],
+                     remaining_seconds=float(row["remaining"]),
+                     prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"]) for t in reversed(prior)),
+                     state=row["state"])
 
     async def claim_next(self, *, worker: str, lease_seconds: int, executor: str,
                          reserved_units: int, deep_concurrency: int,
@@ -423,9 +442,9 @@ class RunStore:
                 turn_id = uuid.uuid4()
                 ordinal = conversation["revision"] + 1
                 await conn.execute(
-                    """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer)
-                       VALUES ($1, $2, $3, $4, $5, $6)""",
-                    turn_id, conversation_id, run_id, ordinal, run["question"], result.answer,
+                    """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer, kind)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                    turn_id, conversation_id, run_id, ordinal, run["question"], result.answer, result.kind,
                 )
                 if result.citations:
                     await conn.executemany(
@@ -435,8 +454,8 @@ class RunStore:
                          for n, c in enumerate(result.citations, start=1)],
                     )
                 await conn.execute(
-                    "UPDATE iris_ai.conversation SET revision = $2 WHERE id = $1",
-                    conversation_id, ordinal,
+                    "UPDATE iris_ai.conversation SET revision = $2, state = coalesce($3, state) WHERE id = $1",
+                    conversation_id, ordinal, result.state,
                 )
                 await conn.execute(
                     "UPDATE iris_ai.ask_run SET turn_id = $2 WHERE id = $1", run_id, turn_id,
@@ -541,7 +560,7 @@ class RunStore:
                 if revision is None:
                     raise NotFound
                 turns = await conn.fetch(
-                    """SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.created_at, r.pinned
+                    """SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.created_at, r.pinned
                          FROM iris_ai.turn t JOIN iris_ai.ask_run r ON r.id = t.run_id
                         WHERE t.conversation_id = $1 ORDER BY t.ordinal""",
                     conversation_id,
@@ -563,7 +582,7 @@ class RunStore:
             "revision": revision,
             "turns": [{
                 "id": str(t["id"]), "run_id": str(t["run_id"]), "ordinal": t["ordinal"],
-                "question": t["question"], "answer": t["answer"],
+                "question": t["question"], "answer": t["answer"], "kind": t["kind"],
                 "created_at": t["created_at"].isoformat(),
                 "pinned": t["pinned"],
                 "citations": by_turn.get(t["id"], []),
@@ -587,7 +606,8 @@ class RunStore:
     async def _delete(self, conn, conversation_id) -> None:
         """Fence first, then remove content; the caller holds the Conversation lock."""
         await conn.execute(
-            "UPDATE iris_ai.conversation SET deleted_at = now() WHERE id = $1", conversation_id,
+            "UPDATE iris_ai.conversation SET deleted_at = now(), state = '{}' WHERE id = $1",
+            conversation_id,
         )
         active = await conn.fetch(
             "SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1 AND state = ANY($2) FOR UPDATE",
