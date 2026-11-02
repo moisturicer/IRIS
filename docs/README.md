@@ -108,8 +108,8 @@ Recorded rather than silently reconciled. Each needs a decision.
 | 5 | `main` and `refactor/docker-service` carried different documentation sets | **Resolved 2026-09-02** — merged. The legacy per-module `software-requirements/M01-M08`, and the byte-identical `SRS (2).md` / `SDD (2).md` copies, were removed |
 | 6 | **ADR-011**, [`mvp-validation/FRAMEWORK_DECISION.md`](mvp-validation/FRAMEWORK_DECISION.md) and [`mvp-validation/01-framework-selection.md`](mvp-validation/01-framework-selection.md) each state the evaluation-framework decision | Open — three statements of one decision. ADR-011 is authoritative; the other two should be reduced to the evaluation detail the ADR does not carry |
 | 7 | The **SRS service table** lists no FastAPI gateway; [ADR-014](adr/014-ai-gateway-as-a-service.md) deploys one | **Moot 2026-09-03** — the SRS is frozen and is no longer an authority. ADR-014 stands alone |
-| 8 | [`security/SECURITY.md`](security/SECURITY.md) §8 records external AI transmission as **UNCONFIRMED**; [ADR-015](adr/015-voyage-embedding-and-reranking.md) sends chunk text to Voyage | **Blocking** — ADR-015 is conditional on written KTTO/IERC sign-off. Synthetic and published data only until then |
-| 9 | [`architecture-review/04-ai-rag-architecture.md`](architecture-review/04-ai-rag-architecture.md) and [`security/SECURITY.md`](security/SECURITY.md) §7 state `ai/` has no source directory | Stale — `ai/` exists. Both predate ADR-014 |
+| 8 | `security/SECURITY.md` §8 recorded external AI transmission as **UNCONFIRMED**; [ADR-015](adr/015-voyage-embedding-and-reranking.md) sends chunk text to Voyage | **Resolved 2026-11-02 (IR-670)** — ADR-015 dropped the sign-off precondition on 2026-09-04, and [`security/SECURITY.md`](security/SECURITY.md) §8 now lists its remaining conditions |
+| 9 | [`architecture-review/04-ai-rag-architecture.md`](architecture-review/04-ai-rag-architecture.md) states `ai/` has no source directory | Stale — `ai/` exists. It predates ADR-014. `security/SECURITY.md` no longer says so (IR-670) |
 
 ---
 

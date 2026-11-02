@@ -2505,3 +2505,7 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 **Not done here.** The AI runtime has no disclosure decision of its own, so its guard withholds any payload built from Record evidence rather than authorize it; IR-720's guard covers Django only. No streaming caller exists, so there is no lease renewal on the AI side. Row ownership is not enforced in the database: the runtime may settle or abandon any row's settlement columns, as Django's sweep also does. A settlement lost to a doubly cancelled task stays open and is abandoned at full charge. The race test pits two AI workers; Django against AI is exercised through shared limits, not a concurrent race. Embedding and reranking have no AI-runtime caller (ADR-024 keeps embedding in Django, already admitted by IR-545); repair and compaction callers belong to their own tickets. The gateway's legacy `/api/v1/ai/ask` path is not admitted and stays undeployable (ADR-014). No route builds the agent executor, no live provider was used, and no limit is approved.
 
 **Status.** Implemented; awaiting review.
+
+## IR-670 — SECURITY.md describes the system as it is
+
+`docs/security/SECURITY.md` rewritten against `main` on 2026-11-02: closed risks listed apart, open risks linked to their tickets, SSO and MFA marked deferred, and no SRS or SDD citation. No behaviour changes. The PR lists what was checked.
