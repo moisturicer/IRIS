@@ -91,3 +91,17 @@ IR-730's commit applied. Other local work remains in the original checkout.
 - Production AGENT composition remains unavailable, so the new reader remains off
   by default and refuses operator echoes. No paid inference, deployment or traffic
   cutover was performed. Automated reviews do not replace human approval.
+
+## CI startup harness follow-up — 3 November 2026
+
+The first GitHub run passed Backend, Frontend, Security and AI gateway, but its
+Compose job booted a stock nginx image with only the older startup script mounted.
+The missing generated `/tmp/iris-runtime-reader.conf` failure was reproduced locally.
+Both bare-nginx harnesses now mount the reader startup script and its disabled-reader
+marker, resolve the private gateway to loopback, and execute the script on Linux.
+The application defaults and enabled-reader credential requirement are unchanged.
+
+The corrected real nginx startup/header smoke test passed for the SPA, assets, a 404,
+activation route and JavaScript module-worker MIME type. The full admin-allowlist
+smoke script passed, including forwarded-address and invalid-configuration cases.
+Automated standards/spec reviews found no material issue in this CI-only change.
