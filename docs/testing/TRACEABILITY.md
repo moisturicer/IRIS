@@ -13,9 +13,11 @@ save/rollback and duplicate identity, owner isolation, real restricted-role
 source reads and forged/mismatched/stale/revoked grant refusal, renewal, lost
 publication, and two independent worker processes racing one acknowledgement.
 The authenticated PDF-upload test runs on Linux (bounded intake is unavailable
-on Windows). All nine checks passed together in the Linux backend container on
+on Windows). All ten checks passed together in the Linux backend container on
 2026-11-02, including access revocation before cleanup, historical identity
 uniqueness, and cleanup after hard deletion. Additive Django and AI migrations
+also preserve current work across authenticated submission: old grant generations
+are refused and replayed cleanup cannot erase a newer acknowledgement. Migrations
 also passed on a development database copy preserving 63 Records; publication
 model/migration consistency and Python F-rule lint passed. No live writer
 switch, provider call, extraction or index activation was performed.

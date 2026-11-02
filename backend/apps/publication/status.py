@@ -10,7 +10,8 @@ def processing_status(record):
     acknowledged = False
     try:
         with transaction.atomic(), connection.cursor() as cursor:
-            cursor.execute("SELECT iris_ai.manuscript_acknowledged(%s)", [str(work.pk)])
+            cursor.execute("SELECT iris_ai.manuscript_acknowledged(%s, %s)",
+                           [str(work.pk), work.authority_generation])
             acknowledged = cursor.fetchone()[0]
     except ProgrammingError as exc:
         # AI migrations are additive and may not have been installed yet.

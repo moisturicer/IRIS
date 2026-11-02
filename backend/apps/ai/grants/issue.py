@@ -130,7 +130,8 @@ def committed_work_grant(work) -> Grant:
     cfg = config.read()
     now = int(time.time())
     return _sign(cfg, _claims(cfg, INGESTION, now=now, exp=now + cfg.ttl_seconds,
-        wrk=str(work.pk), rec=work.record_id, rev=str(work.revision), op=work.operation))
+        wrk=str(work.pk), rec=work.record_id, rev=str(work.revision), op=work.operation,
+        wgen=work.authority_generation))
 
 
 def renew_reader_grant(user, run, token: str, *, using: str = "default") -> Grant:

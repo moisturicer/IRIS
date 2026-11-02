@@ -29,13 +29,17 @@ async def acknowledge(conn, token: str) -> bool:
             await conn.fetchval("SELECT iris_authz.begin_research($1, 'ingestion')", token)
         except asyncpg.InsufficientPrivilegeError:
             return False
-        source = await conn.fetchrow("SELECT work_id, record_id, revision FROM iris_authz.processing_source()")
+        source = await conn.fetchrow("SELECT work_id, record_id, revision,"
+            " (iris_authz.current_research_claims()->>'wgen')::bigint AS generation"
+            " FROM iris_authz.processing_source()")
         if source is None:
             return False
         result = await conn.execute(
-            "INSERT INTO iris_ai.manuscript_receipt(work_id, record_id, revision)"
-            " VALUES ($1, $2, $3) ON CONFLICT (work_id) DO NOTHING",
-            source["work_id"], source["record_id"], source["revision"],
+            "INSERT INTO iris_ai.manuscript_receipt(work_id, record_id, revision, authority_generation)"
+            " VALUES ($1, $2, $3, $4) ON CONFLICT (work_id) DO UPDATE"
+            " SET authority_generation = excluded.authority_generation, acknowledged_at = clock_timestamp()"
+            " WHERE iris_ai.manuscript_receipt.authority_generation < excluded.authority_generation",
+            source["work_id"], source["record_id"], source["revision"], source["generation"],
         )
         return result == "INSERT 0 1"
 
@@ -56,7 +60,8 @@ async def consume(dsn: str, *, limit: int, after: uuid.UUID | None = None,
                     "INSERT INTO iris_ai.manuscript_invalidation_receipt(event_id) VALUES ($1)"
                     " ON CONFLICT (event_id) DO NOTHING", fact["event_id"])
                 # Cleanup is idempotent and cannot establish source authority.
-                await conn.execute("DELETE FROM iris_ai.manuscript_receipt WHERE work_id = $1", fact["work_id"])
+                await conn.execute("DELETE FROM iris_ai.manuscript_receipt WHERE work_id = $1"
+                    " AND authority_generation <= $2", fact["work_id"], fact["authority_generation"])
                 invalidated += result == "INSERT 0 1"
         work = await conn.fetch("SELECT * FROM iris_authz.pending_manuscript_work($1, $2)", limit, after)
         count = 0

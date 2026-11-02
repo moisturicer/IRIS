@@ -4,9 +4,12 @@ Django's `publication` app owns an institutional outbox. Its PostgreSQL trigger
 commits work with the Record's source, including bulk SQL updates. Changing the
 source revokes previous work; rollback removes both changes. Soft deletion
 revokes work permanently. Restoring a Record cannot restore an old grant.
-Adviser, publication status, embargo state, and owner removal/reassignment also
-revoke existing work. Non-content invalidation facts survive hard deletion and
-are reconciled separately; delayed cleanup can only remove an old receipt.
+Adviser, publication status, embargo state, and owner removal/reassignment advance
+processing authority's generation and invalidate old grants. The same current
+work remains pending and can receive fresh authority after canonical rechecking,
+so ordinary submission never discards its work. Non-content invalidation facts
+survive hard deletion and are reconciled separately; delayed cleanup can only
+remove receipts at or below its generation, never a newer acknowledgement.
 The database forbids another work identity for the same Record/revision/operation.
 
 The revision is the accepted Manuscript UUID when available, otherwise a fresh

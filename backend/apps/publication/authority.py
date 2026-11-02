@@ -17,8 +17,8 @@ def issue_grant(work_id) -> Grant:
     if work is None:
         raise WorkRefused()
     record = Record.objects.select_for_update().filter(pk=work.record_id, is_deleted=False).first()
-    work = ManuscriptWork.objects.select_for_update().get(pk=work_id)
-    if (record is None or work.revoked_at is not None or not record.abstract_file
+    work = ManuscriptWork.objects.select_for_update().filter(pk=work_id).first()
+    if (record is None or work is None or work.revoked_at is not None or not record.abstract_file
             or record.abstract_file.name != work.source_file or work.operation != "local_extraction"):
         raise WorkRefused()
     grant = committed_work_grant(work)

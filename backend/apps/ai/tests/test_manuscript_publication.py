@@ -148,6 +148,15 @@ def test_reconcile_lost_publication_and_race_independent_workers(grant_db):
         client.force_authenticate(owner)
         url = f"/api/v1/records/{record.pk}/metadata-suggestions/"
         assert client.get(url).data["runtime_processing"]["state"] == "acknowledged_pending"
+        record.pipeline_status = "published"
+        record.save()
+        from ai.ingestion.worker import consume
+        with probe_credentials() as (name, password):
+            runtime = dsn(name, password)
+            assert asyncio.run(consume(runtime, limit=10)).acknowledged == 1
+            assert asyncio.run(consume(runtime, limit=10)).acknowledged == 0
+        # Replaying the older access fact cannot remove the new acknowledgement.
+        assert client.get(url).data["runtime_processing"]["state"] == "acknowledged_pending"
         record.abstract_file = "manuscripts/next.pdf"
         record.save()
         assert client.get(url).data["runtime_processing"]["state"] == "pending"
@@ -174,8 +183,8 @@ def test_access_change_denies_bound_grant_before_cleanup(grant_db):
         conn.rollback()
     assert ManuscriptInvalidation.objects.filter(work_id=work.pk, reason="access").count() == 1
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
-    with pytest.raises(authority.WorkRefused):
-        authority.issue_grant(work.pk)
+    renewed = authority.issue_grant(work.pk)
+    assert renewed.claims["wgen"] == grant.claims["wgen"] + 1
 
 
 def test_record_access_and_historical_revision_replay_are_fenced(grant_db):
@@ -186,10 +195,11 @@ def test_record_access_and_historical_revision_replay_are_fenced(grant_db):
     record = Record.objects.create(title="Revision", abstract_file="manuscripts/revision.pdf")
     first = ManuscriptWork.objects.get(record=record, revoked_at=None)
     Record.objects.filter(pk=record.pk).update(pipeline_status="published")
-    assert not ManuscriptWork.objects.filter(record=record, revoked_at=None).exists()
+    assert ManuscriptWork.objects.get(record=record, revoked_at=None).pk == first.pk
     with pytest.raises(IntegrityError), transaction.atomic():
         ManuscriptWork.objects.create(record=record, revision=first.revision, source_file=first.source_file)
     assert ManuscriptWork.objects.filter(record=record, revision=first.revision).count() == 1
+    Record.objects.filter(pk=record.pk).update(abstract_file="manuscripts/replacement.pdf")
     with pytest.raises(authority.WorkRefused):
         authority.issue_grant(first.pk)
 
@@ -252,3 +262,32 @@ def test_authenticated_manuscript_upload_publishes_work(tmp_path, settings, monk
     work = ManuscriptWork.objects.get(record=record, revoked_at=None)
     response = client.get(f"/api/v1/records/{record.pk}/metadata-suggestions/")
     assert response.data["runtime_processing"] == {"state": "pending", "revision": str(work.revision)}
+
+
+def test_authenticated_submission_keeps_current_work_recoverable(grant_db, monkeypatch):
+    from apps.ai.grants.database import verify
+    from apps.documents.tasks import extract_manuscript_text
+    from apps.publication.models import ManuscriptWork
+    from apps.records.models import RecordType
+
+    owner = make_user("publication-submit@cit.edu")
+    adviser = make_user("publication-adviser@cit.edu", "Adviser")
+    record = Record.objects.create(title="A complete research paper", abstract="Research abstract " * 5,
+        added_by=owner, adviser=adviser, abstract_file="manuscripts/submit.pdf",
+        record_type=RecordType.objects.get_or_create(name="Thesis / Research")[0])
+    RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+    work = ManuscriptWork.objects.get(record=record, revoked_at=None)
+    old_token = work.grant_token
+    monkeypatch.setattr(extract_manuscript_text, "delay", lambda *args: None)
+    client = APIClient()
+    client.force_authenticate(owner)
+    response = client.post(f"/api/v1/records/{record.pk}/submit/",
+                           {"dpa_accepted": True}, format="json")
+    assert response.status_code == 200, response.data
+    current = ManuscriptWork.objects.get(record=record, revoked_at=None)
+    assert current.pk == work.pk
+    assert current.authority_generation > work.authority_generation
+    assert verify(old_token, "ingestion") is None
+    assert verify(current.grant_token, "ingestion") is not None
+    assert client.get(f"/api/v1/records/{record.pk}/metadata-suggestions/").data[
+        "runtime_processing"] == {"state": "pending", "revision": str(work.revision)}

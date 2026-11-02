@@ -14,6 +14,7 @@ class ManuscriptWork(models.Model):
     revoked_at = models.DateTimeField(null=True)
     grant_token = models.TextField(default="", editable=False)
     grant_expires_at = models.DateTimeField(null=True, editable=False)
+    authority_generation = models.PositiveBigIntegerField(default=0, editable=False)
 
     class Meta:
         constraints = [models.UniqueConstraint(
@@ -29,8 +30,9 @@ class ManuscriptInvalidation(models.Model):
     record_id = models.BigIntegerField()
     work_id = models.UUIDField()
     reason = models.CharField(max_length=32)
+    authority_generation = models.PositiveBigIntegerField(default=0, editable=False)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        constraints = [models.UniqueConstraint(fields=["work_id", "reason"],
+        constraints = [models.UniqueConstraint(fields=["work_id", "authority_generation", "reason"],
                                                name="unique_manuscript_invalidation")]
