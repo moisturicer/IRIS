@@ -137,7 +137,6 @@ def test_database_mode_refuses_owner_and_bypass_credentials(settings, grant_db):
 def test_django_startup_runs_the_check(settings):
     from django.apps import apps
 
-    settings.AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = False
     settings.AI_RESEARCH_READ_POLICY = "nonsense"
     with pytest.raises(ImproperlyConfigured, match="AI_RESEARCH_READ_POLICY"):
         apps.get_app_config("ai").ready()

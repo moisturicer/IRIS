@@ -15,6 +15,7 @@ take seeded records and *run the real service over them*:
 its way into `declined`, there would be no `Review` row naming the declining
 office and both would route as a full restart instead.
 """
+from datetime import date
 from io import StringIO
 
 from django.core.management import call_command
@@ -22,15 +23,18 @@ from django.core.management.base import CommandError
 from django.test import TestCase
 
 from apps.accounts.models import User
+from apps.ai.policy.disclosure import Reason
+from apps.ai.policy.records import decision_for_record
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.reviews.models import RecordAssignment, RecordClearance, Turnaround
 from apps.reviews.new_version import submit_new_version
 from apps.reviews.tracker import workflow_state
-from core.enums import ClearanceStatus, Office, PipelineStatus, RecordTypeName
+from core.enums import ClearanceStatus, EmbargoState, Office, PipelineStatus, RecordTypeName
 
 from .management.commands.seed_demo import (
     ADMIN_EMAIL,
     AT_RDCO_TITLE,
+    CATALOGUE,
     COORDINATOR_ACCOUNTS,
     FLAGSHIP_TITLE,
     IN_RDCO_POOL_TITLE,
@@ -449,6 +453,122 @@ class SeedDemoRecordTests(TestCase):
             c.office: c.status
             for c in RecordClearance.objects.filter(record=record)
         }
+
+
+class SeedDemoEmbargoTests(TestCase):
+    """Test data answers the embargo question itself (ADR-052 decision 16).
+
+    Read through the real gate, because a stamp that exists and a paper the AI
+    may read are different claims.
+    """
+
+    def setUp(self):
+        seed()
+
+    def test_an_ordinary_submitted_paper_may_reach_the_ai(self):
+        record = Record.objects.get(title=PROPOSAL_AT_ADVISER_TITLE)
+
+        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertTrue(decision_for_record(record).allowed)
+
+    def test_the_owner_gave_the_answer(self):
+        record = Record.objects.get(title=PROPOSAL_AT_ADVISER_TITLE)
+
+        self.assertEqual(record.embargo_answered_by.email, "student@cit.edu")
+
+    def test_one_paper_shows_the_blocked_state_with_a_date_ahead(self):
+        record = Record.objects.get(title=AT_RDCO_TITLE)
+
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
+        self.assertGreater(record.embargoed_until, date.today())
+        self.assertIn(Reason.EMBARGOED, decision_for_record(record).reasons)
+
+    def test_no_other_paper_is_under_embargo(self):
+        dated = Record.objects.filter(embargoed_until__isnull=False)
+
+        self.assertEqual([record.title for record in dated], [AT_RDCO_TITLE])
+
+    def test_every_submitted_paper_has_an_answer(self):
+        past_draft = Record.objects.exclude(pipeline_status=PipelineStatus.DRAFT)
+
+        self.assertTrue(past_draft.exists())
+        for record in past_draft:
+            self.assertNotEqual(record.embargo_state, EmbargoState.UNKNOWN, record.title)
+
+    def test_the_draft_is_left_for_publish_to_ask(self):
+        draft = Record.objects.get(pipeline_status=PipelineStatus.DRAFT)
+
+        self.assertEqual(draft.embargo_state, EmbargoState.UNKNOWN)
+
+    def test_an_ip_marked_paper_is_still_refused_with_its_answer(self):
+        record = Record.objects.get(title=NEW_MODEL_TITLE)
+
+        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertIn(Reason.UNRELEASED_IP, decision_for_record(record).reasons)
+
+
+class SeedDemoEarlierPapersTests(TestCase):
+    """A second run creates nothing, so it must answer for what an older run left."""
+
+    def setUp(self):
+        seed()
+        # What a database seeded before the question existed holds.
+        Record.objects.update(
+            embargoed_until=None, embargo_answered_at=None, embargo_answered_by=None,
+        )
+
+    def test_a_second_run_answers_papers_seeded_before_the_question(self):
+        seed()
+
+        record = Record.objects.get(title=PROPOSAL_AT_ADVISER_TITLE)
+        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertEqual(record.embargo_answered_by.email, "student@cit.edu")
+
+    def test_the_paper_chosen_to_be_blocked_gets_its_date(self):
+        seed()
+
+        self.assertEqual(
+            Record.objects.get(title=AT_RDCO_TITLE).embargo_state, EmbargoState.ACTIVE,
+        )
+
+    def test_the_draft_stays_unanswered(self):
+        seed()
+
+        draft = Record.objects.get(pipeline_status=PipelineStatus.DRAFT)
+        self.assertEqual(draft.embargo_state, EmbargoState.UNKNOWN)
+
+    def test_a_paper_someone_else_created_is_left_alone(self):
+        """Only the seed's own papers: an answer here would be one nobody gave."""
+        other = Record.objects.create(
+            title="Imported by hand", origin=Record.Origin.SYNTHETIC,
+            record_type=RecordType.objects.first(),
+            pipeline_status=PipelineStatus.PUBLISHED,
+        )
+
+        seed()
+
+        other.refresh_from_db()
+        self.assertEqual(other.embargo_state, EmbargoState.UNKNOWN)
+
+    def test_a_real_paper_that_happens_to_share_a_catalogue_title_is_left_alone(self):
+        title = CATALOGUE[0][0]
+        Record.objects.filter(title=title).update(origin=Record.Origin.INSTITUTIONAL)
+
+        seed()
+
+        self.assertEqual(Record.objects.get(title=title).embargo_state, EmbargoState.UNKNOWN)
+
+    def test_a_second_run_leaves_an_existing_answer_alone(self):
+        record = Record.objects.get(title=PROPOSAL_AT_ADVISER_TITLE)
+        Record.objects.filter(pk=record.pk).update(
+            embargo_answered_at="2020-01-01T00:00:00Z", embargoed_until="2099-01-01",
+        )
+
+        seed()
+
+        record.refresh_from_db()
+        self.assertEqual(record.embargoed_until, date(2099, 1, 1))
+        self.assertEqual(record.embargo_answered_at.year, 2020)
 
 
 class SeedDemoAdhocSlotTests(TestCase):
