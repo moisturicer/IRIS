@@ -78,7 +78,7 @@ def test_extraction_settings_are_read_only_inside_the_extraction_module():
 
     backend = Path(__file__).resolve().parents[4]
     package = backend / "apps" / "ai" / "extraction"
-    reader = re.compile(r"""settings\.(DOCLING_|EXTRACTION_BACKEND)|getattr\(\s*settings,\s*["'](DOCLING_|EXTRACTION_BACKEND)""")
+    reader = re.compile(r"""settings\.(DOCLING_|LLAMAPARSE_|EXTRACTION_BACKEND)|getattr\(\s*settings,\s*["'](DOCLING_|LLAMAPARSE_|EXTRACTION_BACKEND)""")
     readers = [
         str(path.relative_to(backend))
         for path in (backend / "apps").rglob("*.py")
@@ -86,3 +86,72 @@ def test_extraction_settings_are_read_only_inside_the_extraction_module():
     ]
 
     assert readers == []
+
+
+def _llamaparse(settings, **values):
+    settings.EXTRACTION_BACKEND = "llamaparse"
+    settings.LLAMAPARSE_API_KEY = "llx-test"
+    settings.LLAMAPARSE_TIER = "agentic"
+    settings.LLAMAPARSE_VERSION = "2026-09-28"
+    settings.LLAMAPARSE_BASE_URL = "https://api.cloud.eu.llamaindex.ai"
+    for name, value in values.items():
+        setattr(settings, name, value)
+
+
+@pytest.fixture
+def shaping(monkeypatch):
+    from apps.ai.extraction import selection
+
+    monkeypatch.setattr(selection, "_llamaparse_shape", lambda: (lambda raw: DOCUMENT))
+
+
+@pytest.mark.parametrize("missing", ["LLAMAPARSE_API_KEY", "LLAMAPARSE_VERSION"])
+def test_llamaparse_refuses_to_start_without_a_key_or_a_pinned_version(settings, shaping, missing):
+    _llamaparse(settings, **{missing: ""})
+
+    with pytest.raises(ImproperlyConfigured, match=missing):
+        verify_extraction_configuration()
+
+
+def test_llamaparse_refuses_latest_outside_development(settings, shaping):
+    _llamaparse(settings, LLAMAPARSE_VERSION="latest", DEBUG=False)
+
+    with pytest.raises(ImproperlyConfigured, match="latest"):
+        verify_extraction_configuration()
+
+
+def test_llamaparse_allows_latest_in_development(settings, shaping):
+    _llamaparse(settings, LLAMAPARSE_VERSION="latest", DEBUG=True)
+
+    verify_extraction_configuration()
+
+
+def test_llamaparse_refuses_a_region_it_does_not_know(settings, shaping):
+    _llamaparse(settings, LLAMAPARSE_BASE_URL="https://llamaparse.example.com")
+
+    with pytest.raises(ImproperlyConfigured, match="LLAMAPARSE_BASE_URL"):
+        verify_extraction_configuration()
+
+
+def test_llamaparse_refuses_to_start_until_its_result_can_be_shaped(settings, monkeypatch):
+    from apps.ai.extraction import selection
+
+    _llamaparse(settings)
+    monkeypatch.setattr(selection, "_llamaparse_shape", lambda: None)
+
+    with pytest.raises(ImproperlyConfigured, match="IR-840"):
+        verify_extraction_configuration()
+
+
+def test_the_llamaparse_adapter_is_built_from_the_llamaparse_settings(settings, shaping):
+    from apps.ai.extraction.llamaparse_client import LlamaParseExtractor
+
+    _llamaparse(settings)
+
+    adapter = current_extractor()
+
+    assert isinstance(adapter, LlamaParseExtractor)
+    assert adapter.leaves_campus is True
+    assert adapter._base_url == "https://api.cloud.eu.llamaindex.ai"
+    assert adapter._options["tier"] == "agentic"
+    assert adapter._options["version"] == "2026-09-28"

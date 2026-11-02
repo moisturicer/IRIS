@@ -18,6 +18,8 @@ PROVENANCE = Provenance(name="memory", version="1")
 
 
 class InMemoryExtractor:
+    leaves_campus = False
+
     def __init__(self, result: Answers, *, provenance: Provenance = PROVENANCE,
                  timeout_seconds: float = 60, failed_pages: tuple[int, ...] = ()):
         self._result = result

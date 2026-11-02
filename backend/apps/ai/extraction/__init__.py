@@ -15,6 +15,7 @@ from .docling_mapping import normalized_document_from_docling
 from .flattening import flatten_for_search
 from .hashing import extraction_hash
 from .memory import InMemoryExtractor
+from .pages import page_report
 from .ports import (
     DocumentRejected,
     EmptyExtraction,
@@ -22,8 +23,10 @@ from .ports import (
     ExtractionError,
     ExtractorUnavailable,
     Failure,
+    FigureImage,
     Provenance,
     StructuredExtractor,
+    Usage,
     classify,
 )
 from .selection import current_extractor, use_extractor, verify_extraction_configuration
@@ -40,6 +43,8 @@ __all__ = [
     "Failure",
     "classify",
     "Provenance",
+    "Usage",
+    "FigureImage",
     # selection
     "current_extractor",
     "use_extractor",
@@ -53,4 +58,5 @@ __all__ = [
     "document_from_json",
     "flatten_for_search",
     "extraction_hash",
+    "page_report",
 ]

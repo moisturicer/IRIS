@@ -91,6 +91,8 @@ class DoclingExtractor:
     per call and closed with it.
     """
 
+    leaves_campus = False
+
     def __init__(
         self,
         base_url: str,

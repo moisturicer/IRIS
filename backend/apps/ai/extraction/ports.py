@@ -15,7 +15,8 @@ sketch, and separate fields are exactly how they drift.
 
 import enum
 from dataclasses import dataclass, field
-from typing import Any, Mapping, Protocol, runtime_checkable
+from decimal import Decimal
+from typing import Any, Mapping, Optional, Protocol, runtime_checkable
 
 from apps.ai.chunking.document import NormalizedDocument
 
@@ -56,16 +57,42 @@ class Provenance:
 
 
 @dataclass(frozen=True)
+class Usage:
+    """What one read cost: pages read, and the credits charged when the
+    vendor reported them (IR-841)."""
+
+    pages: int
+    credits: Optional[Decimal] = None
+
+
+@dataclass(frozen=True)
+class FigureImage:
+    """A figure the Extractor cropped, downloaded before its copy is deleted
+    (IR-841). ``bbox`` is the vendor's page-point box; IR-845 stores it."""
+
+    page: int
+    bbox: Mapping[str, float]
+    media_type: str
+    data: bytes
+    caption: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class ExtractedDocument:
     """What an extractor returns: the structured document and its provenance.
 
     ``failed_pages`` are pages the extractor could not read; the rest of the
-    document is still used (IR-839).
+    document is still used (IR-839). ``raw`` is the vendor's whole result,
+    less expiring URLs, so shaping can re-run without a paid re-read; ``usage``
+    is None for an on-campus Extractor that charges nothing (IR-841).
     """
 
     document: NormalizedDocument
     provenance: Provenance
     failed_pages: tuple[int, ...] = ()
+    usage: Optional[Usage] = None
+    figures: tuple[FigureImage, ...] = ()
+    raw: Mapping[str, Any] = field(default_factory=dict)
 
 
 class Failure(enum.Enum):
@@ -98,5 +125,7 @@ class StructuredExtractor(Protocol):
     """
 
     timeout_seconds: float
+    # True when the PDF is sent off the deployment (IR-841, ADR-056).
+    leaves_campus: bool
 
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument: ...

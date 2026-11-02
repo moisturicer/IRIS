@@ -6,3 +6,6 @@ scripts/*.sh text eol=lf
 
 # Contract fixtures are compared byte for byte with what their layout draws (IR-838).
 *.pdf binary
+
+# Recordings stay byte for byte as LlamaParse returned them (IR-841).
+backend/apps/ai/extraction/tests/fixtures/llamaparse/** -text

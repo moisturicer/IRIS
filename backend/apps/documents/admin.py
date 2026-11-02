@@ -1,6 +1,8 @@
 """
 Django admin for `documents`: `RecordFile` as an escape hatch (IR-476), and
-`PdfExtraction` read-only, the one place its provenance is shown (IR-838).
+`PdfExtraction` read-only, the one place its provenance is shown (IR-838), and
+its raw result's pages: low-confidence pages flagged, never dropped, and
+watermark text, which only staff see (IR-841).
 
 `RecordFile`:
 
@@ -17,6 +19,7 @@ action alike -- `QuerySet.delete()` would otherwise leave every file on disk.
 
 from django.contrib import admin
 
+from apps.ai.extraction import page_report
 from apps.audit.services import create_audit_event
 
 from .attachments import delete_record_file
@@ -70,8 +73,13 @@ class PdfExtractionAdmin(admin.ModelAdmin):
     list_select_related = ("record", "upload")
     fields = readonly_fields = (
         "record", "upload", "kind", "status", "phase", "extractor", "extractor_version",
-        "extractor_options", "content_hash", "warnings", "created_at", "completed_at",
+        "extractor_options", "content_hash", "warnings", "pages_read", "credits", "pages",
+        "created_at", "completed_at",
     )
+
+    @admin.display(description="Pages (least confident first)")
+    def pages(self, obj):
+        return page_report(obj.raw_result)
 
     def has_module_permission(self, request):
         return request.user.is_superuser
