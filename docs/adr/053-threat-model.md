@@ -69,7 +69,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 
 | | Threat | Control or gap |
 |---|---|---|
-| T, E | A hostile PDF exploits the parser | PDF content check ([IR-665](https://citiris.atlassian.net/browse/IR-665)), Docling isn't published. Gaps: malware scan ([IR-666](https://citiris.atlassian.net/browse/IR-666)), outbound limits ([IR-825](https://citiris.atlassian.net/browse/IR-825)) |
+| T, E | A hostile PDF exploits the parser | PDF content check ([IR-665](https://citiris.atlassian.net/browse/IR-665)), Docling isn't published. Docling has no route out ([IR-825](https://citiris.atlassian.net/browse/IR-825)). Gap: malware scan ([IR-666](https://citiris.atlassian.net/browse/IR-666)) |
 | D | A PDF that takes the parser down | 50 MB limit, worker separation on the `extraction` queue |
 
 **Django ↔ Voyage and LLM vendors**

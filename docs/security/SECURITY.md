@@ -105,6 +105,25 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 **Tenancy** is one instance per tenant ([ADR-005](../adr/005-instance-per-tenant.md)). Each institution gets its own database and media volume, so a missing tenant filter can't leak across institutions.
 
+
+### Outbound traffic
+
+In production, `private` is an internal Compose network with no route to the internet ([IR-825](https://citiris.atlassian.net/browse/IR-825)).
+
+| Service | Reaches outside | Why |
+|---|---|---|
+| `db`, `redis`, `migrate` | Nothing | Internal only |
+| `docling` | Nothing | It parses uploaded PDFs, so a hostile file stays contained. Its models are in the image |
+| `frontend` | Nothing | It serves files and forwards to `backend` |
+| `celery-extraction` | Nothing | It only calls Docling |
+| `celery-beat` | Nothing | It only queues tasks |
+| `backend`, `celery-default` | AI vendors, mail server | Answers and email |
+| `celery-embedding`, `celery-shadow` | AI vendors | Embedding, overviews and evidence decisions |
+| `ai-gateway` | AI vendors | Chat |
+| `caddy` | The certificate authority | Getting and renewing certificates |
+
+**Services on `egress` can reach any host, not only those listed.** Compose can't filter by hostname, and vendors' addresses change, so limiting them needs an outbound proxy, which IRIS doesn't run.
+
 ---
 
 ## 8 · External AI services

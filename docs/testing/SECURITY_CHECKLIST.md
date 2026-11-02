@@ -174,7 +174,7 @@
 | 12.4.2 | files obtained from untrusted sources are scanned by antivirus scanners to prevent upload and serving of known malicious content. | Gap | No scanning. [IR-666](https://citiris.atlassian.net/browse/IR-666) |
 | 12.5.1 | the web tier is configured to serve only files with specific file extensions to prevent unintentional information and source code leakage. For example, backup files (e.g. .bak), temporary working files (e.g. .swp), compressed files (.zip, .tar.gz, etc) and other extensions commonly used by editors should be blocked unless required. | Pass | nginx serves the built bundle and named asset types; `/api/` and `/admin/` are proxied |
 | 12.5.2 | direct requests to uploaded files will never be executed as HTML/JavaScript content. | Pass | Files go through Django views with nosniff ([IR-152](https://citiris.atlassian.net/browse/IR-152)) |
-| 12.6.1 | the web or application server is configured with an allow list of resources or systems to which the server can send requests or load data/files from. | Gap | No outbound restriction. [IR-825](https://citiris.atlassian.net/browse/IR-825) |
+| 12.6.1 | the web or application server is configured with an allow list of resources or systems to which the server can send requests or load data/files from. | Partial | Docling, `db`, `redis` and other internal services have no route out, shown by CI ([IR-825](https://citiris.atlassian.net/browse/IR-825)). Services that call vendors can reach any host, and `SECURITY.md` §7 says why |
 
 ## V13 · API and Web Service
 

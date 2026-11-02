@@ -479,6 +479,25 @@ jobs:
       # touch until a worker runs the task. The secret is the same throwaway
       # the Backend job uses. `timeout` ends the run, so its exit code is not
       # the verdict: the two greps are.
+      # IR-825: the real production networks. The control proves the probe can
+      # succeed, so a failure on `private` means no route, not a broken probe.
+      - name: Private services have no route to the internet
+        run: |
+          compose="docker compose -p iris-net -f docker-compose.prod.yml"
+          trap '$compose down -v' EXIT
+          $compose up --no-start --no-deps redis caddy
+          $compose start redis
+          url=https://example.com
+          docker run --rm --network iris-net_egress alpine:3.20 wget -q -T 15 -O /dev/null "$url"
+          echo "egress network reaches the internet, as it should"
+          if docker run --rm --network iris-net_private alpine:3.20 wget -q -T 8 -O /dev/null "$url"; then
+            echo "::error::the private network reached the internet"; exit 1
+          fi
+          if $compose exec -T redis wget -q -T 8 -O /dev/null "$url"; then
+            echo "::error::redis reached the internet"; exit 1
+          fi
+          echo "private network and redis have no route out, as they should"
+
       - name: Boot celery-beat and see its schedule
         run: |
           docker compose -f docker-compose.yml up -d redis
