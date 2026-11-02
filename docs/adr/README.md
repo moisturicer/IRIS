@@ -72,6 +72,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 |---|---|---|---|
 | [006](006-minimum-rag-pipeline.md) | Minimum RAG pipeline, no orchestration framework | Superseded | [013](013-chunk-level-rag-pipeline.md), amended by [016](016-docling-structured-extraction.md) |
 | [012](012-ai-provider-abstraction-not-a-service.md) | AI provider abstraction in Django, not a separate service | Superseded | [014](014-ai-gateway-as-a-service.md) |
+| [055](055-traceability-evidence-lives-in-one-file-per-ticket.md) | **Accepted** 2026-11-02 by Ashlee Sean. Traceability notes live in one file per ticket, and the matrix holds status and links |
 
 ---
 
