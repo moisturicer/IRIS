@@ -87,7 +87,7 @@ export function ConversationHistoryList({
                 <span className="block text-[14px] font-semibold truncate pr-6">
                   {c.title || "New conversation"}
                 </span>
-                <span className="block text-[12px] text-stone-400 mt-0.5">
+                <span className="block text-[12px] text-stone-600 mt-0.5">
                   {formatDate(c.updated_at, "MMM d · h:mm a")}
                 </span>
               </Link>

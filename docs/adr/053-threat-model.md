@@ -49,7 +49,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 | S | Password guessing, stolen credentials | Lockout on the real client address ([IR-656](https://citiris.atlassian.net/browse/IR-656)), rate limits ([IR-661](https://citiris.atlassian.net/browse/IR-661)), recovery ([IR-642](https://citiris.atlassian.net/browse/IR-642)). Gap: password rules ([IR-819](https://citiris.atlassian.net/browse/IR-819)). SSO and MFA deferred ([IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | S | A stolen session stays usable | Idle expiry ([IR-166](https://citiris.atlassian.net/browse/IR-166)), revoke ([IR-657](https://citiris.atlassian.net/browse/IR-657)), ending sessions on lock or password change ([IR-644](https://citiris.atlassian.net/browse/IR-644)). Gap: no notice on password change ([IR-820](https://citiris.atlassian.net/browse/IR-820)) |
 | T | Forged client address in `X-Forwarded-For` | `TRUSTED_PROXY_COUNT` ([IR-656](https://citiris.atlassian.net/browse/IR-656)) |
-| T | Traffic altered in transit | Gap: TLS isn't configured in this repository, no ticket yet |
+| T | Traffic altered in transit | Caddy serves HTTPS, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-056). Gap: not yet run on a deployed domain |
 | R | Denying a sign-in or an act | Insert-only audit log ([IR-166](https://citiris.atlassian.net/browse/IR-166)), workflow events ([IR-144](https://citiris.atlassian.net/browse/IR-144)). Gap: refused sign-ins aren't audited ([IR-659](https://citiris.atlassian.net/browse/IR-659)) |
 | I | Reading a record or file by guessing its id | One `visible_to` predicate ([IR-153](https://citiris.atlassian.net/browse/IR-153)), route matrix ([IR-615](https://citiris.atlassian.net/browse/IR-615), [IR-616](https://citiris.atlassian.net/browse/IR-616)), no public `/media/` ([IR-152](https://citiris.atlassian.net/browse/IR-152)) |
 | I | Script injection reading tokens | React escaping, report-only CSP. Gap: enforce it ([IR-823](https://citiris.atlassian.net/browse/IR-823)). Gap: unpinned CDN stylesheet ([IR-822](https://citiris.atlassian.net/browse/IR-822)) |
@@ -63,13 +63,13 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 | | Threat | Control or gap |
 |---|---|---|
 | S, T | Someone on the host's network writes to the broker | Redis password and localhost binding ([IR-669](https://citiris.atlassian.net/browse/IR-669)). JSON-only Celery content, so a broker message can't run pickle |
-| I | Reading tokens or data from Redis | Same. Gap: development web services are still on every interface ([IR-828](https://citiris.atlassian.net/browse/IR-828)) |
+| I | Reading tokens or data from Redis | Same. Every development port binds to localhost ([IR-828](https://citiris.atlassian.net/browse/IR-828)) |
 
 **Django ↔ Docling**
 
 | | Threat | Control or gap |
 |---|---|---|
-| T, E | A hostile PDF exploits the parser | PDF content check ([IR-665](https://citiris.atlassian.net/browse/IR-665)), Docling isn't published. Gaps: malware scan ([IR-666](https://citiris.atlassian.net/browse/IR-666)), outbound limits ([IR-825](https://citiris.atlassian.net/browse/IR-825)) |
+| T, E | A hostile PDF exploits the parser | PDF content check ([IR-665](https://citiris.atlassian.net/browse/IR-665)), Docling isn't published. Docling has no route out ([IR-825](https://citiris.atlassian.net/browse/IR-825)). Gap: malware scan ([IR-666](https://citiris.atlassian.net/browse/IR-666)) |
 | D | A PDF that takes the parser down | 50 MB limit, worker separation on the `extraction` queue |
 
 **Django ↔ Voyage and LLM vendors**
@@ -93,7 +93,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 **Gains:**
 
 - Every control now has a stated reason, so removing one has a visible cost.
-- Each gap has a ticket, apart from TLS.
+- Each gap has a ticket.
 - The ASVS checklist has something to point at for 11.1.5, the business risks IRIS has identified.
 
 **Costs:**

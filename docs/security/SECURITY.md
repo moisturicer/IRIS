@@ -105,6 +105,25 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 **Tenancy** is one instance per tenant ([ADR-005](../adr/005-instance-per-tenant.md)). Each institution gets its own database and media volume, so a missing tenant filter can't leak across institutions.
 
+
+### Outbound traffic
+
+In production, `private` is an internal Compose network with no route to the internet ([IR-825](https://citiris.atlassian.net/browse/IR-825)).
+
+| Service | Reaches outside | Why |
+|---|---|---|
+| `db`, `redis`, `migrate` | Nothing | Internal only |
+| `docling` | Nothing | It parses uploaded PDFs, so a hostile file stays contained. Its models are in the image |
+| `frontend` | Nothing | It serves files and forwards to `backend` |
+| `celery-extraction` | Nothing | It only calls Docling |
+| `celery-beat` | Nothing | It only queues tasks |
+| `backend`, `celery-default` | AI vendors, mail server | Answers and email |
+| `celery-embedding`, `celery-shadow` | AI vendors | Embedding, overviews and evidence decisions |
+| `ai-gateway` | AI vendors | Chat |
+| `caddy` | The certificate authority | Getting and renewing certificates |
+
+**Services on `egress` can reach any host, not only those listed.** Compose can't filter by hostname, and vendors' addresses change, so limiting them needs an outbound proxy, which IRIS doesn't run.
+
 ---
 
 ## 8 · External AI services
@@ -154,7 +173,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 1 | Django's admin is reachable from the internet at `/admin/`, guarded only by `is_staff`, with no MFA | **High** | One stolen staff password opens a separate path to the database | [IR-782](https://citiris.atlassian.net/browse/IR-782), then [IR-668](https://citiris.atlassian.net/browse/IR-668)'s allowlist applies (spec [IR-655](https://citiris.atlassian.net/browse/IR-655)) |
 | 2 | Uploads aren't scanned for malware | **High** | A hostile file reaches the parser and the people who download it | [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)) |
 | 3 | No backups and no rehearsed restore | **High** | A lost disk loses records that can't be recreated | [IR-167](https://citiris.atlassian.net/browse/IR-167) (parent [IR-151](https://citiris.atlassian.net/browse/IR-151)) |
-| 4 | TLS isn't configured in this repository | **High** | Passwords, tokens and unpublished work could be read in transit | **No ticket yet** |
+| 4 | TLS is configured but hasn't run on a deployed domain, and HSTS isn't confirmed for one | **High** | Passwords, tokens and unpublished work could be read in transit until it has | [IR-847](https://citiris.atlassian.net/browse/IR-847), [IR-806](https://citiris.atlassian.net/browse/IR-806) |
 | 5 | Security-relevant sign-in events leave no audit row | **Medium** | Password guessing leaves nothing to investigate | [IR-659](https://citiris.atlassian.net/browse/IR-659) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 6 | Registration accepts any email domain | **Medium** | Anyone can get a signed-in account | [IR-660](https://citiris.atlassian.net/browse/IR-660) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 7 | One office holds workflow and system administration powers together | **Medium** | One compromised account reaches both sets of powers | [IR-781](https://citiris.atlassian.net/browse/IR-781) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
@@ -163,7 +182,6 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | A compromised gateway could read records past Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
 | 11 | Voyage's training opt-out has no recorded evidence | **Medium** | Nothing shows the vendor isn't training on unpublished text | [IR-827](https://citiris.atlassian.net/browse/IR-827) |
 | 12 | The ASVS checklist is a draft awaiting review | **Medium** | Its statuses come from reading code, and nobody has confirmed them | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
-| 13 | Development `backend`, `frontend` and `docling` listen on every interface | **Low** | Exposes development machines to their local network, not production | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
 
 [`SECURITY_CHECKLIST.md`](../testing/SECURITY_CHECKLIST.md) lists further Level 1 gaps: [IR-819](https://citiris.atlassian.net/browse/IR-819), [IR-820](https://citiris.atlassian.net/browse/IR-820), [IR-821](https://citiris.atlassian.net/browse/IR-821), [IR-822](https://citiris.atlassian.net/browse/IR-822), [IR-823](https://citiris.atlassian.net/browse/IR-823), [IR-824](https://citiris.atlassian.net/browse/IR-824), [IR-825](https://citiris.atlassian.net/browse/IR-825).
 
@@ -187,6 +205,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | Lockout counted the proxy's address, not the client's | [IR-656](https://citiris.atlassian.net/browse/IR-656) |
 | A revoked session's access token kept working | [IR-657](https://citiris.atlassian.net/browse/IR-657) |
 | CI didn't run `ai/tests`, including the gateway's service authentication test | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
+| Development `backend`, `frontend` and `docling` listened on every interface | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
 | Production HTTPS redirect loop behind the proxy | [IR-662](https://citiris.atlassian.net/browse/IR-662) |
 | No browser security headers | [IR-663](https://citiris.atlassian.net/browse/IR-663) |
 | Uploads accepted without checking the content was a PDF | [IR-665](https://citiris.atlassian.net/browse/IR-665) |

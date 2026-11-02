@@ -39,7 +39,7 @@ Both run inside the backend container (`support/stack.ts`).
 ## Limitations
 
 - **TLS.** Production settings redirect any request not marked HTTPS, and
-  nothing in this repository terminates TLS (IR-662). The run sends
+  this stack turns Caddy off (IR-847) and publishes nginx directly. The run sends
   `X-Forwarded-Proto: https`, which nginx passes through as a fronting proxy
   would. Emailed links name the `https://` `FRONTEND_URL`; the run follows
   their path on the plain-HTTP address.

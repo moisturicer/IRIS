@@ -213,4 +213,4 @@ These are limits on the evidence. Security risks, with severity and reason, are 
 | Some security checklist items need a check by hand, and nobody has done it | Reading the code can't settle them | [IR-829](https://citiris.atlassian.net/browse/IR-829) |
 | Restore is unrehearsed | No backups exist to restore | [IR-167](https://citiris.atlassian.net/browse/IR-167) |
 | Real Ask IRIS answers aren't driven by the journeys | Every question answers "no readable sources" until the embargo work lands | [IR-250](https://citiris.atlassian.net/browse/IR-250) |
-| TLS is untested end to end | Nothing in this repository terminates it, so journeys send `X-Forwarded-Proto: https` | No ticket yet |
+| TLS is untested end to end | CI tests Caddy with a local certificate, journeys turn it off and send `X-Forwarded-Proto: https`, and nothing is deployed | [IR-847](https://citiris.atlassian.net/browse/IR-847) |

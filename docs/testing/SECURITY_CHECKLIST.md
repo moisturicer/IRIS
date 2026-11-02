@@ -138,9 +138,9 @@
 
 | Item | Requirement | Status | Evidence |
 |---|---|---|---|
-| 9.1.1 | TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. | Gap | nginx listens on plain 8080, and this repository configures no TLS. **No ticket yet.** [IR-662](https://citiris.atlassian.net/browse/IR-662) only trusts the proxy's scheme |
-| 9.1.2 | using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred. | Gap | As 9.1.1. **No ticket yet** |
-| 9.1.3 | only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option. | Gap | As 9.1.1. **No ticket yet** |
+| 9.1.1 | TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. | Partial | Caddy serves HTTPS and redirects plain HTTP, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-056). CI shows this on the real Caddy with a local certificate. Not yet seen on a deployed domain |
+| 9.1.2 | using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred. | Partial | CI's OpenSSL probe refuses weak ciphers on the real Caddy (IR-847). A full scan on a deployed domain is still owed |
+| 9.1.3 | only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option. | Partial | The Caddyfile allows only 1.2 and 1.3, and CI's probe confirms it (IR-847). Not yet seen on a deployed domain |
 
 ## V10 · Malicious Code
 
@@ -174,7 +174,7 @@
 | 12.4.2 | files obtained from untrusted sources are scanned by antivirus scanners to prevent upload and serving of known malicious content. | Gap | No scanning. [IR-666](https://citiris.atlassian.net/browse/IR-666) |
 | 12.5.1 | the web tier is configured to serve only files with specific file extensions to prevent unintentional information and source code leakage. For example, backup files (e.g. .bak), temporary working files (e.g. .swp), compressed files (.zip, .tar.gz, etc) and other extensions commonly used by editors should be blocked unless required. | Pass | nginx serves the built bundle and named asset types; `/api/` and `/admin/` are proxied |
 | 12.5.2 | direct requests to uploaded files will never be executed as HTML/JavaScript content. | Pass | Files go through Django views with nosniff ([IR-152](https://citiris.atlassian.net/browse/IR-152)) |
-| 12.6.1 | the web or application server is configured with an allow list of resources or systems to which the server can send requests or load data/files from. | Gap | No outbound restriction. [IR-825](https://citiris.atlassian.net/browse/IR-825) |
+| 12.6.1 | the web or application server is configured with an allow list of resources or systems to which the server can send requests or load data/files from. | Partial | Docling, `db`, `redis` and other internal services have no route out, shown by CI ([IR-825](https://citiris.atlassian.net/browse/IR-825)). Services that call vendors can reach any host, and `SECURITY.md` §7 says why |
 
 ## V13 · API and Web Service
 

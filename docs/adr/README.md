@@ -25,7 +25,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [013](013-chunk-level-rag-pipeline.md) | Chunk-level RAG pipeline with reranking | Accepted · **amended 2026-09-04, 2026-09-08** | Scope · Cost · Security · **Research** |
 | [014](014-ai-gateway-as-a-service.md) | The AI gateway is adopted as a deployed service, subject to five preconditions | Accepted · **completed by 017** | Architecture · Security · Deployment |
 | [015](015-voyage-embedding-and-reranking.md) | Voyage for embedding and reranking, always — `voyage-context-4` | Accepted · **amended 2026-09-20 (awaiting acceptance)** | Architecture · Security · Cost |
-| [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Accepted · **amended 2026-09-04 (twice)** | Architecture · Scope · **Research** |
+| [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | **Superseded** by [056](056-manuscript-extraction-moves-to-llamaparse.md) · accepted 2026-09-03, amended 2026-09-04 (twice) | Architecture · Scope · **Research** |
 | [017](017-asgi-deployment-for-gateway-streaming.md) | ASGI deployment so Django can call the gateway asynchronously | Accepted | Architecture · Deployment · Performance |
 | [018](018-conditional-parallel-office-routing.md) | Conditional parallel-office routing | **Accepted** — 2026-09-07 · **partially superseded by [021](021-reviewer-directed-routing.md) and [032](032-adviser-first-review-and-office-reviewer-pools.md)** | Architecture · Research |
 | [019](019-persisted-unified-conversation-history.md) | Persisted conversation history, unified across Ask IRIS and Paper Chat | Accepted | Architecture · **Research** |
@@ -55,6 +55,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) | Every paper states its embargo first, before its file is uploaded, with a required No or Yes and a date. Unanswered stays blocked, the date is only a reminder, and the Adviser or RDCO releases it. KTTO releases IP-marked papers, and RDCO is warned rather than blocked when publishing | **Accepted on merge** — 2026-11-01 (IR-250), Lee Jasmin Adolfo as relayed by Hermoine Zozobrado · amends [015](015-voyage-embedding-and-reranking.md) · partly built: the answer, test data, setting and releasing (IR-811, IR-816, IR-815, IR-812) | Security · Architecture |
 | [053](053-threat-model.md) | **Accepted** 2026-11-02 by Ashlee Sean. The assets, actors, trust boundaries and STRIDE threats IRIS defends against, each mapped to a control or a ticketed gap |
 | [054](054-each-person-answers-whether-ai-may-use-their-papers.md) | Each person answers once whether AI may use their papers, at sign-up and after each new notice, and can change it in Settings. A No keeps their account normal and their papers away from AI. A paper keeps its Contact person's answer, and a change only reaches later papers unless a person going to Yes chooses to include earlier ones. Replaces ADR-051's Submission consent | **Accepted on merge** — 2026-11-02 (IR-836), Lee Jasmin Adolfo, as relayed by Hermoine Zozobrado |
+| [056](056-manuscript-extraction-moves-to-llamaparse.md) | Manuscript extraction moves to LlamaParse, behind the consent and embargo gate and ADR-041 admission. LlamaParse's labels and structure become IRIS's; Figures are images IRIS stores and describes for retrieval only; chunks stay IRIS's and are embedded by Voyage. Supersedes 016 and 025 | **Accepted on merge** — 2026-11-02 (IR-837), decisions by Jive Tyler Revalde · not built | Architecture · Security · Cost · **Research** |
 
 **ADR-034 takes the next free number** (added 2026-10-02, IR-453). 024–031 exist as files but were never added to this index; 033 and 034 were free under both the files on disk and this table. **ADR-033** is the IR-390 spec's written basis. Both it and ADR-034 cite ADRs **by filename** throughout because of the duplicate numbers noted above.
 
@@ -66,13 +67,16 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 
 **Numbering note:** ADR-018 was drafted on `main` as "016" while `feat/rag-service` (not yet merged into `main` at the time) already had its own ADR-016 (`docling-structured-extraction`). It was renumbered to 018 to avoid a collision once the branches reconciled, rather than reusing 016.
 
-**Two superseded decisions, kept for the record — not for "what does IRIS do today."** This project's rule is to supersede an ADR rather than edit or delete it (see *Writing a new ADR* below), so these stay, but neither describes current behavior:
+**Superseded decisions, kept for the record — not for "what does IRIS do today."** This project's rule is to supersede an ADR rather than edit or delete it (see *Writing a new ADR* below), so these stay, but neither describes current behavior:
 
 | ADR | Title | Status | Superseded by |
 |---|---|---|---|
 | [006](006-minimum-rag-pipeline.md) | Minimum RAG pipeline, no orchestration framework | Superseded | [013](013-chunk-level-rag-pipeline.md), amended by [016](016-docling-structured-extraction.md) |
 | [012](012-ai-provider-abstraction-not-a-service.md) | AI provider abstraction in Django, not a separate service | Superseded | [014](014-ai-gateway-as-a-service.md) |
+| [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Superseded | [056](056-manuscript-extraction-moves-to-llamaparse.md) |
+| [025](025-figures-and-formulas-in-extraction.md) | Figures are cropped from the source PDF, formulas are OCR'd, and figure contents are not described | Superseded | [056](056-manuscript-extraction-moves-to-llamaparse.md) |
 | [055](055-traceability-evidence-lives-in-one-file-per-ticket.md) | **Accepted** 2026-11-02 by Ashlee Sean. Traceability notes live in one file per ticket, and the matrix holds status and links |
+| [056](056-caddy-terminates-tls.md) | **Accepted** 2026-11-02 by Ashlee Sean. Caddy terminates TLS in production, and nginx is no longer published |
 
 ---
 
