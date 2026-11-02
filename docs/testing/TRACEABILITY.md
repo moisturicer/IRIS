@@ -2513,7 +2513,7 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 
 ## IR-617 — Threat model and ASVS Level 1 checklist (NFR-S1…S6)
 
-NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECKLIST.md), against the threats in [ADR-053](../adr/053-threat-model.md). Both are drafts until Ashlee Sean reviews them, and ADR-053 needs acceptance by a named person. Gaps are ticketed, IR-819 to IR-829, apart from TLS.
+NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECKLIST.md), against the threats in [ADR-053](../adr/053-threat-model.md). Ashlee Sean accepted ADR-053 on 2026-11-02. The checklist is a draft until reviewed. Gaps are ticketed, IR-819 to IR-829, apart from TLS.
 
 ## IR-732 — Fit the complete outgoing request within verified model capacity
 

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Proposed** — 2026-11-02. Drafted by an AI agent under [IR-617](https://citiris.atlassian.net/browse/IR-617). Ashlee Sean reviews it, and it takes effect only when a named person accepts it. An agent can't accept it.
+**Accepted** — 2026-11-02 by Ashlee Sean, after review ([IR-617](https://citiris.atlassian.net/browse/IR-617)). Drafted by an AI agent.
 
 ## Context
 
