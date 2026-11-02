@@ -51,6 +51,21 @@ class Settings(BaseSettings):
     RUNS_POLL_SECONDS: float | None = None
     # Worker wakeups only; empty means workers poll PostgreSQL.
     RUNS_REDIS_URL: str = ""
+    # Provider admission (IR-725): Django's names, one shared campaign.
+    # No defaults; unset refuses every paid attempt.
+    AI_ADMISSION_CAMPAIGN: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_ATTEMPTS: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_INPUT_TOKENS: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_OUTPUT_TOKENS: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_COST_USD: str = ""
+    AI_ADMISSION_CAMPAIGN_MAX_ACTIVE_MINUTES: str = ""
+    AI_ADMISSION_RESERVE_FRACTION: str = ""
+    AI_ADMISSION_RESERVE_RELEASED: str = ""
+    AI_ADMISSION_LANE_CONCURRENCY: str = ""
+    AI_ADMISSION_ACCOUNT_CONCURRENCY: str = ""
+    AI_ADMISSION_PRICES: str = ""
+    AI_ADMISSION_MAX_OUTPUT_TOKENS: str = ""
+    AI_ADMISSION_LEASE_GRACE_SECONDS: str = ""
     
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

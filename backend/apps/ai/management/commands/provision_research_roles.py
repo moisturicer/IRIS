@@ -36,6 +36,15 @@ RUNTIME_FUNCTIONS = (
     # Row policies call it as the invoker (IR-718).
     "research_record_ids()",
 )
+#: Provider admission's ledger, shared by both runtimes (IR-725), and the
+#: columns the AI runtime may update: settlement and totals, never a reservation.
+LEDGER_TABLES = {
+    "ai_providercampaign": "charged_attempts, charged_input_tokens, charged_output_tokens,"
+                           " charged_cost_micros, charged_active_ms",
+    "ai_providerreservation": "state, settled_at, sent, usage_reported, charge_attempts,"
+                              " charge_input_tokens, charge_output_tokens, charge_cost_micros,"
+                              " charge_active_ms",
+}
 #: Columns the verifier reads, and nothing else (no password hashes).
 VERIFIER_COLUMNS = {
     "accounts_user": "id, is_active, is_locked, credential_version, role_id",
@@ -85,6 +94,21 @@ def problems(cursor) -> list[str]:
     )
     found += [f"function iris_authz.{name} is not owned by {VERIFIER}" for (name,) in cursor.fetchall()]
     found += _policy_problems(cursor)
+    cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = 'iris_ai_runtime'")
+    if cursor.fetchone() is not None:
+        for table in LEDGER_TABLES:
+            cursor.execute(
+                "SELECT has_table_privilege('iris_ai_runtime', %s, 'DELETE, TRUNCATE')",
+                [f"public.{table}"],
+            )
+            if cursor.fetchone()[0]:
+                found.append(f"role iris_ai_runtime can delete from {table}")
+        cursor.execute(
+            "SELECT has_column_privilege('iris_ai_runtime', 'public.ai_providerreservation',"
+            " 'reserved_cost_micros', 'UPDATE')"
+        )
+        if cursor.fetchone()[0]:
+            found.append("role iris_ai_runtime can rewrite reservations")
     return found
 
 
@@ -201,6 +225,12 @@ class Command(BaseCommand):
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.reader_status(bigint) TO iris_ai_runtime"
         )
+        # The AI runtime reserves and settles in the one shared ledger (IR-725).
+        for table, columns in LEDGER_TABLES.items():
+            cursor.execute(f"REVOKE UPDATE ON public.{table} FROM iris_ai_runtime")
+            cursor.execute(f"GRANT SELECT, INSERT ON public.{table} TO iris_ai_runtime")
+            cursor.execute(f"GRANT UPDATE ({columns}) ON public.{table} TO iris_ai_runtime")
+            cursor.execute(f"GRANT USAGE ON SEQUENCE public.{table}_id_seq TO iris_ai_runtime")
         # Django renews grants, so it alone may ask whether one verifies.
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.verify_research_grant(text, text) TO iris_django_runtime"

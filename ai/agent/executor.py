@@ -7,8 +7,11 @@ a mismatch is `unavailable`, never a substitute model or dialect.
 
 from __future__ import annotations
 
+import asyncio
+
+from ai.admission.errors import AdmissionDenied
 from ai.agent.protocol import AgentRequest, NotFinal, Pin, User, final_answer
-from ai.domain.ports import LLMProvider, UnsupportedCapability
+from ai.domain.ports import LLMProvider, TransientProviderError, UnsupportedCapability
 from ai.runs import config as runs_config
 from ai.runs.executor import Result, Unavailable
 
@@ -39,14 +42,26 @@ class AgentExecutor:
         return (all(getattr(self.pin, k) == v for k, v in SUPPORTED.items())
                 and self.provider.accepts(self.pin))
 
+    def admitted(self) -> bool:
+        """A provider that may bill is reached only through admission (IR-725)."""
+        return getattr(self.provider, "admitted", False) or not getattr(self.provider, "paid", True)
+
     async def answer(self, question: str, tools=None) -> Result:
         if not self.supported():
             raise Unavailable("unsupported_pin")
+        if not self.admitted():
+            raise Unavailable("not_admitted")
         request = AgentRequest(pin=self.pin, instructions=INSTRUCTIONS, history=(User(question),))
         try:
             turn = await self.provider.converse(request)
         except UnsupportedCapability:
             raise Unavailable("unsupported_pin") from None
+        except AdmissionDenied as refused:
+            raise Unavailable(refused.reason) from None
+        except asyncio.TimeoutError:
+            raise Unavailable("provider_timeout") from None
+        except TransientProviderError:
+            raise Unavailable("provider_failed") from None
         try:
             text = final_answer(turn)
         except NotFinal as refused:
