@@ -130,6 +130,8 @@ IR-250 (builds this) · IR-317 (the bypass it removes) · IR-127 (the gate) · I
 
 ## Amendment — 2026-11-02 (IR-816): the question comes first, and who can see the answer
 
+**Changed since by [ADR-054](054-each-person-answers-whether-ai-may-use-their-papers.md):** consent no longer stays on the last step, once that ADR is built. The Why below records the reasoning at the time.
+
 **What this supersedes.** Decision 2's "at submission: a toggle and a date on the publish form, beside the IP question", and the word "toggle" in decision 5. Everything else stands. Decided by Hermoine Zozobrado. Decision 18 was accepted separately on 2026-11-02.
 
 **Decision 2, as amended.** Every paper answers one question first, before its file is uploaded. Publish opens on it, alone, as a required No or Yes with a date. No records "no embargo", and Yes requires a date. It starts unanswered, because "no embargo" can send text out and must be something a person chose. The answer is saved before the file is sent, with who gave it and when, the way consent is, and a first submission with no answer is refused. Under Yes, nothing is filled in from the paper's content at upload.
