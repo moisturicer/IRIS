@@ -12,6 +12,9 @@ import { AskIrisNotice } from "@/features/ai/components/AskIrisNotice";
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
+import { runtimeReaderEnabled } from "@/api/runtimeReader";
+import { useAuthStore } from "@/store/auth.store";
+import { RuntimeReader } from "@/features/ai/components/RuntimeReader";
 import {
   CONTROL_BASE,
   CONTROL_FILLED,
@@ -171,7 +174,39 @@ function subjectOf(record: RecordDetail): ChatSubject {
  * "Chat about this paper instead", closing the panel, and reaching a paper
  * any other way all bring back the page's own record.
  */
-export function PaperChatPanel({
+export function PaperChatPanel(props: PaperChatPanelProps) {
+  return runtimeReaderEnabled ? <RuntimePaperChatPanel key={props.record.id} {...props} /> : <LegacyPaperChatPanel {...props} />;
+}
+
+function RuntimePaperChatPanel(props: PaperChatPanelProps) {
+  const userId = useAuthStore(s => s.user?.id);
+  const storageKey = `iris-runtime-paper:${userId}:${props.record.id}`;
+  const [conversationId, setConversationId] = useState<string | undefined>(() => {
+    try { return sessionStorage.getItem(storageKey) ?? undefined; } catch { return undefined; }
+  });
+  const headingId = useId();
+  return <aside ref={props.panelRef} style={props.style} tabIndex={-1} aria-labelledby={headingId}
+    role={props.modal ? "dialog" : undefined} aria-modal={props.modal || undefined}
+    className={cn("bg-canvas flex flex-col overflow-hidden", props.className)}>
+    {props.resize && !props.minimized && <ResizeEdge {...props.resize} />}
+    <header className="flex items-start justify-between gap-3 border-b border-stone-200 p-4">
+      <div className="min-w-0"><h2 id={headingId} className="font-display text-xl text-stone-900">Ask IRIS</h2>
+        <p className="text-sm text-stone-600 break-words">{props.record.title}</p>
+        <p className="text-xs text-stone-500">Research stays within this paper.</p></div>
+      <button type="button" aria-label="Close Paper Chat" className="min-h-11 px-2 text-sm" onClick={props.onClose}>Close</button>
+    </header>
+    {props.viewingVersion != null && <p className="px-4 py-2 text-xs text-stone-600">You are viewing an older manuscript. Answers use the current version.</p>}
+    {props.minimized && <button type="button" onClick={props.onRestore} className="min-h-14 px-4 text-left">Ask IRIS: back to the answer</button>}
+    <div className={props.minimized ? "hidden" : "min-h-0 flex-1"}>
+      <RuntimeReader conversationId={conversationId} recordId={props.record.id} onConversation={id => {
+        setConversationId(id);
+        try { sessionStorage.setItem(storageKey, id); } catch { /* optional address convenience */ }
+      }} />
+    </div>
+  </aside>;
+}
+
+function LegacyPaperChatPanel({
   record,
   arrival,
   onClose,

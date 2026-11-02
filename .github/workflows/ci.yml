@@ -437,13 +437,17 @@ jobs:
           echo '<!doctype html><title>IRIS</title>' > "$RUNNER_TEMP/html/index.html"
           echo 'export {};' > "$RUNNER_TEMP/html/assets/app.js"
           echo 'export {};' > "$RUNNER_TEMP/html/assets/pdf.worker.min-x.mjs"
+          # The stock image needs the same reader startup inputs as our image.
+          printf false > "$RUNNER_TEMP/runtime-reader-enabled"
           image=nginxinc/nginx-unprivileged:1.25-alpine
           mounts="-v $PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
                   -v $PWD/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
                   -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
+                  -v $PWD/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro
+                  -v $RUNNER_TEMP/runtime-reader-enabled:/etc/nginx/iris/runtime-reader-enabled:ro
                   -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"
-          docker run --rm --add-host backend:127.0.0.1 $mounts "$image" nginx -t
-          docker run -d --name iris-nginx --add-host backend:127.0.0.1 -p 8080:8080 $mounts "$image"
+          docker run --rm --add-host backend:127.0.0.1 --add-host ai-gateway:127.0.0.1 $mounts "$image" nginx -t
+          docker run -d --name iris-nginx --add-host backend:127.0.0.1 --add-host ai-gateway:127.0.0.1 -p 8080:8080 $mounts "$image"
           trap 'docker logs iris-nginx; docker rm -f iris-nginx' EXIT
           ready=
           for i in $(seq 1 20); do curl -s -o /dev/null localhost:8080/ && { ready=1; break; }; sleep 1; done
