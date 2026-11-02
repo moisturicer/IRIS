@@ -2496,7 +2496,7 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 
 **Evidence:** driven in a real browser on 2026-11-02 against the real backend on a throwaway database, not in CI: the question comes first with no default, Continue refuses no answer and a past date, `POST /records/` then `embargo-answer/` then the file, the date stored on the row, no suggestion requests under Yes and two under No, an answered draft skips the question, and no sideways scroll at 360, 768, 1280 or 1745 px.
 
-**PARTIAL:** the server does not refuse a file on an unanswered draft: only Publish's order enforces "answer first", and the gate still refuses an unanswered paper. Releasing an embargo is IR-812, so a submitted Yes cannot end yet, and the screen does not promise it. Saving the answer writes no audit event: the row holds who and when, and IR-812 adds the audit types. Jive's planned AI that fills in fields at upload still needs consent, which comes at the last step, so the gate refuses it for every paper.
+**PARTIAL:** the server does not refuse a file on an unanswered draft: only Publish's order enforces "answer first", and the gate still refuses an unanswered paper. Releasing an embargo is IR-812, so a submitted Yes cannot end yet, and the screen does not promise it. Saving the answer writes no audit event: the row holds who and when, and IR-812 adds the audit types. AI that fills in fields at upload still needs consent, which stays on the last step until ADR-054 is built (IR-791), so the gate refuses it for every paper until then.
 
 **Status:** Implemented; awaiting review.
 
