@@ -28,7 +28,7 @@ test("register through the three-step form", async ({ page }, testInfo) => {
   await page.getByRole("radio", { name: "Student" }).check();
   await page.getByLabel("First Name").fill("Journey");
   await page.getByLabel("Last Name").fill(last);
-  await page.getByLabel("CIT-U Email").fill(email);
+  await page.getByLabel("Institutional email").fill(email);
   await page.getByRole("button", { name: "Continue" }).click();
 
   const college = page.getByLabel("College");
