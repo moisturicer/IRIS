@@ -1,3 +1,4 @@
+import { INSTITUTION } from "@/config/institution";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
@@ -240,7 +241,7 @@ function SimilarPapers({ recordId }: { recordId: number }) {
             className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
           >
             <p className="text-2xs font-semibold tracking-wider text-stone-500 mb-2">
-              CIT-U #{item.id}
+              Record #{item.id}
             </p>
             <p className="font-display text-lg font-semibold text-stone-900 leading-snug line-clamp-3 group-hover:text-brand transition-colors duration-200">
               {item.title}
@@ -965,7 +966,7 @@ export default function PaperViewPage() {
                 <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
                   {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
-                  {record.origin === "institutional" && <span>Cebu Institute of Technology – University</span>}
+                  {record.origin === "institutional" && <span>{INSTITUTION.name}</span>}
                   {record.publication_year && <span>Published {record.publication_year}</span>}
                   {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
                 </div>

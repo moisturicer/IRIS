@@ -119,7 +119,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     shownTo: (r) => canAccess(r.role, "opportunities"),
     body: (
       <p>
-        Calls for papers and conferences open to the CIT-U research community. RDCO and Advisers
+        Calls for papers and conferences open to your institution's research community. RDCO and Advisers
         post them and keep them up to date.
       </p>
     ),

@@ -1,3 +1,4 @@
+import { INSTITUTION } from "@/config/institution";
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
@@ -222,7 +223,7 @@ function ProfileTab({ user, onSaved }: { user: NonNullable<ReturnType<typeof use
                 <span className="flex items-center gap-1.5">
                   <i className="fas fa-circle-check text-stone-900 text-[12px]" aria-hidden />
                   {user.is_verified ? "Verified · " : ""}
-                  Managed by CIT-U. Your email is your sign-in identity and the name attached to
+                  Managed by {INSTITUTION.name}. Your email is your sign-in identity and the name attached to
                   every clearance decision, so it cannot be changed here.
                 </span>
               }

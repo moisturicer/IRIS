@@ -80,7 +80,7 @@ export function RelatedPublishedResearch({ recordId }: { recordId: number }) {
       {state.kind === "ready" && state.items.length > 0 && (
         <>
           <p className="text-sm text-stone-600 mb-3">
-            Published work at CIT-U that is close to this proposal. Read it to judge whether
+            Published work at your institution that is close to this proposal. Read it to judge whether
             your idea has already been done here.
           </p>
           <ul className="space-y-2">

@@ -224,7 +224,7 @@ export function CallsAndConferencesPage() {
     <div>
       <PageHeader
         title="Calls & Conferences"
-        description="Internal research calls, conference deadlines and funding windows, posted by CIT-U offices and advisers. Soonest deadline first."
+        description="Internal research calls, conference deadlines and funding windows, posted by institutional offices and advisers. Soonest deadline first."
         actions={postButton || undefined}
       />
 

@@ -2527,6 +2527,16 @@ NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECK
 
 **Status.** Implemented; awaiting review.
 
+
+## IR-769 - Institution copy and entry-screen links
+
+**Basis.** ADR-005 and IR-769, including the requested login/signup footer and duplicate-link changes. Neutral copy replaces deployment-specific wording in discovery examples, opportunities, help and related research. Paper View uses Record identifiers; Paper View, metadata origin, account details and APA/MLA/BibTeX citations read the shared institution configuration.
+
+**Verification.** Rendered UI tests in `config/institution.test.tsx` use Example Research University / ERU to demonstrate account details, metadata labels and all three citation formats follow a different deployment. `PaperViewPage.test.tsx` checks the configured institution and does not attribute external references to it. Login/signup tests check one account-switch link, Help, privacy/terms dialogs, preserved input, Escape/focus return and blocking accessibility rules. Shared-footer assertions in EmailVerifyPage/PendingApprovalPage and the rotating DiscoverSearchComposer expectation are deliberately updated for the new requirements.
+
+**Browser evidence (2026-11-02).** Headless Chromium, login and signup at 1440px and 360px: one account-switch link; Help, Data privacy and Terms open and close; no horizontal overflow. Desktop and phone screenshots visually inspected. TypeScript checks pass. Full frontend suite and independent AI-assisted standards/spec review are recorded in the PR before handoff.
+
+**Boundaries.** Existing `DataNotice.tsx` and `lib/dpaTerms.ts` legal wording is unchanged; Terms explicitly says institutional review is pending. No policy approval is implied. Ask IRIS copy remains unchanged and is flagged for Jive in the Jira comment. No backend, workflow, office configuration or deployment changes. Human approval and merge remain outstanding.
 ## IR-770 — Paper View and My Reviews contrast (2026-11-02)
 
 NFR-A1: muted text on stone-100 now uses the existing stone-600 utility in the reading header, single-version label, PDF zoom, Paper Chat heading context, review workspace heading and inactive My Reviews counts. Real Chromium measured the affected pair at 4.3977:1 before and 6.9934:1 after (AA minimum 4.5:1). The existing IR-414 browser pre-pass is the acceptance check; see [executed evidence and limits](evidence/IR-770/README.md). Human approval remains outstanding.

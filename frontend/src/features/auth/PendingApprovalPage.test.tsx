@@ -188,15 +188,15 @@ describe.each([
     signInAs(request);
 
     expect(screen.queryByText(/Your research has/)).not.toBeInTheDocument();
-    expect(screen.queryAllByRole("link")).toEqual([]);
+    expect(screen.queryByRole("link", { name: /sign in|create an account/i })).not.toBeInTheDocument();
   });
 
-  it("names the pilot institution in the footer", () => {
+  it("offers privacy and terms in the shared entry footer", () => {
     signInAs(request);
 
-    expect(screen.getByRole("contentinfo")).toHaveTextContent(
-      "Pilot institution: Cebu Institute of Technology – University",
-    );
+    expect(screen.getByRole("contentinfo")).not.toHaveTextContent("Pilot institution:");
+    expect(screen.getByRole("link", { name: "Data privacy" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Terms" })).toBeInTheDocument();
   });
 });
 
