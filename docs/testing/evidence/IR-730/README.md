@@ -105,3 +105,21 @@ The corrected real nginx startup/header smoke test passed for the SPA, assets, a
 activation route and JavaScript module-worker MIME type. The full admin-allowlist
 smoke script passed, including forwarded-address and invalid-configuration cases.
 Automated standards/spec reviews found no material issue in this CI-only change.
+
+## CI calendar boundary follow-up — 3 November 2026
+
+The next GitHub run passed Compose, all four backend shards, Security and AI
+gateway. Frontend exposed an existing Publish test assumption after 16:00 UTC:
+the fixture used the runner's local day while the form correctly used Manila's
+day. The original UI failure reproduced locally with `TZ=UTC`.
+
+The test fixture now uses Manila calendar dates. Fixed instants just before and
+after Manila midnight independently assert yesterday/today and exercise the same
+past-date refusal and today acceptance through the dialog. The after-midnight
+case failed before the helper correction; all **77 Publish dialog tests** passed
+afterward under UTC. Type checking and targeted lint passed. Application date
+validation is unchanged. Automated standards/spec reviews found no findings.
+
+The final full frontend run under UTC passed **1,707 tests in 131 files**. An
+earlier restricted local run could not read temporary files for four source-scan
+suites; rerunning with normal filesystem access passed every suite.
