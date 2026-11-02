@@ -171,9 +171,11 @@ class PdfExtraction(models.Model):
     # ingestion on an unchanged document is a hash comparison rather than a
     # re-chunk. Indexed because that comparison is the lookup.
     content_hash   = models.CharField(max_length=64, blank=True, db_index=True)
-    # Which extractor produced the result. One value today; recorded anyway,
-    # so the question is answerable from the row rather than from its date.
+    # Which Extractor, version and options produced the result (IR-838), so
+    # the question is answerable from the row rather than from its date.
     extractor      = models.CharField(max_length=32, blank=True)
+    extractor_version = models.CharField(max_length=64, blank=True, default="")
+    extractor_options = models.JSONField(default=dict, blank=True)
     celery_task_id = models.CharField(max_length=200, blank=True)
     error          = models.TextField(blank=True)
     created_at     = models.DateTimeField(auto_now_add=True)

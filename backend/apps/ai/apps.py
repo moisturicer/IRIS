@@ -6,7 +6,7 @@ class AiConfig(AppConfig):
     name = "apps.ai"
 
     def ready(self):
-        """Startup checks for the AI configuration (IR-379, IR-464, IR-312).
+        """Startup checks for the AI configuration (IR-379, IR-464, IR-312, IR-838).
 
         Here rather than in a settings module because they must hold whichever
         settings module is loaded. It also puts them on every entry point --
@@ -17,6 +17,7 @@ class AiConfig(AppConfig):
             load_rule_set,
             verify_evidence_configuration,
         )
+        from apps.ai.extraction import verify_extraction_configuration
         from apps.ai.inference import verify_inference_configuration
         from apps.ai.similarity import verify_novelty_configuration
 
@@ -27,6 +28,7 @@ class AiConfig(AppConfig):
         from apps.ai.grants.config import verify_grant_configuration
         from apps.ai.grants.reads import verify_research_read_configuration
 
+        verify_extraction_configuration()
         verify_research_configuration()
         verify_controller_configuration()
         verify_comparison_configuration()

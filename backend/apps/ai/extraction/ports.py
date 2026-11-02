@@ -13,8 +13,8 @@ disagrees with its own elements — the two were separate fields in the design
 sketch, and separate fields are exactly how they drift.
 """
 
-from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+from dataclasses import dataclass, field
+from typing import Any, Mapping, Protocol, runtime_checkable
 
 from apps.ai.chunking.document import NormalizedDocument
 
@@ -45,16 +45,21 @@ class EmptyExtraction(ExtractionError):
 
 
 @dataclass(frozen=True)
-class ExtractedDocument:
-    """What an extractor returns: the structured document, and its own name.
+class Provenance:
+    """Which Extractor produced an Extraction, at which version, with which
+    options (IR-838). Stored on the row, so the answer is in the data."""
 
-    ``extractor`` is stored on the extraction row so that "which extractor
-    produced this?" is answerable from the data rather than from the date of
-    the row and a memory of when the code changed.
-    """
+    name: str
+    version: str = ""
+    options: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class ExtractedDocument:
+    """What an extractor returns: the structured document and its provenance."""
 
     document: NormalizedDocument
-    extractor: str
+    provenance: Provenance
 
 
 @runtime_checkable

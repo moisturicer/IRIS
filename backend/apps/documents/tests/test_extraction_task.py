@@ -1,13 +1,13 @@
-"""The extraction task end to end, against a fake extractor (IR-107).
+"""The extraction task end to end, against the in-memory extractor (IR-107).
 
 The seam is the ``StructuredExtractor`` port, so none of this needs a Docling
-container: a fake returning a canned document exercises everything the task
-actually does — the status transitions, the two derived outputs, the error
-path and the retry.
+container: ``InMemoryExtractor`` returning a canned document exercises
+everything the task actually does — the status transitions, the two derived
+outputs, the error path and the retry.
 
-The fakes below are real implementations of the port, not ``MagicMock``s.
-That matters: a mock breaks when the call sequence changes, which is not a
-defect; a fake breaks when the *contract* changes, which is.
+It is a real implementation of the port, not a ``MagicMock``. A mock breaks
+when the call sequence changes, which is not a defect; a fake breaks when the
+*contract* changes, which is.
 
 Needs a database because ``PdfExtraction`` is the thing under test.
 ``db_required`` skips these cleanly where no Postgres is reachable rather
@@ -26,10 +26,12 @@ from apps.ai.chunking.document import (
     NormalizedDocument,
 )
 from apps.ai.extraction import (
-    ExtractedDocument,
     ExtractionError,
     ExtractorUnavailable,
+    InMemoryExtractor,
+    Provenance,
     extraction_hash,
+    use_extractor,
 )
 from apps.documents import tasks
 from apps.documents.models import PdfExtraction, RecordUpload, UploadSlot
@@ -52,31 +54,6 @@ DOCUMENT = NormalizedDocument(
     ),
     page_sizes={12: (612.0, 792.0)},
 )
-
-
-class FakeExtractor:
-    """Returns a canned document. A real implementation of the port."""
-
-    def __init__(self, document=DOCUMENT, name="fake"):
-        self._document = document
-        self._name = name
-        self.calls = []
-
-    def extract(self, pdf_bytes, *, filename):
-        self.calls.append((pdf_bytes, filename))
-        return ExtractedDocument(document=self._document, extractor=self._name)
-
-
-class FailingExtractor:
-    """Raises whatever it was given. Also a real implementation."""
-
-    def __init__(self, error):
-        self._error = error
-        self.calls = 0
-
-    def extract(self, pdf_bytes, *, filename):
-        self.calls += 1
-        raise self._error
 
 
 @pytest.fixture(autouse=True)
@@ -111,9 +88,9 @@ def extraction(upload):
     return PdfExtraction.objects.create(upload=upload)
 
 
-def _run(monkeypatch, extractor, upload_id):
-    monkeypatch.setattr(tasks, "_build_extractor", lambda: extractor)
-    return tasks.extract_pdf_text.apply(args=[upload_id])
+def _run(extractor, upload_id):
+    with use_extractor(extractor):
+        return tasks.extract_pdf_text.apply(args=[upload_id])
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +99,7 @@ def _run(monkeypatch, extractor, upload_id):
 
 
 def test_a_successful_extraction_reaches_done(monkeypatch, upload, extraction):
-    _run(monkeypatch, FakeExtractor(), upload.id)
+    _run(InMemoryExtractor(DOCUMENT), upload.id)
 
     extraction.refresh_from_db()
     assert extraction.status == "done"
@@ -133,7 +110,7 @@ def test_a_successful_extraction_reaches_done(monkeypatch, upload, extraction):
 def test_the_flat_text_is_populated_so_full_text_search_is_unaffected(
     monkeypatch, upload, extraction
 ):
-    _run(monkeypatch, FakeExtractor(), upload.id)
+    _run(InMemoryExtractor(DOCUMENT), upload.id)
 
     extraction.refresh_from_db()
     assert "Samples were collected weekly" in extraction.extracted_text
@@ -143,7 +120,7 @@ def test_the_flat_text_is_populated_so_full_text_search_is_unaffected(
 def test_the_structure_is_persisted_not_only_the_flat_text(monkeypatch, upload, extraction):
     """The whole point of ADR-016: flattening at extraction is irreversible,
     so the structure the chunker needs has to be stored here or nowhere."""
-    _run(monkeypatch, FakeExtractor(), upload.id)
+    _run(InMemoryExtractor(DOCUMENT), upload.id)
 
     extraction.refresh_from_db()
     assert extraction.structure
@@ -153,7 +130,7 @@ def test_the_structure_is_persisted_not_only_the_flat_text(monkeypatch, upload, 
 def test_the_persisted_structure_keeps_the_regions_a_citation_anchors_to(
     monkeypatch, upload, extraction
 ):
-    _run(monkeypatch, FakeExtractor(), upload.id)
+    _run(InMemoryExtractor(DOCUMENT), upload.id)
 
     extraction.refresh_from_db()
     paragraph = extraction.as_normalized_document().elements[1]
@@ -163,33 +140,39 @@ def test_the_persisted_structure_keeps_the_regions_a_citation_anchors_to(
     )
 
 
-def test_the_row_records_which_extractor_produced_the_result(monkeypatch, upload, extraction):
-    _run(monkeypatch, FakeExtractor(name="docling"), upload.id)
+def test_the_row_records_which_extractor_version_and_options_produced_it(
+    monkeypatch, upload, extraction
+):
+    provenance = Provenance(name="llamaparse", version="2.4.1", options={"tier": "agentic"})
+
+    _run(InMemoryExtractor(DOCUMENT, provenance=provenance), upload.id)
 
     extraction.refresh_from_db()
-    assert extraction.extractor == "docling"
+    assert (extraction.extractor, extraction.extractor_version, extraction.extractor_options) == (
+        "llamaparse", "2.4.1", {"tier": "agentic"}
+    )
 
 
 def test_the_extraction_hash_ties_a_chunk_set_to_this_extraction(
     monkeypatch, upload, extraction
 ):
-    _run(monkeypatch, FakeExtractor(), upload.id)
+    _run(InMemoryExtractor(DOCUMENT), upload.id)
 
     extraction.refresh_from_db()
     assert extraction.content_hash == extraction_hash(DOCUMENT)
 
 
 def test_the_task_records_its_celery_id_before_doing_the_work(monkeypatch, upload, extraction):
-    _run(monkeypatch, FakeExtractor(), upload.id)
+    _run(InMemoryExtractor(DOCUMENT), upload.id)
 
     extraction.refresh_from_db()
     assert extraction.celery_task_id
 
 
 def test_the_pdf_bytes_and_filename_reach_the_extractor(monkeypatch, upload, extraction):
-    extractor = FakeExtractor()
+    extractor = InMemoryExtractor(DOCUMENT)
 
-    _run(monkeypatch, extractor, upload.id)
+    _run(extractor, upload.id)
 
     (pdf_bytes, filename) = extractor.calls[0]
     assert pdf_bytes == b"%PDF-1.7 fake bytes"
@@ -202,7 +185,7 @@ def test_a_re_extraction_clears_a_previous_error(monkeypatch, upload, extraction
     extraction.error = "PDF reading failed. Retry extraction or enter details manually."
     extraction.save(update_fields=["status", "error"])
 
-    _run(monkeypatch, FakeExtractor(), upload.id)
+    _run(InMemoryExtractor(DOCUMENT), upload.id)
 
     extraction.refresh_from_db()
     assert (extraction.status, extraction.error) == ("done", "")
@@ -218,7 +201,7 @@ def test_a_successful_extraction_does_not_queue_chunking(
     supplementary, not because ``extract_pdf_text`` is a task that never
     chunks. The ``extraction`` fixture leaves ``kind`` at its default, which
     is exactly the supplementary case."""
-    _run(monkeypatch, FakeExtractor(), upload.id)
+    _run(InMemoryExtractor(DOCUMENT), upload.id)
 
     assert queued_chunkings == []
 
@@ -237,7 +220,7 @@ def test_a_successful_extraction_does_not_queue_chunking(
     ids=["unavailable", "rejected"],
 )
 def test_a_failed_extraction_is_recorded_and_retried(monkeypatch, upload, extraction, error):
-    result = _run(monkeypatch, FailingExtractor(error), upload.id)
+    result = _run(InMemoryExtractor(error), upload.id)
 
     extraction.refresh_from_db()
     assert extraction.status == "failed"
@@ -247,7 +230,7 @@ def test_a_failed_extraction_is_recorded_and_retried(monkeypatch, upload, extrac
 
 
 def test_a_failure_leaves_no_half_written_structure(monkeypatch, upload, extraction):
-    _run(monkeypatch, FailingExtractor(ExtractionError("boom")), upload.id)
+    _run(InMemoryExtractor(ExtractionError("boom")), upload.id)
 
     extraction.refresh_from_db()
     assert extraction.structure == {}
@@ -259,17 +242,17 @@ def test_the_task_retries_three_times_before_giving_up(monkeypatch, upload, extr
     """Enough to cover a container restart; not so many that a genuinely
     unreadable PDF occupies a worker all afternoon. Counted rather than read
     off ``max_retries``, so this fails if the retry stops being raised."""
-    extractor = FailingExtractor(ExtractorUnavailable("container is down"))
+    extractor = InMemoryExtractor(ExtractorUnavailable("container is down"))
 
-    _run(monkeypatch, extractor, upload.id)
+    _run(extractor, upload.id)
 
-    assert extractor.calls == 4  # the first attempt, then three retries
+    assert len(extractor.calls) == 4  # the first attempt, then three retries
 
 
 def test_a_deleted_extraction_row_is_not_an_error(monkeypatch, upload):
     """The upload can be deleted between the task being queued and running."""
-    extractor = FakeExtractor()
+    extractor = InMemoryExtractor(DOCUMENT)
 
-    _run(monkeypatch, extractor, upload.id)
+    _run(extractor, upload.id)
 
     assert extractor.calls == []

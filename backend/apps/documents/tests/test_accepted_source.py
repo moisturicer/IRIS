@@ -8,6 +8,7 @@ from django.urls import reverse
 from django.db import connections
 from rest_framework.test import APIClient
 
+from apps.ai.extraction import InMemoryExtractor, use_extractor
 from apps.documents.models import PdfExtraction
 from apps.documents.testing import pdf_upload
 from apps.records.models import Record, RecordOwner, RecordType
@@ -70,7 +71,6 @@ def test_source_identity_is_persistent_and_unchanged_bytes_are_idempotent(manusc
 @pytest.mark.parametrize("old_outcome", ["success", "retry", "failure"])
 def test_replaced_source_cannot_finish_fail_retry_or_chunk_last(manuscript, monkeypatch, old_outcome):
     from apps.ai.chunking.document import DocumentElement, NormalizedDocument, PARAGRAPH
-    from apps.ai.extraction import ExtractedDocument
     from apps.ai.models import ChunkSet
     from apps.ai.tasks import chunk_extraction, embed_chunk_set
     from apps.documents import tasks
@@ -84,56 +84,55 @@ def test_replaced_source_cannot_finish_fail_retry_or_chunk_last(manuscript, monk
     monkeypatch.setattr(tasks, "_queue_chunk_extraction", lambda *args: handoffs.append(args))
     monkeypatch.setattr(embed_chunk_set, "delay", lambda *args, **kwargs: embedded.append((args, kwargs)))
 
-    class Extractor:
-        def extract(self, content, *, filename):
-            old = content.endswith(b"%A\n")
-            if old:
-                started.set()
-                assert release.wait(20)
-                if old_outcome != "success":
-                    raise RuntimeError("private parser path /secret/old.pdf")
-            title = "Old manuscript" if old else "Current manuscript"
-            return ExtractedDocument(document=NormalizedDocument(title=title, elements=(
-                DocumentElement(kind=PARAGRAPH, text="A complete research passage about current findings.", page=1),
-            )), extractor="local-test")
+    def respond(content, filename):
+        old = content.endswith(b"%A\n")
+        if old:
+            started.set()
+            assert release.wait(20)
+            if old_outcome != "success":
+                return RuntimeError("private parser path /secret/old.pdf")
+        title = "Old manuscript" if old else "Current manuscript"
+        return NormalizedDocument(title=title, elements=(
+            DocumentElement(kind=PARAGRAPH, text="A complete research passage about current findings.", page=1),
+        ))
 
-    monkeypatch.setattr(tasks, "_build_extractor", Extractor)
-    assert attach(client, record).status_code == 200
-    first = queued[-1]
+    with use_extractor(InMemoryExtractor(respond)):
+        assert attach(client, record).status_code == 200
+        first = queued[-1]
 
-    def worker():
-        connections.close_all()
-        try:
-            return tasks.extract_manuscript_text.apply(args=first, retries=3 if old_outcome == "failure" else 0)
-        finally:
+        def worker():
             connections.close_all()
+            try:
+                return tasks.extract_manuscript_text.apply(args=first, retries=3 if old_outcome == "failure" else 0)
+            finally:
+                connections.close_all()
 
-    with ThreadPoolExecutor(max_workers=1) as workers:
-        old = workers.submit(worker)
-        try:
-            assert started.wait(20)
-            assert attach(client, record, b"B").status_code == 200
-            current = queued[-1]
-            assert status(client, record)["suggestions"]["title"] is None
-            assert tasks.extract_manuscript_text.apply(args=current).successful()
-        finally:
-            release.set()
-        assert old.result(timeout=20).successful()
+        with ThreadPoolExecutor(max_workers=1) as workers:
+            old = workers.submit(worker)
+            try:
+                assert started.wait(20)
+                assert attach(client, record, b"B").status_code == 200
+                current = queued[-1]
+                assert status(client, record)["suggestions"]["title"] is None
+                assert tasks.extract_manuscript_text.apply(args=current).successful()
+            finally:
+                release.set()
+            assert old.result(timeout=20).successful()
 
-    assert status(client, record)["state"] == "ready"
-    assert status(client, record)["suggestions"]["title"] == "Current manuscript"
-    assert client.post(reverse("record-retry-extraction", args=[record.pk]),
-                       {"manuscript_revision": first[1]}).status_code == 409
-    extraction = PdfExtraction.objects.get(record=record)
-    assert handoffs == [(extraction.pk, current[1])]
-    assert chunk_extraction.apply(args=[extraction.pk, first[1]]).result is None
-    result = chunk_extraction.apply(args=[extraction.pk, current[1]])
-    assert result.successful(), result.result
-    active = ChunkSet.objects.get(record=record, is_active=True)
-    assert str(active.source_revision) == current[1]
-    assert embedded == [((record.pk,), {"chunk_set_id": active.pk, "source_revision": current[1]})]
-    assert tasks.extract_manuscript_text.apply(args=current).successful()
-    assert len(handoffs) == 1
+        assert status(client, record)["state"] == "ready"
+        assert status(client, record)["suggestions"]["title"] == "Current manuscript"
+        assert client.post(reverse("record-retry-extraction", args=[record.pk]),
+                           {"manuscript_revision": first[1]}).status_code == 409
+        extraction = PdfExtraction.objects.get(record=record)
+        assert handoffs == [(extraction.pk, current[1])]
+        assert chunk_extraction.apply(args=[extraction.pk, first[1]]).result is None
+        result = chunk_extraction.apply(args=[extraction.pk, current[1]])
+        assert result.successful(), result.result
+        active = ChunkSet.objects.get(record=record, is_active=True)
+        assert str(active.source_revision) == current[1]
+        assert embedded == [((record.pk,), {"chunk_set_id": active.pk, "source_revision": current[1]})]
+        assert tasks.extract_manuscript_text.apply(args=current).successful()
+        assert len(handoffs) == 1
 
 
 def test_failed_replacement_preserves_accepted_source_and_no_job_is_queued(manuscript, monkeypatch):
@@ -165,30 +164,26 @@ def test_retrying_is_pending_and_final_failure_requires_owner_action(manuscript,
     monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: queued.append(args))
     assert attach(client, record).status_code == 200
 
-    class Unavailable:
-        def extract(self, content, *, filename):
-            raise RuntimeError("private parser path /secret.pdf")
-
-    monkeypatch.setattr(tasks, "_build_extractor", Unavailable)
-    from celery.exceptions import Retry
-    monkeypatch.setattr(tasks.extract_manuscript_text, "retry", lambda **kwargs: (_ for _ in ()).throw(Retry()))
-    tasks.extract_manuscript_text.apply(args=queued[-1])
-    payload = status(client, record)
-    assert payload["state"] == "pending" and payload["phase"] == "retrying"
-    assert payload["retryable"] is False
-    tasks.extract_manuscript_text.apply(args=queued[-1], retries=3)
-    payload = status(client, record)
-    assert payload["state"] == "failed" and payload["retryable"] is True
-    assert "secret" not in str(payload)
-    assert tasks.extract_manuscript_text.apply(args=queued[-1]).successful()
-    assert status(client, record)["state"] == "failed"
-    stranger = APIClient()
-    stranger.force_authenticate(make_user("other@cit.edu", "Student"))
-    url = reverse("record-retry-extraction", args=[record.pk])
-    assert stranger.post(url, {"manuscript_revision": payload["manuscript_revision"]}).status_code == 404
-    assert client.post(url, {"manuscript_revision": "old"}).status_code == 409
-    assert client.post(url, {"manuscript_revision": payload["manuscript_revision"]}).status_code == 202
-    assert len(queued) == 2
+    with use_extractor(InMemoryExtractor(RuntimeError("private parser path /secret.pdf"))):
+        from celery.exceptions import Retry
+        monkeypatch.setattr(tasks.extract_manuscript_text, "retry", lambda **kwargs: (_ for _ in ()).throw(Retry()))
+        tasks.extract_manuscript_text.apply(args=queued[-1])
+        payload = status(client, record)
+        assert payload["state"] == "pending" and payload["phase"] == "retrying"
+        assert payload["retryable"] is False
+        tasks.extract_manuscript_text.apply(args=queued[-1], retries=3)
+        payload = status(client, record)
+        assert payload["state"] == "failed" and payload["retryable"] is True
+        assert "secret" not in str(payload)
+        assert tasks.extract_manuscript_text.apply(args=queued[-1]).successful()
+        assert status(client, record)["state"] == "failed"
+        stranger = APIClient()
+        stranger.force_authenticate(make_user("other@cit.edu", "Student"))
+        url = reverse("record-retry-extraction", args=[record.pk])
+        assert stranger.post(url, {"manuscript_revision": payload["manuscript_revision"]}).status_code == 404
+        assert client.post(url, {"manuscript_revision": "old"}).status_code == 409
+        assert client.post(url, {"manuscript_revision": payload["manuscript_revision"]}).status_code == 202
+        assert len(queued) == 2
 
 
 def test_removed_source_and_old_unpinned_messages_cannot_extract(manuscript, monkeypatch):
@@ -288,41 +283,37 @@ def test_general_attachment_non_pdf_policy_is_unchanged(manuscript):
 
 def test_different_original_bytes_with_identical_text_get_current_source_chunks(manuscript, monkeypatch):
     from apps.ai.chunking.document import DocumentElement, NormalizedDocument, PARAGRAPH
-    from apps.ai.extraction import ExtractedDocument
     from apps.ai.models import ChunkSet
     from apps.ai.tasks import chunk_extraction, embed_chunk_set
     from apps.documents import tasks
 
     client, record = manuscript
-    class SameText:
-        def extract(self, content, *, filename):
-            return ExtractedDocument(document=NormalizedDocument(title="Same extracted paper", elements=(
-                DocumentElement(kind=PARAGRAPH, text="The extracted text is unchanged despite new original bytes.", page=1),
-            )), extractor="local-test")
-    monkeypatch.setattr(tasks, "_build_extractor", SameText)
-    monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: None)
-    monkeypatch.setattr(tasks, "_queue_chunk_extraction", lambda *args: None)
-    monkeypatch.setattr(embed_chunk_set, "delay", lambda *args, **kwargs: None)
-    first = None
-    for content in (b"A", b"B"):
-        assert attach(client, record, content).status_code == 200
-        revision = status(client, record)["manuscript_revision"]
-        assert tasks.extract_manuscript_text.apply(args=[record.pk, revision]).successful()
-        extraction = PdfExtraction.objects.get(record=record)
-        result = chunk_extraction.apply(args=[extraction.pk, revision])
-        assert result.successful(), result.result
-        current = ChunkSet.objects.get(record=record, is_active=True)
-        assert str(current.source_revision) == revision
-        if first:
-            assert current.pk != first.pk
-            assert current.extraction_hash == first.extraction_hash
-        first = current
+    same_text = NormalizedDocument(title="Same extracted paper", elements=(
+        DocumentElement(kind=PARAGRAPH, text="The extracted text is unchanged despite new original bytes.", page=1),
+    ))
+    with use_extractor(InMemoryExtractor(same_text)):
+        monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: None)
+        monkeypatch.setattr(tasks, "_queue_chunk_extraction", lambda *args: None)
+        monkeypatch.setattr(embed_chunk_set, "delay", lambda *args, **kwargs: None)
+        first = None
+        for content in (b"A", b"B"):
+            assert attach(client, record, content).status_code == 200
+            revision = status(client, record)["manuscript_revision"]
+            assert tasks.extract_manuscript_text.apply(args=[record.pk, revision]).successful()
+            extraction = PdfExtraction.objects.get(record=record)
+            result = chunk_extraction.apply(args=[extraction.pk, revision])
+            assert result.successful(), result.result
+            current = ChunkSet.objects.get(record=record, is_active=True)
+            assert str(current.source_revision) == revision
+            if first:
+                assert current.pk != first.pk
+                assert current.extraction_hash == first.extraction_hash
+            first = current
 
 
 def test_replacement_during_embedding_cannot_persist_old_vectors(manuscript, monkeypatch):
     from django.utils import timezone
     from apps.ai.chunking.document import DocumentElement, NormalizedDocument, PARAGRAPH
-    from apps.ai.extraction import ExtractedDocument
     from apps.ai.indexing import embed_active_chunk_set
     from apps.ai.models import ChunkSet
     from apps.ai.models.chunk import ChunkEmbedding
@@ -334,27 +325,25 @@ def test_replacement_during_embedding_cannot_persist_old_vectors(manuscript, mon
     record.embargo_answered_at = timezone.now()
     record.dpa_accepted_at = timezone.now()
     record.save(update_fields=["embargo_answered_at", "dpa_accepted_at"])
-    class Extractor:
-        def extract(self, content, *, filename):
-            return ExtractedDocument(document=NormalizedDocument(title="Research paper", elements=(
-                DocumentElement(kind=PARAGRAPH, text="The paper contains a passage for deterministic local embedding.", page=1),
-            )), extractor="local-test")
-    monkeypatch.setattr(tasks, "_build_extractor", Extractor)
-    monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: None)
-    monkeypatch.setattr(tasks, "_queue_chunk_extraction", lambda *args: None)
-    monkeypatch.setattr(embed_chunk_set, "delay", lambda *args, **kwargs: None)
-    assert attach(client, record).status_code == 200
-    revision = status(client, record)["manuscript_revision"]
-    assert tasks.extract_manuscript_text.apply(args=[record.pk, revision]).successful()
-    extraction = PdfExtraction.objects.get(record=record)
-    assert chunk_extraction.apply(args=[extraction.pk, revision]).successful()
-    chunks = ChunkSet.objects.get(record=record, is_active=True)
-    class ReplacingEmbedder(DeterministicEmbeddingProvider):
-        def embed_document_chunks(self, documents):
-            assert attach(client, record, b"B").status_code == 200
-            return super().embed_document_chunks(documents)
-    result = embed_active_chunk_set(record.pk, provider=ReplacingEmbedder(),
-                                    chunk_set_id=chunks.pk, source_revision=revision)
-    assert result.refused
-    assert not ChunkEmbedding.objects.filter(chunk__record=record).exists()
-    assert status(client, record)["manuscript_revision"] != revision
+    paper = NormalizedDocument(title="Research paper", elements=(
+        DocumentElement(kind=PARAGRAPH, text="The paper contains a passage for deterministic local embedding.", page=1),
+    ))
+    with use_extractor(InMemoryExtractor(paper)):
+        monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: None)
+        monkeypatch.setattr(tasks, "_queue_chunk_extraction", lambda *args: None)
+        monkeypatch.setattr(embed_chunk_set, "delay", lambda *args, **kwargs: None)
+        assert attach(client, record).status_code == 200
+        revision = status(client, record)["manuscript_revision"]
+        assert tasks.extract_manuscript_text.apply(args=[record.pk, revision]).successful()
+        extraction = PdfExtraction.objects.get(record=record)
+        assert chunk_extraction.apply(args=[extraction.pk, revision]).successful()
+        chunks = ChunkSet.objects.get(record=record, is_active=True)
+        class ReplacingEmbedder(DeterministicEmbeddingProvider):
+            def embed_document_chunks(self, documents):
+                assert attach(client, record, b"B").status_code == 200
+                return super().embed_document_chunks(documents)
+        result = embed_active_chunk_set(record.pk, provider=ReplacingEmbedder(),
+                                        chunk_set_id=chunks.pk, source_revision=revision)
+        assert result.refused
+        assert not ChunkEmbedding.objects.filter(chunk__record=record).exists()
+        assert status(client, record)["manuscript_revision"] != revision

@@ -33,6 +33,7 @@ from .ports import (
     ExtractedDocument,
     ExtractionError,
     ExtractorUnavailable,
+    Provenance,
 )
 
 EXTRACTOR_NAME = "docling"
@@ -130,7 +131,8 @@ class DoclingExtractor:
                 f"Docling-serve returned no extractable content for {filename!r}. "
                 "The PDF may be empty, corrupt, or an image-only scan OCR could not read."
             )
-        return ExtractedDocument(document=document, extractor=EXTRACTOR_NAME)
+        # Legacy (ADR-056): no version is read from the server.
+        return ExtractedDocument(document=document, provenance=Provenance(name=EXTRACTOR_NAME))
 
     # -- HTTP ---------------------------------------------------------------
 

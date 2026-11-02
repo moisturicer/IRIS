@@ -1,5 +1,8 @@
 """
-Django admin for `documents` -- `RecordFile` only, as an escape hatch (IR-476).
+Django admin for `documents`: `RecordFile` as an escape hatch (IR-476), and
+`PdfExtraction` read-only, the one place its provenance is shown (IR-838).
+
+`RecordFile`:
 
 No office may remove a file another office filed, or a file with no party, and
 an owner may remove none (`attachments.py`). When one has to go anyway, the
@@ -17,7 +20,7 @@ from django.contrib import admin
 from apps.audit.services import create_audit_event
 
 from .attachments import delete_record_file
-from .models import RecordFile
+from .models import PdfExtraction, RecordFile
 
 
 def _remove(request, record_file):
@@ -58,3 +61,29 @@ class RecordFileAdmin(admin.ModelAdmin):
     def delete_queryset(self, request, queryset):
         for record_file in queryset.select_related("record"):
             _remove(request, record_file)
+
+
+@admin.register(PdfExtraction)
+class PdfExtractionAdmin(admin.ModelAdmin):
+    list_display = ("id", "record", "upload", "kind", "status", "extractor", "extractor_version", "completed_at")
+    list_filter = ("kind", "status", "extractor")
+    list_select_related = ("record", "upload")
+    fields = readonly_fields = (
+        "record", "upload", "kind", "status", "phase", "extractor", "extractor_version",
+        "extractor_options", "content_hash", "created_at", "completed_at",
+    )
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
