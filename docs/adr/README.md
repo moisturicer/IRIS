@@ -76,6 +76,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Superseded | [056](056-manuscript-extraction-moves-to-llamaparse.md) |
 | [025](025-figures-and-formulas-in-extraction.md) | Figures are cropped from the source PDF, formulas are OCR'd, and figure contents are not described | Superseded | [056](056-manuscript-extraction-moves-to-llamaparse.md) |
 | [055](055-traceability-evidence-lives-in-one-file-per-ticket.md) | **Accepted** 2026-11-02 by Ashlee Sean. Traceability notes live in one file per ticket, and the matrix holds status and links |
+| [056](056-caddy-terminates-tls.md) | **Accepted** 2026-11-02 by Ashlee Sean. Caddy terminates TLS in production, and nginx is no longer published |
 
 ---
 

@@ -356,6 +356,7 @@ jobs:
             echo "DB_USER=iris"
             echo "DB_PASSWORD=ci-only-not-a-real-secret"
             echo "REDIS_PASSWORD=ci-only-not-a-real-secret"
+            echo "IRIS_DOMAIN=localhost"
           } > .env
 
       - name: Validate development stack
@@ -375,6 +376,53 @@ jobs:
       # break. The frontend job already runs a real `npm run build`.
       - name: Build the backend image
         run: docker compose -f docker-compose.yml build backend
+
+      # IR-847: the real Caddy with the real Caddyfile, in front of a stand-in that
+      # echoes the forwarded headers. A local certificate replaces ACME, because
+      # a test has no public domain.
+      - name: Caddy serves HTTPS only, with strong TLS
+        run: |
+          docker network create iris-tls
+          docker run -d --name frontend --network iris-tls python:3.11-alpine python -c '
+          import http.server
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  body = ("xff=%s proto=%s" % (self.headers.get("X-Forwarded-For"), self.headers.get("X-Forwarded-Proto"))).encode()
+                  self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+          http.server.HTTPServer(("0.0.0.0", 8080), H).serve_forever()
+          '
+          image=$(docker compose -f docker-compose.prod.yml config --images | grep '^caddy')
+          docker run -d --name iris-caddy --network iris-tls -p 18080:80 -p 18443:443 \
+            -e IRIS_DOMAIN=localhost -e IRIS_CADDY_OPTIONS=local_certs \
+            -v "$PWD/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" "$image"
+          trap 'docker logs frontend; docker logs iris-caddy; docker rm -f iris-caddy frontend; docker network rm iris-tls' EXIT
+          ready=
+          for i in $(seq 1 30); do curl -sk -o /dev/null https://localhost:18443/ && { ready=1; break; }; sleep 1; done
+          [ -n "$ready" ] || { echo "::error::Caddy did not answer within 30s"; exit 1; }
+
+          redirect=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:18080/x)
+          echo "plain HTTP: $redirect"
+          case "$redirect" in 30[18]\ https://localhost*/x) ;; *) echo "::error::plain HTTP did not redirect to HTTPS"; exit 1 ;; esac
+
+          echo_back=$(curl -sk -H 'X-Forwarded-For: 203.0.113.9' -H 'X-Forwarded-Proto: http' https://localhost:18443/)
+          echo "forged headers: $echo_back"
+          case "$echo_back" in *203.0.113.9*) echo "::error::Caddy passed on a forged X-Forwarded-For"; exit 1 ;; esac
+          case "$echo_back" in *proto=https*) ;; *) echo "::error::Caddy did not set X-Forwarded-Proto: https"; exit 1 ;; esac
+
+          probe() { openssl s_client -connect localhost:18443 -servername localhost "$@" </dev/null 2>&1; }
+          for version in -tls1_2 -tls1_3; do
+            result=$(probe "$version" | grep -E '^ *(New, |Cipher is)|Cipher is' | head -1)
+            echo "$version: $result"
+            case "$result" in *TLS*|*ECDHE*) ;; *) echo "::error::$version was refused"; exit 1 ;; esac
+          done
+          for refused in "-tls1 -cipher ALL:@SECLEVEL=0" "-tls1_1 -cipher ALL:@SECLEVEL=0" "-tls1_2 -cipher AES128-SHA" "-tls1_2 -cipher DES-CBC3-SHA:@SECLEVEL=0"; do
+            # shellcheck disable=SC2086
+            if probe $refused | grep -qE 'Cipher is [A-Z0-9]'; then
+              probe $refused | grep -E 'Cipher is'
+              echo "::error::Caddy accepted $refused"; exit 1
+            fi
+            echo "refused as it should be: $refused"
+          done
 
       # IR-663: the real nginx, with the real config and snippet mounted where
       # the frontend image puts them, answers with the security headers on the
