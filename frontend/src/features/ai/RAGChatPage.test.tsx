@@ -107,9 +107,10 @@ describe("comparison picker (IR-574)", () => {
     status.mockResolvedValue({ data: { generative: true, indexed_records: 4, comparison_max_records: maximum } });
     catalogue.mockResolvedValue({ data: { results: papers, next: null, count: papers.length } });
     renderScreen(<RAGChatPage />);
-    const picker = await screen.findByRole("button", { name: "Compare papers" });
-    await waitFor(() => expect(picker).toBeEnabled());
-    await userEvent.click(picker);
+    // Opening a Conversation remounts the picker; query the current control,
+    // not the disabled element from the initial, conversation-less paint.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Compare papers" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Compare papers" }));
     const dialog = await screen.findByRole("dialog", { name: "Compare papers" });
     await within(dialog).findByRole("checkbox", { name: "Compare Flood sensors" });
     return dialog;
@@ -185,9 +186,8 @@ describe("comparison picker (IR-574)", () => {
     list.mockResolvedValue({ data: [summary({ id: 9, title: "First" }), summary({ id: 10, title: "Second" })] });
     get.mockImplementation((id: number) => Promise.resolve({ data: detail({ id, title: id === 9 ? "First" : "Second" }) }));
     renderScreen(<Routes><Route path="/ai/conversations/:conversationId" element={<RAGChatPage />} /></Routes>, { route: "/ai/conversations/9" });
-    const button = await screen.findByRole("button", { name: "Compare papers" });
-    await waitFor(() => expect(button).toBeEnabled());
-    await userEvent.click(button);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Compare papers" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Compare papers" }));
     const dialog = await screen.findByRole("dialog", { name: "Compare papers" });
     await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Compare Flood sensors" }));
     await userEvent.click(within(dialog).getByRole("button", { name: "Done" }));

@@ -28,8 +28,14 @@ At 360 px, opening confirmation closed the history drawer so only one focus trap
 
 ## Automated checks and review
 
-Per the user's standing instruction, **GitHub CI supplies lint, TypeScript/build and automated test evidence**. No local pass is claimed. The page regression additions cover catalogue-vs-private-history choices, declared origins, search/Area requests, configured bounds, removed IDs, unknown capacity, scoped refusal, Conversation switching, stale replies, search retry and accidental submission. The existing deletion test is deliberately changed to require confirmation; new tests cover Cancel, Escape and failure recovery.
+Per the user's standing instruction, **GitHub CI supplies lint, TypeScript/build and automated test evidence**. The full suite is not duplicated locally. The page regression additions cover catalogue-vs-private-history choices, declared origins, search/Area requests, configured bounds, removed IDs, unknown capacity, scoped refusal, Conversation switching, stale replies, search retry and accidental submission. The existing deletion test is deliberately changed to require confirmation; new tests cover Cancel, Escape and failure recovery.
 
 Server-side catalogue authorization remains enforced by the unchanged `RecordViewSet.get_queryset()`. Existing backend tests in `apps/records/tests.py` (`test_list_still_excludes_drafts_for_the_owner`, `test_list_still_excludes_drafts_for_staff`, stranger draft refusal) exercise that boundary in CI; the mocked page test does not establish server authorization by itself.
 
 Standards and Spec agent reviews are recorded in the PR. Human approval remains outstanding.
+
+## Initial CI setup failure and targeted correction
+
+The first CI run (`41475759436`) passed lint but failed six new picker cases because the tests retained a DOM reference to the disabled control from the conversation-less initial paint. Opening the Conversation intentionally remounts the picker (to discard another Conversation's transient dialog/search state), so the current control was enabled while the detached old element stayed disabled. The tests now re-query the live accessible tree while waiting and clicking; the production guard is unchanged.
+
+A targeted debugging run (`npm test -- --maxWorkers=1 src/features/ai/RAGChatPage.test.tsx -t "comparison picker"`) then passed **8 tests**, with 48 unrelated cases skipped. This was a focused debugging check under the user's exception, not a repeated full suite. GitHub CI remains the full automated evidence.
