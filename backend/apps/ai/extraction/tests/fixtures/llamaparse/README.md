@@ -51,4 +51,4 @@ Four PDFs, **6 pages** in all. Per page, from LlamaParse's pricing page
 | Granular boxes | not published |
 
 So about **108 credits ($0.14)** at most, before granular boxes. The real
-figure is in each `manifest.json` and in `NOTES.md`.
+figure is in each `manifest.json` and in `OPEN_CONDITIONS.md`.
