@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
@@ -16,27 +17,31 @@ import { AppShell } from "@/components/layout/AppShell";
 
 // Feature pages
 import HomePage             from "@/features/dashboard/HomePage";
-import PaperViewPage        from "@/features/records/paper-view/PaperViewPage";
 import { CallsAndConferencesPage } from "@/features/opportunities/CallsAndConferencesPage";
 import MyLibraryPage        from "@/features/library/MyLibraryPage";
-import ImportRecordsPage    from "@/features/records/ImportRecordsPage";
 import MyReviewsPage        from "@/features/review/MyReviewsPage";
 import ReviewAnalyticsPage  from "@/features/review/ReviewAnalyticsPage";
 import OfficeConsolePage    from "@/features/review/OfficeConsolePage";
 
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
-import AuditLogPage         from "@/features/audit/AuditLogPage";
-import RoleRequestsPage     from "@/features/accounts/RoleRequestsPage";
-import UserListPage         from "@/features/accounts/UserListPage";
-import RAGChatPage          from "@/features/ai/RAGChatPage";
 import SettingsPage         from "@/features/settings/SettingsPage";
 import HelpPage             from "@/features/help/HelpPage";
-import DownloadRequestsPage  from "@/features/admin/DownloadRequestsPage";
-import DeleteRequestsPage    from "@/features/admin/DeleteRequestsPage";
 
 // Error screens (IR-745)
 import { NotFoundScreen }   from "@/features/errors/NotFoundScreen";
 import { RouteErrorScreen } from "@/features/errors/RouteErrorScreen";
+import { DeferredPage } from "./DeferredPage";
+
+// IR-749: defer the screens with the heaviest route-level dependencies.
+// These imports do not start until the authenticated/authorized route renders.
+const PaperViewPage = lazy(() => import("@/features/records/paper-view/PaperViewPage"));
+const RAGChatPage = lazy(() => import("@/features/ai/RAGChatPage"));
+const ImportRecordsPage = lazy(() => import("@/features/records/ImportRecordsPage"));
+const UserListPage = lazy(() => import("@/features/accounts/UserListPage"));
+const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage"));
+const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
+const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
+const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
 
 export const routes: RouteObject[] = [{
   // The last resort (IR-745): a crash outside the shell's own boundary below,
@@ -70,7 +75,11 @@ export const routes: RouteObject[] = [{
           // moves the address, and the page it lands on applies its own.
           ...redirectRoutes,
           // No crumb: the reading header is this page's navigation (IR-569).
-          { path: "records/:id",           element: <PaperViewPage />,   handle: { width: "full" } },
+          {
+            path: "records/:id",
+            element: <DeferredPage name="Paper View"><PaperViewPage /></DeferredPage>,
+            handle: { width: "full" },
+          },
           { path: "records/mine",          element: <MyLibraryPage />,   handle: { crumb: "My Library" } },
           { path: "opportunities",         element: <CallsAndConferencesPage />, handle: { crumb: "Calls & Conferences" } },
           { path: "notifications",         element: <NotificationsPage />, handle: { crumb: "Notifications" } },
@@ -80,8 +89,14 @@ export const routes: RouteObject[] = [{
             // in the same position, so moving between them keeps its state.
             path: "ai", handle: { crumb: "Ask IRIS" },
             children: [
-              { index: true,                          element: <RAGChatPage /> },
-              { path: "conversations/:conversationId", element: <RAGChatPage /> },
+              {
+                index: true,
+                element: <DeferredPage name="Ask IRIS"><RAGChatPage /></DeferredPage>,
+              },
+              {
+                path: "conversations/:conversationId",
+                element: <DeferredPage name="Ask IRIS"><RAGChatPage /></DeferredPage>,
+              },
             ],
           },
           { path: "help",                  element: <HelpPage />,        handle: { crumb: "Help" } },
@@ -113,12 +128,36 @@ export const routes: RouteObject[] = [{
             // path -- which is why RDCO does not also get the submission wizard.
             element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
             children: [
-              { path: "records/import",            element: <ImportRecordsPage />,     handle: { crumb: "Import Records" } },
-              { path: "admin/users",               element: <UserListPage />,          handle: { crumb: "Users", width: "full" } },
-              { path: "admin/role-requests",       element: <RoleRequestsPage />,      handle: { crumb: "Role Requests", width: "full" } },
-              { path: "admin/download-requests",   element: <DownloadRequestsPage />,  handle: { crumb: "Download Requests", width: "full" } },
-              { path: "admin/delete-requests",     element: <DeleteRequestsPage />,    handle: { crumb: "Delete Requests", width: "full" } },
-              { path: "admin/audit",               element: <AuditLogPage />,          handle: { crumb: "Audit Log", width: "full" } },
+              {
+                path: "records/import",
+                element: <DeferredPage name="Import Records"><ImportRecordsPage /></DeferredPage>,
+                handle: { crumb: "Import Records" },
+              },
+              {
+                path: "admin/users",
+                element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
+                handle: { crumb: "Users", width: "full" },
+              },
+              {
+                path: "admin/role-requests",
+                element: <DeferredPage name="Role Requests"><RoleRequestsPage /></DeferredPage>,
+                handle: { crumb: "Role Requests", width: "full" },
+              },
+              {
+                path: "admin/download-requests",
+                element: <DeferredPage name="Download Requests"><DownloadRequestsPage /></DeferredPage>,
+                handle: { crumb: "Download Requests", width: "full" },
+              },
+              {
+                path: "admin/delete-requests",
+                element: <DeferredPage name="Delete Requests"><DeleteRequestsPage /></DeferredPage>,
+                handle: { crumb: "Delete Requests", width: "full" },
+              },
+              {
+                path: "admin/audit",
+                element: <DeferredPage name="Audit Log"><AuditLogPage /></DeferredPage>,
+                handle: { crumb: "Audit Log", width: "full" },
+              },
             ],
           },
 
