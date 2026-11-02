@@ -38,7 +38,8 @@ Compaction is absent until its manual capability is implemented (IR-754).
   question, Stop/reopen, owner refusal, protocol refusal, revoked-source withholding,
   queued multi-paper progress, and the identity-only edge grant. Four reader-progress
   tests passed in a dedicated database; the edge and prerequisite suites passed too,
-  with the Redis wakeup test skipped because that fixture expects localhost:6379.
+  with Redis initially unavailable. The final full run below supplies isolated Redis
+  and executes that wakeup fixture as well.
 - **73 frontend tests passed** across the new reader, existing Ask IRIS/Paper Chat and
   persistent notice suites. New tests cover keyboard Stop, same-scope deep requests,
   idempotent reconnect after busy/network failure, revision-conflict recovery and axe.
@@ -46,19 +47,47 @@ Compaction is absent until its manual capability is implemented (IR-754).
 - The production nginx image passed `nginx -t`; an enabled reader without its credential
   failed startup as required, and one with a test credential passed configuration validation.
 
-## Broader checks and limits
+## Publication verification
 
-- Full frontend run: **127 files passed, 3 failed; 1,649 tests passed, 8 failed** plus
-  7 unhandled errors. Failing files: `PublishDialog.test.tsx`, `Sidebar.test.tsx` and
-  `errorScreens.test.tsx`. Error-screen failures include the Node/jsdom AbortSignal
-  mismatch. None is in the new reader suite.
-- Typechecking reports existing errors in `src/api/client.test.ts:15` and
-  `src/features/records/metadata/metadataSchema.ts:32,53`; no reader-file type errors.
-- The full backend selection in its own `test_ir730_full` database stopped at
-  `ProductionSettingTests.test_production_starts_with_a_count`: the container inherits
-  `AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT`, which production correctly refuses with DEBUG
-  off. The earlier broad run overlapped a focused session on the shared test database;
-  it was stopped and its results discarded. Final focused evidence uses
-  `test_ir730_reader`; the broad check uses a separate database.
-- No schema migration, live traffic switch, provider campaign, deployment or history
-  migration was performed. Review is automated assistance, not independent human approval.
+The PR was rebuilt on a clean checkout of `origin/main` at `a472a87d`, with only
+IR-730's commit applied. Other local work remains in the original checkout.
+
+- `npm ci --no-audit --no-fund` installed the exact lockfile. The original checkout
+  had Zod 3 and Vitest 2 installed despite requiring Zod 4 and Vitest 5. The earlier
+  type errors and frontend failures did not reproduce with the locked dependencies.
+- **Full frontend: 131 files and 1,706 tests passed.** `npm run build` passed,
+  including TypeScript. `npm run lint` passed with three existing warnings.
+- The backend static gate exposed unused fixture imports in this ticket's new test.
+  They now follow the existing module-alias fixture pattern; the full backend
+  `flake8 apps/ config/ core/ testing/` gate passes. Runtime static checks pass too.
+- **42 standalone gateway tests passed** on the clean PR branch. Development and
+  production `docker compose config --quiet` validation both passed using CI's
+  throwaway configuration.
+- Final backend fixes preserve the existing safeguards: the edge uses the single
+  `research_records` entry point; its header-based authentication route is declared
+  in the authorization matrix; configured scope issuance and hidden-Record refusal
+  have direct HTTP coverage. The matrix now supports request headers without
+  changing any existing role outcome.
+- The nginx checks were deliberately corrected: quoted regex braces are parsed as
+  text, the smaller JSON-only reader limit is distinguished from the unchanged
+  global PDF limit, and the FastAPI proxy must add the headers Django supplies on
+  its own proxies. Those twelve existing configuration checks passed after the fix.
+- The proxy fixture is byte-pinned. Its committed blob matches the existing audit
+  SHA; a one-file LF attribute preserves those exact bytes on Windows and Linux
+  without changing the fixture data or audit hash.
+- The focused backend regression selection passed **53 tests**, and both property
+  regressions passed under the existing `ci` Hypothesis profile. Final full-suite
+  verification uses that profile, as GitHub Actions does.
+- **Final full backend: 5,696 passed, one pre-existing non-strict XPASS.** All four
+  shards exited successfully, with zero JUnit errors, failures or skips. Each shard
+  passed 1,424 tests; their authorization subtests also passed. This supersedes the
+  earlier failed/overlapping runs and the focused-only results above.
+- **47 security regression tests passed.** The rebased nginx configuration and
+  missing-secret startup guard passed again in the production nginx image.
+- Backend verification uses one temporary PostgreSQL server per CI shard, plus a
+  test-only Redis. It does not share the development server or its advisory run
+  lock. The inherited development disclosure bypass is explicitly disabled, matching
+  production's required gate rather than weakening startup validation.
+- Production AGENT composition remains unavailable, so the new reader remains off
+  by default and refuses operator echoes. No paid inference, deployment or traffic
+  cutover was performed. Automated reviews do not replace human approval.

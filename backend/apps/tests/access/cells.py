@@ -79,7 +79,8 @@ class Call:
     query: dict = field(default_factory=dict)
     data: dict | None = None
     format: str = "json"
-    objects: tuple[str, ...] = ()  # Body/query ids governed by object visibility.
+    objects: tuple[str, ...] = ()  # Body/query/header ids governed by object visibility.
+    headers: dict = field(default_factory=dict)
 
     @property
     def refs(self) -> set[str]:
@@ -95,7 +96,7 @@ class Call:
                 for v in value:
                     scan(v)
 
-        scan([self.kwargs, self.query, self.data])
+        scan([self.kwargs, self.query, self.data, self.headers])
         return found
 
     @property

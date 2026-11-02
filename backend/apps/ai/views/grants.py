@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.ai.grants import config, database, issue
+from apps.ai.grants import config, database, issue, reads
 
 
 def _owned_run(user, pk):
@@ -101,8 +101,7 @@ class RuntimeEdgeGrantView(APIView):
             record_id = int(raw)
             if not 0 < record_id < 2**63:
                 return Response({"status": "invalid"}, status=400)
-            from apps.records.models import Record
-            if not Record.objects.visible_to(request.user).filter(pk=record_id).exists():
+            if not reads.research_records(request.user, scope_record_id=record_id).exists():
                 raise Http404
         result = _outcome(lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
         if result.status_code != 201:

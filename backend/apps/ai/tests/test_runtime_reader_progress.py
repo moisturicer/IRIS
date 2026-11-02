@@ -5,11 +5,14 @@ import json
 import pytest
 
 from .test_ai_runtime_agent_loop_db import agent_service, call, recording, reply, tools
-from .test_ai_runtime_runs_db import api, as_reader, runtime, session, submit
+from . import test_ai_runtime_runs_db as runs_db
+from .test_ai_runtime_runs_db import as_reader, session
 from .corpus import make_user
 
 pytestmark = [pytest.mark.db_required, pytest.mark.django_db(transaction=True)]
 PUBLIC = {"X-IRIS-Protocol": "runs-reader-1"}
+api = runs_db.api
+runtime = runs_db.runtime
 
 
 def test_actual_plan_and_context_agree_live_reconnected_and_reopened(api, runtime):

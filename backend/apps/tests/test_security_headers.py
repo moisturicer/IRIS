@@ -26,6 +26,7 @@ import re
 
 import pytest
 from django.test import SimpleTestCase, override_settings
+from testing.nginx import location_blocks
 
 from apps.documents.tests.test_document_access_control import NEEDS_CHECKOUT, REPO_ROOT
 
@@ -139,18 +140,6 @@ def _snippet_headers():
     return headers
 
 
-def _location_blocks(conf):
-    """`[(location line, body)]` for each location block, nested ones included."""
-    blocks = []
-    for match in re.finditer(r"^\s*location\b[^{]*\{", conf, re.MULTILINE):
-        depth, i = 1, match.end()
-        while depth:
-            depth += {"{": 1, "}": -1}.get(conf[i], 0)
-            i += 1
-        blocks.append((match.group(0).strip(), conf[match.end():i - 1]))
-    return blocks
-
-
 def _without_comments(text):
     return re.sub(r"#[^\n]*", "", text)
 
@@ -172,11 +161,12 @@ def test_every_location_nginx_answers_itself_includes_the_snippet():
     nginx inherits `add_header` into a location only when that location sets
     none of its own -- the asset location sets Cache-Control -- so a server-level
     header would silently vanish from every JS and CSS file. Each location that
-    serves files includes the snippet instead. Proxied locations do not: Django
-    sets the same headers, and nginx would send them twice.
+    serves files includes the snippet instead. Django proxies do not: Django
+    sets the same headers, and nginx would send them twice. The private AI
+    runtime does not set them, so its reader proxy includes the snippet.
     """
     conf = _without_comments(_frontend("nginx.conf"))
-    blocks = _location_blocks(conf)
+    blocks = location_blocks(conf)
     assert blocks, "no location blocks found -- has nginx.conf changed shape?"
     served = [(line, body) for line, body in blocks if "proxy_pass" not in body]
     assert served, "nginx serves nothing itself?"
@@ -185,7 +175,11 @@ def test_every_location_nginx_answers_itself_includes_the_snippet():
             f"`{line}` serves the SPA without the security headers"
         )
     for line, body in blocks:
-        if "proxy_pass" in body:
+        if "proxy_pass http://ai-gateway:8001;" in body:
+            assert re.search(rf"include\s+{re.escape(SNIPPET_INCLUDE_PATH)}\s*;", body), (
+                f"`{line}` proxies the reader without the security headers"
+            )
+        elif "proxy_pass" in body:
             assert "security-headers.conf" not in body, f"`{line}` would duplicate Django's"
 
 

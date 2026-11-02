@@ -260,6 +260,7 @@ See [verification, public recording and screenshot](evidence/IR-730/README.md).
 
 **Limits:** disabled by default; the reader refuses the operator echo executor until
 an AGENT service is composed. No paid enablement or cutover. Manual compaction is
-IR-754. Full-suite/typechecking failures and the discarded overlapping-database run
-are recorded in the evidence. Automated standards/spec reviews were performed and
+IR-754. Clean-install verification resolves the earlier frontend/typechecking failures;
+publication evidence records 5,696 passing backend tests, 1,706 passing frontend
+tests and the isolated CI-equivalent setup. Automated standards/spec reviews were performed and
 their material findings addressed; independent human approval and CI remain required.
