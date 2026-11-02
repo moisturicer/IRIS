@@ -69,12 +69,13 @@ import {
   type PublishStep,
 } from "./draft";
 import { EMBARGO_FIELD_IDS, EmbargoStep } from "./EmbargoStep";
-import { ManuscriptStep, type ManuscriptUpload } from "./ManuscriptStep";
+import { acceptedManuscript, ManuscriptStep, type ManuscriptUpload } from "./ManuscriptStep";
 import { PrefillChip } from "./PrefillChip";
 import { usePrefill, type PrefillStatus } from "./prefill";
 import { PublishSuccess, successHeadline } from "./PublishSuccess";
 import { ReviewStep } from "./ReviewStep";
 import { IrisLoader } from "@/components/brand/IrisBrand";
+import { PublishDetailsPreview } from "./PublishDetailsPreview";
 
 export const PUBLISH_PARAM = "publish";
 
@@ -390,6 +391,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     const file = fileRef.current;
     if (!file || typeId == null) return;
 
+    // A replacement attempt is not the accepted source. IR-831 keeps the
+    // preceding valid Manuscript on the server when a replacement is refused,
+    // so retain that accepted identity until this upload succeeds.
+    const acceptedBeforeAttempt = acceptedManuscript(upload);
     const controller = new AbortController();
     abortRef.current = controller;
     setUpload({ status: "uploading", fileName: file.name, progress: 0 });
@@ -430,6 +435,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         status: "failed",
         fileName: file.name,
         error: failure.fields.abstract_file ?? failure.fields.title ?? failure.fields.embargoed_until ?? failure.message,
+        accepted: acceptedBeforeAttempt,
       });
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
@@ -490,9 +496,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   // Under an embargo nothing is filled in from the paper (ADR-052 decision 2). These
   // suggestions are read inside IRIS, but the rule is that nothing is automatic.
   const underEmbargo = embargo.choice === "yes";
+  const acceptedUpload = acceptedManuscript(upload);
   const prefill = usePrefill({
     recordId: draftId,
-    active: phase.kind === "form" && step === 2 && upload.status === "done" && !underEmbargo,
+    active: phase.kind === "form" && step === 2 && acceptedUpload != null && !underEmbargo,
     generation: uploadGeneration,
   });
   const prefillStatus: PrefillStatus = underEmbargo ? "idle" : prefill.status;
@@ -584,7 +591,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     keywords: values.keywords,
     ownerEmails: values.owner_emails,
     typeName,
-    fileName: upload.status === "done" ? upload.fileName : null,
+    fileName: acceptedUpload?.fileName ?? null,
     title: values.title ?? "",
     abstract: values.abstract ?? "",
     adviserName: adviserName ?? "",
@@ -631,7 +638,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
             <button
               type="button"
               onClick={() => void continueFromManuscript()}
-              disabled={upload.status !== "done" || typeId == null || saving}
+              disabled={acceptedUpload == null || typeId == null || saving}
               className={cn(PILL_PRIMARY, FOCUS_RING)}
             >
               Continue
@@ -670,7 +677,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       title="Publish your research"
       displayTitle
       sheet
-      size="max-w-[720px]"
+      size={phase.kind === "form" && step === 2 ? "max-w-[1180px]" : "max-w-[720px]"}
       footer={footer}
     >
       <span role="status" className="sr-only">
@@ -797,36 +804,38 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
             />
           )}
 
-          {step === 2 && (
-            <FormProvider {...form}>
-              {/* One announcement for the prefill, where the visible lines sit
-                  under both fields and would be read twice. */}
-              <span role="status" className="sr-only">
-                {prefillAnnouncement(prefillStatus, prefillNotes)}
-              </span>
-              {(prefillStatus === "failed" || prefillStatus === "unsupported") && (
-                <p className="mb-section-sm text-small text-stone-600">{NEUTRAL_PREFILL}</p>
-              )}
-              <form
-                noValidate
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  void continueFromDetails();
-                }}
-              >
-                <MetadataForm
-                  advisers={lists.advisers}
-                  classifications={lists.classifications}
-                  psceds={lists.psceds}
-                  selfId={selfId}
-                  loadError={listsFailed.advisers || listsFailed.classification || listsFailed.psced}
-                  loadErrorMessage={listError}
-                  moreOpen={moreOpen}
-                  onMoreOpenChange={setMoreOpen}
-                  fieldNotes={prefillNotes}
-                />
-              </form>
-            </FormProvider>
+          {step === 2 && draftId != null && (
+            <PublishDetailsPreview recordId={draftId} sourceKey={uploadGeneration}>
+              <FormProvider {...form}>
+                {/* One announcement for the prefill, where the visible lines sit
+                    under both fields and would be read twice. */}
+                <span role="status" className="sr-only">
+                  {prefillAnnouncement(prefillStatus, prefillNotes)}
+                </span>
+                {(prefillStatus === "failed" || prefillStatus === "unsupported") && (
+                  <p className="mb-section-sm text-small text-stone-600">{NEUTRAL_PREFILL}</p>
+                )}
+                <form
+                  noValidate
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void continueFromDetails();
+                  }}
+                >
+                  <MetadataForm
+                    advisers={lists.advisers}
+                    classifications={lists.classifications}
+                    psceds={lists.psceds}
+                    selfId={selfId}
+                    loadError={listsFailed.advisers || listsFailed.classification || listsFailed.psced}
+                    loadErrorMessage={listError}
+                    moreOpen={moreOpen}
+                    onMoreOpenChange={setMoreOpen}
+                    fieldNotes={prefillNotes}
+                  />
+                </form>
+              </FormProvider>
+            </PublishDetailsPreview>
           )}
 
           {step === 3 && (
