@@ -18,7 +18,7 @@ Needs a database because ``PdfExtraction`` is the thing under test.
 import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from apps.ai.extraction import ExtractedDocument
+from apps.ai.extraction import InMemoryExtractor, use_extractor
 from apps.ai.chunking.document import HEADING, PARAGRAPH, DocumentElement, NormalizedDocument
 from apps.documents import tasks
 from apps.documents.testing import real_pdf_bytes
@@ -38,13 +38,6 @@ DOCUMENT = NormalizedDocument(
 )
 
 
-class FakeExtractor:
-    """Returns a canned document. A real implementation of the port."""
-
-    def extract(self, pdf_bytes, *, filename):
-        return ExtractedDocument(document=DOCUMENT, extractor="fake")
-
-
 @pytest.fixture(autouse=True)
 def queued_chunkings(monkeypatch):
     """Every extraction id handed to the chunking task, in place of a real
@@ -58,8 +51,9 @@ def queued_chunkings(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
-def fake_extractor(monkeypatch):
-    monkeypatch.setattr(tasks, "_build_extractor", lambda: FakeExtractor())
+def fake_extractor():
+    with use_extractor(InMemoryExtractor(DOCUMENT)):
+        yield
 
 
 @pytest.fixture
@@ -190,13 +184,9 @@ def test_a_failed_extraction_is_not_chunked_whatever_its_kind(record, queued_chu
     """Kind decides *whether* a good extraction belongs in the corpus, not
     whether a broken one does."""
 
-    class FailingExtractor:
-        def extract(self, pdf_bytes, *, filename):
-            raise RuntimeError("Docling-serve unreachable")
-
-    monkeypatch.setattr(tasks, "_build_extractor", lambda: FailingExtractor())
     PdfExtraction.objects.create(record=record, kind=DocumentKind.MANUSCRIPT)
 
-    tasks.extract_manuscript_text.apply(args=[record.id])
+    with use_extractor(InMemoryExtractor(RuntimeError("Docling-serve unreachable"))):
+        tasks.extract_manuscript_text.apply(args=[record.id])
 
     assert queued_chunkings == []

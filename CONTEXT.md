@@ -36,6 +36,14 @@ _Avoid_: Submitting owner, import actor
 One research/IP disclosure submission moving through the workflow. Has one or more uploads, authors (byline names, not accounts), and owners (the `User` accounts who submitted/manage it).
 _Avoid_: Submission, paper, thesis (a Record's `record_type` may be a thesis, but not every Record is one), document (too generic — see Upload/Extraction below for the file-shaped things).
 
+**Extraction**:
+The structured document read out of one PDF (a `PdfExtraction` row): its elements in reading order with page boxes, the flattened search text derived from them, and the Provenance of the Extractor that produced it.
+_Avoid_: Parse, OCR result, the PDF text
+
+**Extractor**:
+The adapter that turns PDF bytes into an Extraction behind the `StructuredExtractor` port. `EXTRACTION_BACKEND` chooses which one runs; every non-legacy Extractor passes the contract suite.
+_Avoid_: Parser, Docling (one legacy Extractor, not the role)
+
 **Conversation**:
 A persisted, multi-turn Ask IRIS chat thread, owned by exactly one `User`. Optionally scoped to one `Record` (a "Paper Chat" conversation) via a nullable FK; unscoped when general Ask IRIS. One `Conversation` model covers both the full-page Ask IRIS surface and the per-record docked panel — they are two presentations of the same underlying thread, not two features.
 _Avoid_: Chat, session, thread (used loosely elsewhere in the codebase for unrelated things), Paper Chat (a UI surface/preset scope, not a distinct data concept).

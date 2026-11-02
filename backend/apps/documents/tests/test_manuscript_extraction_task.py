@@ -1,4 +1,4 @@
-"""The manuscript extraction task end to end, against a fake extractor (IR-195).
+"""The manuscript extraction task end to end, against the in-memory extractor (IR-195).
 
 Mirrors ``test_extraction_task.py``'s approach for ``extract_pdf_text``, but
 for ``extract_manuscript_text``: same fake-port pattern, same status
@@ -14,10 +14,11 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 
 from apps.ai.chunking.document import HEADING, PARAGRAPH, DocumentElement, NormalizedDocument
 from apps.ai.extraction import (
-    ExtractedDocument,
     ExtractionError,
     ExtractorUnavailable,
+    InMemoryExtractor,
     extraction_hash,
+    use_extractor,
 )
 from apps.documents import tasks
 from apps.documents.models import DocumentKind, PdfExtraction
@@ -34,29 +35,6 @@ DOCUMENT = NormalizedDocument(
     ),
     page_sizes={12: (612.0, 792.0)},
 )
-
-
-class FakeExtractor:
-    """Returns a canned document. A real implementation of the port."""
-
-    def __init__(self, document=DOCUMENT, name="fake"):
-        self._document = document
-        self._name = name
-        self.calls = []
-
-    def extract(self, pdf_bytes, *, filename):
-        self.calls.append((pdf_bytes, filename))
-        return ExtractedDocument(document=self._document, extractor=self._name)
-
-
-class FailingExtractor:
-    """Raises whatever it was given. Also a real implementation."""
-
-    def __init__(self, error):
-        self._error = error
-
-    def extract(self, pdf_bytes, *, filename):
-        raise self._error
 
 
 @pytest.fixture(autouse=True)
@@ -85,13 +63,13 @@ def extraction(record):
     return PdfExtraction.objects.create(record=record, kind=DocumentKind.MANUSCRIPT)
 
 
-def _run(monkeypatch, extractor, record_id):
-    monkeypatch.setattr(tasks, "_build_extractor", lambda: extractor)
-    return tasks.extract_manuscript_text.apply(args=[record_id])
+def _run(extractor, record_id):
+    with use_extractor(extractor):
+        return tasks.extract_manuscript_text.apply(args=[record_id])
 
 
 def test_a_successful_extraction_reaches_done(monkeypatch, record, extraction):
-    _run(monkeypatch, FakeExtractor(), record.id)
+    _run(InMemoryExtractor(DOCUMENT), record.id)
 
     extraction.refresh_from_db()
     assert extraction.status == "done"
@@ -100,7 +78,7 @@ def test_a_successful_extraction_reaches_done(monkeypatch, record, extraction):
 
 
 def test_the_structure_is_persisted(monkeypatch, record, extraction):
-    _run(monkeypatch, FakeExtractor(), record.id)
+    _run(InMemoryExtractor(DOCUMENT), record.id)
 
     extraction.refresh_from_db()
     assert extraction.structure
@@ -108,7 +86,7 @@ def test_the_structure_is_persisted(monkeypatch, record, extraction):
 
 
 def test_the_extraction_hash_ties_a_chunk_set_to_this_extraction(monkeypatch, record, extraction):
-    _run(monkeypatch, FakeExtractor(), record.id)
+    _run(InMemoryExtractor(DOCUMENT), record.id)
 
     extraction.refresh_from_db()
     assert extraction.content_hash == extraction_hash(DOCUMENT)
@@ -130,7 +108,7 @@ def test_resolved_record_id_reads_through_the_record_fk(record, extraction):
     ids=["unavailable", "rejected"],
 )
 def test_a_failed_extraction_is_recorded_and_retried(monkeypatch, record, extraction, error):
-    result = _run(monkeypatch, FailingExtractor(error), record.id)
+    result = _run(InMemoryExtractor(error), record.id)
 
     extraction.refresh_from_db()
     assert extraction.status == "failed"
@@ -141,9 +119,9 @@ def test_a_failed_extraction_is_recorded_and_retried(monkeypatch, record, extrac
 
 def test_a_deleted_extraction_row_is_not_an_error(monkeypatch, record):
     """The manuscript can be removed between the task being queued and running."""
-    extractor = FakeExtractor()
+    extractor = InMemoryExtractor(DOCUMENT)
 
-    _run(monkeypatch, extractor, record.id)
+    _run(extractor, record.id)
 
     assert extractor.calls == []
 
@@ -154,7 +132,7 @@ def test_a_successful_extraction_queues_chunking(
     """The manuscript is exactly what ADR-013's 2026-09-08 amendment says
     belongs in the RAG corpus. Queued by extraction id (IR-239), since that
     is the row the chunker reads."""
-    _run(monkeypatch, FakeExtractor(), record.id)
+    _run(InMemoryExtractor(DOCUMENT), record.id)
 
     assert queued_chunkings == [extraction.id]
 
@@ -162,6 +140,6 @@ def test_a_successful_extraction_queues_chunking(
 def test_a_failed_extraction_does_not_queue_chunking(
     monkeypatch, record, extraction, queued_chunkings
 ):
-    _run(monkeypatch, FailingExtractor(ExtractionError("boom")), record.id)
+    _run(InMemoryExtractor(ExtractionError("boom")), record.id)
 
     assert queued_chunkings == []

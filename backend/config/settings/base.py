@@ -1100,6 +1100,8 @@ AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
 # (REDIS_URL in IR-132, EXTRACTION_TIMEOUT in the compose comments). The
 # inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
 # above.
+# Which Extractor reads manuscripts (IR-838); read only in apps.ai.extraction.
+EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="docling")
 DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction; Compose sets this to the service name
 # A scanned thesis through OCR is minutes of work, not seconds. This bounds
 # one conversion, not the Celery retry that wraps it.

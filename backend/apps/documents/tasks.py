@@ -7,8 +7,8 @@ to the next. None of the three libraries was declared in any requirements
 file, so on a clean install all three fell through and extraction raised. It
 was scaffolding, and its own module docstring said so.
 
-It is replaced by one call to the Docling-serve container that both Compose
-files have declared all along. **There is no fallback extractor.** ADR-016
+It is replaced by one call to the Extractor ``apps.ai.extraction`` chooses
+(IR-838); this task never names a vendor. **There is no fallback extractor.** ADR-016
 retained PyMuPDF for Docling-serve unavailability; that clause is dropped —
 see the divergence note in the ADR. A second extractor produces documents
 without the structure this pipeline exists to consume, which means the
@@ -33,23 +33,6 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from apps.documents.models import PdfExtraction
 
 
-def _build_extractor():
-    """The seam. Tests replace this function rather than patching a client
-    into the middle of the task."""
-    from django.conf import settings
-
-    from apps.ai.extraction import DoclingExtractor
-
-    return DoclingExtractor(
-        settings.DOCLING_API_URL,
-        timeout=settings.DOCLING_TIMEOUT_SECONDS,
-        do_ocr=settings.DOCLING_DO_OCR,
-        do_formula_enrichment=settings.DOCLING_DO_FORMULA_ENRICHMENT,
-        do_code_enrichment=settings.DOCLING_DO_CODE_ENRICHMENT,
-        do_picture_classification=settings.DOCLING_DO_PICTURE_CLASSIFICATION,
-    )
-
-
 def _locked_extraction(extraction_id):
     """Lock order matches upload: Record first, then its extraction row."""
     from apps.documents.models import PdfExtraction
@@ -71,7 +54,7 @@ def _locked_extraction(extraction_id):
 def _run_extraction(self, extraction_id, source_revision):
     import uuid
     from django.db import transaction
-    from apps.ai.extraction import document_to_json, extraction_hash, flatten_for_search
+    from apps.ai.extraction import current_extractor, document_to_json, extraction_hash, flatten_for_search
 
     attempt = uuid.uuid4()
     with transaction.atomic():
@@ -92,12 +75,15 @@ def _run_extraction(self, extraction_id, source_revision):
     try:
         with storage.open(filename, "rb") as source:
             pdf_bytes = source.read()
-        extracted = _build_extractor().extract(pdf_bytes, filename=os.path.basename(filename))
+        extracted = current_extractor().extract(pdf_bytes, filename=os.path.basename(filename))
         values = {
             "extracted_text": flatten_for_search(extracted.document),
             "structure": document_to_json(extracted.document),
             "content_hash": extraction_hash(extracted.document),
-            "extractor": extracted.extractor, "error": "", "status": "done",
+            "extractor": extracted.provenance.name,
+            "extractor_version": extracted.provenance.version,
+            "extractor_options": dict(extracted.provenance.options),
+            "error": "", "status": "done",
             "phase": ExtractionPhase.READY, "completed_at": timezone.now(),
         }
     except Exception:

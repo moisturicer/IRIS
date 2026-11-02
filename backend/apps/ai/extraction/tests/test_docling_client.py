@@ -224,7 +224,7 @@ def test_a_trailing_slash_on_the_base_url_does_not_double_up():
 def test_a_successful_conversion_returns_the_mapped_document():
     result = _extractor(_ok()).extract(b"pdf", filename="thesis.pdf")
 
-    assert result.extractor == EXTRACTOR_NAME
+    assert (result.provenance.name, result.provenance.version) == (EXTRACTOR_NAME, "")
     assert result.document.title == "A Thesis"
     assert [e.kind for e in result.document.elements][0] == HEADING
     assert result.document.page_sizes == {1: (612.0, 792.0)}
