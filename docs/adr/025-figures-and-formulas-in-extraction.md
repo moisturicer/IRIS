@@ -2,6 +2,8 @@
 
 ## Status
 
+**Superseded by [ADR-056](056-manuscript-extraction-moves-to-llamaparse.md)** — 2026-11-02. Figures are now images LlamaParse crops and IRIS stores, described for retrieval only; formulas are found by their LaTeX delimiters. The IR-424 and IR-437 amendments below are carried forward in ADR-056 decision 12. Kept for the record, not for "what does IRIS do today".
+
 **Accepted** — 2026-09-17.
 
 **Amends [ADR-016](016-docling-structured-extraction.md)** on what the extractor captures. Does not supersede it: structured extraction through Docling-serve, on-premise, with no fallback extractor, is unchanged.
