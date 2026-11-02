@@ -333,7 +333,20 @@ cp backend/.env.example backend/.env
 cd backend && python -m pytest -q
 cd backend && python -m pytest apps/reviews -v
 cd backend && python -m pytest apps/ai apps/documents   # the RAG pipeline suites
+cd backend && python -m pytest -m "not slow"           # skip the slowest tests locally (IR-835)
 ```
+
+**One run per Postgres server (IR-835).** Two runs sharing one server slow each
+other several-fold (measured: 24 minutes alone, about two hours shared), and two
+checkouts with the same `DB_NAME` fight over one test database. A run that needs
+the database takes a session advisory lock in the server's `postgres` database;
+a second run exits at once naming the holder's pid and directory. The lock dies
+with its connection, so a crashed run leaves nothing to clean up. Collect-only
+runs and pytest runs started from inside a locked run do not take it.
+
+**`slow` (IR-835)** marks every `*_migration.py` test automatically (each migrates
+the schema backwards and forwards) and a few tests marked by hand. `-m "not slow"`
+saves about five minutes locally. CI selects nothing and runs all of them.
 
 **Backend CI (IR-810)** runs the complete pytest collection across four isolated
 runners/PostgreSQL services. Whole test modules stay together, assigned by test

@@ -101,7 +101,10 @@ python manage.py check
 python manage.py migrate
 python manage.py runserver
 python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db_required
-                                          # tests skip cleanly with no Postgres reachable
+                                          # tests skip cleanly with no Postgres reachable.
+                                          # One run per Postgres server: a second exits at
+                                          # once (IR-835). -m "not slow" skips migration
+                                          # tests and a few others locally; CI runs all
 python manage.py seed_demo                # accounts + Discover catalogue + every workflow_state
                                           # (IR-227). Logins are <role>@cit.edu / IrisDemo123!,
                                           # plus admin@cit.edu (Django superuser, no app role).

@@ -115,6 +115,7 @@ def test_concurrent_research_streams_stream_and_do_not_block_other_requests(slow
         assert body.index("event: agent_step") < body.index("event: done")
 
 
+@pytest.mark.slow
 def test_a_reader_leaving_closes_the_run_on_its_own_thread(monkeypatch):
     token = str(start_session(make_user("leave@cit.edu")).access_token).encode()
     closed, release = threading.Event(), threading.Event()
