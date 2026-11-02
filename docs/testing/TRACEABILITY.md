@@ -2611,3 +2611,7 @@ NFR-A1: muted text on stone-100 now uses the existing stone-600 utility in the r
 ## IR-98 — The test plan describes the testing IRIS does
 
 `TEST_PLAN.md` now lists the tooling and levels in use, and §9 lists what testing does not establish yet. `SECURITY.md` §11 gives each risk a reason and stays the one register. Documentation only: no test or requirement status changes.
+
+## IR-844 — CI runs the AI gateway's own tests
+
+`.github/workflows/ci.yml` gains an `AI gateway` job that runs `ai/tests`, including the service authentication test for ADR-014 precondition 1. No requirement status changes, and no test changed.
