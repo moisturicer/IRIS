@@ -2459,6 +2459,10 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 
 **PARTIAL:** Django's admin stays at `/admin/`, unrestricted, until IR-782 moves it. Until then the 403 guards a path Django does not serve.
 
+## IR-669 — Dev Postgres and Redis listen on localhost only, and Redis requires a password
+
+`docker-compose.yml` binds Postgres and Redis to `127.0.0.1`. Redis takes `--requirepass` in both Compose files, and every Redis URL in them carries the password, from the repo-root `.env` that `scripts/setup_env.py` generates when it is missing. No ASVS Level 1 item: this is developer-machine hygiene. Evidence is recorded on the PR.
+
 ## IR-811 · Every paper stores its embargo answer, and the disclosure check reads it
 
 **Design:** [ADR-052](../adr/052-each-paper-states-its-embargo-and-a-person-ends-it.md) decisions 1 to 4, 15 and 18, amending ADR-015's gate. Subtask 1 of IR-250.

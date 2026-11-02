@@ -325,6 +325,7 @@ jobs:
             echo "DB_NAME=iris"
             echo "DB_USER=iris"
             echo "DB_PASSWORD=ci-only-not-a-real-secret"
+            echo "REDIS_PASSWORD=ci-only-not-a-real-secret"
           } > .env
 
       - name: Validate development stack
