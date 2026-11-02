@@ -284,9 +284,11 @@ def chunk_extraction(self, extraction_id: int, source_revision=None, *, force: b
 
     with transaction.atomic():
         extraction = _locked_extraction(extraction_id)
-        if (not extraction or extraction.status != "done"
-                or str(extraction.source_revision) != str(source_revision)):
+        if not extraction or str(extraction.source_revision) != str(source_revision):
             return None
+        if extraction.status != "done":
+            from apps.ai.ingestion.pipeline import IngestionError
+            raise IngestionError("Extraction must complete before chunking.")
         return _run_ingestion(self, extraction, force)
 
 

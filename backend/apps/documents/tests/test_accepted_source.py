@@ -317,3 +317,45 @@ def test_different_original_bytes_with_identical_text_get_current_source_chunks(
             assert current.pk != first.pk
             assert current.extraction_hash == first.extraction_hash
         first = current
+
+
+def test_replacement_during_embedding_cannot_persist_old_vectors(manuscript, monkeypatch):
+    from django.utils import timezone
+    from apps.ai.chunking.document import DocumentElement, NormalizedDocument, PARAGRAPH
+    from apps.ai.extraction import ExtractedDocument
+    from apps.ai.indexing import embed_active_chunk_set
+    from apps.ai.models import ChunkSet
+    from apps.ai.models.chunk import ChunkEmbedding
+    from apps.ai.providers.fakes import DeterministicEmbeddingProvider
+    from apps.ai.tasks import chunk_extraction, embed_chunk_set
+    from apps.documents import tasks
+
+    client, record = manuscript
+    record.embargo_state = "none"
+    record.embargo_answered_at = timezone.now()
+    record.dpa_accepted_at = timezone.now()
+    record.save(update_fields=["embargo_state", "embargo_answered_at", "dpa_accepted_at"])
+    class Extractor:
+        def extract(self, content, *, filename):
+            return ExtractedDocument(document=NormalizedDocument(title="Research paper", elements=(
+                DocumentElement(kind=PARAGRAPH, text="The paper contains a passage for deterministic local embedding.", page=1),
+            )), extractor="local-test")
+    monkeypatch.setattr(tasks, "_build_extractor", Extractor)
+    monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: None)
+    monkeypatch.setattr(tasks, "_queue_chunk_extraction", lambda *args: None)
+    monkeypatch.setattr(embed_chunk_set, "delay", lambda *args, **kwargs: None)
+    assert attach(client, record).status_code == 200
+    revision = status(client, record)["manuscript_revision"]
+    assert tasks.extract_manuscript_text.apply(args=[record.pk, revision]).successful()
+    extraction = PdfExtraction.objects.get(record=record)
+    assert chunk_extraction.apply(args=[extraction.pk, revision]).successful()
+    chunks = ChunkSet.objects.get(record=record, is_active=True)
+    class ReplacingEmbedder(DeterministicEmbeddingProvider):
+        def embed_document_chunks(self, documents):
+            assert attach(client, record, b"B").status_code == 200
+            return super().embed_document_chunks(documents)
+    result = embed_active_chunk_set(record.pk, provider=ReplacingEmbedder(),
+                                    chunk_set_id=chunks.pk, source_revision=revision)
+    assert result.refused
+    assert not ChunkEmbedding.objects.filter(chunk__record=record).exists()
+    assert status(client, record)["manuscript_revision"] != revision

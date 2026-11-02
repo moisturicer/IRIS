@@ -53,5 +53,3 @@ def current_source(extraction, record):
         and record.manuscript_revision == extraction.source_revision
         and (not extraction.source_file or record.abstract_file.name == extraction.source_file)
     )
-
-
