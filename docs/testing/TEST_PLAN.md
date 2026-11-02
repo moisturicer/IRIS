@@ -177,7 +177,7 @@ Non-functional requirements are verified as part of the Weeks 8-15 evidence work
 
 | Group | NFRs | How |
 |---|---|---|
-| Security | NFR-S1…S6 | Authorization matrix tests + manual verification of session expiry and audit immutability |
+| Security | NFR-S1…S6 | [`SECURITY_CHECKLIST.md`](SECURITY_CHECKLIST.md): authorization matrix tests + manual verification of session expiry and audit immutability |
 | Performance | NFR-P1…P5 | Measured against the deployed instance, including the 100-concurrent-session target |
 | Usability | NFR-U1, **NFR-U2** | Task-based testing. **NFR-U2 requires 5 of 5 participants to complete a submission in under 10 minutes** |
 | Accessibility | NFR-U3 | axe-core in CI, keyboard walkthrough, screen reader pass, **no horizontal scroll at 360 px** |

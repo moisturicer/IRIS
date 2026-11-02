@@ -158,10 +158,12 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 7 | One office holds workflow and system administration powers together | **Medium** | [IR-781](https://citiris.atlassian.net/browse/IR-781) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
 | 8 | Consent has no version and can't be withdrawn, and the notice lacks DPO review | **Medium** | [IR-789](https://citiris.atlassian.net/browse/IR-789), [IR-791](https://citiris.atlassian.net/browse/IR-791), [IR-123](https://citiris.atlassian.net/browse/IR-123) |
 | 9 | No account deletion, personal data copy or retention job | **Medium** | [IR-785](https://citiris.atlassian.net/browse/IR-785), [IR-786](https://citiris.atlassian.net/browse/IR-786), [IR-794](https://citiris.atlassian.net/browse/IR-794) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
-| 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | **No ticket found:** [IR-655](https://citiris.atlassian.net/browse/IR-655) names [IR-58](https://citiris.atlassian.net/browse/IR-58), which Jira doesn't return |
-| 11 | Voyage's training opt-out has no recorded evidence | **Medium** | **No ticket yet** |
-| 12 | No threat model or ASVS Level 1 checklist | **Medium** | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
-| 13 | Development `backend`, `frontend` and `docling` listen on every interface | **Low** | **No ticket yet** |
+| 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
+| 11 | Voyage's training opt-out has no recorded evidence | **Medium** | [IR-827](https://citiris.atlassian.net/browse/IR-827) |
+| 12 | The threat model and ASVS checklist are drafts awaiting review | **Medium** | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
+| 13 | Development `backend`, `frontend` and `docling` listen on every interface | **Low** | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
+
+[`SECURITY_CHECKLIST.md`](../testing/SECURITY_CHECKLIST.md) lists further Level 1 gaps: [IR-819](https://citiris.atlassian.net/browse/IR-819), [IR-820](https://citiris.atlassian.net/browse/IR-820), [IR-821](https://citiris.atlassian.net/browse/IR-821), [IR-822](https://citiris.atlassian.net/browse/IR-822), [IR-823](https://citiris.atlassian.net/browse/IR-823), [IR-824](https://citiris.atlassian.net/browse/IR-824), [IR-825](https://citiris.atlassian.net/browse/IR-825).
 
 **Deferred deliberately:** SSO and MFA, until CIT-U IT provides an identity provider ([IR-652](https://citiris.atlassian.net/browse/IR-652)).
 

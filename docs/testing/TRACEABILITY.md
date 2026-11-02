@@ -2509,3 +2509,7 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 ## IR-670 — SECURITY.md describes the system as it is
 
 `docs/security/SECURITY.md` rewritten against `main` on 2026-11-02: closed risks listed apart, open risks linked to their tickets, SSO and MFA marked deferred, and no SRS or SDD citation. No behaviour changes. The PR lists what was checked.
+
+## IR-617 — Threat model and ASVS Level 1 checklist (NFR-S1…S6)
+
+NFR-S1…S6 are checked item by item in [`SECURITY_CHECKLIST.md`](SECURITY_CHECKLIST.md), against the threats in [ADR-053](../adr/053-threat-model.md). Both are drafts until Ashlee Sean reviews them, and ADR-053 needs acceptance by a named person. Gaps are ticketed, IR-819 to IR-829, apart from TLS.
