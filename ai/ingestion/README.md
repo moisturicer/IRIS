@@ -73,7 +73,7 @@ extraction writers and reader behavior remain in place.
 
 The existing owner-only `GET /api/v1/records/<id>/metadata-suggestions/` adds
 `runtime_processing`: null without current work, otherwise the revision and
-`pending` or `acknowledged_pending`. Both mean incomplete processing. Existing
+`pending_processing` or `acknowledged_pending`. Both mean incomplete processing. Existing
 extraction status stays separate. Grants, storage keys, internal errors and
 extracted text are excluded. Old receipts cannot replace a newer revision's
 status. Before AI schema installation, status remains pending.
