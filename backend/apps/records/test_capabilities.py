@@ -35,6 +35,7 @@ from django.db import transaction
 from django.test import override_settings
 from django.urls import reverse
 
+from apps.records.testing import answered_no_embargo
 from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import AssignmentState, Party, RecordTypeName, ResubmissionRequestState, SeatState
@@ -73,7 +74,10 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # --- the states ------------------------------------------------------------------
 
     def draft(self):
-        return self.make_record()
+        record = self.make_record()
+        # So a refusal on submit is about who is asking, not a missing answer.
+        answered_no_embargo(record.pk)
+        return record
 
     def with_adviser_unopened(self):
         return self.new_model()

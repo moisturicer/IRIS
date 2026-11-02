@@ -8,6 +8,7 @@ Adviser can route it to the same office pool as a Project.
 from rest_framework import status
 
 from apps.records.models import Record, RecordType
+from apps.records.testing import answered_no_embargo
 from apps.reviews import seats
 from apps.reviews.models import RecordAssignment, RecordClearance
 from core.enums import RecordTypeName
@@ -32,6 +33,7 @@ class ItsoForThesisTests(OfficeReviewTestBase):
         )
         self.assertEqual(created.status_code, status.HTTP_201_CREATED, created.data)
         record = Record.objects.get(pk=created.data["id"])
+        answered_no_embargo(record.pk)
         submitted = self.client.post(
             f"/api/v1/records/{record.pk}/submit/", {"dpa_accepted": True}, format="json",
         )

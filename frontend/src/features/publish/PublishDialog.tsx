@@ -1,8 +1,10 @@
 /**
  * Publish: starting a submission is a short dialog (IR-408; spec §4.4).
  *
- * It replaces the Submit Disclosure page and its wizard. There are three steps,
- * the fewest that keep the upload, the confirmation and the consent separate:
+ * It replaces the Submit Disclosure page and its wizard. It opens on one question,
+ * whether the paper is under an embargo (`EmbargoStep`), because the answer must
+ * reach the server before the file does. Then there are three steps, the fewest
+ * that keep the upload, the confirmation and the consent separate:
  *
  *   1. **Your manuscript** — the type, and the PDF. Choosing the file creates
  *      the draft at once, titled from the file name, so nothing typed later
@@ -50,14 +52,23 @@ import {
 import { personName } from "@/features/records/metadata/personName";
 
 import {
+  UNANSWERED,
   describeFailure,
+  embargoAnswer,
+  embargoFromDraft,
+  embargoProblem,
   firstIncompleteStep,
   isProposal,
+  manilaToday,
   provisionalTitle,
+  sameEmbargo,
   stateFromDraft,
   type ApiFailure,
+  type EmbargoChoice,
+  type EmbargoProblem,
   type PublishStep,
 } from "./draft";
+import { EMBARGO_FIELD_IDS, EmbargoStep } from "./EmbargoStep";
 import { ManuscriptStep, type ManuscriptUpload } from "./ManuscriptStep";
 import { PrefillChip } from "./PrefillChip";
 import { usePrefill, type PrefillStatus } from "./prefill";
@@ -84,6 +95,8 @@ const FIELD_LABELS: Record<string, string> = {
   psced: "PSCED classification",
   record_type: "Type",
   abstract_file: "Manuscript",
+  embargoed: "Embargo",
+  embargoed_until: "Embargo date",
 };
 
 /**
@@ -185,7 +198,11 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [listError, setListError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
-  const [step, setStep] = useState<PublishStep>(1);
+  const [step, setStep] = useState<PublishStep>(0);
+  const [embargo, setEmbargo] = useState<EmbargoChoice>(UNANSWERED);
+  const [embargoIssue, setEmbargoIssue] = useState<EmbargoProblem | null>(null);
+  // What the server holds, so a repeat saves only a change and keeps who and when.
+  const savedEmbargo = useRef<EmbargoChoice | null>(null);
   const [typeId, setTypeId] = useState<number | null>(null);
   const [isContinuation, setIsContinuation] = useState(false);
   // The type the server holds, so Continue saves only a change.
@@ -279,7 +296,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         savedTypeId.current = state.typeId;
         const hasManuscript = Boolean(record.abstract_file);
         setUpload(hasManuscript ? { status: "done", fileName: null, size: null } : { status: "idle" });
-        setStep(firstIncompleteStep({ typeId: state.typeId, hasManuscript, values: state.values }, selfId));
+        const onDraft = embargoFromDraft(record);
+        setEmbargo(onDraft);
+        savedEmbargo.current = onDraft.choice == null ? null : onDraft;
+        setStep(firstIncompleteStep({ embargo: onDraft, typeId: state.typeId, hasManuscript, values: state.values }, selfId));
         setPhase({ kind: "form" });
       } catch (err) {
         if (cancelled) return;
@@ -316,7 +336,53 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   function goTo(next: PublishStep) {
     setStep(next);
     setStepFailure(null);
-    setAnnouncement(`Step ${next} of 3: ${STEPS[next - 1].title}`);
+    setAnnouncement(next === 0 ? "Is this paper under an embargo?" : `Step ${next} of 3: ${STEPS[next - 1].title}`);
+  }
+
+  /* ── The embargo question: asked first, saved before any file is sent ── */
+  async function saveEmbargo(id: number) {
+    if (sameEmbargo(savedEmbargo.current, embargo)) return;
+    await recordsApi.answerEmbargo(id, embargoAnswer(embargo));
+    savedEmbargo.current = embargo;
+  }
+
+  function showEmbargoProblem(problem: EmbargoProblem) {
+    setEmbargoIssue(problem);
+    requestAnimationFrame(() => {
+      const field = document.getElementById(EMBARGO_FIELD_IDS[problem.field]);
+      field?.focus();
+      // Focus alone can leave the message under the footer on a phone.
+      field?.scrollIntoView?.({ block: "center" });
+    });
+  }
+
+  async function continueFromEmbargo() {
+    setStepFailure(null);
+    // An answer the server already holds is not asked to pass again: a draft whose
+    // date has since gone by would otherwise be stuck here with no way forward.
+    const problem = sameEmbargo(savedEmbargo.current, embargo) ? null : embargoProblem(embargo, manilaToday());
+    if (problem) {
+      showEmbargoProblem(problem);
+      return;
+    }
+    setEmbargoIssue(null);
+    // A new submission has no draft yet: `startUpload` saves it, before the file.
+    const id = draftIdRef.current;
+    if (id != null) {
+      setSaving(true);
+      try {
+        await saveEmbargo(id);
+      } catch (err) {
+        const failure = describeFailure(err, "We couldn't save your answer. Try again.");
+        const field = (["embargoed", "embargoed_until"] as const).find((name) => failure.fields[name]);
+        if (field) showEmbargoProblem({ field, message: failure.fields[field] });
+        else setStepFailure(failure);
+        return;
+      } finally {
+        setSaving(false);
+      }
+    }
+    goTo(1);
   }
 
   /* ── Step 1: create the draft once, then upload onto it ─────────────── */
@@ -346,6 +412,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           provisionalTitleRef.current = title;
         }
       }
+      // Before the file, so nothing that runs at upload meets a paper with no answer.
+      await saveEmbargo(id);
+      if (controller.signal.aborted) return;
       await recordsApi.uploadManuscript(id, file, {
         signal: controller.signal,
         onProgress: (progress) =>
@@ -360,7 +429,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       setUpload({
         status: "failed",
         fileName: file.name,
-        error: failure.fields.abstract_file ?? failure.fields.title ?? failure.message,
+        error: failure.fields.abstract_file ?? failure.fields.title ?? failure.fields.embargoed_until ?? failure.message,
       });
     } finally {
       if (abortRef.current === controller) abortRef.current = null;
@@ -418,11 +487,15 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   const continueFromDetails = form.handleSubmit(saveDetails, (errors) => focusFirstInvalid(errors, () => setMoreOpen(true)));
 
+  // Under an embargo nothing is filled in from the paper (ADR-052 decision 2). These
+  // suggestions are read inside IRIS, but the rule is that nothing is automatic.
+  const underEmbargo = embargo.choice === "yes";
   const prefill = usePrefill({
     recordId: draftId,
-    active: phase.kind === "form" && step === 2 && upload.status === "done",
+    active: phase.kind === "form" && step === 2 && upload.status === "done" && !underEmbargo,
     generation: uploadGeneration,
   });
+  const prefillStatus: PrefillStatus = underEmbargo ? "idle" : prefill.status;
 
   /**
    * Fill a field from its suggestion, and put the author in it. The chip goes
@@ -487,7 +560,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
   /* ── What the steps show ─────────────────────────────────────────────── */
   const values = form.watch();
-  const prefillNotes = prefillFieldNotes(prefill.status, (field) => {
+  const prefillNotes = prefillFieldNotes(prefillStatus, (field) => {
     const text = prefill.suggestions[field];
     const current = values[field] ?? "";
     if (text == null || dismissed.has(field) || current === text) return null;
@@ -507,6 +580,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const typeName = lists.recordTypes.find((t) => t.id === typeId)?.name ?? "";
 
   const summary = {
+    embargoUntil: underEmbargo ? embargo.until : null,
     keywords: values.keywords,
     ownerEmails: values.owner_emails,
     typeName,
@@ -533,14 +607,24 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           {draftId != null ? "Saved as a draft. You can close this and finish later." : " "}
         </p>
         <div className="ml-auto flex gap-2">
-          {step > 1 && (
+          {step > 0 && (
             <button
               type="button"
               onClick={() => goTo((step - 1) as PublishStep)}
-              disabled={saving || submitting}
+              disabled={saving || submitting || upload.status === "uploading"}
               className={cn(PILL_SECONDARY, FOCUS_RING)}
             >
               Back
+            </button>
+          )}
+          {step === 0 && (
+            <button
+              type="button"
+              onClick={() => void continueFromEmbargo()}
+              disabled={saving}
+              className={cn(PILL_PRIMARY, FOCUS_RING)}
+            >
+              Continue
             </button>
           )}
           {step === 1 && (
@@ -671,7 +755,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
 
       {phase.kind === "form" && (
         <>
-          <StepIndicator current={step} />
+          {step !== 0 && <StepIndicator current={step} />}
 
           {stepFailure && step !== 3 && (
             <div role="alert" className={cn(LOAD_ERROR, "mb-section flex-wrap")}>
@@ -680,7 +764,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               {stepFailure.network && (
                 <button
                   type="button"
-                  onClick={() => void (step === 1 ? continueFromManuscript() : continueFromDetails())}
+                  onClick={() => void (step === 0 ? continueFromEmbargo() : step === 1 ? continueFromManuscript() : continueFromDetails())}
                   className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}
                 >
                   Try again
@@ -690,6 +774,18 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           )}
 
           <div ref={stepRef} tabIndex={-1} className="outline-none">
+          {step === 0 && (
+            <EmbargoStep
+              value={embargo}
+              onChange={(value) => {
+                setEmbargo(value);
+                setEmbargoIssue(null);
+              }}
+              problem={embargoIssue}
+              today={manilaToday()}
+            />
+          )}
+
           {step === 1 && (
             <ManuscriptStep
               recordTypes={isContinuation ? lists.recordTypes.filter((type) => !isProposal(type.name)) : lists.recordTypes}
@@ -706,9 +802,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               {/* One announcement for the prefill, where the visible lines sit
                   under both fields and would be read twice. */}
               <span role="status" className="sr-only">
-                {prefillAnnouncement(prefill.status, prefillNotes)}
+                {prefillAnnouncement(prefillStatus, prefillNotes)}
               </span>
-              {(prefill.status === "failed" || prefill.status === "unsupported") && (
+              {(prefillStatus === "failed" || prefillStatus === "unsupported") && (
                 <p className="mb-section-sm text-small text-stone-600">{NEUTRAL_PREFILL}</p>
               )}
               <form
@@ -742,6 +838,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               onRetry={() => void submit()}
               onFixDetails={() => goTo(2)}
               fieldLabels={FIELD_LABELS}
+              onEditEmbargo={() => goTo(0)}
               onEditManuscript={() => goTo(1)}
               onEditDetails={() => goTo(2)}
               onEditHints={() => {
@@ -790,7 +887,7 @@ function prefillAnnouncement(status: PrefillStatus, notes: Partial<Record<Prefil
 }
 
 /** Where the author is: done steps say so in words, the current one is marked. */
-function StepIndicator({ current }: { current: PublishStep }) {
+function StepIndicator({ current }: { current: Exclude<PublishStep, 0> }) {
   return (
     <div className="mb-section">
       <p className="text-small text-stone-600 sm:hidden" aria-hidden>
