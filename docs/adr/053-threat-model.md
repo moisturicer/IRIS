@@ -63,7 +63,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 | | Threat | Control or gap |
 |---|---|---|
 | S, T | Someone on the host's network writes to the broker | Redis password and localhost binding ([IR-669](https://citiris.atlassian.net/browse/IR-669)). JSON-only Celery content, so a broker message can't run pickle |
-| I | Reading tokens or data from Redis | Same. Gap: development web services are still on every interface ([IR-828](https://citiris.atlassian.net/browse/IR-828)) |
+| I | Reading tokens or data from Redis | Same. Every development port binds to localhost ([IR-828](https://citiris.atlassian.net/browse/IR-828)) |
 
 **Django ↔ Docling**
 
