@@ -366,7 +366,7 @@ A value exported in your shell still applies, as it would in CI. To test with
 real settings, run the app, not the suite.
 
 **Full suite in parallel (IR-854).** After installing
-`backend/requirements/development.txt`, run `cd backend && python -m pytest -n 8`.
+`backend/requirements/development.txt`, run `cd backend && python -m pytest -n 4`.
 Use fewer workers if memory or database connections are limited; `-n 0` runs
 serially. Every selected test still runs. pytest-django creates one migrated
 database per worker (`test_<DB_NAME>_gw0`, etc.). The controller holds IR-835's
