@@ -363,6 +363,8 @@ their union runs every collected test once, preserving module order. Shard
 balance currently uses counts; use the reports to judge elapsed time before
 claiming a speedup or changing the partition policy.
 
+**AI gateway:** CI's `AI gateway` job runs `ai/tests` with `ai/requirements-dev.txt` (IR-844). Run it with `cd ai && python -m pytest -ra`.
+
 **Frontend:** CI runs `npm run lint`, `npm test` (Vitest with axe-core, IR-210) and `npm run build`.
 
 Rules: **never modify a test to make it pass**; if the test is wrong, fix it deliberately and say so in the PR. A requirement is not satisfied because code exists — only when a test demonstrates it and the evidence is recorded.
