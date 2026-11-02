@@ -19,6 +19,7 @@ import { MemoryRouter } from "react-router-dom";
 
 import { makeUser, validToken } from "@/test/authFixtures";
 import { useAuthStore } from "@/store/auth.store";
+import { useNotificationsStore } from "@/store/notifications.store";
 import type { Notification } from "@/types/notifications";
 
 import { useUnreadNotificationsFetch } from "@/hooks/useNotifications";
@@ -111,6 +112,32 @@ async function openBell() {
 
 afterEach(() => {
   act(() => useAuthStore.getState().logout());
+});
+
+
+describe("the bell's visible count and accessible name (IR-777)", () => {
+  it.each([
+    [0, null, "Notifications"],
+    [7, "7", "Notifications, 7 unread"],
+    [20, "9+", "Notifications, 9+ unread"],
+  ] as const)(
+    "keeps the visible badge text in the accessible name at %i unread",
+    (unreadCount, visibleBadge, accessibleName) => {
+      useNotificationsStore.setState({ items: [], unreadCount });
+      render(
+        <MemoryRouter>
+          <NotificationBell />
+        </MemoryRouter>,
+      );
+
+      const bell = screen.getByRole("button", { name: accessibleName });
+      if (visibleBadge === null) {
+        expect(within(bell).queryByText(/\d/)).not.toBeInTheDocument();
+      } else {
+        expect(within(bell).getByText(visibleBadge)).toBeInTheDocument();
+      }
+    },
+  );
 });
 
 describe("NotificationBell across a change of account in one tab", () => {
