@@ -31,6 +31,7 @@ DEFINER_FUNCTIONS = (
     "reader_status(bigint)",
     "processing_source()",
     "pending_manuscript_work(integer, uuid)",
+    "manuscript_invalidations(integer, uuid)",
 )
 HELPER_FUNCTIONS = ("hmac_sha256(bytea, bytea)", "b64url_encode(bytea)", "b64url_decode(text)")
 RUNTIME_FUNCTIONS = (
@@ -54,6 +55,7 @@ VERIFIER_COLUMNS = {
     "records_record": "id, is_deleted, pipeline_status, adviser_id, abstract_file",
     "publication_manuscriptwork": "id, record_id, revision, source_file, operation, revoked_at,"
                                   " created_at, grant_token, grant_expires_at",
+    "publication_manuscriptinvalidation": "id, record_id, work_id, reason",
     "records_recordowner": "record_id, user_id",
     "ai_askrun": "id, state, deadline_at, user_id, conversation_id",
     "ai_conversation": "id, user_id, record_id",
@@ -230,7 +232,8 @@ class Command(BaseCommand):
             "GRANT EXECUTE ON FUNCTION iris_authz.reader_status(bigint) TO iris_ai_runtime"
         )
         cursor.execute("GRANT EXECUTE ON FUNCTION iris_authz.processing_source(),"
-                       " iris_authz.pending_manuscript_work(integer, uuid) TO iris_ai_runtime")
+                       " iris_authz.pending_manuscript_work(integer, uuid),"
+                       " iris_authz.manuscript_invalidations(integer, uuid) TO iris_ai_runtime")
         # The AI runtime reserves and settles in the one shared ledger (IR-725).
         for table, columns in LEDGER_TABLES.items():
             cursor.execute(f"REVOKE UPDATE ON public.{table} FROM iris_ai_runtime")

@@ -19,4 +19,18 @@ class ManuscriptWork(models.Model):
         constraints = [models.UniqueConstraint(
             fields=["record"], condition=models.Q(revoked_at=None),
             name="one_current_manuscript_work",
-        )]
+        ), models.UniqueConstraint(fields=["record", "revision", "operation"],
+                                   name="unique_manuscript_work_revision")]
+
+
+class ManuscriptInvalidation(models.Model):
+    """Non-content cleanup facts survive the institutional Record's deletion."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    record_id = models.BigIntegerField()
+    work_id = models.UUIDField()
+    reason = models.CharField(max_length=32)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [models.UniqueConstraint(fields=["work_id", "reason"],
+                                               name="unique_manuscript_invalidation")]

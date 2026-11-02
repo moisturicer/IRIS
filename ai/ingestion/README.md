@@ -4,6 +4,10 @@ Django's `publication` app owns an institutional outbox. Its PostgreSQL trigger
 commits work with the Record's source, including bulk SQL updates. Changing the
 source revokes previous work; rollback removes both changes. Soft deletion
 revokes work permanently. Restoring a Record cannot restore an old grant.
+Adviser, publication status, embargo state, and owner removal/reassignment also
+revoke existing work. Non-content invalidation facts survive hard deletion and
+are reconciled separately; delayed cleanup can only remove an old receipt.
+The database forbids another work identity for the same Record/revision/operation.
 
 The revision is the accepted Manuscript UUID when available, otherwise a fresh
 attachment revision UUID. Storage uses unique attachment paths; this contract
@@ -29,6 +33,8 @@ with maintenance credentials. Apply AI migrations through the existing
 `python -m ai.runs.migrate` maintenance entry point. Only that AI owner migrates
 receipts. Django can execute a boolean acknowledgement projection and receives
 no receipt-table write grant.
+The AI worker owns both source and invalidation receipts; neither can authorize
+a content read. Only a currently verified institutional grant can do that.
 
 After commit, Django attempts to sign current work. A missed publisher,
 disabled grants or lost wakeup leaves durable pending work. Reconcile from

@@ -153,7 +153,79 @@ def test_reconcile_lost_publication_and_race_independent_workers(grant_db):
         assert client.get(url).data["runtime_processing"]["state"] == "pending"
     finally:
         with connection.cursor() as cursor:
-            cursor.execute("TRUNCATE iris_ai.manuscript_receipt")
+            cursor.execute("TRUNCATE iris_ai.manuscript_receipt, iris_ai.manuscript_invalidation_receipt")
+
+
+def test_access_change_denies_bound_grant_before_cleanup(grant_db):
+    from apps.publication import authority
+    from apps.publication.models import ManuscriptWork, ManuscriptInvalidation
+    from .grant_support import probe_login
+
+    owner = make_user("revoked-publication-owner@cit.edu")
+    record = Record.objects.create(title="Access", abstract_file="manuscripts/access.pdf")
+    ownership = RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+    work = ManuscriptWork.objects.get(record=record, revoked_at=None)
+    grant = authority.issue_grant(work.pk)
+    with probe_login() as conn, conn.cursor() as cursor:
+        cursor.execute("SELECT iris_authz.begin_research(%s, 'ingestion')", [grant.token])
+        ownership.delete()
+        cursor.execute("SELECT * FROM iris_authz.processing_source()")
+        assert cursor.fetchall() == []  # no projection cleanup has run
+        conn.rollback()
+    assert ManuscriptInvalidation.objects.filter(work_id=work.pk, reason="access").count() == 1
+    RecordOwner.objects.create(record=record, user=owner, is_primary=True)
+    with pytest.raises(authority.WorkRefused):
+        authority.issue_grant(work.pk)
+
+
+def test_record_access_and_historical_revision_replay_are_fenced(grant_db):
+    from apps.publication import authority
+    from apps.publication.models import ManuscriptWork
+    from django.db import IntegrityError
+
+    record = Record.objects.create(title="Revision", abstract_file="manuscripts/revision.pdf")
+    first = ManuscriptWork.objects.get(record=record, revoked_at=None)
+    Record.objects.filter(pk=record.pk).update(pipeline_status="published")
+    assert not ManuscriptWork.objects.filter(record=record, revoked_at=None).exists()
+    with pytest.raises(IntegrityError), transaction.atomic():
+        ManuscriptWork.objects.create(record=record, revision=first.revision, source_file=first.source_file)
+    assert ManuscriptWork.objects.filter(record=record, revision=first.revision).count() == 1
+    with pytest.raises(authority.WorkRefused):
+        authority.issue_grant(first.pk)
+
+
+def test_deletion_fact_survives_record_and_is_reconciled(grant_db):
+    import asyncio
+    import sys
+    from pathlib import Path
+    from django.db import connection
+    from apps.publication.models import ManuscriptWork, ManuscriptInvalidation
+    from .grant_support import probe_credentials
+    from .test_ai_runtime_runs_db import admin_dsn, dsn
+
+    root = Path(__file__).resolve().parents[4]
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    from ai.runs.migrate import migrate
+    from ai.ingestion.worker import consume
+
+    asyncio.run(migrate(admin_dsn()))
+    try:
+        record = Record.objects.create(title="Delete", abstract_file="manuscripts/delete.pdf")
+        work = ManuscriptWork.objects.get(record=record, revoked_at=None)
+        with probe_credentials() as (name, password):
+            runtime = dsn(name, password)
+            assert asyncio.run(consume(runtime, limit=10)).acknowledged == 1
+            record.delete()
+            assert ManuscriptInvalidation.objects.filter(work_id=work.pk, reason="deleted").exists()
+            assert asyncio.run(consume(runtime, limit=10)).invalidated == 1
+            assert asyncio.run(consume(runtime, limit=10)).invalidated == 0
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT count(*) FROM iris_ai.manuscript_receipt WHERE work_id=%s", [str(work.pk)])
+                assert cursor.fetchone()[0] == 0
+    finally:
+        with connection.cursor() as cursor:
+            cursor.execute("TRUNCATE iris_ai.manuscript_receipt, iris_ai.manuscript_invalidation_receipt")
 
 
 def test_authenticated_manuscript_upload_publishes_work(tmp_path, settings, monkeypatch):

@@ -18,6 +18,8 @@ WAKEUP_KEY = "iris_ai:ingestion:wakeup"
 class Batch:
     after: uuid.UUID | None
     acknowledged: int
+    invalidation_after: uuid.UUID | None = None
+    invalidated: int = 0
 
 
 async def acknowledge(conn, token: str) -> bool:
@@ -38,29 +40,44 @@ async def acknowledge(conn, token: str) -> bool:
         return result == "INSERT 0 1"
 
 
-async def consume(dsn: str, *, limit: int, after: uuid.UUID | None = None) -> Batch:
+async def consume(dsn: str, *, limit: int, after: uuid.UUID | None = None,
+                  invalidation_after: uuid.UUID | None = None) -> Batch:
     """Scan one bounded page of committed grants, regardless of queue delivery."""
     if not 1 <= limit <= 1000:
         raise ValueError("limit must be between 1 and 1000")
     conn = await asyncpg.connect(dsn)
     try:
+        facts = await conn.fetch("SELECT * FROM iris_authz.manuscript_invalidations($1, $2)",
+                                 limit, invalidation_after)
+        invalidated = 0
+        for fact in facts:
+            async with conn.transaction():
+                result = await conn.execute(
+                    "INSERT INTO iris_ai.manuscript_invalidation_receipt(event_id) VALUES ($1)"
+                    " ON CONFLICT (event_id) DO NOTHING", fact["event_id"])
+                # Cleanup is idempotent and cannot establish source authority.
+                await conn.execute("DELETE FROM iris_ai.manuscript_receipt WHERE work_id = $1", fact["work_id"])
+                invalidated += result == "INSERT 0 1"
         work = await conn.fetch("SELECT * FROM iris_authz.pending_manuscript_work($1, $2)", limit, after)
         count = 0
         for row in work:
             count += await acknowledge(conn, row["grant_token"])
-        return Batch(work[-1]["work_id"] if len(work) == limit else None, count)
+        return Batch(work[-1]["work_id"] if len(work) == limit else None, count,
+                     facts[-1]["event_id"] if len(facts) == limit else None, invalidated)
     finally:
         await conn.close()
 
 
 async def serve(dsn: str, *, limit: int, poll_seconds: float, once=False, redis_url=""):
     after = None
+    invalidation_after = None
     while True:
-        batch = await consume(dsn, limit=limit, after=after)
+        batch = await consume(dsn, limit=limit, after=after, invalidation_after=invalidation_after)
         if once:
             return batch
         after = batch.after
-        if after is not None:
+        invalidation_after = batch.invalidation_after
+        if after is not None or invalidation_after is not None:
             continue
         if redis_url:
             try:
