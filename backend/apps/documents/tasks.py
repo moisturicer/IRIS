@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING
 
 from celery import shared_task
 from django.utils import timezone
+from .phases import ExtractionPhase
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from apps.documents.models import PdfExtraction
@@ -77,10 +78,10 @@ def _run_extraction(self, extraction_id, source_revision):
         extraction = _locked_extraction(extraction_id)
         if not extraction or str(extraction.source_revision) != str(source_revision):
             return
-        if extraction.status in {"done", "failed"} or extraction.phase == "awaiting_submission":
+        if extraction.status in {"done", "failed"} or extraction.phase == ExtractionPhase.AWAITING_SUBMISSION:
             return
         extraction.status = "running"
-        extraction.phase = "reading"
+        extraction.phase = ExtractionPhase.READING
         extraction.attempt = attempt
         extraction.celery_task_id = self.request.id or ""
         extraction.save(update_fields=["status", "phase", "attempt", "celery_task_id"])
@@ -97,7 +98,7 @@ def _run_extraction(self, extraction_id, source_revision):
             "structure": document_to_json(extracted.document),
             "content_hash": extraction_hash(extracted.document),
             "extractor": extracted.extractor, "error": "", "status": "done",
-            "phase": "ready", "completed_at": timezone.now(),
+            "phase": ExtractionPhase.READY, "completed_at": timezone.now(),
         }
     except Exception:
         final = self.request.retries >= self.max_retries
@@ -107,7 +108,7 @@ def _run_extraction(self, extraction_id, source_revision):
                     or str(extraction.source_revision) != str(source_revision)):
                 return
             extraction.status = "failed" if final else "retrying"
-            extraction.phase = "failed" if final else "retrying"
+            extraction.phase = ExtractionPhase.FAILED if final else ExtractionPhase.RETRYING
             extraction.error = "PDF reading failed. Retry extraction or enter details manually."
             extraction.save(update_fields=["status", "phase", "error"])
         # No parser exception/path in Celery messages or public status.

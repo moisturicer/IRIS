@@ -110,8 +110,13 @@ def main():
 
         memory_mib, max_pages, max_objects, max_depth = map(int, sys.argv[2:])
         memory = memory_mib * 1024 * 1024
+        runtime_bytes = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss * 1024
         resource.setrlimit(resource.RLIMIT_AS, (memory, memory))
         resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+        # A cap below the Linux interpreter's own resident footprint cannot
+        # even import the parser reliably; that is a budget refusal, not bad PDF bytes.
+        if runtime_bytes > memory:
+            return 5
         return inspect(sys.argv[1], max_pages, max_objects, max_depth)
     except (MemoryError, OverBudget, RecursionError):
         return 5

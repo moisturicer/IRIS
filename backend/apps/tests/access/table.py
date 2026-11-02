@@ -151,6 +151,11 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-metadata-suggestions": Entry({
         "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
     }),
+    # IR-831: only an owner can explicitly retry the current Manuscript.
+    "record-retry-extraction": Entry({
+        "POST": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+                      kwargs=RECORD, data={}),
+    }),
     # Any office, on any record it can see (decided 2026-10-11). A role gate
     # before lookup, so a non-office caller's 403 is the same for a missing id.
     "record-tags": Entry({"PATCH": _case(OFFICE_ONLY, kwargs=RECORD, data={"is_ip": True})}),

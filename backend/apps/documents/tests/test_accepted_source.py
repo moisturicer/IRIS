@@ -331,10 +331,9 @@ def test_replacement_during_embedding_cannot_persist_old_vectors(manuscript, mon
     from apps.documents import tasks
 
     client, record = manuscript
-    record.embargo_state = "none"
     record.embargo_answered_at = timezone.now()
     record.dpa_accepted_at = timezone.now()
-    record.save(update_fields=["embargo_state", "embargo_answered_at", "dpa_accepted_at"])
+    record.save(update_fields=["embargo_answered_at", "dpa_accepted_at"])
     class Extractor:
         def extract(self, content, *, filename):
             return ExtractedDocument(document=NormalizedDocument(title="Research paper", elements=(

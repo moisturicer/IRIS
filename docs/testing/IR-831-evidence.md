@@ -21,7 +21,15 @@ All **40 public arXiv proxy papers** in the local development corpus were accept
 
 ## Migrations and static checks
 
-Applied the additive AI `0039`, documents `0013`/`0014` and records `0026` migrations to an isolated copy of the development PostgreSQL database. The copy contained **63 Records, 44 extractions and 44 chunk sets**; identity migration retained them. The phase backfill maps existing statuses without reading/replacing source bytes. `makemigrations --check --dry-run` reports no missing migrations. The full repository Python undefined-name/import check passes.
+Applied the additive AI `0039`, documents `0013`/`0014`/`0015` and records `0026` migrations to an isolated copy of the development PostgreSQL database. The copy contained **63 Records, 44 extractions and 44 chunk sets**; identity migration retained them. The phase backfill maps existing statuses without reading/replacing source bytes, and `0015` records the explicit processing-phase vocabulary. `makemigrations --check --dry-run` reports no missing migrations. The full repository Python undefined-name/import check passes.
+
+## Backend integration verification
+
+The completed local full run collected **6,023 cases**, with nine failures and one skip. It exposed two legacy task assertions missing the revision argument, a new test incorrectly assigning the derived embargo property, two historical-schema tests querying newer model columns, an undeclared retry route (two guard failures), the independent processing/library vocabulary collision and a CRLF-converted archive fixture checksum. No frozen migration, research label or audit pin was changed to fix these.
+
+The corrected integration group ran **120 cases**: 119 passed, with only the archive checksum still failing before its committed LF bytes were restored in the disposable snapshot. A subsequent **31-case parser/fixture run passed completely**, covering that checksum and the final real-process memory-budget behavior. CI's Python 3.11 initially classified a cap below interpreter startup memory as malformed content; the child now installs its hard limit and explicitly refuses an already-over-budget runtime before importing the parser. The limit was not relaxed and the test still exercises a real child.
+
+Authorization outcomes are now declared for all nine matrix roles; only the owner passes authorization for explicit retry. `ExtractionPhase` owns processing labels in a narrow module; its Reading PDF phase does not borrow the unrelated library `ReadingStatus`. Historical migration tests read only the schema under test and retain their original behavioral assertions. Final whole-suite evidence is the PR's CI run, with every backend shard required.
 
 ## Frontend verification
 

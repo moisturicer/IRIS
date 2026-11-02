@@ -4,6 +4,7 @@ from pathlib import Path
 from django.utils import timezone
 
 from core.enums import DocumentRequestItemState, DocumentRequestState, Party
+from .phases import ExtractionPhase
 
 
 def attachment_path(instance, filename):
@@ -150,7 +151,7 @@ class PdfExtraction(models.Model):
     source_revision = models.UUIDField(null=True, blank=True, editable=False)
     source_file = models.CharField(max_length=255, blank=True, editable=False)
     attempt = models.UUIDField(null=True, blank=True, editable=False)
-    phase = models.CharField(max_length=24, default="queued")
+    phase = models.CharField(max_length=24, choices=ExtractionPhase.choices, default=ExtractionPhase.QUEUED)
     # The RAG corpus boundary, stored on the row the chunker reads (IR-239).
     # Defaults to SUPPLEMENTARY so the failure mode is closed: a row whose
     # creator forgot to say what it holds is left out of the corpus rather

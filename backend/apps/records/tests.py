@@ -334,7 +334,8 @@ class ManuscriptExtractionTriggerTests(APITestCase):
                 response = self._patch_manuscript()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        mock_delay.assert_called_once_with(self.record.id)
+        self.record.refresh_from_db()
+        mock_delay.assert_called_once_with(self.record.id, str(self.record.manuscript_revision))
 
     def test_patching_abstract_file_creates_a_pdf_extraction_row(self):
         from unittest.mock import patch
@@ -370,7 +371,8 @@ class ManuscriptExtractionTriggerTests(APITestCase):
                 )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        mock_delay.assert_called_once_with(response.data["id"])
+        record = Record.objects.get(pk=response.data["id"])
+        mock_delay.assert_called_once_with(record.pk, str(record.manuscript_revision))
 
     def test_patching_an_unrelated_field_does_not_queue_extraction(self):
         from unittest.mock import patch

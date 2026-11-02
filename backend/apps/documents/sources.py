@@ -4,6 +4,7 @@ import uuid
 from django.db import transaction
 
 from .models import DocumentKind, PdfExtraction
+from .phases import ExtractionPhase
 
 
 def manuscript_changes(instance, file):
@@ -30,12 +31,12 @@ def reset_manuscript(record, *, defer=False, retry=False):
         ChunkSet.objects.filter(record=record, is_active=True).update(is_active=False)
         return
     same = extraction and extraction.source_revision == revision and extraction.source_file == record.abstract_file.name
-    if same and not retry and (extraction.status != "queued" or extraction.phase != "awaiting_submission" or defer):
+    if same and not retry and (extraction.status != "queued" or extraction.phase != ExtractionPhase.AWAITING_SUBMISSION or defer):
         return
     extraction, _ = PdfExtraction.objects.update_or_create(record=record, defaults={
         "source_revision": revision, "source_file": record.abstract_file.name,
         "kind": DocumentKind.MANUSCRIPT, "status": "queued",
-        "phase": "awaiting_submission" if defer else "queued", "attempt": None,
+        "phase": ExtractionPhase.AWAITING_SUBMISSION if defer else ExtractionPhase.QUEUED, "attempt": None,
         "extracted_text": "", "structure": {}, "content_hash": "", "extractor": "",
         "error": "", "completed_at": None, "celery_task_id": "",
     })
