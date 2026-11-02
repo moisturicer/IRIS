@@ -39,8 +39,8 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
   return (
     <Modal open={isOpen} onClose={onClose} title="Cite this paper" size="max-w-2xl">
       <div className="space-y-4">
-        <p className="text-xs text-slate-500 leading-relaxed line-clamp-2">
-          <span className="font-semibold text-slate-700">{record.title}</span>
+        <p className="text-xs text-stone-500 leading-relaxed line-clamp-2">
+          <span className="font-semibold text-stone-700">{record.title}</span>
         </p>
 
         {/* Style switcher */}
@@ -54,7 +54,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
                 "px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer",
                 style === option
                   ? "bg-brand text-white"
-                  : "bg-slate-100 text-slate-600 hover:bg-slate-200/70",
+                  : "bg-stone-100 text-stone-600 hover:bg-stone-200/70",
               )}
             >
               {option}
@@ -63,12 +63,12 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
         </div>
 
         {/* Citation body */}
-        <pre className="bg-slate-50 border border-slate-200 rounded-lg p-4 text-xs text-slate-800 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-64 overflow-y-auto">
+        <pre className="bg-stone-50 border border-stone-200 rounded-lg p-4 text-xs text-stone-800 whitespace-pre-wrap break-words font-mono leading-relaxed max-h-64 overflow-y-auto">
           {citation}
         </pre>
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[12px] text-slate-400">
+          <p className="text-[12px] text-stone-400">
             Generated from the record&apos;s authors, title and year.
           </p>
           <button

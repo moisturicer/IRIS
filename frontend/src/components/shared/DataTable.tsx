@@ -65,14 +65,14 @@ export function DataTable<T>({
       <div className="overflow-x-auto">
         <table className="w-full text-[14px]">
           <caption className="sr-only">{caption}</caption>
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-stone-50 border-b border-stone-200">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
                     scope="col"
-                    className="text-left px-4 py-3 font-semibold text-gray-600 whitespace-nowrap"
+                    className="text-left px-4 py-3 font-semibold text-stone-600 whitespace-nowrap"
                   >
                     {header.isPlaceholder
                       ? null
@@ -93,15 +93,15 @@ export function DataTable<T>({
               </tr>
             ) : table.getRowModel().rows.length === 0 ? (
               <tr>
-                <td colSpan={columns.length} className="py-12 text-center text-gray-500 text-[14px]">
+                <td colSpan={columns.length} className="py-12 text-center text-stone-500 text-[14px]">
                   No records found.
                 </td>
               </tr>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <tr key={row.id} className="border-b border-gray-100 hover:bg-gray-50">
+                <tr key={row.id} className="border-b border-stone-100 hover:bg-stone-50">
                   {row.getVisibleCells().map((cell) => (
-                    <td key={cell.id} className="px-4 py-3 text-gray-700">
+                    <td key={cell.id} className="px-4 py-3 text-stone-700">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   ))}
@@ -114,7 +114,7 @@ export function DataTable<T>({
 
       {/* Pagination bar */}
       {totalCount > 0 && (
-        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 text-[13px] text-gray-500">
+        <div className="flex items-center justify-between px-4 py-3 border-t border-stone-200 text-[13px] text-stone-500">
           <span>{start}-{end} of {totalCount}</span>
           <div className="flex gap-1">
             <Button
@@ -126,7 +126,7 @@ export function DataTable<T>({
             >
               <i className="fa fa-chevron-left text-[12px]" aria-hidden />
             </Button>
-            <span className="px-2 py-1 font-medium text-gray-700">{page} / {totalPages}</span>
+            <span className="px-2 py-1 font-medium text-stone-700">{page} / {totalPages}</span>
             <Button
               variant="ghost"
               size="sm"
