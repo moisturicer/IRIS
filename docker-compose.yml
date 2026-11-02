@@ -88,7 +88,8 @@ services:
       - ./backend:/app
       - media_files:/app/media
     ports:
-      - "8000:8000"
+      # Localhost only, like every port here (IR-828).
+      - "127.0.0.1:8000:8000"
     env_file:
       - ./backend/.env
     environment:
@@ -117,7 +118,7 @@ services:
     working_dir: /app
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "127.0.0.1:5173:5173"
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -139,7 +140,7 @@ services:
       file: docling/compose.yml
       service: ${DOCLING_VARIANT:-docling-gpu}
     ports:
-      - "5001:5001"
+      - "127.0.0.1:5001:5001"
     environment:
       - DOCLING_SERVE_ENABLE_UI=1
 

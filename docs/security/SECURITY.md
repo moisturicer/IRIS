@@ -161,7 +161,6 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | A compromised gateway could read records past Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
 | 11 | Voyage's training opt-out has no recorded evidence | **Medium** | Nothing shows the vendor isn't training on unpublished text | [IR-827](https://citiris.atlassian.net/browse/IR-827) |
 | 12 | The ASVS checklist is a draft awaiting review | **Medium** | Its statuses come from reading code, and nobody has confirmed them | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
-| 13 | Development `backend`, `frontend` and `docling` listen on every interface | **Low** | Exposes development machines to their local network, not production | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
 
 [`SECURITY_CHECKLIST.md`](../testing/SECURITY_CHECKLIST.md) lists further Level 1 gaps: [IR-819](https://citiris.atlassian.net/browse/IR-819), [IR-820](https://citiris.atlassian.net/browse/IR-820), [IR-821](https://citiris.atlassian.net/browse/IR-821), [IR-822](https://citiris.atlassian.net/browse/IR-822), [IR-823](https://citiris.atlassian.net/browse/IR-823), [IR-824](https://citiris.atlassian.net/browse/IR-824), [IR-825](https://citiris.atlassian.net/browse/IR-825).
 
@@ -185,6 +184,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | Lockout counted the proxy's address, not the client's | [IR-656](https://citiris.atlassian.net/browse/IR-656) |
 | A revoked session's access token kept working | [IR-657](https://citiris.atlassian.net/browse/IR-657) |
 | CI didn't run `ai/tests`, including the gateway's service authentication test | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
+| Development `backend`, `frontend` and `docling` listened on every interface | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
 | Production HTTPS redirect loop behind the proxy | [IR-662](https://citiris.atlassian.net/browse/IR-662) |
 | No browser security headers | [IR-663](https://citiris.atlassian.net/browse/IR-663) |
 | Uploads accepted without checking the content was a PDF | [IR-665](https://citiris.atlassian.net/browse/IR-665) |
