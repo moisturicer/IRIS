@@ -16,7 +16,7 @@
 
 **Browser journeys.** Playwright specs in `e2e/` drive one production-settings build (IR-631). They're started by hand and aren't a PR gate. See [`CORE_JOURNEYS.md`](CORE_JOURNEYS.md). `docs/testing/runs/` holds only the template, so no run record is committed there.
 
-**AI gateway.** `ai/tests` exists, but **CI doesn't run it** ([IR-844](https://citiris.atlassian.net/browse/IR-844)).
+**AI gateway.** `ai/tests` has its own `pytest.ini` and requirements, and the CI `AI gateway` job runs it (IR-844).
 
 [`TRACEABILITY.md`](TRACEABILITY.md) says what is demonstrated for each requirement. **A requirement is not satisfied because code exists for it; it is satisfied when a test demonstrates it and the evidence is recorded.**
 
@@ -47,6 +47,7 @@ A passing test suite says nothing about whether the contribution is better than 
 | **Integration** | Service functions against real PostgreSQL with pgvector: workflow transitions, clearance state | `backend/apps/**/tests/` |
 | **API / authorization** | Endpoint behaviour per role and ownership, including the route matrix (IR-615, IR-616) | `backend/apps/*/tests/`, `backend/apps/tests/test_access_matrix.py` |
 | **Frontend component and accessibility** | Rendered behaviour through the accessible tree, plus axe-core | `frontend/src/**/*.test.*` |
+| **AI gateway** | The gateway's service authentication, run configuration and embedding contract, no database | `ai/tests` |
 | **Frontend build** | Types compile, lint passes | `frontend/` |
 | **Configuration** | Compose files validate, the backend image builds, the real nginx sends its headers, celery-beat boots | CI `Docker Compose` job |
 | **Security gates** | Secret scan, dependency audit, SAST | CI `Security` job, §6 |
@@ -102,6 +103,9 @@ cd backend && python -m pytest apps/ai apps/documents   # RAG pipeline suites
 # Reproduce CI's contract locally: a missing database fails the run instead of
 # skipping it. Use this before claiming a suite passed.
 cd backend && IRIS_REQUIRE_DB=1 python -m pytest -ra
+
+# AI gateway (its own requirements: pip install -r ai/requirements-dev.txt)
+cd ai && python -m pytest -ra
 
 # frontend
 cd frontend && npm run lint
@@ -206,7 +210,6 @@ These are limits on the evidence. Security risks, with severity and reason, are 
 | Limit | Why | Ticket |
 |---|---|---|
 | Capacity and response times are unmeasured | No agreed target and no measurement | [IR-95](https://citiris.atlassian.net/browse/IR-95) |
-| `ai/tests` doesn't run in CI | CI's pytest runs only `backend/` and `security/tests` | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
 | Some security checklist items need a check by hand, and nobody has done it | Reading the code can't settle them | [IR-829](https://citiris.atlassian.net/browse/IR-829) |
 | Restore is unrehearsed | No backups exist to restore | [IR-167](https://citiris.atlassian.net/browse/IR-167) |
 | Real Ask IRIS answers aren't driven by the journeys | Every question answers "no readable sources" until the embargo work lands | [IR-250](https://citiris.atlassian.net/browse/IR-250) |

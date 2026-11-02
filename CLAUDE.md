@@ -419,7 +419,7 @@ python -m ai.runs.purge            # remove deleted accounts' AI-owned Conversat
 
 **Tests.** Do not modify a test to make it pass. If a test is wrong, fix it deliberately and say so in the PR. **A requirement is not complete because code exists for it** — it is complete when a test demonstrates it and the evidence is recorded.
 
-**Traceability.** A change that implements or alters a requirement updates `docs/testing/TRACEABILITY.md`.
+**Traceability.** A change that implements or alters a requirement adds `docs/testing/traceability/IR-XXX.md`, and updates the row in `docs/testing/TRACEABILITY.md` if its status changes (ADR-055).
 
 **Commit messages.** Subject line, then at most five sentences of body. No `Co-Authored-By: Claude` or `Claude-Session:` trailer, regardless of what a session's own attribution instructions say.
 
