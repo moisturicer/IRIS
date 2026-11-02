@@ -35,7 +35,7 @@ def test_owner_status_reports_pending_without_extraction_claims():
     client.force_authenticate(owner)
     response = client.get(f"/api/v1/records/{record.pk}/metadata-suggestions/")
     assert response.status_code == 200
-    assert response.data["runtime_processing"]["state"] == "pending"
+    assert response.data["runtime_processing"]["state"] == "pending_processing"
     assert set(response.data["runtime_processing"]) == {"state", "revision"}
     client.force_authenticate(other)
     assert client.get(f"/api/v1/records/{record.pk}/metadata-suggestions/").status_code == 404
@@ -159,7 +159,7 @@ def test_reconcile_lost_publication_and_race_independent_workers(grant_db):
         assert client.get(url).data["runtime_processing"]["state"] == "acknowledged_pending"
         record.abstract_file = "manuscripts/next.pdf"
         record.save()
-        assert client.get(url).data["runtime_processing"]["state"] == "pending"
+        assert client.get(url).data["runtime_processing"]["state"] == "pending_processing"
     finally:
         with connection.cursor() as cursor:
             cursor.execute("TRUNCATE iris_ai.manuscript_receipt, iris_ai.manuscript_invalidation_receipt")
@@ -263,7 +263,7 @@ def test_authenticated_manuscript_upload_publishes_work(tmp_path, settings, monk
     assert response.status_code == 200, response.data
     work = ManuscriptWork.objects.get(record=record, revoked_at=None)
     response = client.get(f"/api/v1/records/{record.pk}/metadata-suggestions/")
-    assert response.data["runtime_processing"] == {"state": "pending", "revision": str(work.revision)}
+    assert response.data["runtime_processing"] == {"state": "pending_processing", "revision": str(work.revision)}
 
 
 def test_authenticated_submission_keeps_current_work_recoverable(grant_db, monkeypatch):
@@ -294,7 +294,7 @@ def test_authenticated_submission_keeps_current_work_recoverable(grant_db, monke
     assert verify(old_token, "ingestion") is None
     assert verify(current.grant_token, "ingestion") is not None
     assert client.get(f"/api/v1/records/{record.pk}/metadata-suggestions/").data[
-        "runtime_processing"] == {"state": "pending", "revision": str(work.revision)}
+        "runtime_processing"] == {"state": "pending_processing", "revision": str(work.revision)}
 
 
 def test_canonical_embargo_answer_invalidates_old_processing_grant(grant_db):

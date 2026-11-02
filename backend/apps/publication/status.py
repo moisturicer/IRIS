@@ -17,5 +17,5 @@ def processing_status(record):
         # AI migrations are additive and may not have been installed yet.
         if getattr(exc.__cause__, "pgcode", None) not in ("42883", "3F000"):
             raise
-    return {"state": "acknowledged_pending" if acknowledged else "pending",
+    return {"state": "acknowledged_pending" if acknowledged else "pending_processing",
             "revision": str(work.revision)}
