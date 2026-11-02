@@ -19,6 +19,10 @@ def encoded(writer):
     return file
 
 
+def test_a_structurally_parseable_pdf_with_zero_pages_is_refused():
+    assert pdf_upload_problem(encoded(PdfWriter())) == "This file is not a readable PDF."
+
+
 @pytest.mark.parametrize("password", ["", "secret"])
 def test_encryption_is_refused_even_when_no_password_is_needed(password):
     writer = PdfWriter()
