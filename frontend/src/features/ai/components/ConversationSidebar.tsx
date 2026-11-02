@@ -99,7 +99,7 @@ export function ConversationHistoryList({
                 className="absolute right-2 top-1/2 -translate-y-1/2 inline-flex items-center justify-center p-1.5 rounded-md
                   opacity-0 group-hover:opacity-100 focus-visible:opacity-100
                   [@media(hover:none)]:opacity-100 [@media(hover:none)]:w-11 [@media(hover:none)]:h-11
-                  text-stone-400 hover:text-red-600 hover:bg-red-50/80"
+                  text-stone-600 hover:text-brand-dark hover:bg-brand-50"
                 aria-label={`Delete ${c.title}`}
               >
                 <i className="fas fa-trash text-[11px]" aria-hidden />

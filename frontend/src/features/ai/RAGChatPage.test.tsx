@@ -94,16 +94,28 @@ beforeEach(() => {
 });
 
 describe("persisted conversations", () => {
-  it("uses AA secondary text for the Ask IRIS label, hint and history timestamp (IR-771)", async () => {
+  it("uses AA secondary text and omits the persistent keyboard hint (IR-771, IR-365)", async () => {
     list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" })] });
     get.mockResolvedValue({ data: detail({ id: 9, title: "Flooding" }) });
 
     renderScreen(<RAGChatPage />);
 
     expect(await screen.findByText("Ask IRIS")).toHaveClass("text-stone-600");
-    expect(screen.getByText("Enter to send · Shift+Enter for new line")).toHaveClass("text-stone-600");
+    expect(screen.queryByText("Enter to send · Shift+Enter for new line")).toBeNull();
     const conversation = screen.getByRole("link", { name: /Flooding/ });
+    expect(conversation).toHaveClass("bg-brand-50", "text-brand");
     expect(within(conversation).getByText(/Sep 20/)).toHaveClass("text-stone-600");
+  });
+
+  it("keeps retrieval-only mode soft maroon and identifiable by icon and text (IR-365)", async () => {
+    status.mockResolvedValue({ data: { generative: false, indexed_records: 4 } as AIStatus });
+
+    renderScreen(<RAGChatPage />);
+
+    const label = await screen.findByText(/Retrieval-only mode/i);
+    const banner = label.closest("div");
+    expect(banner).toHaveClass("bg-brand-50", "text-brand");
+    expect(banner?.querySelector("svg")).not.toBeNull();
   });
 
   it("announces a throttled question with the server's wait", async () => {
@@ -511,7 +523,8 @@ describe("owned conversation URLs (IR-548)", () => {
 
     renderRoutes("/ai/conversations/404");
 
-    expect(await screen.findByText(/this conversation is not available/i)).toBeTruthy();
+    const message = await screen.findByText(/this conversation is not available/i);
+    expect(message.parentElement).toHaveClass("bg-brand", "text-white");
     expect(create).not.toHaveBeenCalled();
     expect(askStream).not.toHaveBeenCalled();
     expect((screen.getByRole("textbox", { name: /ask a follow-up/i }) as HTMLTextAreaElement).disabled).toBe(true);

@@ -20,25 +20,14 @@ import { offGreyClasses, offPaletteClasses, seeThroughWhiteClasses } from "./pal
  * Grouped by the subtask whose scope names the file. It started with the 48
  * files found on 2026-09-25.
  */
-const NOT_YET_CONVERTED: readonly string[] = [
-  // IR-362 -- Notifications (My Library came off with IR-410, Calls &
-  // Conferences with IR-530)
-  // IR-365 -- the Ask IRIS hub and chat page
-  "src/features/ai/AIHubPage.tsx",
-  "src/features/ai/components/ConversationSidebar.tsx",
-  "src/features/ai/RAGChatPage.tsx",
-];
+const NOT_YET_CONVERTED: readonly string[] = [];
 
 /**
  * IR-558: files that still use a `gray` or `slate` class, a second and third
  * grey beside `stone`. **This list must only shrink.** Never add a file to it:
- * write `stone`. The Ask IRIS files stay on it until IR-365 lands, and
- * IR-366 deletes the list with the one above.
+ * write `stone`. IR-366 deletes the list with the one above.
  */
 const GREY_NOT_YET_CONVERTED: readonly string[] = [
-  // IR-365 -- Ask IRIS
-  "src/features/ai/AIHubPage.tsx",
-  "src/features/ai/components/answerLayout.ts",
   // IR-362 -- Notifications
   // Shared pieces no subtask names yet
   "src/components/compliance/DpaConsentModal.tsx",
