@@ -136,6 +136,8 @@ IR-250 (builds this) · IR-317 (the bypass it removes) · IR-127 (the gate) · I
 
 **Decision 18.** Owners, the Adviser and office staff see an embargo's state and date on the record. Other readers of a published paper don't, because that a paper is under an agreement isn't theirs to learn from it.
 
+**A Continuation answers for itself.** A Thesis or Project continuing a Proposal is asked the question from scratch, and a Proposal's embargo is not carried over. It's a different paper, and may not be covered by the same agreement. The cost is that a student can answer No on a Continuation of an embargoed Proposal, and its text can then go out once it's submitted.
+
 **Why.**
 
 - AI that fills in fields at upload is planned, and it has to know the answer before the file arrives. It still needs consent, which stays on the last step, so the gate refuses it until then.

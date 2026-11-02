@@ -2488,6 +2488,7 @@ Participants and due dates are `null` under `may_read_review` refusal, including
 - **Saved first:** `POST /records/<id>/embargo-answer/`, a draft's owners only, is called after the draft exists and before `uploadManuscript`. If it fails, the file is not sent. It joins `apps/tests/access/table.py`.
 - **Submission:** `POST /records/<id>/submit/` refuses a paper with no answer, like consent, and no longer writes one. A new Version goes through its own action and is not asked.
 - **Under Yes:** the title and abstract suggestions from the PDF are off. IRIS still reads the PDF with Docling, which stays inside IRIS.
+- **Continuations:** a Continuation starts unanswered and Publish asks again, even when its Proposal is under embargo (`apps/records/test_continuation.py`).
 - **Review and Help:** the review step has an Embargo group whose Edit goes back to the question, and Help's publishing section explains it.
 
 **Tests:** `frontend/src/features/publish/PublishDialog.test.tsx` and `draft.test.ts` (asked first and alone, no default, date rules, saved before the file, a failed save sends no file, reopening a draft, suggestions off, axe), `frontend/src/features/help/HelpPage.test.tsx`, `apps/records/test_embargo.py` (the route and the refusal), and `apps/tests/test_access_matrix.py`.
