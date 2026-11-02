@@ -16,7 +16,7 @@ export function Breadcrumbs() {
 
   return (
     <nav aria-label="Breadcrumb" className="mb-4">
-      <ol className="flex flex-wrap items-center gap-1.5 text-[13px] text-gray-500">
+      <ol className="flex flex-wrap items-center gap-1.5 text-[13px] text-stone-500">
         <li>
           <Link to="/" className="hover:text-brand transition-colors font-medium">
             Home
@@ -29,11 +29,11 @@ export function Breadcrumbs() {
 
           return (
             <li key={path} className="flex items-center gap-1.5">
-              <span className="text-gray-300" aria-hidden>
+              <span className="text-stone-300" aria-hidden>
                 /
               </span>
               {isLast ? (
-                <span className="text-gray-800 font-semibold" aria-current="page">
+                <span className="text-stone-800 font-semibold" aria-current="page">
                   {label}
                 </span>
               ) : (
