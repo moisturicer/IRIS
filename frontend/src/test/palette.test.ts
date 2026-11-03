@@ -1,59 +1,14 @@
 /**
- * The palette guard (IR-358): no off-palette colour class anywhere in the
- * frontend source, except in files not yet converted.
+ * The palette guard (IR-358, closed by IR-366): no off-palette colour class
+ * anywhere in the frontend source.
  *
  * It reads every `.ts`, `.tsx` and `.css` file under `src/` as text and fails
- * naming each file and class. This file is the one exception, because its
- * fixtures are off-palette on purpose.
+ * naming each file and class. This test file is the only exception because its
+ * fixtures are deliberately off-palette.
  */
 import { describe, expect, it } from "vitest";
 
 import { offGreyClasses, offPaletteClasses, seeThroughWhiteClasses } from "./palette";
-
-/**
- * IR-357: files not yet converted to the white, black, grey and maroon
- * palette. **This list must only shrink.** Each IR-357 subtask removes its own
- * files as it converts them, and IR-366 deletes the list. Never add a file to
- * it: convert the colour instead. A file that no longer has an off-palette
- * colour fails the guard until it is taken off.
- *
- * Grouped by the subtask whose scope names the file. It started with the 48
- * files found on 2026-09-25.
- */
-const NOT_YET_CONVERTED: readonly string[] = [
-  // IR-362 -- Notifications (My Library came off with IR-410, Calls &
-  // Conferences with IR-530)
-  // IR-365 -- the Ask IRIS hub and chat page
-  "src/features/ai/AIHubPage.tsx",
-  "src/features/ai/components/ConversationSidebar.tsx",
-  "src/features/ai/RAGChatPage.tsx",
-];
-
-/**
- * IR-558: files that still use a `gray` or `slate` class, a second and third
- * grey beside `stone`. **This list must only shrink.** Never add a file to it:
- * write `stone`. The Ask IRIS files stay on it until IR-365 lands, and
- * IR-366 deletes the list with the one above.
- */
-const GREY_NOT_YET_CONVERTED: readonly string[] = [
-  // IR-365 -- Ask IRIS
-  "src/features/ai/AIHubPage.tsx",
-  "src/features/ai/components/answerLayout.ts",
-  // IR-362 -- Notifications
-  // Shared pieces no subtask names yet
-  "src/components/compliance/DpaConsentModal.tsx",
-  "src/components/layout/Breadcrumbs.tsx",
-  "src/components/layout/NotificationBell.tsx",
-  "src/components/records/DownloadRequestModal.tsx",
-  "src/components/shared/DataTable.tsx",
-  "src/features/discover/PaperCiteModal.tsx",
-];
-
-/**
- * IR-558: files with a see-through white background left on purpose. Empty
- * since IR-538 redrew the email-verify screen without its decorative circles.
- */
-const SEE_THROUGH_ALLOWED: readonly string[] = [];
 
 const THIS_FILE = "src/test/palette.test.ts";
 
@@ -125,77 +80,46 @@ describe("what counts as a second grey or a see-through white (IR-558)", () => {
 
 describe("the palette guard", () => {
   it("reads the whole source tree, not an empty one", () => {
-    // A broken glob would make both guards below pass by reading nothing.
+    // A broken glob would make the guards below pass by reading nothing.
     expect(Object.keys(SOURCES).length).toBeGreaterThan(100);
     expect(SOURCES["src/components/shared/StatusBadge.tsx"]).toContain("StatusBadge");
     expect(SOURCES["src/index.css"]).toBeDefined();
   });
 
-  it("finds no off-palette colour outside the not-yet-converted files", () => {
-    const allowed = new Set([...NOT_YET_CONVERTED, THIS_FILE]);
+  it("finds no off-palette colour anywhere in frontend source", () => {
     const offenders = Object.fromEntries(
       Object.entries(SOURCES)
-        .filter(([path]) => !allowed.has(path))
-        .map(([path, text]) => [path, offPaletteClasses(text)])
+        .filter(([path]) => path !== THIS_FILE)
+        .map(([path, source]) => [path, offPaletteClasses(source)])
         .filter(([, classes]) => classes.length > 0),
     );
 
     expect(
       offenders,
       "Off-palette colours (01-design-system.md section 0). Use stone, brand or a TONES entry " +
-      "from components/ui/statusTones.ts; do not add the file to NOT_YET_CONVERTED.",
+      "from components/ui/statusTones.ts.",
     ).toEqual({});
   });
 
-  it("finds an off-palette colour in every not-yet-converted file, so the list only shrinks", () => {
-    const converted = NOT_YET_CONVERTED.filter(
-      (path) => offPaletteClasses(SOURCES[path] ?? "").length === 0,
-    );
-
-    expect(
-      converted,
-      "Converted, renamed or deleted: take these off NOT_YET_CONVERTED in src/test/palette.test.ts.",
-    ).toEqual([]);
-  });
-
-  it("lists each not-yet-converted file once", () => {
-    expect(new Set(NOT_YET_CONVERTED).size).toBe(NOT_YET_CONVERTED.length);
-  });
-
-  it("finds no gray or slate class outside the not-yet-converted files", () => {
-    const allowed = new Set([...GREY_NOT_YET_CONVERTED, THIS_FILE]);
+  it("finds no second grey anywhere in frontend source", () => {
     const offenders = Object.fromEntries(
       Object.entries(SOURCES)
-        .filter(([path]) => !allowed.has(path))
-        .map(([path, text]) => [path, offGreyClasses(text)])
+        .filter(([path]) => path !== THIS_FILE)
+        .map(([path, source]) => [path, offGreyClasses(source)])
         .filter(([, classes]) => classes.length > 0),
     );
 
     expect(
       offenders,
-      "gray and slate are a second grey beside stone (01-design-system.md section 0). Write stone; " +
-      "do not add the file to GREY_NOT_YET_CONVERTED.",
+      "gray and slate are a second grey beside stone (01-design-system.md section 0). Write stone.",
     ).toEqual({});
   });
 
-  it("finds a gray or slate class in every file on the grey list, so it only shrinks", () => {
-    const converted = GREY_NOT_YET_CONVERTED.filter(
-      (path) => offGreyClasses(SOURCES[path] ?? "").length === 0,
-    );
-
-    expect(
-      converted,
-      "Converted, renamed or deleted: take these off GREY_NOT_YET_CONVERTED in src/test/palette.test.ts.",
-    ).toEqual([]);
-    expect(new Set(GREY_NOT_YET_CONVERTED).size).toBe(GREY_NOT_YET_CONVERTED.length);
-  });
-
-  it("finds no see-through white background outside the allowed files", () => {
-    const allowed = new Set([...SEE_THROUGH_ALLOWED, THIS_FILE]);
+  it("finds no see-through white background anywhere in frontend source", () => {
     const offenders = Object.fromEntries(
       Object.entries(SOURCES)
-        .filter(([path]) => !allowed.has(path))
-        .map(([path, text]) => [path, seeThroughWhiteClasses(text)])
+        .filter(([path]) => path !== THIS_FILE)
+        .map(([path, source]) => [path, seeThroughWhiteClasses(source)])
         .filter(([, classes]) => classes.length > 0),
     );
 
@@ -204,16 +128,5 @@ describe("the palette guard", () => {
       "A see-through white shows whatever is behind it. Use bg-surface for content and bg-overlay " +
       "for floating controls (01-design-system.md section 0).",
     ).toEqual({});
-  });
-
-  it("finds a see-through white in every allowed file, so the list only shrinks", () => {
-    const converted = SEE_THROUGH_ALLOWED.filter(
-      (path) => seeThroughWhiteClasses(SOURCES[path] ?? "").length === 0,
-    );
-
-    expect(
-      converted,
-      "Converted, renamed or deleted: take these off SEE_THROUGH_ALLOWED in src/test/palette.test.ts.",
-    ).toEqual([]);
   });
 });

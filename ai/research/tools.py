@@ -23,6 +23,7 @@ CONFIG = "english"
 SEARCH_LIMIT = 20
 PAGE_PASSAGES = 20
 OUTLINE_CHUNKS = 2000
+RECALL_LIMIT = 50
 
 OK, NO_MATCH, PARTIAL, UNAVAILABLE = "ok", "no_match", "partial", "unavailable"
 
@@ -334,6 +335,46 @@ class ResearchTools:
                               dependencies=frozenset({source}))
 
         return await self._call_on_handle("outline", body)
+
+    async def recall(self, record_ids) -> ToolResult:
+        """Fresh paper handles for Records a Conversation showed, still readable now (IR-728).
+
+        Unreadable, out-of-scope and missing Records are left out alike.
+        """
+        ids = [i for i in record_ids if _is_int(i)][:RECALL_LIMIT]
+
+        async def body(conn):
+            rows = await conn.fetch(
+                """SELECT r.id AS record_id, r.title, cs.id AS chunk_set_id, cs.extraction_hash
+                     FROM public.records_record r
+                     JOIN public.ai_chunkset cs ON cs.record_id = r.id AND cs.is_active
+                    WHERE r.id = ANY($1::bigint[]) AND ($2::bigint IS NULL OR r.id = $2)""",
+                ids, self.scope,
+            )
+            found = {row["record_id"]: row for row in rows}
+            ordered = [found[i] for i in ids if i in found]
+            if not ordered:
+                return ToolResult(NO_MATCH, coverage=Coverage(total=0))
+            handles = await self._handles(
+                conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in ordered])
+            records = tuple(
+                RecordRef(h, r["record_id"], r["title"],
+                          Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]))
+                for r, h in zip(ordered, handles)
+            )
+            return ToolResult(OK, records=records, coverage=Coverage(len(records), len(records)),
+                              dependencies=frozenset(r.source for r in records))
+
+        return await self._call("recall", body)
+
+    async def journal(self, name: str, data: dict) -> bool:
+        """Append a run event under the grant; False once the run has ended (IR-728)."""
+        try:
+            async with self._session() as conn:
+                await RunStore._journal(conn, self.run_id, name, data)
+            return True
+        except _Refused:
+            return False
 
     async def semantic_search(self, query: str) -> ToolResult:
         """Declared, never run: needs embedding and reranking."""

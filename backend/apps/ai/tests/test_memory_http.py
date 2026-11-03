@@ -38,7 +38,7 @@ from .corpus import (
     root_with,
 )
 
-pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
+pytestmark = [pytest.mark.db_required, pytest.mark.django_db, pytest.mark.slow]
 
 #: The verbatim window these tests run under, in estimated tokens (IR-449).
 #:
@@ -286,6 +286,11 @@ class BoundedPromptSizeTests:
             for i in range(20):
                 ask(client, f"filler question number {i}", conversation_id=conversation_id)
             ask(client, FLOOD_QUESTION, conversation_id=conversation_id)
+            # Under the same root as the questions: the window now asks it what
+            # may be sent (IR-812), so outside this block it would read the real
+            # gate, and this fixture's paper has no answer.
+            conversation = Conversation.objects.get(pk=conversation_id)
+            admitted = _recent_turns(conversation)
 
         _system, prompt = llm.calls[-1]
         from apps.ai import history
@@ -295,8 +300,6 @@ class BoundedPromptSizeTests:
         # (IR-449): what the window admits depends on how large those Turns
         # were, so the ceiling is computed from the same predicate the view
         # used rather than restated as a number here.
-        conversation = Conversation.objects.get(pk=conversation_id)
-        admitted = _recent_turns(conversation)
         assert prompt.count("\nQ: ") + (1 if prompt.startswith("Q: ") else 0) <= (
             len(admitted) + MAX_RECALLED_TURNS
         )

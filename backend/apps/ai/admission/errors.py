@@ -22,6 +22,8 @@ ANSWER_RESERVED = "answer_reserved"
 LEASE_LOST = "lease_lost"
 #: The run's asker cancelled it (IR-548): nothing new is sent on its behalf.
 RUN_CANCELLED = "run_cancelled"
+#: An attempt that may only be made admitted, with admission off (IR-850).
+ADMISSION_OFF = "admission_off"
 
 #: Denials that hold for every later attempt in the run, whatever its lane
 #: or model: the budget is spent, or nothing is configured. The run stops

@@ -129,9 +129,22 @@ def served_manuscript(record, user):
     version's while the stored one is still unsubmitted. Falsy when there is
     no manuscript.
     """
-    if stored_manuscript_unsubmitted(record) and not is_record_owner(user, record):
+    if _reads_submitted_version(record, user):
         return latest_version(record).manuscript
     return record.abstract_file
+
+
+def served_manuscript_revision(record, user):
+    """The revision of ``served_manuscript(record, user)``: what a Figure
+    must have been cropped from to be shown to ``user`` (IR-845)."""
+    if _reads_submitted_version(record, user):
+        return latest_version(record).manuscript_revision
+    return record.manuscript_revision
+
+
+def _reads_submitted_version(record, user) -> bool:
+    """Is ``user`` served the latest version rather than the stored file?"""
+    return stored_manuscript_unsubmitted(record) and not is_record_owner(user, record)
 
 
 def restore_submitted_manuscript(record) -> bool:
@@ -146,8 +159,18 @@ def restore_submitted_manuscript(record) -> bool:
     """
     if not stored_manuscript_unsubmitted(record):
         return False
-    record.abstract_file = latest_version(record).manuscript.name or None
-    record.save(update_fields=["abstract_file", "updated_at"])
+    submitted = latest_version(record)
+    record.abstract_file = submitted.manuscript.name or None
+    for field in ("manuscript_revision", "manuscript_sha256", "manuscript_filename"):
+        setattr(record, field, getattr(submitted, field))
+    record.save(update_fields=["abstract_file", "updated_at", "manuscript_revision",
+                               "manuscript_sha256", "manuscript_filename"])
+    # The discarded revision never entered research. Keep the submitted chunks
+    # and discard its pending status rather than re-extracting the submitted file.
+    from apps.documents.models import PdfExtraction
+    PdfExtraction.objects.filter(record=record).exclude(
+        source_revision=record.manuscript_revision,
+    ).delete()
     return True
 
 
@@ -202,5 +225,8 @@ def write_version(record, actor, cause: VersionCause) -> RecordVersion:
         number=(previous or 0) + 1,
         cause=cause,
         manuscript=record.abstract_file.name or None,
+        manuscript_revision=record.manuscript_revision,
+        manuscript_sha256=record.manuscript_sha256,
+        manuscript_filename=record.manuscript_filename,
         created_by=created_by,
     )

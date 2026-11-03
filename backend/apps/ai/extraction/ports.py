@@ -13,8 +13,10 @@ disagrees with its own elements — the two were separate fields in the design
 sketch, and separate fields are exactly how they drift.
 """
 
-from dataclasses import dataclass
-from typing import Protocol, runtime_checkable
+import enum
+from dataclasses import dataclass, field
+from decimal import Decimal
+from typing import Any, Mapping, Optional, Protocol, runtime_checkable
 
 from apps.ai.chunking.document import NormalizedDocument
 
@@ -27,12 +29,12 @@ class ExtractorUnavailable(ExtractionError):
     """The extractor could not be reached, or failed in a way that says
     nothing about the document — a connection refused, a timeout, a 5xx.
 
-    Kept distinct from its parent because the two want different operational
-    responses: a retry is likely to succeed here and unlikely to succeed on a
-    document the extractor rejected. Both retry today (ADR-016 keeps the
-    Celery retry either way); only this one is a reason to look at the
-    container rather than at the PDF.
+    The one transient failure (IR-839): the only one the task retries.
     """
+
+
+class DocumentRejected(ExtractionError):
+    """The extractor read the document and refused it. Permanent (IR-839)."""
 
 
 class EmptyExtraction(ExtractionError):
@@ -44,17 +46,71 @@ class EmptyExtraction(ExtractionError):
     """
 
 
+class IncompleteExtraction(ExtractionError):
+    """The extractor reports partial coverage rather than a complete document."""
+
+
+@dataclass(frozen=True)
+class Provenance:
+    """Which Extractor produced an Extraction, at which version, with which
+    options (IR-838). Stored on the row, so the answer is in the data."""
+
+    name: str
+    version: str = ""
+    options: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class Usage:
+    """What the vendor billed for one read (IR-850). ``credits`` is ``None``
+    when it was not reported, and admission then keeps the reservation."""
+
+    pages: int
+    credits: Optional[Decimal] = None
+
+
+@dataclass(frozen=True)
+class FigureImage:
+    """A figure the Extractor cropped, downloaded before its copy is deleted
+    (IR-841). ``bbox`` is the vendor's page-point box; IR-845 stores it.
+    ``name`` is the vendor's image filename, which its image item also names."""
+
+    page: int
+    bbox: Mapping[str, float]
+    media_type: str
+    data: bytes
+    caption: Optional[str] = None
+    name: str = ""
+
+
 @dataclass(frozen=True)
 class ExtractedDocument:
-    """What an extractor returns: the structured document, and its own name.
+    """What an extractor returns: the structured document and its provenance.
 
-    ``extractor`` is stored on the extraction row so that "which extractor
-    produced this?" is answerable from the data rather than from the date of
-    the row and a memory of when the code changed.
+    ``failed_pages`` are pages the extractor could not read; the rest of the
+    document is still used (IR-839). ``usage`` is what a billing Extractor
+    reported; ``None`` when nothing was (IR-850). ``raw`` is the vendor's
+    whole result, less expiring URLs, so shaping can re-run without a paid
+    re-read (IR-841).
     """
 
     document: NormalizedDocument
-    extractor: str
+    provenance: Provenance
+    failed_pages: tuple[int, ...] = ()
+    usage: Optional[Usage] = None
+    figures: tuple[FigureImage, ...] = ()
+    raw: Mapping[str, Any] = field(default_factory=dict)
+
+
+class Failure(enum.Enum):
+    TRANSIENT = "transient"
+    PERMANENT = "permanent"
+
+
+def classify(error: BaseException) -> Failure:
+    """Only an unavailable extractor is worth retrying; anything else,
+    an unexpected exception included, fails once (IR-839)."""
+    return Failure.TRANSIENT if isinstance(error, ExtractorUnavailable) else Failure.PERMANENT
 
 
 @runtime_checkable
@@ -70,6 +126,17 @@ class StructuredExtractor(Protocol):
 
     Raises ``ExtractionError`` (or a subclass) rather than returning an empty
     document on failure.
+
+    ``timeout_seconds`` is the longest one call may take; the task's time
+    limit is derived from it (IR-839).
+
+    ``leaves_campus`` is true when the PDF is sent off the deployment; such an
+    Extractor is gated and admitted, and also names the ``account`` it spends
+    (``admission.ledger.account_for``) and the ``model`` it is recorded under
+    (IR-850).
     """
+
+    timeout_seconds: float
+    leaves_campus: bool
 
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument: ...

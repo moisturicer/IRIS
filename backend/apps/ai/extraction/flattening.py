@@ -22,6 +22,7 @@ Pure: no Django, no I/O, no clock.
 import re
 
 from apps.ai.chunking.document import NormalizedDocument
+from apps.ai.chunking.formulas import without_formulas
 
 # Lines shorter than this are page furniture — a folio, a rule, a stray
 # glyph — not content worth indexing.
@@ -34,6 +35,12 @@ _WHITESPACE_RUN = re.compile(r"\s+")
 
 def flatten_for_search(document: NormalizedDocument) -> str:
     """Return the document as one cleaned line of text, for FTS indexing."""
+    if document.structure_is_authoritative:
+        return " ".join(" ".join(
+            without_formulas(element.text)
+            for element in document.elements
+            if element.kind not in {"header", "footer", "formula"}
+        ).split())
     return clean_text("\n".join(element.text for element in document.elements))
 
 

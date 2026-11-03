@@ -91,7 +91,6 @@ const LEDE = {
   sentence: "Register once with your institutional email. You verify the address, then an administrator reviews the role you ask for.",
 };
 
-
 // ── Validation ─────────────────────────────────────────────────────────────
 function validateAll(f: FormState, role: Role): FieldErrors {
   const e: FieldErrors = {};
@@ -411,6 +410,7 @@ export default function SignupPage() {
   if (registered) {
     return (
       <EntryFrame
+        help
         lede={LEDE}
         wide
         tabs={<EntrySteps steps={STEPS.map(({ name, shortName }) => ({ name, shortName, state: "completed" }))} />}
@@ -494,6 +494,7 @@ export default function SignupPage() {
 
   return (
     <EntryFrame
+      help
       lede={LEDE}
       wide
       tabs={<EntrySteps steps={tabs} onSelect={goTo} />}

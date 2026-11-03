@@ -348,7 +348,7 @@ Administration (RDCO) — unchanged
 
 ### 4.4 Publish dialog
 
-**Pattern: one dialog, three steps, with a slim progress indicator.**
+**Pattern: one dialog, three steps, with a slim progress indicator.** Since IR-816 the dialog opens on one question before these steps: whether the paper is under an embargo (ADR-052, Amendment 2026-11-02).
 
 It is not a long form, and not a full-page wizard. Three steps is the fewest that keep upload, confirmation and consent separate. Each step fits one screen at 1280×720 without scrolling the dialog body, except Details, whose body may scroll while its actions stay pinned in the dialog footer. *(Amended 2026-10-06, IR-408: Details measured about 100 px over at 1280×720 with every essential field shown, and the lead accepted a scrolling body over hiding an essential field.)*
 
@@ -374,7 +374,7 @@ At `md` and above it is a centred dialog up to 720 px wide. Below `md` it is a f
 
 - **Essential fields:** title, abstract, adviser (searchable, from the existing advisers endpoint), co-authors, year.
 - **More details** (a disclosure, closed by default): classification, PSCED, and "Flag for your adviser" hints (possible IP · human subjects · commercialisation). These are the existing `is_ip`, `requires_ethics_review` and `for_commercialization` fields. Under ADR-032 they are hints the Adviser sees, not routes, and the copy says so. **Publish never writes `requested_*`:** the author picks no office; the Adviser may route a Thesis or Project to specialists after reviewing it.
-- **Prefill** (§4.5): a field the server found text for shows a "Found in your PDF" chip with **Use** and **Dismiss**. A suggestion **never overwrites** a field the user has typed in.
+- **Prefill** (§4.5): a field the server found text for shows a "Found in your PDF" chip with **Use** and **Dismiss**. A suggestion **never overwrites** a field the user has typed in. *Superseded for Publish by IR-833: a reliable title and abstract are filled into empty or placeholder fields with Undo; other values stay chips; still never over the user's words.*
 - **While extraction runs:** the title and abstract fields show a quiet inline "Reading your PDF…" line. They are **never** disabled, so the user may type over them at any time.
 - **Adviser ≠ owner.** The client disables choosing oneself, with an explanation. The server refuses it as well (IR-260 owns the server rule).
 - **Validation:**
@@ -442,7 +442,7 @@ A polite live region announces the result.
 
 **Client behaviour:**
 
-- Poll every 2 s while `pending`, backing off to 5 s after 20 s, and stop after 90 s or when the dialog leaves step 2.
+- Poll every 2 s while `pending`, backing off to 5 s after 20 s, and stop after 90 s or when the dialog leaves step 2. *Superseded by IR-833: back off to 15 s, stop after two minutes as Still processing with Check again.*
 - `failed` or `unsupported` shows one neutral line, "We couldn't read details from this file — fill them in below", and never an error state.
 - A scanned PDF with no text layer comes back `ready` with nulls, and the UI simply shows no chips.
 
@@ -450,7 +450,7 @@ A polite live region announces the result.
 
 - Extraction is asynchronous, and the dialog never waits on it.
 - The size limit is the existing upload limit.
-- A 90 s ceiling means a 300-page thesis simply produces no chips in time. That is acceptable, because prefill is assistance.
+- A 90 s ceiling means a 300-page thesis simply produces no chips in time. That is acceptable, because prefill is assistance. *Superseded by IR-833, which offers Check again instead.*
 
 **Confidence.** No confidence score is shown: Docling does not produce one, and inventing one is the fabrication ADR-008's spirit forbids. The chip says *where* the text came from ("Found in your PDF"), which is the honest signal.
 

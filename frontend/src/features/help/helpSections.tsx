@@ -119,7 +119,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     shownTo: (r) => canAccess(r.role, "opportunities"),
     body: (
       <p>
-        Calls for papers and conferences open to the CIT-U research community. RDCO and Advisers
+        Calls for papers and conferences open to your institution's research community. RDCO and Advisers
         post them and keep them up to date.
       </p>
     ),
@@ -131,9 +131,17 @@ export const HELP_SECTIONS: HelpSection[] = [
     body: (
       <>
         <p>
-          Choose <strong>Publish</strong> on Discover to start a record. Pick its type (Proposal,
-          Thesis / Research or Project), fill in its details, name your Adviser and upload the
-          manuscript. Your Adviser cannot also be one of the record&rsquo;s owners.
+          Choose <strong>Publish</strong> on Discover to start a record. IRIS asks first whether the
+          paper is under an embargo. Then pick its type (Proposal, Thesis / Research or Project),
+          fill in its details, name your Adviser and upload the manuscript. Your Adviser cannot also
+          be one of the record&rsquo;s owners.
+        </p>
+        <p>
+          An embargo keeps a paper&rsquo;s text from going to outside AI companies. It doesn&rsquo;t
+          hide the paper from people who can read it in IRIS.
+          Its date doesn&rsquo;t end the embargo. After you submit, only your Adviser or RDCO can,
+          by releasing it.
+          Text already sent can&rsquo;t be recalled.
         </p>
         <p>
           Once submitted, the record goes to your Adviser first. If anyone reviewing it asks for a
@@ -213,16 +221,17 @@ export const HELP_SECTIONS: HelpSection[] = [
   {
     id: "administration",
     title: "Administration",
-    shownTo: (r) => canAccess(r.role, "audit"),
+    // RDCO and the System Admin share it (ADR-051 §4, amended, IR-781).
+    shownTo: (r) => canAccess(r.role, "users"),
     body: (
       <>
-        <p>The Administration part of the sidebar is RDCO&rsquo;s:</p>
+        <p>The Administration part of the sidebar belongs to RDCO and the System Admin:</p>
         <ul>
-          <li><strong>Role Requests</strong>: approve or decline the role someone asked for when they registered.</li>
-          <li><strong>Users</strong>: change a role, lock or unlock an account, and name office coordinators.</li>
-          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong>: decide what readers and owners have asked for.</li>
-          <li><strong>Import Records</strong>: file research on someone&rsquo;s behalf.</li>
-          <li><strong>Audit Log</strong>: the record of workflow acts.</li>
+          <li><strong>Users</strong>: RDCO makes someone a Student or an Adviser and locks or unlocks accounts. The System Admin gives the office roles and names office coordinators.</li>
+          <li><strong>Role Requests</strong> (RDCO): approve or decline the role someone asked for when they registered.</li>
+          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong> (RDCO): decide what readers and owners have asked for.</li>
+          <li><strong>Import Records</strong> (RDCO): file research on someone&rsquo;s behalf.</li>
+          <li><strong>Audit Log</strong> (the System Admin): the record of workflow acts.</li>
         </ul>
       </>
     ),

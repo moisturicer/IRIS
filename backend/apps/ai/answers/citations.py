@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional, Sequence
+from typing import TYPE_CHECKING, Collection, Optional, Sequence
 
 from apps.ai.citation_markers import MARKER, numbers_in
 from apps.ai.regions import Region
@@ -246,7 +246,7 @@ def build_prompt(
 #: Markdown image syntax, inline and reference style. The leading `!` keeps it
 #: off citation markers. Raw `<img>` is not matched: the renderer shows it as text.
 _IMAGE = re.compile(
-    r"!\[[^\]\n]*\](?:\([^)\n]*\)|\[[^\]\n]*\])"
+    r"!\[[^\]\n]*\](?:\((?P<address>[^)\n]*)\)|\[[^\]\n]*\])"
 )
 
 
@@ -255,13 +255,19 @@ def images_in(answer: str) -> tuple[str, ...]:
     return tuple(match.group(0) for match in _IMAGE.finditer(answer))
 
 
-def strip_images(answer: str) -> str:
-    """``answer`` without Markdown images, alt text included.
+def strip_images(answer: str, *, handed: Collection[str] = ()) -> str:
+    """``answer`` without Markdown images, alt text included, except an
+    inline image whose address IRIS ``handed`` the model.
 
-    IRIS hands the model no image addresses (IR-292 "Figure crop endpoint"), so
-    any image is an invented URL that reads as a figure that failed to load.
+    The rule is "no image the system did not hand you" (ADR-056 §12, IR-845):
+    any other image is an invented URL that reads as a figure that failed to
+    load. Nothing hands an address over until IR-293, so every caller strips
+    them all.
     """
-    return _IMAGE.sub("", answer)
+    def kept(match: re.Match) -> str:
+        return match.group(0) if match.group("address") in handed else ""
+
+    return _IMAGE.sub(kept, answer)
 
 
 #: The model writes `\(..\)` and `\[..\]` whatever the prompt asks for; the

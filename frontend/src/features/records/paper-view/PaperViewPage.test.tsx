@@ -54,6 +54,10 @@ import PaperViewPage from "./PaperViewPage";
 import { citationNavigationState } from "@/lib/citedPage";
 import { formatDate } from "@/lib/utils";
 
+vi.mock("@/config/institution", () => ({
+  INSTITUTION: { name: "Example Research University", shortName: "ERU", logo: "example.png", emailDomain: "example.edu" },
+}));
+
 const RECORD_ID = 7;
 const PAPER_URL = "https://iris.test/media/manuscripts/thesis.pdf";
 const ASSIGNED_ADVISER_ID = 30;
@@ -208,6 +212,10 @@ vi.mock("@/api/records", () => ({
     } })),
     route:            vi.fn(() => Promise.resolve({ data: {} })),
     updateTags:       vi.fn(),
+    // The embargo card's acts (IR-817); its own behaviour is `EmbargoCard.test.tsx`'s.
+    setEmbargo:       vi.fn(),
+    releaseEmbargo:   vi.fn(() => Promise.resolve({ data: { state: "released", until: "2099-01-01" } })),
+    releaseIp:        vi.fn(),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
@@ -318,6 +326,13 @@ function renderPaper(route: string, state?: unknown) {
 function renderPaperView() {
   return renderPaper(`/records/${RECORD_ID}`);
 }
+
+it("names the configured institution on an institutional paper", async () => {
+  shownRecord = { ...record, origin: "institutional" };
+  signInAs(99, "Student");
+  renderPaperView();
+  expect(await screen.findByText("Example Research University")).toBeVisible();
+});
 
 describe("arriving from a citation", () => {
   beforeEach(() => {
@@ -1035,7 +1050,7 @@ describe("the Paper tab (IR-372, IR-569)", () => {
     expect(screen.getByRole("heading", { level: 1, name: record.title })).toHaveAttribute("title", record.title);
     expect(screen.getByText("v1")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Back" })).toBeInTheDocument();
-    expect(screen.queryByText("Cebu Institute of Technology – University")).not.toBeInTheDocument();
+    expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Share" })).not.toBeInTheDocument();
   });
 
@@ -2858,7 +2873,7 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.getByText("Published 2017")).toBeInTheDocument();
     expect(screen.getByText("Completed 2020")).toBeInTheDocument();
     expect(screen.getByText("Imported reference")).toBeInTheDocument();
-    expect(screen.queryByText("Cebu Institute of Technology – University")).not.toBeInTheDocument();
+    expect(screen.queryByText("Example Research University")).not.toBeInTheDocument();
   });
 
   it("holds governance and documents in Record details, beside the page", async () => {
@@ -3092,5 +3107,65 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     expect(await screen.findByText(/open at page 14, 0 region\(s\)/i)).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Page context: the Overview drew on page 14 as a whole.");
+  });
+});
+
+
+// The embargo and its acts sit in Record details, beside what the paper is
+// held under (IR-817). Which control shows is `EmbargoCard.test.tsx`'s.
+describe("the embargo in Record details (IR-817)", () => {
+  const underEmbargo: RecordDetail = {
+    ...record,
+    embargo: { state: "active", until: "2099-01-01" },
+    capabilities: [...record.capabilities, "set_embargo", "release_embargo"],
+  };
+
+  beforeEach(() => {
+    shownRecord = underEmbargo;
+    signInAs(99, "Adviser");
+  });
+
+  it("shows the card in the rail, and a release reloads the record", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    const rail = screen.getByRole("complementary", { name: "Record details" });
+    const card = within(rail).getByRole("region", { name: "Embargo" });
+    expect(within(card).getByText("Under embargo")).toBeInTheDocument();
+
+    shownRecord = { ...underEmbargo, embargo: { state: "released", until: "2099-01-01" }, capabilities: record.capabilities };
+    await userEvent.click(within(card).getByRole("button", { name: "Release embargo" }));
+    await userEvent.click(within(screen.getByRole("dialog", { name: "Release this embargo?" })).getByRole("button", { name: "Release" }));
+
+    expect(recordsApi.releaseEmbargo).toHaveBeenCalledWith(RECORD_ID);
+    expect(await within(card).findByText("Released")).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Release embargo" })).not.toBeInTheDocument();
+  });
+
+  it("works on a phone, dialog included", async () => {
+    workspaceAt(360);
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+    const card = within(screen.getByRole("complementary", { name: "Record details" })).getByRole("region", { name: "Embargo" });
+    await expectNoBlockingA11yViolations(container);
+
+    await userEvent.click(within(card).getByRole("button", { name: "Release embargo" }));
+    expect(screen.getByRole("dialog", { name: "Release this embargo?" })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(document.body);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await userEvent.click(within(card).getByRole("button", { name: "Change date" }));
+    expect(screen.getByRole("dialog", { name: "Change the review date" })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(document.body);
+  });
+
+  it("says in Institutional Governance whether KTTO released the IP mark", async () => {
+    shownRecord = { ...underEmbargo, is_ip: true, ip_type: "patent", ip_release: { released: true, released_at: "2026-11-03T02:00:00Z" } };
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const governance = screen.getByRole("region", { name: "Institutional Governance" });
+    expect(within(governance).getByText("Released for the AI by KTTO")).toBeInTheDocument();
   });
 });

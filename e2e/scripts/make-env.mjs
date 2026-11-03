@@ -60,6 +60,8 @@ const lines = [
   "ALLOWED_HOSTS=localhost,127.0.0.1,backend",
   `CORS_ALLOWED_ORIGINS=${origin}`,
   "TRUSTED_PROXY_COUNT=1",
+  // Required by the production file; its caddy service is off in this stack.
+  "IRIS_DOMAIN=localhost",
   // An https origin is a production requirement for recovery links. Nothing
   // listens on it with TLS: the run reads links from Mailpit and follows only
   // their path on the plain-HTTP base URL (see e2e/README.md, Limitations).
@@ -84,6 +86,15 @@ const lines = [
   "# at its default of three failures. A run record states this deviation.",
   "API_THROTTLE_ANON=20000/day",
   "API_THROTTLE_USER=20000/day",
+  "",
+  "# PDF intake refuses every PDF unless these are set (IR-831). The candidate",
+  "# values from docs/engineering/PDF_INTAKE.md. A run here doesn't verify them",
+  "# on real papers, which that document still requires of a deployment.",
+  "PDF_VALIDATION_WALL_SECONDS=10",
+  "PDF_VALIDATION_MEMORY_MIB=256",
+  "PDF_VALIDATION_MAX_PAGES=1000",
+  "PDF_VALIDATION_MAX_OBJECTS=200000",
+  "PDF_VALIDATION_MAX_DEPTH=100",
   "",
   "# Docling on CPU: CI runners have no GPU",
   "DOCLING_VARIANT=docling-cpu",

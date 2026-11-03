@@ -62,8 +62,8 @@ function renderSignup() {
 const steps = () => screen.getByRole("navigation", { name: "Registration steps" });
 const tab = (name: RegExp) => within(steps()).getByRole("link", { name });
 const currentStep = (name: RegExp) => {
-  const current = steps().querySelector('[aria-current="step"]');
-  expect(current?.textContent?.replace(/^\d/, "")).toMatch(name);
+  const current = within(steps()).getByRole("listitem", { current: "step" });
+  expect(current).toHaveTextContent(name);
   return current;
 };
 const stepHeading = () => screen.getByRole("heading", { level: 3, name: /^Step \d of 3/ });
@@ -125,6 +125,28 @@ afterEach(() => {
 // Each walk through the steps types key by key, which took close to the 15s
 // default in the dev container, so the blocks get room rather than a flaky edge.
 describe("the register steps", { timeout: 30_000 }, () => {
+  it("offers one Sign in link and opens help and policy dialogs without losing identity", async () => {
+    const user = userEvent.setup();
+    renderSignup();
+    expect(screen.getAllByRole("link", { name: "Sign in" })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: "Sign in" })).toHaveAttribute("href", "/login");
+    await user.type(firstName(), "Rea");
+    await user.click(within(screen.getByRole("banner")).getByRole("link", { name: "Help" }));
+    const help = screen.getByRole("dialog", { name: "Help" });
+    expect(within(help).getByRole("link", { name: "Reset your password" })).toHaveAttribute("href", "/password/forgot");
+    await expectNoBlockingA11yViolations(help);
+    await user.keyboard("{Escape}");
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).not.toHaveTextContent(/Pilot institution/);
+    for (const name of ["Data privacy", "Terms"]) {
+      await user.click(within(footer).getByRole("link", { name }));
+      const dialog = screen.getByRole("dialog", { name });
+      await expectNoBlockingA11yViolations(dialog);
+      await user.keyboard("{Escape}");
+      expect(firstName()).toHaveValue("Rea");
+    }
+  });
+
   it("opens on Identity in the folder, under the register headline", async () => {
     renderSignup();
 
@@ -132,12 +154,12 @@ describe("the register steps", { timeout: 30_000 }, () => {
     expect(screen.getByText(/research identity\./)).toBeInTheDocument();
     expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity");
 
-    expect(currentStep(/^Identity, current step$/)).toHaveAttribute("aria-current", "step");
+    expect(currentStep(/Identity, current step$/)).toHaveAttribute("aria-current", "step");
     expect(within(steps()).queryByRole("link", { name: /^Identity, current step$/ })).not.toBeInTheDocument();
     expect(within(steps()).queryByRole("tab")).not.toBeInTheDocument();
     const header = screen.getByRole("banner");
     expect(within(header).getAllByRole("link")).toHaveLength(1);
-    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("href", "/entry/help");
+    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("aria-haspopup", "dialog");
     for (const name of [/^Affiliation, not started$/, /^Security & agreement, not started$/]) {
       expect(tab(name)).toHaveAttribute("aria-disabled", "true");
       expect(tab(name)).not.toHaveAttribute("href");
@@ -193,7 +215,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
     expect(stepHeading()).toHaveTextContent("Step 2 of 3 · Affiliation");
     expect(stepHeading()).toHaveFocus();
     expect(tab(/^Identity, completed$/)).toHaveAttribute("href", "/signup");
-    expect(currentStep(/^Affiliation, current step$/)).toHaveAttribute("aria-current", "step");
+    expect(currentStep(/Affiliation, current step$/)).toHaveAttribute("aria-current", "step");
     expect(tab(/^Security & agreement, not started$/)).toHaveAttribute("aria-disabled", "true");
   });
 
@@ -241,7 +263,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
     }
     expect(reached).not.toContain(tab(/^Affiliation, not started$/));
     expect(reached).not.toContain(tab(/^Security & agreement, not started$/));
-    expect(reached).not.toContain(currentStep(/^Identity, current step$/));
+    expect(reached).not.toContain(currentStep(/Identity, current step$/));
   });
 
   it("keeps the college, clears the program and says why when the role changes", async () => {

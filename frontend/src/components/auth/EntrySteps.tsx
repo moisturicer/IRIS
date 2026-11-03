@@ -85,10 +85,9 @@ export function EntrySteps({ steps, onSelect }: EntryStepsProps) {
 
           if (step.state === "current") {
             return (
-              <li key={step.name} className="flex">
+              <li key={step.name} aria-current="step" className="flex">
                 <span
-                  aria-current="step"
-                  className={cn(TAB, "relative z-10 rounded-tl-xl border-t-2 border-stone-200 border-t-brand bg-white text-brand")}
+                  className={cn(TAB, "entry-label z-10 mr-3 rounded-tl-xl border-t-2 border-stone-200 border-t-brand bg-white text-brand")}
                 >
                   {label}
                 </span>

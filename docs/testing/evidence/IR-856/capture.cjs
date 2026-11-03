@@ -17,8 +17,7 @@ async function main() {
         await page.screenshot({ path: path.join(__dirname, `${screen}-${size}.png`), fullPage: true });
         const geometry = await page.evaluate(() => {
           const card = document.querySelector('main .shadow-card-md');
-          const label = document.querySelector('main [aria-current="step"]') ??
-            document.querySelector('main .border-t-brand');
+          const label = document.querySelector('main .entry-label');
           const header = document.querySelector('header');
           const box = (el) => {
             const r = el?.getBoundingClientRect();
@@ -42,15 +41,13 @@ async function main() {
             runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
           }));
           console.log(`${screen} axe: ${JSON.stringify(audit.violations.map(v => ({ id: v.id, impact: v.impact, nodes: v.nodes.length })))}`);
+          await page.getByRole('link', { name: 'Help', exact: true }).click();
+          console.log(`${screen} Help dialog: ${await page.getByRole('dialog', { name: 'Help', exact: true }).isVisible()}`);
+          await page.keyboard.press('Escape');
         }
         await context.close();
       }
     }
-    const context = await browser.newContext({ viewport: { width: 360, height: 800 }, reducedMotion: 'reduce' });
-    const page = await context.newPage();
-    await page.goto('http://127.0.0.1:5173/entry/help');
-    console.log(`help: ${await page.locator('h2').first().textContent()}`);
-    await context.close();
   } finally {
     await browser.close();
   }

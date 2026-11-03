@@ -1,7 +1,18 @@
 from django.db import models
+import uuid
+from pathlib import Path
 from django.utils import timezone
 
 from core.enums import DocumentRequestItemState, DocumentRequestState, Party
+from .phases import ExtractionPhase
+
+
+def attachment_path(instance, filename):
+    return f"documents/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
+
+def figure_path(instance, filename):
+    return f"figures/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
 
 
 class UploadSlot(models.Model):
@@ -42,7 +53,7 @@ class RecordUpload(models.Model):
     """
     record      = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="uploads")
     slot        = models.ForeignKey(UploadSlot, on_delete=models.CASCADE, related_name="uploads")
-    file        = models.FileField(upload_to="documents/")
+    file        = models.FileField(upload_to=attachment_path)
     version     = models.PositiveIntegerField(default=1)
     status      = models.ForeignKey(
         UploadStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploads"
@@ -128,6 +139,7 @@ class PdfExtraction(models.Model):
     STATUS = [
         ("queued",  "Queued"),
         ("running", "Running"),
+        ("retrying", "Retrying"),
         ("done",    "Done"),
         ("failed",  "Failed"),
     ]
@@ -140,6 +152,10 @@ class PdfExtraction(models.Model):
         null=True, blank=True,
     )
     status         = models.CharField(max_length=10, choices=STATUS, default="queued", db_index=True)
+    source_revision = models.UUIDField(null=True, blank=True, editable=False)
+    source_file = models.CharField(max_length=255, blank=True, editable=False)
+    attempt = models.UUIDField(null=True, blank=True, editable=False)
+    phase = models.CharField(max_length=24, choices=ExtractionPhase.choices, default=ExtractionPhase.QUEUED)
     # The RAG corpus boundary, stored on the row the chunker reads (IR-239).
     # Defaults to SUPPLEMENTARY so the failure mode is closed: a row whose
     # creator forgot to say what it holds is left out of the corpus rather
@@ -159,13 +175,30 @@ class PdfExtraction(models.Model):
     # ingestion on an unchanged document is a hash comparison rather than a
     # re-chunk. Indexed because that comparison is the lookup.
     content_hash   = models.CharField(max_length=64, blank=True, db_index=True)
-    # Which extractor produced the result. One value today; recorded anyway,
-    # so the question is answerable from the row rather than from its date.
+    # Which Extractor, version and options produced the result (IR-838), so
+    # the question is answerable from the row rather than from its date.
     extractor      = models.CharField(max_length=32, blank=True)
+    extractor_version = models.CharField(max_length=64, blank=True, default="")
+    extractor_options = models.JSONField(default=dict, blank=True)
     celery_task_id = models.CharField(max_length=200, blank=True)
+    # The reader's message; never an exception or a path (IR-839).
     error          = models.TextField(blank=True)
+    # Admin only: pages the Extractor could not read (IR-839).
+    warnings       = models.JSONField(default=list, blank=True)
+    # The vendor's whole result, kept for shaping without a paid re-read (IR-841).
+    # Admin only: it carries watermark text, which only staff see.
+    raw_result     = models.JSONField(default=dict, blank=True)
+    pages_read     = models.PositiveIntegerField(null=True, blank=True)
+    # Null when the vendor never reported a charge.
+    credits        = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
     created_at     = models.DateTimeField(auto_now_add=True)
     completed_at   = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def reader_message(self):
+        """A failed or held extraction's message (IR-839, IR-850); ``warnings`` stay admin-only."""
+        shown = self.status == "failed" or self.phase == ExtractionPhase.AWAITING_DISCLOSURE
+        return (self.error or None) if shown else None
 
     class Meta:
         ordering = ["-created_at"]
@@ -195,11 +228,95 @@ class PdfExtraction(models.Model):
         depend on ``apps.ai``, and ingestion is the one direction that
         dependency may ever run.
         """
-        if not self.structure:
-            return None
-        from apps.ai.extraction import document_from_json
+        from apps.ai.extraction import read_document
 
-        return document_from_json(self.structure)
+        return read_document(
+            extractor=self.extractor, structure=self.structure,
+            raw_result=getattr(self, "raw_result", None),  # Storage belongs to IR-841.
+        )
+
+    def as_search_text(self):
+        """Search text derived from the same current structure chunking reads."""
+        from apps.ai.extraction import flatten_for_search
+
+        document = self.as_normalized_document()
+        return flatten_for_search(document) if document is not None else ""
+
+
+class ExtractionFigure(models.Model):
+    """A Figure the Extractor cropped from a Manuscript (IR-845, ADR-056 §9).
+
+    Stored with the Manuscript in storage nothing serves directly, and read
+    only through the Figure endpoint, which resolves its Record through
+    ``visible_to``. ``source_revision`` is the Manuscript revision it was
+    cropped from, so a Figure is never served beside a different file.
+    ``bbox`` is the vendor's page-point box. An uncaptioned Figure is kept.
+    """
+
+    extraction = models.ForeignKey(PdfExtraction, on_delete=models.CASCADE, related_name="figures")
+    source_revision = models.UUIDField(editable=False)
+    page = models.PositiveIntegerField()
+    bbox = models.JSONField(default=dict, blank=True)
+    caption = models.TextField(blank=True)
+    media_type = models.CharField(max_length=32)
+    image = models.FileField(upload_to=figure_path, max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # The Extractor's image filename, which its image element also names (IR-852).
+    name = models.CharField(max_length=255, blank=True)
+    # Retrieval only (IR-852): embedded with the Figure's chunk, never shown.
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["page", "pk"]
+
+    def __str__(self):
+        return f"Figure {self.pk} extraction={self.extraction_id} page={self.page}"
+
+
+class ManuscriptMetadata(models.Model):
+    """LlamaExtract's reading of one parsed Manuscript revision (IR-846).
+
+    One row per extraction and source revision, so a replaced Manuscript's
+    reading can never be mistaken for the current one: the suggestions read
+    only the row whose ``source_revision`` is the Record's current one, and
+    the task writes only under that same fence. ``result`` is the vendor's
+    values and citations, admin only; nothing reads it but the Publish
+    suggestions, which project it.
+    """
+
+    QUEUED, RUNNING, DONE, FAILED, REFUSED = "queued", "running", "done", "failed", "refused"
+    STATUS = [
+        (QUEUED, "Queued"),
+        (RUNNING, "Running"),
+        (DONE, "Done"),
+        # Not read: the vendor failed or admission refused. Publish falls back.
+        (FAILED, "Failed"),
+        # Not sent: the disclosure gate refused just before sending.
+        (REFUSED, "Refused"),
+    ]
+
+    extraction = models.ForeignKey(PdfExtraction, on_delete=models.CASCADE, related_name="metadata_readings")
+    source_revision = models.UUIDField(editable=False)
+    status = models.CharField(max_length=10, choices=STATUS, default=QUEUED)
+    attempt = models.UUIDField(null=True, blank=True, editable=False)
+    result = models.JSONField(default=dict, blank=True)
+    # Null when the vendor never reported a charge.
+    credits = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # When a worker claimed it: a reading's budget runs from here, not from
+    # the time it waited in the queue behind other parses.
+    started_at = models.DateTimeField(null=True, blank=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["extraction", "source_revision"], name="manuscriptmetadata_one_per_revision",
+            ),
+        ]
+
+    def __str__(self):
+        return f"ManuscriptMetadata extraction={self.extraction_id} status={self.status}"
 
 
 class RecordFile(models.Model):
@@ -213,7 +330,7 @@ class RecordFile(models.Model):
     `attachments.py`).
     """
     record      = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="files")
-    file        = models.FileField(upload_to="record_files/")
+    file        = models.FileField(upload_to=attachment_path)
     filename    = models.CharField(max_length=300)
     uploaded_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="record_files"

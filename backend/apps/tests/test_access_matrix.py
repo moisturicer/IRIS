@@ -193,6 +193,7 @@ class AccessMatrixTests(APITestCase):
                 failures.append(f"{method} {route.name}{label} as {role}: {reason}")
         return failures
 
+    @pytest.mark.slow
     def test_records_routes(self):
         self.run_app("records")
 

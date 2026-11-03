@@ -25,6 +25,28 @@
 }
 
 @layer components {
+  /* The label's concave return continues its right edge into the sheet's
+     top border. The white underlay also masks the straight border below it. */
+  .entry-label {
+    @apply relative;
+  }
+
+  .entry-label::before,
+  .entry-label::after {
+    content: "";
+    @apply pointer-events-none absolute bottom-0 h-3;
+    right: calc(-1 * theme('spacing.3'));
+    width: calc(theme('spacing.3') + 1px);
+  }
+
+  .entry-label::before {
+    @apply bg-white;
+  }
+
+  .entry-label::after {
+    @apply rounded-bl-xl border-b border-l border-stone-200 bg-canvas;
+  }
+
   .chat-markdown pre {
     @apply rounded-lg overflow-x-auto text-[12px] p-3;
   }

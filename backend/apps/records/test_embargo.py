@@ -1,12 +1,15 @@
 """
-A paper's embargo answer at the API (ADR-052 §2-5, IR-811).
+A paper's embargo answer at the API (ADR-052 decision 2, IR-811, IR-816).
 
-The answer rides on `POST /records/<id>/submit/`. These pin three things: an
-answer is stored with who and when, a bad one leaves the paper in draft, and a
-missing one never reads as "no embargo", whatever shape the request takes.
+Publish saves the answer through `POST /records/<id>/embargo-answer/` before the
+file is sent, and `POST /records/<id>/submit/` refuses a paper that has none.
+These pin three things: an answer is stored with who and when, a bad one changes
+nothing, and a missing one never reads as "no embargo", whatever shape the
+request takes.
 """
 
 from datetime import date, timedelta
+from uuid import uuid4
 from unittest import mock
 
 from django.urls import reverse
@@ -30,7 +33,7 @@ def _in_days(days: int) -> date:
     return timezone.localdate() + timedelta(days=days)
 
 
-class SubmitDraftBase(APITestCase):
+class DraftBase(APITestCase):
     def setUp(self):
         self.record_type = RecordType.objects.get_or_create(name=RecordTypeName.THESIS_RESEARCH)[0]
         self.owner = make_user("embargo-owner@cit.edu", "Student")
@@ -38,61 +41,73 @@ class SubmitDraftBase(APITestCase):
         self.record = self._draft()
         self.client.force_authenticate(self.owner)
 
-    def _draft(self, **fields):
+    def _draft(self, status_=PipelineStatus.DRAFT, **fields):
         record = Record.objects.create(
-            title="C" * 10, abstract="D" * 40, record_type=self.record_type,
-            added_by=self.owner, adviser=self.adviser,
-            pipeline_status=PipelineStatus.DRAFT, **fields,
+            title="C" * 10 + uuid4().hex[:8], abstract="D" * 40, record_type=self.record_type,
+            added_by=self.owner, adviser=self.adviser, pipeline_status=status_, **fields,
         )
         RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)
         return record
 
-    def _submit(self, record=None, **answer):
-        record = record or self.record
+    def _answer(self, record=None, format_="json", **answer):
         return self.client.post(
-            reverse("record-submit", args=[record.pk]),
-            {"dpa_accepted": True, **answer}, format="json",
+            reverse("record-embargo-answer", args=[(record or self.record).pk]),
+            answer, format=format_,
         )
 
+    def _submit(self, record=None):
+        return self.client.post(
+            reverse("record-submit", args=[(record or self.record).pk]),
+            {"dpa_accepted": True}, format="json",
+        )
 
-class AnsweringAtSubmissionTests(SubmitDraftBase):
-    def test_no_embargo_is_stored_with_who_and_when(self):
-        response = self._submit(embargoed=False)
+    def _assert_unanswered(self):
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertIsNone(self.record.embargo_answered_at)
+        self.assertIsNone(self.record.embargo_answered_by)
+        self.assertIsNone(self.record.embargoed_until)
+
+
+class AnsweringTheQuestionTests(DraftBase):
+    """Publish's first question, saved before the file is sent."""
+
+    def test_no_embargo_is_saved_with_who_and_when(self):
+        response = self._answer(embargoed=False)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data, {"state": "none", "until": None})
         self.record.refresh_from_db()
         self.assertEqual(self.record.embargo_state, EmbargoState.NONE)
-        self.assertIsNone(self.record.embargoed_until)
         self.assertIsNotNone(self.record.embargo_answered_at)
         self.assertEqual(self.record.embargo_answered_by, self.owner)
 
-    def test_an_embargo_is_stored_with_its_date_who_and_when(self):
+    def test_an_embargo_is_saved_with_its_date_who_and_when(self):
         until = _in_days(90)
 
-        response = self._submit(embargoed=True, embargoed_until=until.isoformat())
+        response = self._answer(embargoed=True, embargoed_until=until.isoformat())
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.assertEqual(response.data, {"state": "active", "until": until.isoformat()})
         self.record.refresh_from_db()
         self.assertEqual(self.record.embargo_state, EmbargoState.ACTIVE)
         self.assertEqual(self.record.embargoed_until, until)
-        self.assertIsNotNone(self.record.embargo_answered_at)
         self.assertEqual(self.record.embargo_answered_by, self.owner)
 
     def test_todays_date_is_accepted_because_it_has_not_passed(self):
-        response = self._submit(embargoed=True, embargoed_until=_in_days(0).isoformat())
+        response = self._answer(embargoed=True, embargoed_until=_in_days(0).isoformat())
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
     def test_no_embargo_with_a_null_date_is_a_plain_no(self):
-        """What a form sends with the toggle off and the date cleared."""
-        response = self._submit(embargoed=False, embargoed_until=None)
+        response = self._answer(embargoed=False, embargoed_until=None)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()
         self.assertEqual(self.record.embargo_state, EmbargoState.NONE)
 
     def test_an_owner_may_change_the_answer_before_submission(self):
-        """ADR-052 §5: nothing has been sent yet, so the toggle stays theirs."""
+        """ADR-052 §5: nothing has been sent yet, so the answer stays theirs."""
         for stored in (
             {"embargo_answered_at": timezone.now(), "embargoed_until": _in_days(30)},
             {
@@ -103,7 +118,7 @@ class AnsweringAtSubmissionTests(SubmitDraftBase):
             with self.subTest(stored=sorted(stored)):
                 record = self._draft(**stored)
 
-                response = self._submit(record, embargoed=False)
+                response = self._answer(record, embargoed=False)
 
                 self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
                 record.refresh_from_db()
@@ -111,57 +126,111 @@ class AnsweringAtSubmissionTests(SubmitDraftBase):
                 self.assertIsNone(record.embargo_released_at)
                 self.assertEqual(record.embargo_answered_by, self.owner)
 
+    def test_a_bad_answer_changes_nothing(self):
+        bad_answers = {
+            "nothing at all": {},
+            "on with no date": {"embargoed": True},
+            "on with a null date": {"embargoed": True, "embargoed_until": None},
+            "on with a date that is not one": {"embargoed": True, "embargoed_until": "soon"},
+            "on with a past date": {"embargoed": True, "embargoed_until": _in_days(-1).isoformat()},
+            "off with a date": {"embargoed": False, "embargoed_until": _in_days(30).isoformat()},
+            "a date with no toggle": {"embargoed_until": _in_days(30).isoformat()},
+            "a toggle that is not a yes or no": {"embargoed": "maybe"},
+            "a null toggle": {"embargoed": None},
+        }
+        for name, answer in bad_answers.items():
+            with self.subTest(name):
+                response = self._answer(**answer)
 
-class NoAnswerTests(SubmitDraftBase):
-    """Until IR-816 makes the form send one, submitting must keep working."""
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+                self._assert_unanswered()
 
-    def test_a_submission_with_no_answer_succeeds_and_stays_unknown(self):
-        response = self._submit()
+    def test_a_form_post_never_reads_as_no(self):
+        """DRF reads a boolean missing from form data as False, which would record
+        "no embargo" that nobody gave and let the paper be sent to a vendor."""
+        for name, answer in {
+            "no toggle at all": {"unrelated": "x"},
+            "a blank date and no toggle": {"embargoed_until": ""},
+            "a blank toggle": {"embargoed": ""},
+        }.items():
+            with self.subTest(name):
+                response = self._answer(format_="multipart", **answer)
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.pipeline_status, PipelineStatus.IN_REVIEW)
-        self.assertEqual(self.record.embargo_state, EmbargoState.UNKNOWN)
-        self.assertIsNone(self.record.embargo_answered_at)
-        self.assertIsNone(self.record.embargo_answered_by)
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+                self.assertIn("embargoed", response.data)
+                self._assert_unanswered()
 
-    def test_a_form_post_with_no_answer_stays_unknown(self):
-        """DRF reads a boolean missing from form data as False, which here would
-        record "no embargo" that nobody gave and send the paper to a vendor."""
-        response = self.client.post(
-            reverse("record-submit", args=[self.record.pk]),
-            {"dpa_accepted": "true"}, format="multipart",
+    def test_the_refusal_names_the_field_to_fix(self):
+        response = self._answer(embargoed=True)
+
+        self.assertIn("embargoed_until", response.data)
+
+    def test_a_submitted_paper_cannot_be_answered_here(self):
+        """Otherwise an owner could end an embargo here with no release (§6)."""
+        record = self._draft(
+            PipelineStatus.IN_REVIEW,
+            embargo_answered_at=timezone.now(), embargoed_until=_in_days(30),
         )
 
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.embargo_state, EmbargoState.UNKNOWN)
+        response = self._answer(record, embargoed=False)
 
-    def test_a_form_post_with_a_blank_date_and_no_toggle_is_refused(self):
-        """The same trap by another door: the date's key is present, so this is
-        not "no answer", and DRF would read the missing toggle as False."""
-        response = self.client.post(
-            reverse("record-submit", args=[self.record.pk]),
-            {"dpa_accepted": "true", "embargoed_until": ""}, format="multipart",
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+        record.refresh_from_db()
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
+
+    def test_saving_the_answer_sends_nothing_on(self):
+        """Consent comes at the last step, so the gate has nothing to open yet."""
+        with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
+            response = self._answer(embargoed=False)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        queue.assert_not_called()
+
+    def test_patching_the_record_cannot_answer_for_it(self):
+        """An answer that opens the gate comes through this route, with who and
+        when, and never as an ordinary details edit."""
+        response = self.client.patch(
+            reverse("record-detail", args=[self.record.pk]),
+            {
+                "embargoed": False,
+                "embargoed_until": _in_days(30).isoformat(),
+                "embargo_answered_at": timezone.now().isoformat(),
+                "embargo_released_at": timezone.now().isoformat(),
+            },
+            format="json",
         )
 
+        self.assertLess(response.status_code, 500, response.data)
+        self._assert_unanswered()
+
+
+class SubmittingNeedsAnAnswerTests(DraftBase):
+    """The form asks first, so a paper with no answer cannot enter review."""
+
+    def _assert_refused_as_unanswered(self, response):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
         self.assertIn("embargoed", response.data)
-        self.record.refresh_from_db()
+        self._assert_unanswered()
         self.assertEqual(self.record.pipeline_status, PipelineStatus.DRAFT)
-        self.assertEqual(self.record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertIsNone(self.record.dpa_accepted_at)
 
-    def test_a_form_post_with_a_blank_toggle_is_refused(self):
-        response = self.client.post(
+    def test_a_first_submission_with_no_answer_is_refused_and_stays_a_draft(self):
+        self._assert_refused_as_unanswered(self._submit())
+
+    def test_a_refused_submission_sends_nothing_on(self):
+        with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
+            self._assert_refused_as_unanswered(self._submit())
+
+        queue.assert_not_called()
+
+    def test_an_answer_in_the_submit_body_is_not_an_answer(self):
+        """One route writes the answer, so it always arrives before the file."""
+        self._assert_refused_as_unanswered(self.client.post(
             reverse("record-submit", args=[self.record.pk]),
-            {"dpa_accepted": "true", "embargoed": ""}, format="multipart",
-        )
+            {"dpa_accepted": True, "embargoed": False}, format="json",
+        ))
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.embargo_state, EmbargoState.UNKNOWN)
-
-    def test_a_stored_answer_stands_when_the_request_sends_none(self):
+    def test_a_saved_answer_is_enough_to_submit_and_stands(self):
         record = self._draft(
             embargo_answered_at=timezone.now(), embargo_answered_by=self.adviser,
             embargoed_until=_in_days(30),
@@ -171,97 +240,40 @@ class NoAnswerTests(SubmitDraftBase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         record.refresh_from_db()
+        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
         self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
         self.assertEqual(record.embargo_answered_by, self.adviser)
 
 
-class RefusedAnswerTests(SubmitDraftBase):
-    def test_a_bad_answer_is_refused_and_the_paper_stays_a_draft(self):
-        """Refused before anything is written, so a paper never reaches a review
-        queue with an answer nobody gave, or with consent stamped for it."""
-        bad_answers = {
-            "on with no date": {"embargoed": True},
-            "on with a null date": {"embargoed": True, "embargoed_until": None},
-            "on with a date that is not one": {"embargoed": True, "embargoed_until": "soon"},
-            "on with a past date": {
-                "embargoed": True, "embargoed_until": _in_days(-1).isoformat(),
-            },
-            "off with a date": {"embargoed": False, "embargoed_until": _in_days(30).isoformat()},
-            "a date with no toggle": {"embargoed_until": _in_days(30).isoformat()},
-            "a toggle that is not a yes or no": {"embargoed": "maybe"},
-            "a null toggle": {"embargoed": None},
-        }
-        for name, answer in bad_answers.items():
-            with self.subTest(name):
-                response = self._submit(**answer)
-
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-                self.record.refresh_from_db()
-                self.assertEqual(self.record.pipeline_status, PipelineStatus.DRAFT)
-                self.assertEqual(self.record.embargo_state, EmbargoState.UNKNOWN)
-                self.assertIsNone(self.record.embargoed_until)
-                self.assertIsNone(self.record.dpa_accepted_at)
-
-    def test_the_refusal_names_the_field_to_fix(self):
-        response = self._submit(embargoed=True)
-
-        self.assertIn("embargoed_until", response.data)
-
-
-class OnlySubmitWritesTheAnswerTests(SubmitDraftBase):
-    def test_patching_the_record_cannot_answer_for_it(self):
-        """An answer that opens the gate has to come through submit, with who
-        and when, and never as an ordinary details edit."""
-        response = self.client.patch(
-            reverse("record-detail", args=[self.record.pk]),
-            {
-                "embargoed_until": _in_days(30).isoformat(),
-                "embargo_answered_at": timezone.now().isoformat(),
-                "embargo_released_at": timezone.now().isoformat(),
-            },
-            format="json",
-        )
-
-        self.assertLess(response.status_code, 500, response.data)
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.embargo_state, EmbargoState.UNKNOWN)
-        self.assertIsNone(self.record.embargoed_until)
-        self.assertIsNone(self.record.embargo_released_at)
-
-
-class SendingThePaperOnTests(SubmitDraftBase):
+class SendingThePaperOnTests(DraftBase):
     """
     ADR-052 §Consequences: a normal paper reaches the AI "once its owner says no
-    embargo". Its upload was refused while it was a draft with no answer and no
-    consent, and a refused paper is never tried again, so submitting has to
-    queue it. Whatever the gate still refuses is not queued.
+    embargo". Its upload was refused while it was a draft with no consent, and a
+    refused paper is never tried again, so submitting has to queue it. Whatever
+    the gate still refuses is not queued.
     """
 
-    def _submit_and_commit(self, record=None, **answer):
+    def _submit_and_commit(self, record=None):
         with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
-            response = self._submit(record, **answer)
+            response = self._submit(record)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         return queue
 
     def test_answering_no_queues_the_paper_for_indexing(self):
-        queue = self._submit_and_commit(embargoed=False)
+        self._answer(embargoed=False)
 
-        queue.assert_called_once_with(self.record.pk)
+        self._submit_and_commit().assert_called_once_with(self.record.pk)
 
     def test_an_active_embargo_queues_nothing(self):
-        queue = self._submit_and_commit(
-            embargoed=True, embargoed_until=_in_days(30).isoformat(),
-        )
+        self._answer(embargoed=True, embargoed_until=_in_days(30).isoformat())
 
-        queue.assert_not_called()
-
-    def test_no_answer_queues_nothing(self):
         self._submit_and_commit().assert_not_called()
 
     def test_an_ip_mark_still_holds_the_paper_back(self):
         record = self._draft(is_ip=True)
+        self._answer(record, embargoed=False)
 
-        self._submit_and_commit(record, embargoed=False).assert_not_called()
+        self._submit_and_commit(record).assert_not_called()
 
     def _overview_refused_at_upload(self):
         """What chunking leaves behind: its overview was refused by the gate and
@@ -277,18 +289,20 @@ class SendingThePaperOnTests(SubmitDraftBase):
 
     def test_answering_no_asks_again_for_the_overview_refused_at_upload(self):
         self._overview_refused_at_upload()
+        self._answer(embargoed=False)
 
         with mock.patch(OVERVIEW_QUEUE) as overview:
-            self._submit_and_commit(embargoed=False)
+            self._submit_and_commit()
 
         overview.assert_called_once()
         self.assertEqual(RecordOverview.objects.get(record=self.record).state, "generating")
 
     def test_an_active_embargo_leaves_the_overview_alone(self):
         self._overview_refused_at_upload()
+        self._answer(embargoed=True, embargoed_until=_in_days(30).isoformat())
 
         with mock.patch(OVERVIEW_QUEUE) as overview:
-            self._submit_and_commit(embargoed=True, embargoed_until=_in_days(30).isoformat())
+            self._submit_and_commit()
 
         overview.assert_not_called()
         self.assertEqual(RecordOverview.objects.get(record=self.record).state, "unavailable")
@@ -296,11 +310,13 @@ class SendingThePaperOnTests(SubmitDraftBase):
     def test_a_broker_outage_does_not_fail_the_submission(self):
         """The submission has already committed. A paper that missed its queue
         is one a backfill can reach, and the owner's act succeeded."""
+        self._answer(embargoed=False)
+
         with (
             mock.patch(QUEUE, side_effect=ConnectionError("broker down")),
             self.captureOnCommitCallbacks(execute=True),
         ):
-            response = self._submit(embargoed=False)
+            response = self._submit()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()

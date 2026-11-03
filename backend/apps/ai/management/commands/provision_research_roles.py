@@ -29,6 +29,10 @@ DEFINER_FUNCTIONS = (
     "begin_research(text, text)",
     "research_record_ids()",
     "reader_status(bigint)",
+    "processing_source()",
+    "lock_processing_source()",
+    "pending_manuscript_work(integer, uuid)",
+    "manuscript_invalidations(integer, uuid)",
 )
 HELPER_FUNCTIONS = ("hmac_sha256(bytea, bytea)", "b64url_encode(bytea)", "b64url_decode(text)")
 RUNTIME_FUNCTIONS = (
@@ -49,7 +53,10 @@ LEDGER_TABLES = {
 VERIFIER_COLUMNS = {
     "accounts_user": "id, is_active, is_locked, credential_version, role_id",
     "accounts_role": "id, name",
-    "records_record": "id, is_deleted, pipeline_status, adviser_id",
+    "records_record": "id, is_deleted, pipeline_status, adviser_id, abstract_file",
+    "publication_manuscriptwork": "id, record_id, revision, source_file, operation, revoked_at,"
+                                  " created_at, grant_token, grant_expires_at, authority_generation",
+    "publication_manuscriptinvalidation": "id, record_id, work_id, reason, authority_generation",
     "records_recordowner": "record_id, user_id",
     "ai_askrun": "id, state, deadline_at, user_id, conversation_id",
     "ai_conversation": "id, user_id, record_id",
@@ -208,6 +215,8 @@ class Command(BaseCommand):
         cursor.execute(f"GRANT SELECT ON iris_authz.grant_key TO {VERIFIER}")
         for table, columns in VERIFIER_COLUMNS.items():
             cursor.execute(f"GRANT SELECT ({columns}) ON public.{table} TO {VERIFIER}")
+        # PostgreSQL row locks require UPDATE on at least one column.
+        cursor.execute(f"GRANT UPDATE (id) ON public.records_record TO {VERIFIER}")
         for fn in HELPER_FUNCTIONS:
             cursor.execute(f"GRANT EXECUTE ON FUNCTION iris_authz.{fn} TO {VERIFIER}")
         for fn in DEFINER_FUNCTIONS:
@@ -225,6 +234,10 @@ class Command(BaseCommand):
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.reader_status(bigint) TO iris_ai_runtime"
         )
+        cursor.execute("GRANT EXECUTE ON FUNCTION iris_authz.processing_source(),"
+                       " iris_authz.pending_manuscript_work(integer, uuid),"
+                       " iris_authz.manuscript_invalidations(integer, uuid),"
+                       " iris_authz.lock_processing_source() TO iris_ai_runtime")
         # The AI runtime reserves and settles in the one shared ledger (IR-725).
         for table, columns in LEDGER_TABLES.items():
             cursor.execute(f"REVOKE UPDATE ON public.{table} FROM iris_ai_runtime")

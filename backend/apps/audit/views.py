@@ -5,7 +5,7 @@ from django.http import StreamingHttpResponse
 from rest_framework import generics, serializers
 from rest_framework.permissions import IsAuthenticated
 
-from core.permissions import IsAdmin
+from core.permissions import IsSystemAdmin
 from .models import AuditEvent
 from .serializers import AuditEventSerializer
 
@@ -29,8 +29,9 @@ class AuditFilters(serializers.Serializer):
 class AuditEventListView(generics.ListAPIView):
     """
     GET /audit/
-    RDCO only (ADR-009). Was DRF IsAdminUser, which reads Django's
-    is_staff flag and therefore admitted all four offices (IR-165). Supports filtering via query params:
+    The System Admin alone (ADR-051 §3; RDCO until IR-781). Was DRF IsAdminUser,
+    which reads Django's is_staff flag and therefore admitted all four offices
+    (IR-165). Supports filtering via query params:
       ?event_type=LOGIN
       ?record=<id>
       ?user=<id>
@@ -38,7 +39,7 @@ class AuditEventListView(generics.ListAPIView):
       ?to=YYYY-MM-DD     (inclusive)
     """
     serializer_class   = AuditEventSerializer
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
 
     def get_queryset(self):
         qs = AuditEvent.objects.select_related("user__role", "record").order_by("-created_at", "-id")

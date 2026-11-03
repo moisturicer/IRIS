@@ -14,11 +14,13 @@ the public endpoints. Document requests are covered by the shared fixture in
 """
 
 from django.urls import reverse
+from uuid import uuid4
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordOwner, RecordType
+from apps.records.testing import answered_no_embargo
 from apps.reviews.models import RecordAssignment
 from core.enums import PipelineStatus, RecordTypeName, RoleName
 
@@ -49,7 +51,9 @@ class TrackerTestBase(APITestCase):
 
     def make_record(self, type_name, **extra):
         record = Record.objects.create(
-            title=f"Tracker {type_name}",
+            # These are separate papers for workflow tests. Reusing one title
+            # would now invoke IR-832's real likely-match acknowledgement.
+            title=f"Tracker {type_name} {uuid4().hex[:8]}",
             abstract="A" * 40,
             record_type=RecordType.objects.get_or_create(name=type_name)[0],
             added_by=self.owner,
@@ -62,6 +66,7 @@ class TrackerTestBase(APITestCase):
 
     def submitted(self, type_name, **extra):
         record = self.make_record(type_name, **extra)
+        answered_no_embargo(record.pk)
         self.client.force_authenticate(self.owner)
         response = self.client.post(
             reverse("record-submit", args=[record.pk]),

@@ -30,7 +30,6 @@ import os
 import subprocess
 from pathlib import Path
 
-from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.management.base import BaseCommand, CommandError
 from django.utils import timezone
@@ -206,7 +205,6 @@ class Command(BaseCommand):
             return
 
         user = self._user(options.get("user"))
-        self._warn_about_the_gate()
 
         configs = self._configs(options, techniques)
         root = composition_root()
@@ -215,9 +213,6 @@ class Command(BaseCommand):
             "question_set_path": question_set.source,
             "question_set_sha256": _question_set_digest(question_set.source),
             "retrieved_as": user.email,
-            "disclosure_bypass": bool(
-                getattr(settings, "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", False)
-            ),
         }
 
         reports = []
@@ -322,16 +317,6 @@ class Command(BaseCommand):
             for reranking in wanted
         ]
 
-    def _warn_about_the_gate(self):
-        if getattr(settings, "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", False):
-            self.stdout.write(
-                self.style.WARNING(
-                    "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT is on (IR-317). These "
-                    "numbers are a development measurement and are not evidence "
-                    "about any corpus."
-                )
-            )
-
     def _warn_about_empty_final_sets(self, reports):
         for report in reports:
             retrieved = sum(o.retrieved_count for o in report.outcomes)
@@ -343,9 +328,9 @@ class Command(BaseCommand):
                         f"{report.config.label}: retrieval returned passages but "
                         f"the model would receive none. That is the disclosure "
                         f"gate refusing every record, usually because they carry "
-                        f"no embargo answer (ADR-052). Use "
-                        f"AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT to measure "
-                        f"meanwhile."
+                        f"no embargo answer (ADR-052). On a development "
+                        f"database, mark test papers with "
+                        f"manage.py mark_corpus_cleared."
                     )
                 )
 

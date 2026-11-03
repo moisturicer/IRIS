@@ -74,6 +74,16 @@ class DocumentElement:
     level: Optional[int] = None
     page: Optional[int] = None
     bboxes: tuple[BoundingBox, ...] = ()
+    printed_page_number: Optional[str] = None
+    source_label: str = ""
+    children: tuple["DocumentElement", ...] = ()
+    ordered: bool = False
+    rows: tuple[tuple[str, ...], ...] = ()
+    html: str = ""
+    # Retrieval only. A Figure's printed caption stays in text (ADR-056 §10).
+    description: str = ""
+    # The Extractor's image name, joining a Figure element to its stored image.
+    figure: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.bboxes, tuple):
@@ -101,6 +111,10 @@ class NormalizedDocument:
     title: str
     elements: tuple[DocumentElement, ...] = ()
     page_sizes: Mapping[int, tuple[float, float]] = field(default_factory=dict)
+    # Authoritative labels need no legacy heading/furniture repairs (IR-840).
+    structure_is_authoritative: bool = False
+    page_metadata: Mapping[int, Mapping] = field(default_factory=dict)
+    confidence: Optional[float] = None
 
     def __post_init__(self) -> None:
         if not isinstance(self.elements, tuple):

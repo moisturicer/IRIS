@@ -208,6 +208,7 @@ jobs:
         run: >-
           python -m pytest -p testing.ci_sharding
           --ci-shard=${{ matrix.shard }} --ci-shards=4
+          --ci-timings=testing/module_durations.json
           -ra --durations=25 --junitxml=pytest-results.xml
 
       - name: Report authorization matrix duration
@@ -251,6 +252,36 @@ jobs:
           RESULT: ${{ needs.backend-tests.result }}
         run: test "$RESULT" = success
 
+  # The gateway has its own requirements and pytest.ini, so the backend job's
+  # collection never reaches ai/tests (IR-844). That left the gateway's service
+  # authentication test (ADR-014 precondition 1) out of CI. pytest exits 5 when
+  # it collects nothing, so an empty run fails this job too.
+  ai-gateway:
+    name: AI gateway
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: ai
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          # 3.11, matching ai/Dockerfile.
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            ai/requirements.txt
+            ai/requirements-dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements-dev.txt
+
+      - name: Tests
+        run: python -m pytest -ra
+
   frontend:
     name: Frontend
     runs-on: ubuntu-latest
@@ -267,7 +298,8 @@ jobs:
           # 20, matching frontend/Dockerfile's build image (node:20-alpine).
           # Not a preference: jsdom 29, which the Vitest suite runs under, needs
           # Node >=20.19, and on 18 `npm ci` already warned EBADENGINE.
-          node-version: '20'
+          # pdfjs-dist 6 and jsdom require a newer runtime than Node 20.
+          node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -326,6 +358,7 @@ jobs:
             echo "DB_USER=iris"
             echo "DB_PASSWORD=ci-only-not-a-real-secret"
             echo "REDIS_PASSWORD=ci-only-not-a-real-secret"
+            echo "IRIS_DOMAIN=localhost"
           } > .env
 
       - name: Validate development stack
@@ -346,6 +379,53 @@ jobs:
       - name: Build the backend image
         run: docker compose -f docker-compose.yml build backend
 
+      # IR-847: the real Caddy with the real Caddyfile, in front of a stand-in that
+      # echoes the forwarded headers. A local certificate replaces ACME, because
+      # a test has no public domain.
+      - name: Caddy serves HTTPS only, with strong TLS
+        run: |
+          docker network create iris-tls
+          docker run -d --name frontend --network iris-tls python:3.11-alpine python -c '
+          import http.server
+          class H(http.server.BaseHTTPRequestHandler):
+              def do_GET(self):
+                  body = ("xff=%s proto=%s" % (self.headers.get("X-Forwarded-For"), self.headers.get("X-Forwarded-Proto"))).encode()
+                  self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+          http.server.HTTPServer(("0.0.0.0", 8080), H).serve_forever()
+          '
+          image=$(docker compose -f docker-compose.prod.yml config --images | grep '^caddy')
+          docker run -d --name iris-caddy --network iris-tls -p 18080:80 -p 18443:443 \
+            -e IRIS_DOMAIN=localhost -e IRIS_CADDY_OPTIONS=local_certs \
+            -v "$PWD/deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro" "$image"
+          trap 'docker logs frontend; docker logs iris-caddy; docker rm -f iris-caddy frontend; docker network rm iris-tls' EXIT
+          ready=
+          for i in $(seq 1 30); do curl -sk -o /dev/null https://localhost:18443/ && { ready=1; break; }; sleep 1; done
+          [ -n "$ready" ] || { echo "::error::Caddy did not answer within 30s"; exit 1; }
+
+          redirect=$(curl -s -o /dev/null -w '%{http_code} %{redirect_url}' http://localhost:18080/x)
+          echo "plain HTTP: $redirect"
+          case "$redirect" in 30[18]\ https://localhost*/x) ;; *) echo "::error::plain HTTP did not redirect to HTTPS"; exit 1 ;; esac
+
+          echo_back=$(curl -sk -H 'X-Forwarded-For: 203.0.113.9' -H 'X-Forwarded-Proto: http' https://localhost:18443/)
+          echo "forged headers: $echo_back"
+          case "$echo_back" in *203.0.113.9*) echo "::error::Caddy passed on a forged X-Forwarded-For"; exit 1 ;; esac
+          case "$echo_back" in *proto=https*) ;; *) echo "::error::Caddy did not set X-Forwarded-Proto: https"; exit 1 ;; esac
+
+          probe() { openssl s_client -connect localhost:18443 -servername localhost "$@" </dev/null 2>&1; }
+          for version in -tls1_2 -tls1_3; do
+            result=$(probe "$version" | grep -E '^ *(New, |Cipher is)|Cipher is' | head -1)
+            echo "$version: $result"
+            case "$result" in *TLS*|*ECDHE*) ;; *) echo "::error::$version was refused"; exit 1 ;; esac
+          done
+          for refused in "-tls1 -cipher ALL:@SECLEVEL=0" "-tls1_1 -cipher ALL:@SECLEVEL=0" "-tls1_2 -cipher AES128-SHA" "-tls1_2 -cipher DES-CBC3-SHA:@SECLEVEL=0"; do
+            # shellcheck disable=SC2086
+            if probe $refused | grep -qE 'Cipher is [A-Z0-9]'; then
+              probe $refused | grep -E 'Cipher is'
+              echo "::error::Caddy accepted $refused"; exit 1
+            fi
+            echo "refused as it should be: $refused"
+          done
+
       # IR-663: the real nginx, with the real config and snippet mounted where
       # the frontend image puts them, answers with the security headers on the
       # SPA route, an asset, a 404 and the legacy activation path. A stand-in
@@ -358,13 +438,17 @@ jobs:
           echo '<!doctype html><title>IRIS</title>' > "$RUNNER_TEMP/html/index.html"
           echo 'export {};' > "$RUNNER_TEMP/html/assets/app.js"
           echo 'export {};' > "$RUNNER_TEMP/html/assets/pdf.worker.min-x.mjs"
+          # The stock image needs the same reader startup inputs as our image.
+          printf false > "$RUNNER_TEMP/runtime-reader-enabled"
           image=nginxinc/nginx-unprivileged:1.25-alpine
           mounts="-v $PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
                   -v $PWD/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
                   -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
+                  -v $PWD/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro
+                  -v $RUNNER_TEMP/runtime-reader-enabled:/etc/nginx/iris/runtime-reader-enabled:ro
                   -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"
-          docker run --rm --add-host backend:127.0.0.1 $mounts "$image" nginx -t
-          docker run -d --name iris-nginx --add-host backend:127.0.0.1 -p 8080:8080 $mounts "$image"
+          docker run --rm --add-host backend:127.0.0.1 --add-host ai-gateway:127.0.0.1 $mounts "$image" nginx -t
+          docker run -d --name iris-nginx --add-host backend:127.0.0.1 --add-host ai-gateway:127.0.0.1 -p 8080:8080 $mounts "$image"
           trap 'docker logs iris-nginx; docker rm -f iris-nginx' EXIT
           ready=
           for i in $(seq 1 20); do curl -s -o /dev/null localhost:8080/ && { ready=1; break; }; sleep 1; done
@@ -390,8 +474,8 @@ jobs:
           esac
           exit $status
 
-      # IR-668: the default is deny, the allowlist reads the real client, and
-      # IRIS's own /admin/... pages are not refused.
+      # IR-668: the default is deny and the allowlist reads the real client.
+      # IR-782: IRIS's own /admin/... and /rdco/... pages load the app, not Django.
       - name: nginx closes /django-admin/ unless allowlisted
         run: sh scripts/check_django_admin_allowlist.sh
 
@@ -401,6 +485,25 @@ jobs:
       # touch until a worker runs the task. The secret is the same throwaway
       # the Backend job uses. `timeout` ends the run, so its exit code is not
       # the verdict: the two greps are.
+      # IR-825: the real production networks. The control proves the probe can
+      # succeed, so a failure on `private` means no route, not a broken probe.
+      - name: Private services have no route to the internet
+        run: |
+          compose="docker compose -p iris-net -f docker-compose.prod.yml"
+          trap '$compose down -v' EXIT
+          $compose up --no-start --no-deps redis caddy
+          $compose start redis
+          url=https://example.com
+          docker run --rm --network iris-net_egress alpine:3.20 wget -q -T 15 -O /dev/null "$url"
+          echo "egress network reaches the internet, as it should"
+          if docker run --rm --network iris-net_private alpine:3.20 wget -q -T 8 -O /dev/null "$url"; then
+            echo "::error::the private network reached the internet"; exit 1
+          fi
+          if $compose exec -T redis wget -q -T 8 -O /dev/null "$url"; then
+            echo "::error::redis reached the internet"; exit 1
+          fi
+          echo "private network and redis have no route out, as they should"
+
       - name: Boot celery-beat and see its schedule
         run: |
           docker compose -f docker-compose.yml up -d redis

@@ -62,6 +62,14 @@ class AuditEvent(models.Model):
     DOCUMENT_REQUEST_REJECTED  = "DOCUMENT_REQUEST_REJECTED"
     DOCUMENT_REQUEST_WITHDRAWN = "DOCUMENT_REQUEST_WITHDRAWN"
 
+    # A paper's embargo (ADR-052 §8, IR-812).
+    EMBARGO_ANSWERED = "EMBARGO_ANSWERED"
+    EMBARGO_SET      = "EMBARGO_SET"
+    EMBARGO_EXTENDED = "EMBARGO_EXTENDED"
+    EMBARGO_RELEASED = "EMBARGO_RELEASED"
+    # KTTO's release of an IP-marked paper (ADR-052 §11, IR-813).
+    IP_RELEASED      = "IP_RELEASED"
+
     # Account recovery (ADR-045 §8, IR-642). Metadata is an allowlist --
     # purpose, correlation_id, outcome, reason, attempt -- written only by
     # `apps.accounts.recovery.audit`. Never an address, token or password.
@@ -113,6 +121,11 @@ class AuditEvent(models.Model):
         (REVIEWER_ADDED,             "Reviewer Added"),
         (SEAT_OPENED,                "Seat Opened"),
         (RECORD_WITHDRAWN,           "Record Withdrawn"),
+        (EMBARGO_ANSWERED,           "Embargo Question Answered"),
+        (EMBARGO_SET,                "Embargo Set"),
+        (EMBARGO_EXTENDED,           "Embargo Date Moved"),
+        (EMBARGO_RELEASED,           "Embargo Released"),
+        (IP_RELEASED,                "IP Mark Released"),
         (DOCUMENT_REQUESTED,         "Documents Requested"),
         (DOCUMENT_REQUEST_FULFILLED, "Document Request Fulfilled"),
         (DOCUMENT_REQUEST_ACCEPTED,  "Requested Document Accepted"),

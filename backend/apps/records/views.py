@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from rest_framework import viewsets, mixins, status
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -15,18 +15,22 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from core.enums import (
     DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
+    EmbargoState,
     IPType,
     PipelineStatus,
     RecordTypeName,
     RequestStatus,
 )
-from . import embargo, lifecycle
+from . import embargo, ip_release, lifecycle
 from core.permissions import (
     IsAdmin,
     IsAuthor,
     IsRDCO,
     IsRecordOwner,
     IsStaff,
+    MayReleaseEmbargo,
+    MayReleaseIp,
+    MaySetEmbargo,
 )
 from .download_service import (
     DownloadRequestAlreadyDecided,
@@ -93,7 +97,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
-        if self.action in ("metadata_suggestions", "related_research"):
+        if self.action in ("metadata_suggestions", "retry_extraction", "related_research", "duplicate_matches", "acknowledge_duplicates"):
             # The Publish dialog's prefill is the manuscript's own text, offered
             # to the person publishing it (IR-406; IR-374 spec Appendix D:
             # "the owner through visible_to(), with a 404 otherwise").
@@ -145,8 +149,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "destroy"):
+        if self.action in ("update", "partial_update", "submit", "embargo_answer", "destroy", "duplicate_matches", "acknowledge_duplicates"):
             return [IsAuthenticated(), IsRecordOwner()]
+        if self.action == "embargo_set":
+            return [IsAuthenticated(), MaySetEmbargo()]
+        if self.action == "embargo_release":
+            return [IsAuthenticated(), MayReleaseEmbargo()]
+        if self.action == "ip_release":
+            return [IsAuthenticated(), MayReleaseIp()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -161,6 +171,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # is exactly [IsAuthenticated]. See tests.py::DeadPermissionKwargSweepTests.
         return super().get_permissions()
 
+    @transaction.atomic
     def perform_create(self, serializer):
         from .models import RecordOwner
         record = serializer.save(
@@ -199,28 +210,46 @@ class RecordViewSet(viewsets.ModelViewSet):
         self._queue_manuscript_extraction_if_present(serializer, record)
 
     def _queue_manuscript_extraction_if_present(self, serializer, record):
-        # abstract_file is the manuscript (see RecordWriteSerializer). Any
-        # save that changes it -- create or update -- must reach the chunker
-        # (IR-195 / ADR-013's 2026-09-08 amendment), the same way
-        # SubmitDocumentView does for a supplementary upload. "in
-        # validated_data" rather than diffing old vs. new: a client
-        # re-sending an unchanged file is rare enough that re-running
-        # extraction on it costs nothing, and the alternative (comparing
-        # file contents) costs a read on every save just to skip the common
-        # case.
-        #
-        # Except an owner's revised manuscript, which waits for its version
-        # (IR-273): reviewers are served the submitted one meanwhile, and the
-        # chunks Ask IRIS answers from must be the same file.
+        # The canonical writer removes unchanged bytes from validated_data.
+        # A changed revision is extracted only at the submission boundary.
         if "abstract_file" not in serializer.validated_data:
             return
 
-        from .services import queue_manuscript_extraction
+        from apps.documents.sources import reset_manuscript
         from .versions import manuscript_awaits_submission
 
-        if manuscript_awaits_submission(record):
-            return
-        queue_manuscript_extraction(record)
+        reset_manuscript(record, defer=manuscript_awaits_submission(record))
+
+    @action(detail=True, methods=["get"], url_path="duplicate-matches")
+    def duplicate_matches(self, request, pk=None):
+        """Current owner-visible likely matches for Publish's Details and Review."""
+        from .duplicates import acknowledgement_basis, exact_matches, likely_matches
+
+        record = self.get_object()
+        exact = exact_matches(request.user, record.pk, record.manuscript_sha256)
+        likely = likely_matches(request.user, record)
+        return Response({"exact": exact, "likely": likely,
+                         "acknowledged": bool(likely) and record.duplicate_acknowledgement == acknowledgement_basis(record, likely)})
+
+    @action(detail=True, methods=["post"], url_path="acknowledge-duplicates")
+    @transaction.atomic
+    def acknowledge_duplicates(self, request, pk=None):
+        from .duplicates import ExactDuplicate, acknowledgement_basis, exact_matches, likely_matches
+
+        record = self.get_object()
+        Record.objects.select_for_update().get(pk=record.pk)
+        record.refresh_from_db()
+        exact = exact_matches(request.user, record.pk, record.manuscript_sha256)
+        if exact:
+            raise ExactDuplicate(exact)
+        likely = likely_matches(request.user, record)
+        ids = sorted(item["id"] for item in likely)
+        supplied = request.data.get("candidate_ids", [])
+        if not isinstance(supplied, list) or any(type(item) is not int for item in supplied) or sorted(supplied) != ids:
+            return Response({"code": "acknowledgement_required", "detail": "Review the current likely matches.", "matches": likely}, status=409)
+        record.duplicate_acknowledgement = acknowledgement_basis(record, likely) if likely else ""
+        record.save(update_fields=["duplicate_acknowledgement"])
+        return Response({"acknowledged": bool(likely), "matches": likely})
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -353,19 +382,28 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        # The embargo answer (ADR-052 §2). Parsed here too, so a bad one refuses
-        # before anything is written. No answer leaves the paper Unknown and so
-        # blocked from the AI; IR-816 makes the form send one, then requires it.
-        embargo_answer = embargo.answer_from(request.data)
+        # The embargo answer (ADR-052 §2). Publish saved it through `embargo-answer/`
+        # before the file was sent. Refused like consent, before anything is written,
+        # so nothing enters review unanswered. A new Version goes through its own
+        # action and is not asked again.
+        if record.embargo_state == EmbargoState.UNKNOWN:
+            return Response(
+                {"embargoed": embargo.ANSWER_REQUIRED},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        from .duplicates import acknowledgement_basis, enforce_exact, likely_matches, lock_digest
+        lock_digest(record.manuscript_sha256)
+        enforce_exact(request.user, record.pk, record.manuscript_sha256)
+        likely = likely_matches(request.user, record)
+        if likely and record.duplicate_acknowledgement != acknowledgement_basis(record, likely):
+            return Response({"code": "acknowledgement_required", "detail": "Review and acknowledge the likely matches before submitting.", "matches": likely}, status=409)
         try:
-            # Consent, embargo answer, assignment, entry seat and v1 commit together.
+            # Consent, assignment, entry seat and v1 commit together.
             with transaction.atomic():
                 if not record.dpa_accepted:
                     record.dpa_accepted_at = timezone.now()
                     record.dpa_accepted_by = request.user
                     record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-                if embargo_answer is not None:
-                    embargo.record_answer(record, embargo_answer, actor=request.user)
                 enter_at_adviser(record, actor=request.user)
         except RoutingError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -381,6 +419,93 @@ class RecordViewSet(viewsets.ModelViewSet):
             {"detail": "Record submitted successfully. The adviser has been notified."},
             status=status.HTTP_200_OK,
         )
+
+    @action(detail=True, methods=["post"], url_path="embargo-answer")
+    @transaction.atomic
+    def embargo_answer(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-answer/  {"embargoed": bool, "embargoed_until": date}
+
+        A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
+        It is saved before the file is sent, so nothing that runs at upload can
+        act on a paper whose answer the server doesn't have yet. Draft only:
+        after submission an embargo changes by its own acts (IR-812).
+        """
+        record = self.get_object()  # enforces IsRecordOwner object permission
+        Record.objects.select_for_update().get(pk=record.pk)
+        record = self.get_object()
+
+        if record.pipeline_status != PipelineStatus.DRAFT:
+            return Response(
+                {"detail": "This paper has been submitted, so its embargo can't be answered here."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        answer = embargo.answer_from(request.data)
+        if answer is None:
+            return Response(
+                {"embargoed": embargo.ANSWER_REQUIRED},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        embargo.record_answer(record, answer, actor=request.user)
+        return Response(embargo.state_payload(record))
+
+    def _paper_under_lock(self):
+        record = self.get_object()  # a 404 for a paper they can't see, then a 403
+        Record.objects.select_for_update().get(pk=record.pk)
+        return self.get_object()
+
+    def _submitted_paper_under_lock(self):
+        record = self._paper_under_lock()
+        if record.pipeline_status == PipelineStatus.DRAFT:
+            raise serializers.ValidationError({"detail": embargo.DRAFT_ANSWERS_INSTEAD})
+        return record
+
+    @action(detail=True, methods=["post"], url_path="embargo-set")
+    @transaction.atomic
+    def embargo_set(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-set/  {"embargoed_until": date}
+
+        An owner or the Adviser sets an embargo on a submitted paper, or moves an
+        active one's date (ADR-052 §5, IR-812). The date is required, so this can
+        never blank one: that would read as "no embargo" with no release.
+        """
+        record = self._submitted_paper_under_lock()
+        until = embargo.until_from(request.data)
+        return Response(embargo.set_embargo(record, until, actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="embargo-release")
+    @transaction.atomic
+    def embargo_release(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-release/
+
+        The Adviser or RDCO ends an active embargo and sends the paper on to the
+        AI (ADR-052 §6, §10, IR-812). Who may ask is checked before where the
+        embargo stands, so a refusal says nothing about it.
+        """
+        record = self._submitted_paper_under_lock()
+        if record.embargo_state != EmbargoState.ACTIVE:
+            return Response(
+                {"detail": embargo.NOTHING_TO_RELEASE}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(embargo.release_embargo(record, actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="ip-release")
+    @transaction.atomic
+    def ip_release(self, request, pk=None):
+        """
+        POST /records/<id>/ip-release/
+
+        KTTO releases an IP-marked paper for the AI and sends it on (ADR-052 §11,
+        IR-813). The mark stays. Who may ask is checked before whether there is a
+        mark to release, so a refusal says nothing about the paper.
+        """
+        record = self._paper_under_lock()
+        refused = ip_release.why_not_releasable(record)
+        if refused is not None:
+            return Response({"detail": refused}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(ip_release.release_ip(record, actor=request.user))
 
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):
@@ -428,6 +553,36 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
         response["Cache-Control"] = "private, no-store"
+        return response
+
+    @action(detail=True, methods=["get"], url_path=r"figures/(?P<figure_id>[0-9]+)", url_name="figure")
+    def figure(self, request, pk=None, figure_id=None):
+        """
+        GET /records/<id>/figures/<figure_id>/ -- one Figure's image (IR-845).
+
+        A Figure is part of the paper, so it is read as the paper is:
+        `get_object()` resolves through `visible_to(user)`, and the Figure
+        must belong to this record and to the Manuscript revision this reader
+        is served (`versions.served_manuscript_revision`). Every refusal is
+        the 404 of a missing record. It takes an id, never a file path.
+
+        Stored images are checked to be what their media type says
+        (`documents.figures`); `nosniff` holds the browser to that type.
+        """
+        from apps.documents.models import ExtractionFigure
+        from .versions import served_manuscript_revision
+
+        record = self.get_object()
+        figure = ExtractionFigure.objects.filter(
+            pk=figure_id, extraction__record=record,
+            source_revision=served_manuscript_revision(record, request.user),
+        ).first()
+        if figure is None:
+            raise Http404
+        response = FileResponse(figure.image.open("rb"), content_type=figure.media_type)
+        response["Content-Disposition"] = "inline"
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
         return response
 
     @action(detail=True, methods=["get"])
@@ -660,7 +815,30 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         from .metadata_suggestions import suggestions_payload
 
-        return Response(suggestions_payload(self.get_object()))
+        from apps.publication.status import processing_status
+
+        record = self.get_object()
+        payload = suggestions_payload(record)
+        payload["runtime_processing"] = processing_status(record)
+        return Response(payload)
+
+    @action(detail=True, methods=["post"], url_path="retry-extraction")
+    @transaction.atomic
+    def retry_extraction(self, request, pk=None):
+        from apps.documents.models import PdfExtraction
+        from apps.documents.sources import reset_manuscript
+        from .metadata_suggestions import suggestions_payload
+        from .versions import manuscript_awaits_submission
+
+        record = self.get_object()
+        record = Record.objects.select_for_update().get(pk=record.pk)
+        if str(request.data.get("manuscript_revision")) != str(record.manuscript_revision):
+            return Response({"detail": "The manuscript has changed. Check its status again."}, status=409)
+        extraction = PdfExtraction.objects.filter(record=record, status="failed").first()
+        if not extraction or manuscript_awaits_submission(record):
+            return Response({"detail": "There is no failed extraction to retry."}, status=400)
+        reset_manuscript(record, retry=True)
+        return Response(suggestions_payload(record), status=202)
 
     @action(detail=True, methods=["get", "post"], url_path="document-requests")
     def document_requests(self, request, pk=None):
@@ -1022,7 +1200,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         PATCH /records/<id>/tags/
         Staff (KTTO, RDCO, ITSO, IERC) may update IP classification
-        flags and the structured ip_type label on any record.
+        flags and the structured ip_type label on any record. `is_ip` can be
+        set and never cleared: KTTO releases a marked paper with `ip-release/`.
 
         Boolean fields (all optional):
           { "is_ip": true, "for_commercialization": false, "community_extension": false }
@@ -1047,6 +1226,14 @@ class RecordViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 updates[field] = value
+
+        # Only KTTO's release opens the disclosure check for a marked paper
+        # (ADR-052 §12, IR-813), so no office clears the mark, KTTO included.
+        if updates.get("is_ip") is False and record.is_ip:
+            return Response(
+                {"is_ip": [ip_release.MARK_CANNOT_BE_CLEARED]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if "ip_type" in request.data:
             ip_type_value = request.data["ip_type"]

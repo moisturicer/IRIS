@@ -201,6 +201,7 @@ export default function LoginPage() {
 
   return (
     <EntryFrame
+      help
       lede={{
         headline: <>Your research has <span className="text-brand">a place.</span></>,
         sentence:

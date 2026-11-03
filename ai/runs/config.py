@@ -11,7 +11,7 @@ from dataclasses import dataclass
 EXECUTORS = ("deterministic",)
 DEPTHS = ("ordinary", "deep")
 PROTOCOL = "runs-1"
-SCHEMA = "0003_dispatch.sql"
+SCHEMA = "0004_agent.sql"
 
 LIMIT_NAMES = (
     "RUNS_DEADLINE_SECONDS", "RUNS_DEEP_DEADLINE_SECONDS", "RUNS_LEASE_SECONDS",

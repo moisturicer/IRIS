@@ -1,0 +1,61 @@
+{
+ "paper": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+ "options": {
+  "cost_optimizer": {
+   "enable": true
+  }
+ },
+ "pages": 5,
+ "credits": 36.0,
+ "cost_optimized_pages": [
+  1,
+  5
+ ],
+ "layout_images": 11,
+ "image_kinds": [
+  "chart",
+  "table"
+ ],
+ "job_metadata": {
+  "state_transitions": {
+   "pending_at": "2026-11-03T08:56:00.469012Z",
+   "throttled_at": "2026-11-03T08:56:00.626859Z",
+   "running_at": "2026-11-03T08:56:00.787008Z",
+   "completed_at": "2026-11-03T08:56:11.991272Z",
+   "failed_at": null,
+   "cancelled_at": null
+  },
+  "latency": {
+   "decode_ms": 4100,
+   "agent_ms": 4727,
+   "output_ms": 1407,
+   "page_throttle_wall_ms": 0,
+   "page_throttle_sum_ms": 0,
+   "page_throttle_max_ms": 0,
+   "page_throttle_waits": 1,
+   "job_throttle_ms": 0,
+   "total_ms": 11401
+  },
+  "quarantine": null,
+  "pdf-pages": 5,
+  "pdf-real-pages": 5,
+  "pdf-rawTextLength": 41850,
+  "pdf-mdLength": 30816,
+  "pdf-time": 6105,
+  "pdf-ocrTime": 0,
+  "pdf-image-convertTime": 0,
+  "pdf-pdfToHTMLTime": 0,
+  "pdf-llmTime": 4240,
+  "pdf-inputTokens": 25986,
+  "pdf-outputTokens": 10629,
+  "pdf-image-ocr-count": 11,
+  "pdf-image-ocr-failed-count": 0,
+  "pdf-image-ocr-success-count": 16,
+  "pdf-image-ocr-empty-count": 16,
+  "pdf-image-ocr-hadText-count": 0,
+  "pdf-image-ocr-pixels": 43723106,
+  "pdf-multimodal-time": 0,
+  "pdf-multimodal-pdf2Image": 0,
+  "pdf-high-res-ocr": 5
+ }
+}

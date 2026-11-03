@@ -3,11 +3,70 @@ import { errorDetail } from "@/lib/errorDetail";
  * The Publish dialog's pure rules (IR-408), kept out of the component so each
  * is stated once and tested as a table.
  */
-import type { Classification, PSCEDClassification, RecordDetail, RecordType } from "@/types/records";
+import type { Classification, EmbargoAnswer, PSCEDClassification, RecordDetail, RecordType } from "@/types/records";
 
 import { emptyMetadata, metadataSchema, type MetadataValues } from "@/features/records/metadata/metadataSchema";
 
-export type PublishStep = 1 | 2 | 3;
+/** 0 is the embargo question, which comes before the three numbered steps. */
+export type PublishStep = 0 | 1 | 2 | 3;
+
+/** Publish's first question as the dialog holds it. `null` is unanswered, not No. */
+export interface EmbargoChoice {
+  choice: "no" | "yes" | null;
+  /** `YYYY-MM-DD`, or blank. Only a Yes uses it. */
+  until:  string;
+}
+
+export const UNANSWERED: EmbargoChoice = { choice: null, until: "" };
+
+export interface EmbargoProblem {
+  /** The server's field names, so its refusals land in the same place. */
+  field:   "embargoed" | "embargoed_until";
+  message: string;
+}
+
+/** What is wrong with an answer, or null. The server re-checks all of it. */
+export function embargoProblem(value: EmbargoChoice, today: string): EmbargoProblem | null {
+  if (value.choice == null) return { field: "embargoed", message: "Say whether this paper is under embargo." };
+  if (value.choice === "no") return null;
+  if (!value.until) return { field: "embargoed_until", message: "Choose the date to review this embargo." };
+  if (value.until < today) {
+    return { field: "embargoed_until", message: "The date to review this embargo cannot be in the past." };
+  }
+  return null;
+}
+
+/**
+ * The request body for an answer. A No sends no date, even one left from an earlier
+ * Yes. Unanswered throws rather than reading as No, which can send text out.
+ */
+export function embargoAnswer(value: EmbargoChoice): EmbargoAnswer {
+  if (value.choice == null) throw new Error("The embargo question has not been answered.");
+  const embargoed = value.choice === "yes";
+  return { embargoed, embargoed_until: embargoed ? value.until : null };
+}
+
+/** Is this what the server already holds? A No's leftover date does not count. */
+export function sameEmbargo(saved: EmbargoChoice | null, value: EmbargoChoice): boolean {
+  if (saved == null || saved.choice !== value.choice) return false;
+  return value.choice !== "yes" || saved.until === value.until;
+}
+
+/**
+ * What a saved draft answered. Only No and an active embargo are answers to show
+ * again: anything else, a released one included, asks the question.
+ */
+export function embargoFromDraft(record: Pick<RecordDetail, "embargo">): EmbargoChoice {
+  const embargo = record.embargo;
+  if (embargo?.state === "none") return { choice: "no", until: "" };
+  if (embargo?.state === "active") return { choice: "yes", until: embargo.until ?? "" };
+  return UNANSWERED;
+}
+
+/** Today in Manila, where the server decides whether a date has passed. */
+export function manilaToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+}
 
 /**
  * A record type's name reduced to a stable key ("Thesis / Research" →
@@ -80,13 +139,14 @@ export function stateFromDraft(
 /**
  * Where a reopened draft resumes: the first step with something missing.
  *
- * Step 1 needs a type and a manuscript; step 2 needs metadata the schema
- * accepts; anything past that is ready to review.
+ * The embargo question comes first; step 1 needs a type and a manuscript; step 2
+ * needs metadata the schema accepts; anything past that is ready to review.
  */
 export function firstIncompleteStep(
-  draft: { typeId: number | null; hasManuscript: boolean; values: MetadataValues },
+  draft: { embargo: EmbargoChoice; typeId: number | null; hasManuscript: boolean; values: MetadataValues },
   selfId: number | null,
 ): PublishStep {
+  if (draft.embargo.choice == null) return 0;
   if (draft.typeId == null || !draft.hasManuscript) return 1;
   if (!metadataSchema(selfId).safeParse(draft.values).success) return 2;
   return 3;
@@ -127,7 +187,7 @@ export function describeFailure(err: unknown, fallback: string): ApiFailure {
       const text = Array.isArray(value) ? value.filter((v) => typeof v === "string").join(" ") : value;
       if (typeof text !== "string" || !text) continue;
       if (key === "non_field_errors") message = text;
-      else if (key === "detail") continue;
+      else if (key === "detail" || key === "code") continue;
       else fields[key] = text;
     }
   } else if (typeof data === "string" && (response.status ?? 0) < 500) {

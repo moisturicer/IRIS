@@ -18,6 +18,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.records.models import Record, RecordOwner, RecordType
+from apps.records.testing import answered_no_embargo
 from apps.reviews import seats
 from apps.reviews.models import (
     RecordAssignment,
@@ -83,6 +84,7 @@ class SeatTestBase(APITestCase):
         cls.ierc_coordinator.is_office_coordinator = True
         cls.ierc_coordinator.save(update_fields=["is_office_coordinator"])
         cls.rdco = make_user("seat-rdco@cit.edu", RoleName.RDCO)
+        cls.sysadmin = make_user("seat-sysadmin@cit.edu", RoleName.SYSTEM_ADMIN)
 
     def make_record(self, type_name=RecordTypeName.THESIS_RESEARCH,
                     pipeline_status=PipelineStatus.IN_REVIEW, **extra):
@@ -125,6 +127,7 @@ class EntrySeatAndPoolTests(SeatTestBase):
         record = self.make_record(
             RecordTypeName.PROPOSAL, PipelineStatus.DRAFT, adviser=self.adviser,
         )
+        answered_no_embargo(record.pk)
         self.client.force_authenticate(self.owner)
         response = self.client.post(
             reverse("record-submit", args=[record.pk]), {"dpa_accepted": True}, format="json",
@@ -545,27 +548,29 @@ class CoordinatorGrantTests(SeatTestBase):
             {"is_office_coordinator": value}, format="json",
         )
 
-    def test_an_administrator_grants_and_revokes_it(self):
-        response = self.grant(self.rdco, self.itso2)
+    def test_the_system_admin_grants_and_revokes_it(self):
+        """RDCO did, until IR-781 gave office roles and this flag to the System Admin."""
+        response = self.grant(self.sysadmin, self.itso2)
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.itso2.refresh_from_db()
         self.assertTrue(self.itso2.is_office_coordinator)
 
-        self.grant(self.rdco, self.itso2, value=False)
+        self.grant(self.sysadmin, self.itso2, value=False)
         self.itso2.refresh_from_db()
         self.assertFalse(self.itso2.is_office_coordinator)
 
     def test_nobody_else_grants_it(self):
+        self.assertEqual(self.grant(self.rdco, self.itso2).status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.grant(self.itso_coordinator, self.itso2).status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(self.grant(self.itso2, self.itso2).status_code, status.HTTP_403_FORBIDDEN)
 
     def test_a_user_with_no_office_cannot_be_made_a_coordinator(self):
-        self.assertEqual(self.grant(self.rdco, self.adviser).status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self.grant(self.sysadmin, self.adviser).status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_a_role_change_drops_the_grant(self):
         """An ITSO coordinator moved to IERC is not thereby an IERC coordinator."""
-        self.grant(self.rdco, self.itso2)
-        self.client.force_authenticate(self.rdco)
+        self.grant(self.sysadmin, self.itso2)
+        self.client.force_authenticate(self.sysadmin)
         response = self.client.patch(
             reverse("user-change-role", args=[self.itso2.pk]),
             {"role_name": RoleName.IERC}, format="json",

@@ -1,0 +1,9 @@
+campaign ir851-llamaparse-free-tier
+  protected reserve 10%, held
+                        charged     spendable       ceiling
+  attempts               226.00      1,800.00      2,000.00
+  input tokens     2,823,957.00 18,000,000.00 20,000,000.00
+  output tokens            0.00        900.00      1,000.00
+  cost US$                 2.37         11.25         12.50
+  active minutes           6.91        540.00        600.00
+  in flight: none

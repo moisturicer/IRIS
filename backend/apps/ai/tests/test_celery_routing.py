@@ -82,15 +82,11 @@ def _tasks_that_build_an_extractor() -> set[str]:
 
     from apps.documents import tasks as document_tasks
 
-    # `_build_extractor` is the only way to get an extractor, but no task
-    # calls it directly -- they go through `_run_extraction`. So resolve one
-    # level: collect the module's own helpers that reach for it, then treat a
-    # task as Docling-dependent if it names any of them. Matching only the
-    # direct name finds nothing, which is what the guard below caught.
-    extractor_helpers = {"_build_extractor"} | {
+    # Tasks reach `current_extractor` (IR-838) through helpers: resolve one level.
+    extractor_helpers = {"current_extractor"} | {
         name
         for name, obj in vars(document_tasks).items()
-        if inspect.isfunction(obj) and "_build_extractor" in inspect.getsource(obj)
+        if inspect.isfunction(obj) and "current_extractor" in inspect.getsource(obj)
     }
 
     found = set()

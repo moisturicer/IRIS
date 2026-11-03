@@ -1,13 +1,16 @@
-import { useState, type FormEvent, type KeyboardEvent } from "react";
+import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { CHAT_COLUMN } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
 
 interface ChatInputProps {
   onSend:    (text: string) => void;
   disabled?: boolean;
+  sendDisabled?: boolean;
+  children?: ReactNode;
   placeholder?: string;
   /** The box's accessible name, when the placeholder is shortened for a narrow page. */
   label?: string;
+  maxLength?: number;
   /**
    * The box's text, when the page keeps it: Ask IRIS keeps one unsent draft
    * per conversation (IR-562). Never sent on its own. Without it the box
@@ -17,14 +20,14 @@ interface ChatInputProps {
   onDraftChange?: (text: string) => void;
 }
 
-export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraftChange }: ChatInputProps) {
+export function ChatInput({ onSend, disabled, sendDisabled, children, placeholder, label, draft, onDraftChange, maxLength }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
   const text = draft ?? ownText;
   const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
 
   const submit = () => {
     const trimmed = text.trim();
-    if (!trimmed || disabled) return;
+    if (!trimmed || disabled || sendDisabled) return;
     onSend(trimmed);
     setText("");
   };
@@ -46,6 +49,7 @@ export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraft
       onSubmit={handleSubmit}
       className="shrink-0 border-t border-stone-200/80 px-4 sm:px-6 py-4"
     >
+      {children && <div className={`mb-3 ${CHAT_COLUMN}`}>{children}</div>}
       <div className={`flex gap-2 items-end ${CHAT_COLUMN}`}>
         <textarea
           value={text}
@@ -53,15 +57,16 @@ export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraft
           onKeyDown={handleKeyDown}
           disabled={disabled}
           rows={1}
+          maxLength={maxLength}
           aria-label={label ?? placeholder ?? "Ask about the research corpus…"}
           placeholder={placeholder ?? "Ask about the research corpus…"}
-          className="flex-1 resize-none rounded-full border border-stone-200 bg-stone-50/80 px-5 py-3 text-[15px]
+          className="min-w-0 flex-1 resize-none rounded-full border border-stone-200 bg-stone-50/80 px-5 py-3 text-[15px]
             outline-none focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12] focus:bg-white
             text-stone-900 placeholder:text-stone-400 disabled:opacity-50 min-h-[48px] max-h-[120px]"
         />
         <button
           type="submit"
-          disabled={disabled || !text.trim()}
+          disabled={disabled || sendDisabled || !text.trim()}
           className="shrink-0 w-12 h-12 rounded-full bg-[#6B0F12] text-white flex items-center justify-center
             hover:bg-[#7d1215] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
           aria-label="Send message"
@@ -69,11 +74,6 @@ export function ChatInput({ onSend, disabled, placeholder, label, draft, onDraft
           <i className="fas fa-arrow-up text-[15px]" aria-hidden />
         </button>
       </div>
-      {/* Keyboard hints mean nothing on a touch screen, where the line would
-          only push the composer up under the software keyboard (IR-570). */}
-      <p className={`text-[12px] text-stone-400 text-center mt-2 [@media(pointer:coarse)]:hidden ${CHAT_COLUMN}`}>
-        Enter to send · Shift+Enter for new line
-      </p>
       <AskIrisNotice className={`text-center mt-1.5 ${CHAT_COLUMN}`} />
     </form>
   );

@@ -10,7 +10,7 @@
  * the same split IR-356 made for titles on reading surfaces.
  */
 export const ANSWER_MARKDOWN =
-  "chat-markdown prose prose-base max-w-none prose-pre:my-2 prose-pre:bg-gray-900 prose-pre:text-gray-100";
+  "chat-markdown prose prose-base max-w-none prose-pre:my-2 prose-pre:bg-stone-900 prose-pre:text-stone-100";
 
 /**
  * The AI Overview is an article, not a chat bubble (IR-569): a rhythm made for

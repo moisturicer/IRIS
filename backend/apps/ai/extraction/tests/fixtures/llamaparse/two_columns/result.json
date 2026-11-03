@@ -1,0 +1,302 @@
+{
+  "job": {
+    "user_metadata": null,
+    "id": "pjb-urh3sj10fnjq75l9xitead6vs9lf",
+    "created_at": "2026-11-02T15:06:47.356047Z",
+    "updated_at": "2026-11-02T15:06:50.999434Z",
+    "project_id": "736ceb96-4c70-415d-a239-339e306e8a0d",
+    "status": "COMPLETED",
+    "error_message": null,
+    "name": "two_columns.pdf",
+    "tier": "agentic",
+    "usage": {
+      "credits": 15.0
+    }
+  },
+  "result_content_metadata": {
+    "grounded_items": {
+      "size_bytes": 6034,
+      "exists": true
+    }
+  },
+  "text": null,
+  "markdown": {
+    "pages": [
+      {
+        "page_number": 1,
+        "markdown": "## **Two column study**\n\nLeft column one opens. Right column one resumes.\n\nLeft column two continues. Right column two continues.\n\nE = m c^2\n\nRight column three ends.\n\nLeft column three ends.",
+        "header": "IRIS contract fixture",
+        "footer": "Page 1",
+        "success": true
+      }
+    ]
+  },
+  "items": {
+    "pages": [
+      {
+        "page_number": 1,
+        "items": [
+          {
+            "type": "header",
+            "md": "IRIS contract fixture",
+            "bbox": [
+              {
+                "x": 70.99,
+                "y": 34.85,
+                "w": 71.61,
+                "h": 9.5
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "IRIS contract fixture",
+                "bbox": [
+                  {
+                    "x": 70.99,
+                    "y": 34.85,
+                    "w": 71.61,
+                    "h": 9.5,
+                    "confidence": 0.844,
+                    "start_index": 0,
+                    "end_index": 20,
+                    "label": "text"
+                  }
+                ],
+                "value": "IRIS contract fixture"
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "md": "## **Two column study**",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 69.7,
+                "w": 123.07,
+                "h": 17.28,
+                "confidence": 0.844,
+                "start_index": 0,
+                "end_index": 22,
+                "label": "paragraph_title"
+              }
+            ],
+            "level": 2,
+            "value": "Two column study"
+          },
+          {
+            "type": "text",
+            "md": "Left column one opens. Right column one resumes.",
+            "bbox": [
+              {
+                "x": 72.76,
+                "y": 112.72,
+                "w": 97.52,
+                "h": 9.34,
+                "confidence": 0.938,
+                "start_index": 0,
+                "end_index": 22,
+                "label": "text"
+              },
+              {
+                "x": 324.88,
+                "y": 112.82,
+                "w": 115.03,
+                "h": 9.37,
+                "confidence": 0.938,
+                "start_index": 23,
+                "end_index": 47,
+                "label": "text"
+              }
+            ],
+            "value": "Left column one opens. Right column one resumes."
+          },
+          {
+            "type": "text",
+            "md": "Left column two continues. Right column two continues.",
+            "bbox": [
+              {
+                "x": 72.76,
+                "y": 142.72,
+                "w": 112.33,
+                "h": 7.42,
+                "confidence": 0.906,
+                "start_index": 0,
+                "end_index": 26,
+                "label": "text"
+              },
+              {
+                "x": 324.88,
+                "y": 142.82,
+                "w": 118.87,
+                "h": 9.37,
+                "confidence": 0.906,
+                "start_index": 27,
+                "end_index": 53,
+                "label": "text"
+              }
+            ],
+            "value": "Left column two continues. Right column two continues."
+          },
+          {
+            "type": "text",
+            "md": "E = m c^2",
+            "bbox": [
+              {
+                "x": 113.03,
+                "y": 183.38,
+                "w": 51.7,
+                "h": 8.79,
+                "confidence": 0.822,
+                "start_index": 0,
+                "end_index": 8,
+                "label": "text"
+              }
+            ],
+            "value": "E = m c^2"
+          },
+          {
+            "type": "text",
+            "md": "Right column three ends.",
+            "bbox": [
+              {
+                "x": 324.88,
+                "y": 172.82,
+                "w": 104.77,
+                "h": 9.37,
+                "confidence": 0.822,
+                "start_index": 0,
+                "end_index": 23,
+                "label": "text"
+              }
+            ],
+            "value": "Right column three ends."
+          },
+          {
+            "type": "text",
+            "md": "Left column three ends.",
+            "bbox": [
+              {
+                "x": 70.99,
+                "y": 219.38,
+                "w": 106.49,
+                "h": 10.76,
+                "confidence": 0.875,
+                "start_index": 0,
+                "end_index": 22,
+                "label": "text"
+              }
+            ],
+            "value": "Left column three ends."
+          },
+          {
+            "type": "footer",
+            "md": "Page 1",
+            "bbox": [
+              {
+                "x": 290.69,
+                "y": 752.26,
+                "w": 23.09,
+                "h": 7.49
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "Page 1",
+                "bbox": [
+                  {
+                    "x": 290.69,
+                    "y": 752.26,
+                    "w": 23.09,
+                    "h": 7.49,
+                    "confidence": 0.813,
+                    "start_index": 0,
+                    "end_index": 5,
+                    "label": "footer"
+                  }
+                ],
+                "value": "Page 1"
+              }
+            ]
+          }
+        ],
+        "page_width": 612.0,
+        "page_height": 792.0,
+        "success": true
+      }
+    ]
+  },
+  "metadata": {
+    "pages": [
+      {
+        "page_number": 1,
+        "confidence": 0.3,
+        "printed_page_number": "1",
+        "original_orientation_angle": 0,
+        "cost_optimized": false,
+        "triggered_auto_mode": false
+      }
+    ],
+    "document": {
+      "confidence": 0.3,
+      "confidence_breakdown": {
+        "min_page_score": 0.3,
+        "scored_pages": 1,
+        "total_pages": 1
+      }
+    }
+  },
+  "forms": null,
+  "markdown_full": null,
+  "text_full": null,
+  "images_content_metadata": {
+    "total_count": 0,
+    "images": []
+  },
+  "job_metadata": {
+    "state_transitions": {
+      "pending_at": "2026-11-02T15:06:47.353384Z",
+      "throttled_at": "2026-11-02T15:06:47.483307Z",
+      "running_at": "2026-11-02T15:06:47.626147Z",
+      "completed_at": "2026-11-02T15:06:51.001307Z",
+      "failed_at": null,
+      "cancelled_at": null
+    },
+    "latency": {
+      "decode_ms": 594,
+      "agent_ms": 1493,
+      "output_ms": 128,
+      "page_throttle_wall_ms": 0,
+      "page_throttle_sum_ms": 0,
+      "page_throttle_max_ms": 0,
+      "page_throttle_waits": 1,
+      "job_throttle_ms": 0,
+      "total_ms": 3525
+    },
+    "quarantine": null,
+    "pdf-pages": 1,
+    "pdf-real-pages": 1,
+    "pdf-rawTextLength": 266,
+    "pdf-mdLength": 192,
+    "pdf-time": 1778,
+    "pdf-ocrTime": 0,
+    "pdf-image-convertTime": 0,
+    "pdf-pdfToHTMLTime": 0,
+    "pdf-llmTime": 233,
+    "pdf-inputTokens": 6617,
+    "pdf-outputTokens": 188,
+    "pdf-image-ocr-count": 0,
+    "pdf-image-ocr-failed-count": 0,
+    "pdf-image-ocr-success-count": 1,
+    "pdf-image-ocr-empty-count": 1,
+    "pdf-image-ocr-hadText-count": 0,
+    "pdf-image-ocr-pixels": 7913600,
+    "pdf-multimodal-time": 0,
+    "pdf-multimodal-pdf2Image": 0,
+    "pdf-high-res-ocr": 1
+  },
+  "raw_parameters": null,
+  "debug": null
+}

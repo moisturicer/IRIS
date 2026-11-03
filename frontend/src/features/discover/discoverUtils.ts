@@ -1,3 +1,4 @@
+import { INSTITUTION } from "@/config/institution";
 import React from "react";
 import { parseISO, isValid, format } from "date-fns";
 import type { Author, RecordListItem } from "@/types/records";
@@ -183,7 +184,6 @@ export type CitationStyle = "APA" | "MLA" | "BibTeX";
 
 export const CITATION_STYLES: CitationStyle[] = ["APA", "MLA", "BibTeX"];
 
-const INSTITUTION = "Cebu Institute of Technology – University";
 
 function authorNames(record: RecordListItem): string[] {
   return (record.authors ?? [])
@@ -214,7 +214,7 @@ export function buildCitation(record: RecordListItem, style: CitationStyle): str
   const names = authorNames(record);
   const year = String(recordYear(record) ?? "n.d.");
   const title = record.title.trim();
-  const institution = record.origin === "institutional" ? ` ${INSTITUTION}.` : "";
+  const institution = record.origin === "institutional" ? ` ${INSTITUTION.name}.` : "";
 
   if (style === "APA") {
     const authors =
@@ -241,7 +241,7 @@ export function buildCitation(record: RecordListItem, style: CitationStyle): str
     `  title        = {${title}},`,
     ...(names.length > 0 ? [`  author       = {${names.join(" and ")}},`] : []),
     `  year         = {${year}},`,
-    ...(record.origin === "institutional" ? [`  institution  = {${INSTITUTION}},`] : []),
+    ...(record.origin === "institutional" ? [`  institution  = {${INSTITUTION.name}},`] : []),
     `  note         = {IRIS record ${record.id}}`,
     `}`,
   ].join("\n");

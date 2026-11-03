@@ -99,9 +99,8 @@ def test_a_recipient_without_a_known_provider_policy_receives_nothing(reader, mo
     assert result.permitted == frozenset()
 
 
-def test_by_default_unknown_disclosure_facts_refuse_transmission(reader, settings):
+def test_by_default_unknown_disclosure_facts_refuse_transmission(reader):
     # An unanswered embargo is Unknown (ADR-052), so the real gate refuses.
-    settings.AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = False
     flood = paper("Flood")
     result = OutboundGuard(principal=reader, provider_permits=lambda model: True).authorize(
         [passage(flood)], model=MODEL)
@@ -158,12 +157,11 @@ def answered(title, *, until=None, owner=None):
     return record
 
 
-def real_gate(reader, settings):
-    settings.AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = False
+def real_gate(reader):
     return OutboundGuard(principal=reader, provider_permits=lambda model: True)
 
 
-def test_an_embargo_answered_after_a_read_withholds_only_that_paper(reader, settings):
+def test_an_embargo_answered_after_a_read_withholds_only_that_paper(reader):
     from datetime import timedelta
 
     from django.utils import timezone
@@ -172,23 +170,23 @@ def test_an_embargo_answered_after_a_read_withholds_only_that_paper(reader, sett
 
     flood, pond = answered("Flood"), answered("Pond")
     read = [passage(flood), passage(pond)]
-    assert real_gate(reader, settings).authorize(read, model=MODEL).allowed
+    assert real_gate(reader).authorize(read, model=MODEL).allowed
     record_answer(pond, EmbargoAnswer(until=timezone.localdate() + timedelta(days=30)), actor=None)
-    result = real_gate(reader, settings).authorize(read, model=MODEL)
+    result = real_gate(reader).authorize(read, model=MODEL)
     assert result.permitted == {passage(flood)}
     assert result.denied == {passage(pond)}
 
 
-def test_an_unanswered_paper_the_reader_owns_is_readable_but_never_sent(reader, settings):
+def test_an_unanswered_paper_the_reader_owns_is_readable_but_never_sent(reader):
     draft = paper("Own draft", status=PipelineStatus.DRAFT, owner=reader)
-    result = real_gate(reader, settings).authorize([passage(draft)], model=MODEL)
+    result = real_gate(reader).authorize([passage(draft)], model=MODEL)
     assert result.denied == {passage(draft)}
 
 
 @pytest.mark.parametrize("change", [{"dpa_accepted_at": None}, {"is_ip": True}])
-def test_withdrawn_consent_or_an_ip_mark_withholds_a_paper_read_earlier(reader, settings, change):
+def test_withdrawn_consent_or_an_ip_mark_withholds_a_paper_read_earlier(reader, change):
     flood = answered("Flood")
     read = passage(flood)
-    assert real_gate(reader, settings).authorize([read], model=MODEL).allowed
+    assert real_gate(reader).authorize([read], model=MODEL).allowed
     Record.objects.filter(pk=flood.pk).update(**change)
-    assert real_gate(reader, settings).authorize([read], model=MODEL).denied == {read}
+    assert real_gate(reader).authorize([read], model=MODEL).denied == {read}

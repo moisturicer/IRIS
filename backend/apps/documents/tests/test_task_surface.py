@@ -9,6 +9,8 @@ Needs Django loaded (the module imports Celery and Django utilities) but no
 database.
 """
 
+import inspect
+
 import pytest
 
 from apps.documents import tasks
@@ -24,6 +26,7 @@ pytestmark = [pytest.mark.django_required]
         "_extract_with_pymupdf",
         "_extract_with_tesseract",
         "_EXTRACTORS",
+        "_build_extractor",  # IR-838: apps.ai.extraction chooses the Extractor
     ],
 )
 def test_the_prototype_extractor_chain_is_gone(name):
@@ -33,6 +36,7 @@ def test_the_prototype_extractor_chain_is_gone(name):
 def test_extraction_goes_through_the_structured_extractor_port():
     """The one seam. If this stops being where the extractor comes from, the
     task's tests are exercising something the worker does not run."""
-    from apps.ai.extraction import StructuredExtractor
+    from apps.ai.extraction import StructuredExtractor, current_extractor
 
-    assert isinstance(tasks._build_extractor(), StructuredExtractor)
+    assert isinstance(current_extractor(), StructuredExtractor)
+    assert "current_extractor()" in inspect.getsource(tasks._run_extraction)

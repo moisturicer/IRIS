@@ -2,6 +2,8 @@
 
 ## Status
 
+**Superseded by [ADR-056](056-manuscript-extraction-moves-to-llamaparse.md)** — 2026-11-02. Manuscript extraction moves to LlamaParse; Docling is abandoned. Kept for the record, not for "what does IRIS do today".
+
 Accepted — 2026-09-03 · **amended 2026-09-04, decision point 4 and §Research Impact**
 
 > **Amendment, 2026-09-04 — the PyMuPDF fallback is dropped.** Decision point 4

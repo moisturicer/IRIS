@@ -187,6 +187,10 @@ class Record(models.Model):
     abstract_file      = models.FileField(
         upload_to=abstract_file_path, max_length=255, null=True, blank=True
     )
+    manuscript_revision = models.UUIDField(null=True, blank=True, editable=False)
+    manuscript_sha256 = models.CharField(max_length=64, blank=True, editable=False, db_index=True)
+    manuscript_filename = models.CharField(max_length=255, blank=True, editable=False)
+    duplicate_acknowledgement = models.CharField(max_length=64, blank=True, editable=False)
     classification     = models.ForeignKey(
         Classification, on_delete=models.SET_NULL, null=True, blank=True, related_name="records"
     )
@@ -254,9 +258,18 @@ class Record(models.Model):
     # that, because every workflow save moves it too. The manuscript is not a
     # detail: a new one is told apart by the file a version names.
     details_edited_at    = models.DateTimeField(null=True, blank=True)
+    # Moved by every detail save (IR-833), so a save made from an older view of
+    # the draft can be refused instead of overwriting a newer one. A
+    # manuscript alone does not move it: the file is not a detail.
+    details_revision     = models.PositiveIntegerField(default=0)
+    # The author's decision about each field Publish can fill in from the PDF
+    # (IR-833): which it filled in, and which the author typed, accepted,
+    # cleared or dismissed. Validated by `RecordWriteSerializer`; owners only.
+    metadata_sources     = models.JSONField(default=dict, blank=True)
 
     # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
-    # `RecordViewSet.submit` and by nothing else -- neither field is writable
+    # `RecordViewSet.submit`, and for test data by `seed_demo` and
+    # `corpus_clearance` -- neither field is writable
     # through a serializer, because a consent record the subject can set on
     # themselves through the ordinary update path is not evidence of anything.
     #
@@ -333,6 +346,24 @@ class Record(models.Model):
             return EmbargoState.ACTIVE
         return EmbargoState.NONE
 
+    # KTTO's release of an IP mark (ADR-052 §11-13, IR-813). The mark stays on
+    # the paper, and this is what opens the disclosure check for it. Stamped by
+    # `apps.records.ip_release` and nothing else. A release can't outlive its
+    # mark (the constraint below), so a paper marked again starts unreleased.
+    ip_released_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When KTTO released the IP mark for the AI. Null means it has not been released.",
+    )
+    ip_released_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="ip_released_records",
+        help_text="Who released it. SET_NULL so a deleted account cannot erase the timestamp.",
+    )
+
+    @property
+    def ip_released(self) -> bool:
+        return self.ip_released_at is not None
+
     # Soft delete
     is_deleted  = models.BooleanField(default=False, db_index=True)
     deleted_at  = models.DateTimeField(null=True, blank=True)
@@ -383,6 +414,10 @@ class Record(models.Model):
                 ),
                 name="record_embargo_release_needs_date",
             ),
+            models.CheckConstraint(
+                condition=models.Q(ip_released_at__isnull=True) | models.Q(is_ip=True),
+                name="record_ip_release_needs_mark",
+            ),
         ]
 
     def __str__(self):
@@ -417,6 +452,9 @@ class RecordVersion(models.Model):
     manuscript = models.FileField(
         upload_to=abstract_file_path, max_length=255, null=True, blank=True,
     )
+    manuscript_revision = models.UUIDField(null=True, blank=True, editable=False)
+    manuscript_sha256 = models.CharField(max_length=64, blank=True, editable=False)
+    manuscript_filename = models.CharField(max_length=255, blank=True, editable=False)
     cause      = models.CharField(max_length=16, choices=VersionCause.choices)
     created_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
@@ -434,6 +472,29 @@ class RecordVersion(models.Model):
 
     def __str__(self):
         return f"{self.record_id} v{self.number}"
+
+
+class EmbargoReminder(models.Model):
+    """
+    A reminder already sent about one embargo's review date (ADR-052 §9).
+
+    The unique key is the idempotency, as with `DeadlineMoment`: a re-run, a
+    missed tick or two beat instances insert the same row, and only one wins.
+    `embargo_set_at` is the paper's `embargo_answered_at`, which every set and
+    extend restamps, so a new date, or a released paper held again, starts the
+    reminders over. `step` is 0 on the date, then one more per 5 working days.
+    """
+
+    record = models.ForeignKey("Record", on_delete=models.CASCADE, related_name="embargo_reminders")
+    embargo_set_at = models.DateTimeField()
+    step = models.PositiveIntegerField()
+    sent_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["sent_at", "pk"]
+        constraints = [models.UniqueConstraint(
+            fields=["record", "embargo_set_at", "step"], name="one_embargo_reminder_per_step",
+        )]
 
 
 class RecordOwner(models.Model):

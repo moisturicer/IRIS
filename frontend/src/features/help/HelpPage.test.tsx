@@ -45,6 +45,16 @@ describe("Help", () => {
     expect(section("Administration")).not.toBeInTheDocument();
   });
 
+  it("tells an author what the embargo question means (ADR-052)", () => {
+    renderAs({ role_name: ROLES.STUDENT });
+
+    const publishing = section("Publishing your research")!;
+    expect(within(publishing).getByText(/IRIS asks first whether the\s+paper is under an embargo/)).toBeInTheDocument();
+    expect(within(publishing).getByText(/outside AI companies/)).toBeInTheDocument();
+    expect(within(publishing).getByText(/doesn.t end the embargo/)).toBeInTheDocument();
+    expect(within(publishing).getByText(/only your Adviser or RDCO can/)).toBeInTheDocument();
+  });
+
   it("always explains the review workflow and who to contact", () => {
     renderAs({ role_name: ROLES.STUDENT });
 
@@ -86,5 +96,12 @@ describe("Help", () => {
 
     expect(section("Coordinating your office")).toBeInTheDocument();
     expect(section("Administration")).toBeInTheDocument();
+  });
+
+  it("shows the System Admin its administration too (IR-781)", () => {
+    renderAs({ role_name: ROLES.SYSTEM_ADMIN, review_access: { my_reviews: false, offices: [], is_coordinator: false } });
+
+    expect(section("Administration")).toBeInTheDocument();
+    expect(section("Coordinating your office")).not.toBeInTheDocument();
   });
 });

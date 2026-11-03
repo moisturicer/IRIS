@@ -7,7 +7,10 @@ from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
+from .dotenv import restrict_dotenv
 from .validation import missing_required, non_blank, recovery_problems
+
+restrict_dotenv(config)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -75,6 +78,7 @@ LOCAL_APPS = [
     "apps.records",
     "apps.reviews",
     "apps.documents",
+    "apps.publication",
     "apps.notifications",
     "apps.audit",
     "apps.ai",
@@ -256,7 +260,7 @@ CONTENT_SECURITY_POLICY = "; ".join([
     "form-action 'self'",
     "frame-ancestors 'none'",
 ])
-# Report-only until the manual walk-through in docs/testing/TRACEABILITY.md
+# Report-only until the manual walk-through in docs/testing/traceability/
 # (IR-663) shows no violation. Enforcing is a reviewed change to this line,
 # and to frontend/security-headers.conf, never an environment variable.
 CONTENT_SECURITY_POLICY_REPORT_ONLY = True
@@ -332,6 +336,8 @@ CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
     "apps.documents.tasks.extract_manuscript_text": {"queue": "extraction"},
+    # IR-846: LlamaExtract reads the parse, with the same outbound access.
+    "apps.documents.tasks.read_manuscript_metadata": {"queue": "extraction"},
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
@@ -341,13 +347,19 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
 }
 
-# ADR-043 §8 (IR-620): the `celery-beat` service's only entry. Hourly, on
-# `default`; the task asks the database what is owed, so the schedule of
-# reminders lives in data and a missed tick is caught up by the next one.
+# The `celery-beat` service's entries. Each reminder task asks the database what
+# is owed, so the schedule of reminders lives in data and a missed tick is
+# caught up by the next one. Deadlines are ADR-043 §8 (IR-620): hourly, on `default`.
 CELERY_BEAT_SCHEDULE = {
     "deadline-notifications": {
         "task": "apps.reviews.tasks.send_deadline_notifications",
         "schedule": crontab(minute=0),
+    },
+    # ADR-052 §9 (IR-814): embargo review reminders, daily at 08:00 Manila.
+    # Celery runs on UTC here, and Manila is UTC+8 with no daylight saving.
+    "embargo-reminders": {
+        "task": "apps.records.tasks.send_embargo_reminders",
+        "schedule": crontab(hour=0, minute=0),
     },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due
@@ -659,6 +671,15 @@ AI_ADMISSION_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_MAX_OUTPUT_TOKENS", defaul
 # Queued questions waiting or running at once, and per asker.
 AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
 AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
+# IR-850 (ADR-056 §6): what an off-campus read costs. A read reserves its
+# pages x (tier credits + add-on credits) x the credit's price, and settles to
+# the credits reported. Required for extraction only; none has a default.
+AI_ADMISSION_EXTRACTION_CREDIT_USD = config("AI_ADMISSION_EXTRACTION_CREDIT_USD", default="")
+AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", default="")
+AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", default="")
+# IR-846: LlamaExtract's credits per page, on the same credit price. Required
+# for Publish's LlamaExtract reading only; unset refuses it and Publish falls back.
+AI_ADMISSION_METADATA_CREDITS_PER_PAGE = config("AI_ADMISSION_METADATA_CREDITS_PER_PAGE", default="")
 # Added to an attempt's own timeout to make its lease. Not a spending limit.
 AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
 # IR-717 (ADR-049 §6-7): Django-signed research grants, verified inside
@@ -1032,24 +1053,6 @@ AI_EVIDENCE_AREA_TERMS = config(
     cast=lambda v: tuple(s.strip() for s in str(v).split(",") if s.strip()),
 )
 
-# ---- The development disclosure bypass (IR-317, ADR-015) -----------------
-#
-# Stands beside ADR-015's disclosure gate — it does not replace it and it
-# encodes no policy. The gate refuses a record with no embargo answer (ADR-052),
-# and seeded and loaded records carry none until IR-815 gives them one, so with
-# this off they cannot be indexed and Ask IRIS answers "no readable sources";
-# turning it on is how the feature is clicked through in a browser meanwhile.
-# Deliberately named for what it is: a rule that merely sounds defensible
-# ("published records are not embargoed") would read as somebody's decision,
-# and this cannot.
-#
-# `apps.ai.policy.bypass` raises `ImproperlyConfigured` at startup when this is
-# set while DEBUG is off, so it takes the service down rather than quietly
-# disabling a control. IR-815 deletes it.
-AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT = config(
-    "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", default=False, cast=bool
-)
-
 # ---- Embedding spend (IR-282) -------------------------------------------
 #
 # Indexing is metered per token, and `AI_CHUNK_MAX_TOKENS` counts whitespace
@@ -1118,6 +1121,8 @@ AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
 # (REDIS_URL in IR-132, EXTRACTION_TIMEOUT in the compose comments). The
 # inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
 # above.
+# Which Extractor reads manuscripts (IR-838); read only in apps.ai.extraction.
+EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="docling")
 DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction; Compose sets this to the service name
 # A scanned thesis through OCR is minutes of work, not seconds. This bounds
 # one conversion, not the Celery retry that wraps it.
@@ -1142,6 +1147,40 @@ DOCLING_DO_FORMULA_ENRICHMENT = config("DOCLING_DO_FORMULA_ENRICHMENT", default=
 DOCLING_DO_CODE_ENRICHMENT = config("DOCLING_DO_CODE_ENRICHMENT", default=True, cast=bool)
 # A 4M-parameter classifier; the mapper does not store its output yet.
 DOCLING_DO_PICTURE_CLASSIFICATION = config("DOCLING_DO_PICTURE_CLASSIFICATION", default=True, cast=bool)
+# LlamaParse (IR-841, ADR-056); read only in apps.ai.extraction. With
+# EXTRACTION_BACKEND=llamaparse Django refuses to start without a key and a
+# dated version ("latest" only with DEBUG on).
+LLAMAPARSE_API_KEY = config("LLAMAPARSE_API_KEY", default="")
+LLAMAPARSE_TIER = config("LLAMAPARSE_TIER", default="agentic")
+LLAMAPARSE_VERSION = config("LLAMAPARSE_VERSION", default="")
+LLAMAPARSE_BASE_URL = config("LLAMAPARSE_BASE_URL", default="https://api.cloud.llamaindex.ai")
+# One job's budget is base + per page x its page count.
+LLAMAPARSE_TIMEOUT_BASE_SECONDS = config("LLAMAPARSE_TIMEOUT_BASE_SECONDS", default=300, cast=int)
+LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS = config("LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS", default=30, cast=int)
+# Sizes the task's time limit when PDF_VALIDATION_MAX_PAGES is unset.
+LLAMAPARSE_MAX_PAGES = config("LLAMAPARSE_MAX_PAGES", default=1000, cast=int)
+# LlamaExtract (IR-846, ADR-056 §15): Publish suggestions read from the parse
+# job above, with the same key and region. Unset version reads nothing and
+# Publish falls back to the shaped document; "latest" only with DEBUG on.
+LLAMAEXTRACT_TIER = config("LLAMAEXTRACT_TIER", default="agentic")
+LLAMAEXTRACT_VERSION = config("LLAMAEXTRACT_VERSION", default="")
+LLAMAEXTRACT_TIMEOUT_SECONDS = config("LLAMAEXTRACT_TIMEOUT_SECONDS", default=600, cast=int)
+
+
+def _unit_interval(value):
+    """Empty is unset; anything else must be a number from 0 to 1."""
+    if value in (None, ""):
+        return None
+    number = float(value)
+    if not 0 <= number <= 1:
+        raise ValueError(f"must be between 0 and 1, not {value!r}")
+    return number
+
+
+# The LlamaExtract confidence at or above which Publish may fill in a title or
+# abstract unasked (IR-846). No default: unset offers every value for the
+# author to accept, until a measured cut-off is chosen.
+PUBLISH_AUTOFILL_MIN_CONFIDENCE = config("PUBLISH_AUTOFILL_MIN_CONFIDENCE", default="", cast=_unit_interval)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
 # path off the gateway — it posted to a route the gateway never registered, at
 # an endpoint returning no vector field — and Django now embeds in-process
@@ -1292,3 +1331,9 @@ USE_TZ = True
 
 # TODO: configure django-storages for S3 in production
 # TODO: configure Sentry in production settings
+# IR-830: missing limits disable PDF intake rather than permit an unlimited parser.
+PDF_VALIDATION_WALL_SECONDS = config("PDF_VALIDATION_WALL_SECONDS", default="", cast=lambda v: float(v) if v else None)
+PDF_VALIDATION_MEMORY_MIB = config("PDF_VALIDATION_MEMORY_MIB", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_PAGES = config("PDF_VALIDATION_MAX_PAGES", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_OBJECTS = config("PDF_VALIDATION_MAX_OBJECTS", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_DEPTH = config("PDF_VALIDATION_MAX_DEPTH", default="", cast=lambda v: int(v) if v else None)

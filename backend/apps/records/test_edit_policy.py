@@ -19,6 +19,7 @@ from django.urls import reverse
 from rest_framework import status
 
 from apps.records.models import Record, RecordOwner, RecordType
+from apps.records.testing import answered_no_embargo
 from apps.records.versions import SUBMISSION_FIXED_FIELDS
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import Party, PipelineStatus, RecordTypeName
@@ -39,6 +40,7 @@ class EditPolicyTestBase(DecisionTestBase):
         return self.client.patch(detail_url(record), body, format="json")
 
     def submit(self, record, as_user):
+        answered_no_embargo(record.pk)
         return self.post(submit_url(record), as_user, {"dpa_accepted": True})
 
     def published(self):

@@ -472,6 +472,8 @@ class RoleName(models.TextChoices):
     RDCO = "RDCO", "RDCO"
     ITSO = "ITSO", "ITSO"
     IERC = "IERC", "IERC"
+    #: Runs IRIS itself, with no workflow access (ADR-051 §1-2). Seeded by `accounts/0018`.
+    SYSTEM_ADMIN = "System Admin", "System Admin"
 
 
 class RecordTypeName(models.TextChoices):

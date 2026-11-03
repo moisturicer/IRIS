@@ -39,7 +39,7 @@
 
 **When applicable**
 - [ ] Tests added or updated, and executed
-- [ ] `docs/testing/TRACEABILITY.md` updated for a requirement-bearing change
+- [ ] `docs/testing/traceability/IR-XXX.md` added for a requirement-bearing change
 - [ ] Documentation updated
 - [ ] Security implications addressed — auth, permissions, file access, secrets, external calls
 - [ ] Migration included and tested against a realistic database copy

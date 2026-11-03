@@ -1,6 +1,7 @@
 /**
- * User management page -- RDCO only.
- * Lists all users with role, active status, and quick actions:
+ * User management page -- RDCO and the System Admin (ADR-051 §4, amended).
+ * Lists all users with role, active status, and the quick actions this viewer
+ * may take on each row (`accountActions.ts`):
  *   - Lock / unlock account
  *   - Change role (via modal)
  *   - Make or remove an office coordinator (IR-478, ADR-032 §4)
@@ -18,8 +19,10 @@ import { Input }        from "@/components/ui/Input";
 import { Button }       from "@/components/ui/Button";
 import { Badge }        from "@/components/ui/Badge";
 import { Modal }        from "@/components/ui/Modal";
-import { ALL_ROLES, STAFF_ROLES } from "@/lib/constants";
+import { STAFF_ROLES } from "@/lib/constants";
+import { useAuthStore } from "@/store/auth.store";
 import { useUIStore }   from "@/store/ui.store";
+import { mayCoordinate, mayLock, rolesToOffer } from "./accountActions";
 import type { ColumnDef } from "@tanstack/react-table";
 import type { UserListItem } from "@/types/auth";
 import { SearchGlyph } from "@/components/brand/IrisBrand";
@@ -31,6 +34,7 @@ function isOfficeMember(user: UserListItem): boolean {
 
 export default function UserListPage() {
   const addToast = useUIStore((s) => s.addToast);
+  const viewer = useAuthStore((s) => s.user?.role_name);
   const roleSelectId = useId();
 
   const [users, setUsers]     = useState<UserListItem[]>([]);
@@ -176,25 +180,29 @@ export default function UserListPage() {
       id: "actions",
       cell: ({ row }) => (
         <div className="flex gap-2 justify-end">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => { setRoleTarget(row.original); setNewRole(row.original.role_name); }}
-          >
-            Change role
-          </Button>
-          {isOfficeMember(row.original) && (
+          {rolesToOffer(viewer, row.original.role_name).length > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setRoleTarget(row.original); setNewRole(row.original.role_name); }}
+            >
+              Change role
+            </Button>
+          )}
+          {mayCoordinate(viewer, row.original.role_name) && (
             <Button variant="ghost" size="sm" onClick={() => openCoordinator(row.original)}>
               {row.original.is_office_coordinator ? "Remove coordinator" : "Make coordinator"}
             </Button>
           )}
-          <Button
-            variant={row.original.is_locked ? "secondary" : "danger"}
-            size="sm"
-            onClick={() => setLockTarget(row.original)}
-          >
-            {row.original.is_locked ? "Unlock" : "Lock"}
-          </Button>
+          {mayLock(viewer, row.original.role_name) && (
+            <Button
+              variant={row.original.is_locked ? "secondary" : "danger"}
+              size="sm"
+              onClick={() => setLockTarget(row.original)}
+            >
+              {row.original.is_locked ? "Unlock" : "Lock"}
+            </Button>
+          )}
         </div>
       ),
     },
@@ -301,7 +309,7 @@ export default function UserListPage() {
               className="w-full border border-stone-300 rounded-lg px-3 py-2 text-[14px] outline-none
                 focus:border-brand focus:ring-1 focus:ring-brand"
             >
-              {ALL_ROLES.map((r) => (
+              {rolesToOffer(viewer, roleTarget?.role_name ?? "").map((r) => (
                 <option key={r} value={r}>{r}</option>
               ))}
             </select>

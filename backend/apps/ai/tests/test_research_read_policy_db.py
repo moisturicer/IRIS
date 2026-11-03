@@ -360,7 +360,16 @@ def test_policy_tables_match_the_policies_postgres_holds(db):
         cursor.execute("SELECT tablename, policyname, cmd FROM pg_policies WHERE schemaname = 'public'")
         rows = cursor.fetchall()
     assert {table for table, _, _ in rows} == set(PROTECTED_TABLES)
-    assert {(name, cmd) for _, name, cmd in rows} == {("iris_research_read", "SELECT")}
+    assert {(name, cmd) for _, name, cmd in rows} == {
+        ("iris_research_read", "SELECT"), ("iris_processing_lock", "UPDATE")}
+    assert [(table, name) for table, name, cmd in rows if cmd == 'UPDATE'] == [
+        ('records_record', 'iris_processing_lock')]
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT qual, with_check FROM pg_policies WHERE schemaname='public'"
+                       " AND tablename='records_record' AND policyname='iris_processing_lock'")
+        assert cursor.fetchone() == (
+            "(CURRENT_USER = 'iris_authz_verifier'::name)",
+            "(CURRENT_USER = 'iris_authz_verifier'::name)")
 
 
 @pytest.mark.parametrize("group", ["iris_ai_runtime", "iris_django_runtime"])
