@@ -16,6 +16,7 @@ import { ROLES } from "@/lib/constants";
 import { useAuthStore } from "@/store/auth.store";
 
 import { PublishDialog } from "./PublishDialog";
+import { manilaToday } from "./draft";
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
@@ -1021,11 +1022,21 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
 
 describe("the embargo question (ADR-052 decision 2)", () => {
   const inDays = (days: number) => {
-    const day = new Date();
-    day.setDate(day.getDate() + days);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+    const day = new Date(`${manilaToday()}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() + days);
+    return day.toISOString().slice(0, 10);
   };
+
+  it("uses Manila's date when the UTC runner is still on the previous day", () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-11-02T16:02:00Z"));
+      expect(inDays(0)).toBe("2026-11-03");
+      expect(inDays(-1)).toBe("2026-11-02");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   const question = () => screen.findByRole("radiogroup", { name: /Is this paper under an embargo/ });
   const continueButton = () => screen.getByRole("button", { name: "Continue" });
   const dateField = () => screen.getByLabelText(/Date to review the embargo/);
