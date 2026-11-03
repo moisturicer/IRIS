@@ -345,13 +345,19 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
 }
 
-# ADR-043 §8 (IR-620): the `celery-beat` service's only entry. Hourly, on
-# `default`; the task asks the database what is owed, so the schedule of
-# reminders lives in data and a missed tick is caught up by the next one.
+# The `celery-beat` service's entries. Each reminder task asks the database what
+# is owed, so the schedule of reminders lives in data and a missed tick is
+# caught up by the next one. Deadlines are ADR-043 §8 (IR-620): hourly, on `default`.
 CELERY_BEAT_SCHEDULE = {
     "deadline-notifications": {
         "task": "apps.reviews.tasks.send_deadline_notifications",
         "schedule": crontab(minute=0),
+    },
+    # ADR-052 §9 (IR-814): embargo review reminders, daily at 08:00 Manila.
+    # Celery runs on UTC here, and Manila is UTC+8 with no daylight saving.
+    "embargo-reminders": {
+        "task": "apps.records.tasks.send_embargo_reminders",
+        "schedule": crontab(hour=0, minute=0),
     },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due
