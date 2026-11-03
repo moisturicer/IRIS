@@ -263,3 +263,7 @@ embeddings. The two-stage search ranks Record vectors before Passage vectors.
 No paid campaign, provider policy approval, default traffic switch, writer
 transfer or deployment is authorized by this implementation. Existing extraction
 retirement/ADR-056 operational gates also remain in force.
+
+Research role provisioning also restores the read-only Embedding Space metadata
+grant after Django table recreation. Independent AI migration records do not
+substitute for that ownership step; `provision_research_roles --check` audits it.

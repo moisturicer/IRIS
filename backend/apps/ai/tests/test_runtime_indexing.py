@@ -441,7 +441,11 @@ def test_disclosure_can_be_withdrawn_during_inference_without_waiting_for_provid
                 await conn.close()
             return result
 
-    assert index(runtime, token, WithdrawDuringInference()) == "stale"
+    provider = WithdrawDuringInference()
+    assert index(runtime, token, provider) == "stale"
+    assert len(provider.calls) == 1
+    record.refresh_from_db()
+    assert record.dpa_accepted_at is None
     with connection.cursor() as cursor:
         cursor.execute("SELECT count(*) FROM iris_ai.active_source")
         assert cursor.fetchone()[0] == 0
@@ -564,3 +568,15 @@ def test_current_indexed_citation_remains_in_followup_context(runtime,api):
     followup=runs_db.submit(api[0],grant,'indexed-remember-0002',
                            conversation_id=response.json()['conversation_id'],base_revision=1)
     assert followup.json()['state']=='completed'
+
+def test_reprovisioning_restores_space_reads_after_table_recreation(runtime):
+    from django.core.management import call_command
+
+    _, _, token = permitted()
+    assert extraction.run(runtime, token) == "extracted"
+    # Recreating a Django-owned table discards its grants while the independent
+    # AI schema still records migration 0011 as applied, exactly as in CI.
+    with connection.cursor() as cursor:
+        cursor.execute("REVOKE SELECT ON public.ai_embeddingspace FROM iris_ai_runtime")
+    call_command("provision_research_roles")
+    assert index(runtime, token, Recording()) == "ready"

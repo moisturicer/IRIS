@@ -105,3 +105,35 @@ injection; its existing provider-gated default remains. No live paid campaign,
 production rollout, traffic switch, institutional data reset or parent-ticket
 modification occurred. Existing ADR-056/extractor-retirement enablement gates
 remain. Human approval and remote CI remain separate delivery gates.
+
+## CI follow-up — restoring metadata grants after schema recreation
+
+[The first PR integration run](https://github.com/moisturicer/IRIS/actions/runs/41664632900)
+passed the frontend, security, Docker Compose, AI gateway and three backend
+shards. Its other backend shard placed historical Embedding Space recreation
+before indexing; recreation removed the table's SELECT grant while the
+independent AI schema still recorded migration 0011 as applied. Fourteen new
+indexing cases then failed closed with `permission denied`, before any provider
+send. The local shard assignment had kept that historical test elsewhere.
+
+A minimal public-worker regression reproduced RED: revoke the metadata read
+grant, run normal role provisioning, then index as the restricted worker. The
+worker incorrectly stayed stale because provisioning omitted this metadata.
+Django-owned provisioning now idempotently restores SELECT on Embedding Space
+metadata and its `--check` audits that grant. No write permission is added and
+no applied migration is edited. The regression is GREEN.
+
+The historical migration suite followed by all **16 indexing/recovery cases**,
+the grant suite and the row-policy suite passed **45 tests**, zero failures.
+Static checks also pass. Both independent reviewers inspected this correction
+and report no material findings.
+
+The non-superuser maintenance fixture was deliberately extended to own the
+newly touched metadata-table category, matching its documented responsibility.
+Its existing assertions forbidding verifier SET/USAGE were preserved. The
+withdrawal test was strengthened to require an actual transport call and actual
+canonical consent withdrawal, so an earlier fail-closed permission error cannot
+masquerade as its intended successful refusal. No assertion was weakened.
+
+The renewed complete remote CI result is tracked in PR #505; the earlier local
+full-suite figures above remain pinned to their stated implementation revision.

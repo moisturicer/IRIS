@@ -51,6 +51,8 @@ LEDGER_TABLES = {
                               " charge_input_tokens, charge_output_tokens, charge_cost_micros,"
                               " charge_active_ms",
 }
+# Non-content metadata is read-only, without per-reader row filtering.
+RUNTIME_METADATA_TABLES = ("ai_embeddingspace",)
 #: Columns the verifier reads, and nothing else (no password hashes).
 VERIFIER_COLUMNS = {
     "accounts_user": "id, is_active, is_locked, credential_version, role_id",
@@ -106,6 +108,12 @@ def problems(cursor) -> list[str]:
     found += _policy_problems(cursor)
     cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = 'iris_ai_runtime'")
     if cursor.fetchone() is not None:
+        for table in RUNTIME_METADATA_TABLES:
+            cursor.execute(
+                "SELECT has_table_privilege('iris_ai_runtime', %s, 'SELECT')", [f"public.{table}"]
+            )
+            if not cursor.fetchone()[0]:
+                found.append(f"role iris_ai_runtime cannot read {table}")
         for table in LEDGER_TABLES:
             cursor.execute(
                 "SELECT has_table_privilege('iris_ai_runtime', %s, 'DELETE, TRUNCATE')",
@@ -233,6 +241,10 @@ class Command(BaseCommand):
         for role in RUNTIME_ROLES:
             for table in PROTECTED_TABLES:
                 cursor.execute(f"GRANT SELECT ON public.{table} TO {role}")
+        # Restore Django-owned metadata grants after historical table recreation,
+        # even when independent AI schema migrations are already recorded.
+        for table in RUNTIME_METADATA_TABLES:
+            cursor.execute(f"GRANT SELECT ON public.{table} TO iris_ai_runtime")
         # The AI runtime fences a departed reader's runs (IR-722).
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.reader_status(bigint) TO iris_ai_runtime"
