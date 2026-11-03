@@ -79,7 +79,8 @@ async def process(dsn, token, *, load, extractor, options, pipeline, lease_secon
                 "INSERT INTO iris_ai.extraction_job(work_id,pipeline,generation,attempt,state,lease_until)"
                 " VALUES($1,$2,$3,$4,'running',clock_timestamp()+$5*interval '1 second')"
                 " ON CONFLICT(work_id,pipeline) DO UPDATE SET generation=excluded.generation,"
-                " attempt=excluded.attempt,state=excluded.state,lease_until=excluded.lease_until",
+                " attempt=excluded.attempt,state=excluded.state,lease_until=excluded.lease_until,"
+                " started_at=clock_timestamp()",
                 work, pipeline, source['generation'], attempt, lease_seconds)
 
         state, output = 'extracted', None

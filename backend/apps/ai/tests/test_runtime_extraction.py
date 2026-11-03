@@ -53,12 +53,12 @@ class Extractor:
         return document()
 
 
-def run(runtime, token, extractor=None):
+def run(runtime, token, extractor=None, *, pipeline='synthetic-v1', lease=60):
     from ai.ingestion.extraction import process
     from apps.ai.chunking import ChunkingOptions
     return asyncio.run(process(runtime, token, load=lambda path: b'synthetic PDF bytes',
         extractor=extractor or Extractor(), options=ChunkingOptions(),
-        pipeline='synthetic-v1', lease_seconds=60))
+        pipeline=pipeline, lease_seconds=lease))
 
 
 def source():
@@ -183,6 +183,7 @@ def test_independent_workers_claim_once_and_recover_expired_attempt(runtime):
         assert status(owner, record)['state'] == 'processing'
         assert run(runtime, token) == 'busy'
         time.sleep(1.1)
+        assert status(owner, record)['state'] == 'pending_processing'
         assert run(runtime, token) == 'extracted'
         out, error = worker.communicate('\n', timeout=20)
         assert worker.returncode == 0, error
@@ -217,6 +218,19 @@ def test_pending_rows_are_scoped_and_output_has_no_mutation_grant(runtime):
     asyncio.run(inspect())
 
 
+def test_new_profile_status_is_not_hidden_by_an_older_long_lease(runtime):
+    from apps.ai.extraction import ExtractionError
+    owner, record, token = source()
+
+    class Broken:
+        def extract(self, *args, **kwargs):
+            raise ExtractionError('deterministic failure')
+
+    assert run(runtime, token, Broken(), pipeline='older', lease=120) == 'failed'
+    assert run(runtime, token, pipeline='corrected', lease=30) == 'extracted'
+    assert status(owner, record)['state'] == 'extracted_pending'
+
+
 def test_local_storage_refuses_escape_and_byte_limit(tmp_path):
     from ai.ingestion.extract_worker import LocalSource
     media = tmp_path / 'media'
@@ -228,6 +242,36 @@ def test_local_storage_refuses_escape_and_byte_limit(tmp_path):
         load('../outside.pdf')
     with pytest.raises(ValueError):
         load('inside.pdf')
+
+
+def test_final_write_lock_serializes_canonical_revocation(runtime):
+    import asyncpg
+    import psycopg2
+    owner, record, token = source()
+    cfg = connection.settings_dict
+
+    def revoke():
+        conn = psycopg2.connect(host=cfg['HOST'], port=cfg['PORT'], dbname=cfg['NAME'],
+                                user=cfg['USER'], password=cfg['PASSWORD'])
+        try:
+            with conn.cursor() as cursor:
+                cursor.execute("SET lock_timeout = '100ms'")
+                with pytest.raises(psycopg2.errors.LockNotAvailable):
+                    cursor.execute('UPDATE records_record SET is_deleted=true WHERE id=%s', [record.pk])
+        finally:
+            conn.rollback()
+            conn.close()
+
+    async def hold_source():
+        conn = await asyncpg.connect(runtime)
+        try:
+            async with conn.transaction():
+                await conn.fetchval("SELECT iris_authz.begin_research($1,'ingestion')", token)
+                assert await conn.fetchrow('SELECT * FROM iris_authz.lock_processing_source()')
+                await asyncio.to_thread(revoke)
+        finally:
+            await conn.close()
+    asyncio.run(hold_source())
 
 
 def test_local_docling_extracts_synthetic_pdf_into_pending_output(runtime):
