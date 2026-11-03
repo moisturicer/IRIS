@@ -72,6 +72,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import workflow as audit
+from apps.records.embargo import state_payload as embargo_payload
 from apps.records.lifecycle import type_name_of
 from apps.records.versions import latest_version
 from core.enums import (
@@ -300,9 +301,10 @@ def closes_payload(record, decider_seat) -> dict:
 def decision_token(record) -> str:
     """
     A short digest of everything a decision would act on: the latest version,
-    every active assignment, every open seat and every open document request.
-    Any change to any of them changes the token, so a dialog opened before the
-    change is refused rather than deciding into it (IR-270, decision 11).
+    every active assignment, every open seat and every open document request,
+    and the embargo RDCO is warned about (ADR-052 §14). Any change to any of
+    them changes the token, so a dialog opened before the change is refused
+    rather than deciding into it (IR-270, decision 11).
     """
     version = latest_version(record)
     active = sorted(
@@ -318,7 +320,11 @@ def decision_token(record) -> str:
     requests = sorted(_open_document_requests(record).values_list("pk", flat=True))
     revision_requests = list(revisions.open_requests(record).values_list("pk", "reason"))
     findings = list(record.reviews.filter(status=ReviewDecision.NEGATIVE_FINDING).order_by("pk").values_list("pk", "comment"))
-    facts = f"{version.pk if version else 0}|{active}|{open_seats}|{requests}|{revision_requests}|{findings}"
+    embargo = embargo_payload(record)
+    facts = (
+        f"{version.pk if version else 0}|{active}|{open_seats}|{requests}|{revision_requests}|{findings}"
+        f"|{embargo}"
+    )
     return hashlib.sha256(facts.encode()).hexdigest()[:16]
 
 
@@ -333,12 +339,13 @@ def decision_flags(record, user) -> dict:
     """
     `decision` on record detail (IR-270): the outcomes the viewer may take, why
     not yet, what deciding would close, the staleness token, and -- for the
-    Adviser -- the author's hints the send-to-RDCO dialog shows. A rendering
-    hint; `decide/` re-checks all of it.
+    Adviser -- the author's hints the send-to-RDCO dialog shows; for RDCO, the
+    embargo it is warned about and may publish through (ADR-052 §14). A
+    rendering hint; `decide/` re-checks all of it.
     """
     empty = {
         "party": None, "outcomes": [], "blocked": None, "closes": None,
-        "token": None, "author_hints": [],
+        "token": None, "author_hints": [], "embargo": None,
     }
     if not _decidable(record):
         return empty
@@ -356,6 +363,7 @@ def decision_flags(record, user) -> dict:
         "closes": closes_payload(record, seat),
         "token": decision_token(record),
         "author_hints": author_hints(record) if party == Party.ADVISER and routable else [],
+        "embargo": embargo_payload(record) if party == Party.RDCO else None,
     }
 
 
