@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('records', '0028_record_ip_release'),
+        ('records', '0029_embargo_reminder'),
     ]
 
     operations = [
