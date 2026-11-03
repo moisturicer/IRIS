@@ -190,6 +190,7 @@ class Record(models.Model):
     manuscript_revision = models.UUIDField(null=True, blank=True, editable=False)
     manuscript_sha256 = models.CharField(max_length=64, blank=True, editable=False, db_index=True)
     manuscript_filename = models.CharField(max_length=255, blank=True, editable=False)
+    duplicate_acknowledgement = models.CharField(max_length=64, blank=True, editable=False)
     classification     = models.ForeignKey(
         Classification, on_delete=models.SET_NULL, null=True, blank=True, related_name="records"
     )

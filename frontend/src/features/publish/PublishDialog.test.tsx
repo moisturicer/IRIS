@@ -29,6 +29,8 @@ vi.mock("@/api/records", () => ({
     submit: vi.fn(),
     detail: vi.fn(),
     metadataSuggestions: vi.fn(),
+    duplicateMatches: vi.fn(),
+    acknowledgeDuplicates: vi.fn(),
   },
 }));
 
@@ -139,6 +141,8 @@ beforeEach(() => {
   // Ready with nothing found: no chip and no line, so tests of other criteria see
   // Details exactly as before prefill existed.
   vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready") as never);
+  vi.mocked(recordsApi.duplicateMatches).mockResolvedValue({ data: { exact: [], likely: [], acknowledged: false } } as never);
+  vi.mocked(recordsApi.acknowledgeDuplicates).mockResolvedValue({ data: { acknowledged: true, matches: [] } } as never);
   useAuthStore.setState({
     user: makeUser({ id: SELF_ID, first_name: "Ada", last_name: "Reyes", role_name: ROLES.ADVISER }),
   });
@@ -619,6 +623,35 @@ describe("the review", () => {
 });
 
 describe("submitting", () => {
+  it("offers Check again when likely-match lookup fails on a resumed draft", async () => {
+    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail(COMPLETE) } as never);
+    vi.mocked(recordsApi.duplicateMatches).mockRejectedValueOnce(new Error("offline"));
+    const user = userEvent.setup();
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+    const retry = await screen.findByRole("button", { name: "Check again" });
+    await user.click(retry);
+    await waitFor(() => expect(recordsApi.duplicateMatches).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument());
+  });
+
+  it("shows a likely match and lets a keyboard user acknowledge it without losing Review", async () => {
+    const match = { id: 17, title: "Related Cebu research", url: "/records/17", action: "open_record", reason: "same_title" };
+    vi.mocked(recordsApi.duplicateMatches).mockResolvedValue({ data: { exact: [], likely: [match], acknowledged: false } } as never);
+    vi.mocked(recordsApi.acknowledgeDuplicates).mockResolvedValue({ data: { acknowledged: true, matches: [match] } } as never);
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await completeDetails(user);
+    expect(await screen.findByRole("heading", { name: "Likely manuscript matches" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Related Cebu research" })).toHaveAttribute("href", "/records/17");
+    const acknowledge = screen.getByRole("button", { name: "Acknowledge matches" });
+    acknowledge.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(recordsApi.acknowledgeDuplicates).toHaveBeenCalledWith(42, [17]));
+    expect(screen.getByRole("button", { name: "Matches acknowledged" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Submit for review" })).toBeInTheDocument();
+  });
+
   it("needs consent, and sends the DPA flag", async () => {
     const user = userEvent.setup();
     await openNew();

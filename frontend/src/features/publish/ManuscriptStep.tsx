@@ -12,6 +12,8 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatBytes } from "@/lib/utils";
 import type { RecordType } from "@/types/records";
+import type { ManuscriptMatch } from "@/api/records";
+import { Link } from "react-router-dom";
 
 import { typeKey } from "./draft";
 
@@ -53,9 +55,10 @@ interface ManuscriptStepProps {
   upload:      ManuscriptUpload;
   onFile:      (file: File) => void;
   onRetry:     () => void;
+  exactMatches?: ManuscriptMatch[];
 }
 
-export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFile, onRetry }: ManuscriptStepProps) {
+export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFile, onRetry, exactMatches = [] }: ManuscriptStepProps) {
   const [replacing, setReplacing] = useState(false);
   const uploading = upload.status === "uploading";
 
@@ -123,6 +126,18 @@ export function ManuscriptStep({ recordTypes, typeId, onTypeChange, upload, onFi
       </fieldset>
 
       <section aria-labelledby="publish-manuscript-heading">
+        {exactMatches.length > 0 && (
+          <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+            <p className="font-semibold">This manuscript is already attached to a record you can read.</p>
+            <ul className="mt-2 space-y-2">
+              {exactMatches.map((match) => <li key={match.id}>
+                <Link to={match.action === "resume_draft" ? `/?publish=${match.id}` : match.url} className={cn("underline", FOCUS_RING)}>
+                  {match.action === "resume_draft" ? "Resume draft" : "Open record"}: {match.title}
+                </Link>
+              </li>)}
+            </ul>
+          </div>
+        )}
         <h3 id="publish-manuscript-heading" className="text-heading font-semibold text-stone-900">
           Manuscript file
         </h3>

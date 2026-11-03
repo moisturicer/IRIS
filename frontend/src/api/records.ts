@@ -9,6 +9,14 @@ import type {
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
 
+export interface ManuscriptMatch {
+  id: number;
+  title: string;
+  url: string;
+  action: "resume_draft" | "open_record";
+  reason?: "same_title" | "similar_title_and_author";
+}
+
 interface PaginatedResponse<T> {
   count:    number;
   next:     string | null;
@@ -190,6 +198,10 @@ export const recordsApi = {
   // that already carries consent ignores the value, so passing it is always safe.
   submit:         (id: number, dpaAccepted: boolean) =>
     apiClient.post<{ detail: string }>(`/records/${id}/submit/`, { dpa_accepted: dpaAccepted }),
+  duplicateMatches: (id: number) =>
+    apiClient.get<{ exact: ManuscriptMatch[]; likely: ManuscriptMatch[]; acknowledged: boolean }>(`/records/${id}/duplicate-matches/`),
+  acknowledgeDuplicates: (id: number, candidateIds: number[]) =>
+    apiClient.post<{ acknowledged: boolean; matches: ManuscriptMatch[] }>(`/records/${id}/acknowledge-duplicates/`, { candidate_ids: candidateIds }),
   // Publish's first question, saved before the file is sent (ADR-052 §2).
   answerEmbargo:  (id: number, answer: EmbargoAnswer) =>
     apiClient.post<RecordEmbargo>(`/records/${id}/embargo-answer/`, answer),
