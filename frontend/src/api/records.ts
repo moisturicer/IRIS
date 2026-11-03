@@ -204,7 +204,7 @@ export const recordsApi = {
   downloadTemplate: () => apiClient.get("/records/download_template/", { responseType: "blob" }),
 
   // Reference data
-  classifications: (params?: { page: number }) => apiClient.get<PaginatedResponse<Classification>>("/records/classifications/", params ? { params } : undefined),
+  classifications: () => apiClient.get<PaginatedResponse<Classification>>("/records/classifications/"),
   pscedList:       () => apiClient.get<PaginatedResponse<PSCEDClassification>>("/records/psced-classifications/"),
   recordTypes:     () => apiClient.get<PaginatedResponse<RecordType>>("/records/record-types/"),
 

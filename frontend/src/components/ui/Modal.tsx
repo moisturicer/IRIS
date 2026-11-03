@@ -70,9 +70,8 @@ export function Modal({
               {title}
             </h2>
             <button
-              type="button"
               onClick={onClose}
-              className="inline-flex min-h-11 min-w-11 items-center justify-center p-1 rounded-md text-stone-500 hover:text-stone-700 hover:bg-stone-100"
+              className="p-1 rounded-md text-stone-500 hover:text-stone-700 hover:bg-stone-100"
               aria-label="Close"
             >
               <i className="fa fa-times text-[15px]" aria-hidden />

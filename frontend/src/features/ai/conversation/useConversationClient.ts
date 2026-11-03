@@ -27,7 +27,6 @@ import { aiApi } from "@/api/ai";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
 import type { SSEEvent } from "@/lib/sse";
 import type { ConversationDetail } from "@/types/ai";
-import type { ComparisonRecord } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 
 function isNotFound(err: unknown): boolean {
@@ -41,8 +40,6 @@ interface Thread {
   draft:      string;
   /** The answer whose sources are shown; `null` follows the latest answer. */
   selectedId: string | null;
-  record: number | null;
-  comparisonRecords: ComparisonRecord[];
 }
 
 /** The answer a Conversation is waiting for, under the request that asked it. */
@@ -53,7 +50,7 @@ interface Answering {
   streaming: StreamingState | null;
 }
 
-const EMPTY_THREAD: Thread = { messages: [], draft: "", selectedId: null, record: null, comparisonRecords: [] };
+const EMPTY_THREAD: Thread = { messages: [], draft: "", selectedId: null };
 
 export interface ConversationClientEvents {
   /** An answer arrived for `conversationId`; `onScreen` when the reader is looking at it. */
@@ -94,7 +91,7 @@ function selectedAnswer({ messages, selectedId }: Thread): ChatMessage | null {
   return null;
 }
 
-export function useConversationClient(events: ConversationClientEvents = {}, comparisonLimit?: number) {
+export function useConversationClient(events: ConversationClientEvents = {}) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [threads, setThreads] = useState<Record<number, Thread>>({});
@@ -200,11 +197,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
         const kept = chosen?.turnId !== undefined
           ? messages.find((m) => m.role === "assistant" && m.turnId === chosen.turnId)
           : messages.find((m) => m.id === thread.selectedId);
-        return {
-          ...thread, messages, selectedId: kept?.id ?? null,
-          record: conversation.record,
-          comparisonRecords: conversation.record === null ? thread.comparisonRecords : [],
-        };
+        return { ...thread, messages, selectedId: kept?.id ?? null };
       });
       const run = conversation.latest_run;
       if (run && (run.state === "queued" || run.state === "running")) {
@@ -251,26 +244,15 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
     (question: string) => {
       const id = activeRef.current;
       if (id === null || flights.current.has(id)) return;
-      const thread = threads[id] ?? EMPTY_THREAD;
-      const records = thread.comparisonRecords;
-      if (records.length && (thread.record !== null || comparisonLimit === undefined ||
-        records.length < 2 || records.length > comparisonLimit)) return;
-      const comparison = records.length ? { comparisonRecordIds: records.map((r) => r.id) } : {};
       updateThread(id, (thread) => ({
         ...thread,
         draft: "",
         messages: [...thread.messages, newChatMessage("user", question)],
       }));
-      return answer(id, question, (signal) => aiApi.askStream(question, { conversationId: id, ...comparison }, signal));
+      return answer(id, question, (signal) => aiApi.askStream(question, { conversationId: id }, signal));
     },
-    [answer, comparisonLimit, threads, updateThread],
+    [answer, updateThread],
   );
-
-  const setComparisonRecords = useCallback((records: ComparisonRecord[]) => {
-    const id = activeRef.current;
-    if (id === null || flights.current.has(id)) return;
-    updateThread(id, (thread) => thread.record !== null ? thread : { ...thread, comparisonRecords: records });
-  }, [updateThread]);
 
   /**
    * Retries the queued question `message` stands for as a new run (IR-548).
@@ -361,9 +343,6 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
     unavailable,
     messages:    thread.messages,
     draft:       thread.draft,
-    record:      thread.record,
-    comparisonRecords: thread.comparisonRecords,
-    setComparisonRecords,
     /** The answer the sources panel describes. */
     selected,
     isAnswering: live !== undefined,
