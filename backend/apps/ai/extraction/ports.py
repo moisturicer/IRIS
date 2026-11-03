@@ -46,6 +46,10 @@ class EmptyExtraction(ExtractionError):
     """
 
 
+class IncompleteExtraction(ExtractionError):
+    """The extractor reports partial coverage rather than a complete document."""
+
+
 @dataclass(frozen=True)
 class Provenance:
     """Which Extractor produced an Extraction, at which version, with which
