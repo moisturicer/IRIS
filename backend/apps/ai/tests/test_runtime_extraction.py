@@ -170,10 +170,12 @@ def start_worker(runtime, token, *, lease=60):
     from apps.ai.extraction import document_to_json
     return subprocess.Popen([sys.executable, '-m', 'ai.tests.extraction_worker', '--pause'],
         env={**os.environ, 'RUNS_DATABASE_URL': runtime, 'SYNTHETIC_GRANT': token,
+             'PYTHONPATH': os.pathsep.join(filter(None, (
+                 str(ROOT / 'backend'), os.environ.get('PYTHONPATH', '')))),
              'SYNTHETIC_DOCUMENT': json.dumps(document_to_json(document().document)),
              'SYNTHETIC_PDF': base64.b64encode(synthetic_pdf()).decode(),
              'SYNTHETIC_LEASE': str(lease)},
-        stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        cwd=ROOT, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
 
 def test_independent_workers_claim_once_and_recover_expired_attempt(runtime):
@@ -181,7 +183,7 @@ def test_independent_workers_claim_once_and_recover_expired_attempt(runtime):
     owner, record, token = source()
     worker = start_worker(runtime, token, lease=1)
     try:
-        assert worker.stdout.readline().strip() == 'extracting'
+        assert worker.stdout.readline().strip() == 'extracting', worker.stderr.read()
         assert status(owner, record)['state'] == 'processing'
         assert run(runtime, token) == 'busy'
         time.sleep(1.1)

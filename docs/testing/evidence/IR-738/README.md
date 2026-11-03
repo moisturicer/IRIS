@@ -85,6 +85,27 @@ corrected profile identity before retry.
 
 The implementation was committed first on the user-requested original branch,
 then adapted on an isolated current-main delivery branch to preserve unrelated
-edits and current provenance/ADR-055 contracts. Publishing was blocked by automatic
-approval review as private-source transfer without explicit authorization; no
-push or pull request occurred. Jira remains In Progress pending publication.
+edits and current provenance/ADR-055 contracts. The initial publication attempt
+was blocked pending explicit authorization. The user subsequently authorized
+publication: [PR #495](https://github.com/moisturicer/IRIS/pull/495) is open and
+Jira is In Review.
+
+## CI follow-up: independent worker startup
+
+[The first remote run](https://github.com/moisturicer/IRIS/actions/runs/41626586172)
+failed only backend shard 1: the independent extraction worker returned no
+startup marker. CI launches pytest from `backend/`, so its subprocess could not
+import the repository-root `ai` package. Parent-process `sys.path` changes do
+not propagate to children. The original local container's explicit `PYTHONPATH`
+masked this defect.
+
+An isolated run without that environment override reproduced the exact failure;
+the worker reported `ModuleNotFoundError: No module named 'ai'`. The test now
+starts its worker from the repository root and explicitly supplies the backend
+package path while preserving any existing `PYTHONPATH`. Failed startup includes
+the worker's stderr in the assertion. Production worker behavior is unchanged.
+
+The entire extraction test file then passed **13 tests**, with its opt-in local
+Docling test skipped, under the same environment without an inherited path
+override. Undefined-name checks and `git diff --check` passed. Remote CI must
+rerun on this follow-up commit; no remote pass is claimed by this checkpoint.
