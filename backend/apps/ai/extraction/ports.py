@@ -44,6 +44,10 @@ class EmptyExtraction(ExtractionError):
     """
 
 
+class IncompleteExtraction(ExtractionError):
+    """The extractor reports partial coverage rather than a complete document."""
+
+
 @dataclass(frozen=True)
 class ExtractedDocument:
     """What an extractor returns: the structured document, and its own name.

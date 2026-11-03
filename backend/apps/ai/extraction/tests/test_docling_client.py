@@ -53,6 +53,15 @@ def _ok(json_content=None, *, status="success"):
     return handler
 
 
+def test_pending_runtime_refuses_partial_success_while_legacy_contract_is_preserved():
+    from apps.ai.extraction.ports import IncompleteExtraction
+    with pytest.raises(IncompleteExtraction):
+        _extractor(_ok(status='partial_success'), require_complete=True).extract(
+            b'%PDF synthetic', filename='synthetic.pdf')
+    assert _extractor(_ok(status='partial_success')).extract(
+        b'%PDF synthetic', filename='synthetic.pdf').document.elements
+
+
 # ---------------------------------------------------------------------------
 # The request
 # ---------------------------------------------------------------------------
