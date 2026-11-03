@@ -152,6 +152,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
 });
 
 function openAtQuestion() {
@@ -1400,9 +1401,9 @@ describe("autofill from the manuscript (IR-833; supersedes IR-409's chips)", () 
       await waitFor(() => expect(titleField()).toHaveValue(FOUND_TITLE));
       expect(within(filled("title")!).getByText("Found on page 1")).toBeInTheDocument();
       // The title is the PDF's words exactly, so they are not repeated.
-      expect(within(filled("title")!).queryByText(FOUND_TITLE, { selector: "blockquote" })).not.toBeInTheDocument();
+      expect(within(filled("title")!).queryByRole("blockquote")).not.toBeInTheDocument();
       expect(within(chip("authors")!).getByText("Found on page 2")).toBeInTheDocument();
-      expect(within(chip("authors")!).getByText("Ana Cruz and Ben Reyes", { selector: "blockquote" })).toBeInTheDocument();
+      expect(within(chip("authors")!).getByRole("blockquote")).toHaveTextContent("Ana Cruz and Ben Reyes");
     });
 
     it("asks the author to check a low-confidence value, in words and never as a number", async () => {
@@ -1417,7 +1418,7 @@ describe("autofill from the manuscript (IR-833; supersedes IR-409's chips)", () 
       await waitFor(() => expect(chip("abstract")).toBeInTheDocument());
       expect(within(chip("abstract")!).getByText("Check this against your PDF.")).toBeInTheDocument();
       expect(within(chip("keywords")!).queryByText(/Check this/)).not.toBeInTheDocument();
-      expect(document.body.textContent).not.toMatch(/0\.62|0\.99|62%|99%/);
+      expect(screen.queryByText(/0\.62|0\.99|62%|99%/)).not.toBeInTheDocument();
       expect(abstractField()).toHaveValue("");
       await expectNoBlockingA11yViolations(view.container);
     });
@@ -1434,6 +1435,26 @@ describe("autofill from the manuscript (IR-833; supersedes IR-409's chips)", () 
       await user.click(within(chip("authors")!).getByRole("button", { name: "Show the authors in your PDF, page 2" }));
 
       expect(await screen.findByText("Reader at page 2, 1 highlighted")).toBeInTheDocument();
+    });
+
+    it("keeps focus in the form on Show in PDF when both panes are on screen", async () => {
+      vi.stubGlobal("matchMedia", (query: string) => ({
+        matches: query === "(min-width: 1024px)", addEventListener: vi.fn(), removeEventListener: vi.fn(),
+      }));
+      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(reading({
+        authors: cited(["Ana Cruz"], { page: 2, region: { ...REGION, page: 2 } }),
+      }) as never);
+      const user = userEvent.setup();
+      await openNew();
+      await completeManuscript(user);
+
+      await waitFor(() => expect(chip("authors")).toBeInTheDocument());
+      const show = within(chip("authors")!).getByRole("button", { name: "Show the authors in your PDF, page 2" });
+      await user.click(show);
+
+      expect(await screen.findByText("Reader at page 2, 1 highlighted")).toBeInTheDocument();
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      expect(show).toHaveFocus();
     });
 
     it("offers no Show in PDF for a value with no page", async () => {

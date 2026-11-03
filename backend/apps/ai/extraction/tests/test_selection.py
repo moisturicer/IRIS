@@ -177,3 +177,44 @@ def test_the_llamaparse_adapter_is_built_from_the_llamaparse_settings(settings, 
     assert adapter._base_url == "https://api.cloud.eu.llamaindex.ai"
     assert adapter._options["tier"] == "agentic"
     assert adapter._options["version"] == "2026-09-28"
+
+
+# ── LlamaExtract (IR-846) ─────────────────────────────────────────────────
+
+
+def _llamaextract(settings, **overrides):
+    settings.EXTRACTION_BACKEND = "docling"
+    settings.LLAMAPARSE_API_KEY = "llx-test"
+    settings.LLAMAPARSE_BASE_URL = "https://api.cloud.llamaindex.ai"
+    settings.LLAMAEXTRACT_TIER = "agentic"
+    settings.LLAMAEXTRACT_VERSION = "2.5"
+    for name, value in overrides.items():
+        setattr(settings, name, value)
+
+
+@pytest.mark.parametrize("missing", ["LLAMAPARSE_API_KEY", "LLAMAEXTRACT_TIER"])
+def test_llamaextract_refuses_to_start_without_its_key_or_tier(settings, missing):
+    _llamaextract(settings, **{missing: ""})
+
+    with pytest.raises(ImproperlyConfigured, match=missing):
+        verify_extraction_configuration()
+
+
+def test_llamaextract_refuses_latest_outside_development(settings):
+    _llamaextract(settings, LLAMAEXTRACT_VERSION="latest", DEBUG=False)
+
+    with pytest.raises(ImproperlyConfigured, match="LLAMAEXTRACT_VERSION=latest"):
+        verify_extraction_configuration()
+
+
+def test_llamaextract_refuses_a_region_it_does_not_know(settings):
+    _llamaextract(settings, LLAMAPARSE_BASE_URL="https://llamaparse.example.com")
+
+    with pytest.raises(ImproperlyConfigured, match="LLAMAPARSE_BASE_URL"):
+        verify_extraction_configuration()
+
+
+def test_unset_llamaextract_checks_nothing(settings):
+    _llamaextract(settings, LLAMAEXTRACT_VERSION="", LLAMAPARSE_API_KEY="")
+
+    verify_extraction_configuration()

@@ -270,7 +270,8 @@ def _run_metadata(reading_id) -> None:
             return
         row.status = ManuscriptMetadata.RUNNING
         row.attempt = attempt
-        row.save(update_fields=["status", "attempt"])
+        row.started_at = timezone.now()
+        row.save(update_fields=["status", "attempt", "started_at"])
         record_id, pages = extraction.record_id, extraction.pages_read
 
     try:

@@ -169,6 +169,7 @@ def test_the_reading_names_the_parse_job_and_is_admitted_and_settled(enforced, s
 
     assert reader.calls == [PARSE_JOB_ID]
     assert reading.status == ManuscriptMetadata.DONE
+    assert reading.started_at is not None
     assert reading.result["values"]["title"] == "Two column study"
     assert reading.credits == Decimal("15")
     metadata = [r for r in _reservations() if r.operation == "metadata"]

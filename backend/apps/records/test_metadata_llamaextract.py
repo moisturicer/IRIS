@@ -181,6 +181,16 @@ class LlamaExtractSuggestionTests(APITestCase):
         self.assertFalse(title["auto_apply"])
 
     @override_settings(PUBLISH_AUTOFILL_MIN_CONFIDENCE=0.5)
+    def test_a_confident_title_cited_to_other_text_is_not_filled_in(self):
+        cited = {"citation": [{"page": 1, "matching_text": "Two column study"}], "confidence": 0.99}
+        self._reading(result=_vendor_result(title=("A Study Nobody Printed", cited)))
+
+        title = self._data()["fields"]["title"]
+
+        self.assertIsNotNone(title["region"])
+        self.assertFalse(title["auto_apply"])
+
+    @override_settings(PUBLISH_AUTOFILL_MIN_CONFIDENCE=0.5)
     def test_an_overlong_title_is_offered_whole_and_never_filled_in(self):
         long_title = "Two column study " * 40
         cited = {"citation": [{"page": 1, "matching_text": "Two column study"}], "confidence": 0.99}
@@ -234,6 +244,26 @@ class LlamaExtractSuggestionTests(APITestCase):
     def test_a_reading_left_running_past_its_budget_falls_back(self):
         reading = self._reading(status=ManuscriptMetadata.RUNNING, result={})
         ManuscriptMetadata.objects.filter(pk=reading.pk).update(
+            created_at=timezone.now() - timezone.timedelta(hours=3),
+            started_at=timezone.now() - timezone.timedelta(hours=2),
+        )
+
+        data = self._data()
+
+        self.assertEqual(data["state"], "ready")
+        self.assertEqual(data["source"], "pdf_structure")
+
+    def test_a_reading_that_waited_in_the_queue_gets_its_whole_budget_once_claimed(self):
+        reading = self._reading(status=ManuscriptMetadata.RUNNING, result={})
+        ManuscriptMetadata.objects.filter(pk=reading.pk).update(
+            created_at=timezone.now() - timezone.timedelta(hours=2), started_at=timezone.now(),
+        )
+
+        self.assertEqual(self._data()["state"], "pending")
+
+    def test_a_reading_never_claimed_past_its_budget_falls_back(self):
+        reading = self._reading(status=ManuscriptMetadata.QUEUED, result={})
+        ManuscriptMetadata.objects.filter(pk=reading.pk).update(
             created_at=timezone.now() - timezone.timedelta(hours=2),
         )
 
@@ -265,6 +295,15 @@ class LlamaExtractSuggestionTests(APITestCase):
         self.assertEqual(data["fields"]["abstract"]["value"], "We pumped water with sunlight.")
         # LlamaParse papers are not read for labelled front matter.
         self.assertIsNone(data["fields"]["keywords"])
+
+    def test_a_reading_that_found_nothing_falls_back_to_the_shaped_document(self):
+        self._fallback_parse()
+        self._reading(result={"values": {}, "field_metadata": {}})
+
+        data = self._data()
+
+        self.assertEqual(data["source"], "pdf_structure")
+        self.assertEqual(data["fields"]["title"]["value"], "Solar Irrigation for Upland Farms")
 
     def test_with_no_reading_at_all_the_shaped_document_is_read(self):
         self._fallback_parse()

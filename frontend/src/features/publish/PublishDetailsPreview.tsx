@@ -2,6 +2,7 @@ import { createContext, useContext, useRef, useState, type ReactNode } from "rea
 
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { useMediaQuery } from "@/hooks/useMediaQuery";
 import { cn } from "@/lib/utils";
 import { PaperPdfReader } from "@/features/records/paper-view/PaperPdfReader";
 import type { Region } from "@/types/ai";
@@ -51,6 +52,8 @@ export function PublishDetailsPreview({
   const [focus, setFocus] = useState<PreviewFocus | null>(null);
   const detailsRef = useRef<HTMLElement>(null);
   const previewRef = useRef<HTMLElement>(null);
+  // Tailwind's `lg`, where both panes are on screen at once.
+  const sideBySide = useMediaQuery("(min-width: 1024px)");
 
   function choosePane(next: PublishPane) {
     setPane(next);
@@ -71,8 +74,9 @@ export function PublishDetailsPreview({
   const showInPreview: ShowInPreview = (page, region) => {
     setFocus((previous) => ({ page, regions: region ? [region] : [], turn: (previous?.turn ?? 0) + 1 }));
     // On a narrow screen the preview is the other pane: open it, and take
-    // focus there, as the pane switch does.
-    choosePane("preview");
+    // focus there, as the pane switch does. Side by side, focus stays in the
+    // form so a keyboard user keeps their place.
+    if (!sideBySide) choosePane("preview");
   };
 
   return (

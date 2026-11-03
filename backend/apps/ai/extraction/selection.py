@@ -75,11 +75,30 @@ def _verify_llamaparse() -> None:
         )
 
 
+def _verify_llamaextract() -> None:
+    """LlamaExtract reads the parse with LlamaParse's own account (IR-846)."""
+    from .llamaparse_client import BASE_URLS
+
+    for name in ("LLAMAPARSE_API_KEY", "LLAMAEXTRACT_TIER"):
+        if not getattr(settings, name):
+            raise ImproperlyConfigured(f"{name} is required when LLAMAEXTRACT_VERSION is set (IR-846).")
+    if settings.LLAMAEXTRACT_VERSION == "latest" and not settings.DEBUG:
+        raise ImproperlyConfigured(
+            "LLAMAEXTRACT_VERSION=latest is refused outside development; pin a version (ADR-056)."
+        )
+    hosts = {urlparse(url).netloc for url in BASE_URLS.values()}
+    if urlparse(settings.LLAMAPARSE_BASE_URL).netloc not in hosts:
+        raise ImproperlyConfigured(
+            f"LLAMAPARSE_BASE_URL must be one of: {', '.join(sorted(BASE_URLS.values()))} (IR-846)."
+        )
+
+
 BACKENDS: dict[str, Callable[[], StructuredExtractor]] = {"docling": _docling, "llamaparse": _llamaparse}
 
 # A module global, not a contextvar: worker threads in tests must see it.
 _installed: Optional[StructuredExtractor] = None
-_installed_reader = None
+# A LlamaExtractReader, or a test's stand-in with the same read().
+_installed_reader: Optional[object] = None
 
 
 def verify_extraction_configuration() -> None:
@@ -91,6 +110,8 @@ def verify_extraction_configuration() -> None:
         )
     if backend == "llamaparse":
         _verify_llamaparse()
+    if settings.LLAMAEXTRACT_VERSION:
+        _verify_llamaextract()
 
 
 def current_extractor() -> StructuredExtractor:
@@ -135,10 +156,7 @@ def current_metadata_reader():
     else:
         from .llamaextract_client import LlamaExtractReader
 
-        if settings.LLAMAEXTRACT_VERSION == "latest" and not settings.DEBUG:
-            raise ImproperlyConfigured(
-                "LLAMAEXTRACT_VERSION=latest is refused outside development; pin a version (ADR-056)."
-            )
+        _verify_llamaextract()
         adapter = LlamaExtractReader(
             api_key=settings.LLAMAPARSE_API_KEY,
             base_url=settings.LLAMAPARSE_BASE_URL,

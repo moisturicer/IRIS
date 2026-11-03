@@ -63,7 +63,7 @@ LIMITS = SimpleNamespace(
     title=TITLE_LIMIT, abstract=ABSTRACT_LIMIT, author=AUTHOR_LIMIT,
     keyword=KEYWORD_LIMIT, max_keywords=MAX_KEYWORDS,
 )
-_LLAMAPARSE = "llamaparse"
+
 _IN_FLIGHT = frozenset({ManuscriptMetadata.QUEUED, ManuscriptMetadata.RUNNING})
 
 
@@ -147,10 +147,12 @@ def suggestions_payload(record) -> dict:
         record=record, kind=DocumentKind.MANUSCRIPT,
         source_revision=record.manuscript_revision,
     ).first()
+    from apps.ai.extraction.llamaparse_client import EXTRACTOR_NAME as LLAMAPARSE
+
     state = _state(extraction)
     fields = dict.fromkeys(FIELDS)
     source = SOURCE
-    if state == SuggestionState.READY and extraction.extractor == _LLAMAPARSE:
+    if state == SuggestionState.READY and extraction.extractor == LLAMAPARSE:
         state, fields, source = _llamaparse_fields(record, extraction)
     elif state == SuggestionState.READY:
         fields = read_fields(document_from_json(extraction.structure or {}), record.abstract_file.name)
@@ -192,7 +194,10 @@ def _llamaparse_fields(record, extraction: PdfExtraction) -> tuple[SuggestionSta
         return SuggestionState.PENDING, dict.fromkeys(FIELDS), SOURCE
     if reading is not None and reading.status == ManuscriptMetadata.DONE:
         fields = fields_from_reading(reading.result or {}, extraction.raw_result or {}, limits=LIMITS)
-        return SuggestionState.READY, fields, LLAMAEXTRACT
+        # A reading that came back with nothing usable has failed as surely
+        # as one that raised: the shaped document is read instead.
+        if any(fields.values()):
+            return SuggestionState.READY, fields, LLAMAEXTRACT
     fields = dict.fromkeys(FIELDS)
     document = extraction.as_normalized_document()
     if document is not None:

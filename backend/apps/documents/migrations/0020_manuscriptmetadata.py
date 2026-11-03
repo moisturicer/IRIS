@@ -21,6 +21,7 @@ class Migration(migrations.Migration):
                 ('result', models.JSONField(blank=True, default=dict)),
                 ('credits', models.DecimalField(blank=True, decimal_places=3, max_digits=12, null=True)),
                 ('created_at', models.DateTimeField(auto_now_add=True)),
+                ('started_at', models.DateTimeField(blank=True, null=True)),
                 ('completed_at', models.DateTimeField(blank=True, null=True)),
                 ('extraction', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='metadata_readings', to='documents.pdfextraction')),
             ],

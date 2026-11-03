@@ -8,7 +8,8 @@ reported. IRIS never computes or guesses a confidence: an unreported one is
 
 Only a title or abstract may be filled in unasked, and only when
 ``PUBLISH_AUTOFILL_MIN_CONFIDENCE`` is set, the reported confidence reaches
-it, and the cited text is found in the parse. Unset, every value is offered.
+it, and both the cited text and the value are found on the cited page of
+the parse. Unset, every value is offered.
 Nothing but the five fields is ever read from the vendor's values.
 
 Pure: reads the stored result and the stored parse, calls nothing.
@@ -22,6 +23,10 @@ from django.utils import timezone
 
 SOURCE = "llamaextract"
 BASIS = "cited_text"
+
+# Past the task's own hard limit (its timeout plus 60 s), so a reading is
+# never declared dead while its worker can still write it back.
+STALE_GRACE_SECONDS = 120
 
 _AUTO_FIELDS = frozenset({"title", "abstract"})
 _WORD = re.compile(r"[^\W_]+")
@@ -61,6 +66,9 @@ def fields_from_reading(result: Mapping[str, Any], raw_parse: Mapping[str, Any],
         region = lines.locate(page, matching) if page is not None and matching else None
         too_long = exceeds[name](value)
         confident = threshold is not None and confidence is not None and confidence >= threshold
+        # The value itself, not only the citation, must be on the cited page:
+        # a citation can point at other text than the value it vouches for.
+        found = region is not None and lines.locate(page, value) is not None
         fields[name] = {
             "value": value,
             "source": SOURCE,
@@ -69,7 +77,7 @@ def fields_from_reading(result: Mapping[str, Any], raw_parse: Mapping[str, Any],
             "region": region,
             "matching_text": matching,
             "confidence": confidence,
-            "auto_apply": name in _AUTO_FIELDS and confident and region is not None and not too_long,
+            "auto_apply": name in _AUTO_FIELDS and confident and found and not too_long,
             "exceeds_limit": too_long,
             "low_confidence": threshold is not None and confidence is not None and confidence < threshold,
         }
@@ -77,9 +85,15 @@ def fields_from_reading(result: Mapping[str, Any], raw_parse: Mapping[str, Any],
 
 
 def reading_is_stale(reading) -> bool:
-    """A reading still queued or running past its budget: its worker died."""
-    budget = settings.LLAMAEXTRACT_TIMEOUT_SECONDS + 120
-    return (timezone.now() - reading.created_at).total_seconds() > budget
+    """A reading still queued or running past its budget: its worker died.
+
+    A running reading is timed from its claim, a queued one from its
+    creation, so a reading that waited behind other parses gets its whole
+    budget once a worker takes it.
+    """
+    budget = settings.LLAMAEXTRACT_TIMEOUT_SECONDS + STALE_GRACE_SECONDS
+    since = reading.started_at or reading.created_at
+    return (timezone.now() - since).total_seconds() > budget
 
 
 # -- values -------------------------------------------------------------------
