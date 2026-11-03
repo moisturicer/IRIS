@@ -73,6 +73,7 @@ from apps.records.models import Record
 
 if TYPE_CHECKING:
     from apps.ai.evidence.model_decision import ModelEvidenceDecision
+    from apps.ai.providers.vision import ImageDescribingLLM
     from apps.ai.inference import InferenceTask
     from apps.ai.memory import ConversationMemory
     from apps.ai.providers.tool_calling import ToolCallingLLM
