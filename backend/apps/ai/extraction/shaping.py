@@ -8,6 +8,8 @@ numbering sets heading depth, and a caption labelled a heading becomes text.
 """
 
 import re
+from pathlib import PurePosixPath
+from urllib.parse import urlparse
 from collections import Counter
 from dataclasses import replace
 from typing import Any, Mapping
@@ -74,6 +76,7 @@ def _element(item, page, metadata, *, nested=False):
         printed_page_number=metadata.get(page, {}).get("printed_page_number"),
         source_label=label, children=children, ordered=ordered, rows=rows,
         html=str(item.get("html") or ""),
+        figure=PurePosixPath(urlparse(str(item.get("url") or "")).path).name if label == "image" else "",
     )
     if nested and label == "text" and DISPLAY_FORMULA.search(text):
         element = replace(element, children=tuple(_split_formulas(element)))

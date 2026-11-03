@@ -287,6 +287,15 @@ class CompositionRoot:
                 return None
         return ModelEvidenceDecision(self._shadow_llm)
 
+    def figure_describer(self) -> Optional["ImageDescribingLLM"]:
+        """The ``describe_figure`` model, or ``None`` while its Profile is unset (IR-852)."""
+        from apps.ai.inference import InferenceTask, profile_for
+        from apps.ai.providers.vision import require_image_describing
+
+        if self._llm is None and not profile_for(InferenceTask.DESCRIBE_FIGURE).is_configured:
+            return None
+        return require_image_describing(self.llm_for(InferenceTask.DESCRIBE_FIGURE))
+
     def memory(self) -> Optional["ConversationMemory"]:
         """The conversation-memory recaller, or ``None`` when off.
 

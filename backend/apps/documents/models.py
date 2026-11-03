@@ -261,6 +261,10 @@ class ExtractionFigure(models.Model):
     media_type = models.CharField(max_length=32)
     image = models.FileField(upload_to=figure_path, max_length=255)
     created_at = models.DateTimeField(auto_now_add=True)
+    # The Extractor's image filename, which its image element also names (IR-852).
+    name = models.CharField(max_length=255, blank=True)
+    # Retrieval only (IR-852): embedded with the Figure's chunk, never shown.
+    description = models.TextField(blank=True)
 
     class Meta:
         ordering = ["page", "pk"]

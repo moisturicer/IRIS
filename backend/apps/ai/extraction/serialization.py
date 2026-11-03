@@ -96,7 +96,7 @@ def _element_to_json(element: DocumentElement) -> dict[str, Any]:
         out["bbox"] = _bbox_to_json(element.bboxes[0])
     elif element.bboxes:
         out["bboxes"] = [_bbox_to_json(b) for b in element.bboxes]
-    for name in ("printed_page_number", "source_label", "ordered", "html", "description"):
+    for name in ("printed_page_number", "source_label", "ordered", "html", "description", "figure"):
         value = getattr(element, name)
         if value:
             out[name] = value
@@ -139,6 +139,7 @@ def _element_from_json(data: Mapping[str, Any]) -> DocumentElement:
         ordered=data.get("ordered", False),
         rows=tuple(tuple(row) for row in data.get("rows", [])),
         html=data.get("html", ""), description=data.get("description", ""),
+        figure=data.get("figure", ""),
     )
 
 

@@ -272,6 +272,7 @@ def test_a_layout_figure_is_downloaded_with_its_page_and_caption():
     (figure,) = extracted.figures
     assert (figure.page, figure.media_type, figure.data) == (1, "image/png", b"\x89PNG crop")
     assert figure.caption == "Figure 1: A captioned rectangle."
+    assert figure.name == "image_0.png"
     assert figure.bbox == {"x": 72, "y": 300, "w": 200, "h": 100}
     downloads = [r for r in vendor.requests if r.url.host == "downloads.vendor.test"]
     assert "/images/page_1.jpg" not in [r.url.path for r in downloads]

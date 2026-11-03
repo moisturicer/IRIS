@@ -202,7 +202,13 @@ def _queue_chunking_if_manuscript(extraction: "PdfExtraction") -> None:
     from apps.documents.models import DocumentKind
 
     if extraction.kind == DocumentKind.MANUSCRIPT:
-        _queue_chunk_extraction(extraction.pk, str(extraction.source_revision) if extraction.source_revision else None)
+        pinned = str(extraction.source_revision) if extraction.source_revision else None
+        _queue_chunk_extraction(extraction.pk, pinned)
+        if extraction.figures.exists():
+            from django.db import transaction
+            from apps.ai.tasks import describe_extraction_figures
+
+            transaction.on_commit(lambda: describe_extraction_figures.delay(extraction.pk, pinned))
 
 
 def _queue_chunk_extraction(extraction_id: int, source_revision=None) -> None:

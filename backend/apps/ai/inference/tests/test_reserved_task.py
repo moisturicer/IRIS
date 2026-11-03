@@ -1,18 +1,20 @@
-"""`describe_figure` is reserved, and nothing calls it (IR-378).
+"""`describe_figure` is reached only through the composition root (IR-378, IR-852).
 
-Declared so the task set is closed rather than grown later by surprise; its
-implementation is a separate spec that first has to reverse ADR-025's
-"no image ever leaves the deployment" clause. A file scan rather than a
-Django test, like `test_one_retrieval_stack.py` -- what is being asserted is
-that no module reaches for it.
+ADR-056 §10 gives the task its one caller, `figure_describer()`, used by
+`figure_descriptions.py`. A file scan rather than a Django test, like
+`test_one_retrieval_stack.py`: what is asserted is that no other module
+reaches for it.
 """
 
 import pathlib
+import re
 
 from testing.source_files import python_sources
 
 APPS = pathlib.Path(__file__).resolve().parents[3]
 INFERENCE = APPS / "ai" / "inference"
+CALLERS = {"ai/composition.py"}
+TASK = re.compile(r"\bdescribe_figure\b")
 
 
 def _python_files():
@@ -23,14 +25,14 @@ def _python_files():
     ]
 
 
-def test_nothing_outside_the_inference_package_asks_for_describe_figure():
-    callers = [
-        str(path.relative_to(APPS))
+def test_only_the_composition_root_asks_for_describe_figure():
+    callers = {
+        path.relative_to(APPS).as_posix()
         for path in _python_files()
-        if "describe_figure" in path.read_text(encoding="utf-8").lower()
-    ]
-    assert callers == [], (
-        f"{callers} reach for the reserved `describe_figure` task. It is "
-        f"declared and unused until its own spec lands (it needs a figure "
-        f"describer port, a crop port, and an ADR superseding ADR-025)."
+        if TASK.search(path.read_text(encoding="utf-8").lower())
+        and "tests" not in path.relative_to(APPS).parts
+    }
+    assert callers == CALLERS, (
+        f"{sorted(callers - CALLERS)} reach for `describe_figure` directly; "
+        f"go through CompositionRoot.figure_describer() (IR-852)."
     )
