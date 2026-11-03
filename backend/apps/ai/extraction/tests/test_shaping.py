@@ -1,25 +1,9 @@
 """Shaping at its public boundary, using the synthetic PDF recordings."""
 
-import json
-from pathlib import Path
-
 import pytest
 
 from apps.ai.extraction.shaping import shape_llamaparse
-
-
-RECORDINGS = Path(__file__).parent / "fixtures" / "llamaparse"
-
-
-def recorded(name):
-    directory = RECORDINGS / name
-    raw = json.loads((directory / "result.json").read_text(encoding="utf-8"))
-    raw["grounded_items"] = [
-        json.loads(line)
-        for line in (directory / "grounded_items.jsonl").read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
-    return raw
+from .llamaparse_fixtures import recorded, result_with
 
 
 def test_recorded_headings_keep_vendor_depth_and_line_evidence():
@@ -36,13 +20,6 @@ def test_recorded_headings_keep_vendor_depth_and_line_evidence():
     assert heading.printed_page_number == "1"
     assert heading.bboxes[0].left == 72.97
     assert heading.bboxes[0].top == 83.85
-
-
-def result_with(items):
-    return {
-        "items": {"pages": [{"page_number": 1, "page_width": 612, "page_height": 792, "items": items}]},
-        "metadata": {"pages": [{"page_number": 1, "printed_page_number": "iv"}]},
-    }
 
 
 def test_kinds_keep_nested_ordered_lists_tables_and_uncaptioned_figures():

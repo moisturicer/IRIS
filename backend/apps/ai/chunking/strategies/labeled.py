@@ -2,6 +2,8 @@
 
 from dataclasses import replace
 from html import escape
+import hashlib
+import json
 
 from ..context_path import _truncate_middle
 from ..document import FORMULA, HEADING, DocumentElement, NormalizedDocument
@@ -9,6 +11,7 @@ from ..formulas import without_formulas
 from ..hashing import chunkset_hash
 from ..regions import dedupe_regions
 from ..text_splitting import grapheme_safe_split, split_into_sentences
+from ..table_html import TableHTML
 from ..tokens import count_tokens
 from ..values import Chunk, ChunkingOptions, ChunkSet
 
@@ -34,15 +37,32 @@ class LabeledStructureChunker:
                 stack.append((level, element.text))
                 headings = tuple(text for _, text in stack)
                 path = headings if headings[0] == document.title else ((document.title,) if document.title else ()) + headings
-                path = _truncate_middle(path, options.context_path_max_tokens)
+                path = _bounded_path(path, options)
             section.append(element)
         if section:
             chunks.extend(_pack_section(section, path, options))
         chunks = [replace(chunk, sequence=index) for index, chunk in enumerate(chunks)]
         return ChunkSet(
             chunks=tuple(chunks), strategy_id=STRATEGY_ID, options=options,
-            content_hash=chunkset_hash(chunks), page_sizes=document.page_sizes,
+            content_hash=_content_hash(chunks, document.page_sizes), page_sizes=document.page_sizes,
         )
+
+
+def _bounded_path(path, options):
+    # Leave most of the total budget for the author's text, including the
+    # separator. The legacy helper alone can retain an oversized first word.
+    budget = min(options.context_path_max_tokens, options.max_tokens // 3)
+    if budget < 1:
+        return ()
+    path = _truncate_middle(path, budget)
+    if count_tokens(" > ".join(path)) <= budget:
+        return path
+    label = ""
+    for cluster in grapheme_safe_split(path[0], 1):
+        if count_tokens(label + cluster) > budget:
+            break
+        label += cluster
+    return (label,) if label else ()
 
 
 def _embedded(elements, path):
@@ -80,7 +100,7 @@ def _pack_section(elements, path, options):
 
 
 def _prose_parts(element, path, options):
-    if element.kind not in {"text", "paragraph", "code", "link"} or _fits([element], path, options):
+    if element.kind not in {HEADING, "text", "paragraph", "code", "link"} or _fits([element], path, options):
         return [element]
     atoms = []
     for sentence in split_into_sentences(element.text):
@@ -114,26 +134,29 @@ def _word_parts(word, element, path, options):
 def _table_parts(table, path, options):
     if _fits([table], path, options) or len(table.rows) < 2:
         return [table]
-    header, *rows = table.rows
+    layout = TableHTML.parse(table.html, len(table.rows))
     parts = []
-    current: list[tuple[str, ...]] = []
-    for row in rows:
-        candidate = _table_fragment(table, header, current + [row])
-        if current and not _fits([candidate], path, options):
-            parts.append(_table_fragment(table, header, current))
-            current = []
-        current.append(row)
-    if current:
-        parts.append(_table_fragment(table, header, current))
+    start = 1
+    for stop in range(2, len(table.rows) + 1):
+        candidate = _table_fragment(table, start, stop, layout)
+        if stop > start + 1 and not _fits([candidate], path, options):
+            parts.append(_table_fragment(table, start, stop - 1, layout))
+            start = stop - 1
+    parts.append(_table_fragment(table, start, len(table.rows), layout))
     return parts
 
 
-def _table_fragment(table, header, rows):
+def _table_fragment(table, start, stop, layout):
     def cells(row, tag):
         return "<tr>" + "".join(f"<{tag}>{escape(cell)}</{tag}>" for cell in row) + "</tr>"
 
-    html = "<table><thead>" + cells(header, "th") + "</thead><tbody>"
-    html += "".join(cells(row, "td") for row in rows) + "</tbody></table>"
+    header = table.rows[0]
+    rows = table.rows[start:stop]
+    if layout is not None:
+        html = layout.fragment(start, stop)
+    else:
+        html = "<table><thead>" + cells(header, "th") + "</thead><tbody>"
+        html += "".join(cells(row, "td") for row in rows) + "</tbody></table>"
     return replace(table, rows=(header, *rows), html=html,
                    text="\n".join(" | ".join(row) for row in (header, *rows)))
 
@@ -150,3 +173,21 @@ def _chunk(elements, path):
         element_kinds=frozenset(e.kind for e in elements),
         bboxes=dedupe_regions(tuple(box for e in elements for box in e.bboxes)),
     )
+
+
+def _content_hash(chunks, page_sizes):
+    """Refresh display/evidence edits while reusing unchanged text vectors.
+
+    Legacy strategies retain their pinned semantic-only set hash. This new
+    strategy must also notice formulas, HTML and evidence, which deliberately
+    do not enter embedding text. Per-chunk text hashes remain unchanged.
+    """
+    payload = {
+        "semantic": chunkset_hash(chunks), "page_sizes": page_sizes,
+        "display": [{
+            "content": chunk.content, "source_page": chunk.source_page,
+            "element_kinds": sorted(chunk.element_kinds),
+            "boxes": [(b.page, b.left, b.top, b.right, b.bottom) for b in chunk.bboxes],
+        } for chunk in chunks],
+    }
+    return hashlib.sha256(json.dumps(payload, sort_keys=True, ensure_ascii=False).encode()).hexdigest()

@@ -11,6 +11,7 @@ from typing import Any, Mapping
 
 from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
 from apps.ai.chunking.formulas import DISPLAY_FORMULA
+from apps.ai.chunking.regions import dedupe_regions
 
 
 _KINDS = {"heading", "text", "list", "table", "image", "code", "link", "header", "footer"}
@@ -54,10 +55,14 @@ def _element(item, page, metadata, *, nested=False):
         text = _list_text(children, ordered)
     elif label in {"header", "footer"} and not text:
         text = "\n".join(child.text for child in children)
+    boxes = _boxes(item, page)
+    child_boxes = tuple(box for child in children for box in child.bboxes)
+    if child_boxes and not (item.get("grounding") or {}).get("lines"):
+        boxes = dedupe_regions(child_boxes)
     element = DocumentElement(
         kind=label if label in _KINDS else "paragraph", text=text,
         level=item.get("level") if label == "heading" else None,
-        page=page, bboxes=_boxes(item, page),
+        page=page, bboxes=boxes,
         printed_page_number=metadata.get(page, {}).get("printed_page_number"),
         source_label=label, children=children, ordered=ordered, rows=rows,
         html=str(item.get("html") or ""),

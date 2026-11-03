@@ -4,7 +4,7 @@ from dataclasses import replace
 
 from apps.ai.chunking.values import ChunkingOptions
 from apps.ai.extraction.shaping import shape_llamaparse
-from apps.ai.extraction.tests.test_shaping import recorded, result_with
+from apps.ai.extraction.tests.llamaparse_fixtures import recorded, result_with
 from apps.ai.ingestion.pipeline import build_chunk_set
 from apps.ai.chunking.tokens import count_tokens
 
@@ -103,3 +103,54 @@ def test_exclusions_remain_a_chunking_choice_and_repeated_body_text_is_kept():
     text = "\n".join(c.text for c in chunk_set.chunks)
     assert "Omitted bibliography." not in text
     assert text.count("Repeated finding") == 3
+
+
+def test_display_only_edits_refresh_the_chunk_set_without_changing_embedding_text():
+    raw = result_with([
+        {"type": "heading", "level": 1, "value": "Study"},
+        {"type": "text", "value": "The surrounding prose is unchanged."},
+        {"type": "text", "value": "$$x=1$$"},
+    ])
+    original = build_chunk_set(shape_llamaparse(raw), ChunkingOptions())
+    raw["items"]["pages"][0]["items"][-1]["value"] = "$$x=2$$"
+    revised = build_chunk_set(shape_llamaparse(raw), ChunkingOptions())
+    assert [c.text for c in original.chunks] == [c.text for c in revised.chunks]
+    assert original.content_hash != revised.content_hash
+    assert "x=2" in revised.chunks[0].content
+
+
+def test_list_chunk_retains_its_child_line_boxes():
+    document = shape_llamaparse(result_with([{
+        "type": "list", "ordered": False,
+        "items": [{"type": "text", "value": "A grounded item.", "grounding": {"lines": [{
+            "bbox": {"x": 10, "y": 20, "w": 100, "h": 12},
+        }]}}],
+    }]))
+    chunk = build_chunk_set(document, ChunkingOptions()).chunks[0]
+    assert len(chunk.bboxes) == 1
+    assert (chunk.bboxes[0].left, chunk.bboxes[0].top, chunk.bboxes[0].right, chunk.bboxes[0].bottom) == (10, 20, 110, 32)
+
+
+def test_small_budget_bounds_the_prefix_before_splitting_ordinary_prose():
+    document = shape_llamaparse(result_with([
+        {"type": "heading", "level": 1, "value": "One two three four five six seven eight nine ten"},
+        {"type": "text", "value": "Useful prose remains readable."},
+    ]))
+    chunks = build_chunk_set(document, ChunkingOptions(max_tokens=8)).chunks
+    assert all(count_tokens(chunk.text) <= 8 for chunk in chunks)
+    words = " ".join(chunk.content for chunk in chunks).split()
+    assert all(word in words for word in ("Useful", "prose", "remains", "readable."))
+
+
+def test_split_table_preserves_colspan_and_continues_rowspan_cells_for_display():
+    rows = [["Measurements", ""], ["Spanning label", "1"]] + [["", str(n)] for n in range(2, 13)]
+    html = '<table><thead><tr><th colspan="2">Measurements</th></tr></thead><tbody>'
+    html += '<tr><td rowspan="12">Spanning label</td><td>1</td></tr>'
+    html += ''.join(f'<tr><td>{n}</td></tr>' for n in range(2, 13)) + '</tbody></table>'
+    document = shape_llamaparse(result_with([{"type": "table", "rows": rows, "html": html}]))
+    chunks = build_chunk_set(document, ChunkingOptions(max_tokens=24)).chunks
+    assert len(chunks) > 1
+    assert all('colspan="2"' in c.content for c in chunks)
+    assert all("Spanning label" in c.content for c in chunks)
+    assert all('rowspan="12"' not in c.content for c in chunks)
+    assert "\n".join(c.text for c in chunks).count("Spanning label") == 1

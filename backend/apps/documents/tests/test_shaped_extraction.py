@@ -1,6 +1,6 @@
 """Stored Extraction reads use today's shaping, never yesterday's derived copy."""
 
-from apps.ai.extraction.tests.test_shaping import result_with
+from apps.ai.extraction.tests.llamaparse_fixtures import result_with
 from apps.ai.extraction import document_to_json, shape_llamaparse
 from apps.documents.models import PdfExtraction
 
