@@ -207,6 +207,13 @@ def submit_new_version(record, actor):
     blocked = unchanged_reason(record, requests)
     if blocked:
         raise NewVersionError(blocked)
+    if stored_manuscript_unsubmitted(record):
+        # The file was accepted while the owner could read a particular set of
+        # Records. Recheck that set at the actual version boundary as well.
+        from apps.records.duplicates import enforce_exact, lock_digest
+
+        lock_digest(record.manuscript_sha256)
+        enforce_exact(actor, record.pk, record.manuscript_sha256)
 
     parties = _parties(requests)
     reset = _reset_offices(record, parties)
