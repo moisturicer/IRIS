@@ -91,8 +91,8 @@ approval remain separate from implementation.
 
 ## Pending local extraction (IR-738)
 
-Apply Django migration `publication/0006`, rerun `provision_research_roles`,
-then apply AI migration `0008` through `python -m ai.runs.migrate`.
+Apply Django migrations `publication/0006–0007`, rerun `provision_research_roles`,
+then apply AI migrations `0008–0009` through `python -m ai.runs.migrate`.
 The latter remains the only migration/writer authority for `iris_ai`.
 The AI runtime has insert-only access to immutable extraction revisions;
 row policies require a verified grant for that exact current work. Django
