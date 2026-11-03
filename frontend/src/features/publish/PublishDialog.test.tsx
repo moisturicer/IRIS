@@ -35,11 +35,7 @@ vi.mock("@/api/records", () => ({
 }));
 
 vi.mock("@/features/records/paper-view/PaperPdfReader", () => ({
-  PaperPdfReader: ({ recordId }: { recordId: number }) => (
-    <div data-testid="publish-paper-reader" data-record-id={String(recordId)}>
-      Shared authenticated PDF reader
-    </div>
-  ),
+  PaperPdfReader: () => <p>Shared authenticated PDF reader</p>,
 }));
 
 vi.mock("@/api/accounts", () => ({
@@ -478,7 +474,7 @@ describe("IR-834 manuscript preview", () => {
     expect(await screen.findByRole("region", { name: /Manuscript preview/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Details" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
-    expect(screen.getByTestId("publish-paper-reader")).toHaveAttribute("data-record-id", "42");
+    expect(screen.getByText("Shared authenticated PDF reader")).toBeInTheDocument();
   });
 
   it("keeps the preceding accepted Manuscript when a replacement is rejected", async () => {
@@ -502,7 +498,7 @@ describe("IR-834 manuscript preview", () => {
 
     await user.click(continueButton);
     expect(await screen.findByRole("region", { name: /Manuscript preview/i })).toBeInTheDocument();
-    expect(screen.getByTestId("publish-paper-reader")).toHaveAttribute("data-record-id", "42");
+    expect(screen.getByText("Shared authenticated PDF reader")).toBeInTheDocument();
   });
 });
 

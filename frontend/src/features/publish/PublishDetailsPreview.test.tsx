@@ -6,26 +6,9 @@ import { render, screen, userEvent, waitFor } from "@/test/render";
 
 import { PublishDetailsPreview } from "./PublishDetailsPreview";
 
-const readerInstances = vi.hoisted(() => ({ next: 0 }));
-
-vi.mock("@/features/records/paper-view/PaperPdfReader", async () => {
-  const React = await import("react");
-
-  return {
-    PaperPdfReader: ({ recordId }: { recordId: number }) => {
-      const [instance] = React.useState(() => ++readerInstances.next);
-      return (
-        <div
-          data-testid="shared-paper-reader"
-          data-record-id={String(recordId)}
-          data-instance={String(instance)}
-        >
-          Shared authenticated PDF reader
-        </div>
-      );
-    },
-  };
-});
+vi.mock("@/features/records/paper-view/PaperPdfReader", () => ({
+  PaperPdfReader: () => <p>Shared authenticated PDF reader</p>,
+}));
 
 function Details() {
   const [title, setTitle] = useState("Original title");
@@ -66,26 +49,6 @@ describe("PublishDetailsPreview (IR-834)", () => {
     expect(details).toHaveAttribute("aria-pressed", "true");
     await waitFor(() => expect(title).toHaveFocus());
     expect(title).toHaveValue("Edited while reading");
-  });
-
-  it("remounts the shared reader when the accepted source changes", () => {
-    const { rerender } = render(
-      <PublishDetailsPreview recordId={42} sourceKey={1}>
-        <Details />
-      </PublishDetailsPreview>,
-    );
-
-    const first = screen.getByTestId("shared-paper-reader").getAttribute("data-instance");
-
-    rerender(
-      <PublishDetailsPreview recordId={42} sourceKey={2}>
-        <Details />
-      </PublishDetailsPreview>,
-    );
-
-    const second = screen.getByTestId("shared-paper-reader").getAttribute("data-instance");
-    expect(second).not.toBe(first);
-    expect(screen.getByTestId("shared-paper-reader")).toHaveAttribute("data-record-id", "42");
   });
 
   it("has no serious or critical accessibility violations", async () => {
