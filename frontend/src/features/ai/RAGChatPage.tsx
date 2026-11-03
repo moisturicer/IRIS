@@ -31,6 +31,8 @@ import { recordsApi } from "@/api/records";
 import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
 import { ChatInput } from "./components/ChatInput";
+import { ComparisonPicker } from "./components/ComparisonPicker";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
 import { ConversationHistoryList, ConversationSidebar } from "./components/ConversationSidebar";
@@ -122,6 +124,9 @@ function LegacyRAGChatPage() {
   const [sourcesOpen, setSourcesOpen]       = useState(false);
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<ConversationSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   // Too narrow to hold history and sources beside the answer, they open one at
   // a time as drawers over it, closed until asked for (IR-570). Unmeasured
   // (jsdom, the first paint) counts as wide: the layout this page always had.
@@ -151,6 +156,9 @@ function LegacyRAGChatPage() {
 
   // Transcripts, drafts, selected answers and answers in flight, one set per
   // conversation, each answer bound to the conversation that asked (IR-562).
+  const configuredLimit = status?.comparison_max_records;
+  const comparisonLimit = configuredLimit !== undefined && Number.isInteger(configuredLimit) && configuredLimit >= 2
+    ? configuredLimit : undefined;
   const client = useConversationClient({
     onAnswered: (_conversationId, message, onScreen) => {
       if (onScreen && message.citations?.length) setSourcesOpen(true);
@@ -162,9 +170,11 @@ function LegacyRAGChatPage() {
         message: errorDetail(error, "IRIS could not answer right now. Check that the AI service is available."),
       });
     },
-  });
+  }, comparisonLimit);
   const { activeId, unavailable, messages, selected } = client;
   const loading = client.isAnswering;
+  const comparisonInvalid = client.comparisonRecords.length > 0 &&
+    (comparisonLimit === undefined || client.comparisonRecords.length < 2 || client.comparisonRecords.length > comparisonLimit);
 
   // Read off the selected reply itself, so the panel cannot show one answer's
   // passages beside another, or one conversation's beside another's (IR-284,
@@ -343,18 +353,47 @@ function LegacyRAGChatPage() {
     refreshList();
   };
 
-  const handleDelete = async (id: number) => {
-    await aiApi.conversations.remove(id);
-    client.forget(id);
-    const list = await refreshList();
-    if (isOnScreen(id) || unavailable) {
-      const { data } = list.length > 0
-        ? await aiApi.conversations.get(list[0].id)
-        : await aiApi.conversations.create();
-      // The deleted address must not come back with Back.
-      goTo(data, true);
+  const requestDelete = (id: number) => {
+    if (deleting) return;
+    const target = conversations.find((c) => c.id === id);
+    if (!target) return;
+    // Only one focus trap is active: the phone history drawer closes first.
+    setDrawer(null);
+    setDeleteError(null);
+    setDeleteTarget(target);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    const id = deleteTarget.id;
+    let removed = false;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await aiApi.conversations.remove(id);
+      removed = true;
+      client.forget(id);
+      setDeleteTarget(null);
+      setConversations((all) => all.filter((c) => c.id !== id));
+      const list = await refreshList();
+      if (isOnScreen(id) || unavailable) {
+        const { data } = list.length > 0
+          ? await aiApi.conversations.get(list[0].id)
+          : await aiApi.conversations.create();
+        // The deleted address must not come back with Back.
+        goTo(data, true);
+      }
+      addToast({ type: "info", message: "Chat removed." });
+    } catch (error) {
+      if (removed) {
+        if (isOnScreen(id)) showUnavailable();
+        addToast({ type: "error", message: "Chat removed, but history could not be refreshed. Reload to continue." });
+      } else {
+        setDeleteError(errorDetail(error, "Could not delete this conversation. Please try again."));
+      }
+    } finally {
+      setDeleting(false);
     }
-    addToast({ type: "info", message: "Chat removed." });
   };
 
   const handleRetry = async (message: ChatMessage) => {
@@ -381,7 +420,7 @@ function LegacyRAGChatPage() {
             conversations={conversations}
             activeId={activeId}
             open={historyOpen}
-            onDelete={handleDelete}
+            onDelete={requestDelete}
           />
         )}
 
@@ -471,10 +510,14 @@ function LegacyRAGChatPage() {
             draft={client.draft}
             onDraftChange={client.setDraft}
             disabled={loading || !activeId}
+            sendDisabled={comparisonInvalid}
             label={FOLLOW_UP_LABEL}
             // One line in a phone's composer; the name above stays whole.
             placeholder={panelsAsDrawers ? "Ask a follow-up…" : FOLLOW_UP_LABEL}
-          />
+          >
+            <ComparisonPicker key={activeId} selected={client.comparisonRecords} onChange={client.setComparisonRecords}
+              limit={comparisonLimit} scoped={client.record !== null} disabled={loading || !activeId} />
+          </ChatInput>
         </div>
 
         {!panelsAsDrawers && (
@@ -510,7 +553,7 @@ function LegacyRAGChatPage() {
               New chat
             </button>
           </div>
-          <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={handleDelete} />
+          <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={requestDelete} />
         </ChatDrawer>
       )}
       {drawer === "sources" && (
@@ -527,6 +570,10 @@ function LegacyRAGChatPage() {
           </CitationTurnContext.Provider>
         </ChatDrawer>
       )}
+      <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"
+        message={`Delete “${deleteTarget?.title || "New conversation"}” and its messages? This cannot be undone.`}
+        confirmLabel="Delete conversation" danger focusCancel confirming={deleting} error={deleteError}
+        onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
     </CitationConversationContext.Provider>
   );
