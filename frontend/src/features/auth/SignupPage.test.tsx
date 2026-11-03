@@ -61,6 +61,11 @@ function renderSignup() {
 
 const steps = () => screen.getByRole("navigation", { name: "Registration steps" });
 const tab = (name: RegExp) => within(steps()).getByRole("link", { name });
+const currentStep = (name: RegExp) => {
+  const current = within(steps()).getByRole("listitem", { current: "step" });
+  expect(current).toHaveTextContent(name);
+  return current;
+};
 const stepHeading = () => screen.getByRole("heading", { level: 3, name: /^Step \d of 3/ });
 
 const firstName = () => screen.getByRole("textbox", { name: "First Name" });
@@ -149,7 +154,12 @@ describe("the register steps", { timeout: 30_000 }, () => {
     expect(screen.getByText(/research identity\./)).toBeInTheDocument();
     expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity");
 
-    expect(tab(/^Identity, current step$/)).toHaveAttribute("aria-current", "step");
+    expect(currentStep(/Identity, current step$/)).toHaveAttribute("aria-current", "step");
+    expect(within(steps()).queryByRole("link", { name: /^Identity, current step$/ })).not.toBeInTheDocument();
+    expect(within(steps()).queryByRole("tab")).not.toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(within(header).getAllByRole("link")).toHaveLength(1);
+    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("aria-haspopup", "dialog");
     for (const name of [/^Affiliation, not started$/, /^Security & agreement, not started$/]) {
       expect(tab(name)).toHaveAttribute("aria-disabled", "true");
       expect(tab(name)).not.toHaveAttribute("href");
@@ -205,7 +215,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
     expect(stepHeading()).toHaveTextContent("Step 2 of 3 · Affiliation");
     expect(stepHeading()).toHaveFocus();
     expect(tab(/^Identity, completed$/)).toHaveAttribute("href", "/signup");
-    expect(tab(/^Affiliation, current step$/)).toHaveAttribute("aria-current", "step");
+    expect(currentStep(/Affiliation, current step$/)).toHaveAttribute("aria-current", "step");
     expect(tab(/^Security & agreement, not started$/)).toHaveAttribute("aria-disabled", "true");
   });
 
@@ -253,7 +263,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
     }
     expect(reached).not.toContain(tab(/^Affiliation, not started$/));
     expect(reached).not.toContain(tab(/^Security & agreement, not started$/));
-    expect(reached).not.toContain(tab(/^Identity, current step$/));
+    expect(reached).not.toContain(currentStep(/Identity, current step$/));
   });
 
   it("keeps the college, clears the program and says why when the role changes", async () => {
