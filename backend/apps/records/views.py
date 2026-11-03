@@ -555,6 +555,36 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "private, no-store"
         return response
 
+    @action(detail=True, methods=["get"], url_path=r"figures/(?P<figure_id>[0-9]+)", url_name="figure")
+    def figure(self, request, pk=None, figure_id=None):
+        """
+        GET /records/<id>/figures/<figure_id>/ -- one Figure's image (IR-845).
+
+        A Figure is part of the paper, so it is read as the paper is:
+        `get_object()` resolves through `visible_to(user)`, and the Figure
+        must belong to this record and to the Manuscript revision this reader
+        is served (`versions.served_manuscript_revision`). Every refusal is
+        the 404 of a missing record. It takes an id, never a file path.
+
+        Stored images are checked to be what their media type says
+        (`documents.figures`); `nosniff` holds the browser to that type.
+        """
+        from apps.documents.models import ExtractionFigure
+        from .versions import served_manuscript_revision
+
+        record = self.get_object()
+        figure = ExtractionFigure.objects.filter(
+            pk=figure_id, extraction__record=record,
+            source_revision=served_manuscript_revision(record, request.user),
+        ).first()
+        if figure is None:
+            raise Http404
+        response = FileResponse(figure.image.open("rb"), content_type=figure.media_type)
+        response["Content-Disposition"] = "inline"
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
+        return response
+
     @action(detail=True, methods=["get"])
     def download(self, request, pk=None):
         """

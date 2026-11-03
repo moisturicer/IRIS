@@ -77,6 +77,7 @@ def _run_extraction(self, extraction_id, source_revision):
         document_to_json, extraction_hash, flatten_for_search,
     )
     from apps.ai.extraction.gate import NotDisclosed, reading
+    from .figures import replace_figures
 
     attempt = uuid.uuid4()
     with transaction.atomic():
@@ -162,6 +163,7 @@ def _run_extraction(self, extraction_id, source_revision):
         for key, value in values.items():
             setattr(extraction, key, value)
         extraction.save(update_fields=list(values))
+        replace_figures(extraction, extracted.figures)
         _queue_chunking_if_manuscript(extraction)
 
 
