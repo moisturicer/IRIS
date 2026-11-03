@@ -1,6 +1,7 @@
 """The LlamaParse cutover plans, prices and refuses before it reads (IR-842)."""
 
 import uuid
+from datetime import timedelta
 from datetime import date
 from decimal import Decimal
 
@@ -160,12 +161,13 @@ def test_rollback_restores_the_previous_chunk_set_and_its_tombstoned_chunks(pric
     )
     chunk = DocumentChunk.objects.create(
         chunk_set=previous, record=record, sequence=0, max_sequence=0, text="t", content="t",
-        text_hash="h", token_count=1, deleted_at=timezone.now(),
+        text_hash="h", token_count=1,
     )
     current = ChunkSet.objects.create(
         record=record, extraction_hash="l", strategy_id="s", options={}, content_hash="l",
         is_active=True,
     )
+    DocumentChunk.objects.filter(pk=chunk.pk).update(deleted_at=timezone.now())
 
     _run("--rollback", "--record", str(record.pk))
 
@@ -174,3 +176,55 @@ def test_rollback_restores_the_previous_chunk_set_and_its_tombstoned_chunks(pric
     chunk.refresh_from_db()
     assert previous.is_active and not current.is_active
     assert chunk.deleted_at is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_rollback_names_its_records_and_leaves_a_docling_read_alone(priced, queued):
+    with pytest.raises(CommandError, match="--record"):
+        _run("--rollback")
+
+    record = _record(extractor="docling")
+    ChunkSet.objects.create(record=record, extraction_hash="a", strategy_id="s", options={}, content_hash="a")
+    ChunkSet.objects.create(
+        record=record, extraction_hash="b", strategy_id="s", options={}, content_hash="b", is_active=True
+    )
+
+    _run("--rollback", "--record", str(record.pk))
+
+    assert list(ChunkSet.objects.filter(record=record, is_active=True).values_list("content_hash", flat=True)) == ["b"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_rollback_restores_only_what_the_swap_tombstoned(priced, queued):
+    record = _record(extractor="llamaparse")
+    long_ago = timezone.now() - timedelta(days=30)
+    previous = ChunkSet.objects.create(
+        record=record, extraction_hash="d", strategy_id="s", options={}, content_hash="d",
+    )
+    kw = dict(chunk_set=previous, record=record, max_sequence=1, text="t", content="t", token_count=1)
+    earlier = DocumentChunk.objects.create(sequence=0, text_hash="a", deleted_at=long_ago, **kw)
+    swapped = DocumentChunk.objects.create(sequence=1, text_hash="b", **kw)
+    ChunkSet.objects.create(
+        record=record, extraction_hash="l", strategy_id="s", options={}, content_hash="l", is_active=True,
+    )
+    DocumentChunk.objects.filter(pk=swapped.pk).update(deleted_at=timezone.now())
+
+    _run("--rollback", "--record", str(record.pk))
+
+    earlier.refresh_from_db()
+    swapped.refresh_from_db()
+    assert earlier.deleted_at is not None
+    assert swapped.deleted_at is None
+
+
+@pytest.mark.django_db(transaction=True)
+def test_rollback_does_not_put_a_paper_back_that_the_gate_refuses(priced, queued):
+    record = _record(extractor="llamaparse", consent=False)
+    ChunkSet.objects.create(record=record, extraction_hash="a", strategy_id="s", options={}, content_hash="a")
+    ChunkSet.objects.create(
+        record=record, extraction_hash="b", strategy_id="s", options={}, content_hash="b", is_active=True
+    )
+
+    _run("--rollback", "--record", str(record.pk))
+
+    assert list(ChunkSet.objects.filter(record=record, is_active=True).values_list("content_hash", flat=True)) == ["b"]

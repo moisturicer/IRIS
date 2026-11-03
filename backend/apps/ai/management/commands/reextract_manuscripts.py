@@ -18,6 +18,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai import reextraction
+from apps.ai.admission.limits import NotConfigured
 
 
 class Command(BaseCommand):
@@ -33,18 +34,20 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--rollback", action="store_true",
-            help="Reactivate each record's previous ChunkSet. Reads nothing and spends nothing.",
+            help="Reactivate the previous ChunkSet of each --record. Spends nothing; going forward again needs a new read.",
         )
 
     def handle(self, *args, **options):
         if options["rollback"]:
+            if not options["record_ids"]:
+                raise CommandError("--rollback needs --record: it reverts the records you name, never all of them.")
             restored = reextraction.rollback(options["record_ids"])
             self.stdout.write(self.style.SUCCESS(f"Restored the previous ChunkSet of {restored} record(s)."))
             return
 
         try:
             plan = reextraction.plan_cutover(options["record_ids"])
-        except reextraction.NotConfigured as error:
+        except NotConfigured as error:
             raise CommandError(f"Extraction price is not set: {error}. Nothing was sent.") from None
         if options["limit"]:
             plan = plan.limited(options["limit"])
@@ -90,6 +93,8 @@ class Command(BaseCommand):
             f"  Voyage (upper)       ~US${plan.embed_usd:,.4f}  ({plan.embed_tokens:,} tokens if every "
             f"chunk changed; backfill_embeddings --dry-run prices the real set)"
         )
+        if not plan.embed_cost_per_million:
+            self.stdout.write(self.style.WARNING("  AI_EMBEDDING_COST_PER_MILLION_TOKENS is unset: the Voyage figure is 0, not free."))
         self.stdout.write("  describe_figure      per Figure; unknown until each paper is read")
         reasons: dict[str, int] = {}
         for item in plan.skipped:

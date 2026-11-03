@@ -8,13 +8,11 @@ paper is read, so they are not estimated here.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from typing import Optional, Sequence
 
 from django.db.models import Sum
-
-from apps.ai.admission.limits import NotConfigured  # noqa: F401 - the command catches it from here
 
 ALREADY_READ = "already read by LlamaParse"
 AWAITING_CONSENT = "awaiting consent or release"
@@ -26,7 +24,6 @@ IN_FLIGHT = "a read is already queued or running"
 @dataclass(frozen=True)
 class CutoverItem:
     record_id: int
-    title: str
     pages: int = 0
     reason: str = ""
     #: Tokens of the active chunks, the most a re-embed could send.
@@ -71,7 +68,7 @@ class CutoverPlan:
     def limited(self, count: int) -> "CutoverPlan":
         keep = {i.record_id for i in self.to_read[:count]}
         items = tuple(i for i in self.items if i.reason or i.record_id in keep)
-        return CutoverPlan(items, self.credits_per_page, self.credit_usd, self.embed_cost_per_million)
+        return replace(self, items=items)
 
     def exceeds(self, ceiling_credits: Decimal) -> bool:
         return ceiling_credits > 0 and self.credits > ceiling_credits
@@ -105,10 +102,8 @@ def _reason(record, extraction) -> str:
     current = extraction is not None and extraction.source_revision == record.manuscript_revision
     if current and extraction.extractor == "llamaparse" and extraction.status == "done":
         return ALREADY_READ
-    if current and extraction.status in {"running", "retrying"} or (
-        current and extraction.status == "queued"
-        and extraction.phase == ExtractionPhase.QUEUED
-    ):
+    queued = extraction is not None and extraction.status == "queued" and extraction.phase == ExtractionPhase.QUEUED
+    if current and (extraction.status in {"running", "retrying"} or queued):
         return IN_FLIGHT
     if not permits(record):
         return AWAITING_CONSENT
@@ -117,9 +112,8 @@ def _reason(record, extraction) -> str:
 
 def plan_cutover(record_ids: Optional[Sequence[int]] = None) -> CutoverPlan:
     """Every live Record with a manuscript, costed or skipped with its reason."""
-    from django.conf import settings
-
     from apps.ai.admission.limits import read_extraction_price
+    from apps.ai.backfill import cost_per_million
     from apps.documents.models import PdfExtraction
     from apps.records.models import Record
 
@@ -138,14 +132,14 @@ def plan_cutover(record_ids: Optional[Sequence[int]] = None) -> CutoverPlan:
             if not pages:
                 reason = UNREADABLE
         items.append(CutoverItem(
-            record_id=record.pk, title=record.title, pages=pages, reason=reason,
+            record_id=record.pk, pages=pages, reason=reason,
             embed_tokens=0 if reason else _embed_tokens(record.pk),
         ))
     return CutoverPlan(
         items=tuple(items),
         credits_per_page=price.credits_per_page + price.addon_credits_per_page,
         credit_usd=price.credit_usd,
-        embed_cost_per_million=getattr(settings, "AI_EMBEDDING_COST_PER_MILLION_TOKENS", 0.0),
+        embed_cost_per_million=cost_per_million(),
     )
 
 
@@ -174,23 +168,29 @@ def queue_reads(plan: CutoverPlan) -> int:
     return queued
 
 
-def rollback(record_ids: Optional[Sequence[int]] = None) -> int:
-    """Make each record's previous ChunkSet active again, tombstoned chunks included.
+def rollback(record_ids: Sequence[int]) -> int:
+    """Make each named record's previous ChunkSet active again.
 
-    Returns how many records changed. Only a record with an inactive set older
-    than its active one has anything to go back to."""
+    Only a live record whose manuscript was read by LlamaParse and that has an
+    inactive set older than its active one has anything to go back to. Only
+    chunks tombstoned by the swap (at or after the active set was made) come
+    back. The extraction row is left as read: going forward again means a new
+    paid read, because re-chunking the same read is a no-op."""
     from django.db import transaction
 
+    from apps.ai.extraction.gate import permits
     from apps.ai.models import ChunkSet, DocumentChunk
+    from apps.documents.models import PdfExtraction
     from apps.records.models import Record
 
-    ids = ChunkSet.objects.values_list("record_id", flat=True).distinct()
-    if record_ids:
-        ids = ids.filter(record_id__in=list(record_ids))
     restored = 0
-    for record_id in list(ids):
+    for record_id in record_ids:
         with transaction.atomic():
-            Record.objects.select_for_update().filter(pk=record_id).first()
+            record = Record.objects.select_for_update().filter(pk=record_id, is_deleted=False).first()
+            if record is None or not permits(record) or not PdfExtraction.objects.filter(
+                record=record, extractor="llamaparse"
+            ).exists():
+                continue
             active = ChunkSet.objects.filter(record_id=record_id, is_active=True).first()
             if active is None:
                 continue
@@ -202,6 +202,8 @@ def rollback(record_ids: Optional[Sequence[int]] = None) -> int:
                 continue
             ChunkSet.objects.filter(pk=active.pk).update(is_active=False)
             ChunkSet.objects.filter(pk=previous.pk).update(is_active=True)
-            DocumentChunk.objects.filter(chunk_set=previous).update(deleted_at=None)
+            DocumentChunk.objects.filter(
+                chunk_set=previous, deleted_at__gte=active.created_at
+            ).update(deleted_at=None)
             restored += 1
     return restored

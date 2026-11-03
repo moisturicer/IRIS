@@ -14,7 +14,7 @@ To save LlamaParse credits, five of IR-851's six papers were re-read. "Diverse M
 | Reads queued, read and stored | **Pass**: 5 of 5 `done`, `ready`, extractor `llamaparse` |
 | Credits | **1,256 for 55 pages, the same per paper as IR-851**: 551, 56, 448, 65, 136 |
 | ChunkSet swap | **Pass**: each re-read record has one active set (LlamaParse) and its Docling set inactive |
-| Only changed chunks embedded | **Pass**: no Docling chunk text survived, so all 248 new chunks were embedded and none carried over. Carry-over itself is covered by the existing repository tests |
+| Only changed chunks embedded | **Not demonstrated**: no Docling chunk text survived, so all 248 new chunks were embedded and none carried over. Carry-over is covered by the existing repository tests; this command does not enforce it, and embedding is the separate `backfill_embeddings` step |
 | `backfill_embeddings --dry-run` afterwards | Nothing left to embed |
 | `check_vector_index` | **Pass**: 1.000 on both indexes ([output](check_vector_index.txt)) |
 | `eval_retrieval` (14 questions) | recall@10 0.643 without reranking, 0.857 with ([run](../20261103-150134-proxy_ir851_six.json)). IR-851: LlamaParse 0.571 / 0.857 after IR-859, Docling 0.643 / 0.929. One question is 0.071, so no measured difference |
@@ -26,6 +26,11 @@ To save LlamaParse credits, five of IR-851's six papers were re-read. "Diverse M
 
 - **Figure descriptions were not exercised.** The database copy holds no stored Figures, and `LLM_DESCRIBE_FIGURE_MODEL` is unset. The dry run says so rather than guessing a cost.
 - **Rolling back cannot be undone for free.** After a rollback, re-chunking the LlamaParse read is a no-op (the ingestion job's idempotency key is already used), so going forward again means another paid read.
-- **Rollback is per record, not per run.** It reactivates the newest older ChunkSet of every record named (or all records), so it also reverts an unrelated later re-chunk. Name the records.
+- **Rollback is per record and needs `--record`.** It reactivates the newest older ChunkSet, so for a record re-chunked again since the cutover it goes back one step too far. It skips records the gate refuses, deleted records and records not read by LlamaParse, and restores only chunks the swap tombstoned. The extraction row stays `llamaparse`.
 - **Docling is not removed**, and `EXTRACTION_BACKEND` is not switched in any committed config. That switch, the full-corpus run and the owner's spend approval are still open.
 - The 14-question set cannot separate the Extractors (IR-851 reached the same conclusion).
+- **A read that fails leaves the Docling ChunkSet active but the extraction row reset.** `reset_manuscript` clears the old structure when it queues, so a failed LlamaParse read loses the Docling structure (the chunks stay). Failed reads are read again on the next run.
+- **A read stuck in `queued` or `running` (a lost message) is skipped as in flight** on every re-run; there is no staleness check.
+- **Supplementary uploads are not re-read**, only manuscripts. They do not reach the corpus.
+- **Page counts are taken at planning.** A manuscript replaced between the plan and the queue is read at its new length, which the ceiling did not see; admission still bounds the spend.
+- The ceiling covers LlamaParse credits only. Voyage is bounded by `AI_EMBEDDING_TOKEN_CEILING` in `backfill_embeddings`.
