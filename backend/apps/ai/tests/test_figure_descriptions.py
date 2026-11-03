@@ -135,7 +135,8 @@ def test_a_stale_revision_describes_nothing():
     assert describer.images == []
 
 
-def test_a_failed_description_is_skipped_and_the_rest_are_written():
+def test_a_failed_description_is_owed_and_the_rest_are_written():
+    from apps.ai.figure_descriptions import DescriptionsOwed
     from apps.ai.providers.openai_compatible import LLMUnavailable
 
     record, extraction = manuscript()
@@ -146,12 +147,56 @@ def test_a_failed_description_is_skipped_and_the_rest_are_written():
                 raise LLMUnavailable("down")
             return super().describe_image(system, user, image, media_type)
 
-    with root(Flaky()):
+    with root(Flaky()), pytest.raises(DescriptionsOwed):
         describe_figures(extraction.pk, str(record.manuscript_revision))
 
     assert list(ExtractionFigure.objects.order_by("pk").values_list("description", flat=True)) == [
         "", DESCRIPTION,
     ]
+
+    with root(Describer()):
+        assert describe_figures(extraction.pk, str(record.manuscript_revision)) == 1
+
+
+def test_a_refused_admission_stops_the_rest():
+    from apps.ai.admission.errors import AdmissionDenied
+    from apps.ai.figure_descriptions import DescriptionsOwed
+
+    record, extraction = manuscript()
+
+    class Refused(Describer):
+        def describe_image(self, system, user, image, media_type):
+            self.images.append((image, media_type))
+            raise AdmissionDenied("campaign_exhausted")
+
+    describer = Refused()
+    with root(describer), pytest.raises(DescriptionsOwed):
+        describe_figures(extraction.pk, str(record.manuscript_revision))
+
+    assert len(describer.images) == 1
+
+
+def test_a_figure_with_no_name_is_not_sent():
+    record, extraction = manuscript()
+    ExtractionFigure.objects.filter(name="image_1.png").update(name="")
+    describer = Describer()
+
+    with root(describer):
+        describe_figures(extraction.pk, str(record.manuscript_revision))
+
+    assert [image for image, _ in describer.images] == [b"\x89PNG image_0.png"]
+
+
+def test_a_gate_closing_midway_still_reindexes_what_was_written(monkeypatch):
+    record, extraction = manuscript()
+    queued = []
+    monkeypatch.setattr("apps.ai.figure_descriptions._queue_rechunk", lambda *a: queued.append(a))
+    answers = iter([True, False])
+
+    with root(Describer(), permits=lambda record: next(answers)):
+        assert describe_figures(extraction.pk, str(record.manuscript_revision)) == 1
+
+    assert queued == [(extraction.pk, str(record.manuscript_revision))]
 
 
 def test_describing_re_embeds_only_the_figure_chunks():

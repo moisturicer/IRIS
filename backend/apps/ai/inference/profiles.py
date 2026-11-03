@@ -194,7 +194,7 @@ def _model_context_windows(prefix: str) -> tuple[tuple[str, int], ...]:
 #: with no new configuration, but borrowing the *answer* model would send
 #: every follow-up rewrite to the expensive one. Its own model ships as a
 #: default instead. `summary` and `describe_figure` inherit nothing and are
-#: off until configured.
+#: off until configured; `describe_figure` is zero-retention (IR-852).
 _INHERITED_KEYS = {
     InferenceTask.ANSWER: ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"),
     InferenceTask.RESOLVE: ("LLM_BASE_URL", "LLM_API_KEY", ""),

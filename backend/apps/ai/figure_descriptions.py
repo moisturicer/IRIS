@@ -21,9 +21,14 @@ SYSTEM = (
 )
 
 
+class DescriptionsOwed(Exception):
+    """A Figure was left undescribed by a failure worth retrying."""
+
+
 def describe_figures(extraction_id: int, source_revision) -> int:
     """Describe each undescribed Figure of the current read; returns how many.
-    Nothing is sent while the Profile is unset or the gate refuses the Record."""
+    Nothing is sent while the Profile is unset or the gate refuses the Record.
+    Raises ``DescriptionsOwed`` after the rest are written if a send failed."""
     from apps.ai.composition import composition_root
     from apps.ai.providers.openai_compatible import LLMUnavailable
     from apps.ai.admission.errors import AdmissionDenied
@@ -38,21 +43,26 @@ def describe_figures(extraction_id: int, source_revision) -> int:
     if describer is None:
         return 0
     written = 0
+    owed = False
+    # An unnamed Figure joins no element, so describing it buys nothing.
     pending = ExtractionFigure.objects.filter(
         extraction=extraction, source_revision=extraction.source_revision, description="",
-    )
+    ).exclude(name="")
     for figure in pending:
         # Read fresh before each send: a withdrawn consent stops the rest.
         record = Record.objects.filter(pk=extraction.record_id, is_deleted=False).first()
         if record is None or record.manuscript_revision != figure.source_revision \
                 or not root.vendor_permits()(record):
-            return written
+            break
         with figure.image.open("rb") as image:
             data = image.read()
         try:
             text = describer.describe_image(SYSTEM, _prompt(figure), data, figure.media_type).strip()
         except (LLMUnavailable, AdmissionDenied) as error:
             logger.warning("Figure %s was not described: %s", figure.pk, type(error).__name__)
+            owed = True
+            if isinstance(error, AdmissionDenied):
+                break  # every later send would be refused too
             continue
         # Written only while the Figure is still the current read's.
         written += ExtractionFigure.objects.filter(
@@ -60,6 +70,8 @@ def describe_figures(extraction_id: int, source_revision) -> int:
         ).update(description=text)
     if written:
         _queue_rechunk(extraction.pk, str(extraction.source_revision))
+    if owed:
+        raise DescriptionsOwed(f"extraction {extraction.pk} has Figures left to describe")
     return written
 
 

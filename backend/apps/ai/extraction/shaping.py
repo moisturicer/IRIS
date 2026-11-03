@@ -8,11 +8,11 @@ numbering sets heading depth, and a caption labelled a heading becomes text.
 """
 
 import re
-from pathlib import PurePosixPath
-from urllib.parse import urlparse
 from collections import Counter
 from dataclasses import replace
+from pathlib import PurePosixPath
 from typing import Any, Mapping
+from urllib.parse import urlparse
 
 from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
 from apps.ai.chunking.formulas import DISPLAY_FORMULA
@@ -38,10 +38,13 @@ def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
         evidence_page = grounded.get(number, page)
         if evidence_page.get("success") is False or evidence_page.get("items") is None:
             evidence_page = page
+        start = len(elements)
         for item in evidence_page.get("items", []) or []:
             if item.get("type") == "table" and item.get("merged_into_page"):
                 continue
             elements.extend(_split_formulas(_element(item, number, metadata)))
+        if evidence_page is not page:
+            elements[start:] = _named_images(elements[start:], page)
     elements = _repair_headings(elements)
     title = next((e.text for e in elements if e.kind == "heading" and e.level == 1 and e.page in (1, 2)), "")
     return NormalizedDocument(
@@ -76,11 +79,29 @@ def _element(item, page, metadata, *, nested=False):
         printed_page_number=metadata.get(page, {}).get("printed_page_number"),
         source_label=label, children=children, ordered=ordered, rows=rows,
         html=str(item.get("html") or ""),
-        figure=PurePosixPath(urlparse(str(item.get("url") or "")).path).name if label == "image" else "",
+        figure=_image_name(item) if label == "image" else "",
     )
     if nested and label == "text" and DISPLAY_FORMULA.search(text):
         element = replace(element, children=tuple(_split_formulas(element)))
     return element
+
+
+def _named_images(elements, page):
+    """Grounded items may omit an image's url; take it from the page's image
+    items, in order, so a stored Figure still joins its element (IR-852)."""
+    names = iter([_image_name(item) for item in page.get("items", []) or [] if item.get("type") == "image"])
+    named = []
+    for element in elements:
+        if element.kind == "image":
+            name = next(names, "")
+            element = element if element.figure else replace(element, figure=name)
+        named.append(element)
+    return named
+
+
+def _image_name(item):
+    """The image's filename, as the adapter stores its Figure under (IR-852)."""
+    return PurePosixPath(urlparse(str(item.get("url") or "")).path).name
 
 
 def _repair_headings(elements):
