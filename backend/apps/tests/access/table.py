@@ -148,6 +148,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
     "record-manuscript": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
+    # A Figure is read as the paper is (IR-845).
+    "record-figure": Entry({
+        "GET": _case(READS_RECORD, kwargs={"pk": Ref("record"), "figure_id": Ref("figure")}),
+    }),
     # Earlier versions are review material: participants, or the pool of a
     # party with an active assignment (IR-479). ADR-047 makes RDCO active on `record`.
     "record-version-manuscript": Entry({
