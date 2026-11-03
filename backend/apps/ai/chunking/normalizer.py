@@ -18,6 +18,7 @@ and nothing else.
 """
 
 import re
+from dataclasses import replace
 
 from .document import (
     HEADING,
@@ -54,6 +55,10 @@ def normalize(document: NormalizedDocument, options: ChunkingOptions) -> Normali
     """Return a cleaned copy of ``document``. ``document`` itself is left
     untouched."""
     elements = list(document.elements)
+    if document.structure_is_authoritative:
+        return replace(document, elements=tuple(_drop_excluded_sections(
+            [e for e in elements if e.kind not in {"header", "footer"}], options.exclude_sections,
+        )))
     elements = _drop_running_headers_and_footers(elements)
     elements = _drop_repeating_furniture(elements)
     elements = _drop_stranded_page_numbers(elements)

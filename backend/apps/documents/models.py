@@ -224,11 +224,19 @@ class PdfExtraction(models.Model):
         depend on ``apps.ai``, and ingestion is the one direction that
         dependency may ever run.
         """
-        if not self.structure:
-            return None
-        from apps.ai.extraction import document_from_json
+        from apps.ai.extraction import read_document
 
-        return document_from_json(self.structure)
+        return read_document(
+            extractor=self.extractor, structure=self.structure,
+            raw_result=getattr(self, "raw_result", None),  # Storage belongs to IR-841.
+        )
+
+    def as_search_text(self):
+        """Search text derived from the same current structure chunking reads."""
+        from apps.ai.extraction import flatten_for_search
+
+        document = self.as_normalized_document()
+        return flatten_for_search(document) if document is not None else ""
 
 
 class RecordFile(models.Model):

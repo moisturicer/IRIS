@@ -32,9 +32,24 @@ from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDo
 FORMAT_VERSION = 1
 
 
+def read_document(*, extractor, structure, raw_result=None):
+    """Read the current document; LlamaParse's persisted raw result is primary.
+
+    ``raw_result`` is stored by IR-841. Missing raw data must never turn a
+    stale derived structure into an apparently successful LlamaParse read.
+    """
+    if extractor == "llamaparse":
+        if not raw_result:
+            return None
+        from .shaping import shape_llamaparse
+
+        return shape_llamaparse(raw_result)
+    return document_from_json(structure) if structure else None
+
+
 def document_to_json(document: NormalizedDocument) -> dict[str, Any]:
     """Return ``document`` as a JSON-serializable dict."""
-    return {
+    out = {
         "version": FORMAT_VERSION,
         "title": document.title,
         "page_sizes": {
@@ -42,6 +57,13 @@ def document_to_json(document: NormalizedDocument) -> dict[str, Any]:
         },
         "elements": [_element_to_json(element) for element in document.elements],
     }
+    if document.structure_is_authoritative:
+        out["structure_is_authoritative"] = True
+    if document.page_metadata:
+        out["page_metadata"] = {str(page): dict(meta) for page, meta in document.page_metadata.items()}
+    if document.confidence is not None:
+        out["confidence"] = document.confidence
+    return out
 
 
 def document_from_json(data: Mapping[str, Any]) -> NormalizedDocument:
@@ -53,6 +75,9 @@ def document_from_json(data: Mapping[str, Any]) -> NormalizedDocument:
             int(page): (float(size[0]), float(size[1]))
             for page, size in (data.get("page_sizes") or {}).items()
         },
+        structure_is_authoritative=data.get("structure_is_authoritative", False),
+        page_metadata={int(page): meta for page, meta in (data.get("page_metadata") or {}).items()},
+        confidence=data.get("confidence"),
     )
 
 
@@ -71,6 +96,14 @@ def _element_to_json(element: DocumentElement) -> dict[str, Any]:
         out["bbox"] = _bbox_to_json(element.bboxes[0])
     elif element.bboxes:
         out["bboxes"] = [_bbox_to_json(b) for b in element.bboxes]
+    for name in ("printed_page_number", "source_label", "ordered", "html", "description"):
+        value = getattr(element, name)
+        if value:
+            out[name] = value
+    if element.children:
+        out["children"] = [_element_to_json(child) for child in element.children]
+    if element.rows:
+        out["rows"] = [list(row) for row in element.rows]
     return out
 
 
@@ -100,6 +133,12 @@ def _element_from_json(data: Mapping[str, Any]) -> DocumentElement:
         level=data.get("level"),
         page=data.get("page"),
         bboxes=regions,
+        printed_page_number=data.get("printed_page_number"),
+        source_label=data.get("source_label", ""),
+        children=tuple(_element_from_json(child) for child in data.get("children", [])),
+        ordered=data.get("ordered", False),
+        rows=tuple(tuple(row) for row in data.get("rows", [])),
+        html=data.get("html", ""), description=data.get("description", ""),
     )
 
 
