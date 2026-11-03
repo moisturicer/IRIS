@@ -129,6 +129,9 @@ export const recordsApi = {
    */
   metadataSuggestions: (id: number) =>
     apiClient.get<MetadataSuggestions>(`/records/${id}/metadata-suggestions/`),
+  /** Read a failed manuscript again. 409 when the manuscript has changed since. */
+  retryExtraction: (id: number, manuscriptRevision: string | null) =>
+    apiClient.post<MetadataSuggestions>(`/records/${id}/retry-extraction/`, { manuscript_revision: manuscriptRevision }),
   /**
    * The Novelty check (IR-312): published work close to this Proposal.
    * Owner-only; anyone else gets a 404. `checked` is false when no comparison

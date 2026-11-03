@@ -241,9 +241,50 @@ export type Capability =
  */
 export interface MetadataSuggestions {
   state:       "pending" | "ready" | "failed" | "unsupported";
+  /** The legacy projection, kept while clients move to `fields` (IR-833). */
   suggestions: { title: string | null; abstract: string | null };
   source:      "pdf_structure";
+  /** Each field's value and where it was read, null when none was (IR-833). */
+  fields?:     SuggestionFields;
+  /** Opaque: the accepted manuscript these values were read from (IR-831). */
+  manuscript_revision?: string | null;
+  /** `queued`, `reading`, `retrying`, `ready`, `failed`, … (IR-831). */
+  phase?:      string;
+  /** A failed read the owner may ask to retry. */
+  retryable?:  boolean;
+  message?:    string | null;
 }
+
+/** One value read from the PDF (IR-833). No confidence value: none is measured. */
+export interface SuggestionEntry<T> {
+  value:         T;
+  basis:         "document_title" | "abstract_section" | "labelled_front_matter";
+  /** Only when the stored structure records them. */
+  page:          number | null;
+  region:        { page: number; left: number; top: number; right: number; bottom: number } | null;
+  /** Publish may fill it in unasked: a title or abstract within its limit. */
+  auto_apply:    boolean;
+  /** Longer than the field allows: offered whole, for the author to shorten. */
+  exceeds_limit: boolean;
+}
+
+export interface SuggestionFields {
+  title:            SuggestionEntry<string> | null;
+  abstract:         SuggestionEntry<string> | null;
+  authors:          SuggestionEntry<string[]> | null;
+  keywords:         SuggestionEntry<string[]> | null;
+  publication_year: SuggestionEntry<number> | null;
+}
+
+/** The author's decision about a field Publish can fill in (IR-833). */
+export interface FieldDecision {
+  state:            "placeholder" | "automatic" | "accepted" | "authored" | "dismissed";
+  source_revision?: string | null;
+  /** What Undo restores, for an `automatic` value. */
+  previous?:        string;
+}
+
+export type MetadataSources = Partial<Record<keyof SuggestionFields, FieldDecision>>;
 
 /** Server-filtered fields: null means withheld or not recorded. */
 export interface PaperPerson {
@@ -307,6 +348,10 @@ export interface EmbargoAnswer {
 }
 
 export interface RecordDetail extends RecordListItem {
+  /** Moved by each detail save; name it to make a save conditional (IR-833). */
+  details_revision?: number | null;
+  /** The owner's field-source decisions; null for anyone else (IR-833). */
+  metadata_sources?: MetadataSources | null;
   /** Added in IR-686; absent only when using an older API. */
   paper_details?: PaperDetails;
   /** Null for anyone but the owners, the Adviser and office staff (ADR-052 §18). */
@@ -912,6 +957,9 @@ export interface RecordFormData {
   requested_ktto?:        boolean;
   /** Flat list of author name strings — backend creates Author rows. */
   authors?:              string[];
+  metadata_sources?:     MetadataSources;
+  /** The revision last seen; a newer one on the server refuses the save (409). */
+  expected_details_revision?: number;
 }
 
 export interface Classification {
