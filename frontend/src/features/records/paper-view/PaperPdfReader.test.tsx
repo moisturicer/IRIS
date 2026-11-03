@@ -20,6 +20,7 @@ import type { TextRun } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 
 import { PaperPdfReader } from "./PaperPdfReader";
+import { PublishDetailsPreview } from "@/features/publish/PublishDetailsPreview";
 import { useAuthStore } from "@/store/auth.store";
 import { PANE_TOP_PX, READER_TOOLBAR_TOP_PX } from "./paneLayout";
 import { MAX_LIVE_PAGES } from "./readerGeometry";
@@ -165,6 +166,49 @@ describe("loading the paper", () => {
     );
 
     expect(await screen.findByText(/could not load the paper/i)).toBeInTheDocument();
+  });
+});
+
+describe("Publish Details with the authenticated reader (IR-834)", () => {
+  const details = <label>Title<input defaultValue="Original title" /></label>;
+
+  it("keeps Details editable when access fails and Retry loads the accepted source", async () => {
+    manuscriptBlob.mockRejectedValueOnce(new Error("forbidden"));
+    const user = userEvent.setup();
+    render(<PublishDetailsPreview recordId={42} sourceKey={1}>{details}</PublishDetailsPreview>);
+
+    const title = screen.getByRole("textbox", { name: "Title" });
+    await user.clear(title);
+    await user.type(title, "My revised title");
+    const preview = screen.getByRole("region", { name: "Manuscript preview" });
+    expect(await within(preview).findByText(/could not load the paper/i)).toBeInTheDocument();
+    expect(within(preview).queryByText("Page 1 / 3")).not.toBeInTheDocument();
+
+    await user.click(within(preview).getByRole("button", { name: /try again/i }));
+    expect(await within(preview).findByText("Page 1 / 3")).toBeInTheDocument();
+    expect(title).toHaveValue("My revised title");
+    expect(manuscriptBlob).toHaveBeenCalledWith(42, { signal: expect.any(AbortSignal) });
+  });
+
+  it("aborts the old request and ignores its late reply after an accepted replacement", async () => {
+    let resolveOld!: (value: { data: Blob }) => void;
+    manuscriptBlob
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveOld = resolve; }))
+      .mockResolvedValueOnce({ data: pdfBlob() });
+    const { rerender } = render(
+      <PublishDetailsPreview recordId={42} sourceKey={1}>{details}</PublishDetailsPreview>,
+    );
+    await waitFor(() => expect(manuscriptBlob).toHaveBeenCalledTimes(1));
+    const oldSignal = manuscriptBlob.mock.calls[0][1].signal as AbortSignal;
+
+    rerender(<PublishDetailsPreview recordId={42} sourceKey={2}>{details}</PublishDetailsPreview>);
+    expect(oldSignal.aborted).toBe(true);
+    expect(await screen.findByText("Page 1 / 3")).toBeInTheDocument();
+    await act(async () => { resolveOld({ data: pdfBlob() }); });
+
+    expect(manuscriptBlob).toHaveBeenCalledTimes(2);
+    expect(loadPdfDocument).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("textbox", { name: "Title" })).toHaveValue("Original title");
   });
 });
 
