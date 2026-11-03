@@ -36,6 +36,7 @@ from .deadline import bounded, time_left
 from .dialects import DEFAULT_DIALECT, VendorDialect
 from .errors import ClassifiedError, ErrorKind, classify_message, classify_status_code
 from .ports import StreamDelta
+from .vision import ImageDescribingLLM, data_url
 from .tool_calling import (
     AssistantMessage,
     Message,
@@ -169,7 +170,7 @@ def _deadline_passed() -> "DeadlineExceeded":
     return DeadlineExceeded("the run's deadline has passed")
 
 
-class OpenAICompatibleAdapter(ToolCallingLLM):
+class OpenAICompatibleAdapter(ToolCallingLLM, ImageDescribingLLM):
     """`LLMProvider` and `ToolCallingLLM` over any OpenAI-compatible
     chat-completions endpoint."""
 
@@ -318,6 +319,21 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
     # -- the port -----------------------------------------------------------
 
     def generate(self, system: str, user: str) -> str:
+        return self.dialect.normalize_citation_markers(self._complete([
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]))
+
+    def describe_image(self, system: str, user: str, image: bytes, media_type: str) -> str:
+        return self._complete([
+            {"role": "system", "content": system},
+            {"role": "user", "content": [
+                {"type": "text", "text": user},
+                {"type": "image_url", "image_url": {"url": data_url(image, media_type)}},
+            ]},
+        ])
+
+    def _complete(self, messages: list) -> str:
         timeout = self._call_timeout()
         # An injected client is already configured -- it is how the request
         # shaping is tested without an account. Only the real one needs a key,
@@ -334,10 +350,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             mark_sent(model=self.model)
             response = client.chat.completions.create(
                 model=self.model,
-                messages=[
-                    {"role": "system", "content": system},
-                    {"role": "user", "content": user},
-                ],
+                messages=messages,
                 **self._temperature_kwargs(),
                 **extra,
             )
@@ -359,7 +372,7 @@ class OpenAICompatibleAdapter(ToolCallingLLM):
             # An empty string would render as an answer with no content and no
             # indication that anything went wrong.
             raise LLMUnavailable("the model returned an empty message")
-        return self.dialect.normalize_citation_markers(content)
+        return content
 
     def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
         """Genuine streaming (IR-325), for a model reachable behind this

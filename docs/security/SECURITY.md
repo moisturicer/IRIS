@@ -99,7 +99,7 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 **TLS.** nginx listens on plain 8080 and takes the scheme from the proxy in front of it, so TLS must end upstream. This repository doesn't configure that proxy (§11).
 
-**Django admin.** nginx closes `/django-admin/` except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)), but **Django still serves its admin at `/admin/`, which nginx leaves open**, because that path also carries IRIS's own pages. The allowlist protects the admin only once [IR-782](https://citiris.atlassian.net/browse/IR-782) moves it.
+**Django admin.** Django serves its admin only at `/django-admin/` ([IR-782](https://citiris.atlassian.net/browse/IR-782)), and nginx closes that path except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)). `/admin/...` and `/rdco/...` are IRIS's own pages: nginx serves them the app and proxies nothing there to Django.
 
 **`ai-gateway`** is adopted by [ADR-014](../adr/014-ai-gateway-as-a-service.md) under preconditions. It sets no CORS, publishes no port and refuses any request without the shared service secret (`ai/main.py`). **It still receives `DATABASE_URL`**, against ADR-014's "no direct DB access" (§11).
 
@@ -133,6 +133,15 @@ In production, `private` is an internal Compose network with no route to the int
 1. **A disclosure check before sending.** `apps/ai/policy/disclosure.py` refuses on IP status, embargo state and missing consent. An Unknown embargo is refused until someone answers: Publish asks first, and after submission owners or the Adviser set an embargo and the Adviser or RDCO release it ([IR-812](https://citiris.atlassian.net/browse/IR-812)).
 2. **Voyage's training opt-out**, an account setting. The repository can't show whether it was exercised (§11).
 3. **`VOYAGE_API_KEY` as a production secret.**
+
+[ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md) sends **whole Manuscript PDFs** to LlamaParse once [IR-842](https://citiris.atlassian.net/browse/IR-842) sets `EXTRACTION_BACKEND=llamaparse`. Until then Docling reads them on campus. Its conditions:
+
+1. **The same disclosure check**, read when a read is queued and again just before sending ([IR-850](https://citiris.atlassian.net/browse/IR-850)).
+2. **ADR-041 admission**, which refuses every read unless admission enforces.
+3. **No vendor copy kept.** Every job sets `disable_cache`, and the uploaded file is deleted afterwards. Retention in writing and the region are still ADR-056's open conditions, and no-training evidence is [IR-827](https://citiris.atlassian.net/browse/IR-827)'s (§11).
+4. **`LLAMAPARSE_API_KEY` and a dated `LLAMAPARSE_VERSION` as production settings.** Django won't start without them when LlamaParse is selected.
+
+The threat model's Django ↔ LlamaParse boundary ([ADR-053](../adr/053-threat-model.md), [IR-864](https://citiris.atlassian.net/browse/IR-864)) lists what each condition is for.
 
 IR-317's development bypass is deleted ([IR-815](https://citiris.atlassian.net/browse/IR-815)), and the indexing path no longer accepts a substitute for the check. Test papers get an answer instead: `load_corpus --clear-for-ai` and `mark_corpus_cleared` refuse with `DEBUG` off, and `--force` doesn't change that. Neither answers for a paper declared `institutional`, but neither can recognise a real paper whose origin was never declared, so they depend on `DEBUG` and on who runs them. `seed_demo` answers only for its own synthetic papers, whose text it wrote.
 
@@ -170,7 +179,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 
 | # | Risk | Severity | Why | Closed by |
 |---|---|---|---|---|
-| 1 | Django's admin is reachable from the internet at `/admin/`, guarded only by `is_staff`, with no MFA | **High** | One stolen staff password opens a separate path to the database | [IR-782](https://citiris.atlassian.net/browse/IR-782), then [IR-668](https://citiris.atlassian.net/browse/IR-668)'s allowlist applies (spec [IR-655](https://citiris.atlassian.net/browse/IR-655)) |
+| 1 | Django's admin has no MFA. Since IR-782 it is served only at `/django-admin/`, and nginx's network allowlist is the one control in front of `is_staff` | **High** | One stolen staff password, from an allowlisted network, opens a separate path to the database | MFA, once CIT-U IT provides an identity provider ([IR-652](https://citiris.atlassian.net/browse/IR-652)); the allowlist is [IR-668](https://citiris.atlassian.net/browse/IR-668) |
 | 2 | Uploads aren't scanned for malware | **High** | A hostile file reaches the parser and the people who download it | [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)) |
 | 3 | No backups and no rehearsed restore | **High** | A lost disk loses records that can't be recreated | [IR-167](https://citiris.atlassian.net/browse/IR-167) (parent [IR-151](https://citiris.atlassian.net/browse/IR-151)) |
 | 4 | TLS is configured but hasn't run on a deployed domain, and HSTS isn't confirmed for one | **High** | Passwords, tokens and unpublished work could be read in transit until it has | [IR-847](https://citiris.atlassian.net/browse/IR-847), [IR-806](https://citiris.atlassian.net/browse/IR-806) |
@@ -182,6 +191,8 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | A compromised gateway could read records past Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
 | 11 | Voyage's training opt-out has no recorded evidence | **Medium** | Nothing shows the vendor isn't training on unpublished text | [IR-827](https://citiris.atlassian.net/browse/IR-827) |
 | 12 | The ASVS checklist is a draft awaiting review | **Medium** | Its statuses come from reading code, and nobody has confirmed them | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
+| 13 | LlamaParse's retention and region aren't confirmed in writing, and there's no recorded no-training evidence for it | **Medium** | Whole unpublished Manuscripts would go to it at the cutover | ADR-056 open conditions 1–2 ([IR-848](https://citiris.atlassian.net/browse/IR-848)), [IR-827](https://citiris.atlassian.net/browse/IR-827) |
+| 14 | `celery-extraction` gets a route out at the LlamaParse cutover | **Medium** | A PDF that exploits the worker's own checks could then send data out, and `egress` can't filter by host (§7) | Accepted at the cutover ([IR-842](https://citiris.atlassian.net/browse/IR-842)). An outbound proxy would narrow it |
 
 [`SECURITY_CHECKLIST.md`](../testing/SECURITY_CHECKLIST.md) lists further Level 1 gaps: [IR-819](https://citiris.atlassian.net/browse/IR-819), [IR-820](https://citiris.atlassian.net/browse/IR-820), [IR-821](https://citiris.atlassian.net/browse/IR-821), [IR-822](https://citiris.atlassian.net/browse/IR-822), [IR-823](https://citiris.atlassian.net/browse/IR-823), [IR-824](https://citiris.atlassian.net/browse/IR-824), [IR-825](https://citiris.atlassian.net/browse/IR-825).
 

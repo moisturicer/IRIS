@@ -18,7 +18,8 @@ COLUMNS = "created_at,event_type,actor_id,actor_role,record_id,party,from_party,
 class AuditCsvTests(APITestCase):
     def setUp(self):
         self.rdco = make_user("csv@cit.edu", RoleName.RDCO)
-        self.client.force_authenticate(self.rdco)
+        # The export's only reader since IR-781; RDCO stays the events' actor.
+        self.client.force_authenticate(make_user("csv-reader@cit.edu", RoleName.SYSTEM_ADMIN))
 
     def read_csv(self, params=None):
         response = self.client.get(EXPORT, params or {})
@@ -65,8 +66,9 @@ class AuditCsvTests(APITestCase):
         listed = self.client.get("/api/v1/audit/", params)
         self.assertEqual(listed.data["count"], 25)
 
-    def test_non_rdco_roles_cannot_export_even_with_django_staff_flag(self):
-        for role in [RoleName.STUDENT, RoleName.ADVISER, RoleName.ITSO, RoleName.IERC, RoleName.KTTO, None]:
+    def test_no_one_but_the_system_admin_exports_even_with_django_staff_flag(self):
+        for role in [RoleName.STUDENT, RoleName.ADVISER, RoleName.ITSO, RoleName.IERC, RoleName.KTTO,
+                     RoleName.RDCO, None]:
             with self.subTest(role=role):
                 actor = make_user(f"{role or 'none'}@cit.edu", role)
                 actor.is_staff = True

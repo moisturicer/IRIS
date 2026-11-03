@@ -190,6 +190,9 @@ def ingest_extraction(
                 f"(status={extraction.status!r}). Extraction must succeed first."
             ),
         )
+    from apps.ai.figure_descriptions import with_descriptions
+
+    document = with_descriptions(document, extraction)
     options = _options_for_document(document, options)
     if not extraction.content_hash:
         raise _record_failure(

@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('documents', '0019_pdfextraction_raw_result'),
+        ('documents', '0021_extractionfigure_name_description'),
     ]
 
     operations = [

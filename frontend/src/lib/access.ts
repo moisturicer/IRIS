@@ -26,7 +26,7 @@
 import { ROLES, type RoleName } from "./constants";
 
 const EVERYONE: RoleName[] = [
-  ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO,
+  ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO, ROLES.SYSTEM_ADMIN,
 ];
 
 /**
@@ -54,6 +54,10 @@ const COORDINATOR: RoleName[] = [ROLES.RDCO];
 
 /** The four offices (`IsStaff` on the server). Not the Adviser, who has no office. */
 const OFFICES: RoleName[] = [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO];
+/** The System Admin alone: the Audit Log (ADR-051 §3, IR-781). */
+const SYSTEM_ADMIN: RoleName[] = [ROLES.SYSTEM_ADMIN];
+/** Who opens the Users page: RDCO gives Student and Adviser, the System Admin office roles. */
+const ACCOUNT_ADMINS: RoleName[] = [ROLES.RDCO, ROLES.SYSTEM_ADMIN];
 
 /**
  * The sidebar's groups (IR-413, spec §4.1). "Main" is one short, unlabelled
@@ -139,9 +143,10 @@ export const SCREEN_ACCESS = {
   // --- RDCO coordination -------------------------------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
                  nav: { label: "Import Records", icon: "fa-file-import", section: "Administration" } },
-  // Restored for RDCO by IR-478 after IR-160 removed it: the Django admin it
-  // was to move to never registered `User`, so nothing could reach this.
-  users:         { path: "/admin/users", roles: COORDINATOR,
+  // Restored for RDCO by IR-478 after IR-160 removed it. Django's admin site
+  // registers `User` since IR-781, but only to give the System Admin role:
+  // RDCO gives Student and Adviser here, and the System Admin office roles.
+  users:         { path: "/admin/users", roles: ACCOUNT_ADMINS,
                  nav: { label: "Users", icon: "fa-users", section: "Administration" } },
   roleRequests:  { path: "/admin/role-requests", roles: COORDINATOR,
                  nav: { label: "Role Requests", icon: "fa-user-check", section: "Administration" } },
@@ -149,7 +154,7 @@ export const SCREEN_ACCESS = {
                  nav: { label: "Download Requests", icon: "fa-download", section: "Administration" } },
   deleteRequests: { path: "/admin/delete-requests", roles: COORDINATOR,
                  nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "Administration" } },
-  audit:         { path: "/admin/audit", roles: COORDINATOR,
+  audit:         { path: "/admin/audit", roles: SYSTEM_ADMIN,
                  nav: { label: "Audit Log", icon: "fa-clipboard-list", section: "Administration" } },
 } as const satisfies Record<string, ScreenDef>;
 

@@ -11,6 +11,10 @@ def attachment_path(instance, filename):
     return f"documents/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
 
 
+def figure_path(instance, filename):
+    return f"figures/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
+
+
 class UploadSlot(models.Model):
     """
     Defines what kind of document a record type requires.
@@ -237,6 +241,36 @@ class PdfExtraction(models.Model):
 
         document = self.as_normalized_document()
         return flatten_for_search(document) if document is not None else ""
+
+
+class ExtractionFigure(models.Model):
+    """A Figure the Extractor cropped from a Manuscript (IR-845, ADR-056 §9).
+
+    Stored with the Manuscript in storage nothing serves directly, and read
+    only through the Figure endpoint, which resolves its Record through
+    ``visible_to``. ``source_revision`` is the Manuscript revision it was
+    cropped from, so a Figure is never served beside a different file.
+    ``bbox`` is the vendor's page-point box. An uncaptioned Figure is kept.
+    """
+
+    extraction = models.ForeignKey(PdfExtraction, on_delete=models.CASCADE, related_name="figures")
+    source_revision = models.UUIDField(editable=False)
+    page = models.PositiveIntegerField()
+    bbox = models.JSONField(default=dict, blank=True)
+    caption = models.TextField(blank=True)
+    media_type = models.CharField(max_length=32)
+    image = models.FileField(upload_to=figure_path, max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+    # The Extractor's image filename, which its image element also names (IR-852).
+    name = models.CharField(max_length=255, blank=True)
+    # Retrieval only (IR-852): embedded with the Figure's chunk, never shown.
+    description = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["page", "pk"]
+
+    def __str__(self):
+        return f"Figure {self.pk} extraction={self.extraction_id} page={self.page}"
 
 
 class ManuscriptMetadata(models.Model):

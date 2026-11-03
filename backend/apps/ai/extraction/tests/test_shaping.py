@@ -206,3 +206,20 @@ def test_an_unnumbered_peer_section_resets_the_outline_below_it():
 def test_an_all_caps_plural_is_not_a_caption(heading):
     element, = shape_llamaparse(result_with([{"type": "heading", "value": heading, "level": 2}])).elements
     assert element.kind == "heading"
+
+
+def test_an_image_is_named_after_its_file_even_when_grounding_omits_the_url():
+    raw = result_with([
+        {"type": "image", "url": "https://files.vendor.test/job/image_0.png?sig=x", "bbox": [{"x": 1, "y": 2, "w": 3, "h": 4}]},
+        {"type": "text", "value": "Prose."},
+        {"type": "image", "url": "image_1.png", "caption": "Figure 2: Second."},
+    ])
+    raw["grounded_items"] = [{"page_number": 1, "items": [
+        {"type": "image", "md": "", "bbox": [{"x": 1, "y": 2, "w": 3, "h": 4}]},
+        {"type": "text", "md": "Prose.", "value": "Prose."},
+        {"type": "image", "md": "", "caption": "Figure 2: Second."},
+    ]}]
+
+    figures = [e.figure for e in shape_llamaparse(raw).elements if e.kind == "image"]
+
+    assert figures == ["image_0.png", "image_1.png"]

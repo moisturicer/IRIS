@@ -72,8 +72,17 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
     # --- reading the log, as the evaluation will -------------------------------
 
     def events(self, record, *types):
-        """`record`'s workflow events through `GET /audit/`, oldest first."""
-        self.client.force_authenticate(self.rdco)
+        """`record`'s workflow events through `GET /audit/`, oldest first.
+
+        Read as the System Admin, the log's only reader since IR-781.
+        """
+        from apps.accounts.models import Role, User
+
+        reader = User.objects.filter(email="audit-reader@cit.edu").first() or User.objects.create_user(
+            email="audit-reader@cit.edu", password="pw12345!", is_verified=True,
+            role=Role.objects.get(name="System Admin"),
+        )
+        self.client.force_authenticate(reader)
         response = self.client.get(AUDIT, {"record": record.pk, "page_size": 100})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         rows = sorted(response.data["results"], key=lambda row: row["id"])

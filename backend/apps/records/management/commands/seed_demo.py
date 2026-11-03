@@ -93,13 +93,14 @@ COORDINATOR_ACCOUNTS = [
     ("rdco.coordinator@cit.edu", "Ramon", "Bautista", RoleName.RDCO),
 ]
 
-#: The seventh account: **a Django superuser holding no application role.**
+#: The seventh account: **the System Admin, and a Django superuser too.**
 #:
-#: `core.permissions.ADMIN_ROLES` is `{RDCO}` -- RDCO is IRIS's administrator,
-#: holding account administration, the audit log and the request queues. This
-#: account opens /admin and nothing else, because IR-165 deliberately left
-#: `is_superuser` with no API standing. Giving it a role would look harmless and
-#: quietly recreate the privilege bypass that ticket removed.
+#: The System Admin runs IRIS itself: the Audit Log, system settings and office
+#: roles (ADR-051 §3, IR-781). RDCO administers people's accounts and the request
+#: queues. The superuser flag only opens Django's admin site, because IR-165 left
+#: `is_superuser` with no API standing, so the role is what this account does in
+#: IRIS. ADR-051 §6 lets only this demo login hold both; a real System Admin is a
+#: named person's account and not a superuser.
 ADMIN_EMAIL = "admin@cit.edu"
 
 CLASSIFICATIONS = [
@@ -234,14 +235,15 @@ class Command(BaseCommand):
         admin, created = User.objects.get_or_create(
             email=ADMIN_EMAIL, defaults={"first_name": "Iris", "last_name": "Admin"},
         )
-        # role stays None deliberately -- see ADMIN_EMAIL's docstring.
+        admin.role = Role.objects.get_or_create(name=RoleName.SYSTEM_ADMIN)[0]
+        admin.is_office_coordinator = False
         admin.is_staff = True
         admin.is_superuser = True
         admin.is_verified = True
         admin.is_active = True
         admin.set_password(self.password)
         admin.save()
-        self._report(created, f"{ADMIN_EMAIL:26} Django superuser, no application role")
+        self._report(created, f"{ADMIN_EMAIL:26} System Admin, and a Django superuser")
 
         return users
 

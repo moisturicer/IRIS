@@ -272,6 +272,12 @@ def test_a_layout_figure_is_downloaded_with_its_page_and_caption():
     (figure,) = extracted.figures
     assert (figure.page, figure.media_type, figure.data) == (1, "image/png", b"\x89PNG crop")
     assert figure.caption == "Figure 1: A captioned rectangle."
+    assert figure.name == "image_0.png"
+    # IR-852 joins a stored Figure to its element on this name. The recorded
+    # grounding has no image, so shape from the items alone.
+    from apps.ai.extraction.shaping import shape_llamaparse
+    shaped = shape_llamaparse({**extracted.raw, "grounded_items": []})
+    assert figure.name in {e.figure for e in shaped.elements}
     assert figure.bbox == {"x": 72, "y": 300, "w": 200, "h": 100}
     downloads = [r for r in vendor.requests if r.url.host == "downloads.vendor.test"]
     assert "/images/page_1.jpg" not in [r.url.path for r in downloads]
