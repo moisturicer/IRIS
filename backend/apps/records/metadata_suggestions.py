@@ -19,6 +19,7 @@ from django.db import models
 from apps.ai.chunking.document import HEADING, PAGE_FOOTER, PAGE_HEADER, NormalizedDocument
 from apps.ai.extraction.serialization import document_from_json
 from apps.documents.models import DocumentKind, PdfExtraction
+from apps.documents.phases import ExtractionPhase
 
 SOURCE = "pdf_structure"
 
@@ -40,7 +41,7 @@ class SuggestionState(models.TextChoices):
 # Queued or running is still being read; done is readable; anything else --
 # ``failed``, or a status added to ``PdfExtraction.STATUS`` later -- is
 # treated as a failure, which the dialog shows as its neutral line.
-_READING = frozenset({"queued", "running"})
+_READING = frozenset({"queued", "running", "retrying"})
 _READ = "done"
 
 _ABSTRACT_HEADING = "abstract"
@@ -59,17 +60,11 @@ def suggestions_payload(record) -> dict:
     Suggestions are only ever read from a ``ready`` structure; a ready one
     with no title or *Abstract* heading gives nulls.
 
-    **Two known gaps, recorded rather than hidden.** A retrying extraction
-    reads ``failed`` between attempts (``_run_extraction`` saves the failure
-    before Celery retries it), and the dialog stops polling on ``failed``
-    until Details is opened again (IR-409), so a retry that succeeds while it
-    stays open offers no chips until then. And an image-only scan is
-    stored as ``failed`` (the extractor raises ``EmptyExtraction``), not as
-    the ``ready``-with-nulls spec §4.5 describes -- the dialog shows its
-    neutral line for it rather than nothing. Both are for the spec's owner.
+    Every value is bound to the currently accepted source revision (IR-830).
     """
     extraction = PdfExtraction.objects.filter(
-        record=record, kind=DocumentKind.MANUSCRIPT
+        record=record, kind=DocumentKind.MANUSCRIPT,
+        source_revision=record.manuscript_revision,
     ).first()
     state = _state(extraction)
     suggestions = {"title": None, "abstract": None}
@@ -79,11 +74,16 @@ def suggestions_payload(record) -> dict:
             "title": _title(document, record.abstract_file.name),
             "abstract": _abstract(document),
         }
-    return {"state": state.value, "suggestions": suggestions, "source": SOURCE}
+    return {"state": state.value, "suggestions": suggestions, "source": SOURCE,
+            "manuscript_revision": str(record.manuscript_revision) if record.manuscript_revision else None,
+            "phase": extraction.phase if extraction else "unsupported",
+            "retryable": bool(extraction and extraction.status == "failed"),
+            "message": extraction.reader_message if extraction else None}
 
 
 def _state(extraction: Optional[PdfExtraction]) -> SuggestionState:
-    if extraction is None:
+    # A read held for consent or release is not coming: the author types (IR-850).
+    if extraction is None or extraction.phase == ExtractionPhase.AWAITING_DISCLOSURE:
         return SuggestionState.UNSUPPORTED
     if extraction.status in _READING:
         return SuggestionState.PENDING

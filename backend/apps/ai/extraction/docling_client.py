@@ -33,6 +33,7 @@ from .ports import (
     ExtractedDocument,
     ExtractionError,
     ExtractorUnavailable,
+    Provenance,
 )
 
 EXTRACTOR_NAME = "docling"
@@ -90,6 +91,9 @@ class DoclingExtractor:
     per call and closed with it.
     """
 
+    #: Docling-serve runs in the deployment (IR-850): not gated, not admitted.
+    leaves_campus = False
+
     def __init__(
         self,
         base_url: str,
@@ -121,6 +125,10 @@ class DoclingExtractor:
         if do_formula_enrichment or do_code_enrichment:
             self._convert_options["code_formula_preset"] = _CODE_FORMULA_PRESET
 
+    @property
+    def timeout_seconds(self) -> float:
+        return self._timeout
+
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument:
         payload = self._convert(pdf_bytes, filename=filename)
         document = normalized_document_from_docling(payload, fallback_title=filename)
@@ -130,7 +138,8 @@ class DoclingExtractor:
                 f"Docling-serve returned no extractable content for {filename!r}. "
                 "The PDF may be empty, corrupt, or an image-only scan OCR could not read."
             )
-        return ExtractedDocument(document=document, extractor=EXTRACTOR_NAME)
+        # Legacy (ADR-056): no version is read from the server.
+        return ExtractedDocument(document=document, provenance=Provenance(name=EXTRACTOR_NAME))
 
     # -- HTTP ---------------------------------------------------------------
 

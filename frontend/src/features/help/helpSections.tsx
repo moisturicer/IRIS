@@ -139,7 +139,9 @@ export const HELP_SECTIONS: HelpSection[] = [
         <p>
           An embargo keeps a paper&rsquo;s text from going to outside AI companies. It doesn&rsquo;t
           hide the paper from people who can read it in IRIS.
-          Its date doesn&rsquo;t end the embargo, and text already sent can&rsquo;t be recalled.
+          Its date doesn&rsquo;t end the embargo. After you submit, only your Adviser or RDCO can,
+          by releasing it.
+          Text already sent can&rsquo;t be recalled.
         </p>
         <p>
           Once submitted, the record goes to your Adviser first. If anyone reviewing it asks for a

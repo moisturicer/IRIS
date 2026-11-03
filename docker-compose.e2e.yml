@@ -52,6 +52,10 @@ services:
     profiles: ["tls"]
 
   frontend:
+    # A published port needs a network with a route out (IR-825).
+    networks:
+      - private
+      - egress
     ports: !override
       - "${E2E_PORT:-8090}:8080"
     depends_on: !override
@@ -59,6 +63,9 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.27
+    networks:
+      - private
+      - egress
     restart: unless-stopped
     environment:
       # Django sends EMAIL_HOST_USER/PASSWORD because production settings

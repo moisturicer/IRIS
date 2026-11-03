@@ -1,7 +1,14 @@
 from django.db import models
+import uuid
+from pathlib import Path
 from django.utils import timezone
 
 from core.enums import DocumentRequestItemState, DocumentRequestState, Party
+from .phases import ExtractionPhase
+
+
+def attachment_path(instance, filename):
+    return f"documents/{uuid.uuid4().hex}{Path(filename).suffix.lower()}"
 
 
 class UploadSlot(models.Model):
@@ -42,7 +49,7 @@ class RecordUpload(models.Model):
     """
     record      = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="uploads")
     slot        = models.ForeignKey(UploadSlot, on_delete=models.CASCADE, related_name="uploads")
-    file        = models.FileField(upload_to="documents/")
+    file        = models.FileField(upload_to=attachment_path)
     version     = models.PositiveIntegerField(default=1)
     status      = models.ForeignKey(
         UploadStatus, on_delete=models.SET_NULL, null=True, blank=True, related_name="uploads"
@@ -128,6 +135,7 @@ class PdfExtraction(models.Model):
     STATUS = [
         ("queued",  "Queued"),
         ("running", "Running"),
+        ("retrying", "Retrying"),
         ("done",    "Done"),
         ("failed",  "Failed"),
     ]
@@ -140,6 +148,10 @@ class PdfExtraction(models.Model):
         null=True, blank=True,
     )
     status         = models.CharField(max_length=10, choices=STATUS, default="queued", db_index=True)
+    source_revision = models.UUIDField(null=True, blank=True, editable=False)
+    source_file = models.CharField(max_length=255, blank=True, editable=False)
+    attempt = models.UUIDField(null=True, blank=True, editable=False)
+    phase = models.CharField(max_length=24, choices=ExtractionPhase.choices, default=ExtractionPhase.QUEUED)
     # The RAG corpus boundary, stored on the row the chunker reads (IR-239).
     # Defaults to SUPPLEMENTARY so the failure mode is closed: a row whose
     # creator forgot to say what it holds is left out of the corpus rather
@@ -159,13 +171,30 @@ class PdfExtraction(models.Model):
     # ingestion on an unchanged document is a hash comparison rather than a
     # re-chunk. Indexed because that comparison is the lookup.
     content_hash   = models.CharField(max_length=64, blank=True, db_index=True)
-    # Which extractor produced the result. One value today; recorded anyway,
-    # so the question is answerable from the row rather than from its date.
+    # Which Extractor, version and options produced the result (IR-838), so
+    # the question is answerable from the row rather than from its date.
     extractor      = models.CharField(max_length=32, blank=True)
+    extractor_version = models.CharField(max_length=64, blank=True, default="")
+    extractor_options = models.JSONField(default=dict, blank=True)
     celery_task_id = models.CharField(max_length=200, blank=True)
+    # The reader's message; never an exception or a path (IR-839).
     error          = models.TextField(blank=True)
+    # Admin only: pages the Extractor could not read (IR-839).
+    warnings       = models.JSONField(default=list, blank=True)
+    # The vendor's whole result, kept for shaping without a paid re-read (IR-841).
+    # Admin only: it carries watermark text, which only staff see.
+    raw_result     = models.JSONField(default=dict, blank=True)
+    pages_read     = models.PositiveIntegerField(null=True, blank=True)
+    # Null when the vendor never reported a charge.
+    credits        = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
     created_at     = models.DateTimeField(auto_now_add=True)
     completed_at   = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def reader_message(self):
+        """A failed or held extraction's message (IR-839, IR-850); ``warnings`` stay admin-only."""
+        shown = self.status == "failed" or self.phase == ExtractionPhase.AWAITING_DISCLOSURE
+        return (self.error or None) if shown else None
 
     class Meta:
         ordering = ["-created_at"]
@@ -213,7 +242,7 @@ class RecordFile(models.Model):
     `attachments.py`).
     """
     record      = models.ForeignKey("records.Record", on_delete=models.CASCADE, related_name="files")
-    file        = models.FileField(upload_to="record_files/")
+    file        = models.FileField(upload_to=attachment_path)
     filename    = models.CharField(max_length=300)
     uploaded_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, related_name="record_files"

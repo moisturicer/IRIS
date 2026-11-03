@@ -318,6 +318,14 @@ cp backend/.env.example backend/.env
 - The application fails to start on a missing required secret rather than defaulting silently. `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have **no defaults**: `config/settings/base.py`'s `required()` raises `ImproperlyConfigured` naming the variable, and a value set to the empty string counts as missing
 - Production must run with `TRUSTED_PROXY_COUNT` set to the number of proxies in front of Django, nginx included (IR-656). `apps/accounts/client_address.py` reads the sign-in lockout's client address from it.
 - Compose publishes development Postgres and Redis on `127.0.0.1` only, and Redis requires `REDIS_PASSWORD` in both stacks (IR-669). `python scripts/setup_env.py` generates it in the repo-root `.env` when it is missing. **After pulling this change, run that script again**, or Compose stops by name. If a local Postgres or Redis already holds the port, Compose stops with "ports are not available": set `DB_HOST_PORT` or `REDIS_HOST_PORT` in the repo-root `.env`. A Django or Celery run on the host keeps using `backend/.env`. To point it at Compose's Redis, use `redis://:<REDIS_PASSWORD>@localhost:<port>/0`.
+- To test from a phone on the same network, publish the frontend for that session in the gitignored `docker-compose.override.yml`, then delete the file. Anyone on that network can reach the frontend meanwhile, so use it on a network you trust. This recipe hasn't been run on a phone yet.
+
+  ```yaml
+  services:
+    frontend:
+      ports: !override
+        - "5173:5173"
+  ```
 - `/django-admin/` answers 403 in production unless the client is in `DJANGO_ADMIN_ALLOWED_NETWORKS` (IR-668). Set it in the repo-root `.env`, as addresses or CIDRs separated by spaces or commas: `DJANGO_ADMIN_ALLOWED_NETWORKS=203.0.113.0/24, 198.51.100.7`. Empty allows nobody. With a value set, also put `TRUSTED_PROXY_COUNT` in that `.env`, matching `backend/.env`, because nginx reads the client address the same way. A bad value, `/0` or a missing count stops the frontend container. Restart it after a change: `docker compose -f docker-compose.prod.yml up -d frontend`. Port 80 must be reachable only from the TLS proxy, or a client could forge its address (IR-662). Development has no nginx, so it is unaffected. **Django serves its admin at `/admin/` until IR-782 moves it, and that path is not restricted until then.**
 - Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`. `config/settings/production.py` re-reads the last two without base's `localhost` default and refuses to start on an empty, `*` or non-https value
 
@@ -348,20 +356,49 @@ runs and pytest runs started from inside a locked run do not take it.
 the schema backwards and forwards) and a few tests marked by hand. `-m "not slow"`
 saves about five minutes locally. CI selects nothing and runs all of them.
 
-**Backend CI (IR-810)** runs the complete pytest collection across four isolated
-runners/PostgreSQL services. Whole test modules stay together, assigned by test
-count; tests within a shard retain collection order. This avoids sharing the
-database roles and migration state that integration tests mutate. The required
-`Backend` check passes only when all four shards succeed. Each shard retains
-its JUnit report as a `backend-tests-N` artifact and logs its slowest 25 tests.
-Static/configuration/migration checks and `IRIS_REQUIRE_DB=1` remain enabled.
-PR updates cancel that PR's obsolete run; main push runs remain independent.
+**Tests do not read your AI configuration (IR-853).** A test run reads only what
+CI supplies from `backend/.env`: `SECRET_KEY`, the two `RECOVERY_*` keys and the
+`DB_*` connection. Vendor keys, LLM profiles and AI switches there are ignored,
+so a local run tests the same configuration CI does and cannot reach a paid
+vendor. `testing/hermetic_env.py` sets `IRIS_DOTENV_ALLOWLIST` before Django
+loads; `config/settings/dotenv.py` applies it, and child processes inherit it.
+A value exported in your shell still applies, as it would in CI. To test with
+real settings, run the app, not the suite.
 
-The optional plugin is loaded only in CI (ordinary local pytest remains serial).
-The shard regression tests execute actual pytest subprocesses and verify that
-their union runs every collected test once, preserving module order. Shard
-balance currently uses counts; use the reports to judge elapsed time before
-claiming a speedup or changing the partition policy.
+**Full suite in parallel (IR-854).** After installing
+`backend/requirements/development.txt`, run `cd backend && python -m pytest -n 4`.
+Use fewer workers if memory or database connections are limited; `-n 0` runs
+serially. Every selected test still runs. pytest-django creates one migrated
+database per worker (`test_<DB_NAME>_gw0`, etc.). The controller holds IR-835's
+server lock before starting workers, so separate invocations cannot collide.
+Each worker restores migration-created lookup rows when moving from a test
+that flushes tables back to rollback-based tests. This preserves the initial data
+that serial pytest-django normally protects through test ordering.
+Whole modules stay on one worker, and the research-role consumers share one
+worker because Postgres roles belong to the server. Schema rewinds and advisory
+locks stay inside their worker's database. Tests launching child processes must
+pass the active connection's database name/DSN, as the existing process tests do.
+Run on Linux (or in a Linux container) for the PDF validation suites.
+
+**Backend CI (IR-810, IR-854)** runs the complete collection across four isolated
+runners/Postgres services. Complete modules are assigned longest-first to the
+shard with the lowest estimated duration, with stable path/index tie breaks.
+`backend/testing/module_durations.json` holds seconds including setup/teardown
+from successful CI run **41455637632** (2026-11-02). Unseen modules use **0.2 seconds
+per collected test**; old entries for removed modules are ignored. To refresh,
+download all four `backend-tests-*` JUnit artifacts from one successful run and
+execute, from `backend`:
+
+```bash
+python -m testing.timings path/to/shard1/pytest-results.xml path/to/shard2/pytest-results.xml path/to/shard3/pytest-results.xml path/to/shard4/pytest-results.xml
+```
+
+Commit the updated JSON. Duplicate cases and invalid durations are refused;
+keep reports from different runs separate. Refresh after substantial suite
+changes. The required `Backend` check still waits for all four shards.
+
+The CI shard plugin is opt-in; local runs use one process unless `-n` is supplied.
+Regression tests verify complete coverage and stable assignment.
 
 **AI gateway:** CI's `AI gateway` job runs `ai/tests` with `ai/requirements-dev.txt` (IR-844). Run it with `cd ai && python -m pytest -ra`.
 

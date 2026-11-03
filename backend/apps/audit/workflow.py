@@ -272,3 +272,35 @@ def document_request_withdrawn(request, actor, *, closed_by=BY_REQUESTING_PARTY)
         AuditEvent.DOCUMENT_REQUEST_WITHDRAWN, request, actor, _every_item(request),
         closed_by=closed_by, closed_by_decision=closed_by == BY_DECISION,
     )
+
+
+# --- a paper's embargo (ADR-052 §8) -------------------------------------------
+
+
+def _iso(day):
+    return day.isoformat() if day is not None else None
+
+
+def embargo_answered(record, actor, *, until) -> None:
+    _write(
+        AuditEvent.EMBARGO_ANSWERED, actor, record,
+        embargoed=until is not None, until=_iso(until),
+    )
+
+
+def embargo_set(record, actor, *, until, previous_state) -> None:
+    _write(
+        AuditEvent.EMBARGO_SET, actor, record,
+        until=_iso(until), previous_state=str(previous_state.value),
+    )
+
+
+def embargo_extended(record, actor, *, until, previous_until) -> None:
+    _write(
+        AuditEvent.EMBARGO_EXTENDED, actor, record,
+        until=_iso(until), previous_until=_iso(previous_until),
+    )
+
+
+def embargo_released(record, actor, *, until) -> None:
+    _write(AuditEvent.EMBARGO_RELEASED, actor, record, until=_iso(until))

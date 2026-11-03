@@ -46,6 +46,10 @@ OFFICE_ONLY = row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY)
 READS_RECORD = row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE)
 #: `record`, an owner's act: visible non-owners are refused, others hidden.
 OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE)
+# ADR-052 §5: owners or the Adviser set an embargo, and no office does.
+SETS_EMBARGO = row(ANON, HIDE, OK, OK, DENY, DENY, DENY, DENY, HIDE)
+# ADR-052 §6: the Adviser or RDCO release one, and never a student owner.
+RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE)
 #: `record`, the seated ITSO reviewer's act alone.
 SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE)
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
@@ -132,6 +136,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-embargo-answer": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"embargoed": False},
     )}),
+    "record-embargo-set": Entry({"POST": _case(
+        SETS_EMBARGO, kwargs=RECORD, data={"embargoed_until": "2099-01-01"},
+    )}),
+    "record-embargo-release": Entry({"POST": _case(RELEASES_EMBARGO, kwargs=RECORD)}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
@@ -154,6 +162,11 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # The manuscript's own text, for the person publishing it (IR-406).
     "record-metadata-suggestions": Entry({
         "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
+    }),
+    # IR-831: only an owner can explicitly retry the current Manuscript.
+    "record-retry-extraction": Entry({
+        "POST": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+                      kwargs=RECORD, data={}),
     }),
     # Any office, on any record it can see (decided 2026-10-11). A role gate
     # before lookup, so a non-office caller's 403 is the same for a missing id.
@@ -479,6 +492,11 @@ AI = {
     "ai-ask-run-grant": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant-renew": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-runtime-grant": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # Invalid scope tests the authentication gate without requiring deployment grant keys.
+    # Configured issuance and actual Record visibility are covered by test_runtime_reader_edge.
+    "ai-runtime-edge-grant": Entry({"GET": _case(
+        SIGNED_IN, headers={"HTTP_X_IRIS_RECORD": "invalid"},
+    )}),
     "ai-embed-record": Entry({"POST": _case(OFFICE_ONLY, kwargs=RECORD, data={})}),
     "ai-embed-all": Entry({"POST": _case(OFFICE_ONLY, data={})}),
     "ai-embed-jobs": Entry({"GET": _case(OFFICE_ONLY)}),

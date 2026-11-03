@@ -7,7 +7,10 @@ from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
+from .dotenv import restrict_dotenv
 from .validation import missing_required, non_blank, recovery_problems
+
+restrict_dotenv(config)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -75,6 +78,7 @@ LOCAL_APPS = [
     "apps.records",
     "apps.reviews",
     "apps.documents",
+    "apps.publication",
     "apps.notifications",
     "apps.audit",
     "apps.ai",
@@ -659,6 +663,12 @@ AI_ADMISSION_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_MAX_OUTPUT_TOKENS", defaul
 # Queued questions waiting or running at once, and per asker.
 AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
 AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
+# IR-850 (ADR-056 §6): what an off-campus read costs. A read reserves its
+# pages x (tier credits + add-on credits) x the credit's price, and settles to
+# the credits reported. Required for extraction only; none has a default.
+AI_ADMISSION_EXTRACTION_CREDIT_USD = config("AI_ADMISSION_EXTRACTION_CREDIT_USD", default="")
+AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", default="")
+AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", default="")
 # Added to an attempt's own timeout to make its lease. Not a spending limit.
 AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
 # IR-717 (ADR-049 §6-7): Django-signed research grants, verified inside
@@ -1100,6 +1110,8 @@ AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
 # (REDIS_URL in IR-132, EXTRACTION_TIMEOUT in the compose comments). The
 # inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
 # above.
+# Which Extractor reads manuscripts (IR-838); read only in apps.ai.extraction.
+EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="docling")
 DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction; Compose sets this to the service name
 # A scanned thesis through OCR is minutes of work, not seconds. This bounds
 # one conversion, not the Celery retry that wraps it.
@@ -1124,6 +1136,18 @@ DOCLING_DO_FORMULA_ENRICHMENT = config("DOCLING_DO_FORMULA_ENRICHMENT", default=
 DOCLING_DO_CODE_ENRICHMENT = config("DOCLING_DO_CODE_ENRICHMENT", default=True, cast=bool)
 # A 4M-parameter classifier; the mapper does not store its output yet.
 DOCLING_DO_PICTURE_CLASSIFICATION = config("DOCLING_DO_PICTURE_CLASSIFICATION", default=True, cast=bool)
+# LlamaParse (IR-841, ADR-056); read only in apps.ai.extraction. With
+# EXTRACTION_BACKEND=llamaparse Django refuses to start without a key and a
+# dated version ("latest" only with DEBUG on).
+LLAMAPARSE_API_KEY = config("LLAMAPARSE_API_KEY", default="")
+LLAMAPARSE_TIER = config("LLAMAPARSE_TIER", default="agentic")
+LLAMAPARSE_VERSION = config("LLAMAPARSE_VERSION", default="")
+LLAMAPARSE_BASE_URL = config("LLAMAPARSE_BASE_URL", default="https://api.cloud.llamaindex.ai")
+# One job's budget is base + per page x its page count.
+LLAMAPARSE_TIMEOUT_BASE_SECONDS = config("LLAMAPARSE_TIMEOUT_BASE_SECONDS", default=300, cast=int)
+LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS = config("LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS", default=30, cast=int)
+# Sizes the task's time limit when PDF_VALIDATION_MAX_PAGES is unset.
+LLAMAPARSE_MAX_PAGES = config("LLAMAPARSE_MAX_PAGES", default=1000, cast=int)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
 # path off the gateway — it posted to a route the gateway never registered, at
 # an endpoint returning no vector field — and Django now embeds in-process
@@ -1274,3 +1298,9 @@ USE_TZ = True
 
 # TODO: configure django-storages for S3 in production
 # TODO: configure Sentry in production settings
+# IR-830: missing limits disable PDF intake rather than permit an unlimited parser.
+PDF_VALIDATION_WALL_SECONDS = config("PDF_VALIDATION_WALL_SECONDS", default="", cast=lambda v: float(v) if v else None)
+PDF_VALIDATION_MEMORY_MIB = config("PDF_VALIDATION_MEMORY_MIB", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_PAGES = config("PDF_VALIDATION_MAX_PAGES", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_OBJECTS = config("PDF_VALIDATION_MAX_OBJECTS", default="", cast=lambda v: int(v) if v else None)
+PDF_VALIDATION_MAX_DEPTH = config("PDF_VALIDATION_MAX_DEPTH", default="", cast=lambda v: int(v) if v else None)

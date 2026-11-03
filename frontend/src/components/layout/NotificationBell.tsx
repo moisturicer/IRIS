@@ -95,7 +95,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
         aria-expanded={open}
         aria-haspopup="true"
         title="Notifications"
-        className="relative w-[34px] h-[34px] rounded-lg border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-colors"
+        className="relative w-[34px] h-[34px] rounded-lg border border-stone-200 flex items-center justify-center text-stone-600 hover:bg-stone-50 transition-colors"
       >
         <i className="fas fa-bell text-[15px]" aria-hidden />
         {unreadCount > 0 && (

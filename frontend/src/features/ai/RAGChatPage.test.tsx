@@ -168,7 +168,7 @@ describe("comparison picker (IR-574)", () => {
     const reopened = screen.getByRole("dialog", { name: "Compare papers" });
     await userEvent.type(within(reopened).getByRole("textbox", { name: "Search papers" }), "River{enter}");
     expect(askStream).not.toHaveBeenCalled();
-    await userEvent.click(within(reopened).getByRole("button", { name: "Close", exact: true }));
+    await userEvent.click(within(reopened).getByRole("button", { name: /^Close$/ }));
     expect(askStream).not.toHaveBeenCalled();
     expect(composer).toHaveValue("Compare their methods");
   });
@@ -225,6 +225,30 @@ describe("comparison picker (IR-574)", () => {
 });
 
 describe("persisted conversations", () => {
+  it("uses AA secondary text and omits the persistent keyboard hint (IR-771, IR-365)", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" })] });
+    get.mockResolvedValue({ data: detail({ id: 9, title: "Flooding" }) });
+
+    renderScreen(<RAGChatPage />);
+
+    expect(await screen.findByText("Ask IRIS")).toHaveClass("text-stone-600");
+    expect(screen.queryByText("Enter to send · Shift+Enter for new line")).toBeNull();
+    const conversation = screen.getByRole("link", { name: /Flooding/ });
+    expect(conversation).toHaveClass("bg-brand-50", "text-brand");
+    expect(within(conversation).getByText(/Sep 20/)).toHaveClass("text-stone-600");
+  });
+
+  it("keeps retrieval-only mode soft maroon and identifiable by icon and text (IR-365)", async () => {
+    status.mockResolvedValue({ data: { generative: false, indexed_records: 4 } as AIStatus });
+
+    renderScreen(<RAGChatPage />);
+
+    const label = await screen.findByText(/Retrieval-only mode/i);
+    const banner = label.closest("div");
+    expect(banner).toHaveClass("bg-brand-50", "text-brand");
+    expect(banner?.querySelector("svg")).not.toBeNull();
+  });
+
   it("announces a throttled question with the server's wait", async () => {
     useUIStore.setState({ toasts: [] });
     list.mockResolvedValue({ data: [summary()] });
@@ -325,7 +349,7 @@ describe("persisted conversations", () => {
     await userEvent.click(screen.getByRole("button", { name: /delete flooding/i }));
     const dialog = await screen.findByRole("dialog", { name: "Delete conversation?" });
     expect(remove).not.toHaveBeenCalled();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Delete conversation", exact: true }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /^Delete conversation$/ }));
     await waitFor(() => expect(remove).toHaveBeenCalledWith(9));
     expect(create).toHaveBeenCalled();
   });
@@ -357,7 +381,7 @@ describe("persisted conversations", () => {
     renderScreen(<RAGChatPage />);
     await userEvent.click(await screen.findByRole("button", { name: "Delete Flooding" }));
     const dialog = await screen.findByRole("dialog", { name: "Delete conversation?" });
-    await userEvent.click(within(dialog).getByRole("button", { name: "Delete conversation", exact: true }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /^Delete conversation$/ }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent(/could not delete/i);
     expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeEnabled();
     expect(screen.getByRole("link", { name: /Flooding/ })).toBeInTheDocument();
@@ -665,7 +689,8 @@ describe("owned conversation URLs (IR-548)", () => {
 
     renderRoutes("/ai/conversations/404");
 
-    expect(await screen.findByText(/this conversation is not available/i)).toBeTruthy();
+    const message = await screen.findByText(/this conversation is not available/i);
+    expect(message.parentElement).toHaveClass("bg-brand", "text-white");
     expect(create).not.toHaveBeenCalled();
     expect(askStream).not.toHaveBeenCalled();
     expect((screen.getByRole("textbox", { name: /ask a follow-up/i }) as HTMLTextAreaElement).disabled).toBe(true);

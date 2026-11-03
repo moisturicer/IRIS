@@ -51,7 +51,7 @@ export function ChatToolbar({
       </button>
 
       <div className="min-w-0 flex-1 px-1">
-        <p className="text-[12px] font-semibold uppercase tracking-wider text-stone-400 truncate">
+        <p className="text-[12px] font-semibold uppercase tracking-wider text-stone-600 truncate">
           Ask IRIS
         </p>
         <p className="text-[15px] font-semibold text-stone-900 truncate">{sessionTitle}</p>

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it), IR-816 adds the question itself, and IR-815 adds decisions 16 and 17: test data answers for itself, and IR-317's bypass is gone. Decision 2 is amended and decision 18 added in the Amendment below. The acts, the reminders and the bypass's removal are still to come.
+**Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it), IR-816 adds the question itself, IR-815 adds decisions 16 and 17 (test data answers for itself, and IR-317's bypass is gone), and IR-812 adds decisions 5 to 8 and 10 (setting, extending and releasing). Decision 6 is clarified in the IR-812 Amendment below. Decision 2 is amended and decision 18 added in the Amendment below. KTTO's release (IR-813), Paper View's controls (IR-817), RDCO's warning (IR-818) and the reminders (IR-814) are still to come.
 
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
@@ -147,3 +147,18 @@ IR-250 (builds this) · IR-317 (the bypass it removes) · IR-127 (the gate) · I
 - A toggle's answer saved only at submission is lost when a student closes the dialog and comes back, which can turn a Yes into a No.
 
 **What it costs.** One more screen and one more click on every submission. Under Yes, authors type their own title and abstract. The server does not refuse a file on an unanswered draft: Publish's order enforces "answer first", and the gate still refuses an unanswered paper.
+
+## Amendment — 2026-11-02 (IR-812): a released paper can be held again
+
+Decided by Hermoine Zozobrado while building IR-812.
+
+**Decision 6 says "a release can't be undone". That's about text that has already left, and it doesn't stop a new embargo.** Decision 5 lets owners or the Adviser set an embargo, and a released paper is no exception. Further sending stops, the response says text already sent can't be recalled, and only the Adviser or RDCO can release it again. The audit log keeps every step.
+
+**What it costs.** A student owner can overrule their Adviser's release, until the Adviser or RDCO releases it again. That errs toward holding text back, which is the direction a mistake here should go, because a wrong release can't be taken back and a wrong hold can.
+
+**Two rules that follow from decisions already made:**
+
+- **A date may move earlier as well as later.** It's a reminder and ends nothing (decision 9), so nothing is gained by refusing it.
+- **An earlier chat answer is the paper's text.** A Turn citing a paper the check now refuses stays out of chat history, recall and the answer backfill, and the reader keeps it in their own transcript.
+
+**What this doesn't catch.** IRIS knows what an answer drew on from what it cites, because a Turn stores nothing else. An answer that repeats a paper without citing it, or a later answer that restates an earlier one while citing a different paper, still goes back to the model. Closing that means storing every passage a model was shown, per Turn, which is a schema change and isn't built.

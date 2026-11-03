@@ -86,6 +86,9 @@ class Request:
     #: The completion cap sent with the request; ``None`` if it has none.
     output_tokens: Optional[int]
     timeout_seconds: float
+    #: A worst case the caller priced itself -- an extraction, by pages
+    #: (IR-850). Only a reported cost replaces it at settlement.
+    cost_micros: Optional[int] = None
 
 
 def account_for(key: str) -> str:
@@ -177,7 +180,9 @@ def admit(request: Request) -> "Ticket":
         raise _deny(errors.NOT_CONFIGURED, lane) from None
     if request.output_tokens is None:
         raise _deny(errors.UNBOUNDED_OUTPUT, lane)
-    cost = _worst_cost(limits, request.models, request.input_tokens, request.output_tokens)
+    cost = request.cost_micros
+    if cost is None:
+        cost = _worst_cost(limits, request.models, request.input_tokens, request.output_tokens)
     if cost is None:
         raise _deny(errors.UNPRICED_MODEL, lane)
     lease = timedelta(seconds=max(0.0, request.timeout_seconds) + limits.lease_grace_seconds)
@@ -361,10 +366,13 @@ class Ticket:
             output_tokens = (
                 reservation.reserved_output_tokens if usage.output_tokens is None else usage.output_tokens
             )
-            models = (usage.model,) if usage.model in self._limits.prices else self._request.models
-            cost = _worst_cost(self._limits, models, input_tokens, output_tokens)
+            cost = None
+            if self._request.cost_micros is None:
+                models = (usage.model,) if usage.model in self._limits.prices else self._request.models
+                cost = _worst_cost(self._limits, models, input_tokens, output_tokens)
             if usage.cost_usd is not None and usage.reported:
-                cost = math.ceil(usage.cost_usd * 1_000_000)
+                # Rounded first, so float noise cannot add a micro-dollar.
+                cost = math.ceil(round(usage.cost_usd * 1_000_000, 6))
             charge = {
                 "attempts": 1,
                 "input_tokens": input_tokens,

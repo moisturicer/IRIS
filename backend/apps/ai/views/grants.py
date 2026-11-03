@@ -9,7 +9,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.ai.grants import config, database, issue
+from apps.ai.grants import config, database, issue, reads
 
 
 def _owned_run(user, pk):
@@ -85,3 +85,27 @@ class ReaderSessionGrantView(APIView):
             return Response({"status": "invalid"}, status=400)
         return _outcome(
             lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
+
+
+class RuntimeEdgeGrantView(APIView):
+    """Authenticate a same-origin nginx subrequest; no service credential leaves nginx."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        raw = request.headers.get("X-IRIS-Record")
+        record_id = None
+        if raw:
+            if not raw.isascii() or not raw.isdigit() or len(raw) > 19:
+                return Response({"status": "invalid"}, status=400)
+            record_id = int(raw)
+            if not 0 < record_id < 2**63:
+                return Response({"status": "invalid"}, status=400)
+            if not reads.research_records(request.user, scope_record_id=record_id).exists():
+                raise Http404
+        result = _outcome(lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
+        if result.status_code != 201:
+            return Response(status=403)
+        return Response(status=204, headers={
+            "X-IRIS-Reader-Grant": result.data["grant"], "Cache-Control": "no-store",
+        })

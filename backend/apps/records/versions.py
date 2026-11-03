@@ -146,8 +146,18 @@ def restore_submitted_manuscript(record) -> bool:
     """
     if not stored_manuscript_unsubmitted(record):
         return False
-    record.abstract_file = latest_version(record).manuscript.name or None
-    record.save(update_fields=["abstract_file", "updated_at"])
+    submitted = latest_version(record)
+    record.abstract_file = submitted.manuscript.name or None
+    for field in ("manuscript_revision", "manuscript_sha256", "manuscript_filename"):
+        setattr(record, field, getattr(submitted, field))
+    record.save(update_fields=["abstract_file", "updated_at", "manuscript_revision",
+                               "manuscript_sha256", "manuscript_filename"])
+    # The discarded revision never entered research. Keep the submitted chunks
+    # and discard its pending status rather than re-extracting the submitted file.
+    from apps.documents.models import PdfExtraction
+    PdfExtraction.objects.filter(record=record).exclude(
+        source_revision=record.manuscript_revision,
+    ).delete()
     return True
 
 
@@ -202,5 +212,8 @@ def write_version(record, actor, cause: VersionCause) -> RecordVersion:
         number=(previous or 0) + 1,
         cause=cause,
         manuscript=record.abstract_file.name or None,
+        manuscript_revision=record.manuscript_revision,
+        manuscript_sha256=record.manuscript_sha256,
+        manuscript_filename=record.manuscript_filename,
         created_by=created_by,
     )

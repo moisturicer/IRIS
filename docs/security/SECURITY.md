@@ -105,17 +105,38 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 **Tenancy** is one instance per tenant ([ADR-005](../adr/005-instance-per-tenant.md)). Each institution gets its own database and media volume, so a missing tenant filter can't leak across institutions.
 
+
+### Outbound traffic
+
+In production, `private` is an internal Compose network with no route to the internet ([IR-825](https://citiris.atlassian.net/browse/IR-825)).
+
+| Service | Reaches outside | Why |
+|---|---|---|
+| `db`, `redis`, `migrate` | Nothing | Internal only |
+| `docling` | Nothing | It parses uploaded PDFs, so a hostile file stays contained. Its models are in the image |
+| `frontend` | Nothing | It serves files and forwards to `backend` |
+| `celery-extraction` | Nothing | It only calls Docling |
+| `celery-beat` | Nothing | It only queues tasks |
+| `backend`, `celery-default` | AI vendors, mail server | Answers and email |
+| `celery-embedding`, `celery-shadow` | AI vendors | Embedding, overviews and evidence decisions |
+| `ai-gateway` | AI vendors | Chat |
+| `caddy` | The certificate authority | Getting and renewing certificates |
+
+**Services on `egress` can reach any host, not only those listed.** Compose can't filter by hostname, and vendors' addresses change, so limiting them needs an outbound proxy, which IRIS doesn't run.
+
 ---
 
 ## 8 · External AI services
 
 [ADR-015](../adr/015-voyage-embedding-and-reranking.md) sends chunk text to Voyage, and it dropped the earlier written sign-off precondition on 2026-09-04. Its remaining conditions:
 
-1. **A disclosure check before sending.** `apps/ai/policy/disclosure.py` refuses on IP status, embargo state and missing consent. An Unknown embargo is refused, and nothing yet sends an embargo answer, so **new submissions stay refused until [IR-250](https://citiris.atlassian.net/browse/IR-250) finishes**.
+1. **A disclosure check before sending.** `apps/ai/policy/disclosure.py` refuses on IP status, embargo state and missing consent. An Unknown embargo is refused until someone answers: Publish asks first, and after submission owners or the Adviser set an embargo and the Adviser or RDCO release it ([IR-812](https://citiris.atlassian.net/browse/IR-812)).
 2. **Voyage's training opt-out**, an account setting. The repository can't show whether it was exercised (§11).
 3. **`VOYAGE_API_KEY` as a production secret.**
 
 IR-317's development bypass is deleted ([IR-815](https://citiris.atlassian.net/browse/IR-815)), and the indexing path no longer accepts a substitute for the check. Test papers get an answer instead: `load_corpus --clear-for-ai` and `mark_corpus_cleared` refuse with `DEBUG` off, and `--force` doesn't change that. Neither answers for a paper declared `institutional`, but neither can recognise a real paper whose origin was never declared, so they depend on `DEBUG` and on who runs them. `seed_demo` answers only for its own synthetic papers, whose text it wrote.
+
+An earlier chat answer citing a paper the check now refuses stays out of history, recall and the answer backfill ([IR-812](https://citiris.atlassian.net/browse/IR-812)), because it holds that paper's text. It goes by what a Turn cites, so an answer repeating a paper without citing it isn't caught.
 
 `apps/ai/policy/outbound.py` rechecks withheld or revoked sources before each provider attempt ([IR-720](https://citiris.atlassian.net/browse/IR-720), partially implemented and awaiting review). Retrieval is filtered by `visible_to(user)` before anything is scored.
 
@@ -161,7 +182,6 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | A compromised gateway could read records past Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
 | 11 | Voyage's training opt-out has no recorded evidence | **Medium** | Nothing shows the vendor isn't training on unpublished text | [IR-827](https://citiris.atlassian.net/browse/IR-827) |
 | 12 | The ASVS checklist is a draft awaiting review | **Medium** | Its statuses come from reading code, and nobody has confirmed them | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
-| 13 | Development `backend`, `frontend` and `docling` listen on every interface | **Low** | Exposes development machines to their local network, not production | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
 
 [`SECURITY_CHECKLIST.md`](../testing/SECURITY_CHECKLIST.md) lists further Level 1 gaps: [IR-819](https://citiris.atlassian.net/browse/IR-819), [IR-820](https://citiris.atlassian.net/browse/IR-820), [IR-821](https://citiris.atlassian.net/browse/IR-821), [IR-822](https://citiris.atlassian.net/browse/IR-822), [IR-823](https://citiris.atlassian.net/browse/IR-823), [IR-824](https://citiris.atlassian.net/browse/IR-824), [IR-825](https://citiris.atlassian.net/browse/IR-825).
 
@@ -185,6 +205,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | Lockout counted the proxy's address, not the client's | [IR-656](https://citiris.atlassian.net/browse/IR-656) |
 | A revoked session's access token kept working | [IR-657](https://citiris.atlassian.net/browse/IR-657) |
 | CI didn't run `ai/tests`, including the gateway's service authentication test | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
+| Development `backend`, `frontend` and `docling` listened on every interface | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
 | Production HTTPS redirect loop behind the proxy | [IR-662](https://citiris.atlassian.net/browse/IR-662) |
 | No browser security headers | [IR-663](https://citiris.atlassian.net/browse/IR-663) |
 | Uploads accepted without checking the content was a PDF | [IR-665](https://citiris.atlassian.net/browse/IR-665) |
