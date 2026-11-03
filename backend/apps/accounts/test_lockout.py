@@ -94,6 +94,7 @@ class AxesLockoutTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
 
+@override_settings(AXES_ENABLED=True)
 class AsgiLockoutTests(APITestCase):
     """
     Production serves Django over ASGI, where axes' middleware runs its async
