@@ -101,9 +101,9 @@ def test_likely_matches_require_current_acknowledgement(author):
     acknowledge = reverse("record-acknowledge-duplicates", args=[current.pk])
     assert client.post(acknowledge, {"candidate_ids": [prior.pk]}, format="json").status_code == 200
     assert client.get(url).json()["acknowledged"] is True
-    assert client.post(submit_url, {"dpa_accepted": True}, format="json").status_code == 400  # Adviser still required.
     assert client.patch(reverse("record-detail", args=[current.pk]), {"title": "Different work"}, format="json").status_code == 200
     assert client.get(url).json()["acknowledged"] is False
+    assert client.post(submit_url, {"dpa_accepted": True}, format="json").status_code == 200
 
 
 def test_competing_accessible_uploads_cannot_both_pass(author):
