@@ -43,8 +43,9 @@ ROLES = (
     "seated",       # an ITSO reviewer holding an open, opened seat on it
     "unseated",     # an ITSO member in the pool, with no seat on it
     "coordinator",  # an ITSO coordinator, seated nowhere
-    "rdco",         # RDCO, IRIS's administrator role, seated nowhere
+    "rdco",         # RDCO, which administers people's accounts, seated nowhere
     "admin",        # a Django superuser with no application role (IR-165)
+    "sysadmin",     # the System Admin, which runs IRIS and holds no workflow access (IR-781)
 )
 
 #: An id no fixture has. Every object route is also fired with each of its ids
@@ -143,6 +144,7 @@ def _users() -> dict[str, User | None]:
         "rdco": seeded[RoleName.RDCO],
         "routing_officer": _user("rdco-routing@cit.edu", RoleName.RDCO),
         "admin": admin,
+        "sysadmin": _user("matrix-sysadmin@cit.edu", RoleName.SYSTEM_ADMIN),
     }
 
 

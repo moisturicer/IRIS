@@ -5,6 +5,8 @@
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { useAuthStore } from "@/store/auth.store";
+
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
 import type { UserListItem } from "@/types/auth";
@@ -46,7 +48,14 @@ async function rowFor(email: string) {
   return (await screen.findByRole("row", { name: new RegExp(email) }));
 }
 
+/** The viewer the page is opened by. The System Admin gives office roles and the
+ * coordinator flag, so most tests open it as one (IR-781, deliberately). */
+function signInAs(role_name: string) {
+  useAuthStore.setState({ user: { id: 99, email: "viewer@cit.edu", role_name } as never, isAuthenticated: true });
+}
+
 beforeEach(() => {
+  signInAs("System Admin");
   userList.mockResolvedValue(listing([MEMBER, COORDINATOR, STUDENT, ADVISER]));
 });
 
@@ -246,5 +255,56 @@ describe("a list that fails to load (IR-745)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await rowFor(STUDENT.email)).toBeInTheDocument();
+  });
+});
+
+
+// Who gives which role, and who locks, is the server's (ADR-051 §4-5, amended,
+// IR-781). The page offers each viewer only what the server will let them do.
+describe("what each viewer is offered (IR-781)", () => {
+  const ADMIN = user({ id: 6, email: "sysadmin@cit.edu", role_name: "System Admin" });
+  const buttons = (row: HTMLElement) => within(row).queryAllByRole("button").map((b) => b.textContent);
+
+  beforeEach(() => {
+    userList.mockResolvedValue(listing([MEMBER, STUDENT, ADMIN]));
+  });
+
+  it("offers RDCO Student and Adviser for someone outside the offices, and Lock", async () => {
+    signInAs("RDCO");
+    renderScreen(<UserListPage />);
+
+    const student = await rowFor("student@cit.edu");
+    expect(buttons(student)).toEqual(["Change role", "Lock"]);
+    await userEvent.click(within(student).getByRole("button", { name: "Change role" }));
+    const options = within(screen.getByRole("dialog")).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toEqual(["Student", "Adviser"]);
+  });
+
+  it("offers RDCO no role change or coordinator on an office row, only Lock", async () => {
+    signInAs("RDCO");
+    renderScreen(<UserListPage />);
+
+    expect(buttons(await rowFor("itso@cit.edu"))).toEqual(["Lock"]);
+  });
+
+  it("offers nobody anything on a System Admin's row", async () => {
+    for (const role of ["RDCO", "System Admin"]) {
+      signInAs(role);
+      const view = renderScreen(<UserListPage />);
+      expect(buttons(await rowFor("sysadmin@cit.edu"))).toEqual([]);
+      view.unmount();
+    }
+  });
+
+  it("offers the System Admin every role but its own, and the coordinator flag, and no Lock", async () => {
+    renderScreen(<UserListPage />);
+
+    const member = await rowFor("itso@cit.edu");
+    expect(buttons(member)).toEqual(["Change role", "Make coordinator"]);
+    await userEvent.click(within(member).getByRole("button", { name: "Change role" }));
+    const options = within(screen.getByRole("dialog")).getAllByRole("option").map((o) => o.textContent);
+    expect(options).toContain("ITSO");
+    expect(options).toContain("RDCO");
+    expect(options).not.toContain("System Admin");
   });
 });

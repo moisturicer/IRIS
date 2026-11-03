@@ -33,7 +33,7 @@ Use the assets, actors, boundaries and threats below as the threat model. Each t
 | Student | Owns their records and reads the public catalogue |
 | Adviser | Also reads records they advise |
 | Office reviewer | Reads what their office reviews |
-| RDCO | Holds administrator powers today, until [IR-781](https://citiris.atlassian.net/browse/IR-781) |
+| RDCO | Administers people's accounts and the request queues, and gives Student and Adviser. The Audit Log, system settings and office roles moved to the System Admin in [IR-781](https://citiris.atlassian.net/browse/IR-781) |
 | Django superuser | Holds Django's admin site, a separate path to the database |
 | Compromised account | Any of the above, used by someone else |
 | Prompt injection through an uploaded paper | Text in a PDF that tries to instruct a model reading it |

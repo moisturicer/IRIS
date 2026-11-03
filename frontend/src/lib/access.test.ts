@@ -31,7 +31,7 @@ import { expect, test } from "vitest";
 
 
 const EVERY_ROLE: RoleName[] = [
-  ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO,
+  ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO, ROLES.SYSTEM_ADMIN,
 ];
 
 // --- assertions ------------------------------------------------------------
@@ -121,7 +121,14 @@ test("RDCO's coordination screens, Import Records included, are one Administrati
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
     "Administration: Import Records", "Administration: Users", "Administration: Role Requests", "Administration: Download Requests",
-    "Administration: Delete Requests", "Administration: Audit Log",
+    "Administration: Delete Requests",
+  ]);
+});
+
+test("the System Admin's nav is the main list, Users and the Audit Log (IR-781)", () => {
+  expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
+    "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: Calls & Conferences",
+    "Administration: Users", "Administration: Audit Log",
   ]);
 });
 
@@ -162,13 +169,16 @@ test("My Reviews is listed only when the server says the user has review work", 
 // --- RDCO coordination -----------------------------------------------------
 
 test("RDCO alone holds the coordination screens", () => {
-  // Audit is the headline case: AUDIT_LOG_ROLES has said [RDCO] all along and
-  // was never wired to anything.
-  only("audit", [ROLES.RDCO]);
   only("roleRequests", [ROLES.RDCO]);
   only("downloadRequests", [ROLES.RDCO]);
   only("deleteRequests", [ROLES.RDCO]);
   only("importRecords", [ROLES.RDCO]);
+});
+
+test("the System Admin alone reads the Audit Log, and shares Users with RDCO (ADR-051 §3-4)", () => {
+  // Changed deliberately by IR-781: the Audit Log was RDCO's.
+  only("audit", [ROLES.SYSTEM_ADMIN]);
+  only("users", [ROLES.RDCO, ROLES.SYSTEM_ADMIN]);
 });
 
 test("KTTO is not an administrator", () => {

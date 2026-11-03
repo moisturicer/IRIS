@@ -11,6 +11,7 @@ from rest_framework_simplejwt.token_blacklist.models import OutstandingToken
 
 from apps.accounts.models import Role, User
 from apps.accounts.test_sessions import LOGIN, PASSWORD, REFRESH, SessionTestBase
+from core.enums import RoleName
 
 
 class AccountSessionTestBase(SessionTestBase):
@@ -46,9 +47,15 @@ class AccountSessionTestBase(SessionTestBase):
         self.assertEqual(response.data["code"], code)
 
     def audit_events(self, event_type):
-        response = self.client.get(
-            "/api/v1/audit/", {"event_type": event_type}, **self.admin_headers,
+        # The Audit Log is the System Admin's alone (IR-781), read here through
+        # its own client so this test's token-based client is left as it is.
+        reader = User.objects.filter(email="session-audit-reader@cit.edu").first() or User.objects.create_user(
+            email="session-audit-reader@cit.edu", password=PASSWORD, is_verified=True,
+            role=Role.objects.get(name=RoleName.SYSTEM_ADMIN),
         )
+        client = APIClient()
+        client.force_authenticate(reader)
+        response = client.get("/api/v1/audit/", {"event_type": event_type})
         self.assertEqual(response.status_code, 200, response.content)
         return response.data["results"]
 

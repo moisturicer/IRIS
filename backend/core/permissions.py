@@ -16,11 +16,23 @@ ROLE_KTTO    = RoleName.KTTO
 ROLE_RDCO    = RoleName.RDCO
 ROLE_ITSO    = RoleName.ITSO
 ROLE_IERC    = RoleName.IERC
+ROLE_SYSTEM_ADMIN = RoleName.SYSTEM_ADMIN
 
 # Convenience sets
 REVIEWER_ROLES = {ROLE_ADVISER, ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}
 STAFF_ROLES    = {ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}
+# RDCO administers people's accounts and the request queues. It is not IRIS's
+# administrator: the System Admin is (ADR-051 §1), and holds no workflow access,
+# so it is in none of the sets above.
 ADMIN_ROLES    = {ROLE_RDCO}
+#: The roles RDCO may give, to someone outside the offices (ADR-051 §4, amended).
+#: Office roles are the System Admin's to give, and the System Admin role itself
+#: is given only in Django's admin site.
+RDCO_GIVES     = {ROLE_STUDENT, ROLE_ADVISER}
+#: Who opens the Users page: RDCO and the System Admin.
+ACCOUNT_ADMIN_ROLES = ADMIN_ROLES | {ROLE_SYSTEM_ADMIN}
+#: What `get_role_name` returns for an account with no role yet.
+NO_ROLE = ""
 # Who may author a disclosure. SRS Use Cases M2-2.1 (Create IP Disclosure Draft)
 # and M2-2.2 (Submit Record for Review) both name the actor "Record Owner
 # (Student or Adviser)". Deliberately excludes the clearing offices -- ITSO,
@@ -120,9 +132,47 @@ class IsStaff(BasePermission):
 
 
 class IsAdmin(BasePermission):
-    """RDCO alone: account administration, the audit log, and the request queues."""
+    """RDCO alone: account administration and the request queues."""
     def has_permission(self, request, view):
         return get_role_name(request.user) in ADMIN_ROLES
+
+
+def is_system_admin(user) -> bool:
+    return get_role_name(user) == ROLE_SYSTEM_ADMIN
+
+
+class IsSystemAdmin(BasePermission):
+    """
+    The System Admin alone: the Audit Log, system settings and office roles
+    (ADR-051 §3). `is_superuser` grants nothing here, as everywhere (IR-165).
+    """
+    def has_permission(self, request, view):
+        return is_system_admin(request.user)
+
+
+class IsAccountAdmin(BasePermission):
+    """RDCO or the System Admin: the Users page and its role changes."""
+    def has_permission(self, request, view):
+        return get_role_name(request.user) in ACCOUNT_ADMIN_ROLES
+
+
+def role_change_refusal(actor, target, role) -> str | None:
+    """
+    Why `actor` may not give `target` the role `role`, or None when they may.
+
+    Nobody gives or changes the System Admin role through IRIS: it is given in
+    Django's admin site (ADR-051 §5, amended). The System Admin gives any other
+    role. RDCO gives Student or Adviser to someone outside the offices.
+    """
+    if role.name == ROLE_SYSTEM_ADMIN or is_system_admin(target):
+        return "The System Admin role is given and removed only in Django's admin site."
+    if is_system_admin(actor):
+        return None
+    if get_role_name(actor) in ADMIN_ROLES:
+        if role.name in RDCO_GIVES and get_role_name(target) in RDCO_GIVES | {NO_ROLE}:
+            return None
+        return "Office roles are given by the System Admin."
+    return "You do not have permission to change roles."
 
 
 class IsOpportunityPoster(BasePermission):

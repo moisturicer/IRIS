@@ -193,6 +193,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         enforce_password_policy(data["password"], candidate, "password")
 
         role_name = data.get("role_name")
+        # Sign-up asks only for an author's role. Office accounts are the System
+        # Admin's to make, and the System Admin role is given in Django's admin
+        # site (ADR-051 §4-5, amended).
+        if role_name and role_name not in (RoleName.STUDENT, RoleName.ADVISER):
+            raise serializers.ValidationError({"role_name": "Sign up as a Student or an Adviser."})
         if role_name == RoleName.STUDENT and not data.get("course_id"):
             raise serializers.ValidationError({"course_id": "Course is required for students."})
         if role_name == RoleName.ADVISER:

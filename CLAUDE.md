@@ -110,7 +110,7 @@ python -m pytest -n 4 -q                  # Full backend suite for ticket verifi
                                           # from backend/.env, as CI supplies (IR-853)
 python manage.py seed_demo                # accounts + Discover catalogue + every workflow_state
                                           # (IR-227). Logins are <role>@cit.edu / IrisDemo123!,
-                                          # plus admin@cit.edu (Django superuser, no app role).
+                                          # plus admin@cit.edu (System Admin, and a Django superuser; IR-781).
                                           # Office coordinators (IR-478): itso.coordinator@,
                                           # ierc.coordinator@, ktto.coordinator@ and
                                           # rdco.coordinator@cit.edu, same password. The plain
