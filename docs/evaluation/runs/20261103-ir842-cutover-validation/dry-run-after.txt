@@ -1,0 +1,11 @@
+System check identified some issues:
+LlamaParse cutover
+  papers to read       1
+  pages                23
+  credits (upper)      644  at 28/page
+  LlamaParse (upper)   ~US$0.80
+  Voyage (upper)       ~US$0.0038  (31,964 tokens if every chunk changed; backfill_embeddings --dry-run prices the real set)
+  describe_figure      per Figure; unknown until each paper is read
+Skipped
+       5  already read by LlamaParse
+Dry run: nothing was sent.

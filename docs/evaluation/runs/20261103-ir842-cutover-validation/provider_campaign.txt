@@ -1,0 +1,10 @@
+System check identified some issues:
+campaign ir842-validation
+  protected reserve 10%, held
+                        charged     spendable       ceiling
+  attempts                52.00        450.00        500.00
+  input tokens       609,395.00  4,500,000.00  5,000,000.00
+  output tokens            0.00        900.00      1,000.00
+  cost US$                 1.61          4.50          5.00
+  active minutes           4.06      2,700.00      3,000.00
+  in flight: none
