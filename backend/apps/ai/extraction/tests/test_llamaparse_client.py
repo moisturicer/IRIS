@@ -74,7 +74,7 @@ def test_every_recording_replays(name):
     assert extracted.raw["grounded_items"]
 
 
-def test_the_request_asks_for_everything_and_times_out_by_page_count():
+def test_the_request_asks_for_everything_but_paid_confidence_and_times_out_by_page_count():
     vendor = Vendor("table_across_pages")
 
     read(vendor, "table_across_pages", timeout_base_seconds=100, timeout_per_page_seconds=7)
@@ -82,9 +82,9 @@ def test_the_request_asks_for_everything_and_times_out_by_page_count():
     sent = vendor.created
     assert sent["file_id"] == "dfl-recorded"
     assert (sent["tier"], sent["version"], sent["disable_cache"]) == ("agentic", VERSION, True)
+    # ADR-056 amendment (IR-851): high-effort confidence costs 5 credits a page.
     assert sent["processing_options"] == {
         "cost_optimizer": {"enable": True},
-        "confidence_score_effort": "high",
         "specialized_chart_parsing": "agentic",
     }
     assert sent["output_options"]["granular_bboxes"] == ["word", "line", "cell"]

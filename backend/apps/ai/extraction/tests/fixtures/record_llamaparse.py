@@ -44,14 +44,13 @@ class RecordingFailed(RuntimeError):
 
 
 def configuration(version: str) -> dict[str, Any]:
-    """ADR-056 decision 3: everything LlamaParse can return for a paper."""
+    """ADR-056 decision 3, without high-effort confidence (IR-851 amendment)."""
     return {
         "tier": TIER,
         "version": version,
         "disable_cache": True,
         "processing_options": {
             "cost_optimizer": {"enable": True},
-            "confidence_score_effort": "high",
             "specialized_chart_parsing": "agentic",
         },
         "output_options": {

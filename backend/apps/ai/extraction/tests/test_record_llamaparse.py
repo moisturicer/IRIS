@@ -101,7 +101,6 @@ def test_a_recording_sends_adr_056s_request_and_deletes_the_upload(tmp_path):
         "disable_cache": True,
         "processing_options": {
             "cost_optimizer": {"enable": True},
-            "confidence_score_effort": "high",
             "specialized_chart_parsing": "agentic",
         },
         "output_options": {
