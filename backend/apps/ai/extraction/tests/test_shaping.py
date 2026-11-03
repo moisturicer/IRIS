@@ -97,3 +97,112 @@ def test_failed_grounding_keeps_available_items_and_low_confidence_metadata():
     document = shape_llamaparse(raw)
     assert [e.text for e in document.elements] == ["Available passage."]
     assert document.page_metadata[1]["confidence"] == 0.1
+
+
+def _headings(items):
+    elements = shape_llamaparse(result_with(
+        [{"type": "heading", "value": text, "level": level} for text, level in items]
+    )).elements
+    return [(e.text, e.level) for e in elements if e.kind == "heading"]
+
+
+def test_numbered_headings_take_the_depth_their_numbering_claims():
+    # IR-859: levels as LlamaParse returned them for a proxy paper in IR-851.
+    assert _headings([
+        ("Paper title", 1), ("1 INTRODUCTION", 3), ("1.1 Background", 4),
+        ("1.2 Existing libraries", 2), ("1.2.1 DiffEqGPU", 3), ("2 METHODS", 2), ("3 RESULTS", 2),
+    ]) == [
+        ("Paper title", 1), ("1 INTRODUCTION", 2), ("1.1 Background", 3),
+        ("1.2 Existing libraries", 3), ("1.2.1 DiffEqGPU", 4), ("2 METHODS", 2), ("3 RESULTS", 2),
+    ]
+
+
+def test_roman_sections_and_lettered_subsections_are_numbering_too():
+    assert _headings([
+        ("I. INTRODUCTION", 2), ("A. Decoding", 3), ("B. Locality", 3), ("C. Routing", 2), ("D. Ablation", 2),
+        ("II. DESIGN", 2), ("X. CONCLUSION", 1),
+    ]) == [
+        ("I. INTRODUCTION", 2), ("A. Decoding", 3), ("B. Locality", 3), ("C. Routing", 3), ("D. Ablation", 3),
+        ("II. DESIGN", 2), ("X. CONCLUSION", 2),
+    ]
+
+
+def test_unnumbered_headings_are_placed_against_the_numbered_sections():
+    assert _headings([
+        ("Abstract", 2), ("1 Introduction", 2), ("Self-consistency loop", 4),
+        ("2 Method", 2), ("References", 1), ("Appendix", 2),
+    ]) == [
+        ("Abstract", 2), ("1 Introduction", 2), ("Self-consistency loop", 3),
+        ("2 Method", 2), ("References", 2), ("Appendix", 2),
+    ]
+
+
+def test_a_paper_numbering_nothing_keeps_the_vendor_levels():
+    assert _headings([("Overview", 1), ("Scope", 2), ("Detail", 3)]) == [
+        ("Overview", 1), ("Scope", 2), ("Detail", 3),
+    ]
+
+
+@pytest.mark.parametrize("caption", [
+    "TABLE I: Flit classes in MESHKV.", "Table 1: Expected turnover", "Figure 7: 4DProblem error",
+    "Fig. 3 Latency per hop", "Tab. 2. Parameters",
+])
+def test_a_caption_returned_as_a_heading_becomes_text(caption):
+    element, = shape_llamaparse(result_with([{"type": "heading", "value": caption, "level": 2}])).elements
+    assert (element.kind, element.level, element.source_label) == ("text", None, "heading")
+
+
+@pytest.mark.parametrize("heading", ["Table of Contents", "Figures and Tables", "Tableau results"])
+def test_a_heading_that_only_mentions_tables_or_figures_stays_a_heading(heading):
+    element, = shape_llamaparse(result_with([{"type": "heading", "value": heading, "level": 2}])).elements
+    assert element.kind == "heading"
+
+
+def test_a_title_at_section_level_is_raised_above_the_sections():
+    raw = result_with([
+        {"type": "heading", "value": "Diverse Metallicities in Protoclusters", "level": 2},
+        {"type": "heading", "value": "ABSTRACT", "level": 4},
+        {"type": "heading", "value": "1 INTRODUCTION", "level": 3},
+        {"type": "heading", "value": "2 METHOD", "level": 2},
+    ])
+    document = shape_llamaparse(raw)
+    assert document.title == "Diverse Metallicities in Protoclusters"
+    assert [(e.text, e.level) for e in document.elements] == [
+        ("Diverse Metallicities in Protoclusters", 1), ("ABSTRACT", 2), ("1 INTRODUCTION", 2), ("2 METHOD", 2),
+    ]
+
+
+def test_front_matter_first_is_not_taken_for_the_title():
+    document = shape_llamaparse(result_with([
+        {"type": "heading", "value": "Abstract", "level": 2},
+        {"type": "heading", "value": "1 Introduction", "level": 2},
+    ]))
+    assert document.title == ""
+    assert [e.level for e in document.elements] == [2, 2]
+
+
+def test_a_title_tied_with_level_one_sections_still_heads_them():
+    assert _headings([("Paper title", 1), ("1 Intro", 1), ("2 Method", 1)]) == [
+        ("Paper title", 1), ("1 Intro", 2), ("2 Method", 2),
+    ]
+
+
+def test_an_existing_level_one_title_is_not_displaced_by_a_header_above_it():
+    document = shape_llamaparse(result_with([
+        {"type": "heading", "value": "Physical Review Letters", "level": 2},
+        {"type": "heading", "value": "Real Title", "level": 1},
+        {"type": "heading", "value": "1 Intro", "level": 2},
+    ]))
+    assert document.title == "Real Title"
+
+
+def test_an_unnumbered_peer_section_resets_the_outline_below_it():
+    assert _headings([("1 Intro", 2), ("1.1.1 Deep", 4), ("Appendix", 2), ("Proofs", 3)]) == [
+        ("1 Intro", 2), ("1.1.1 Deep", 4), ("Appendix", 2), ("Proofs", 3),
+    ]
+
+
+@pytest.mark.parametrize("heading", ["TABLES", "FIGURES", "FIGURES AND TABLES", "TABLET DESIGN"])
+def test_an_all_caps_plural_is_not_a_caption(heading):
+    element, = shape_llamaparse(result_with([{"type": "heading", "value": heading, "level": 2}])).elements
+    assert element.kind == "heading"

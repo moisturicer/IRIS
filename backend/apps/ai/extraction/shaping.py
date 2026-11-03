@@ -3,18 +3,25 @@
 The adapter stores its downloaded grounding pages under ``grounded_items``.
 Use those items when present: their line boxes are more precise than the
 coarse boxes in the expanded result. Never infer labels from page position,
-repetition, numbering or the file name.
+repetition or the file name. Two heading repairs are kept (IR-859): section
+numbering sets heading depth, and a caption labelled a heading becomes text.
 """
 
+import re
+from collections import Counter
 from dataclasses import replace
 from typing import Any, Mapping
 
 from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
 from apps.ai.chunking.formulas import DISPLAY_FORMULA
+from apps.ai.chunking.numbering import outline_depths
 from apps.ai.chunking.regions import dedupe_regions
 
 
 _KINDS = {"heading", "text", "list", "table", "image", "code", "link", "header", "footer"}
+# "Table 1:", "TABLE I:", "Fig. 3", but not "Table of Contents" or "TABLES".
+_CAPTION = re.compile(r"^(?:(?i:table|figure)(?![A-Za-z])|(?i:tab|fig)\.)\s*(?:\d+|[IVXLC]+|[A-Z]\d*)\b")
+_FRONT_MATTER = re.compile(r"^(abstract|keywords|contents|table of contents|summary|a preprint)\b", re.IGNORECASE)
 
 
 def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
@@ -33,6 +40,7 @@ def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
             if item.get("type") == "table" and item.get("merged_into_page"):
                 continue
             elements.extend(_split_formulas(_element(item, number, metadata)))
+    elements = _repair_headings(elements)
     title = next((e.text for e in elements if e.kind == "heading" and e.level == 1 and e.page in (1, 2)), "")
     return NormalizedDocument(
         title=title, elements=tuple(elements), page_sizes=sizes,
@@ -70,6 +78,56 @@ def _element(item, page, metadata, *, nested=False):
     if nested and label == "text" and DISPLAY_FORMULA.search(text):
         element = replace(element, children=tuple(_split_formulas(element)))
     return element
+
+
+def _repair_headings(elements):
+    """Captions become text, the title heads the paper, and section numbering
+    sets heading depth (IR-859)."""
+    elements = [
+        replace(e, kind="text", level=None) if e.kind == "heading" and _CAPTION.match(e.text.strip()) else e
+        for e in elements
+    ]
+    headings = [i for i, e in enumerate(elements) if e.kind == "heading"]
+    depths = dict(zip(headings, outline_depths([elements[i].text for i in headings])))
+    top_levels = [elements[i].level for i in headings if depths[i] == 1 and elements[i].level is not None]
+    if not top_levels:
+        return elements
+    counts = Counter(top_levels)
+    section_level = max(counts, key=lambda level: (counts[level], -level))
+    title = _title(elements, headings, depths)
+    if title is not None:
+        elements[title] = replace(elements[title], level=1)
+        section_level = max(section_level, 2)
+    open_level = None
+    for i in headings:
+        element = elements[i]
+        if i == title:
+            continue
+        if depths[i] is not None:
+            level = open_level = section_level + depths[i] - 1
+        elif element.level is None:
+            continue
+        elif open_level is None or element.level <= section_level:
+            # Front matter, or an unnumbered peer of the sections.
+            level = open_level = section_level
+        else:
+            level = open_level + 1
+        elements[i] = replace(element, level=level)
+    return elements
+
+
+def _title(elements, headings, depths):
+    """The heading that names the paper: a level-one heading early on, else an
+    unnumbered first heading on page 1 that is not front matter."""
+    first_numbered = next((i for i in headings if depths[i] is not None), len(elements))
+    front = [i for i in headings if i < first_numbered]
+    named = next((i for i in front if elements[i].level == 1 and elements[i].page in (1, 2)), None)
+    if named is not None:
+        return named
+    if front and front[0] == headings[0] and elements[front[0]].page == 1 \
+            and not _FRONT_MATTER.match(elements[front[0]].text.strip()):
+        return front[0]
+    return None
 
 
 def _list_text(children, ordered):

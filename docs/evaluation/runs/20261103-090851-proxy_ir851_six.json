@@ -1,0 +1,637 @@
+{
+  "runs": [
+    {
+      "question_set": {
+        "name": "proxy_ir851_six",
+        "source": "/docs/evaluation/proxy_ir851_six.json",
+        "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+        "tier": "proxy",
+        "questions": 14,
+        "without_passages": 0,
+        "with_resolved_question": 4,
+        "labels": 14,
+        "skipped_questions": []
+      },
+      "config": {
+        "reranking": false,
+        "retrieval_limit": 10,
+        "max_sources": 8,
+        "name": null,
+        "baseline": null,
+        "techniques": {
+          "fusion": {
+            "setting": "AI_RETRIEVAL_FUSION_ENABLED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-395"
+          },
+          "keyword_retrieval": {
+            "setting": "AI_KEYWORD_RETRIEVAL_ENABLED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-395"
+          },
+          "relevance_cut_off": {
+            "setting": "AI_RELEVANCE_MIN_SCORE",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-396"
+          },
+          "per_paper_cap": {
+            "setting": "AI_MAX_PASSAGES_PER_RECORD",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "neighbour_joining": {
+            "setting": "AI_JOIN_ADJACENT_PASSAGES",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "token_budget": {
+            "setting": "AI_PASSAGE_TOKEN_BUDGET",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "evidence_decision": {
+            "setting": "AI_EVIDENCE_DECISION",
+            "value": "off",
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-466"
+          }
+        },
+        "label": "no-reranking"
+      },
+      "measures": {
+        "recall@10": 0.5714,
+        "final_set_recall": 0.5,
+        "micro_recall@10": 0.5714,
+        "micro_final_set_recall": 0.5,
+        "degraded_questions": 0
+      },
+      "provenance": {
+        "ran_at": "2026-11-03T09:08:32+00:00",
+        "embedding_spaces": [
+          2
+        ],
+        "retrieval_modes": [
+          "vector"
+        ],
+        "embedder": "VoyageEmbeddingProvider",
+        "reranker": "NoOpReranker",
+        "retrieved_with_limit": 10,
+        "techniques_moved": [],
+        "git_commit": "unknown",
+        "question_set_path": "/docs/evaluation/proxy_ir851_six.json",
+        "question_set_sha256": "04c32e605149c90127e79cb17b2266ef67a8e3f7a24a9be3b60e842fbc4eabb9",
+        "retrieved_as": "student@cit.edu"
+      },
+      "questions": [
+        {
+          "question_id": "q01",
+          "question": "how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q08",
+          "question": "where is the waveform actually held in their scheme?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "signals are represented in the probability amplitudes of a quantum state"
+          ],
+          "page_mismatches": [],
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q18",
+          "question": "how do they stop the two kinds of on-chip traffic from jamming each other?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q19",
+          "question": "how many qubits are needed to index the signal samples?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q22",
+          "question": "which model and numeric precision were instrumented to observe cache access patterns?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q29",
+          "question": "how did they assemble the list of candidate young galaxy clusters to follow up?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "protocluster candidate catalogue using the deep learning framework PCFNet"
+          ],
+          "page_mismatches": [],
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q30",
+          "question": "how many candidate protoclusters did the network flag?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "121 protocluster candidates identified by PCFNet"
+          ],
+          "page_mismatches": [],
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q42",
+          "question": "which two solvers did they implement, one for easy equations and one for hard ones?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q61",
+          "question": "what exactly did they say about that?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "quantify uncertainties around Pareto Fronts, either by considering them as rando"
+          ],
+          "page_mismatches": [],
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q75",
+          "question": "and how many of those does it need?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "qubits are needed for the sample position"
+          ],
+          "page_mismatches": [],
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q76",
+          "question": "so how many did it flag?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "121 protocluster candidates identified by PCFNet"
+          ],
+          "page_mismatches": [],
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q77",
+          "question": "which two of those did they build?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q105",
+          "question": "which cache design treats the stored keys and values as traffic to be routed rather than as a storage problem?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q112",
+          "question": "which work corrects a measure of how much a network changed for mistakes in estimating its links?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        }
+      ]
+    },
+    {
+      "question_set": {
+        "name": "proxy_ir851_six",
+        "source": "/docs/evaluation/proxy_ir851_six.json",
+        "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+        "tier": "proxy",
+        "questions": 14,
+        "without_passages": 0,
+        "with_resolved_question": 4,
+        "labels": 14,
+        "skipped_questions": []
+      },
+      "config": {
+        "reranking": true,
+        "retrieval_limit": 10,
+        "max_sources": 8,
+        "name": null,
+        "baseline": "no-reranking",
+        "techniques": {
+          "fusion": {
+            "setting": "AI_RETRIEVAL_FUSION_ENABLED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-395"
+          },
+          "keyword_retrieval": {
+            "setting": "AI_KEYWORD_RETRIEVAL_ENABLED",
+            "value": false,
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-395"
+          },
+          "relevance_cut_off": {
+            "setting": "AI_RELEVANCE_MIN_SCORE",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-396"
+          },
+          "per_paper_cap": {
+            "setting": "AI_MAX_PASSAGES_PER_RECORD",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "neighbour_joining": {
+            "setting": "AI_JOIN_ADJACENT_PASSAGES",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "token_budget": {
+            "setting": "AI_PASSAGE_TOKEN_BUDGET",
+            "value": null,
+            "implemented": false,
+            "overridden": false,
+            "ticket": "IR-397"
+          },
+          "evidence_decision": {
+            "setting": "AI_EVIDENCE_DECISION",
+            "value": "off",
+            "implemented": true,
+            "overridden": false,
+            "ticket": "IR-466"
+          }
+        },
+        "label": "with-reranking"
+      },
+      "measures": {
+        "recall@10": 0.8571,
+        "final_set_recall": 0.8571,
+        "micro_recall@10": 0.8571,
+        "micro_final_set_recall": 0.8571,
+        "degraded_questions": 0
+      },
+      "provenance": {
+        "ran_at": "2026-11-03T09:08:51+00:00",
+        "embedding_spaces": [
+          2
+        ],
+        "retrieval_modes": [
+          "vector"
+        ],
+        "embedder": "VoyageEmbeddingProvider",
+        "reranker": "VoyageReranker",
+        "retrieved_with_limit": 10,
+        "techniques_moved": [],
+        "git_commit": "unknown",
+        "question_set_path": "/docs/evaluation/proxy_ir851_six.json",
+        "question_set_sha256": "04c32e605149c90127e79cb17b2266ef67a8e3f7a24a9be3b60e842fbc4eabb9",
+        "retrieved_as": "student@cit.edu"
+      },
+      "questions": [
+        {
+          "question_id": "q01",
+          "question": "how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q08",
+          "question": "where is the waveform actually held in their scheme?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q18",
+          "question": "how do they stop the two kinds of on-chip traffic from jamming each other?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q19",
+          "question": "how many qubits are needed to index the signal samples?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q22",
+          "question": "which model and numeric precision were instrumented to observe cache access patterns?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q29",
+          "question": "how did they assemble the list of candidate young galaxy clusters to follow up?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q30",
+          "question": "how many candidate protoclusters did the network flag?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q42",
+          "question": "which two solvers did they implement, one for easy equations and one for hard ones?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q61",
+          "question": "what exactly did they say about that?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "quantify uncertainties around Pareto Fronts, either by considering them as rando"
+          ],
+          "page_mismatches": [],
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q75",
+          "question": "and how many of those does it need?",
+          "expected": 1,
+          "retrieved_hits": 0,
+          "final_hits": 0,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [
+            "qubits are needed for the sample position"
+          ],
+          "page_mismatches": [],
+          "retrieval_recall": 0.0,
+          "final_set_recall": 0.0
+        },
+        {
+          "question_id": "q76",
+          "question": "so how many did it flag?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q77",
+          "question": "which two of those did they build?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q105",
+          "question": "which cache design treats the stored keys and values as traffic to be routed rather than as a storage problem?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        },
+        {
+          "question_id": "q112",
+          "question": "which work corrects a measure of how much a network changed for mistakes in estimating its links?",
+          "expected": 1,
+          "retrieved_hits": 1,
+          "final_hits": 1,
+          "retrieved_count": 10,
+          "final_count": 8,
+          "degraded": false,
+          "mode": "vector",
+          "missed": [],
+          "page_mismatches": [],
+          "retrieval_recall": 1.0,
+          "final_set_recall": 1.0
+        }
+      ]
+    }
+  ],
+  "baseline": "no-reranking"
+}
