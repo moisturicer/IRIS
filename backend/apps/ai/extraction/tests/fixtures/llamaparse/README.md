@@ -8,8 +8,8 @@ The PDFs are synthetic, written from `../layouts.py`. They are not Manuscripts,
 so the consent and embargo gate does not apply.
 
 Recorded on 2026-11-02 in IR-841's development checkout, using IR-849's
-script, and committed here for IR-840's shape tests. The four raw results,
-grounding files and manifests are copied without edits. No image crops were
+script. IR-840 consumes the canonical recordings now committed by IR-841.
+The four raw results, grounding files and manifests are unchanged. No image crops were
 returned. The run cost 93 credits for six pages; see `OPEN_CONDITIONS.md` for
 the observed formula, confidence and Figure limitations.
 
