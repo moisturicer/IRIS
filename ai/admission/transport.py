@@ -83,7 +83,8 @@ class AdmittedAgentProvider(LLMProvider):
             await self.guard.check(binding, request.pin, evidence)
             # From here the vendor may bill it, whatever happens next.
             usage.sent = True
-            turn = await asyncio.wait_for(self.provider.converse(request), ticket.timeout_seconds)
+            with scope.admitted_send():
+                turn = await asyncio.wait_for(self.provider.converse(request), ticket.timeout_seconds)
             usage.input_tokens, usage.output_tokens = turn.input_tokens, turn.output_tokens
             usage.model = request.pin.model
             return turn
