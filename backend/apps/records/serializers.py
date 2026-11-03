@@ -247,6 +247,18 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # `{state, until}` (ADR-052 §3, IR-811); `None` to anyone but the owners, the
     # Adviser and office staff.
     embargo              = serializers.SerializerMethodField()
+    # `{released, released_at}` for a marked paper (ADR-052 §11, IR-813), to the
+    # same people as `embargo`; `None` otherwise.
+    ip_release           = serializers.SerializerMethodField()
+
+    def get_ip_release(self, obj):
+        from core.permissions import may_read_embargo
+
+        from .ip_release import detail_payload
+
+        if not obj.is_ip or not may_read_embargo(self._viewer(), obj):
+            return None
+        return detail_payload(obj)
 
     def get_embargo(self, obj):
         from core.permissions import may_read_embargo
@@ -552,7 +564,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
             "versions", "manuscript_unsubmitted", "submitter_status", "lineage",
-            "paper_details", "embargo",
+            "paper_details", "embargo", "ip_release",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as

@@ -344,3 +344,30 @@ class OfferedTests(IpReleaseFixtures, APITestCase):
                        self._paper(PipelineStatus.DRAFT)):
             with self.subTest(record=record.pk):
                 self.assertFalse(self._offers_release(record, self.ktto))
+
+
+class WhoSeesTheReleaseTests(IpReleaseFixtures, APITestCase):
+    """The record says whether the mark is released, to whoever sees its embargo."""
+
+    def _ip_release(self, record, user):
+        self.client.force_authenticate(user)
+        response = self.client.get(reverse("record-detail", args=[record.pk]))
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        return response.data["ip_release"]
+
+    def test_owners_the_adviser_and_offices_see_whether_it_is_released(self):
+        unreleased, released = self._paper(), self._paper(ip_released=True)
+        for user in (self.owner, self.adviser, self.ktto, self.rdco, self.itso):
+            with self.subTest(user=user.email):
+                self.assertEqual(
+                    self._ip_release(unreleased, user), {"released": False, "released_at": None},
+                )
+                seen = self._ip_release(released, user)
+                self.assertTrue(seen["released"])
+                self.assertIsNotNone(seen["released_at"])
+
+    def test_a_reader_of_the_published_paper_is_told_nothing(self):
+        self.assertIsNone(self._ip_release(self._paper(ip_released=True), self.reader))
+
+    def test_an_unmarked_paper_has_no_release_to_show(self):
+        self.assertIsNone(self._ip_release(self._paper(is_ip=False), self.owner))

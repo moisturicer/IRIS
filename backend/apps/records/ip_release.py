@@ -52,6 +52,12 @@ def release_ip(record: Record, *, actor) -> dict:
     return state_payload(record)
 
 
+def detail_payload(record: Record) -> dict:
+    """`{released, released_at}`: what Record detail says of the release."""
+    at = record.ip_released_at
+    return {"released": at is not None, "released_at": at.isoformat() if at else None}
+
+
 def state_payload(record: Record) -> dict:
     """`{marked, released}`: where the IP mark stands, as the API says it."""
     return {"marked": record.is_ip, "released": record.ip_released}
