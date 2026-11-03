@@ -15,15 +15,20 @@ class Recording:
     data_policy = "no-training"
     account = "recording"
     calls = 0
+    delay = 0
 
     async def embed(self, texts, *, input_type):
         self.calls += 1
+        if self.delay and self.calls == 1:
+            print("sending", flush=True)
+            await asyncio.sleep(self.delay)
         return SimpleNamespace(vectors=[[1.0] + [0.0] * 1023 for _ in texts], input_tokens=10)
 
 
 async def main():
     data = json.load(sys.stdin)
     provider = Recording()
+    provider.delay = data.get("delay", 0)
     result = await process(
         data["dsn"],
         data["token"],

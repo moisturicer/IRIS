@@ -36,8 +36,11 @@ CREATE POLICY job_processing ON iris_ai.index_job TO iris_ai_runtime
     WITH CHECK(work_id IN (SELECT s.work_id FROM iris_ai.processing_source() s));
 CREATE POLICY job_read ON iris_ai.index_job FOR SELECT TO iris_ai_runtime
     USING(state='complete' AND iris_ai.indexed_source_current(work_id,revision,generation));
-CREATE POLICY batch_processing ON iris_ai.embedding_batch TO iris_ai_runtime
+CREATE POLICY batch_read ON iris_ai.embedding_batch FOR SELECT TO iris_ai_runtime
     USING(job_id IN (SELECT id FROM iris_ai.index_job));
+CREATE POLICY batch_processing ON iris_ai.embedding_batch FOR INSERT TO iris_ai_runtime
+    WITH CHECK(job_id IN (SELECT j.id FROM iris_ai.index_job j
+        JOIN iris_ai.processing_source() s ON s.work_id=j.work_id));
 -- Completion is checked by the database as well as the worker.
 CREATE FUNCTION iris_ai.complete_index(p_job bigint) RETURNS boolean
 LANGUAGE sql SET search_path=pg_catalog,pg_temp AS $$
@@ -61,6 +64,7 @@ CREATE POLICY source_processing ON iris_ai.active_source TO iris_ai_runtime
     USING(record_id IN (SELECT s.record_id FROM iris_ai.processing_source() s))
     WITH CHECK(EXISTS(SELECT 1 FROM iris_ai.index_job j WHERE j.id=job_id
         AND j.record_id=active_source.record_id AND iris_ai.complete_index(j.id)
+        AND EXISTS(SELECT 1 FROM iris_ai.processing_source() s WHERE s.work_id=j.work_id)
         AND iris_ai.indexed_source_current(j.work_id,j.revision,j.generation)));
 REVOKE ALL ON iris_ai.index_job,iris_ai.embedding_batch,iris_ai.active_source FROM PUBLIC;
 GRANT SELECT,INSERT ON iris_ai.index_job,iris_ai.embedding_batch TO iris_ai_runtime;
@@ -119,8 +123,17 @@ LANGUAGE sql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
        ORDER BY started_at DESC,pipeline LIMIT 1))
 $$;
 
+CREATE FUNCTION iris_ai.readable_record_ids() RETURNS bigint[]
+LANGUAGE plpgsql SET search_path=pg_catalog,pg_temp AS $$
+BEGIN
+    IF to_regprocedure('iris_authz.research_record_ids()') IS NULL THEN RETURN '{}'; END IF;
+    RETURN iris_authz.research_record_ids();
+EXCEPTION WHEN undefined_function OR invalid_schema_name THEN RETURN '{}';
+END $$;
+REVOKE ALL ON FUNCTION iris_ai.readable_record_ids() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION iris_ai.readable_record_ids() TO iris_ai_runtime;
 CREATE POLICY source_reader ON iris_ai.active_source FOR SELECT TO iris_ai_runtime
-    USING(record_id=ANY(iris_authz.research_record_ids()));
+    USING(record_id=ANY(iris_ai.readable_record_ids()));
 GRANT SELECT ON public.ai_embeddingspace TO iris_ai_runtime;
 
 CREATE FUNCTION iris_ai.research_vectors(p_space bigint) RETURNS TABLE(chunk_id bigint,embedding public.vector)

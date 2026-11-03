@@ -17,7 +17,7 @@ class Embeddings:
 class VoyageContextEmbeddings:
     def __init__(self, api_key: str, *, model: str, dimensions: int, data_policy: str):
         if (
-            not api_key
+            not api_key.strip()
             or model != "voyage-context-4"
             or dimensions != 1024
             or data_policy != "no-training"
@@ -25,9 +25,9 @@ class VoyageContextEmbeddings:
             raise ValueError(
                 "a configured supported model and explicit no-training policy are required"
             )
-        self._key = api_key
+        self._key = api_key.strip()
         self.model, self.dimensions, self.data_policy = model, dimensions, data_policy
-        self.account = hashlib.sha256(api_key.encode()).hexdigest()[:32]
+        self.account = hashlib.sha256(self._key.encode()).hexdigest()[:32]
 
     async def embed(self, texts, *, input_type):
         if input_type not in ("document", "query") or not texts:

@@ -214,18 +214,23 @@ async def process(dsn, token, *, pipeline, provider, limits, bounds: Bounds):
                     checked_space = await space(conn, provider)
                     if checked_space["id"] != job["space_id"]:
                         return "stale"
-                    # Canonical facts stay locked from final authorization through send/output commit.
-                    usage.sent = True
-                    response = await asyncio.wait_for(
-                        provider.embed(texts, input_type="document"), ticket.timeout_seconds
-                    )
-                    vectors = checked_vectors(response.vectors, len(texts), provider.dimensions)
-                    usage.input_tokens, usage.output_tokens, usage.model = (
-                        response.input_tokens,
-                        0,
-                        provider.model,
-                    )
-                    if not await claimed(conn, binding):
+                # No transaction or canonical lock stays open during inference.
+                usage.sent = True
+                response = await asyncio.wait_for(
+                    provider.embed(texts, input_type="document"), ticket.timeout_seconds
+                )
+                vectors = checked_vectors(response.vectors, len(texts), provider.dimensions)
+                usage.input_tokens, usage.output_tokens, usage.model = (
+                    response.input_tokens,
+                    0,
+                    provider.model,
+                )
+                async with conn.transaction():
+                    now = await source(conn, token)
+                    if not same_source(now, job) or not await claimed(conn, binding):
+                        return "stale"
+                    checked_space = await space(conn, provider)
+                    if checked_space["id"] != job["space_id"]:
                         return "stale"
                     await conn.execute(
                         "INSERT INTO iris_ai.embedding_batch(job_id,ordinal,vectors,reservation_id)"

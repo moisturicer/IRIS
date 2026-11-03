@@ -176,7 +176,8 @@ def test_resume_keeps_completed_batch_and_reader_cites_active_revision(runtime, 
         )
         .json()
     )
-    assert revoked["turns"] == []
+    assert revoked["turns"][0]["citations"] == []
+    assert "no longer readable" in revoked["turns"][0]["answer"]
 
 
 @pytest.mark.parametrize("change", ["replace", "delete", "consent", "summary"])
@@ -332,3 +333,234 @@ def test_query_embedding_uses_same_space_with_its_own_run_admission(runtime, api
         ProviderReservation.objects.filter(purpose="query", lane="research", owner="ai").count()
         == 1
     )
+
+
+def test_restricted_writer_cannot_mutate_paid_output_or_publish_incomplete_coverage(runtime):
+    import asyncpg
+    from ai.ingestion.indexing import connect
+
+    _, _, token = permitted()
+    assert extraction.run(runtime, token) == "extracted"
+    with pytest.raises(RuntimeError):
+        index(runtime, token, Recording(fail_at=2))
+
+    async def probe():
+        conn = await connect(runtime)
+        try:
+            async with conn.transaction():
+                await conn.fetchval("SELECT iris_authz.begin_research($1,'ingestion')", token)
+                job = await conn.fetchrow("SELECT id,record_id FROM iris_ai.index_job")
+                for statement in [
+                    "UPDATE iris_ai.embedding_batch SET vectors='[]'",
+                    "DELETE FROM iris_ai.embedding_batch",
+                    "UPDATE iris_ai.index_job SET allowance='{}'",
+                    "UPDATE iris_ai.index_job SET payload='{}'",
+                ]:
+                    with pytest.raises(asyncpg.InsufficientPrivilegeError):
+                        async with conn.transaction():
+                            await conn.execute(statement)
+                with pytest.raises(asyncpg.InsufficientPrivilegeError):
+                    async with conn.transaction():
+                        await conn.execute(
+                            "UPDATE iris_ai.index_job SET state='complete' WHERE id=$1", job["id"]
+                        )
+                        await conn.execute(
+                            "INSERT INTO iris_ai.active_source(record_id,job_id) VALUES($1,$2)",
+                            job["record_id"],
+                            job["id"],
+                        )
+            assert await conn.fetchval("SELECT count(*) FROM iris_ai.index_job") == 0
+            assert await conn.fetchval("SELECT count(*) FROM iris_ai.embedding_batch") == 0
+        finally:
+            await conn.close()
+
+    asyncio.run(probe())
+
+
+def test_independent_ingestion_workers_share_the_ingestion_lane_limit(runtime):
+    import os
+    import subprocess
+    import sys
+    from .test_ai_runtime_admission_db import ADMISSION
+    from ai.admission.errors import AdmissionDenied
+
+    _, _, first_token = permitted()
+    _, _, second_token = permitted()
+    assert extraction.run(runtime, first_token) == "extracted"
+    assert extraction.run(runtime, second_token) == "extracted"
+    cfg = {
+        **ADMISSION,
+        "AI_ADMISSION_LANE_CONCURRENCY": json.dumps({"ingestion": 1, "research": 2}),
+        "AI_ADMISSION_PRICES": json.dumps({"voyage-context-4": {"input": 1, "output": 0}}),
+    }
+    child = subprocess.Popen(
+        [sys.executable, "-m", "ai.tests.index_worker"],
+        text=True,
+        stdin=subprocess.PIPE,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        cwd=extraction.ROOT,
+        env={**os.environ, "PYTHONPATH": str(extraction.ROOT / "backend")},
+    )
+    try:
+        child.stdin.write(
+            json.dumps({"dsn": runtime, "token": first_token, "limits": cfg, "delay": 5})
+        )
+        child.stdin.close()
+        child.stdin = None
+        assert child.stdout.readline().strip() == "sending"
+        refused = Recording()
+        with pytest.raises(AdmissionDenied, match="lane_busy"):
+            index(runtime, second_token, refused)
+        assert not refused.calls
+        stdout, stderr = child.communicate(timeout=20)
+        assert child.returncode == 0, stderr
+        assert json.loads(stdout) == {"state": "ready", "calls": 2}
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=5)
+
+
+def test_disclosure_can_be_withdrawn_during_inference_without_waiting_for_provider(runtime):
+    import asyncpg
+
+    owner, record, token = permitted()
+    assert extraction.run(runtime, token) == "extracted"
+
+    class WithdrawDuringInference(Recording):
+        async def embed(self, texts, *, input_type):
+            result = await super().embed(texts, input_type=input_type)
+            conn = await asyncpg.connect(runs_db.admin_dsn())
+            try:
+                await conn.execute("SET statement_timeout='1s'")
+                await conn.execute(
+                    "UPDATE records_record SET dpa_accepted_at=NULL WHERE id=$1", record.pk
+                )
+            finally:
+                await conn.close()
+            return result
+
+    assert index(runtime, token, WithdrawDuringInference()) == "stale"
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT count(*) FROM iris_ai.active_source")
+        assert cursor.fetchone()[0] == 0
+
+
+def test_uncited_research_dependency_is_withheld_on_replay_and_followup(runtime, api):
+    owner, first, first_token = permitted()
+    _, second, second_token = permitted()
+    RecordOwner.objects.create(record=second, user=owner, is_primary=False)
+    for token in (first_token, second_token):
+        assert extraction.run(runtime, token) == "extracted"
+        assert index(runtime, token, Recording()) == "ready"
+    api[1]["dsn"] = runtime
+
+    async def question(tools):
+        found = await tools.search("ponds")
+        assert {p.record_id for p in found.passages} == {first.pk, second.pk}
+        cited = next(p for p in found.passages if p.record_id == second.pk)
+        return Result(
+            answer="Combined findings from both papers.",
+            citations=(
+                Citation(
+                    record_id=second.pk,
+                    page=cited.page,
+                    quote=cited.text,
+                    revision=cited.source.revision,
+                ),
+            ),
+        )
+
+    response, _, grant = ask(api, owner, question, key="indexed-dependencies-0001")
+    assert response.json()["state"] == "completed"
+    Record.objects.filter(pk=first.pk).update(dpa_accepted_at=None)
+    reopened = (
+        api[0]
+        .get(
+            f"/api/v1/ai/conversations/{response.json()['conversation_id']}",
+            headers=runs_db.as_reader(grant),
+        )
+        .json()
+    )
+    assert "Combined findings" not in json.dumps(reopened)
+    assert all(not t["citations"] for t in reopened["turns"])
+
+    class Followup:
+        name = "context-probe"
+        version = "1"
+        reserved_units = 0
+        takes_context = True
+
+        async def answer(self, question, tools, *, context):
+            assert not context.prior
+            return Result(answer="Prior evidence withheld.")
+
+    api[1]["service"] = runs_db.service(runtime, Followup())
+    followup = runs_db.submit(
+        api[0],
+        grant,
+        "indexed-dependencies-0002",
+        conversation_id=response.json()["conversation_id"],
+        base_revision=1,
+    )
+    assert followup.json()["state"] == "completed"
+
+
+def test_legacy_saved_citation_is_withheld_when_ai_publication_supersedes_it(runtime, api):
+    from .test_ai_runtime_research_db import write_source
+
+    owner, record, token = permitted()
+    write_source(record, {1: [("Methods", "The legacy experiment used four ponds.")]}, "legacy")
+    api[1]["dsn"] = runtime
+
+    async def question(tools):
+        found = await tools.search("legacy ponds")
+        hit = found.passages[0]
+        assert hit.source.chunk_set_id > 0
+        return Result(
+            answer="The legacy experiment used four ponds.",
+            citations=(
+                Citation(record_id=record.pk, page=1, quote=hit.text, revision=hit.source.revision),
+            ),
+        )
+
+    response, _, grant = ask(api, owner, question, key="indexed-legacy-0001")
+    assert response.json()["state"] == "completed"
+    assert extraction.run(runtime, token) == "extracted"
+    assert index(runtime, token, Recording()) == "ready"
+    reopened = (
+        api[0]
+        .get(
+            f"/api/v1/ai/conversations/{response.json()['conversation_id']}",
+            headers=runs_db.as_reader(grant),
+        )
+        .json()
+    )
+    assert "four ponds" not in json.dumps(reopened)
+    assert reopened["turns"][0]["citations"] == []
+
+def test_current_indexed_citation_remains_in_followup_context(runtime,api):
+    owner,record,token=permitted()
+    assert extraction.run(runtime,token)=='extracted'
+    assert index(runtime,token,Recording())=='ready'
+    api[1]['dsn']=runtime
+    async def first(tools):
+        found=await tools.search('ponds')
+        hit=found.passages[0]
+        return Result(answer='Remember the pond findings.',citations=(
+            Citation(record_id=record.pk,page=hit.page,quote=hit.text,revision=hit.source.revision),))
+    response,_,grant=ask(api,owner,first,key='indexed-remember-0001')
+    assert response.json()['state']=='completed'
+    class Followup:
+        name='context-probe'
+        version='1'
+        reserved_units=0
+        takes_context=True
+        async def answer(self,question,tools,*,context):
+            assert [turn.answer for turn in context.prior]==['Remember the pond findings.']
+            return Result(answer='Authorized context recovered.')
+    api[1]['service']=runs_db.service(runtime,Followup())
+    followup=runs_db.submit(api[0],grant,'indexed-remember-0002',
+                           conversation_id=response.json()['conversation_id'],base_revision=1)
+    assert followup.json()['state']=='completed'

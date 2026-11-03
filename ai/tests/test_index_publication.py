@@ -14,3 +14,16 @@ def test_indexing_rejects_unconfigured_bounds_before_connecting():
             max_input_tokens=1000,
             max_cost_usd=1,
         )
+
+
+def test_embedding_transport_shares_trimmed_credential_account_identity():
+    from ai.ingestion.embeddings import VoyageContextEmbeddings
+
+    provider = VoyageContextEmbeddings(
+        " abc ", model="voyage-context-4", dimensions=1024, data_policy="no-training"
+    )
+    assert provider.account == "ba7816bf8f01cfea414140de5dae2223"
+    with pytest.raises(ValueError):
+        VoyageContextEmbeddings(
+            " ", model="voyage-context-4", dimensions=1024, data_policy="no-training"
+        )
