@@ -284,6 +284,20 @@ export type EmbargoState = "unknown" | "none" | "active" | "released";
 export interface RecordEmbargo {
   state: EmbargoState;
   until: string | null;
+  /** Set when the paper's text may already have gone out (embargo-set/). */
+  notice?: string;
+}
+
+/** KTTO's release of an IP mark (ADR-052 §11). The mark itself stays. */
+export interface RecordIpRelease {
+  released:    boolean;
+  released_at: string | null;
+}
+
+/** What `POST /records/<id>/ip-release/` answers. */
+export interface IpReleaseResult {
+  marked:   boolean;
+  released: boolean;
 }
 
 /** What `POST /records/<id>/embargo-answer/` takes. */
@@ -297,6 +311,8 @@ export interface RecordDetail extends RecordListItem {
   paper_details?: PaperDetails;
   /** Null for anyone but the owners, the Adviser and office staff (ADR-052 §18). */
   embargo?: RecordEmbargo | null;
+  /** Null for an unmarked paper, and to the same viewers as `embargo`. */
+  ip_release?: RecordIpRelease | null;
   lineage?: {
     derived_from: { id: number; title: string; record_type_name: string | null } | null;
     continued_as: { id: number; title: string; record_type_name: string | null } | null;

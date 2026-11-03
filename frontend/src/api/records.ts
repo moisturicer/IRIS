@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import type {
   RecordListItem, RecordDetail, RecordFormData, MyResearchItem, EmbargoAnswer, RecordEmbargo,
+  IpReleaseResult,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
@@ -205,6 +206,11 @@ export const recordsApi = {
   // Publish's first question, saved before the file is sent (ADR-052 §2).
   answerEmbargo:  (id: number, answer: EmbargoAnswer) =>
     apiClient.post<RecordEmbargo>(`/records/${id}/embargo-answer/`, answer),
+  // After submission an embargo changes by its own acts (ADR-052 §5, §6, §11).
+  setEmbargo:     (id: number, until: string) =>
+    apiClient.post<RecordEmbargo>(`/records/${id}/embargo-set/`, { embargoed_until: until }),
+  releaseEmbargo: (id: number) => apiClient.post<RecordEmbargo>(`/records/${id}/embargo-release/`),
+  releaseIp:      (id: number) => apiClient.post<IpReleaseResult>(`/records/${id}/ip-release/`),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),

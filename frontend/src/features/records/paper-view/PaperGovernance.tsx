@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import type { RecordDetail } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import { RailHeading } from "./headings";
@@ -10,6 +12,7 @@ import { RailHeading } from "./headings";
  * "not modelled".
  */
 export function PaperGovernance({ record }: { record: RecordDetail }) {
+  const headingId = useId();
   const rows: { label: string; value: string; emphasis?: boolean }[] = [
     // The API's own wording for where the record stands (IR-259).
     { label: "Pipeline Status", value: record.workflow_state_label, emphasis: true },
@@ -24,6 +27,14 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
           : "Declared, untyped"
         : "Not declared",
     },
+    // KTTO's release (ADR-052 §11): sent only for a marked paper, to the people
+    // who see its embargo.
+    ...(record.ip_release
+      ? [{
+          label: "IP Release",
+          value: record.ip_release.released ? "Released for the AI by KTTO" : "Not released for the AI",
+        }]
+      : []),
     {
       label: "Commercialization",
       value: record.for_commercialization ? "Eligible" : "Not flagged",
@@ -31,8 +42,8 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
   ];
 
   return (
-    <section className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
-      <RailHeading className="mb-3">Institutional Governance</RailHeading>
+    <section aria-labelledby={headingId} className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
+      <RailHeading id={headingId} className="mb-3">Institutional Governance</RailHeading>
       <dl className="space-y-2">
         {rows.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-3">
