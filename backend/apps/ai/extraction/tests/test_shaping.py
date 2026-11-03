@@ -168,7 +168,7 @@ def test_a_title_at_section_level_is_raised_above_the_sections():
     document = shape_llamaparse(raw)
     assert document.title == "Diverse Metallicities in Protoclusters"
     assert [(e.text, e.level) for e in document.elements] == [
-        ("Diverse Metallicities in Protoclusters", 1), ("ABSTRACT", 4), ("1 INTRODUCTION", 2), ("2 METHOD", 2),
+        ("Diverse Metallicities in Protoclusters", 1), ("ABSTRACT", 2), ("1 INTRODUCTION", 2), ("2 METHOD", 2),
     ]
 
 
@@ -179,3 +179,30 @@ def test_front_matter_first_is_not_taken_for_the_title():
     ]))
     assert document.title == ""
     assert [e.level for e in document.elements] == [2, 2]
+
+
+def test_a_title_tied_with_level_one_sections_still_heads_them():
+    assert _headings([("Paper title", 1), ("1 Intro", 1), ("2 Method", 1)]) == [
+        ("Paper title", 1), ("1 Intro", 2), ("2 Method", 2),
+    ]
+
+
+def test_an_existing_level_one_title_is_not_displaced_by_a_header_above_it():
+    document = shape_llamaparse(result_with([
+        {"type": "heading", "value": "Physical Review Letters", "level": 2},
+        {"type": "heading", "value": "Real Title", "level": 1},
+        {"type": "heading", "value": "1 Intro", "level": 2},
+    ]))
+    assert document.title == "Real Title"
+
+
+def test_an_unnumbered_peer_section_resets_the_outline_below_it():
+    assert _headings([("1 Intro", 2), ("1.1.1 Deep", 4), ("Appendix", 2), ("Proofs", 3)]) == [
+        ("1 Intro", 2), ("1.1.1 Deep", 4), ("Appendix", 2), ("Proofs", 3),
+    ]
+
+
+@pytest.mark.parametrize("heading", ["TABLES", "FIGURES", "FIGURES AND TABLES", "TABLET DESIGN"])
+def test_an_all_caps_plural_is_not_a_caption(heading):
+    element, = shape_llamaparse(result_with([{"type": "heading", "value": heading, "level": 2}])).elements
+    assert element.kind == "heading"

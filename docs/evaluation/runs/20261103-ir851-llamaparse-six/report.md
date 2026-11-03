@@ -11,7 +11,7 @@
 | Contract suite (IR-838) against LlamaParse output | **Pass, on recordings only** — run on IR-841's synthetic recordings, which were made with high-effort confidence on. Not run on output from the new request |
 | Extracted through the admitted, gated path | **Pass** — `AI_PROVIDER_ADMISSION=enforce` ([spend](provider_campaign-llamaparse.txt)); each paper cleared by `load_corpus --clear-for-ai` (IR-815). IR-317's bypass was off |
 | Formulas arrive as LaTeX | **Pass** — all 102 formula elements, plus inline math in `$…$` |
-| Heading nesting matches the numbering | **Fail as extracted, pass after IR-859** — 27 of 113 numbered headings at the wrong level and 11 captions returned as headings; after IR-859's repair, 0 and 0 (see "Re-shaped with IR-859") |
+| Heading nesting matches the numbering | **Fail as extracted, pass after IR-859** — 27 of 113 numbered headings at the wrong level and 11 captions returned as headings; after IR-859's repair, 0 and 1 (see "Re-shaped with IR-859") |
 | No broken hyphenated words | **Pass** — none found (Docling: 4) |
 | recall@10 does not drop below Docling | **Fail without reranking, by one question** (0.571 against 0.643); equal with reranking (0.929). At 14 questions, one question is within noise |
 | `check_vector_index` | **Pass** — 1.000 on both indexes, both databases ([LlamaParse](check_vector_index-llamaparse.txt), [Docling](check_vector_index-docling.txt)) |
@@ -106,13 +106,13 @@ Defects 1, 2 and 4 have no Jira issue yet.
 
 ## Re-shaped with IR-859
 
-The owner decided on 2026-11-03 to keep the numbering repair for LlamaParse and improve it (IR-859, ADR-056 amendment). The stored raw results were re-shaped, re-chunked and re-embedded with no paid re-read, in two passes (the second added the title rule). Between them, 401 changed chunks were re-embedded through Voyage.
+The owner decided on 2026-11-03 to keep the numbering repair for LlamaParse and improve it (IR-859, ADR-056 amendment). The stored raw results were re-shaped, re-chunked and re-embedded with no paid re-read. It took three passes, the later ones adding the title rule and the review fixes. Between them, 401 changed chunks were re-embedded through Voyage. The last pass changed no chunk text.
 
 The rules, in `apps/ai/extraction/shaping.py`:
-- **Numbered headings.** A numbered heading takes its numbering's depth (decimal, roman or lettered), below the level LlamaParse gives most of the paper's top-level sections.
-- **Unnumbered headings.** One ranked as high as a top-level section becomes its peer: References, Acknowledgements, Appendix. One ranked lower sits under the open section.
-- **Captions.** "Table 1:", "TABLE I:" and "Figure 7:" returned as headings become text.
-- **Title.** An unnumbered first heading on page 1, ahead of every numbered section and not front matter, is the title at level 1. Without this, a paper whose title LlamaParse ranked as a section lost its title from every context path.
+- **Numbered headings.** A numbered heading takes its numbering's depth (decimal, roman or lettered), below the paper's section level. That is the level LlamaParse gives most top-level sections, and never level 1 when there is a title.
+- **Unnumbered headings.** Front matter (Abstract) sits at the section level, and so does any heading LlamaParse ranks as high as the sections (References, Acknowledgements, Appendix). A heading ranked lower sits one below the open section.
+- **Captions.** "Table 1:", "TABLE I:" and "Figure 7:" returned as headings become text. "TABLES" and "Table of Contents" stay headings.
+- **Title.** The paper's title is kept at level 1 above the sections. It is LlamaParse's early level-one heading or, failing that, an unnumbered first heading on page 1 that is not front matter. The implementer added this rule after the second pass: a paper whose title LlamaParse ranked as a section had lost the title from every context path.
 
 [headings-ir859.json](headings-ir859.json) · [analysis-llamaparse-ir859.json](analysis-llamaparse-ir859.json)
 
@@ -121,8 +121,13 @@ The rules, in `apps/ai/extraction/shaping.py`:
 | Numbered headings off-level | 27 of 113 | 0 of 113 |
 | Papers whose nesting deepens with depth | 3 of 6 | 6 of 6 |
 | Captions or headers returned as headings | 11 | 1 ("A PREPRINT", a running header seen once) |
+| Titles at level 1, above the sections | 3 of 6 | 6 of 6 |
 
-The zero is partly by construction, since the rule sets levels from the same numbering the count reads. Unnumbered headings were checked by eye. "1.2 Contributions" now sits under "1 Introduction" instead of beside it, and References, Acknowledgements and appendices are peers of the sections. A few figure descriptions LlamaParse labels as headings ("BraninCurrin function, u = …") now sit under their section rather than above it.
+The first two rows after the repair are circular: the rule sets every numbered heading's level from the same numbering `headings.py` reads, so they only confirm the rule ran. What they cannot show was checked by eye in each paper's outline:
+- "1.2 Contributions" now sits under "1 Introduction" instead of beside it.
+- Abstract, References, Acknowledgements and appendices are peers of the sections.
+- Two figure descriptions LlamaParse labelled as headings sit under their section ("Hypervolume Improvement… heatmaps", "Absolute error…").
+- One, "Optimal Placement for BC problem", is ranked like a section, so it becomes a peer and ends section 3's context early.
 
 **Retrieval after the repair** ([run](../20261103-090851-proxy_ir851_six.json)):
 
@@ -133,11 +138,8 @@ The zero is partly by construction, since the rule sets levels from the same num
 | final-set recall, no reranking | 0.571 | 0.500 | 0.571 |
 | final-set recall, with reranking | 0.929 | 0.857 | 0.857 |
 
-Two questions moved by one rank each. q76 ("so how many did it flag?", a follow-up) fell out of the reranked top 10, and q22 left the final eight. Every label still resolves. At 14 questions this is no measured difference. The structure is now correct, and whether it helps retrieval needs the 40-paper corpus to tell.
+What moved, per question (the run files hold hits, not ranks):
+- **With reranking**, q75 ("and how many of those does it need?", a follow-up) is no longer found.
+- **Without reranking**, q30 dropped out of the top ten and q77 came in, which is why recall@10 is unchanged. q22 left the final eight.
 
-## Not covered
-
-- The contract suite on output from the new request. Re-recording IR-841's four synthetic PDFs would cost about 100 credits.
-- 6 papers and 14 questions, not ADR-056 decision 14's 40 papers. Recall shows a direction, not a measured difference.
-- The figure crops IR-845 needs. LlamaParse returned 11 layout crops for MeshKV alone, and the adapter dropped 4 of them because they matched no image item. Not assessed further.
-- Scanned PDFs: every paper here is born-digital.
+Every label still resolves. At 14 questions this is no measured difference. The structure is now correct, and whether it helps retrieval needs the 40-paper corpus to tell.

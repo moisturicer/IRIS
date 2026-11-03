@@ -19,9 +19,9 @@ from apps.ai.chunking.regions import dedupe_regions
 
 
 _KINDS = {"heading", "text", "list", "table", "image", "code", "link", "header", "footer"}
-# "Table 1:", "TABLE I:", "Fig. 3", but not "Table of Contents".
-_CAPTION = re.compile(r"^(?i:table|tab\.|figure|fig\.)\s*(?:\d+|[IVXLC]+|[A-Z]\d*)\b")
-_FRONT_MATTER = re.compile(r"^(abstract|keywords|contents|table of contents|summary)\b", re.IGNORECASE)
+# "Table 1:", "TABLE I:", "Fig. 3", but not "Table of Contents" or "TABLES".
+_CAPTION = re.compile(r"^(?:(?i:table|figure)(?![A-Za-z])|(?i:tab|fig)\.)\s*(?:\d+|[IVXLC]+|[A-Z]\d*)\b")
+_FRONT_MATTER = re.compile(r"^(abstract|keywords|contents|table of contents|summary|a preprint)\b", re.IGNORECASE)
 
 
 def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
@@ -41,7 +41,7 @@ def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
                 continue
             elements.extend(_split_formulas(_element(item, number, metadata)))
     elements = _repair_headings(elements)
-    title =next((e.text for e in elements if e.kind == "heading" and e.level == 1 and e.page in (1, 2)), "")
+    title = next((e.text for e in elements if e.kind == "heading" and e.level == 1 and e.page in (1, 2)), "")
     return NormalizedDocument(
         title=title, elements=tuple(elements), page_sizes=sizes,
         structure_is_authoritative=True, page_metadata=metadata,
@@ -81,34 +81,53 @@ def _element(item, page, metadata, *, nested=False):
 
 
 def _repair_headings(elements):
-    """Numbered headings sit at their numbering's depth below the paper's top
-    section level; unnumbered ones are placed against the open section."""
+    """Captions become text, the title heads the paper, and section numbering
+    sets heading depth (IR-859)."""
     elements = [
         replace(e, kind="text", level=None) if e.kind == "heading" and _CAPTION.match(e.text.strip()) else e
         for e in elements
     ]
-    positions = [i for i, e in enumerate(elements) if e.kind == "heading"]
-    depths = outline_depths([elements[i].text for i in positions])
-    top = [elements[i].level for i, d in zip(positions, depths) if d == 1 and elements[i].level is not None]
-    if not top:
+    headings = [i for i, e in enumerate(elements) if e.kind == "heading"]
+    depths = dict(zip(headings, outline_depths([elements[i].text for i in headings])))
+    top_levels = [elements[i].level for i in headings if depths[i] == 1 and elements[i].level is not None]
+    if not top_levels:
         return elements
-    counts = Counter(top)
-    base = max(counts, key=lambda level: (counts[level], -level))
-    first = positions[0]
-    if depths[0] is None and elements[first].page == 1 and not _FRONT_MATTER.match(elements[first].text.strip()):
-        # The paper's title, which must stay above the sections it heads.
-        elements[first] = replace(elements[first], level=1)
+    counts = Counter(top_levels)
+    section_level = max(counts, key=lambda level: (counts[level], -level))
+    title = _title(elements, headings, depths)
+    if title is not None:
+        elements[title] = replace(elements[title], level=1)
+        section_level = max(section_level, 2)
     open_level = None
-    for i, depth in zip(positions, depths):
+    for i in headings:
         element = elements[i]
-        if depth is not None:
-            level = open_level = base + depth - 1
-        elif open_level is None or element.level is None:
+        if i == title:
             continue
+        if depths[i] is not None:
+            level = open_level = section_level + depths[i] - 1
+        elif element.level is None:
+            continue
+        elif open_level is None or element.level <= section_level:
+            # Front matter, or an unnumbered peer of the sections.
+            level = open_level = section_level
         else:
-            level = base if element.level <= base else open_level + 1
+            level = open_level + 1
         elements[i] = replace(element, level=level)
     return elements
+
+
+def _title(elements, headings, depths):
+    """The heading that names the paper: a level-one heading early on, else an
+    unnumbered first heading on page 1 that is not front matter."""
+    first_numbered = next((i for i in headings if depths[i] is not None), len(elements))
+    front = [i for i in headings if i < first_numbered]
+    named = next((i for i in front if elements[i].level == 1 and elements[i].page in (1, 2)), None)
+    if named is not None:
+        return named
+    if front and front[0] == headings[0] and elements[front[0]].page == 1 \
+            and not _FRONT_MATTER.match(elements[front[0]].text.strip()):
+        return front[0]
+    return None
 
 
 def _list_text(children, ordered):
