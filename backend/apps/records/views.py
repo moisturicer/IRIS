@@ -726,7 +726,12 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         from .metadata_suggestions import suggestions_payload
 
-        return Response(suggestions_payload(self.get_object()))
+        from apps.publication.status import processing_status
+
+        record = self.get_object()
+        payload = suggestions_payload(record)
+        payload["runtime_processing"] = processing_status(record)
+        return Response(payload)
 
     @action(detail=True, methods=["post"], url_path="retry-extraction")
     @transaction.atomic
