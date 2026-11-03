@@ -6,8 +6,8 @@
 
 | Status | Meaning | Items |
 |---|---|---|
-| Pass | Evidence named in the row | 71 |
-| Partial | Met in part, and the row says which part | 9 |
+| Pass | Evidence named in the row | 72 |
+| Partial | Met in part, and the row says which part | 8 |
 | Gap | Not met; the row names the ticket | 17 |
 | Deferred | Deliberately deferred | 1 |
 | N/A | Does not apply, for the reason given | 9 |
@@ -69,7 +69,7 @@
 |---|---|---|---|
 | 4.1.1 | the application enforces access control rules on a trusted service layer, especially if client-side access control is present and could be bypassed. | Pass | Server-side permission classes and `visible_to`; `apps/tests/test_access_matrix.py` |
 | 4.1.2 | all user and data attributes and policy information used by access controls cannot be manipulated by end users unless specifically authorized. | Pass | Consent stamps and roles are not writable through serializers; `test_authorization_matrix.py` |
-| 4.1.3 | the principle of least privilege exists - users should only be able to access functions, data files, URLs, controllers, services, and other resources, for which they possess specific authorization. This implies protection against spoofing and elevation of privilege. | Partial | Route matrix, [IR-667](https://citiris.atlassian.net/browse/IR-667). RDCO holds workflow and administrator powers together. [IR-781](https://citiris.atlassian.net/browse/IR-781) |
+| 4.1.3 | the principle of least privilege exists - users should only be able to access functions, data files, URLs, controllers, services, and other resources, for which they possess specific authorization. This implies protection against spoofing and elevation of privilege. | Pass | Route matrix ([IR-667](https://citiris.atlassian.net/browse/IR-667)). Workflow and system administration are split: RDCO keeps accounts, locks, sessions and role requests, and the System Admin, with no workflow access, holds the Audit Log, settings and office roles (`core/permissions.py`, `test_system_admin.py`, [IR-781](https://citiris.atlassian.net/browse/IR-781)) |
 | 4.1.5 | access controls fail securely including when an exception occurs. | Pass | A refused record is a 404; the matrix asserts refusals |
 | 4.2.1 | sensitive data and APIs are protected against Insecure Direct Object Reference (IDOR) attacks targeting creation, reading, updating and deletion of records, such as creating or updating someone else's record, viewing everyone's records, or deleting all records. | Pass | [IR-153](https://citiris.atlassian.net/browse/IR-153), `apps/documents/tests/test_document_access_control.py`, route matrix |
 | 4.2.2 | the application or framework enforces a strong anti-CSRF mechanism to protect authenticated functionality, and effective anti-automation or anti-CSRF protects unauthenticated functionality. | Pass | API uses Bearer tokens, which browsers do not attach. Django admin uses Django's CSRF middleware |

@@ -53,7 +53,16 @@ Governed by [ADR-009](../adr/009-authorization-model.md).
 
 ### Who holds administrator powers
 
-`ADMIN_ROLES` is `{RDCO}`, so **RDCO holds them**: accounts, locks, sessions, system settings and the Audit Log. [ADR-051](../adr/051-system-admin-account-deletion-and-consent.md) accepts a separate System Admin role, and it isn't built yet ([IR-781](https://citiris.atlassian.net/browse/IR-781)).
+[ADR-051](../adr/051-system-admin-account-deletion-and-consent.md) splits them between two roles ([IR-781](https://citiris.atlassian.net/browse/IR-781), `core/permissions.py`):
+
+| Power | Who |
+|---|---|
+| The Users page, and giving Student or Adviser to someone outside the offices | RDCO or the System Admin (`IsAccountAdmin`) |
+| Locks, sessions and role requests | RDCO (`IsAdmin`) |
+| Office roles, the coordinator flag, system settings and the Audit Log | The System Admin (`IsSystemAdmin`) |
+| Giving or removing the System Admin role | A Django superuser, in Django's admin site only |
+
+The System Admin holds no workflow access. No API act changes a System Admin's account: RDCO can't edit, lock or unlock one, or revoke its sessions, so a compromised System Admin is stopped in Django's admin site. The role can't be held together with `is_staff` or `is_superuser`.
 
 Django's admin site is separate. It is guarded by Django's own `is_staff` flag, and §7 describes its exposure.
 
@@ -185,7 +194,6 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 4 | TLS is configured but hasn't run on a deployed domain, and HSTS isn't confirmed for one | **High** | Passwords, tokens and unpublished work could be read in transit until it has | [IR-847](https://citiris.atlassian.net/browse/IR-847), [IR-806](https://citiris.atlassian.net/browse/IR-806) |
 | 5 | Security-relevant sign-in events leave no audit row | **Medium** | Password guessing leaves nothing to investigate | [IR-659](https://citiris.atlassian.net/browse/IR-659) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 6 | Registration accepts any email domain | **Medium** | Anyone can get a signed-in account | [IR-660](https://citiris.atlassian.net/browse/IR-660) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
-| 7 | One office holds workflow and system administration powers together | **Medium** | One compromised account reaches both sets of powers | [IR-781](https://citiris.atlassian.net/browse/IR-781) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
 | 8 | Consent has no version and can't be withdrawn, and the notice lacks DPO review | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-789](https://citiris.atlassian.net/browse/IR-789), [IR-791](https://citiris.atlassian.net/browse/IR-791), [IR-123](https://citiris.atlassian.net/browse/IR-123) |
 | 9 | No account deletion, personal data copy or retention job | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-785](https://citiris.atlassian.net/browse/IR-785), [IR-786](https://citiris.atlassian.net/browse/IR-786), [IR-794](https://citiris.atlassian.net/browse/IR-794) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
 | 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | A compromised gateway could read records past Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
@@ -218,6 +226,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | A revoked session's access token kept working | [IR-657](https://citiris.atlassian.net/browse/IR-657) |
 | CI didn't run `ai/tests`, including the gateway's service authentication test | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
 | Development `backend`, `frontend` and `docling` listened on every interface | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
+| One office held workflow and system administration powers together | [IR-781](https://citiris.atlassian.net/browse/IR-781) |
 | Production HTTPS redirect loop behind the proxy | [IR-662](https://citiris.atlassian.net/browse/IR-662) |
 | No browser security headers | [IR-663](https://citiris.atlassian.net/browse/IR-663) |
 | Uploads accepted without checking the content was a PDF | [IR-665](https://citiris.atlassian.net/browse/IR-665) |

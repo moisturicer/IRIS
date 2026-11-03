@@ -34,6 +34,7 @@ Use the assets, actors, boundaries and threats below as the threat model. Each t
 | Adviser | Also reads records they advise |
 | Office reviewer | Reads what their office reviews |
 | RDCO | Administers people's accounts and the request queues, and gives Student and Adviser. The Audit Log, system settings and office roles moved to the System Admin in [IR-781](https://citiris.atlassian.net/browse/IR-781) |
+| System Admin | Reads the Audit Log, changes system settings, and gives office roles and the coordinator flag ([IR-781](https://citiris.atlassian.net/browse/IR-781)). No workflow access. Only a Django superuser can give or remove the role, and no API act, RDCO's included, can lock it or end its sessions. With the lockout off ([IR-865](https://citiris.atlassian.net/browse/IR-865)) and no MFA, only the per-address sign-in throttle protects it |
 | Django superuser | Holds Django's admin site, a separate path to the database |
 | Compromised account | Any of the above, used by someone else |
 | Prompt injection through an uploaded paper | Text in a PDF that tries to instruct a model reading it |
@@ -126,4 +127,8 @@ ADR-056 sends whole Manuscript PDFs to LlamaParse, which the Decision's own rule
 ## Amendment — 2026-11-04 (IR-865): the lockout is off for now
 
 Decided by Ashlee Sean, at Jive Tyler Revalde's suggestion: the sign-in lockout got in the way of development, so `AXES_ENABLED` now defaults to off. The code and its tests stay, and `AXES_ENABLED=True` turns it back on. Until it's back on, only the per-address sign-in throttle (IR-661, 300 an hour) limits password guessing. It must be on before launch.
+
+## Amendment — 2026-11-04 (IR-866): the System Admin is an actor
+
+IR-781 built ADR-051's System Admin role, so it gets its own row under Actors. Nothing else changed.
 
