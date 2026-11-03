@@ -466,6 +466,29 @@ class RecordVersion(models.Model):
         return f"{self.record_id} v{self.number}"
 
 
+class EmbargoReminder(models.Model):
+    """
+    A reminder already sent about one embargo's review date (ADR-052 §9).
+
+    The unique key is the idempotency, as with `DeadlineMoment`: a re-run, a
+    missed tick or two beat instances insert the same row, and only one wins.
+    `embargo_set_at` is the paper's `embargo_answered_at`, which every set and
+    extend restamps, so a new date, or a released paper held again, starts the
+    reminders over. `step` is 0 on the date, then one more per 5 working days.
+    """
+
+    record = models.ForeignKey("Record", on_delete=models.CASCADE, related_name="embargo_reminders")
+    embargo_set_at = models.DateTimeField()
+    step = models.PositiveIntegerField()
+    sent_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["sent_at", "pk"]
+        constraints = [models.UniqueConstraint(
+            fields=["record", "embargo_set_at", "step"], name="one_embargo_reminder_per_step",
+        )]
+
+
 class RecordOwner(models.Model):
     """
     Many-to-many between Record and User for ownership.

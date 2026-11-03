@@ -530,11 +530,11 @@ def notify_document_rejected(document_request, item, *, rejected_by):
         _log_failure("notify_document_rejected", request=document_request)
 
 
-def notify_deadline(record, recipient, *, type_name, message):
+def _notify_in_app(record, recipient, *, type_name, message, label):
     """
-    One in-app deadline reminder or escalation (ADR-043 §7). No email: §7
-    keeps deadlines in-app. Returns whether it was written; the savepoint
-    lets the scheduled batch carry on inside its transaction (IR-300).
+    One in-app notice from a scheduled batch, with no email. Returns whether it
+    was written; the savepoint lets the batch carry on inside its transaction
+    (IR-300).
     """
     try:
         with transaction.atomic():
@@ -546,8 +546,20 @@ def notify_deadline(record, recipient, *, type_name, message):
             )
         return True
     except Exception:
-        _log_failure("notify_deadline", record=record)
+        _log_failure(label, record=record)
         return False
+
+
+def notify_deadline(record, recipient, *, type_name, message):
+    """One in-app deadline reminder or escalation (ADR-043 §7 keeps deadlines in-app)."""
+    return _notify_in_app(record, recipient, type_name=type_name, message=message,
+                          label="notify_deadline")
+
+
+def notify_embargo_review(record, recipient, *, type_name, message):
+    """One in-app embargo reminder (ADR-052 §9), in-app like deadlines."""
+    return _notify_in_app(record, recipient, type_name=type_name, message=message,
+                          label="notify_embargo_review")
 
 
 def notify_role_request(user, requested_role):
