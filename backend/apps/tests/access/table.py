@@ -163,6 +163,14 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-metadata-suggestions": Entry({
         "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
     }),
+    # IR-832: only an owner may inspect or acknowledge candidates for Publish.
+    "record-duplicate-matches": Entry({
+        "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
+    }),
+    "record-acknowledge-duplicates": Entry({
+        "POST": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD,
+                      data={"candidate_ids": []}),
+    }),
     # IR-831: only an owner can explicitly retry the current Manuscript.
     "record-retry-extraction": Entry({
         "POST": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),

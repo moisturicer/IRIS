@@ -29,6 +29,8 @@ vi.mock("@/api/records", () => ({
     submit: vi.fn(),
     detail: vi.fn(),
     metadataSuggestions: vi.fn(),
+    duplicateMatches: vi.fn(),
+    acknowledgeDuplicates: vi.fn(),
   },
 }));
 
@@ -139,6 +141,8 @@ beforeEach(() => {
   // Ready with nothing found: no chip and no line, so tests of other criteria see
   // Details exactly as before prefill existed.
   vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(suggestions("ready") as never);
+  vi.mocked(recordsApi.duplicateMatches).mockResolvedValue({ data: { exact: [], likely: [], acknowledged: false } } as never);
+  vi.mocked(recordsApi.acknowledgeDuplicates).mockResolvedValue({ data: { acknowledged: true, matches: [] } } as never);
   useAuthStore.setState({
     user: makeUser({ id: SELF_ID, first_name: "Ada", last_name: "Reyes", role_name: ROLES.ADVISER }),
   });
@@ -335,6 +339,25 @@ describe("upload progress", () => {
 });
 
 describe("a failed upload", () => {
+  it("offers the matching draft when renamed bytes conflict and keeps the new draft for retry", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.uploadManuscript).mockRejectedValueOnce({
+      response: { status: 409, data: { code: "exact_duplicate", detail: "Already attached.", matches: [
+        { id: 17, title: "My earlier draft", url: "/records/17", action: "resume_draft" },
+      ] } },
+    });
+    await openNew();
+    await chooseType(user, /Thesis \/ Research/);
+    dropFile(pdf("renamed.pdf"));
+    const resume = await screen.findByRole("link", { name: "Resume draft: My earlier draft" });
+    expect(resume).toHaveAttribute("href", "/?publish=17");
+    resume.focus();
+    expect(resume).toHaveFocus();
+    expect(screen.getByRole("radio", { name: /Thesis \/ Research/ })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Retry upload" }));
+    expect(recordsApi.create).toHaveBeenCalledTimes(1);
+  });
+
   it("retries with the same file and type, without creating a second draft", async () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.uploadManuscript)
@@ -619,6 +642,35 @@ describe("the review", () => {
 });
 
 describe("submitting", () => {
+  it("offers Check again when likely-match lookup fails on a resumed draft", async () => {
+    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail(COMPLETE) } as never);
+    vi.mocked(recordsApi.duplicateMatches).mockRejectedValueOnce(new Error("offline"));
+    const user = userEvent.setup();
+    renderScreen(<PublishDialog />, { route: "/?publish=42" });
+    const retry = await screen.findByRole("button", { name: "Check again" });
+    await user.click(retry);
+    await waitFor(() => expect(recordsApi.duplicateMatches).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument());
+  });
+
+  it("shows a likely match and lets a keyboard user acknowledge it without losing Review", async () => {
+    const match = { id: 17, title: "Related Cebu research", url: "/records/17", action: "open_record", reason: "same_title" };
+    vi.mocked(recordsApi.duplicateMatches).mockResolvedValue({ data: { exact: [], likely: [match], acknowledged: false } } as never);
+    vi.mocked(recordsApi.acknowledgeDuplicates).mockResolvedValue({ data: { acknowledged: true, matches: [match] } } as never);
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+    await completeDetails(user);
+    expect(await screen.findByRole("heading", { name: "Likely manuscript matches" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Related Cebu research" })).toHaveAttribute("href", "/records/17");
+    const acknowledge = screen.getByRole("button", { name: "Acknowledge matches" });
+    acknowledge.focus();
+    await user.keyboard("{Enter}");
+    await waitFor(() => expect(recordsApi.acknowledgeDuplicates).toHaveBeenCalledWith(42, [17]));
+    expect(screen.getByRole("button", { name: "Matches acknowledged" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Submit for review" })).toBeInTheDocument();
+  });
+
   it("needs consent, and sends the DPA flag", async () => {
     const user = userEvent.setup();
     await openNew();

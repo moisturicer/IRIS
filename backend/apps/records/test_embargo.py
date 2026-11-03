@@ -9,6 +9,7 @@ request takes.
 """
 
 from datetime import date, timedelta
+from uuid import uuid4
 from unittest import mock
 
 from django.urls import reverse
@@ -42,7 +43,7 @@ class DraftBase(APITestCase):
 
     def _draft(self, status_=PipelineStatus.DRAFT, **fields):
         record = Record.objects.create(
-            title="C" * 10, abstract="D" * 40, record_type=self.record_type,
+            title="C" * 10 + uuid4().hex[:8], abstract="D" * 40, record_type=self.record_type,
             added_by=self.owner, adviser=self.adviser, pipeline_status=status_, **fields,
         )
         RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)

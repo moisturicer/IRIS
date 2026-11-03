@@ -96,7 +96,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
-        if self.action in ("metadata_suggestions", "retry_extraction", "related_research"):
+        if self.action in ("metadata_suggestions", "retry_extraction", "related_research", "duplicate_matches", "acknowledge_duplicates"):
             # The Publish dialog's prefill is the manuscript's own text, offered
             # to the person publishing it (IR-406; IR-374 spec Appendix D:
             # "the owner through visible_to(), with a 404 otherwise").
@@ -148,7 +148,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "embargo_answer", "destroy"):
+        if self.action in ("update", "partial_update", "submit", "embargo_answer", "destroy", "duplicate_matches", "acknowledge_duplicates"):
             return [IsAuthenticated(), IsRecordOwner()]
         if self.action == "embargo_set":
             return [IsAuthenticated(), MaySetEmbargo()]
@@ -216,6 +216,37 @@ class RecordViewSet(viewsets.ModelViewSet):
         from .versions import manuscript_awaits_submission
 
         reset_manuscript(record, defer=manuscript_awaits_submission(record))
+
+    @action(detail=True, methods=["get"], url_path="duplicate-matches")
+    def duplicate_matches(self, request, pk=None):
+        """Current owner-visible likely matches for Publish's Details and Review."""
+        from .duplicates import acknowledgement_basis, exact_matches, likely_matches
+
+        record = self.get_object()
+        exact = exact_matches(request.user, record.pk, record.manuscript_sha256)
+        likely = likely_matches(request.user, record)
+        return Response({"exact": exact, "likely": likely,
+                         "acknowledged": bool(likely) and record.duplicate_acknowledgement == acknowledgement_basis(record, likely)})
+
+    @action(detail=True, methods=["post"], url_path="acknowledge-duplicates")
+    @transaction.atomic
+    def acknowledge_duplicates(self, request, pk=None):
+        from .duplicates import ExactDuplicate, acknowledgement_basis, exact_matches, likely_matches
+
+        record = self.get_object()
+        Record.objects.select_for_update().get(pk=record.pk)
+        record.refresh_from_db()
+        exact = exact_matches(request.user, record.pk, record.manuscript_sha256)
+        if exact:
+            raise ExactDuplicate(exact)
+        likely = likely_matches(request.user, record)
+        ids = sorted(item["id"] for item in likely)
+        supplied = request.data.get("candidate_ids", [])
+        if not isinstance(supplied, list) or any(type(item) is not int for item in supplied) or sorted(supplied) != ids:
+            return Response({"code": "acknowledgement_required", "detail": "Review the current likely matches.", "matches": likely}, status=409)
+        record.duplicate_acknowledgement = acknowledgement_basis(record, likely) if likely else ""
+        record.save(update_fields=["duplicate_acknowledgement"])
+        return Response({"acknowledged": bool(likely), "matches": likely})
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -357,6 +388,12 @@ class RecordViewSet(viewsets.ModelViewSet):
                 {"embargoed": embargo.ANSWER_REQUIRED},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        from .duplicates import acknowledgement_basis, enforce_exact, likely_matches, lock_digest
+        lock_digest(record.manuscript_sha256)
+        enforce_exact(request.user, record.pk, record.manuscript_sha256)
+        likely = likely_matches(request.user, record)
+        if likely and record.duplicate_acknowledgement != acknowledgement_basis(record, likely):
+            return Response({"code": "acknowledgement_required", "detail": "Review and acknowledge the likely matches before submitting.", "matches": likely}, status=409)
         try:
             # Consent, assignment, entry seat and v1 commit together.
             with transaction.atomic():

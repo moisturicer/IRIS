@@ -13,6 +13,8 @@ import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatDate } from "@/lib/utils";
 
 import type { ApiFailure } from "./draft";
+import type { ManuscriptMatch } from "@/api/records";
+import { Link } from "react-router-dom";
 
 /** The server's names for the fields the Details step edits. */
 const DETAIL_FIELDS: Record<string, true> = {
@@ -43,6 +45,12 @@ interface ReviewStepProps {
   dpaAccepted:      boolean;
   onDpaChange:      (accepted: boolean) => void;
   failure:          ApiFailure | null;
+  exactMatches?: ManuscriptMatch[];
+  likelyMatches?: ManuscriptMatch[];
+  matchesAcknowledged?: boolean;
+  matchFailure?: string;
+  onAcknowledge?: () => void;
+  onCheckAgain?: () => void;
   /** Submit again, offered when the server never answered. */
   onRetry:          () => void;
   /** Back to Details, offered when the server faults a Details field. */
@@ -60,6 +68,12 @@ export function ReviewStep({
   dpaAccepted,
   onDpaChange,
   failure,
+  exactMatches = [],
+  likelyMatches = [],
+  matchesAcknowledged = false,
+  matchFailure = "",
+  onAcknowledge,
+  onCheckAgain,
   onRetry,
   onFixDetails,
   fieldLabels,
@@ -101,6 +115,31 @@ export function ReviewStep({
           {summary.hints.length > 0 ? summary.hints.join("; ") : "Nothing flagged"}
         </Row>
       </Group>
+
+      {exactMatches.length > 0 && <section role="alert" className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+        <h3 className="font-semibold">Identical manuscript</h3>
+        <p>Choose another file or open the matching record.</p>
+        <ul>{exactMatches.map((match) => <li key={match.id}>
+          <Link to={match.action === "resume_draft" ? `/?publish=${match.id}` : match.url} className={cn("underline", FOCUS_RING)}>
+            {match.action === "resume_draft" ? "Resume draft" : "Open record"}: {match.title}
+          </Link>
+        </li>)}</ul>
+      </section>}
+      {likelyMatches.length > 0 && <section aria-labelledby="publish-likely-heading" className="rounded-lg border border-stone-200 p-4">
+        <h3 id="publish-likely-heading" className="font-semibold">Likely manuscript matches</h3>
+        <p>Review these readable records before submitting. A match is a warning, not a plagiarism finding.</p>
+        <ul className="mt-2 list-disc pl-5">{likelyMatches.map((match) => <li key={match.id}>
+          <Link to={match.action === "resume_draft" ? `/?publish=${match.id}` : match.url} className={cn("underline", FOCUS_RING)}>{match.title}</Link>
+          {match.reason === "same_title" ? " — same title" : " — similar title and author"}
+        </li>)}</ul>
+        <button type="button" onClick={onAcknowledge} disabled={matchesAcknowledged} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-3 min-h-9 px-4")}>
+          {matchesAcknowledged ? "Matches acknowledged" : "Acknowledge matches"}
+        </button>
+      </section>}
+      {matchFailure && <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 p-4">
+        <p>{matchFailure}</p>
+        <button type="button" onClick={onCheckAgain} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-2 min-h-9 px-4")}>Check again</button>
+      </div>}
 
       <DpaConsentInline accepted={dpaAccepted} onAcceptedChange={onDpaChange} />
 

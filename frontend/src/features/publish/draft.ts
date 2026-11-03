@@ -187,7 +187,7 @@ export function describeFailure(err: unknown, fallback: string): ApiFailure {
       const text = Array.isArray(value) ? value.filter((v) => typeof v === "string").join(" ") : value;
       if (typeof text !== "string" || !text) continue;
       if (key === "non_field_errors") message = text;
-      else if (key === "detail") continue;
+      else if (key === "detail" || key === "code") continue;
       else fields[key] = text;
     }
   } else if (typeof data === "string" && (response.status ?? 0) < 500) {
