@@ -36,7 +36,12 @@ vi.mock("@/api/records", () => ({
 }));
 
 vi.mock("@/features/records/paper-view/PaperPdfReader", () => ({
-  PaperPdfReader: () => <p>Shared authenticated PDF reader</p>,
+  PaperPdfReader: ({ scrollToPage, highlightRegions }: { scrollToPage: number | null; highlightRegions: unknown[] }) => (
+    <>
+      <p>Shared authenticated PDF reader</p>
+      {scrollToPage != null && <p>Reader at page {scrollToPage}, {highlightRegions.length} highlighted</p>}
+    </>
+  ),
 }));
 
 vi.mock("@/api/accounts", () => ({
@@ -956,8 +961,8 @@ describe("autofill from the manuscript (IR-833; supersedes IR-409's chips)", () 
 
     await waitFor(() => expect(titleField()).toHaveValue(FOUND_TITLE));
     expect(abstractField()).toHaveValue(FOUND_ABSTRACT);
-    expect(within(filled("title")!).getByText("Found in your PDF, page 1")).toBeInTheDocument();
-    expect(within(filled("abstract")!).getByText("Found in your PDF, page 2")).toBeInTheDocument();
+    expect(within(filled("title")!).getByText("Found on page 1")).toBeInTheDocument();
+    expect(within(filled("abstract")!).getByText("Found on page 2")).toBeInTheDocument();
     expect(chip("title")).not.toBeInTheDocument();
     expect(await screen.findByText(
       "Filled in the title and abstract from your PDF. You can undo this under each field.",
@@ -1047,7 +1052,7 @@ describe("autofill from the manuscript (IR-833; supersedes IR-409's chips)", () 
     expect(screen.getByRole("list", { name: "Authors added" })).toHaveTextContent("Ada Reyes");
     expect(screen.getByRole("textbox", { name: "Keywords" })).toHaveValue("");
     expect(screen.getByRole("spinbutton", { name: "Publication year" })).toHaveValue(null);
-    expect(within(chip("keywords")!).getByText("Found in your PDF, page 1")).toBeInTheDocument();
+    expect(within(chip("keywords")!).getByText("Found on page 1")).toBeInTheDocument();
 
     // The signed-in author is the default; replacing them is spelled out.
     await user.click(within(authors).getByRole("button", { name: "Replace with suggestion" }));
@@ -1374,6 +1379,75 @@ describe("autofill from the manuscript (IR-833; supersedes IR-409's chips)", () 
       },
     });
     expect(body).not.toHaveProperty("requested_itso");
+  });
+
+  describe("read by LlamaExtract (IR-846)", () => {
+    const REGION = { page: 1, left: 72, top: 74, right: 194, bottom: 87 };
+    const cited = <T,>(value: T, more: Record<string, unknown> = {}) => entry(value, {
+      source: "llamaextract", basis: "cited_text", page: 1, region: REGION,
+      matching_text: String(value), confidence: 0.97, low_confidence: false, ...more,
+    });
+
+    it("says which page each value is on, and quotes the PDF where its words differ", async () => {
+      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(reading({
+        title: cited(FOUND_TITLE, { auto_apply: true }),
+        authors: cited(["Ana Cruz", "Ben Reyes"], { matching_text: "Ana Cruz and Ben Reyes", page: 2 }),
+      }) as never);
+      const user = userEvent.setup();
+      await openNew();
+      await completeManuscript(user);
+
+      await waitFor(() => expect(titleField()).toHaveValue(FOUND_TITLE));
+      expect(within(filled("title")!).getByText("Found on page 1")).toBeInTheDocument();
+      // The title is the PDF's words exactly, so they are not repeated.
+      expect(within(filled("title")!).queryByText(FOUND_TITLE, { selector: "blockquote" })).not.toBeInTheDocument();
+      expect(within(chip("authors")!).getByText("Found on page 2")).toBeInTheDocument();
+      expect(within(chip("authors")!).getByText("Ana Cruz and Ben Reyes", { selector: "blockquote" })).toBeInTheDocument();
+    });
+
+    it("asks the author to check a low-confidence value, in words and never as a number", async () => {
+      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(reading({
+        abstract: cited(FOUND_ABSTRACT, { confidence: 0.62, low_confidence: true }),
+        keywords: cited(["irrigation"], { confidence: 0.99 }),
+      }) as never);
+      const user = userEvent.setup();
+      const view = await openNew();
+      await completeManuscript(user);
+
+      await waitFor(() => expect(chip("abstract")).toBeInTheDocument());
+      expect(within(chip("abstract")!).getByText("Check this against your PDF.")).toBeInTheDocument();
+      expect(within(chip("keywords")!).queryByText(/Check this/)).not.toBeInTheDocument();
+      expect(document.body.textContent).not.toMatch(/0\.62|0\.99|62%|99%/);
+      expect(abstractField()).toHaveValue("");
+      await expectNoBlockingA11yViolations(view.container);
+    });
+
+    it("turns the preview to the page and highlights the lines on Show in PDF", async () => {
+      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(reading({
+        authors: cited(["Ana Cruz"], { page: 2, region: { ...REGION, page: 2 } }),
+      }) as never);
+      const user = userEvent.setup();
+      await openNew();
+      await completeManuscript(user);
+
+      await waitFor(() => expect(chip("authors")).toBeInTheDocument());
+      await user.click(within(chip("authors")!).getByRole("button", { name: "Show the authors in your PDF, page 2" }));
+
+      expect(await screen.findByText("Reader at page 2, 1 highlighted")).toBeInTheDocument();
+    });
+
+    it("offers no Show in PDF for a value with no page", async () => {
+      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(reading({
+        keywords: cited(["irrigation"], { page: null, region: null, matching_text: null }),
+      }) as never);
+      const user = userEvent.setup();
+      await openNew();
+      await completeManuscript(user);
+
+      await waitFor(() => expect(chip("keywords")).toBeInTheDocument());
+      expect(within(chip("keywords")!).getByText("Found in your PDF")).toBeInTheDocument();
+      expect(within(chip("keywords")!).queryByRole("button", { name: /Show the/ })).not.toBeInTheDocument();
+    });
   });
 });
 

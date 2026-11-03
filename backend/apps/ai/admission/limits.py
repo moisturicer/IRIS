@@ -57,6 +57,14 @@ EXTRACTION_SETTINGS = (
     "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE",
 )
 
+#: What a LlamaExtract reading of a parsed Manuscript costs per page (IR-846).
+#: Its credit is priced by ``AI_ADMISSION_EXTRACTION_CREDIT_USD``, the same
+#: account's. Unset refuses the reading, and Publish falls back.
+METADATA_SETTINGS = (
+    "AI_ADMISSION_EXTRACTION_CREDIT_USD",
+    "AI_ADMISSION_METADATA_CREDITS_PER_PAGE",
+)
+
 
 class NotConfigured(Exception):
     """At least one limit is unset. The message names them."""
@@ -263,6 +271,18 @@ def read_extraction_price() -> ExtractionPrice:
     )
 
 
+def read_metadata_price() -> ExtractionPrice:
+    """LlamaExtract's price per page, or `NotConfigured` naming the unset settings."""
+    missing = [name for name in METADATA_SETTINGS if not _raw(name)]
+    if missing:
+        raise NotConfigured(", ".join(missing))
+    return ExtractionPrice(
+        credit_usd=_decimal("AI_ADMISSION_EXTRACTION_CREDIT_USD"),
+        credits_per_page=_decimal("AI_ADMISSION_METADATA_CREDITS_PER_PAGE"),
+        addon_credits_per_page=Decimal(0),
+    )
+
+
 def output_cap() -> Optional[int]:
     """The per-call completion cap to send under enforcement, if it is set
     and well-formed; ``None`` otherwise, which admission then refuses."""
@@ -293,7 +313,7 @@ def verify_admission_configuration() -> None:
             "shared limits (IR-545, ADR-041)."
         )
     if enforcing():
-        for read in (read_limits, read_extraction_price):
+        for read in (read_limits, read_extraction_price, read_metadata_price):
             try:
                 read()
             except NotConfigured:

@@ -239,6 +239,49 @@ class PdfExtraction(models.Model):
         return flatten_for_search(document) if document is not None else ""
 
 
+class ManuscriptMetadata(models.Model):
+    """LlamaExtract's reading of one parsed Manuscript revision (IR-846).
+
+    One row per extraction and source revision, so a replaced Manuscript's
+    reading can never be mistaken for the current one: the suggestions read
+    only the row whose ``source_revision`` is the Record's current one, and
+    the task writes only under that same fence. ``result`` is the vendor's
+    values and citations, admin only; nothing reads it but the Publish
+    suggestions, which project it.
+    """
+
+    QUEUED, RUNNING, DONE, FAILED, REFUSED = "queued", "running", "done", "failed", "refused"
+    STATUS = [
+        (QUEUED, "Queued"),
+        (RUNNING, "Running"),
+        (DONE, "Done"),
+        # Not read: the vendor failed or admission refused. Publish falls back.
+        (FAILED, "Failed"),
+        # Not sent: the disclosure gate refused just before sending.
+        (REFUSED, "Refused"),
+    ]
+
+    extraction = models.ForeignKey(PdfExtraction, on_delete=models.CASCADE, related_name="metadata_readings")
+    source_revision = models.UUIDField(editable=False)
+    status = models.CharField(max_length=10, choices=STATUS, default=QUEUED)
+    attempt = models.UUIDField(null=True, blank=True, editable=False)
+    result = models.JSONField(default=dict, blank=True)
+    # Null when the vendor never reported a charge.
+    credits = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["extraction", "source_revision"], name="manuscriptmetadata_one_per_revision",
+            ),
+        ]
+
+    def __str__(self):
+        return f"ManuscriptMetadata extraction={self.extraction_id} status={self.status}"
+
+
 class RecordFile(models.Model):
     """
     A supplementary file an office files on a record it takes part in

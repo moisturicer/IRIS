@@ -8,7 +8,7 @@ call, for a test whose answer depends on the bytes it was given.
 gated and admitted, and reports ``usage``.
 """
 
-from typing import Callable, Optional, Union
+from typing import Any, Callable, Mapping, Optional, Union
 
 from apps.ai.chunking.document import NormalizedDocument
 
@@ -33,6 +33,7 @@ class InMemoryExtractor:
         leaves_campus: bool = False,
         usage: Optional[Usage] = None,
         account: str = "memory-account",
+        raw: Optional[Mapping[str, Any]] = None,
     ):
         self._result = result
         self._provenance = provenance
@@ -41,6 +42,7 @@ class InMemoryExtractor:
         self._usage = usage
         self.account = account
         self.timeout_seconds = timeout_seconds
+        self._raw = dict(raw or {})
         self.calls: list[tuple[bytes, str]] = []
 
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument:
@@ -51,4 +53,4 @@ class InMemoryExtractor:
         if not outcome.elements:
             raise EmptyExtraction(f"no extractable content for {filename!r}")
         return ExtractedDocument(document=outcome, provenance=self._provenance,
-                                 failed_pages=self._failed_pages, usage=self._usage)
+                                 failed_pages=self._failed_pages, usage=self._usage, raw=self._raw)

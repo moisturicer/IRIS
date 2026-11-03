@@ -237,13 +237,14 @@ export type Capability =
  * while Docling reads the manuscript, `ready` once it has, `failed` when it
  * could not (an image-only scan included), `unsupported` when there is no
  * manuscript extraction at all. A `ready` field with nothing found is null.
- * There is deliberately no confidence value: Docling gives none.
+ * `source` is `llamaextract` when LlamaExtract read a LlamaParse Manuscript
+ * (IR-846), and `pdf_structure` when the stored structure was read.
  */
 export interface MetadataSuggestions {
   state:       "pending" | "ready" | "failed" | "unsupported";
   /** The legacy projection, kept while clients move to `fields` (IR-833). */
   suggestions: { title: string | null; abstract: string | null };
-  source:      "pdf_structure";
+  source:      "pdf_structure" | "llamaextract";
   /** Each field's value and where it was read, null when none was (IR-833). */
   fields?:     SuggestionFields;
   /** Opaque: the accepted manuscript these values were read from (IR-831). */
@@ -255,10 +256,16 @@ export interface MetadataSuggestions {
   message?:    string | null;
 }
 
-/** One value read from the PDF (IR-833). No confidence value: none is measured. */
+/**
+ * One value read from the PDF (IR-833). A LlamaExtract value (IR-846) also
+ * carries the text it cites and the confidence LlamaExtract reported, which
+ * the interface never shows as a number: only `low_confidence`, the server's
+ * comparison with its threshold, becomes words ("Check this").
+ */
 export interface SuggestionEntry<T> {
   value:         T;
-  basis:         "document_title" | "abstract_section" | "labelled_front_matter";
+  source?:       "pdf_structure" | "llamaextract";
+  basis:         "document_title" | "abstract_section" | "labelled_front_matter" | "cited_text";
   /** Only when the stored structure records them. */
   page:          number | null;
   region:        { page: number; left: number; top: number; right: number; bottom: number } | null;
@@ -266,6 +273,12 @@ export interface SuggestionEntry<T> {
   auto_apply:    boolean;
   /** Longer than the field allows: offered whole, for the author to shorten. */
   exceeds_limit: boolean;
+  /** The text in the PDF the value was read from (IR-846). */
+  matching_text?: string | null;
+  /** As LlamaExtract reported it; absent when it reported none. Never shown. */
+  confidence?:    number | null;
+  /** Below the server's threshold: the author should check it. */
+  low_confidence?: boolean;
 }
 
 export interface SuggestionFields {

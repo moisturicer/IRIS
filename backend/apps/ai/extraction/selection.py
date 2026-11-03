@@ -79,6 +79,7 @@ BACKENDS: dict[str, Callable[[], StructuredExtractor]] = {"docling": _docling, "
 
 # A module global, not a contextvar: worker threads in tests must see it.
 _installed: Optional[StructuredExtractor] = None
+_installed_reader = None
 
 
 def verify_extraction_configuration() -> None:
@@ -118,3 +119,43 @@ def use_extractor(adapter: StructuredExtractor):
         yield adapter
     finally:
         _installed = previous
+
+
+def metadata_reader_configured() -> bool:
+    """Whether a LlamaParse read is followed by a LlamaExtract reading (IR-846)."""
+    return _installed_reader is not None or bool(settings.LLAMAEXTRACT_VERSION)
+
+
+def current_metadata_reader():
+    """The LlamaExtract reader, admitted (IR-846). Call only when configured."""
+    from apps.ai.admission.extraction import AdmittedMetadataReader
+
+    if _installed_reader is not None:
+        adapter = _installed_reader
+    else:
+        from .llamaextract_client import LlamaExtractReader
+
+        if settings.LLAMAEXTRACT_VERSION == "latest" and not settings.DEBUG:
+            raise ImproperlyConfigured(
+                "LLAMAEXTRACT_VERSION=latest is refused outside development; pin a version (ADR-056)."
+            )
+        adapter = LlamaExtractReader(
+            api_key=settings.LLAMAPARSE_API_KEY,
+            base_url=settings.LLAMAPARSE_BASE_URL,
+            tier=settings.LLAMAEXTRACT_TIER,
+            version=settings.LLAMAEXTRACT_VERSION,
+            timeout_seconds=settings.LLAMAEXTRACT_TIMEOUT_SECONDS,
+        )
+    return adapter if isinstance(adapter, AdmittedMetadataReader) else AdmittedMetadataReader(adapter)
+
+
+@contextmanager
+def use_metadata_reader(adapter):
+    """Install ``adapter`` as the LlamaExtract reader for the block."""
+    global _installed_reader
+    previous = _installed_reader
+    _installed_reader = adapter
+    try:
+        yield adapter
+    finally:
+        _installed_reader = previous

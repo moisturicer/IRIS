@@ -23,10 +23,20 @@ completion year from the paper. A publication year is only a publication year.
 
 It imports the extraction package's serializer read-only and adds nothing to
 ``apps/ai``.
+
+**A LlamaParse Manuscript is different (IR-846, ADR-056 §15).** Its values come
+from LlamaExtract's stored reading of that parse (``extracted_metadata``), each
+with the page, region and matching text it cites and the confidence
+LlamaExtract reported. While that reading runs the state is ``pending``. If it
+failed, was refused or never ran, the shaped document's title and abstract are
+read by the rules below; LlamaParse papers are not read for labelled front
+matter. A paper the disclosure gate now refuses is ``unsupported``. The Docling
+path is unchanged until IR-843.
 """
 
 import os
 import re
+from types import SimpleNamespace
 from typing import Optional
 
 from django.db import models
@@ -34,7 +44,7 @@ from django.utils import timezone
 
 from apps.ai.chunking.document import HEADING, PAGE_FOOTER, PAGE_HEADER, DocumentElement, NormalizedDocument
 from apps.ai.extraction.serialization import document_from_json
-from apps.documents.models import DocumentKind, PdfExtraction
+from apps.documents.models import DocumentKind, ManuscriptMetadata, PdfExtraction
 from apps.documents.phases import ExtractionPhase
 
 SOURCE = "pdf_structure"
@@ -48,6 +58,13 @@ KEYWORD_LIMIT = 100
 MAX_KEYWORDS = 30
 
 FIELDS = ("title", "abstract", "authors", "keywords", "publication_year")
+
+LIMITS = SimpleNamespace(
+    title=TITLE_LIMIT, abstract=ABSTRACT_LIMIT, author=AUTHOR_LIMIT,
+    keyword=KEYWORD_LIMIT, max_keywords=MAX_KEYWORDS,
+)
+_LLAMAPARSE = "llamaparse"
+_IN_FLIGHT = frozenset({ManuscriptMetadata.QUEUED, ManuscriptMetadata.RUNNING})
 
 
 class SuggestionState(models.TextChoices):
@@ -132,13 +149,16 @@ def suggestions_payload(record) -> dict:
     ).first()
     state = _state(extraction)
     fields = dict.fromkeys(FIELDS)
-    if state == SuggestionState.READY:
+    source = SOURCE
+    if state == SuggestionState.READY and extraction.extractor == _LLAMAPARSE:
+        state, fields, source = _llamaparse_fields(record, extraction)
+    elif state == SuggestionState.READY:
         fields = read_fields(document_from_json(extraction.structure or {}), record.abstract_file.name)
     return {
         "state": state.value,
         "suggestions": {name: fields[name]["value"] if fields[name] else None for name in ("title", "abstract")},
         "fields": fields,
-        "source": SOURCE,
+        "source": source,
         "manuscript_revision": str(record.manuscript_revision) if record.manuscript_revision else None,
         "phase": extraction.phase if extraction else "unsupported",
         "retryable": bool(extraction and extraction.status == "failed"),
@@ -155,6 +175,31 @@ def read_fields(document: NormalizedDocument, stored_name: str) -> dict:
     for name, value in _front_matter(document, elements).items():
         fields[name] = value
     return fields
+
+
+def _llamaparse_fields(record, extraction: PdfExtraction) -> tuple[SuggestionState, dict, str]:
+    """LlamaExtract's values, or the shaped document's title and abstract."""
+    from apps.ai.extraction.gate import permits
+
+    from .extracted_metadata import SOURCE as LLAMAEXTRACT, fields_from_reading, reading_is_stale
+
+    if not permits(record):
+        return SuggestionState.UNSUPPORTED, dict.fromkeys(FIELDS), SOURCE
+    reading = ManuscriptMetadata.objects.filter(
+        extraction=extraction, source_revision=record.manuscript_revision,
+    ).first()
+    if reading is not None and reading.status in _IN_FLIGHT and not reading_is_stale(reading):
+        return SuggestionState.PENDING, dict.fromkeys(FIELDS), SOURCE
+    if reading is not None and reading.status == ManuscriptMetadata.DONE:
+        fields = fields_from_reading(reading.result or {}, extraction.raw_result or {}, limits=LIMITS)
+        return SuggestionState.READY, fields, LLAMAEXTRACT
+    fields = dict.fromkeys(FIELDS)
+    document = extraction.as_normalized_document()
+    if document is not None:
+        elements = [e for e in document.elements if e.kind not in _PAGE_FURNITURE]
+        fields["title"] = _title(document, elements, record.abstract_file.name)
+        fields["abstract"] = _abstract(elements)
+    return SuggestionState.READY, fields, SOURCE
 
 
 def _state(extraction: Optional[PdfExtraction]) -> SuggestionState:
