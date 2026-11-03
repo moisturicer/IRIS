@@ -65,12 +65,28 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 | S, T | Someone on the host's network writes to the broker | Redis password and localhost binding ([IR-669](https://citiris.atlassian.net/browse/IR-669)). JSON-only Celery content, so a broker message can't run pickle |
 | I | Reading tokens or data from Redis | Same. Every development port binds to localhost ([IR-828](https://citiris.atlassian.net/browse/IR-828)) |
 
-**Django ↔ Docling**
+**Django ↔ Docling** (until [IR-843](https://citiris.atlassian.net/browse/IR-843) removes Docling, after the LlamaParse cutover)
 
 | | Threat | Control or gap |
 |---|---|---|
 | T, E | A hostile PDF exploits the parser | PDF content check ([IR-665](https://citiris.atlassian.net/browse/IR-665)), Docling isn't published. Docling has no route out ([IR-825](https://citiris.atlassian.net/browse/IR-825)). Gap: malware scan ([IR-666](https://citiris.atlassian.net/browse/IR-666)) |
 | D | A PDF that takes the parser down | 50 MB limit, worker separation on the `extraction` queue |
+
+**Django ↔ LlamaParse** (added 2026-11-03, [IR-864](https://citiris.atlassian.net/browse/IR-864); live once [IR-842](https://citiris.atlassian.net/browse/IR-842) sets `EXTRACTION_BACKEND=llamaparse`)
+
+Unlike the boundary below, which carries chunks and questions, this one carries **the whole Manuscript PDF**, and it leaves for a cloud service ([ADR-056](056-manuscript-extraction-moves-to-llamaparse.md)).
+
+| | Threat | Control or gap |
+|---|---|---|
+| I | A withheld or embargoed paper is sent to be read | The disclosure gate runs when a read is queued and again just before sending (`apps/ai/extraction/gate.py`, [IR-850](https://citiris.atlassian.net/browse/IR-850)). An Extractor that doesn't say whether it leaves campus is treated as leaving |
+| I | LlamaParse keeps or trains on the paper | `disable_cache` is set on every job, and the uploaded file is deleted after the read (ADR-056 decision 7). Gap: retention in writing and the region are ADR-056 open conditions 1–2 ([IR-848](https://citiris.atlassian.net/browse/IR-848)). Gap: no recorded no-training evidence for LlamaParse or the model providers it uses ([IR-827](https://citiris.atlassian.net/browse/IR-827)) |
+| I | The API key reaches another host | Results are downloaded from presigned URLs with a separate client that carries no key (`llamaparse_client.py`). The key is a required secret, and Django won't start without it when LlamaParse is selected |
+| I | A hostile PDF that exploits the worker's own `pypdf` checks sends data out | Gap: `celery-extraction` needs `egress` to reach LlamaParse ([IR-842](https://citiris.atlassian.net/browse/IR-842), PR #500), so it loses IR-825's containment, and `egress` can't filter by hostname (SECURITY.md §7). PDF content check ([IR-665](https://citiris.atlassian.net/browse/IR-665)) and intake limits ([IR-831](https://citiris.atlassian.net/browse/IR-831)) still apply. Malware scan is still a gap ([IR-666](https://citiris.atlassian.net/browse/IR-666)) |
+| T | Prompt injection in a paper changes what the `agentic` tier extracts | Not controlled. The extracted text becomes the paper's chunks, and the same retrieval limit as below applies. Measured only by IRIS's own acceptance check on the proxy corpus ([IR-851](https://citiris.atlassian.net/browse/IR-851)) |
+| D | Spend run up by a bulk run or a retry loop | ADR-041 admission reserves pages × the dearest per-page price per read ([IR-850](https://citiris.atlassian.net/browse/IR-850)), and failures that can't succeed aren't retried ([IR-839](https://citiris.atlassian.net/browse/IR-839)). Refused unless admission enforces |
+| D | LlamaParse is down | Extraction fails as unavailable and the paper is filled in by hand. The submission workflow doesn't depend on it (ADR-056 §MVP Impact) |
+
+Figure images go to the `describe_figure` vendor ([IR-852](https://citiris.atlassian.net/browse/IR-852)) under the same gate and admission. They belong to the next boundary.
 
 **Django ↔ Voyage and LLM vendors**
 
@@ -102,3 +118,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 - It lists threats from reading the code, without a penetration test. The severities in `SECURITY.md` are estimates until a reviewer confirms them.
 
 **Rejected:** a separate risk register, because `SECURITY.md` §11 already is one and two lists would drift.
+
+## Amendment — 2026-11-03 (IR-864): LlamaParse is a trust boundary
+
+ADR-056 sends whole Manuscript PDFs to LlamaParse, which the Decision's own rule says must update this ADR. Added the **Django ↔ LlamaParse** boundary and marked the Docling boundary as ending at IR-843. Nothing else changed, and the Status stands. Drafted by an AI agent, and still to be reviewed.
