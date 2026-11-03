@@ -99,7 +99,7 @@ class DjangoResponseHeaderTests(SimpleTestCase):
         assert_policy_is_strict(self.get()["Content-Security-Policy-Report-Only"])
 
     def test_admin_pages_carry_it_too(self):
-        self.assertIn("Content-Security-Policy-Report-Only", self.get("/admin/login/"))
+        self.assertIn("Content-Security-Policy-Report-Only", self.get("/django-admin/login/"))
 
     @override_settings(CONTENT_SECURITY_POLICY_REPORT_ONLY=False)
     def test_enforcing_is_one_setting(self):

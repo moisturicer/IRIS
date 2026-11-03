@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-11-01 by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado (IR-780, spec IR-779). The decisions come from design sessions with Hermoine Zozobrado on 2026-11-01. **None of it is built yet.**
+**Accepted** — 2026-11-01 by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado (IR-780, spec IR-779). The decisions come from design sessions with Hermoine Zozobrado on 2026-11-01. IR-781 builds decisions 1 to 6, with decisions 4 and 5 amended below. The rest isn't built yet.
 
 **Partly replaced by [ADR-054](054-each-person-answers-whether-ai-may-use-their-papers.md), 2026-11-02:** Submission consent is gone. Decision 14's per-paper half, the last sentence of decision 15, decision 16's submission notice and the first half of decision 18 no longer apply.
 
@@ -202,3 +202,17 @@ The workflow's clearance rules don't change, and neither does clearance-aware re
 ## Related Tasks
 
 IR-779 (spec), IR-780 to IR-795 and IR-797 to IR-800 (subtasks), IR-705 (unverified signups), IR-801 (Contact person). Touches IR-123, IR-165, IR-214, IR-311, IR-420, IR-643, IR-655, IR-667, IR-668, IR-691, IR-693, IR-721, IR-763 and IR-765.
+
+## Amendment — 2026-11-03 (IR-781): who makes which accounts, and where the first System Admin comes from
+
+Decided by Hermoine Zozobrado while building IR-781.
+
+**Decision 4, as amended.** The System Admin makes office staff accounts: it alone gives the office roles (RDCO, KTTO, ITSO and IERC) and the coordinator flag. RDCO gives Student and Adviser, and only to someone outside the offices. RDCO keeps role requests, active sessions, locking, download requests, delete requests and analytics. Both open the Users page, and the server decides which role each may give. Sign-up asks only for Student or Adviser.
+
+**Decision 5, as amended.** The System Admin role is given only in Django's admin site, by a Django superuser, and not by a server command. Nobody gives, changes or removes it through IRIS's API. RDCO acts on no System Admin account at all: it can't change its role, lock or unlock it, revoke its sessions, edit it or approve a role request on it. It can still see the account in lists.
+
+**Decision 6 stands, and is enforced.** Django's admin site refuses the System Admin role together with the superuser or staff flag. Only `seed_demo`'s demo login holds both, and it isn't made through that form.
+
+**Why.** Office accounts carry review authority over other people's papers, so they belong with the role that runs IRIS rather than with an office. Giving the first System Admin in Django's admin site needs no extra tool, because a superuser has to exist anyway to reach that site.
+
+**What it costs.** IRIS can't make its first System Admin without a Django superuser, so someone runs `createsuperuser` first. Until IR-783 builds the System Admin's own pages, it uses the Users page and the Audit Log under RDCO's old Administration addresses. And RDCO, which made office accounts until now, can't.

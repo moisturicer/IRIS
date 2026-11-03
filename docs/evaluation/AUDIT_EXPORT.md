@@ -27,14 +27,14 @@ that carries IR-144; acts taken before it have no rows.
 
 **No review prose.** Decision and finding comments are never copied (IR-479). The only
 free text is a revision request's `reason`, a document request's `message` and a rejected
-document's `reason`. The log is readable by RDCO only (IR-165).
+document's `reason`. The log is readable by the System Admin only (ADR-051 §3, IR-781). It was RDCO's from IR-165 until then.
 
 **Kept apart (ADR-022).** A document request writes only `DOCUMENT_REQUEST*` events and a
 revision only revision events, so "you forgot a form" is never counted as "revise the work".
 
 ## The row
 
-`GET /api/v1/audit/` (RDCO only), filterable by `event_type`, `record`, `user`, `from` and
+`GET /api/v1/audit/` (the System Admin only), filterable by `event_type`, `record`, `user`, `from` and
 `to` (`YYYY-MM-DD`, inclusive), paginated (`page_size` up to 100), newest first.
 
 | Field | Meaning |
@@ -53,7 +53,7 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 ### Research metadata corrections (IR-563, ADR-046)
 
-`SYSTEM_SETTING_CHANGED` is an administrative event, excluded from workflow metrics. The actor is the RDCO account that changed the setting. Metadata contains `key`, `old_value` and `new_value`. Writing the value a setting already holds records nothing.
+`SYSTEM_SETTING_CHANGED` is an administrative event, excluded from workflow metrics. The actor is the System Admin that changed the setting (RDCO before IR-781). Metadata contains `key`, `old_value` and `new_value`. Writing the value a setting already holds records nothing.
 
 `RESEARCH_METADATA_CORRECTED` is an administrative metadata event, excluded from workflow metrics. The actor is the active superuser named by the correction command. Metadata contains `reason`, per-record `evidence`, and `before`/`after` objects with `origin`, nullable `publication_year`, and ordered `authors`. Corrections and audit rows share one transaction: failure rolls back the entire manifest. Dry runs produce no audit rows.
 
@@ -167,7 +167,7 @@ Every document-request event carries `party` (the **requesting** party), `reques
 
 ### CSV export (IR-529)
 
-The Audit Log's **Export CSV** downloads `GET /api/v1/audit/export/`. It is RDCO-only,
+The Audit Log's **Export CSV** downloads `GET /api/v1/audit/export/`. It is the System Admin's alone,
 read-only, and applies the same validated `event_type`, `record`, `user`, `from` and
 `to` filters as the list. Dates are inclusive in Django's configured timezone.
 Apply the screen's Filter button first: export uses the applied filters. It exports

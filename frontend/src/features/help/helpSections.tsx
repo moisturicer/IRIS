@@ -221,16 +221,17 @@ export const HELP_SECTIONS: HelpSection[] = [
   {
     id: "administration",
     title: "Administration",
-    shownTo: (r) => canAccess(r.role, "audit"),
+    // RDCO and the System Admin share it (ADR-051 §4, amended, IR-781).
+    shownTo: (r) => canAccess(r.role, "users"),
     body: (
       <>
-        <p>The Administration part of the sidebar is RDCO&rsquo;s:</p>
+        <p>The Administration part of the sidebar belongs to RDCO and the System Admin:</p>
         <ul>
-          <li><strong>Role Requests</strong>: approve or decline the role someone asked for when they registered.</li>
-          <li><strong>Users</strong>: change a role, lock or unlock an account, and name office coordinators.</li>
-          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong>: decide what readers and owners have asked for.</li>
-          <li><strong>Import Records</strong>: file research on someone&rsquo;s behalf.</li>
-          <li><strong>Audit Log</strong>: the record of workflow acts.</li>
+          <li><strong>Users</strong>: RDCO makes someone a Student or an Adviser and locks or unlocks accounts. The System Admin gives the office roles and names office coordinators.</li>
+          <li><strong>Role Requests</strong> (RDCO): approve or decline the role someone asked for when they registered.</li>
+          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong> (RDCO): decide what readers and owners have asked for.</li>
+          <li><strong>Import Records</strong> (RDCO): file research on someone&rsquo;s behalf.</li>
+          <li><strong>Audit Log</strong> (the System Admin): the record of workflow acts.</li>
         </ul>
       </>
     ),

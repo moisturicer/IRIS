@@ -74,7 +74,7 @@ export default function DeleteRequestsPage() {
         <span>
           Approving a deletion <strong>permanently removes</strong> the record from the system.
           Only approve when you are certain the record should be removed.
-          This action requires administrator privileges.
+          Only RDCO can approve it.
         </span>
       </div>
 

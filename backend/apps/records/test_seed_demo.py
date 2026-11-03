@@ -29,7 +29,7 @@ from apps.documents.models import RecordUpload, UploadSlot
 from apps.reviews.models import RecordAssignment, RecordClearance, Turnaround
 from apps.reviews.new_version import submit_new_version
 from apps.reviews.tracker import workflow_state
-from core.enums import ClearanceStatus, EmbargoState, Office, PipelineStatus, RecordTypeName
+from core.enums import ClearanceStatus, EmbargoState, Office, PipelineStatus, RecordTypeName, RoleName
 
 from .management.commands.seed_demo import (
     ADMIN_EMAIL,
@@ -132,19 +132,19 @@ class SeedDemoAccountTests(TestCase):
                 f"{email} does not accept the documented password",
             )
 
-    def test_the_admin_is_a_django_superuser_with_no_application_role(self):
-        """IR-165 reserved `is_superuser` for /admin and gave it no API standing.
+    def test_the_admin_is_the_system_admin_and_a_django_superuser(self):
+        """One demo login reaches both IRIS's administration and Django's admin site.
 
-        Seeding this account *with* a role -- RDCO, say -- would look harmless
-        and would quietly hand a superuser application privileges too, which is
-        the exact bypass that ticket removed. `ADMIN_ROLES` is `{RDCO}`: RDCO is
-        already IRIS's administrator, and this account is a different thing.
+        Changed deliberately by IR-781: this pinned "no application role" while
+        RDCO was IRIS's administrator. The System Admin is that now, and ADR-051
+        §6 lets only this demo login also be a superuser. The flag still grants
+        nothing in the API (IR-165); the role is what it does in IRIS.
         """
         seed(accounts_only=True)
         admin = User.objects.get(email=ADMIN_EMAIL)
         self.assertTrue(admin.is_superuser)
         self.assertTrue(admin.is_staff)
-        self.assertIsNone(admin.role, "the demo superuser must hold no application role")
+        self.assertEqual(admin.role.name, RoleName.SYSTEM_ADMIN)
 
     def test_accounts_only_seeds_no_records(self):
         seed(accounts_only=True)

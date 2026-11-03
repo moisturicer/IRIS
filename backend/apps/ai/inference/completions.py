@@ -44,6 +44,7 @@ from apps.ai.providers.tool_calling import (
     ToolDefinition,
 )
 from apps.ai.resilience.circuit import CircuitOpen
+from apps.ai.providers.vision import ImageDescribingLLM, require_image_describing
 from apps.ai.resilience.llm import require_tool_calling
 
 from .profiles import Profile
@@ -58,7 +59,7 @@ logger = logging.getLogger(LOGGER_NAME)
 CIRCUIT_OPEN = "circuit_open"
 
 
-class CompletionLoggingLLMProvider(LLMProvider, ToolCallingLLM):
+class CompletionLoggingLLMProvider(LLMProvider, ToolCallingLLM, ImageDescribingLLM):
     """Emits one structured completion record per call (IR-387).
 
     Wraps whichever provider `build_profile_llm` built for `profile` -- a
@@ -141,8 +142,16 @@ class CompletionLoggingLLMProvider(LLMProvider, ToolCallingLLM):
         )
 
     def generate(self, system: str, user: str) -> str:
+        return self._logged(lambda: self._provider.generate(system, user))
+
+    def describe_image(self, system: str, user: str, image: bytes, media_type: str) -> str:
+        return self._logged(
+            lambda: require_image_describing(self._provider).describe_image(system, user, image, media_type)
+        )
+
+    def _logged(self, call) -> str:
         try:
-            text = self._provider.generate(system, user)
+            text = call()
         except Exception as exc:
             self._record(
                 model=self._model_attempted(),

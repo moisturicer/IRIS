@@ -115,6 +115,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-665** | An uploaded PDF must really be one: its bytes carry the signature and it opens with at least one page; `uploads/create/` no longer skips … | [details](traceability/IR-665.md) | **IMPLEMENTED** |
 | **IR-383** | Question resolution runs as its own Inference task, on a model that exists — no FR- id; part E of IR-375's spec, and the ticket that closes … | [details](traceability/IR-383.md) | **IMPLEMENTED** |
 | **IR-382** | Groq dialect: the vendor's request shape behind the adapter, with citation-marker normalisation — no FR- id; part H of IR-375's spec, and … | [details](traceability/IR-382.md) | **IMPLEMENTED** |
+| **IR-852** | Figures are described for retrieval only, never shown to readers — no FR- id; part of IR-848 (ADR-056 §10) | [details](traceability/IR-852.md) | **IMPLEMENTED** |
 | **IR-647** | The API enforces the configured password policy — no FR- id; subtask 4 of IR-644 (account-security findings, 2026-10-30) | [details](traceability/IR-647.md) | **VERIFIED** |
 | **IR-645** | A refused session's 401 says why it ended — no FR- id; subtask 1 of IR-644 (account-security findings, 2026-10-30), extends NFR-S2 (IR-166) | [details](traceability/IR-645.md) | **IMPLEMENTED** |
 | **FR-M5-01** | Hierarchical submission workflow | [details](traceability/FR-M5-01.md) | **VERIFIED** |

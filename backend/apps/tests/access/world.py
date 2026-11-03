@@ -24,7 +24,9 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.utils import timezone
 
 from apps.accounts.models import Role, User
-from apps.documents.models import RecordFile, RecordUpload, UploadSlot, UploadStatus
+from apps.documents.models import (
+    DocumentKind, ExtractionFigure, PdfExtraction, RecordFile, RecordUpload, UploadSlot, UploadStatus,
+)
 from apps.documents.testing import real_pdf_bytes
 from apps.documents.requests import ItemSpec, create_request, requesting_party
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
@@ -43,8 +45,9 @@ ROLES = (
     "seated",       # an ITSO reviewer holding an open, opened seat on it
     "unseated",     # an ITSO member in the pool, with no seat on it
     "coordinator",  # an ITSO coordinator, seated nowhere
-    "rdco",         # RDCO, IRIS's administrator role, seated nowhere
+    "rdco",         # RDCO, which administers people's accounts, seated nowhere
     "admin",        # a Django superuser with no application role (IR-165)
+    "sysadmin",     # the System Admin, which runs IRIS and holds no workflow access (IR-781)
 )
 
 #: An id no fixture has. Every object route is also fired with each of its ids
@@ -76,6 +79,8 @@ class World:
             return obj.assignment.record
         if hasattr(obj, "record"):
             return obj.record
+        if isinstance(obj, ExtractionFigure):
+            return obj.extraction.record
         return obj.request.record   # a document-request item
 
     def restore_files(self) -> None:
@@ -143,6 +148,7 @@ def _users() -> dict[str, User | None]:
         "rdco": seeded[RoleName.RDCO],
         "routing_officer": _user("rdco-routing@cit.edu", RoleName.RDCO),
         "admin": admin,
+        "sysadmin": _user("matrix-sysadmin@cit.edu", RoleName.SYSTEM_ADMIN),
     }
 
 
@@ -179,6 +185,26 @@ def _at_itso(title, users) -> Record:
     return record
 
 
+def _figure(record) -> ExtractionFigure:
+    """A stored Figure of the served Manuscript (IR-845)."""
+    import uuid
+
+    from django.core.files.base import ContentFile
+
+    if record.manuscript_revision is None:
+        # The submitted version and the stored file are one revision.
+        record.manuscript_revision = uuid.uuid4()
+        record.save(update_fields=["manuscript_revision"])
+        record.versions.update(manuscript_revision=record.manuscript_revision)
+    extraction, _ = PdfExtraction.objects.get_or_create(record=record, defaults={
+        "kind": DocumentKind.MANUSCRIPT, "source_revision": record.manuscript_revision,
+    })
+    figure = ExtractionFigure(extraction=extraction, source_revision=record.manuscript_revision,
+                              page=1, media_type="image/png")
+    figure.image.save("figure.png", ContentFile(b"\x89PNG\r\n\x1a\n"), save=True)
+    return figure
+
+
 def build_world() -> World:
     users = _users()
     owner, other, itso = users["owner"], users["other"], users["seated"]
@@ -204,6 +230,7 @@ def build_world() -> World:
     o["document_request_item"] = document_request.items.get()
 
     o["version"] = record.versions.get(number=1)
+    o["figure"] = _figure(record)
     # The owner's, so only the owner may edit it (IR-419).
     o["review_comment"] = ReviewComment.objects.create(
         record=record, author=owner, body="Is the endorsement enough?", version=o["version"],

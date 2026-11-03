@@ -92,6 +92,8 @@ from apps.ai.providers.tool_calling import (
     ToolDefinition,
 )
 
+from apps.ai.providers.vision import ImageDescribingLLM, require_image_describing
+
 from .circuit import CircuitBreaker, CircuitOpen
 from .retry import retry_with_backoff
 
@@ -188,7 +190,7 @@ def _yield_from_opened(
     yield from rest
 
 
-class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
+class RetryingLLMProvider(LLMProvider, ToolCallingLLM, ImageDescribingLLM):
     """Retries a transient (`network`/`timeout`) failure against the same
     provider, bounded to `attempts` tries in total.
 
@@ -218,6 +220,16 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
         kwargs = {} if self._sleep is None else {"sleep": self._sleep}
         return retry_with_backoff(
             lambda: self._provider.generate(system, user),
+            attempts=self._attempts,
+            give_up_on=_GIVE_UP_ON,
+            give_up_on_kind=_GIVE_UP_ON_RETRY,
+            **kwargs,
+        )
+
+    def describe_image(self, system: str, user: str, image: bytes, media_type: str) -> str:
+        kwargs = {} if self._sleep is None else {"sleep": self._sleep}
+        return retry_with_backoff(
+            lambda: require_image_describing(self._provider).describe_image(system, user, image, media_type),
             attempts=self._attempts,
             give_up_on=_GIVE_UP_ON,
             give_up_on_kind=_GIVE_UP_ON_RETRY,
@@ -280,7 +292,7 @@ class RetryingLLMProvider(LLMProvider, ToolCallingLLM):
         )
 
 
-class CircuitBreakingLLMProvider(LLMProvider, ToolCallingLLM):
+class CircuitBreakingLLMProvider(LLMProvider, ToolCallingLLM, ImageDescribingLLM):
     """Refuses to call a provider whose circuit is open, rather than waiting
     out its timeout again.
 
@@ -327,6 +339,11 @@ class CircuitBreakingLLMProvider(LLMProvider, ToolCallingLLM):
     def generate(self, system: str, user: str) -> str:
         return self._breaker.call(lambda: self._provider.generate(system, user))
 
+    def describe_image(self, system: str, user: str, image: bytes, media_type: str) -> str:
+        return self._breaker.call(
+            lambda: require_image_describing(self._provider).describe_image(system, user, image, media_type)
+        )
+
     def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
         """Guards opening the stream, not consuming it.
 
@@ -370,7 +387,7 @@ class CircuitBreakingLLMProvider(LLMProvider, ToolCallingLLM):
         )
 
 
-class FallbackLLMProvider(LLMProvider, ToolCallingLLM):
+class FallbackLLMProvider(LLMProvider, ToolCallingLLM, ImageDescribingLLM):
     """Tries each model in order, switching to the next on a switch-worthy
     failure (IR-321) and giving up immediately on any other.
 
@@ -423,11 +440,19 @@ class FallbackLLMProvider(LLMProvider, ToolCallingLLM):
         return getattr(self._providers[0], "dialect", DEFAULT_DIALECT)
 
     def generate(self, system: str, user: str) -> str:
+        return self._walk(lambda provider: provider.generate(system, user))
+
+    def describe_image(self, system: str, user: str, image: bytes, media_type: str) -> str:
+        return self._walk(
+            lambda provider: require_image_describing(provider).describe_image(system, user, image, media_type)
+        )
+
+    def _walk(self, call: Callable[[LLMProvider], str]) -> str:
         failure: Optional[BaseException] = None
         for provider in self._providers:
             self.last_attempted_model = getattr(provider, "model", None)
             try:
-                text = provider.generate(system, user)
+                text = call(provider)
             except Exception as exc:
                 if not self._switch_on(exc):
                     raise
@@ -589,6 +614,8 @@ class LLMProviderConfig:
     #: The admission lane an attempt is charged to when no workload names
     #: one (IR-545). Read only under `AI_PROVIDER_ADMISSION=enforce`.
     lane: str = "chat"
+    #: Ask the vendor to retain nothing (IR-852); OpenRouter only.
+    zero_retention: bool = False
 
     @property
     def key(self) -> str:
@@ -621,7 +648,7 @@ def _build_retrying(config: LLMProviderConfig) -> LLMProvider:
         api_key=config.api_key or None,
         model=config.model or None,
         reasoning_effort=config.reasoning_effort,
-        dialect=dialect_for(config.vendor, config.provider_only),
+        dialect=dialect_for(config.vendor, config.provider_only, config.zero_retention),
         fallback_models=config.fallback_models,
         max_tokens=max_tokens,
         bounded_attempts=admitted,

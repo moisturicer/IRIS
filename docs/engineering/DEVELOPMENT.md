@@ -184,9 +184,9 @@ python manage.py seed_demo --password hunter2
 |---|---|
 | `student@cit.edu` | Student — owns the demo records |
 | `adviser@cit.edu` | Adviser |
-| `rdco@cit.edu` | RDCO — **IRIS's administrator** (`ADMIN_ROLES` is `{RDCO}`) |
+| `rdco@cit.edu` | RDCO — administers people's accounts and the request queues, and gives Student and Adviser (`ADMIN_ROLES` is `{RDCO}`) |
 | `itso@cit.edu` · `ierc@cit.edu` · `ktto@cit.edu` | The three clearing offices |
-| `admin@cit.edu` | Django superuser, **no application role** — `/admin` only (IR-165) |
+| `admin@cit.edu` | **System Admin**, and a Django superuser — the Audit Log, system settings and office roles in IRIS, and Django's admin site (ADR-051, IR-781). Only this demo login holds both |
 
 Re-running is idempotent for records (keyed by title) but **resets all seven passwords** to the default, so say so before a rehearsal if someone has changed one.
 
@@ -329,7 +329,7 @@ cp backend/.env.example backend/.env
       ports: !override
         - "5173:5173"
   ```
-- `/django-admin/` answers 403 in production unless the client is in `DJANGO_ADMIN_ALLOWED_NETWORKS` (IR-668). Set it in the repo-root `.env`, as addresses or CIDRs separated by spaces or commas: `DJANGO_ADMIN_ALLOWED_NETWORKS=203.0.113.0/24, 198.51.100.7`. Empty allows nobody. With a value set, also put `TRUSTED_PROXY_COUNT` in that `.env`, matching `backend/.env`, because nginx reads the client address the same way. A bad value, `/0` or a missing count stops the frontend container. Restart it after a change: `docker compose -f docker-compose.prod.yml up -d frontend`. Port 80 must be reachable only from the TLS proxy, or a client could forge its address (IR-662). Development has no nginx, so it is unaffected. **Django serves its admin at `/admin/` until IR-782 moves it, and that path is not restricted until then.**
+- `/django-admin/` answers 403 in production unless the client is in `DJANGO_ADMIN_ALLOWED_NETWORKS` (IR-668). Set it in the repo-root `.env`, as addresses or CIDRs separated by spaces or commas: `DJANGO_ADMIN_ALLOWED_NETWORKS=203.0.113.0/24, 198.51.100.7`. Empty allows nobody. With a value set, also put `TRUSTED_PROXY_COUNT` in that `.env`, matching `backend/.env`, because nginx reads the client address the same way. A bad value, `/0` or a missing count stops the frontend container. Restart it after a change: `docker compose -f docker-compose.prod.yml up -d frontend`. Port 80 must be reachable only from the TLS proxy, or a client could forge its address (IR-662). Development has no nginx, so it is unaffected. Django's admin is at `/django-admin/` in every environment, `http://localhost:8000/django-admin/` in development (IR-782); `/admin/...` is IRIS's own pages.
 - Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`. `config/settings/production.py` re-reads the last two without base's `localhost` default and refuses to start on an empty, `*` or non-https value
 
 `CORS_ALLOW_ALL_ORIGINS` is **gone** from every settings module (IR-154 — earlier text here attributing this to IR-61 is superseded; IR-61 was replaced by IR-154). It was set in development and, combined with `CORS_ALLOW_CREDENTIALS`, permitted any origin to make authenticated requests on a logged-in user's behalf. `development.py` now lists its dev origins explicitly, and `production.py` refuses to start if the setting reappears anywhere.

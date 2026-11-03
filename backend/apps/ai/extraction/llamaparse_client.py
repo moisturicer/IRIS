@@ -301,7 +301,7 @@ def _figures(downloads: httpx.Client, result: Mapping[str, Any]) -> Iterator[Fig
         yield FigureImage(
             page=page, bbox=image.get("bbox") or {}, data=_download(downloads, image["presigned_url"]),
             media_type=image.get("content_type") or "application/octet-stream",
-            caption=item.get("caption"),
+            caption=item.get("caption"), name=image["filename"],
         )
 
 

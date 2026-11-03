@@ -72,13 +72,15 @@ class Usage:
 @dataclass(frozen=True)
 class FigureImage:
     """A figure the Extractor cropped, downloaded before its copy is deleted
-    (IR-841). ``bbox`` is the vendor's page-point box; IR-845 stores it."""
+    (IR-841). ``bbox`` is the vendor's page-point box; IR-845 stores it.
+    ``name`` is the vendor's image filename, which its image item also names."""
 
     page: int
     bbox: Mapping[str, float]
     media_type: str
     data: bytes
     caption: Optional[str] = None
+    name: str = ""
 
 
 @dataclass(frozen=True)

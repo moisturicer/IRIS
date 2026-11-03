@@ -62,9 +62,9 @@ class CredentialTests(APITestCase):
         self.user.save(update_fields=["is_staff"])
         browser = Client()
         browser.force_login(self.user)
-        self.assertEqual(browser.get("/admin/").status_code, 200)
+        self.assertEqual(browser.get("/django-admin/").status_code, 200)
         self.reset()
-        self.assertEqual(browser.get("/admin/").status_code, 302)
+        self.assertEqual(browser.get("/django-admin/").status_code, 302)
 
     def setUp(self):
         self.user = User.objects.create_user(email="reader@cit.edu", password=OLD,

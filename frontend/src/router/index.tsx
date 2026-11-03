@@ -126,17 +126,12 @@ export const routes: RouteObject[] = [{
           {
             // RDCO coordination. `Import Records` is the "file on behalf of"
             // path -- which is why RDCO does not also get the submission wizard.
-            element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
+            element: <ProtectedRoute allowedRoles={rolesFor("importRecords")} />,
             children: [
               {
                 path: "records/import",
                 element: <DeferredPage name="Import Records"><ImportRecordsPage /></DeferredPage>,
                 handle: { crumb: "Import Records" },
-              },
-              {
-                path: "admin/users",
-                element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
-                handle: { crumb: "Users", width: "full" },
               },
               {
                 path: "admin/role-requests",
@@ -153,6 +148,23 @@ export const routes: RouteObject[] = [{
                 element: <DeferredPage name="Delete Requests"><DeleteRequestsPage /></DeferredPage>,
                 handle: { crumb: "Delete Requests", width: "full" },
               },
+            ],
+          },
+          {
+            // RDCO gives Student and Adviser; the System Admin office roles.
+            element: <ProtectedRoute allowedRoles={rolesFor("users")} />,
+            children: [
+              {
+                path: "admin/users",
+                element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
+                handle: { crumb: "Users", width: "full" },
+              },
+            ],
+          },
+          {
+            // The System Admin alone (ADR-051 §3). IR-783 gives it its own section.
+            element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
+            children: [
               {
                 path: "admin/audit",
                 element: <DeferredPage name="Audit Log"><AuditLogPage /></DeferredPage>,
