@@ -92,7 +92,7 @@ approval remain separate from implementation.
 ## Pending local extraction (IR-738)
 
 Apply Django migrations `publication/0006–0007`, rerun `provision_research_roles`,
-then apply AI migrations `0008–0009` through `python -m ai.runs.migrate`.
+then apply AI migrations `0008–0010` through `python -m ai.runs.migrate`.
 The latter remains the only migration/writer authority for `iris_ai`.
 The AI runtime has insert-only access to immutable extraction revisions;
 row policies require a verified grant for that exact current work. Django
@@ -171,7 +171,7 @@ pointer here to replace: even successful output is pending for IR-751.
 The owner-only metadata-suggestions endpoint now reports `processing`,
 `extracted_pending`, `failed` or `incomplete`, in addition to the receipt
 states. It returns only state and revision. A partial-success Docling
-envelope, missing page coverage, or absent page provenance cannot be reported
+envelope, coverage that differs from the actual PDF page count, or absent page provenance cannot be reported
 as a complete extraction. Conservative coverage can also withhold blank or
 unmapped pages; it makes no claim about semantic extraction quality. Private
 errors and extracted text never enter this projection. Terminal failed or
@@ -197,3 +197,9 @@ LlamaParse's disclosure, admission and version requirements. ADR-056 integration
 and the planned Docling retirement (IR-843) must be resolved before any live
 activation of this path. Paid extraction and a live writer switch are outside
 this ticket's authorization. No fallback to another extractor is added.
+
+
+Pending-table RLS calls an AI-owned invoker wrapper, which delegates to current
+institutional processing authority and returns no source while that authority is
+unavailable. Its runtime-resolved boundary leaves Django's function/schema
+rollback independent of AI-owned pending output. It never grants source access.

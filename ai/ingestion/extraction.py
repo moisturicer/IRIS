@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import io
 import json
 import uuid
 from dataclasses import asdict
 
 import asyncpg
+from pypdf import PdfReader
 
 from apps.ai.chunking import build_context_path_chunker, normalize
 from apps.ai.extraction import document_to_json, extraction_hash
@@ -27,13 +29,14 @@ async def _source(conn, token):
 
 def build_output(source, load, extractor, options):
     content = load(source['source_file'])
+    pages = set(range(1, len(PdfReader(io.BytesIO(content)).pages) + 1))
     extracted = extractor.extract(content, filename=source['source_file'].rsplit('/', 1)[-1])
     document = extracted.document
     if extracted.failed_pages:
         raise IncompleteCoverage()
-    pages = set(document.page_sizes)
     covered = {e.page for e in document.elements if e.text.strip()}
-    if not pages or not pages <= covered or any(e.page not in pages for e in document.elements):
+    if (not pages or set(document.page_sizes) != pages or not pages <= covered
+            or any(e.page not in pages for e in document.elements)):
         raise IncompleteCoverage()
     chunks = build_context_path_chunker(options).chunk(normalize(document, options), options)
     if not chunks.chunks or any(c.source_page not in pages for c in chunks.chunks):

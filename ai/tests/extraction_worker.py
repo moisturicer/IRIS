@@ -1,5 +1,6 @@
 """Independent deterministic extraction process for restricted-role tests."""
 import asyncio
+import base64
 import json
 import os
 import sys
@@ -20,7 +21,7 @@ class Extractor:
 
 if __name__ == '__main__':
     result = asyncio.run(process(os.environ['RUNS_DATABASE_URL'], os.environ['SYNTHETIC_GRANT'],
-        load=lambda key: b'synthetic PDF bytes', extractor=Extractor(),
+        load=lambda key: base64.b64decode(os.environ['SYNTHETIC_PDF']), extractor=Extractor(),
         options=ChunkingOptions(), pipeline='synthetic-v1',
         lease_seconds=int(os.environ.get('SYNTHETIC_LEASE', '60'))))
     print(result, flush=True)

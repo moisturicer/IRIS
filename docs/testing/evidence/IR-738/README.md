@@ -52,3 +52,25 @@ No provider/model request, live writer transfer, active research publication,
 production deployment or data reset was performed. Profiles and capacity values
 remain explicitly selected operational inputs. The legacy pipeline stays enabled;
 pending AI output is a separate ownership expansion for IR-751 to consume.
+
+
+## Full-suite integration findings
+
+The initial clean four-shard run found a cross-owner migration dependency:
+AI row policies referenced a Django-owned function directly, preventing historical
+Django migrations from rolling back and causing follow-on schema failures.
+AI migration `0010` replaces that reference with an AI-owned invoker wrapper
+that resolves current institutional authority at execution and denies access
+when it is unavailable. Existing historical migration tests exercise the fix.
+The policy-shape test was deliberately updated to require the new verifier-only
+UPDATE policy and its exact predicate; runtime write-denial assertions remain.
+The new role-using test module was registered with local parallel test isolation.
+The local image also lacked the declared `pytest-xdist` test dependency; it was
+installed for the final run. These failures were not counted as passing evidence.
+
+A second coverage regression demonstrated that a success envelope missing a PDF
+page was accepted when checked against only the extractor's own page list.
+The worker now compares against the actual source PDF page count using pypdf,
+and deterministic workers use generated two-page PDFs. The original branch's
+runtime regression run passed 12 tests, with its opt-in Docling test skipped in
+that particular run (the separate live extraction test already passed).

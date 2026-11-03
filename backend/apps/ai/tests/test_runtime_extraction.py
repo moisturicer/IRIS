@@ -49,14 +49,14 @@ def document():
 
 class Extractor:
     def extract(self, content, *, filename):
-        assert content == b'synthetic PDF bytes'
+        assert content.startswith(b'%PDF-')
         return document()
 
 
 def run(runtime, token, extractor=None, *, pipeline='synthetic-v1', lease=60):
     from ai.ingestion.extraction import process
     from apps.ai.chunking import ChunkingOptions
-    return asyncio.run(process(runtime, token, load=lambda path: b'synthetic PDF bytes',
+    return asyncio.run(process(runtime, token, load=lambda path: synthetic_pdf(),
         extractor=extractor or Extractor(), options=ChunkingOptions(),
         pipeline=pipeline, lease_seconds=lease))
 
@@ -163,6 +163,7 @@ def test_source_changes_during_extraction_fence_write(runtime, change):
 
 
 def start_worker(runtime, token, *, lease=60):
+    import base64
     import json
     import os
     import subprocess
@@ -170,6 +171,7 @@ def start_worker(runtime, token, *, lease=60):
     return subprocess.Popen([sys.executable, '-m', 'ai.tests.extraction_worker', '--pause'],
         env={**os.environ, 'RUNS_DATABASE_URL': runtime, 'SYNTHETIC_GRANT': token,
              'SYNTHETIC_DOCUMENT': json.dumps(document_to_json(document().document)),
+             'SYNTHETIC_PDF': base64.b64encode(synthetic_pdf()).decode(),
              'SYNTHETIC_LEASE': str(lease)},
         stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
 
@@ -310,4 +312,34 @@ def test_reported_failed_page_prevents_complete_pending_output(runtime):
             return replace(document(), failed_pages=(2,))
 
     assert run(runtime, token, Partial()) == 'incomplete'
+    assert status(owner, record)['state'] == 'incomplete'
+
+
+def synthetic_pdf():
+    import io
+    from reportlab.pdfgen.canvas import Canvas
+    buffer = io.BytesIO()
+    pdf = Canvas(buffer)
+    pdf.drawString(72, 720, 'Synthetic study: twelve ponds were sampled weekly.')
+    pdf.showPage()
+    pdf.drawString(72, 720, 'Synthetic result: all twelve ponds improved.')
+    pdf.save()
+    return buffer.getvalue()
+
+
+def test_successful_extractor_cannot_hide_a_missing_source_page(runtime):
+    from dataclasses import replace
+    from ai.ingestion.extraction import process
+    from apps.ai.chunking import ChunkingOptions
+    owner, record, token = source()
+
+    class MissingPage:
+        def extract(self, *args, **kwargs):
+            result = document()
+            return replace(result, document=replace(result.document,
+                elements=result.document.elements[:1], page_sizes={1: (612, 792)}))
+
+    result = asyncio.run(process(runtime, token, load=lambda key: synthetic_pdf(),
+        extractor=MissingPage(), options=ChunkingOptions(), pipeline='missing-source-page', lease_seconds=60))
+    assert result == 'incomplete'
     assert status(owner, record)['state'] == 'incomplete'
