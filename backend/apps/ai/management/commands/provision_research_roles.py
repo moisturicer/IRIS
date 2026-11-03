@@ -30,6 +30,7 @@ DEFINER_FUNCTIONS = (
     "research_record_ids()",
     "reader_status(bigint)",
     "processing_source()",
+    "lock_processing_source()",
     "pending_manuscript_work(integer, uuid)",
     "manuscript_invalidations(integer, uuid)",
 )
@@ -214,6 +215,8 @@ class Command(BaseCommand):
         cursor.execute(f"GRANT SELECT ON iris_authz.grant_key TO {VERIFIER}")
         for table, columns in VERIFIER_COLUMNS.items():
             cursor.execute(f"GRANT SELECT ({columns}) ON public.{table} TO {VERIFIER}")
+        # PostgreSQL row locks require UPDATE on at least one column.
+        cursor.execute(f"GRANT UPDATE (id) ON public.records_record TO {VERIFIER}")
         for fn in HELPER_FUNCTIONS:
             cursor.execute(f"GRANT EXECUTE ON FUNCTION iris_authz.{fn} TO {VERIFIER}")
         for fn in DEFINER_FUNCTIONS:
@@ -233,7 +236,8 @@ class Command(BaseCommand):
         )
         cursor.execute("GRANT EXECUTE ON FUNCTION iris_authz.processing_source(),"
                        " iris_authz.pending_manuscript_work(integer, uuid),"
-                       " iris_authz.manuscript_invalidations(integer, uuid) TO iris_ai_runtime")
+                       " iris_authz.manuscript_invalidations(integer, uuid),"
+                       " iris_authz.lock_processing_source() TO iris_ai_runtime")
         # The AI runtime reserves and settles in the one shared ledger (IR-725).
         for table, columns in LEDGER_TABLES.items():
             cursor.execute(f"REVOKE UPDATE ON public.{table} FROM iris_ai_runtime")

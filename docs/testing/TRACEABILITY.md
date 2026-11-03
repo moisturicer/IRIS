@@ -265,3 +265,34 @@ IR-754. Clean-install verification resolves the earlier frontend/typechecking fa
 publication evidence records 5,696 passing backend tests, 1,706 passing frontend
 tests and the isolated CI-equivalent setup. Automated standards/spec reviews were performed and
 their material findings addressed; independent human approval and CI remain required.
+
+### IR-738 — Immutable pending local extraction (ADR-049 §11)
+
+The isolated `ai.ingestion.extract_worker` reuses the structured Docling extraction
+and pure context-path chunking contracts. AI migration `0008` alone owns pending
+jobs/revisions. Source bytes, Manuscript revision, extraction/chunk hashes, pinned
+extractor/profile/tokenizer, page sizes and element/chunk regions remain bound
+together. Completed work is reused. Lease/attempt fencing and canonical Record
+locking prevent late, deleted or revoked work from writing pending output.
+The owner-only metadata-suggestions endpoint reports processing, extracted-pending,
+failed and incomplete states without exposing content or private diagnostics.
+
+**Behavioral evidence (2026-11-03):** the focused runtime extraction, Docling-client
+and IR-737 prerequisite suites passed 48 tests on real PostgreSQL with restricted
+roles, including independent-process lease takeover, duplicate reuse, out-of-order
+revision completion, deletion/revocation before write, immutable-output grants,
+RLS isolation and safe owner HTTP status. A separate generated two-page PDF passed
+through the local Docling 1.36.0 service and became page-bound pending output.
+The AI unit suite passed 42 tests after installing its async-test dependency.
+Static undefined-name checks passed. Django system checks reported only the
+existing disabled PDF-intake configuration warning. The isolated non-root worker
+image built and its entry point booted without Django. Full backend regression
+and migration-copy evidence are recorded in `evidence/IR-738/README.md`.
+
+**Limits:** pending-only additive expansion; no embedding/provider stage, active
+publication, legacy-writer transfer or live service switch. Local filesystem
+storage only. Partial/blank/unmapped-page coverage is conservatively incomplete;
+semantic extraction quality is not mechanically proven. Failed/incomplete work
+requires a corrected profile identity before retry. Numeric worker limits and the
+deployed Docling/profile identity are operator inputs, not approved production
+settings. CI and independent human review remain required.
