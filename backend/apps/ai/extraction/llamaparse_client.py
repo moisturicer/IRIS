@@ -74,14 +74,13 @@ Shape = Callable[[Mapping[str, Any]], NormalizedDocument]
 def request_options(
     tier: str, version: str, *, base_seconds: int, per_page_seconds: int,
 ) -> dict[str, Any]:
-    """ADR-056 decision 3: everything LlamaParse can return for a paper."""
+    """ADR-056 decision 3, less high-effort confidence (amended by IR-851)."""
     return {
         "tier": tier,
         "version": version,
         "disable_cache": True,
         "processing_options": {
             "cost_optimizer": {"enable": True},
-            "confidence_score_effort": "high",
             "specialized_chart_parsing": "agentic",
         },
         "output_options": {

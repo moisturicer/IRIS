@@ -36,7 +36,7 @@ It is the third-party reader [ADR-054](054-each-person-answers-whether-ai-may-us
    - word, line and cell boxes
    - printed page numbers
    - cross-page table merging and table quality flags
-   - high-effort confidence (page and document)
+   - ~~high-effort confidence (page and document)~~ — withdrawn, see the IR-851 amendment
    - chart values
    - figure images
    - watermark text
@@ -157,6 +157,21 @@ These block production enablement, not construction:
 2. **Region.** North America or the EU.
 3. **Prices.** Granular boxes and LlamaExtract are priced separately; confirm both before the cutover estimate.
 4. **Formulas.** Confirm LlamaParse writes LaTeX (decision 14).
+
+## Amendment — 2026-11-03 (IR-851): no high-effort confidence, and a six-paper acceptance check
+
+Decided by Jive Tyler Revalde while running IR-851, to keep the check inside LlamaParse's free tier (10,000 credits a month).
+
+**Decision 3 no longer requests high-effort confidence.** It is a second review pass that costs 5 credits a page on top of `agentic`'s 10. Whatever confidence LlamaParse returns without it is still stored and flagged per decision 16.
+
+**Decision 7 stands.** `disable_cache` stays set: turning the cache on would save credits only on a re-read within 48 hours, and would leave a vendor copy of every Manuscript for that time.
+
+**Decision 14 runs on six papers, one per category of the proxy corpus, not forty.** The same six are extracted by Docling into a separate database, so recall is compared paper for paper.
+
+**What it costs.**
+- A page no longer gets LlamaParse's own grade of its output, so a weak read is harder to spot.
+- About 16 labelled questions instead of 52: one question moves recall@10 by about 6 points, so the check shows the direction, not a measured difference.
+- The 40-paper Docling baseline is not the comparison.
 
 ## Related Requirements
 
