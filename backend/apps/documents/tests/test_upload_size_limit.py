@@ -12,6 +12,7 @@ import re
 from unittest import skipUnless
 
 from django.test import SimpleTestCase
+from testing.nginx import location_blocks
 
 from apps.documents.tests.test_document_access_control import NEEDS_CHECKOUT, REPO_ROOT
 from apps.documents.validators import MAX_PDF_SIZE_BYTES
@@ -33,7 +34,12 @@ class NginxBodyLimitTests(SimpleTestCase):
     @skipUnless(REPO_ROOT, NEEDS_CHECKOUT)
     def test_nginx_accepts_a_pdf_at_the_django_limit_and_bounds_the_rest(self):
         conf = (REPO_ROOT / "frontend" / "nginx.conf").read_text(encoding="utf-8")
-        limits = _body_limits(conf)
+        conf = re.sub(r"#[^\n]*", "", conf)
+        locations = location_blocks(conf)
+        global_conf = conf
+        for _, body in locations:
+            global_conf = global_conf.replace(body, "", 1)
+        limits = _body_limits(global_conf)
 
         self.assertEqual(
             len(limits),
@@ -54,3 +60,11 @@ class NginxBodyLimitTests(SimpleTestCase):
             2 * MAX_PDF_SIZE_BYTES,
             "the nginx bound has drifted far above the PDF limit it exists to serve",
         )
+
+        # The read-only reader accepts small JSON requests, never manuscripts.
+        for header, body in locations:
+            for scoped_limit in _body_limits(body):
+                self.assertIn("/ai/runtime/", header,
+                              "upload routes must inherit the server's PDF allowance")
+                self.assertGreater(scoped_limit, 0, "reader requests must stay bounded")
+                self.assertLess(scoped_limit, limit, "reader JSON needs less room than a PDF")

@@ -7,7 +7,10 @@ from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
+from .dotenv import restrict_dotenv
 from .validation import missing_required, non_blank, recovery_problems
+
+restrict_dotenv(config)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -75,6 +78,7 @@ LOCAL_APPS = [
     "apps.records",
     "apps.reviews",
     "apps.documents",
+    "apps.publication",
     "apps.notifications",
     "apps.audit",
     "apps.ai",

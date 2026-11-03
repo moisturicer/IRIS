@@ -32,6 +32,14 @@ vi.mock("@/api/records", () => ({
   },
 }));
 
+vi.mock("@/features/records/paper-view/PaperPdfReader", () => ({
+  PaperPdfReader: ({ recordId }: { recordId: number }) => (
+    <div data-testid="publish-paper-reader" data-record-id={String(recordId)}>
+      Shared authenticated PDF reader
+    </div>
+  ),
+}));
+
 vi.mock("@/api/accounts", () => ({
   accountsApi: { listAdvisers: vi.fn() },
 }));
@@ -435,6 +443,43 @@ describe("the adviser", () => {
     expect(await screen.findByText("Choose your adviser.")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole("combobox", { name: /Adviser/ })).toHaveFocus());
     expect(recordsApi.update).not.toHaveBeenCalled();
+  });
+});
+
+describe("IR-834 manuscript preview", () => {
+  it("shows the accepted Manuscript beside Details and fetches it through the authenticated reader", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+
+    expect(await screen.findByRole("region", { name: /Manuscript preview/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Details" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview" })).toBeInTheDocument();
+    expect(screen.getByTestId("publish-paper-reader")).toHaveAttribute("data-record-id", "42");
+  });
+
+  it("keeps the preceding accepted Manuscript when a replacement is rejected", async () => {
+    const user = userEvent.setup();
+    await openNew();
+    await completeManuscript(user);
+
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await user.click(screen.getByRole("button", { name: "Replace file" }));
+
+    vi.mocked(recordsApi.uploadManuscript).mockRejectedValueOnce({
+      response: { status: 400, data: { abstract_file: ["This replacement PDF was rejected."] } },
+    });
+    dropFile(pdf("rejected-replacement.pdf"));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This replacement PDF was rejected.");
+    expect(screen.getByText("My_Clearance-Study.pdf", { exact: true })).toBeInTheDocument();
+
+    const continueButton = screen.getByRole("button", { name: "Continue" });
+    expect(continueButton).toBeEnabled();
+
+    await user.click(continueButton);
+    expect(await screen.findByRole("region", { name: /Manuscript preview/i })).toBeInTheDocument();
+    expect(screen.getByTestId("publish-paper-reader")).toHaveAttribute("data-record-id", "42");
   });
 });
 
@@ -1020,11 +1065,13 @@ describe("prefill from the manuscript (IR-409; spec §4.5)", () => {
 });
 
 describe("the embargo question (ADR-052 decision 2)", () => {
+  afterEach(() => vi.useRealTimers());
+
   const inDays = (days: number) => {
-    const day = new Date();
-    day.setDate(day.getDate() + days);
-    const pad = (n: number) => String(n).padStart(2, "0");
-    return `${day.getFullYear()}-${pad(day.getMonth() + 1)}-${pad(day.getDate())}`;
+    // The form validates Manila's calendar date, regardless of the runner's timezone.
+    const day = new Date(Date.now() + 8 * 60 * 60 * 1000);
+    day.setUTCDate(day.getUTCDate() + days);
+    return day.toISOString().slice(0, 10);
   };
   const question = () => screen.findByRole("radiogroup", { name: /Is this paper under an embargo/ });
   const continueButton = () => screen.getByRole("button", { name: "Continue" });
@@ -1086,7 +1133,13 @@ describe("the embargo question (ADR-052 decision 2)", () => {
     expect(dateField()).toHaveAccessibleDescription(/only your Adviser or RDCO can/);
   });
 
-  it("asks for a date only under Yes, and requires one that has not passed", async () => {
+  it.each([
+    { now: "2026-11-02T15:59:00Z", yesterday: "2026-11-01", today: "2026-11-02" },
+    { now: "2026-11-02T16:01:00Z", yesterday: "2026-11-02", today: "2026-11-03" },
+  ])("asks for a date only under Yes, and requires one that has not passed at $now", async ({ now, yesterday, today }) => {
+    vi.setSystemTime(new Date(now));
+    expect(inDays(-1)).toBe(yesterday);
+    expect(inDays(0)).toBe(today);
     const user = userEvent.setup();
     const { container } = openAtQuestion();
     await question();
