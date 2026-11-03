@@ -219,3 +219,69 @@ it("RDCO sees the revision requests and findings its executive Decision supersed
   await userEvent.click(screen.getByRole("button", { name: "Publish" }));
   await waitFor(() => expect(onDone).toHaveBeenCalled());
 });
+
+// ADR-052 decision 14 (IR-818): RDCO is warned about an embargo before it
+// accepts the paper, and the warning blocks nothing.
+describe("an embargo at RDCO's Decision", () => {
+  const EMBARGOED: DecisionFlags = { ...RDCO_ALONE, embargo: { state: "active", until: "2099-01-01" } };
+  const warning = () => screen.queryByRole("region", { name: "Under embargo" });
+
+  it("warns before publishing, gives the date, says what the AI won't do, and still publishes", async () => {
+    const { onDone, view } = open("publish", EMBARGOED);
+
+    const dialog = screen.getByRole("dialog", { name: "Publish this thesis?" });
+    expect(warning()).toHaveTextContent("under embargo, with a review date of Jan 1, 2099");
+    expect(warning()).toHaveTextContent(/Ask IRIS won't read or cite it until the Adviser or RDCO releases the embargo/);
+    expect(dialog).not.toHaveTextContent("Ask IRIS can cite it");
+    await expectNoBlockingA11yViolations(view.container);
+
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    await waitFor(() => expect(onDone).toHaveBeenCalledWith("Published. It is now in Discover."));
+  });
+
+  it("warns before keeping it unlisted too, without promising Ask IRIS anything", () => {
+    open("keep_unlisted", EMBARGOED);
+
+    expect(warning()).toHaveTextContent("under embargo, with a review date of Jan 1, 2099");
+    expect(warning()).toHaveTextContent("Its text stays away from outside AI companies");
+    expect(warning()).not.toHaveTextContent("Ask IRIS");
+  });
+
+  it("leaves the date out rather than showing a dash when there is none", () => {
+    open("publish", { ...RDCO_ALONE, embargo: { state: "active", until: null } });
+
+    expect(warning()).toHaveTextContent("This paper is under embargo. You can still publish it.");
+  });
+
+  it("says nothing when rejecting, where the embargo doesn't matter", () => {
+    open("reject", EMBARGOED);
+
+    expect(warning()).not.toBeInTheDocument();
+  });
+
+  it("says nothing without an active embargo", () => {
+    for (const embargo of [null, { state: "none", until: null }, { state: "released", until: "2099-01-01" }] as const) {
+      const { view } = open("publish", { ...RDCO_ALONE, embargo });
+      expect(warning()).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toHaveTextContent("Ask IRIS can cite it");
+      view.unmount();
+    }
+  });
+
+  it("shows the warning when an embargo set meanwhile makes the dialog stale", async () => {
+    decide.mockRejectedValueOnce({
+      response: {
+        status: 409,
+        data: { detail: "This record changed while you were deciding.", decision: { ...EMBARGOED, token: "t2" } },
+      },
+    });
+    open("publish", RDCO_ALONE);
+    expect(warning()).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("This record changed while you were deciding.");
+    expect(warning()).toHaveTextContent("under embargo, with a review date of Jan 1, 2099");
+  });
+});

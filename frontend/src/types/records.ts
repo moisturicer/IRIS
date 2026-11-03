@@ -456,6 +456,8 @@ export interface DecisionFlags {
   token:        string | null;
   /** The author's flags, shown in the Adviser's *Accept & send to RDCO* dialog. */
   author_hints: string[];
+  /** For RDCO only, the embargo it is warned about and may still publish through (ADR-052 §14). */
+  embargo?:     RecordEmbargo | null;
 }
 
 export interface DecisionCloses {
