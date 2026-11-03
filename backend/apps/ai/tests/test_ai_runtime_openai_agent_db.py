@@ -115,7 +115,7 @@ def test_without_retries_a_transient_failure_ends_the_attempt(runtime):
     assert len(vendor.requests) == 1
 
 
-@pytest.mark.parametrize("n, unset", enumerate(["AI_ADMISSION_PRICES", "AI_ADMISSION_CAMPAIGN_MAX_COST_USD"]))
+@pytest.mark.parametrize("n, unset", list(enumerate(["AI_ADMISSION_PRICES", "AI_ADMISSION_CAMPAIGN_MAX_COST_USD"])))
 def test_with_one_admission_limit_unset_the_next_attempt_sends_nothing(runtime, n, unset):
     from ai.admission.errors import AdmissionDenied
 
