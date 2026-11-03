@@ -1136,6 +1136,18 @@ DOCLING_DO_FORMULA_ENRICHMENT = config("DOCLING_DO_FORMULA_ENRICHMENT", default=
 DOCLING_DO_CODE_ENRICHMENT = config("DOCLING_DO_CODE_ENRICHMENT", default=True, cast=bool)
 # A 4M-parameter classifier; the mapper does not store its output yet.
 DOCLING_DO_PICTURE_CLASSIFICATION = config("DOCLING_DO_PICTURE_CLASSIFICATION", default=True, cast=bool)
+# LlamaParse (IR-841, ADR-056); read only in apps.ai.extraction. With
+# EXTRACTION_BACKEND=llamaparse Django refuses to start without a key and a
+# dated version ("latest" only with DEBUG on).
+LLAMAPARSE_API_KEY = config("LLAMAPARSE_API_KEY", default="")
+LLAMAPARSE_TIER = config("LLAMAPARSE_TIER", default="agentic")
+LLAMAPARSE_VERSION = config("LLAMAPARSE_VERSION", default="")
+LLAMAPARSE_BASE_URL = config("LLAMAPARSE_BASE_URL", default="https://api.cloud.llamaindex.ai")
+# One job's budget is base + per page x its page count.
+LLAMAPARSE_TIMEOUT_BASE_SECONDS = config("LLAMAPARSE_TIMEOUT_BASE_SECONDS", default=300, cast=int)
+LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS = config("LLAMAPARSE_TIMEOUT_PER_PAGE_SECONDS", default=30, cast=int)
+# Sizes the task's time limit when PDF_VALIDATION_MAX_PAGES is unset.
+LLAMAPARSE_MAX_PAGES = config("LLAMAPARSE_MAX_PAGES", default=1000, cast=int)
 # Nothing in Django reads this any more (IR-281). ADR-024 took the indexing
 # path off the gateway — it posted to a route the gateway never registered, at
 # an endpoint returning no vector field — and Django now embeds in-process

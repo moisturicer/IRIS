@@ -181,6 +181,12 @@ class PdfExtraction(models.Model):
     error          = models.TextField(blank=True)
     # Admin only: pages the Extractor could not read (IR-839).
     warnings       = models.JSONField(default=list, blank=True)
+    # The vendor's whole result, kept for shaping without a paid re-read (IR-841).
+    # Admin only: it carries watermark text, which only staff see.
+    raw_result     = models.JSONField(default=dict, blank=True)
+    pages_read     = models.PositiveIntegerField(null=True, blank=True)
+    # Null when the vendor never reported a charge.
+    credits        = models.DecimalField(max_digits=12, decimal_places=3, null=True, blank=True)
     created_at     = models.DateTimeField(auto_now_add=True)
     completed_at   = models.DateTimeField(null=True, blank=True)
 

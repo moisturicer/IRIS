@@ -66,18 +66,34 @@ class Usage:
 
 
 @dataclass(frozen=True)
+class FigureImage:
+    """A figure the Extractor cropped, downloaded before its copy is deleted
+    (IR-841). ``bbox`` is the vendor's page-point box; IR-845 stores it."""
+
+    page: int
+    bbox: Mapping[str, float]
+    media_type: str
+    data: bytes
+    caption: Optional[str] = None
+
+
+@dataclass(frozen=True)
 class ExtractedDocument:
     """What an extractor returns: the structured document and its provenance.
 
     ``failed_pages`` are pages the extractor could not read; the rest of the
     document is still used (IR-839). ``usage`` is what a billing Extractor
-    reported; ``None`` when nothing was (IR-850).
+    reported; ``None`` when nothing was (IR-850). ``raw`` is the vendor's
+    whole result, less expiring URLs, so shaping can re-run without a paid
+    re-read (IR-841).
     """
 
     document: NormalizedDocument
     provenance: Provenance
     failed_pages: tuple[int, ...] = ()
     usage: Optional[Usage] = None
+    figures: tuple[FigureImage, ...] = ()
+    raw: Mapping[str, Any] = field(default_factory=dict)
 
 
 class Failure(enum.Enum):

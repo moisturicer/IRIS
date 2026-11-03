@@ -108,6 +108,9 @@ def _run_extraction(self, extraction_id, source_revision):
             "extractor_version": extracted.provenance.version,
             "extractor_options": dict(extracted.provenance.options),
             "warnings": [{"kind": "page_failed", "page": page} for page in extracted.failed_pages],
+            "raw_result": dict(extracted.raw),
+            "pages_read": extracted.usage.pages if extracted.usage else None,
+            "credits": extracted.usage.credits if extracted.usage else None,
             "error": "", "status": "done",
             "phase": ExtractionPhase.READY, "completed_at": timezone.now(),
         }

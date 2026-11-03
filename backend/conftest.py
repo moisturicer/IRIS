@@ -34,7 +34,7 @@ from testing.harness import (
     strict_mode_requested,
 )
 
-pytest_plugins = ["testing.slow_tests"]
+pytest_plugins = ["testing.slow_tests", "testing.parallel"]
 
 
 def pytest_configure(config):

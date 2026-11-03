@@ -9,3 +9,6 @@ scripts/*.sh text eol=lf
 
 # Preserve the audited proxy fixture bytes in Windows checkouts (IR-730).
 docs/evaluation/proxy_starter.json text eol=lf
+
+# Recordings stay byte for byte as LlamaParse returned them (IR-841).
+backend/apps/ai/extraction/tests/fixtures/llamaparse/** -text
