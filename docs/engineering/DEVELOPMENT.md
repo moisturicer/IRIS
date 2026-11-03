@@ -371,6 +371,9 @@ Use fewer workers if memory or database connections are limited; `-n 0` runs
 serially. Every selected test still runs. pytest-django creates one migrated
 database per worker (`test_<DB_NAME>_gw0`, etc.). The controller holds IR-835's
 server lock before starting workers, so separate invocations cannot collide.
+Each worker restores migration-created lookup rows when moving from a test
+that flushes tables back to rollback-based tests. This preserves the initial data
+that serial pytest-django normally protects through test ordering.
 Whole modules stay on one worker, and the research-role consumers share one
 worker because Postgres roles belong to the server. Schema rewinds and advisory
 locks stay inside their worker's database. Tests launching child processes must
