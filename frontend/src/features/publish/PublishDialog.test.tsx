@@ -1362,7 +1362,8 @@ describe("autofill from the manuscript (IR-833; supersedes IR-409's chips)", () 
     await user.click(screen.getByRole("button", { name: "Continue" }));
     await screen.findByRole("heading", { name: "Manuscript" });
 
-    const body = vi.mocked(recordsApi.update).mock.calls.at(-1)![1];
+    const calls = vi.mocked(recordsApi.update).mock.calls;
+    const body = calls[calls.length - 1][1];
     expect(body).toMatchObject({
       title: FOUND_TITLE,
       abstract: FOUND_ABSTRACT,

@@ -109,6 +109,10 @@ ALLOWED = {
     # is Docling reading a PDF, not a person's ReadingStatus on a saved paper.
     # Keep the exemption on this narrow declaration module, not the task body.
     "documents/phases.py",
+    # IR-833: declares the author's field-source decisions for Publish. Its
+    # "accepted" is an author taking a value the PDF offered, not a workflow
+    # request's RequestStatus.ACCEPTED. Declaration only; no workflow state.
+    "records/metadata_sources.py",
     # (IR-227) Replaces the entry for the deleted `seed_test_users.py`. Every
     # *workflow* value in this seeder is an enum member -- it drives the real
     # services, so it has to be. The two literals here are the demo students'

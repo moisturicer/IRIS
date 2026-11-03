@@ -228,6 +228,10 @@ def _abstract(elements) -> Optional[dict]:
             elif index < _FRONT_ELEMENTS and (match := _inline_abstract(text)):
                 section, start = [match.group("text").strip()], element
             continue
+        # A bilingual thesis heads one abstract twice ("Buod", then "Abstract").
+        if not section and element.kind == HEADING and _ABSTRACT_HEADING.match(text):
+            start = element
+            continue
         if element.kind == HEADING or _labelled(text):
             break
         if text:
