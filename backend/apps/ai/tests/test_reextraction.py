@@ -129,15 +129,6 @@ def test_a_run_over_the_ceiling_sends_nothing(priced, queued):
 
 
 @pytest.mark.django_db(transaction=True)
-def test_a_run_refuses_while_the_backend_is_still_docling(priced, queued, settings):
-    _record()
-    setattr(settings, BACKEND, "docling")
-    with pytest.raises(CommandError, match="EXTRACTION_BACKEND"):
-        _run("--credit-ceiling", "1000")
-    assert queued == []
-
-
-@pytest.mark.django_db(transaction=True)
 def test_a_run_queues_each_permitted_paper_once_and_keeps_the_old_chunks_live(priced, queued):
     record = _record()
     _record("Gated", consent=False)

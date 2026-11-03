@@ -2,7 +2,7 @@
 
 The labelling loop is a person reading PDFs and typing quotes, and the three
 ways that goes wrong are all silent: a title that does not match a `Record`, a
-quote Docling extracted differently than it reads on the page, and a quote that
+quote the Extractor read differently than it reads on the page, and a quote that
 straddles a chunk boundary. Each one shows up as a question that scores zero,
 indistinguishable from retrieval failing.
 

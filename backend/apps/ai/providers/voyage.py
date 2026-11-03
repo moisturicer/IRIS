@@ -1,7 +1,7 @@
 """Voyage as the embedding and reranking provider (IR-128, ADR-015).
 
 One vendor for both stages, no alternative in scope. `httpx`, matching the
-Docling client next door rather than adding a second HTTP stack.
+LlamaParse client rather than adding a second HTTP stack.
 
 **What this module deliberately does not do.** No retries, no circuit breaker,
 no rate limiting, no caching. Those are a decorator stack composed *around*
@@ -171,7 +171,7 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
     ``transport`` is injectable so the request *shaping* -- which input type is
     sent, how texts are batched -- is testable without a network or an account.
     The wire call itself is one function and stays untested, which is the same
-    trade the Docling client makes.
+    trade the LlamaParse client makes.
     """
 
     def __init__(
