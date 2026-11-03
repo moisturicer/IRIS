@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from django.conf import settings
 from django.core.management.base import CommandError
+from django.db import transaction
 from django.utils import timezone
 
 from .embargo import EmbargoAnswer, record_answer
@@ -38,3 +39,7 @@ def clear_for_ai(record: Record, *, actor) -> None:
         record.dpa_accepted_at = timezone.now()
         record.dpa_accepted_by = actor
         record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
+    # A read held for this answer goes now (IR-850).
+    from apps.documents.sources import read_awaiting
+
+    transaction.on_commit(lambda: read_awaiting(record.pk), robust=True)

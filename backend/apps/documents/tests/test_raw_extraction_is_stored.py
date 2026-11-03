@@ -22,7 +22,8 @@ RAW = {
 
 class RawExtractor:
     timeout_seconds = 60
-    leaves_campus = True
+    # Storage only; gating and admission are IR-850's tests.
+    leaves_campus = False
 
     def extract(self, pdf_bytes, *, filename):
         return ExtractedDocument(

@@ -91,6 +91,7 @@ class DoclingExtractor:
     per call and closed with it.
     """
 
+    #: Docling-serve runs in the deployment (IR-850): not gated, not admitted.
     leaves_campus = False
 
     def __init__(

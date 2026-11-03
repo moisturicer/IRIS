@@ -19,6 +19,7 @@ from django.db import models
 from apps.ai.chunking.document import HEADING, PAGE_FOOTER, PAGE_HEADER, NormalizedDocument
 from apps.ai.extraction.serialization import document_from_json
 from apps.documents.models import DocumentKind, PdfExtraction
+from apps.documents.phases import ExtractionPhase
 
 SOURCE = "pdf_structure"
 
@@ -81,7 +82,8 @@ def suggestions_payload(record) -> dict:
 
 
 def _state(extraction: Optional[PdfExtraction]) -> SuggestionState:
-    if extraction is None:
+    # A read held for consent or release is not coming: the author types (IR-850).
+    if extraction is None or extraction.phase == ExtractionPhase.AWAITING_DISCLOSURE:
         return SuggestionState.UNSUPPORTED
     if extraction.status in _READING:
         return SuggestionState.PENDING

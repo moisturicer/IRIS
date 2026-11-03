@@ -28,6 +28,7 @@ from .ports import (
     StructuredExtractor,
     Usage,
     classify,
+    Usage,
 )
 from .selection import current_extractor, use_extractor, verify_extraction_configuration
 from .serialization import document_from_json, document_to_json

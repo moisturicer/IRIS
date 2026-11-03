@@ -148,6 +148,17 @@ class LlamaParseExtractor:
         )
 
     @property
+    def model(self) -> str:
+        return f"{EXTRACTOR_NAME}-{self._tier}"
+
+    @property
+    def account(self) -> str:
+        """Admission's per-account fence (IR-850); never the key itself."""
+        from apps.ai.admission.ledger import account_for
+
+        return account_for(self._api_key)
+
+    @property
     def timeout_seconds(self) -> float:
         return self._job_seconds(self._max_pages) + POLL_GRACE_SECONDS + TRANSFER_SLACK_SECONDS
 

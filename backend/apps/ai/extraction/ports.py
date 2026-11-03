@@ -58,8 +58,8 @@ class Provenance:
 
 @dataclass(frozen=True)
 class Usage:
-    """What one read cost: pages read, and the credits charged when the
-    vendor reported them (IR-841)."""
+    """What the vendor billed for one read (IR-850). ``credits`` is ``None``
+    when it was not reported, and admission then keeps the reservation."""
 
     pages: int
     credits: Optional[Decimal] = None
@@ -82,9 +82,10 @@ class ExtractedDocument:
     """What an extractor returns: the structured document and its provenance.
 
     ``failed_pages`` are pages the extractor could not read; the rest of the
-    document is still used (IR-839). ``raw`` is the vendor's whole result,
-    less expiring URLs, so shaping can re-run without a paid re-read; ``usage``
-    is None for an on-campus Extractor that charges nothing (IR-841).
+    document is still used (IR-839). ``usage`` is what a billing Extractor
+    reported; ``None`` when nothing was (IR-850). ``raw`` is the vendor's
+    whole result, less expiring URLs, so shaping can re-run without a paid
+    re-read (IR-841).
     """
 
     document: NormalizedDocument
@@ -122,10 +123,14 @@ class StructuredExtractor(Protocol):
 
     ``timeout_seconds`` is the longest one call may take; the task's time
     limit is derived from it (IR-839).
+
+    ``leaves_campus`` is true when the PDF is sent off the deployment; such an
+    Extractor is gated and admitted, and also names the ``account`` it spends
+    (``admission.ledger.account_for``) and the ``model`` it is recorded under
+    (IR-850).
     """
 
     timeout_seconds: float
-    # True when the PDF is sent off the deployment (IR-841, ADR-056).
     leaves_campus: bool
 
     def extract(self, pdf_bytes: bytes, *, filename: str) -> ExtractedDocument: ...

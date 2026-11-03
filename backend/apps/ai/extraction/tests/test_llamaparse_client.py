@@ -326,3 +326,13 @@ class TestLlamaParseContract(ExtractorContract):
 
     def extractor_rejecting(self):
         return extractor(Vendor("figures", statuses=("FAILED",), error_message="DOCUMENT_TOO_LARGE"))
+
+
+def test_admission_can_name_the_model_and_the_account():
+    from apps.ai.admission.ledger import account_for
+
+    adapter = extractor(Vendor("figures"), api_key="llx-one", tier="agentic")
+
+    assert adapter.model == "llamaparse-agentic"
+    assert adapter.account == account_for("llx-one")
+    assert adapter.account != extractor(Vendor("figures"), api_key="llx-two").account

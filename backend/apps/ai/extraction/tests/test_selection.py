@@ -88,6 +88,24 @@ def test_extraction_settings_are_read_only_inside_the_extraction_module():
     assert readers == []
 
 
+def test_an_extractor_that_leaves_campus_comes_admitted():
+    from apps.ai.admission.extraction import AdmittedExtractor
+
+    with use_extractor(InMemoryExtractor(DOCUMENT, leaves_campus=True)):
+        assert isinstance(current_extractor(), AdmittedExtractor)
+
+
+def test_an_extractor_that_does_not_say_is_treated_as_leaving():
+    from apps.ai.admission.extraction import AdmittedExtractor
+
+    class Undeclared:
+        def extract(self, pdf_bytes, *, filename):
+            raise AssertionError("never called here")
+
+    with use_extractor(Undeclared()):
+        assert isinstance(current_extractor(), AdmittedExtractor)
+
+
 def _llamaparse(settings, **values):
     settings.EXTRACTION_BACKEND = "llamaparse"
     settings.LLAMAPARSE_API_KEY = "llx-test"
@@ -148,8 +166,12 @@ def test_the_llamaparse_adapter_is_built_from_the_llamaparse_settings(settings, 
 
     _llamaparse(settings)
 
-    adapter = current_extractor()
+    from apps.ai.admission.extraction import AdmittedExtractor
+    from apps.ai.extraction.selection import BACKENDS
 
+    adapter = BACKENDS["llamaparse"]()
+
+    assert isinstance(current_extractor(), AdmittedExtractor)
     assert isinstance(adapter, LlamaParseExtractor)
     assert adapter.leaves_campus is True
     assert adapter._base_url == "https://api.cloud.eu.llamaindex.ai"

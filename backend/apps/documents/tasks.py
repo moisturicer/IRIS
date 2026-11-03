@@ -46,6 +46,9 @@ SOFT_LIMIT_HEADROOM_SECONDS = 30
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from apps.documents.models import PdfExtraction
 
+#: Rows a stale message must not start reading.
+_HELD = frozenset({ExtractionPhase.AWAITING_SUBMISSION, ExtractionPhase.AWAITING_DISCLOSURE})
+
 
 def _locked_extraction(extraction_id):
     """Lock order matches upload: Record first, then its extraction row."""
@@ -68,17 +71,19 @@ def _locked_extraction(extraction_id):
 def _run_extraction(self, extraction_id, source_revision):
     import uuid
     from django.db import transaction
+    from apps.ai.admission.errors import AdmissionDenied
     from apps.ai.extraction import (
         ExtractionError, Failure, classify, current_extractor,
         document_to_json, extraction_hash, flatten_for_search,
     )
+    from apps.ai.extraction.gate import NotDisclosed, reading
 
     attempt = uuid.uuid4()
     with transaction.atomic():
         extraction = _locked_extraction(extraction_id)
         if not extraction or str(extraction.source_revision) != str(source_revision):
             return
-        if extraction.status in {"done", "failed"} or extraction.phase == ExtractionPhase.AWAITING_SUBMISSION:
+        if extraction.status in {"done", "failed"} or extraction.phase in _HELD:
             return
         extraction.status = "running"
         extraction.phase = ExtractionPhase.READING
@@ -88,11 +93,13 @@ def _run_extraction(self, extraction_id, source_revision):
         field = extraction.upload.file if extraction.upload_id else extraction.record.abstract_file
         filename = extraction.source_file or field.name
         storage = field.storage
+        record_id = extraction.resolved_record_id
 
     try:
         with storage.open(filename, "rb") as source:
             pdf_bytes = source.read()
-        extracted = current_extractor().extract(pdf_bytes, filename=os.path.basename(filename))
+        with reading(record_id):
+            extracted = current_extractor().extract(pdf_bytes, filename=os.path.basename(filename))
         values = {
             "extracted_text": flatten_for_search(extracted.document),
             "structure": document_to_json(extracted.document),
@@ -107,8 +114,25 @@ def _run_extraction(self, extraction_id, source_revision):
             "error": "", "status": "done",
             "phase": ExtractionPhase.READY, "completed_at": timezone.now(),
         }
+    except NotDisclosed:
+        # Nothing was sent. Held, then rechecked under the lock in case a
+        # release committed since (IR-850).
+        from .sources import HELD, read_awaiting
+
+        with transaction.atomic():
+            extraction = _locked_extraction(extraction_id)
+            if (not extraction or extraction.attempt != attempt
+                    or str(extraction.source_revision) != str(source_revision)):
+                return
+            for key, value in HELD.items():
+                setattr(extraction, key, value)
+            extraction.save(update_fields=list(HELD))
+            read_awaiting(record_id)
+        return
     except Exception as error:
-        transient = isinstance(error, SoftTimeLimitExceeded) or classify(error) is Failure.TRANSIENT
+        # A refused admission says nothing about the PDF: retried (IR-850).
+        transient = (isinstance(error, (SoftTimeLimitExceeded, AdmissionDenied))
+                     or classify(error) is Failure.TRANSIENT)
         if not transient and not isinstance(error, ExtractionError):
             logger.exception("Unexpected failure extracting PdfExtraction %s", extraction_id)
         final = not transient or self.request.retries >= len(RETRY_COUNTDOWNS)
