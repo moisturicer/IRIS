@@ -1304,6 +1304,10 @@ CELERY_BEAT_SCHEDULE["recovery-dispatch"]["schedule"] = float(RECOVERY_DISPATCH_
 
 # ---- Axes (brute force protection) --------------------------------------
 
+# Off for now (IR-865): the lockout got in the way of development. AXES_ENABLED=True
+# turns it back on with no code change, and it must be on before launch. Until then
+# only the per-address sign-in throttle (API_THROTTLE_LOGIN) limits guessing.
+AXES_ENABLED = config("AXES_ENABLED", default=False, cast=bool)
 AXES_FAILURE_LIMIT = config("AXES_FAILURE_LIMIT", default=3, cast=int)
 AXES_LOCKOUT_PARAMETERS = [["username", "ip_address"]]
 # How many proxies sit in front of Django, nginx included. Zero trusts no

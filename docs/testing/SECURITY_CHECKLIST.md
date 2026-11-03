@@ -6,9 +6,9 @@
 
 | Status | Meaning | Items |
 |---|---|---|
-| Pass | Evidence named in the row | 72 |
+| Pass | Evidence named in the row | 71 |
 | Partial | Met in part, and the row says which part | 9 |
-| Gap | Not met; the row names the ticket | 16 |
+| Gap | Not met; the row names the ticket | 17 |
 | Deferred | Deliberately deferred | 1 |
 | N/A | Does not apply, for the reason given | 9 |
 | Needs manual check | Reading the code can't settle it, or a person must judge it | 21 |
@@ -30,7 +30,7 @@
 | 2.1.10 | there are no periodic credential rotation or password history requirements. | Pass | No rotation or history rule |
 | 2.1.11 | "paste" functionality, browser password helpers, and external password managers are permitted. | Pass | No paste handler in `frontend/src` |
 | 2.1.12 | the user can choose to either temporarily view the entire masked password, or temporarily view the last typed character of the password on platforms that do not have this as built-in functionality. | Pass | Reveal control in `LoginForm.tsx` |
-| 2.2.1 | anti-automation controls are effective at mitigating breached credential testing, brute force, and account lockout attacks. Such controls include blocking the most common breached passwords, soft lockouts, rate limiting, CAPTCHA, ever increasing delays between attempts, IP address restrictions, or risk-based restrictions such as location, first login on a device, recent attempts to unlock the account, or similar. Verify that no more than 100 failed attempts per hour is possible on a single account. | Pass | `AXES_*`, `apps/accounts/test_lockout.py`, `test_auth_throttles.py` ([IR-656](https://citiris.atlassian.net/browse/IR-656), [IR-661](https://citiris.atlassian.net/browse/IR-661)) |
+| 2.2.1 | anti-automation controls are effective at mitigating breached credential testing, brute force, and account lockout attacks. Such controls include blocking the most common breached passwords, soft lockouts, rate limiting, CAPTCHA, ever increasing delays between attempts, IP address restrictions, or risk-based restrictions such as location, first login on a device, recent attempts to unlock the account, or similar. Verify that no more than 100 failed attempts per hour is possible on a single account. | Gap | The lockout is switched off by default for now ([IR-865](https://citiris.atlassian.net/browse/IR-865)), leaving only the 300-an-hour per-address throttle. With `AXES_ENABLED=True` it passes: `AXES_*`, `apps/accounts/test_lockout.py`, `test_auth_throttles.py` ([IR-656](https://citiris.atlassian.net/browse/IR-656), [IR-661](https://citiris.atlassian.net/browse/IR-661)) |
 | 2.2.2 | the use of weak authenticators (such as SMS and email) is limited to secondary verification and transaction approval and not as a replacement for more secure authentication methods. Verify that stronger methods are offered before weak methods, users are aware of the risks, or that proper measures are in place to limit the risks of account compromise. | Pass | Email is used only for recovery and verification (ADR-045) |
 | 2.2.3 | secure notifications are sent to users after updates to authentication details, such as credential resets, email or address changes, logging in from unknown or risky locations. The use of push notifications - rather than SMS or email - is preferred, but in the absence of push notifications, SMS or email is acceptable as long as no sensitive information is disclosed in the notification. | Partial | A reset sends a notice, a signed-in change does not. [IR-820](https://citiris.atlassian.net/browse/IR-820) |
 | 2.3.1 | system generated initial passwords or activation codes SHOULD be securely randomly generated, SHOULD be at least 6 characters long, and MAY contain letters and numbers, and expire after a short period of time. These initial secrets must not be permitted to become the long term password. | Pass | `secrets.token_bytes(32)`, `apps/accounts/recovery/crypto.py`; 30-minute reset TTL |

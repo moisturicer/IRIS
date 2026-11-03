@@ -46,7 +46,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 
 | | Threat | Control or gap |
 |---|---|---|
-| S | Password guessing, stolen credentials | Lockout on the real client address ([IR-656](https://citiris.atlassian.net/browse/IR-656)), rate limits ([IR-661](https://citiris.atlassian.net/browse/IR-661)), recovery ([IR-642](https://citiris.atlassian.net/browse/IR-642)). Gap: password rules ([IR-819](https://citiris.atlassian.net/browse/IR-819)). SSO and MFA deferred ([IR-652](https://citiris.atlassian.net/browse/IR-652)) |
+| S | Password guessing, stolen credentials | Lockout on the real client address ([IR-656](https://citiris.atlassian.net/browse/IR-656)), **switched off by default for now** ([IR-865](https://citiris.atlassian.net/browse/IR-865)), rate limits ([IR-661](https://citiris.atlassian.net/browse/IR-661)), recovery ([IR-642](https://citiris.atlassian.net/browse/IR-642)). Gap: password rules ([IR-819](https://citiris.atlassian.net/browse/IR-819)). SSO and MFA deferred ([IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | S | A stolen session stays usable | Idle expiry ([IR-166](https://citiris.atlassian.net/browse/IR-166)), revoke ([IR-657](https://citiris.atlassian.net/browse/IR-657)), ending sessions on lock or password change ([IR-644](https://citiris.atlassian.net/browse/IR-644)). Gap: no notice on password change ([IR-820](https://citiris.atlassian.net/browse/IR-820)) |
 | T | Forged client address in `X-Forwarded-For` | `TRUSTED_PROXY_COUNT` ([IR-656](https://citiris.atlassian.net/browse/IR-656)) |
 | T | Traffic altered in transit | Caddy serves HTTPS, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-057). Gap: not yet run on a deployed domain |
@@ -122,3 +122,8 @@ Figure images go to the `describe_figure` vendor ([IR-852](https://citiris.atlas
 ## Amendment — 2026-11-03 (IR-864): LlamaParse is a trust boundary
 
 ADR-056 sends whole Manuscript PDFs to LlamaParse, which the Decision's own rule says must update this ADR. Added the **Django ↔ LlamaParse** boundary and marked the Docling boundary as ending at IR-843. Nothing else changed, and the Status stands. Drafted by an AI agent, and still to be reviewed.
+
+## Amendment — 2026-11-04 (IR-865): the lockout is off for now
+
+Decided by Ashlee Sean, at Jive Tyler Revalde's suggestion: the sign-in lockout got in the way of development, so `AXES_ENABLED` now defaults to off. The code and its tests stay, and `AXES_ENABLED=True` turns it back on. Until it's back on, only the per-address sign-in throttle (IR-661, 300 an hour) limits password guessing. It must be on before launch.
+
