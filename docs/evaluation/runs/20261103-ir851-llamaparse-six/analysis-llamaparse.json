@@ -1,0 +1,1068 @@
+[
+ {
+  "title": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+  "extractor": "llamaparse",
+  "status": "done",
+  "pages": 17,
+  "credits": 448.0,
+  "failed_pages": [],
+  "confidence_min": 0.644,
+  "low_confidence_pages": [],
+  "cost_optimized_pages": [
+   2,
+   3,
+   6,
+   13,
+   16,
+   17
+  ],
+  "formula_elements": 23,
+  "formula_elements_latex": 23,
+  "formula_samples": [
+   "\\frac{dy}{dt} = f(t, y; p), \\quad y(t_0) = y_0,",
+   "y(t_{n+1}) = y(t_n) + \\int_{t_n}^{t_n+h} f(t, y(t); p) \\, dt, \\tag{2}",
+   "h_{n+1} = h_n \\min \\left( \\phi_{\\max}, \\max \\left( \\phi_{\\min}, 0.9 \\, \\varepsilon_n^{e_1} \\, \\varepsilon_{n-1}^{e_2} \\, \\varepsilon_{n-2}^{e_3} \\right) \\right),"
+  ],
+  "inline_dollar_math": 385,
+  "inline_samples": [
+   "$y(t) \\in R^D$",
+   "$f$",
+   "$p \\in R^P$"
+  ],
+  "headings": 35,
+  "numbered_headings": 30,
+  "heading_level_offsets": [
+   0,
+   1,
+   2,
+   3
+  ],
+  "heading_mismatches": [
+   [
+    3,
+    "1 INTRODUCTION"
+   ],
+   [
+    4,
+    "1.1 Background"
+   ],
+   [
+    2,
+    "1.2 Existing GPU-accelerated ODE libraries"
+   ],
+   [
+    3,
+    "1.2.1 DiffEqGPU.JL"
+   ],
+   [
+    4,
+    "1.2.2 DIFFRAX"
+   ],
+   [
+    4,
+    "1.2.3 TORCHDIFFEQ"
+   ],
+   [
+    4,
+    "1.2.4 GRADSOLVE"
+   ],
+   [
+    2,
+    "2 METHODS"
+   ]
+  ],
+  "heading_outline": [
+   [
+    2,
+    "Accelerating massive ensembles of ordinary differential equations"
+   ],
+   [
+    3,
+    "ABSTRACT"
+   ],
+   [
+    3,
+    "1 INTRODUCTION"
+   ],
+   [
+    4,
+    "1.1 Background"
+   ],
+   [
+    2,
+    "1.2 Existing GPU-accelerated ODE libraries"
+   ],
+   [
+    3,
+    "1.2.1 DiffEqGPU.JL"
+   ],
+   [
+    4,
+    "1.2.2 DIFFRAX"
+   ],
+   [
+    4,
+    "1.2.3 TORCHDIFFEQ"
+   ],
+   [
+    4,
+    "1.2.4 GRADSOLVE"
+   ],
+   [
+    2,
+    "2 METHODS"
+   ],
+   [
+    2,
+    "2.1 Architectural constraints"
+   ],
+   [
+    3,
+    "2.1.1 SIMT parallelism and thread divergence"
+   ],
+   [
+    3,
+    "2.1.2 Memory access patterns"
+   ],
+   [
+    3,
+    "2.1.3 Floating-point precision"
+   ],
+   [
+    3,
+    "2.1.4 Kernel launch overhead"
+   ],
+   [
+    2,
+    "2.2 Implementation"
+   ],
+   [
+    3,
+    "2.2.1 Choice of numerical methods"
+   ],
+   [
+    3,
+    "2.2.2 Optimally parallelising an ensemble of ODEs"
+   ],
+   [
+    2,
+    "2.2.3 Tsit5: explicit solver"
+   ],
+   [
+    2,
+    "2.2.4 Rodas5P: stiff implicit solver"
+   ],
+   [
+    3,
+    "2.2.4.1 Computing the Jacobian."
+   ],
+   [
+    3,
+    "2.2.4.2 Exploiting sparsity: colouring and ordering."
+   ],
+   [
+    3,
+    "2.2.5 Differentiation via forward sensitivity analysis"
+   ],
+   [
+    2,
+    "3 RESULTS"
+   ],
+   [
+    3,
+    "3.1 Lorenz system: non-stiff benchmarks"
+   ],
+   [
+    2,
+    "3.2 Robertson system: stiff benchmarks"
+   ],
+   [
+    2,
+    "3.3 Van der Pol lattice: scaling with dimensionality"
+   ],
+   [
+    2,
+    "3.4 Practical examples"
+   ],
+   [
+    2,
+    "3.4.1 Bayesian parameter estimation from primordial abundances"
+   ],
+   [
+    2,
+    "3.4.2 Monte Carlo uncertainty quantification of the global 21 cm signa"
+   ],
+   [
+    3,
+    "3.4.3 Uncoupled Fourier modes: the primordial power spectrum"
+   ],
+   [
+    2,
+    "4 CONCLUSIONS"
+   ],
+   [
+    2,
+    "ACKNOWLEDGEMENTS"
+   ],
+   [
+    2,
+    "DATA AVAILABILITY"
+   ],
+   [
+    2,
+    "REFERENCES"
+   ]
+  ],
+  "chunks": 86,
+  "broken_hyphen_candidates": 0,
+  "broken_hyphen_samples": []
+ },
+ {
+  "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+  "extractor": "llamaparse",
+  "status": "done",
+  "pages": 23,
+  "credits": 475.0,
+  "failed_pages": [],
+  "confidence_min": 0.366,
+  "low_confidence_pages": [
+   18,
+   19,
+   21
+  ],
+  "cost_optimized_pages": [
+   2,
+   3,
+   11,
+   14,
+   15
+  ],
+  "formula_elements": 4,
+  "formula_elements_latex": 4,
+  "formula_samples": [
+   "\n\\begin{aligned}\n(g - r > 1.0) \\\\\n\\land \\quad (-1.0 < r - i < 1.0) \\\\\n\\land \\quad (1.5(r - i) < g - r - 0.8).\n\\end{aligned}\n",
+   "\\sigma_N = \\alpha N^\\beta,",
+   "\\rho_{th} = Med(\\rho_{field}) + 4MAD(\\rho_{field}),"
+  ],
+  "inline_dollar_math": 344,
+  "inline_samples": [
+   "$\\log M_{halo}/M_{\\odot} = 12.4--12.8$",
+   "$M_{halo}^{z=0} \\sim 10^{14}M_{\\odot}$",
+   "$\\beta$"
+  ],
+  "headings": 26,
+  "numbered_headings": 19,
+  "heading_level_offsets": [
+   1,
+   2,
+   3
+  ],
+  "heading_mismatches": [
+   [
+    3,
+    "1 INTRODUCTION"
+   ],
+   [
+    2,
+    "2 METHOD"
+   ],
+   [
+    3,
+    "2.1 Protocluster candidate catalogue by PCFNet"
+   ],
+   [
+    2,
+    "3 RESULTS"
+   ],
+   [
+    3,
+    "3.1 Procluster identification"
+   ],
+   [
+    3,
+    "3.2 Properties of procluster members and others"
+   ],
+   [
+    2,
+    "4 DISCUSSION"
+   ],
+   [
+    3,
+    "4.1 Comparison with previous studies"
+   ]
+  ],
+  "heading_outline": [
+   [
+    2,
+    "Diverse Metallicities in Protoclusters at z ∼ 3.4 detected by Deep Lea"
+   ],
+   [
+    4,
+    "ABSTRACT"
+   ],
+   [
+    3,
+    "1 INTRODUCTION"
+   ],
+   [
+    2,
+    "2 METHOD"
+   ],
+   [
+    3,
+    "2.1 Protocluster candidate catalogue by PCFNet"
+   ],
+   [
+    2,
+    "2.2 Target selection"
+   ],
+   [
+    3,
+    "2.2.1 Selection of protocluster candidate targets"
+   ],
+   [
+    3,
+    "2.2.2 Selection of galaxy targets to which slits would be assigned"
+   ],
+   [
+    2,
+    "2.3 MOIRCS Observation"
+   ],
+   [
+    2,
+    "2.4 Line identification"
+   ],
+   [
+    2,
+    "2.5 SED fitting"
+   ],
+   [
+    2,
+    "3 RESULTS"
+   ],
+   [
+    3,
+    "3.1 Procluster identification"
+   ],
+   [
+    3,
+    "3.2 Properties of procluster members and others"
+   ],
+   [
+    2,
+    "3.3 Halo mass of protoclusters"
+   ],
+   [
+    2,
+    "3.4 SFRD of protoclusters"
+   ],
+   [
+    2,
+    "3.5 Metallicity diagnostic from emission line ratio"
+   ],
+   [
+    2,
+    "4 DISCUSSION"
+   ],
+   [
+    3,
+    "4.1 Comparison with previous studies"
+   ],
+   [
+    2,
+    "4.2 Physical mechanisms driving diverse metallicities in protoclusters"
+   ],
+   [
+    2,
+    "5 SUMMARY AND CONCLUSIONS"
+   ],
+   [
+    2,
+    "DATA AVAILABILITY"
+   ],
+   [
+    2,
+    "REFERENCES"
+   ],
+   [
+    2,
+    "APPENDIX A: IMPACT OF DIFFERENT HALO MASS ESTIMATION METHODS"
+   ],
+   [
+    2,
+    "APPENDIX B: COMPARISON OF PROTOCLUSTER MEMBER, FIELD GALAXIES AND NON-"
+   ],
+   [
+    2,
+    "APPENDIX C: CATALOGUE OF THE SPECTROSCOPICALLY IDENTIFIED GALAXIES"
+   ]
+  ],
+  "chunks": 108,
+  "broken_hyphen_candidates": 2,
+  "broken_hyphen_samples": [
+   "low- and"
+  ]
+ },
+ {
+  "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+  "extractor": "llamaparse",
+  "status": "done",
+  "pages": 20,
+  "credits": 551.0,
+  "failed_pages": [],
+  "confidence_min": 0.7,
+  "low_confidence_pages": [],
+  "cost_optimized_pages": [
+   1,
+   2,
+   10,
+   11,
+   16,
+   17,
+   18
+  ],
+  "formula_elements": 39,
+  "formula_elements_latex": 37,
+  "formula_samples": [
+   "L(\\omega, a) : \\Omega \\times A \\rightarrow R, \\tag{1}",
+   "a_{Bayes} \\in \\arg \\min_{a \\in A} E [L(\\omega, a)]. \\tag{2}",
+   "a_{Bayes} \\in \\arg \\min_{a \\in A} \\int L(\\omega, a) \\, d\\omega = \\arg \\min_{a \\in A} \\int_{U} \\ell(u, a) p_U(u) \\, du, \\tag{3}"
+  ],
+  "inline_dollar_math": 212,
+  "inline_samples": [
+   "$\\varepsilon$",
+   "$(\\Omega, F, P)$",
+   "$a \\in A$"
+  ],
+  "headings": 41,
+  "numbered_headings": 30,
+  "heading_level_offsets": [
+   1,
+   2
+  ],
+  "heading_mismatches": [
+   [
+    2,
+    "A PREPRINT"
+   ],
+   [
+    2,
+    "1 Introduction"
+   ],
+   [
+    3,
+    "1.1 Context"
+   ],
+   [
+    2,
+    "2 Stochastic Multiobjective Optimization as a Bayesian decision proble"
+   ],
+   [
+    3,
+    "2.1 Bayesian optimal decision under uncertainties"
+   ],
+   [
+    2,
+    "3 Expected Uncrowded hypervolume"
+   ],
+   [
+    3,
+    "3.1 Uncrowded hypervolume for deterministic MOO"
+   ],
+   [
+    2,
+    "5 Numerical Results"
+   ]
+  ],
+  "heading_outline": [
+   [
+    1,
+    "EXPECTED HYPERVOLUME MAXIMIZATION FOR MULTIOBJECTIVE OPTIMIZATION UNDE"
+   ],
+   [
+    2,
+    "A PREPRINT"
+   ],
+   [
+    2,
+    "ABSTRACT"
+   ],
+   [
+    2,
+    "1 Introduction"
+   ],
+   [
+    3,
+    "1.1 Context"
+   ],
+   [
+    2,
+    "1.2 Contributions"
+   ],
+   [
+    2,
+    "1.3 Related work"
+   ],
+   [
+    2,
+    "2 Stochastic Multiobjective Optimization as a Bayesian decision proble"
+   ],
+   [
+    3,
+    "2.1 Bayesian optimal decision under uncertainties"
+   ],
+   [
+    2,
+    "2.2 Loss function in multiobjective optimization under uncertainties"
+   ],
+   [
+    3,
+    "2.2.1 Pareto Dominance and Indicator functions"
+   ],
+   [
+    3,
+    "2.2.2 Bayesian optimal decision for SMOOUU"
+   ],
+   [
+    2,
+    "2.3 Properties of the expected hypervolume"
+   ],
+   [
+    3,
+    "2.3.1 Single candidate"
+   ],
+   [
+    3,
+    "2.3.2 Multiple candidates with two objectives"
+   ],
+   [
+    3,
+    "2.3.3 Upper bound"
+   ],
+   [
+    2,
+    "3 Expected Uncrowded hypervolume"
+   ],
+   [
+    3,
+    "3.1 Uncrowded hypervolume for deterministic MOO"
+   ],
+   [
+    4,
+    "Hypervolume Improvement and Uncrowded distance heatmaps — panels: Hype"
+   ],
+   [
+    2,
+    "3.2 Gradient-based optimization of the mean UHV"
+   ],
+   [
+    2,
+    "3.3 Illustration on BraninCurrin problem"
+   ],
+   [
+    2,
+    "Optimal Placement for BC problem"
+   ],
+   [
+    1,
+    "4 Gaussian Process Regression and Bayesian Optimization"
+   ],
+   [
+    2,
+    "4.1 Gaussian Process regression in the joint space"
+   ],
+   [
+    2,
+    "4.2 Active Learning"
+   ],
+   [
+    2,
+    "4.3 Lookahead hypervolume Improvement"
+   ],
+   [
+    2,
+    "4.4 Stochastic EHVI"
+   ],
+   [
+    2,
+    "5 Numerical Results"
+   ],
+   [
+    2,
+    "5.1 Experimental setting"
+   ],
+   [
+    2,
+    "5.2 4d problem"
+   ],
+   [
+    3,
+    "Figure 7: 4DProblem: Error in the estimation of the upper bound, depen"
+   ],
+   [
+    2,
+    "5.3 10d problem"
+   ],
+   [
+    3,
+    "Absolute error in the estimation of the upper bound of the mean HV — 1"
+   ],
+   [
+    1,
+    "6 Conclusion and discussion"
+   ],
+   [
+    2,
+    "Acknowledgements"
+   ],
+   [
+    2,
+    "References"
+   ],
+   [
+    2,
+    "A BraninCurrin"
+   ],
+   [
+    2,
+    "B Interpretation as random sets"
+   ],
+   [
+    3,
+    "BraninCurrin function, $u = [0.93, 0.75]$"
+   ],
+   [
+    3,
+    "BraninCurrin function, u = [0.12, 0.38]"
+   ]
+  ],
+  "chunks": 78,
+  "broken_hyphen_candidates": 0,
+  "broken_hyphen_samples": []
+ },
+ {
+  "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+  "extractor": "llamaparse",
+  "status": "done",
+  "pages": 5,
+  "credits": 136.0,
+  "failed_pages": [],
+  "confidence_min": 0.803,
+  "low_confidence_pages": [],
+  "cost_optimized_pages": [
+   1,
+   5
+  ],
+  "formula_elements": 7,
+  "formula_elements_latex": 7,
+  "formula_samples": [
+   "a_{\\ell, h} = softmax\\left(\\frac{q_{\\ell, h} K_{\\ell, h, \\le t}^{\\top}}{\\sqrt{d_h}}\\right), \\qquad o_{\\ell, h} = a_{\\ell, h} V_{\\ell, h, \\le t}, \\tag{1}",
+   "\\Gamma(T) = 2 L H d_h T \\cdot bpe bytes, \\tag{2}",
+   "|B(\\ell, s)| = 2H d_h P \\cdot bpe bytes, \\quad s = \\lfloor j/P \\rfloor."
+  ],
+  "inline_dollar_math": 108,
+  "inline_samples": [
+   "$d_h \\approx 128$",
+   "$\\pi(\\ell, s)$",
+   "$L$"
+  ],
+  "headings": 26,
+  "numbered_headings": 11,
+  "heading_level_offsets": [
+   1,
+   2,
+   3
+  ],
+  "heading_mismatches": [
+   [
+    2,
+    "I. INTRODUCTION"
+   ],
+   [
+    3,
+    "A. Autoregressive decoding and the bandwidth wall"
+   ],
+   [
+    3,
+    "B. Tiled accelerators and the spoke–hub pathology"
+   ],
+   [
+    3,
+    "C. Observed locality in KV accesses"
+   ],
+   [
+    2,
+    "V. TOPOLOGY-AWARE KV STRIPING (TAKV)"
+   ],
+   [
+    3,
+    "A. Deadlock avoidance"
+   ],
+   [
+    3,
+    "A. Interconnect, throughput, and latency"
+   ],
+   [
+    3,
+    "B. Energy efficiency"
+   ]
+  ],
+  "heading_outline": [
+   [
+    1,
+    "MESHKV: A Network-on-Chip KV Cache Fabric for Scalable Transformer Dec"
+   ],
+   [
+    2,
+    "I. INTRODUCTION"
+   ],
+   [
+    2,
+    "II. RELATED WORK"
+   ],
+   [
+    2,
+    "III. BACKGROUND AND MOTIVATION"
+   ],
+   [
+    3,
+    "A. Autoregressive decoding and the bandwidth wall"
+   ],
+   [
+    3,
+    "B. Tiled accelerators and the spoke–hub pathology"
+   ],
+   [
+    3,
+    "C. Observed locality in KV accesses"
+   ],
+   [
+    2,
+    "IV. SYSTEM ARCHITECTURE OVERVIEW"
+   ],
+   [
+    2,
+    "V. TOPOLOGY-AWARE KV STRIPING (TAKV)"
+   ],
+   [
+    2,
+    "VI. MULTICAST ROUTING ENGINE (MARE)"
+   ],
+   [
+    3,
+    "A. Deadlock avoidance"
+   ],
+   [
+    3,
+    "TABLE I: Flit classes in MESHKV."
+   ],
+   [
+    2,
+    "VII. PIPELINED ATTENTION DATAFLOW (PAD)"
+   ],
+   [
+    2,
+    "VIII. IMPLEMENTATION"
+   ],
+   [
+    3,
+    "TABLE II: Per-router parameters in the FPGA implementation."
+   ],
+   [
+    3,
+    "TABLE III: Alveo U280 resource utilization for an 8×8 MESHKV instance "
+   ],
+   [
+    3,
+    "TABLE IV: Normalized interconnect traffic (CENT = 1.00), T=32K, B=1."
+   ],
+   [
+    3,
+    "TABLE V: Bisection KV bandwidth utilization (%), LLaMA-2-7B."
+   ],
+   [
+    3,
+    "TABLE III: Alveo U280 resource utilization for an 8×8 MESHKV instance "
+   ],
+   [
+    2,
+    "IX. EVALUATION"
+   ],
+   [
+    3,
+    "A. Interconnect, throughput, and latency"
+   ],
+   [
+    3,
+    "B. Energy efficiency"
+   ],
+   [
+    3,
+    "C. Comparison with prior FPGA decoders"
+   ],
+   [
+    2,
+    "D. Ablation and sensitivity"
+   ],
+   [
+    1,
+    "X. CONCLUSION"
+   ],
+   [
+    1,
+    "REFERENCES"
+   ]
+  ],
+  "chunks": 44,
+  "broken_hyphen_candidates": 0,
+  "broken_hyphen_samples": []
+ },
+ {
+  "title": "Noise-adjusted turnover in estimated networks",
+  "extractor": "llamaparse",
+  "status": "done",
+  "pages": 8,
+  "credits": 65.0,
+  "failed_pages": [],
+  "confidence_min": 0.833,
+  "low_confidence_pages": [],
+  "cost_optimized_pages": [
+   2,
+   3,
+   4,
+   5,
+   8
+  ],
+  "formula_elements": 9,
+  "formula_elements_latex": 9,
+  "formula_samples": [
+   "E\\widehat{T} = 2q(1-q)N_{00} + 2s(1-s)N_{11} + \\{s(1-q) + (1-s)q\\}T.",
+   "\\widetilde{T}(s, q) = \\frac{\\widehat{T} + (s+q-1)(\\widehat{M}_1 + \\widehat{M}_2) - <u>2sqm</u>}{(s-q)^2} \\tag{1}",
+   "E\\{\\widetilde{T}(s', q')\\} = b^2 T + b(1 - b - 2a)L + 2ma(1 - a) - \\frac{2\\Gamma}{(d')^2}. \\tag{2}"
+  ],
+  "inline_dollar_math": 180,
+  "inline_samples": [
+   "$p$",
+   "$p^{-1}$",
+   "$p$"
+  ],
+  "headings": 11,
+  "numbered_headings": 5,
+  "heading_level_offsets": [
+   1,
+   2,
+   3
+  ],
+  "heading_mismatches": [
+   [
+    3,
+    "1 Introduction"
+   ],
+   [
+    2,
+    "2 Observed and latent network turnover"
+   ],
+   [
+    2,
+    "3 Calibration, dependence and sparsity"
+   ],
+   [
+    2,
+    "5 Conclusion"
+   ]
+  ],
+  "heading_outline": [
+   [
+    2,
+    "Noise-adjusted turnover in estimated networks"
+   ],
+   [
+    3,
+    "Abstract"
+   ],
+   [
+    3,
+    "1 Introduction"
+   ],
+   [
+    2,
+    "2 Observed and latent network turnover"
+   ],
+   [
+    2,
+    "3 Calibration, dependence and sparsity"
+   ],
+   [
+    1,
+    "4 Numerical illustration"
+   ],
+   [
+    2,
+    "Table 1: Expected turnover under no structural change"
+   ],
+   [
+    3,
+    "Table 2: Sensitivity of adjusted turnover to false-positive calibratio"
+   ],
+   [
+    3,
+    "Table 3: Adjusted turnover with an estimated false-positive probabilit"
+   ],
+   [
+    2,
+    "5 Conclusion"
+   ],
+   [
+    2,
+    "References"
+   ]
+  ],
+  "chunks": 22,
+  "broken_hyphen_candidates": 0,
+  "broken_hyphen_samples": []
+ },
+ {
+  "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+  "extractor": "llamaparse",
+  "status": "done",
+  "pages": 5,
+  "credits": 56.0,
+  "failed_pages": [],
+  "confidence_min": 0.757,
+  "low_confidence_pages": [],
+  "cost_optimized_pages": [
+   1,
+   5
+  ],
+  "formula_elements": 20,
+  "formula_elements_latex": 15,
+  "formula_samples": [
+   "|\\psi\\rangle = a|0\\rangle + b|1\\rangle",
+   "|0\\rangle",
+   "|1\\rangle"
+  ],
+  "inline_dollar_math": 196,
+  "inline_samples": [
+   "$|+\\rangle = H|0\\rangle = (|0\\rangle + |1\\rangle)/\\sqrt{2}$",
+   "$R_y(\\theta)$",
+   "$y$"
+  ],
+  "headings": 18,
+  "numbered_headings": 16,
+  "heading_level_offsets": [
+   1,
+   2
+  ],
+  "heading_mismatches": [
+   [
+    2,
+    "1. INTRODUCTION"
+   ],
+   [
+    2,
+    "2. QUANTUM STATES AND CIRCUITS"
+   ],
+   [
+    2,
+    "3. REPRESENTATION OF SIGNALS AND SYSTEMS"
+   ],
+   [
+    3,
+    "3.1. Signal representation as a quantum state"
+   ],
+   [
+    3,
+    "3.2. State-space realization of linear systems"
+   ],
+   [
+    3,
+    "3.3. Parallel processing"
+   ],
+   [
+    3,
+    "3.4. Delay gate"
+   ],
+   [
+    3,
+    "3.5. Projection gate"
+   ]
+  ],
+  "heading_outline": [
+   [
+    1,
+    "STATE-SPACE-BASED FIR FILTERING ON A QUANTUM COMPUTER"
+   ],
+   [
+    2,
+    "ABSTRACT"
+   ],
+   [
+    2,
+    "1. INTRODUCTION"
+   ],
+   [
+    2,
+    "2. QUANTUM STATES AND CIRCUITS"
+   ],
+   [
+    2,
+    "3. REPRESENTATION OF SIGNALS AND SYSTEMS"
+   ],
+   [
+    3,
+    "3.1. Signal representation as a quantum state"
+   ],
+   [
+    3,
+    "3.2. State-space realization of linear systems"
+   ],
+   [
+    3,
+    "3.3. Parallel processing"
+   ],
+   [
+    3,
+    "3.4. Delay gate"
+   ],
+   [
+    3,
+    "3.5. Projection gate"
+   ],
+   [
+    2,
+    "4. FIR FILTERS AS QUANTUM CIRCUITS"
+   ],
+   [
+    3,
+    "4.1. First-order FIR filter"
+   ],
+   [
+    3,
+    "4.2. General FIR filter"
+   ],
+   [
+    2,
+    "4.3. Parameter conversion"
+   ],
+   [
+    2,
+    "5. SIMULATION"
+   ],
+   [
+    2,
+    "6. CONCLUSION"
+   ],
+   [
+    1,
+    "7. ACKNOWLEDGMENTS"
+   ],
+   [
+    1,
+    "8. REFERENCES"
+   ]
+  ],
+  "chunks": 21,
+  "broken_hyphen_candidates": 0,
+  "broken_hyphen_samples": []
+ }
+]
