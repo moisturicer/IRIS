@@ -339,6 +339,25 @@ describe("upload progress", () => {
 });
 
 describe("a failed upload", () => {
+  it("offers the matching draft when renamed bytes conflict and keeps the new draft for retry", async () => {
+    const user = userEvent.setup();
+    vi.mocked(recordsApi.uploadManuscript).mockRejectedValueOnce({
+      response: { status: 409, data: { code: "exact_duplicate", detail: "Already attached.", matches: [
+        { id: 17, title: "My earlier draft", url: "/records/17", action: "resume_draft" },
+      ] } },
+    });
+    await openNew();
+    await chooseType(user, /Thesis \/ Research/);
+    dropFile(pdf("renamed.pdf"));
+    const resume = await screen.findByRole("link", { name: "Resume draft: My earlier draft" });
+    expect(resume).toHaveAttribute("href", "/?publish=17");
+    resume.focus();
+    expect(resume).toHaveFocus();
+    expect(screen.getByRole("radio", { name: /Thesis \/ Research/ })).toBeChecked();
+    await user.click(screen.getByRole("button", { name: "Retry upload" }));
+    expect(recordsApi.create).toHaveBeenCalledTimes(1);
+  });
+
   it("retries with the same file and type, without creating a second draft", async () => {
     const user = userEvent.setup();
     vi.mocked(recordsApi.uploadManuscript)
