@@ -757,7 +757,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     const offer = offers[field];
     if (offer == null) return null;
     const name = FIELD_NAMES[field];
-    if (offer.kind === "filled") return <AutofilledNote field={name} page={offer.page} onUndo={() => undoAutofill(field)} />;
+    if (offer.kind === "filled") return <AutofilledNote field={name} page={offer.page} entry={offer.entry} onUndo={() => undoAutofill(field)} />;
     if (offer.kind === "stale") return <AutofilledNote field={name} page={null} stale />;
     return (
       <PrefillChip
@@ -766,6 +766,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         replaces={offer.replaces}
         page={offer.entry.page}
         tooLong={offer.entry.exceeds_limit}
+        entry={offer.entry}
         onUse={() => acceptSuggestion(field, offer.value)}
         onDismiss={() => dismissSuggestion(field)}
       />
