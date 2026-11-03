@@ -86,7 +86,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 | | Threat | Control or gap |
 |---|---|---|
 | S | An outside caller uses the vendor key | Shared service secret, no published port, no CORS (`ai/main.py`) |
-| E | The gateway bypasses Django's visibility rule | Gap: it still receives `DATABASE_URL` ([IR-826](https://citiris.atlassian.net/browse/IR-826)) |
+| E | The gateway bypasses Django's visibility rule | Django's `DATABASE_URL` removed ([IR-826](https://citiris.atlassian.net/browse/IR-826)). Gap: it reads Records as `iris_ai_runtime`, under ADR-014's amendment, which is still Proposed |
 
 ## Consequences
 

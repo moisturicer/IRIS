@@ -156,12 +156,11 @@ services:
     env_file:
       - ./ai/.env
     environment:
-      # Same repo-root .env as every other service, so the credential is
-      # configured in exactly one place. Note ADR-014 precondition 4 says
-      # the gateway gets no direct DB access at all -- that this DSN
-      # exists is a contradiction recorded on IR-154, to be resolved by
-      # IR-58, not silently here.
-      - DATABASE_URL=postgresql+asyncpg://${DB_USER:?set DB_USER in the repo-root .env}:${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}@db:5432/${DB_NAME:?set DB_NAME in the repo-root .env}
+      # No DATABASE_URL (IR-826, ADR-014 precondition 4): nothing here read
+      # it, and it handed Django's login to a service with egress. AI-owned
+      # runs still connect as iris_ai_runtime through RUNS_DATABASE_URL in
+      # ./ai/.env, hence depends_on db; ADR-014's 2026-11-03 amendment
+      # proposes allowing that login and is not yet decided.
       - UVICORN_WORKERS=4
       - MAX_CONCURRENT_LLM=80
     depends_on:

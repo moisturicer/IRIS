@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-02
+Accepted — 2026-09-02 · **amendment of 2026-11-03 (IR-826) PROPOSED, awaiting Jive Tyler I. Revalde**
 
 **Supersedes [ADR-012](012-ai-provider-abstraction-not-a-service.md).** **Amends [ADR-010](010-deployment-topology.md)** — the topology becomes six services, not five. ADR-010 is otherwise unchanged and remains accepted.
 
@@ -37,6 +37,31 @@ It is adopted **subject to five preconditions**, each of which must be met befor
 5. **It boots.** `ai/services/chat_service.py` and `embedding_service.py` exist, `ai/.env.example` is committed, and `docker compose config` validates.
 
 **The provider ports stay in `ai/domain/ports.py`** and are the single definition. Django reaches them over HTTP.
+
+## Amendment — 2026-11-03 (IR-826): the database logins the AI runtime may hold — PROPOSED
+
+**Status: Proposed. Decider: Jive Tyler I. Revalde, owner of the AI runtime.** Drafted for IR-826; nothing below is accepted until the decider records a decision and date here. Precondition 4 as written stays in force until then.
+
+**Why.** Precondition 4 says the gateway gets no direct database access. Three things on `main` disagree with it:
+
+- **`DATABASE_URL`.** Both Compose files handed the gateway Django's own login. Nothing under `ai/` read it (`ai/infrastructure/settings.py` declares no such field). **Removed in IR-826**; this needs no decision, because precondition 4 already forbade it.
+- **`RUNS_DATABASE_URL`.** AI-owned runs (IR-722, IR-723) connect as `iris_ai_runtime` and write schema `iris_ai`. That is direct database access, from `ai-gateway` and from `ai-runs-worker` (development Compose only; `docker-compose.prod.yml` has no worker yet).
+- **Research tools (IR-719).** Under a Django-issued `reader_session` grant, `iris_ai_runtime` reads the Passages its reader may see, through `research_record_ids()` (migration `ai/0037`). That is retrieval outside Django.
+
+These come from ADR-049, **which is cited across the repository but is not on `main`**. This amendment can't amend text that isn't there, so it states the boundary on ADR-014's side.
+
+**Proposed decision.**
+
+1. **The gateway and `ai-runs-worker` never receive Django's login** — no `DATABASE_URL`, `DB_USER`, `DB_PASSWORD` or `DB_NAME`. `backend/apps/tests/test_gateway_database_access.py` fails if Compose hands one back, to the gateway in both Compose files or to the worker, which only `docker-compose.yml` defines.
+2. **A long-running AI service holds one login, `iris_ai_runtime`, through `RUNS_DATABASE_URL`.** The maintenance login (`RUNS_MIGRATION_DATABASE_URL`) is for the one-shot `python -m ai.runs.migrate` and is not set on a running service.
+3. **Precondition 4's purpose stays; its mechanism changes.** "The gateway never decides what a user may see" still holds. Visibility is decided inside PostgreSQL by the row policy, under a grant Django issues. Python in `ai/` doesn't implement it again. For AI-owned runs this replaces "Django performs retrieval and passes the candidate chunks as request payload". `asyncpg` stays in `ai/requirements.txt`.
+
+**What the decider has to settle before accepting:**
+
+- **Whether the row policy is the same predicate as `Record.objects.visible_to(user)`.** This ADR rejected a gateway with its own visibility filter, because "two implementations … will drift". A SQL policy beside a Django queryset is two implementations unless something proves they agree. Name the test that does, or the ticket that adds it.
+- **Where the maintenance login lives.** `ai/.env.example` lists `RUNS_MIGRATION_DATABASE_URL` in the same file that both long-running services load as `env_file`. Filling it in there gives a running service the maintenance login, against point 2.
+
+**Gain.** It records what the AI runtime actually holds, and Django's login leaves a container that can reach the internet. **Cost.** The gateway is no longer a "stateless transformation over text it was handed" (§Decision Rationale). A compromised gateway can read whatever the row policy lets a reader read, under that reader's grant. Before IR-826 it held Django's own login, which can read everything.
 
 ## Alternatives Considered
 

@@ -101,7 +101,7 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 **Django admin.** nginx closes `/django-admin/` except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)), but **Django still serves its admin at `/admin/`, which nginx leaves open**, because that path also carries IRIS's own pages. The allowlist protects the admin only once [IR-782](https://citiris.atlassian.net/browse/IR-782) moves it.
 
-**`ai-gateway`** is adopted by [ADR-014](../adr/014-ai-gateway-as-a-service.md) under preconditions. It sets no CORS, publishes no port and refuses any request without the shared service secret (`ai/main.py`). **It still receives `DATABASE_URL`**, against ADR-014's "no direct DB access" (§11).
+**`ai-gateway`** is adopted by [ADR-014](../adr/014-ai-gateway-as-a-service.md) under preconditions. It sets no CORS, publishes no port and refuses any request without the shared service secret (`ai/main.py`). It no longer receives Django's `DATABASE_URL` ([IR-826](https://citiris.atlassian.net/browse/IR-826)). **It still connects to PostgreSQL as `iris_ai_runtime`** for AI-owned runs, against ADR-014's "no direct DB access". ADR-014's 2026-11-03 amendment proposes allowing that login and awaits a decision (§11).
 
 **Tenancy** is one instance per tenant ([ADR-005](../adr/005-instance-per-tenant.md)). Each institution gets its own database and media volume, so a missing tenant filter can't leak across institutions.
 
@@ -179,7 +179,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 7 | One office holds workflow and system administration powers together | **Medium** | One compromised account reaches both sets of powers | [IR-781](https://citiris.atlassian.net/browse/IR-781) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
 | 8 | Consent has no version and can't be withdrawn, and the notice lacks DPO review | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-789](https://citiris.atlassian.net/browse/IR-789), [IR-791](https://citiris.atlassian.net/browse/IR-791), [IR-123](https://citiris.atlassian.net/browse/IR-123) |
 | 9 | No account deletion, personal data copy or retention job | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-785](https://citiris.atlassian.net/browse/IR-785), [IR-786](https://citiris.atlassian.net/browse/IR-786), [IR-794](https://citiris.atlassian.net/browse/IR-794) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
-| 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | A compromised gateway could read records past Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
+| 10 | `ai-gateway` reads Records as `iris_ai_runtime`, and ADR-014's amendment allowing it isn't decided | **Medium** | A compromised gateway could read whatever the row policy lets a reader read, and nothing yet proves that policy matches Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
 | 11 | Voyage's training opt-out has no recorded evidence | **Medium** | Nothing shows the vendor isn't training on unpublished text | [IR-827](https://citiris.atlassian.net/browse/IR-827) |
 | 12 | The ASVS checklist is a draft awaiting review | **Medium** | Its statuses come from reading code, and nobody has confirmed them | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
 
