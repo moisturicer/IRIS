@@ -29,6 +29,8 @@ def build_output(source, load, extractor, options):
     content = load(source['source_file'])
     extracted = extractor.extract(content, filename=source['source_file'].rsplit('/', 1)[-1])
     document = extracted.document
+    if extracted.failed_pages:
+        raise IncompleteCoverage()
     pages = set(document.page_sizes)
     covered = {e.page for e in document.elements if e.text.strip()}
     if not pages or not pages <= covered or any(e.page not in pages for e in document.elements):
@@ -38,14 +40,14 @@ def build_output(source, load, extractor, options):
         raise IncompleteCoverage()
     return {
         'version': 1, 'source_sha256': hashlib.sha256(content).hexdigest(),
-        'extractor': extracted.extractor, 'extraction_hash': extraction_hash(document),
+        'provenance': asdict(extracted.provenance), 'extraction_hash': extraction_hash(document),
         'document': document_to_json(document), 'chunk_hash': chunks.content_hash,
         'strategy': chunks.strategy_id, 'options': asdict(options),
         'chunks': [{**asdict(c), 'element_kinds': sorted(c.element_kinds)} for c in chunks.chunks],
     }
 
 
-async def process(dsn, token, *, load, extractor, options, pipeline, lease_seconds):
+async def process(dsn, token, *, load, extractor, options, pipeline, lease_seconds, profile=None):
     """Claim, compute outside the transaction, then fence and commit pending output.
 
     The pipeline identity pins extractor configuration, format and chunk options.
@@ -54,6 +56,9 @@ async def process(dsn, token, *, load, extractor, options, pipeline, lease_secon
     """
     if not pipeline or not 1 <= lease_seconds <= 86400:
         raise ValueError('a pipeline identity and lease of 1..86400 seconds are required')
+    if profile is not None and hashlib.sha256(
+            json.dumps(profile, sort_keys=True).encode()).hexdigest() != pipeline:
+        raise ValueError('pipeline identity does not match its profile')
     conn = await asyncpg.connect(dsn)
     attempt = uuid.uuid4()
     try:
@@ -103,6 +108,7 @@ async def process(dsn, token, *, load, extractor, options, pipeline, lease_secon
             if not claimed:
                 return 'stale'
             if output is not None:
+                output['profile'] = profile
                 await conn.execute(
                     'INSERT INTO iris_ai.extraction_revision(work_id,pipeline,revision,record_id,payload)'
                     ' VALUES($1,$2,$3,$4,$5::jsonb)', work, pipeline,

@@ -39,12 +39,12 @@ def runtime(grant_db):
 
 def document():
     from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
-    from apps.ai.extraction import ExtractedDocument
+    from apps.ai.extraction import ExtractedDocument, Provenance
     return ExtractedDocument(NormalizedDocument('Synthetic research', (
         DocumentElement('paragraph', 'Twelve ponds were sampled weekly.', page=1,
                         bboxes=(BoundingBox(1, 10, 10, 200, 30),)),
         DocumentElement('paragraph', 'All twelve ponds improved.', page=2),
-    ), {1: (612, 792), 2: (612, 792)}), 'deterministic')
+    ), {1: (612, 792), 2: (612, 792)}), Provenance('deterministic'))
 
 
 class Extractor:
@@ -299,3 +299,15 @@ def test_local_docling_extracts_synthetic_pdf_into_pending_output(runtime):
         options=ChunkingOptions(), pipeline='synthetic-live-docling-1.36.0', lease_seconds=180))
     assert result == 'extracted'
     assert status(owner, record)['state'] == 'extracted_pending'
+
+
+def test_reported_failed_page_prevents_complete_pending_output(runtime):
+    from dataclasses import replace
+    owner, record, token = source()
+
+    class Partial:
+        def extract(self, *args, **kwargs):
+            return replace(document(), failed_pages=(2,))
+
+    assert run(runtime, token, Partial()) == 'incomplete'
+    assert status(owner, record)['state'] == 'incomplete'

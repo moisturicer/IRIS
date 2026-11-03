@@ -5,7 +5,7 @@ import os
 import sys
 
 from apps.ai.chunking import ChunkingOptions
-from apps.ai.extraction import ExtractedDocument, document_from_json
+from apps.ai.extraction import ExtractedDocument, Provenance, document_from_json
 from ai.ingestion.extraction import process
 
 
@@ -15,7 +15,7 @@ class Extractor:
         if '--pause' in sys.argv:
             sys.stdin.readline()
         return ExtractedDocument(document_from_json(json.loads(os.environ['SYNTHETIC_DOCUMENT'])),
-                                 'deterministic')
+                                 Provenance('deterministic'))
 
 
 if __name__ == '__main__':

@@ -99,7 +99,7 @@ def main():
     asyncio.run(serve(dsn, limit=args.limit, poll_seconds=args.poll_seconds, once=args.once,
         load=LocalSource(args.media_root, args.max_source_bytes),
         extractor=DoclingExtractor(args.docling_url, timeout=args.docling_timeout, **extraction_options),
-        options=options, pipeline=pipeline, lease_seconds=args.lease_seconds))
+        options=options, pipeline=pipeline, profile=pin, lease_seconds=args.lease_seconds))
 
 
 if __name__ == '__main__':
