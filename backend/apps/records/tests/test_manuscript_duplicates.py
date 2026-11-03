@@ -64,16 +64,18 @@ def test_renamed_exact_file_is_blocked_but_same_record_retry_is_idempotent(autho
 
 def test_hidden_file_never_changes_an_unrelated_authors_upload_outcome(author):
     client, user, kind = author
+    mine = draft(user, kind, "My paper")
+    response = upload(client, mine)
+    assert response.status_code == 200
+    assert response.json()["id"] == mine.pk
+    matches_url = reverse("record-duplicate-matches", args=[mine.pk])
+    before = client.get(matches_url).json()
     hidden_owner = make_user("duplicates-hidden@cit.edu", "Student")
     hidden = draft(hidden_owner, kind, "Private paper")
     other_client = APIClient()
     other_client.force_authenticate(hidden_owner)
     assert upload(other_client, hidden).status_code == 200
-    mine = draft(user, kind, "My paper")
-    response = upload(client, mine)
-    assert response.status_code == 200
-    assert response.json()["id"] == mine.pk
-    assert client.get(reverse("record-duplicate-matches", args=[mine.pk])).json()["exact"] == []
+    assert client.get(matches_url).json() == before
     RecordOwner.objects.create(record=hidden, user=user)
     retry = upload(client, mine, "same-bytes-new-name.pdf")
     assert retry.status_code == 409
@@ -84,6 +86,9 @@ def test_likely_matches_require_current_acknowledgement(author):
     client, user, kind = author
     prior = draft(user, kind, "Water quality in Cebu 2025")
     current = draft(user, kind, "Water quality in Cebu 2025")
+    current.adviser = make_user("duplicates-adviser@cit.edu", "Adviser")
+    current.save(update_fields=["adviser"])
+    assert client.post(reverse("record-embargo-answer", args=[current.pk]), {"embargoed": False}, format="json").status_code == 200
     Author.objects.create(record=prior, name="A. Researcher")
     Author.objects.create(record=current, name="Another Author")
     url = reverse("record-duplicate-matches", args=[current.pk])
@@ -135,6 +140,14 @@ def test_likely_policy_ranks_exact_before_supported_similar_titles(author):
     assert [(item["id"], item["reason"]) for item in matches] == [
         (exact.pk, "same_title"), (near.pk, "similar_title_and_author"),
     ]
+
+
+def test_likely_results_stop_at_five_distinct_readable_records(author):
+    client, user, kind = author
+    current = draft(user, kind, "A study of coastal erosion 2025")
+    candidates = [draft(user, kind, "A study of coastal erosion 2025") for _ in range(7)]
+    matches = client.get(reverse("record-duplicate-matches", args=[current.pk])).json()["likely"]
+    assert [item["id"] for item in matches] == [record.pk for record in candidates[:5]]
 
 
 def test_backfill_is_dry_first_and_skips_a_replaced_source(author, monkeypatch):

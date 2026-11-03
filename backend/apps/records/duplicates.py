@@ -5,6 +5,7 @@ import unicodedata
 
 from django.db import connection
 from rest_framework.exceptions import APIException
+from core.enums import PipelineStatus
 
 from .models import Record
 
@@ -34,7 +35,7 @@ def lock_digest(digest):
 
 
 def _link(record, user):
-    owned_draft = record.pipeline_status == "draft" and record.owners.filter(user=user).exists()
+    owned_draft = record.pipeline_status == PipelineStatus.DRAFT and record.owners.filter(user=user).exists()
     return {
         "id": record.pk, "title": record.title,
         "url": f"/records/{record.pk}",

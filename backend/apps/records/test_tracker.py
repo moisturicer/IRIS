@@ -14,6 +14,7 @@ the public endpoints. Document requests are covered by the shared fixture in
 """
 
 from django.urls import reverse
+from uuid import uuid4
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -50,7 +51,9 @@ class TrackerTestBase(APITestCase):
 
     def make_record(self, type_name, **extra):
         record = Record.objects.create(
-            title=f"Tracker {type_name}",
+            # These are separate papers for workflow tests. Reusing one title
+            # would now invoke IR-832's real likely-match acknowledgement.
+            title=f"Tracker {type_name} {uuid4().hex[:8]}",
             abstract="A" * 40,
             record_type=RecordType.objects.get_or_create(name=type_name)[0],
             added_by=self.owner,

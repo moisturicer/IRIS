@@ -330,13 +330,6 @@ class RecordViewSet(viewsets.ModelViewSet):
         Record.objects.select_for_update().get(pk=record.pk)
         record = self.get_object()
 
-        from .duplicates import acknowledgement_basis, enforce_exact, likely_matches, lock_digest
-        lock_digest(record.manuscript_sha256)
-        enforce_exact(request.user, record.pk, record.manuscript_sha256)
-        likely = likely_matches(request.user, record)
-        if likely and record.duplicate_acknowledgement != acknowledgement_basis(record, likely):
-            return Response({"code": "acknowledgement_required", "detail": "Review and acknowledge the likely matches before submitting.", "matches": likely}, status=409)
-
         if record.pipeline_status != PipelineStatus.DRAFT:
             return Response(
                 {"detail": f"Record is in '{record.pipeline_status}' status and cannot be submitted."},
@@ -395,6 +388,12 @@ class RecordViewSet(viewsets.ModelViewSet):
                 {"embargoed": embargo.ANSWER_REQUIRED},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        from .duplicates import acknowledgement_basis, enforce_exact, likely_matches, lock_digest
+        lock_digest(record.manuscript_sha256)
+        enforce_exact(request.user, record.pk, record.manuscript_sha256)
+        likely = likely_matches(request.user, record)
+        if likely and record.duplicate_acknowledgement != acknowledgement_basis(record, likely):
+            return Response({"code": "acknowledgement_required", "detail": "Review and acknowledge the likely matches before submitting.", "matches": likely}, status=409)
         try:
             # Consent, assignment, entry seat and v1 commit together.
             with transaction.atomic():

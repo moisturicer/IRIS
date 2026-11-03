@@ -190,6 +190,13 @@ class ContinueCreatesALinkedDraftTests(ContinuationTestBase):
             format="multipart",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        matches = self.client.get(reverse("record-duplicate-matches", args=[child_id])).data["likely"]
+        self.assertIn(proposal.pk, [match["id"] for match in matches])
+        acknowledged = self.client.post(
+            reverse("record-acknowledge-duplicates", args=[child_id]),
+            {"candidate_ids": [match["id"] for match in matches]}, format="json",
+        )
+        self.assertEqual(acknowledged.status_code, status.HTTP_200_OK, acknowledged.data)
         response = self.post(submit, self.owner, {"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         detail = self.detail(Record.objects.get(pk=child_id), self.owner)
