@@ -25,6 +25,7 @@ import json
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Mapping
 
 import asyncpg
 
@@ -293,9 +294,13 @@ class RunStore:
         for run in overdue:
             await self._end(conn, run["id"], "expired", "deadline", move_fence=True)
 
-    async def claim(self, run_id, *, worker: str, lease_seconds: int, executor: str,
-                    reserved_units: int) -> Claim | None:
-        """Take the run's lease under a new fence; None if it cannot run now."""
+    async def claim(self, run_id, *, worker: str, lease_seconds: int, executor: str | None,
+                    reserved_units: int | Mapping[str, int]) -> Claim | None:
+        """Take the run's lease under a new fence; None if it cannot run now.
+
+        `executor` None accounts the attempt to the run's pinned executor, with
+        `reserved_units` then given per executor name (IR-862).
+        """
         async with self._connect() as conn:
             async with conn.transaction():
                 return await self._claim(conn, run_id, worker, lease_seconds, executor, reserved_units)
@@ -338,6 +343,11 @@ class RunStore:
         if used >= row["allowance"]["max_attempts"]:
             await self._end(conn, run_id, "failed", "attempts_exhausted")
             return None
+        if executor is None:
+            # The executor the run is pinned to answers it (IR-862).
+            executor = (row["pinned"] or {}).get("executor", "")
+        if isinstance(reserved_units, Mapping):
+            reserved_units = reserved_units.get(executor, 0)
         await conn.execute(
             """INSERT INTO iris_ai.attempt_accounting (run_id, fence, executor, reserved_units)
                VALUES ($1, $2, $3, $4)""",
@@ -356,8 +366,8 @@ class RunStore:
                      prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"]) for t in reversed(prior)),
                      state=row["state"])
 
-    async def claim_next(self, *, worker: str, lease_seconds: int, executor: str,
-                         reserved_units: int, deep_concurrency: int,
+    async def claim_next(self, *, worker: str, lease_seconds: int, executor: str | None,
+                         reserved_units: int | Mapping[str, int], deep_concurrency: int,
                          max_running_per_reader: int) -> Claim | None:
         """Claim the next runnable run, or None.
 

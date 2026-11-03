@@ -7,7 +7,10 @@ paid capacity or answer quality. `tools` is `ai.research.tools.ResearchTools`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Protocol
+from typing import TYPE_CHECKING, Optional, Protocol
+
+if TYPE_CHECKING:
+    from ai.agent.budget import Bounds
 
 
 @dataclass(frozen=True)
@@ -50,6 +53,8 @@ class RunContext:
     prior: tuple[PriorTurn, ...] = ()
     #: Shown order, selections and exclusions, as Record ids.
     state: dict = field(default_factory=dict)
+    #: The research Bounds pinned at admission; the worker cannot widen them (IR-862).
+    bounds: Optional["Bounds"] = None
 
 
 class Unavailable(Exception):
