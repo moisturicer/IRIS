@@ -135,6 +135,7 @@ The Adviser's entry seat writes no seat event: `SUBMITTED` is that act.
 | `EMBARGO_SET` | An owner or the Adviser puts a submitted paper under an embargo, including a paper released before | `until`, `previous_state` (`unknown`, `none` or `released`) |
 | `EMBARGO_EXTENDED` | An owner or the Adviser moves an active embargo's date, earlier or later | `until`, `previous_until` |
 | `EMBARGO_RELEASED` | The Adviser or RDCO ends an active embargo | `until`, the date it held |
+| `IP_RELEASED` | KTTO releases an IP-marked paper for the AI. The mark stays (IR-813) | `ip_type`, or null when none is set |
 
 There is no backfill: answers saved before this have no row. The Record holds only who gave the latest answer or set the current date, and when.
 

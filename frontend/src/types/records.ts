@@ -224,6 +224,7 @@ export type Capability =
   | "continue_as"
   | "set_embargo"
   | "release_embargo"
+  | "release_ip"
   | "set_visibility"
   | "tag_ip"
   | "attach_file"

@@ -50,6 +50,9 @@ OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE)
 SETS_EMBARGO = row(ANON, HIDE, OK, OK, DENY, DENY, DENY, DENY, HIDE)
 # ADR-052 §6: the Adviser or RDCO release one, and never a student owner.
 RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE)
+# ADR-052 §11: KTTO alone releases an IP mark. The world seats no KTTO member,
+# so everyone here is refused; KTTO's success is `records/test_ip_release.py`.
+RELEASES_IP = row(ANON, HIDE, DENY, DENY, DENY, DENY, DENY, DENY, HIDE)
 #: `record`, the seated ITSO reviewer's act alone.
 SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE)
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
@@ -140,6 +143,7 @@ RECORDS: dict[str, Entry | Shadowed] = {
         SETS_EMBARGO, kwargs=RECORD, data={"embargoed_until": "2099-01-01"},
     )}),
     "record-embargo-release": Entry({"POST": _case(RELEASES_EMBARGO, kwargs=RECORD)}),
+    "record-ip-release": Entry({"POST": _case(RELEASES_IP, kwargs=RECORD)}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),

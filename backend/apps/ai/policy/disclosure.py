@@ -7,8 +7,10 @@ fall back to (ADR-008 rejected one, and ADR-015's original local lane was
 removed the same day for contradicting that). A refusal degrades to the same
 PostgreSQL full-text path a vendor outage degrades to.
 
-Three inputs, kept independent because ADR-015 names them independently and a
+Three facts, kept independent because ADR-015 names them independently and a
 single combined flag is how a case goes missing: IP status, embargo, consent.
+An IP mark refuses until KTTO releases it (ADR-052 §11-13), and that release
+opens nothing else.
 
 Pure -- no database, no network, no clock. **It reads an embargo's state and
 never its date** (ADR-052 §9): text sent to a vendor cannot be recalled, so a
@@ -36,8 +38,9 @@ class Reason(enum.Enum):
 
 _EXPLANATIONS = {
     Reason.UNRELEASED_IP: (
-        "the record is marked intellectual property, and disclosing unpublished "
-        "IP to a third party can defeat a later claim over it"
+        "the record is marked intellectual property and KTTO has not released "
+        "it, and disclosing unprotected IP to a third party can defeat a later "
+        "claim over it"
     ),
     Reason.EMBARGOED: "the record is under embargo",
     Reason.NO_CONSENT: "the author has not consented to this disclosure",
@@ -60,6 +63,9 @@ class DisclosureInputs:
     is_ip: bool
     embargo: EmbargoState
     consent_given: bool
+    #: KTTO's release of the mark. Defaults to unreleased, so a caller that
+    #: forgets it is refused rather than let through.
+    ip_released: bool = False
 
 
 @dataclass(frozen=True)
@@ -97,7 +103,7 @@ def may_disclose(inputs: DisclosureInputs) -> Decision:
     """
     reasons: list[Reason] = []
 
-    if inputs.is_ip:
+    if inputs.is_ip and not inputs.ip_released:
         reasons.append(Reason.UNRELEASED_IP)
 
     embargo_reason = _embargo_reason(inputs.embargo)

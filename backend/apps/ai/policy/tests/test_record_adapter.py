@@ -12,10 +12,12 @@ from core.enums import EmbargoState
 
 
 class _Record:
-    """The three attributes the adapter reads, and nothing else."""
+    """The attributes the adapter reads, and nothing else."""
 
-    def __init__(self, *, is_ip=False, dpa_accepted=True, embargo_state=EmbargoState.NONE):
+    def __init__(self, *, is_ip=False, ip_released=False, dpa_accepted=True,
+                 embargo_state=EmbargoState.NONE):
         self.is_ip = is_ip
+        self.ip_released = ip_released
         self.dpa_accepted = dpa_accepted
         self.embargo_state = embargo_state
 
@@ -24,6 +26,10 @@ class RecordAdapterTests:
     def test_it_reads_the_ip_flag(self):
         assert inputs_for_record(_Record(is_ip=True)).is_ip is True
         assert inputs_for_record(_Record(is_ip=False)).is_ip is False
+
+    def test_it_reads_ktto_s_release_of_the_mark(self):
+        assert inputs_for_record(_Record(is_ip=True, ip_released=True)).ip_released is True
+        assert inputs_for_record(_Record(is_ip=True)).ip_released is False
 
     def test_consent_comes_from_the_per_disclosure_dpa_stamp(self):
         """`Record.dpa_accepted` (IR-226), not `User.consent_given` -- the

@@ -21,7 +21,7 @@ from core.enums import (
     RecordTypeName,
     RequestStatus,
 )
-from . import embargo, lifecycle
+from . import embargo, ip_release, lifecycle
 from core.permissions import (
     IsAdmin,
     IsAuthor,
@@ -29,6 +29,7 @@ from core.permissions import (
     IsRecordOwner,
     IsStaff,
     MayReleaseEmbargo,
+    MayReleaseIp,
     MaySetEmbargo,
 )
 from .download_service import (
@@ -154,6 +155,8 @@ class RecordViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), MaySetEmbargo()]
         if self.action == "embargo_release":
             return [IsAuthenticated(), MayReleaseEmbargo()]
+        if self.action == "ip_release":
+            return [IsAuthenticated(), MayReleaseIp()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -446,10 +449,13 @@ class RecordViewSet(viewsets.ModelViewSet):
         embargo.record_answer(record, answer, actor=request.user)
         return Response(embargo.state_payload(record))
 
-    def _submitted_paper_under_lock(self):
+    def _paper_under_lock(self):
         record = self.get_object()  # a 404 for a paper they can't see, then a 403
         Record.objects.select_for_update().get(pk=record.pk)
-        record = self.get_object()
+        return self.get_object()
+
+    def _submitted_paper_under_lock(self):
+        record = self._paper_under_lock()
         if record.pipeline_status == PipelineStatus.DRAFT:
             raise serializers.ValidationError({"detail": embargo.DRAFT_ANSWERS_INSTEAD})
         return record
@@ -484,6 +490,22 @@ class RecordViewSet(viewsets.ModelViewSet):
                 {"detail": embargo.NOTHING_TO_RELEASE}, status=status.HTTP_400_BAD_REQUEST,
             )
         return Response(embargo.release_embargo(record, actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="ip-release")
+    @transaction.atomic
+    def ip_release(self, request, pk=None):
+        """
+        POST /records/<id>/ip-release/
+
+        KTTO releases an IP-marked paper for the AI and sends it on (ADR-052 §11,
+        IR-813). The mark stays. Who may ask is checked before whether there is a
+        mark to release, so a refusal says nothing about the paper.
+        """
+        record = self._paper_under_lock()
+        refused = ip_release.why_not_releasable(record)
+        if refused is not None:
+            return Response({"detail": refused}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(ip_release.release_ip(record, actor=request.user))
 
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):
@@ -1148,7 +1170,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         PATCH /records/<id>/tags/
         Staff (KTTO, RDCO, ITSO, IERC) may update IP classification
-        flags and the structured ip_type label on any record.
+        flags and the structured ip_type label on any record. `is_ip` can be
+        set and never cleared: KTTO releases a marked paper with `ip-release/`.
 
         Boolean fields (all optional):
           { "is_ip": true, "for_commercialization": false, "community_extension": false }
@@ -1173,6 +1196,14 @@ class RecordViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 updates[field] = value
+
+        # Only KTTO's release opens the disclosure check for a marked paper
+        # (ADR-052 §12, IR-813), so no office clears the mark, KTTO included.
+        if updates.get("is_ip") is False and record.is_ip:
+            return Response(
+                {"is_ip": [ip_release.MARK_CANNOT_BE_CLEARED]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if "ip_type" in request.data:
             ip_type_value = request.data["ip_type"]

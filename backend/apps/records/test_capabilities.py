@@ -246,6 +246,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 u, "post", url("record-embargo-set", r), {"embargoed_until": "2099-06-01"},
             ),
             "release_embargo": lambda r, u, d: self._call(u, "post", url("record-embargo-release", r)),
+            "release_ip": lambda r, u, d: self._call(u, "post", url("record-ip-release", r)),
             "delete_record": delete_as("delete_record"),
             "withdraw_submission": delete_as("withdraw_submission"),
             "request_deletion": delete_as("request_deletion"),
