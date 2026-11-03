@@ -95,7 +95,7 @@ class Command(BaseCommand):
         )
         if not plan.embed_cost_per_million:
             self.stdout.write(self.style.WARNING("  AI_EMBEDDING_COST_PER_MILLION_TOKENS is unset: the Voyage figure is 0, not free."))
-        self.stdout.write("  describe_figure      per Figure; unknown until each paper is read")
+        self.stdout.write("  figure descriptions  per Figure; unknown until each paper is read")
         reasons: dict[str, int] = {}
         for item in plan.skipped:
             reasons[item.reason] = reasons.get(item.reason, 0) + 1
