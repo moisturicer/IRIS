@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('records', '0026_record_manuscript_filename_and_more'),
+        ('records', '0027_duplicate_acknowledgement'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
