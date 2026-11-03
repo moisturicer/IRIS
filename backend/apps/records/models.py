@@ -258,6 +258,14 @@ class Record(models.Model):
     # that, because every workflow save moves it too. The manuscript is not a
     # detail: a new one is told apart by the file a version names.
     details_edited_at    = models.DateTimeField(null=True, blank=True)
+    # Moved by every detail save (IR-833), so a save made from an older view of
+    # the draft can be refused instead of overwriting a newer one. A
+    # manuscript alone does not move it: the file is not a detail.
+    details_revision     = models.PositiveIntegerField(default=0)
+    # The author's decision about each field Publish can fill in from the PDF
+    # (IR-833): which it filled in, and which the author typed, accepted,
+    # cleared or dismissed. Validated by `RecordWriteSerializer`; owners only.
+    metadata_sources     = models.JSONField(default=dict, blank=True)
 
     # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
     # `RecordViewSet.submit`, and for test data by `seed_demo` and
