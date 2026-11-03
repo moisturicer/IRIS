@@ -154,3 +154,14 @@ def test_split_table_preserves_colspan_and_continues_rowspan_cells_for_display()
     assert all("Spanning label" in c.content for c in chunks)
     assert all('rowspan="12"' not in c.content for c in chunks)
     assert "\n".join(c.text for c in chunks).count("Spanning label") == 1
+
+
+def test_table_spans_are_bounded_by_the_supplied_grid():
+    rows = [["Measurements", ""], ["Spanning label", "1"]] + [["", str(n)] for n in range(2, 13)]
+    html = '<table><tr><th colspan="1000">Measurements</th></tr>'
+    html += '<tr><td rowspan="1000">Spanning label</td><td>1</td></tr>'
+    html += ''.join(f'<tr><td>{n}</td></tr>' for n in range(2, 13)) + '</table>'
+    document = shape_llamaparse(result_with([{"type": "table", "rows": rows, "html": html}]))
+    chunks = build_chunk_set(document, ChunkingOptions(max_tokens=24)).chunks
+    assert all('colspan="2"' in c.content for c in chunks)
+    assert all('1000' not in c.content for c in chunks)

@@ -64,7 +64,7 @@ def _span(node, name, remaining):
         value = int(dict(node.attrs).get(name) or 1)
     except ValueError:
         return 1
-    return remaining if name == "rowspan" and value == 0 else max(1, value)
+    return remaining if name == "rowspan" and value == 0 else min(remaining, max(1, value))
 
 
 def _rows(node):
@@ -82,7 +82,7 @@ def _rows(node):
 class TableHTML:
     """One parsed table, reused while choosing fragment boundaries."""
 
-    def __init__(self, table, rows):
+    def __init__(self, table, rows, columns):
         self.table = table
         self.rows = rows
         self.cells: list[_Cell] = []
@@ -97,19 +97,23 @@ class TableHTML:
                     continue
                 while column in occupied:
                     column += 1
-                colspan = _span(node, "colspan", len(rows) - index)
+                colspan = _span(node, "colspan", columns)
+                node = replace(node, attrs=tuple(
+                    (key, str(colspan) if key == "colspan" else value) for key, value in node.attrs
+                ))
                 self.cells.append(_Cell(node, index, column, _span(node, "rowspan", len(rows) - index), colspan))
                 column += colspan
 
     @classmethod
-    def parse(cls, html: str, expected_rows: int) -> "TableHTML | None":
+    def parse(cls, html: str, grid: tuple[tuple[str, ...], ...]) -> "TableHTML | None":
         parser = _Parser()
         parser.feed(html)
         table = next((node for node in parser.root.children if isinstance(node, _Node) and node.tag == "table"), None)
         if table is None:
             return None
         rows = _rows(table)
-        return cls(table, rows) if len(rows) == expected_rows else None
+        columns = max((len(row) for row in grid), default=1)
+        return cls(table, rows, max(1, columns)) if len(rows) == len(grid) else None
 
     def fragment(self, start: int, stop: int) -> str:
         selected = [0, *range(start, stop)]

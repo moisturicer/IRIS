@@ -134,7 +134,7 @@ def _word_parts(word, element, path, options):
 def _table_parts(table, path, options):
     if _fits([table], path, options) or len(table.rows) < 2:
         return [table]
-    layout = TableHTML.parse(table.html, len(table.rows))
+    layout = TableHTML.parse(table.html, table.rows)
     parts = []
     start = 1
     for stop in range(2, len(table.rows) + 1):
