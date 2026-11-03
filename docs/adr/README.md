@@ -63,7 +63,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 
 **038 is IR-499's ADR, `Proposed` 2026-10-11.** It records the owner decisions of 2026-10-11 on a bounded research lane (routing by Jev with an LLM backup, a planner that reads documents, two loops under hard limits) and the invariants that keep it safe. It ships before it is measured and does not claim ADR-028's third revisit condition is met. **None of IR-500 to IR-504 (tool layer, screening, planner, Jev router, rollout) may merge until a named person accepts it.** Dated amendment sections in 026, 027, 028, 035 and 036 point at it, and each is also Proposed.
 
-**ADR numbers are unique (IR-457, 2026-10-06).** `docs/adr/` once held two files claiming 021 and two claiming 023. The inference-provider ADR is now **036** (was a second 021) and the migrate-on-boot ADR is **037** (was a second 023); `021-reviewer-directed-routing.md` and `023-retrieval-quality-evaluation.md` keep their numbers, so a bare ADR-021 or ADR-023 means those. 035 is now IR-461's ADR (Proposed).
+**ADR numbers are unique (IR-457, 2026-10-06; again IR-847, 2026-11-03).** The Caddy TLS ADR is **057** (was a second 056, merged after the LlamaParse ADR); a bare ADR-056 means [056](056-manuscript-extraction-moves-to-llamaparse.md). `docs/adr/` once held two files claiming 021 and two claiming 023. The inference-provider ADR is now **036** (was a second 021) and the migrate-on-boot ADR is **037** (was a second 023); `021-reviewer-directed-routing.md` and `023-retrieval-quality-evaluation.md` keep their numbers, so a bare ADR-021 or ADR-023 means those. 035 is now IR-461's ADR (Proposed).
 
 **Numbering note:** ADR-018 was drafted on `main` as "016" while `feat/rag-service` (not yet merged into `main` at the time) already had its own ADR-016 (`docling-structured-extraction`). It was renumbered to 018 to avoid a collision once the branches reconciled, rather than reusing 016.
 
@@ -76,7 +76,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | Superseded | [056](056-manuscript-extraction-moves-to-llamaparse.md) |
 | [025](025-figures-and-formulas-in-extraction.md) | Figures are cropped from the source PDF, formulas are OCR'd, and figure contents are not described | Superseded | [056](056-manuscript-extraction-moves-to-llamaparse.md) |
 | [055](055-traceability-evidence-lives-in-one-file-per-ticket.md) | **Accepted** 2026-11-02 by Ashlee Sean. Traceability notes live in one file per ticket, and the matrix holds status and links |
-| [056](056-caddy-terminates-tls.md) | **Accepted** 2026-11-02 by Ashlee Sean. Caddy terminates TLS in production, and nginx is no longer published |
+| [057](057-caddy-terminates-tls.md) | **Accepted** 2026-11-02 by Ashlee Sean. Caddy terminates TLS in production, and nginx is no longer published |
 
 ---
 

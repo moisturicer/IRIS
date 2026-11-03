@@ -1,4 +1,4 @@
-# TLS for production (IR-847, ADR-056). Caddy gets and renews the certificate for
+# TLS for production (IR-847, ADR-057). Caddy gets and renews the certificate for
 # IRIS_DOMAIN and redirects plain HTTP to HTTPS, because the site address has no
 # scheme. nginx isn't published, so this is the only way in from outside.
 #

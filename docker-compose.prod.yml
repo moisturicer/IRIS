@@ -406,7 +406,7 @@ services:
           cpus: '0.5'
           memory: 512M
 
-  # TLS (IR-847, ADR-056). Needs a public IRIS_DOMAIN with ports 80 and 443 open,
+  # TLS (IR-847, ADR-057). Needs a public IRIS_DOMAIN with ports 80 and 443 open,
   # and TRUSTED_PROXY_COUNT=2. Certificates persist in caddy_data, so a restart
   # doesn't request new ones.
   caddy:
