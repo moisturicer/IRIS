@@ -5,25 +5,12 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { INSTITUTION } from "@/config/institution";
 import { cn } from "@/lib/utils";
 
-interface CrossLink {
-  /** The words before the link, shown from `sm` up ("New to IRIS?"). */
-  prompt: string;
-  label: string;
-  to: string;
-}
-
 interface EntryLede {
   headline: ReactNode;
   sentence: string;
 }
 
 interface EntryFrameProps {
-  /**
-   * The masthead's link to the other entry screen; never hidden at any width.
-   * Sign in and register only: verification's sheet already offers every way
-   * on, and the pending screen's reader is signed in (IR-710).
-   */
-  crossLink?: CrossLink;
   /** Headline and plain sentence, on sign in and register only (IR-704). */
   lede?: EntryLede;
   /** The folder's index tabs, sitting on the sheet's top edge. */
@@ -58,7 +45,7 @@ interface EntryFrameProps {
  *
  * The footer carries no policy link until IR-214's documents are approved.
  */
-export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: EntryFrameProps) {
+export function EntryFrame({ lede, tabs, before, wide, children }: EntryFrameProps) {
   return (
     <div className="flex min-h-screen flex-col bg-canvas font-sans">
       {before}
@@ -79,20 +66,15 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
               className="h-6 w-auto min-w-0 object-contain sm:h-9"
             />
           </h1>
-          {crossLink && (
-            <p className="shrink-0 text-small text-stone-600">
-              <span className="hidden sm:inline">{crossLink.prompt} </span>
-              <Link
-                to={crossLink.to}
-                className={cn(
-                  "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
-                  FOCUS_RING,
-                )}
-              >
-                {crossLink.label}
-              </Link>
-            </p>
-          )}
+          <Link
+            to="/entry/help"
+            className={cn(
+              "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded text-small font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
+              FOCUS_RING,
+            )}
+          >
+            Help
+          </Link>
         </div>
       </header>
 
@@ -116,12 +98,12 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
             wide ? "max-w-5xl" : "max-w-xl",
           )}
         >
-          <div className="relative z-10 flex gap-1 pl-4 sm:pl-5">{tabs}</div>
+          <div className="relative z-10 flex gap-1">{tabs}</div>
           <div
             className="absolute inset-x-0 bottom-0 top-11 -z-10 translate-x-2 translate-y-2 rounded-xl border border-stone-200 bg-stone-100"
             aria-hidden
           />
-          <div className="rounded-xl border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
+          <div className="rounded-b-xl rounded-tr-xl border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
             {children}
           </div>
         </div>
@@ -129,8 +111,8 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
 
       <footer className="border-t border-stone-200">
         <div className="mx-auto flex max-w-page flex-col gap-1 px-4 py-6 text-small text-stone-600 sm:flex-row sm:justify-between sm:px-8 lg:px-12">
-          <p>© 2026 IRIS · Research and IP disclosure</p>
           <p>Pilot institution: {INSTITUTION.name}</p>
+          <p>© 2026 IRIS · Research and IP disclosure</p>
         </div>
       </footer>
     </div>
@@ -147,7 +129,7 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
  */
 export function EntryTab({ children }: { children: ReactNode }) {
   return (
-    <span className="-mb-px rounded-t-lg border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
+    <span className="-mb-px rounded-tl-xl rounded-tr-xl border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
       {children}
     </span>
   );

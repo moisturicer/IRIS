@@ -103,12 +103,15 @@ describe("the frame sign in opens in", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Welcome back" })).toBeInTheDocument();
   });
 
-  it("offers Create an account in the masthead and under the form, and no longer says 'Sign up'", () => {
+  it("offers Help alone in the masthead and one Create an account link below the form", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const links = screen.getAllByRole("link", { name: "Create an account" });
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(1);
     links.forEach((link) => expect(link).toHaveAttribute("href", "/signup"));
+    const header = screen.getByRole("banner");
+    expect(within(header).getAllByRole("link")).toHaveLength(1);
+    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("href", "/entry/help");
     expect(screen.queryByRole("link", { name: /sign up/i })).not.toBeInTheDocument();
   });
 

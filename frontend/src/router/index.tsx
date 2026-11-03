@@ -11,6 +11,7 @@ import SignupPage        from "@/features/auth/SignupPage";
 import EmailVerifyPage   from "@/features/auth/EmailVerifyPage";
 import ForgotPasswordPage from "@/features/auth/ForgotPasswordPage";
 import ResetPasswordPage  from "@/features/auth/ResetPasswordPage";
+import EntryHelpPage      from "@/features/auth/EntryHelpPage";
 
 // App shell (sidebar + header wrapper)
 import { AppShell } from "@/components/layout/AppShell";
@@ -50,6 +51,7 @@ export const routes: RouteObject[] = [{
   children: [
   { path: "/login",  element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
+  { path: "/entry/help", element: <EntryHelpPage /> },
   { path: "/activate/:uidb64/:token", element: <EmailVerifyPage /> },
   // ADR-045 (IR-642). Public: recovery must never require signing in.
   { path: "/password/forgot", element: <ForgotPasswordPage /> },

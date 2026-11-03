@@ -1,5 +1,11 @@
 # Requirements Traceability
 
+## IR-856 · Connected entry labels and visitor navigation
+
+Sign in and registration share the left-edge-connected folder shape. The Sign in and current Identity labels are plain text, with the current registration step marked `aria-current="step"`; completed steps remain links. Both screens show one Help link in the masthead, opening public `/entry/help`. Sign in has one Create an account link below its form. The footer places the copyright at the far right on wide screens and stacks on phones.
+
+**Evidence (2026-11-03):** `LoginPage.test.tsx` and `SignupPage.test.tsx` assert navigation, heading, and step semantics at the page seam; `entryHeadings.test.tsx` and `entryTokens.test.ts` cover heading structure, token use, and reduced-motion classes. All 137 targeted tests passed; `tsc --noEmit` and targeted ESLint passed. Browser captures at 360 px, desktop, and 200% zoom equivalent, plus focus and axe results, are recorded in [the evidence index](evidence/IR-856/README.md). Legal links remain in IR-858. The full frontend suite will be verified by CI.
+
 ## IR-364 · Settings and session bootstrap palette (NFR-U1)
 
 Settings uses the shared settled tone for saved feedback, active maroon for
