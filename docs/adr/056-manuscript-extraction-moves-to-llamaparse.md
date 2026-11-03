@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-02 (IR-837). The decisions are Jive Tyler Revalde's, from a design session. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead. Adviser confirmation is not recorded yet (the IR-189 precedent for the Docling-serve amendment). No CIT-U data protection officer's review is recorded (IR-123). Not built.
+**Accepted on merge** — 2026-11-02 (IR-837). The decisions are Jive Tyler Revalde's, from a design session. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead. Adviser confirmation is not recorded yet (the IR-189 precedent for the Docling-serve amendment). No CIT-U data protection officer's review is recorded (IR-123). Not built. Decisions 3 and 14 are amended by the IR-851 amendment below.
 
 **Supersedes [ADR-016](016-docling-structured-extraction.md)** (Docling-serve as the extraction path) and **[ADR-025](025-figures-and-formulas-in-extraction.md)** (figures cropped on request, formulas OCR'd, figure contents not described). Both are now `Superseded by ADR-056`. The two ADR-025 amendments (IR-424, IR-437) are carried forward in decision 12 rather than lost.
 
@@ -36,7 +36,7 @@ It is the third-party reader [ADR-054](054-each-person-answers-whether-ai-may-us
    - word, line and cell boxes
    - printed page numbers
    - cross-page table merging and table quality flags
-   - high-effort confidence (page and document)
+   - ~~high-effort confidence (page and document)~~ — withdrawn, see the IR-851 amendment
    - chart values
    - figure images
    - watermark text
@@ -63,7 +63,7 @@ It is the third-party reader [ADR-054](054-each-person-answers-whether-ai-may-us
 
 ### Proving it
 
-14. **No real Manuscript is extracted in production until an acceptance check passes** on the 40-paper proxy corpus against today's Docling output:
+14. **No real Manuscript is extracted in production until an acceptance check passes** on the 40-paper proxy corpus (six papers, per the IR-851 amendment) against today's Docling output:
     - formulas still arrive as LaTeX
     - `eval_retrieval` recall@10 does not drop
     - heading nesting is checked against the thesis numbering
@@ -156,7 +156,22 @@ These block production enablement, not construction:
 1. **Retention in writing.** The v2 `disable_cache` replaces v1's `do_not_cache` and `invalidate_cache` (`/parse/guides/migration-v1-to-v2`), and the privacy page still uses the v1 name. Confirm in writing that `disable_cache` stops the 48-hour cache, and how long job results are kept.
 2. **Region.** North America or the EU.
 3. **Prices.** Granular boxes and LlamaExtract are priced separately; confirm both before the cutover estimate.
-4. **Formulas.** Confirm LlamaParse writes LaTeX (decision 14).
+4. **Formulas.** Confirm LlamaParse writes LaTeX (decision 14). Met for born-digital papers by IR-851's run; scanned papers are untested.
+
+## Amendment — 2026-11-03 (IR-851): no high-effort confidence, and a six-paper acceptance check
+
+Decided by Jive Tyler Revalde while running IR-851, to keep the check inside LlamaParse's free tier (10,000 credits a month).
+
+**Decision 3 no longer requests high-effort confidence.** It is a second review pass that costs 5 credits a page on top of `agentic`'s 10. Whatever confidence LlamaParse returns without it is still stored and flagged per decision 16.
+
+**Decision 7 stands.** `disable_cache` stays set: turning the cache on would save credits only on a re-read within 48 hours, and would leave a vendor copy of every Manuscript for that time.
+
+**Decision 14 runs on six papers, one per category of the proxy corpus, not forty.** The same six are extracted by Docling into a separate database, so recall is compared paper for paper.
+
+**What it costs.**
+- A page no longer gets LlamaParse's own grade of its output, so a weak read is harder to spot.
+- 14 labelled questions instead of 52: one question moves recall@10 by about 7 points, so the check shows the direction, not a measured difference.
+- The 40-paper Docling baseline is not the comparison.
 
 ## Related Requirements
 
@@ -171,4 +186,5 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-841: LlamaParse Extractor
 - IR-842: corpus cutover
 - IR-843: Docling retirement
+- IR-851: acceptance check, and the amendment above
 - Related: IR-189, IR-292, IR-293, IR-816, IR-123

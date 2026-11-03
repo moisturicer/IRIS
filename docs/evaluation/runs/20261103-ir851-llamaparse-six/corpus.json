@@ -1,0 +1,42 @@
+{
+ "corpus": "docs/corpus subset, one paper per category (ADR-056 amendment, 2026-11-03)",
+ "tier": "proxy",
+ "papers": [
+  {
+   "category": "active learning",
+   "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+   "pages": 20,
+   "sha256": "c9d452ad566849e95bde7c94ab74ad4ff61e48e6f2a310f98e093e1fa7bb46e9"
+  },
+  {
+   "category": "astrophysics-of-galaxies",
+   "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+   "pages": 23,
+   "sha256": "49bdf91fdfc3c32ddd0d78a61361351ef370980359325f1755e94783275c8f40"
+  },
+  {
+   "category": "audio-and-speech-processing",
+   "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+   "pages": 5,
+   "sha256": "a84f170003ea37dfaffc3b2f15cecbf6f732af6efb9cf588399fc346f0b8d8f0"
+  },
+  {
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "title": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+   "pages": 17,
+   "sha256": "b109f841f0acfdb0cbfa40419313a8c286e1012072acb44aabcde4aabfe19ccd"
+  },
+  {
+   "category": "econometrics",
+   "title": "Noise-adjusted turnover in estimated networks",
+   "pages": 8,
+   "sha256": "1bf325ba792393ceab627162f743d1b0a02508c33348ad980136136a1069b669"
+  },
+  {
+   "category": "hardware-architecture",
+   "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+   "pages": 5,
+   "sha256": "3de679e8c29a24c28592df1192bcd4b8527f38a9c158ecfad032d92496c3e4e7"
+  }
+ ]
+}
