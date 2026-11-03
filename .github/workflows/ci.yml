@@ -474,8 +474,8 @@ jobs:
           esac
           exit $status
 
-      # IR-668: the default is deny, the allowlist reads the real client, and
-      # IRIS's own /admin/... pages are not refused.
+      # IR-668: the default is deny and the allowlist reads the real client.
+      # IR-782: IRIS's own /admin/... and /rdco/... pages load the app, not Django.
       - name: nginx closes /django-admin/ unless allowlisted
         run: sh scripts/check_django_admin_allowlist.sh
 

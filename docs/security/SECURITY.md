@@ -99,7 +99,7 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 **TLS.** nginx listens on plain 8080 and takes the scheme from the proxy in front of it, so TLS must end upstream. This repository doesn't configure that proxy (§11).
 
-**Django admin.** nginx closes `/django-admin/` except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)), but **Django still serves its admin at `/admin/`, which nginx leaves open**, because that path also carries IRIS's own pages. The allowlist protects the admin only once [IR-782](https://citiris.atlassian.net/browse/IR-782) moves it.
+**Django admin.** Django serves its admin only at `/django-admin/` ([IR-782](https://citiris.atlassian.net/browse/IR-782)), and nginx closes that path except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)). `/admin/...` and `/rdco/...` are IRIS's own pages: nginx serves them the app and proxies nothing there to Django.
 
 **`ai-gateway`** is adopted by [ADR-014](../adr/014-ai-gateway-as-a-service.md) under preconditions. It sets no CORS, publishes no port and refuses any request without the shared service secret (`ai/main.py`). **It still receives `DATABASE_URL`**, against ADR-014's "no direct DB access" (§11).
 

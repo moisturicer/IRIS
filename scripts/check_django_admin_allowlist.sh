@@ -1,7 +1,8 @@
 #!/bin/sh
-# Proves IR-668 against the real nginx, the real config and the real entrypoint
-# script. Nothing listens behind nginx, so a request nginx lets through ends in
-# 502, and one it refuses ends in 403. Run from the repository root; needs Docker.
+# Proves IR-668 and IR-782 against the real nginx, the real config and the real
+# entrypoint script. Nothing listens behind nginx, so a request nginx proxies
+# ends in 502, one it refuses ends in 403, and an app page answers 200 with the
+# stand-in index.html. Run from the repository root; needs Docker.
 set -u
 export MSYS_NO_PATHCONV=1
 
@@ -75,12 +76,16 @@ case "$(printf '%s' "$headers" | tr 'A-Z' 'a-z')" in
     *) fail "the 403 lacks the security headers: $headers" ;;
 esac
 expect "the sign-in page stays open" 200 /login
-for path in /admin/users /admin/role-requests /admin/audit; do
-    status=$(docker exec "$name" curl -s -o /dev/null -w '%{http_code}' "http://127.0.0.1:8080$path")
-    case "$status" in
-        403 | 000 | "") fail "$path: expected an answer other than 403, got '$status'" ;;
-        *) echo "ok: $path is not refused ($status)" ;;
-    esac
+# IRIS's own pages are the app, not Django (IR-782): opening or refreshing one
+# gets index.html. A 502 would mean nginx proxied it to the backend.
+for path in /admin/ /admin/users /admin/role-requests /admin/audit /rdco/ /rdco/users /rdco/role-requests; do
+    body=$(docker exec "$name" curl -s -w '\n%{http_code}' "http://127.0.0.1:8080$path")
+    status=$(printf '%s' "$body" | tail -n 1)
+    if [ "$status" = 200 ] && printf '%s' "$body" | grep -q '<title>IRIS</title>'; then
+        echo "ok: $path loads the app"
+    else
+        fail "$path: expected the app's index.html (200), got '$status'"
+    fi
 done
 
 echo "== the direct peer is listed, no proxy in front"

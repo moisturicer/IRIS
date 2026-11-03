@@ -56,7 +56,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 | I | Cached responses on a shared computer | Gap: [IR-821](https://citiris.atlassian.net/browse/IR-821) |
 | D | Request floods, huge uploads | Rate limits, 50 MB upload limit |
 | E | Role escalation through the API | Application role only ([IR-165](https://citiris.atlassian.net/browse/IR-165)), route matrix |
-| E | Django's admin reached from the internet | Gap: it stays at `/admin/` until [IR-782](https://citiris.atlassian.net/browse/IR-782) moves it behind [IR-668](https://citiris.atlassian.net/browse/IR-668)'s allowlist |
+| E | Django's admin reached from the internet | Django serves it only at `/django-admin/` ([IR-782](https://citiris.atlassian.net/browse/IR-782)), which nginx closes except to [IR-668](https://citiris.atlassian.net/browse/IR-668)'s allowlist. Gap: no MFA ([IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 
 **Django ↔ Celery and Redis**
 
