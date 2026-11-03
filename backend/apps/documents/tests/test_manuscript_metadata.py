@@ -21,7 +21,7 @@ from apps.ai.extraction.selection import use_metadata_reader
 from apps.ai.extraction.tests.fixtures import FIXTURES, pdf_bytes
 from apps.ai.extraction.tests.llamaextract_vendor import PARSE_JOB_ID, two_columns_reading
 from apps.ai.extraction.tests.llamaparse_fixtures import recorded
-from apps.ai.models import ProviderCampaign, ProviderReservation
+from apps.ai.models import ProviderReservation
 from apps.ai.models.admission import RELEASED, SETTLED
 from apps.documents import tasks
 from apps.documents.models import DocumentKind, ManuscriptMetadata, PdfExtraction
