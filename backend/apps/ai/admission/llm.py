@@ -25,6 +25,8 @@ from apps.ai.providers.tool_calling import (
     ToolDefinition,
 )
 
+from apps.ai.providers.vision import ImageDescribingLLM, data_url
+
 from . import scope
 from .ledger import Request, admit, estimate_tokens, provider_attempt
 from .limits import enforcing
@@ -37,7 +39,7 @@ def _message_text(message: Message) -> str:
     return json.dumps(getattr(message, "__dict__", str(message)), default=str, ensure_ascii=False)
 
 
-class AdmittedLLMProvider(LLMProvider, ToolCallingLLM):
+class AdmittedLLMProvider(LLMProvider, ToolCallingLLM, ImageDescribingLLM):
     def __init__(
         self,
         adapter,
@@ -74,6 +76,11 @@ class AdmittedLLMProvider(LLMProvider, ToolCallingLLM):
     def generate(self, system: str, user: str) -> str:
         with provider_attempt(lambda: self._request((system, user))):
             return self._adapter.generate(system, user)
+
+    def describe_image(self, system: str, user: str, image: bytes, media_type: str) -> str:
+        # The image is reserved at its encoded size: an upper bound on its tokens.
+        with provider_attempt(lambda: self._request((system, user, data_url(image, media_type)))):
+            return self._adapter.describe_image(system, user, image, media_type)
 
     def stream(self, system: str, user: str) -> Iterator[StreamDelta]:
         if not enforcing():

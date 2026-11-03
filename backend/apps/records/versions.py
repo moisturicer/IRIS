@@ -129,9 +129,22 @@ def served_manuscript(record, user):
     version's while the stored one is still unsubmitted. Falsy when there is
     no manuscript.
     """
-    if stored_manuscript_unsubmitted(record) and not is_record_owner(user, record):
+    if _reads_submitted_version(record, user):
         return latest_version(record).manuscript
     return record.abstract_file
+
+
+def served_manuscript_revision(record, user):
+    """The revision of ``served_manuscript(record, user)``: what a Figure
+    must have been cropped from to be shown to ``user`` (IR-845)."""
+    if _reads_submitted_version(record, user):
+        return latest_version(record).manuscript_revision
+    return record.manuscript_revision
+
+
+def _reads_submitted_version(record, user) -> bool:
+    """Is ``user`` served the latest version rather than the stored file?"""
+    return stored_manuscript_unsubmitted(record) and not is_record_owner(user, record)
 
 
 def restore_submitted_manuscript(record) -> bool:

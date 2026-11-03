@@ -130,6 +130,18 @@ def embed_chunk_set(self, record_id: int, *, force: bool = False, chunk_set_id=N
     return outcome.as_dict()
 
 
+@shared_task(bind=True, max_retries=3, ignore_result=True)
+def describe_extraction_figures(self, extraction_id: int, source_revision=None):
+    """Describe a read's Figures for retrieval, then re-chunk (IR-852).
+    A retry resends only the Figures still undescribed."""
+    from apps.ai.figure_descriptions import DescriptionsOwed, describe_figures
+
+    try:
+        describe_figures(extraction_id, source_revision)
+    except DescriptionsOwed as exc:
+        raise self.retry(exc=exc, countdown=300 * (self.request.retries + 1))
+
+
 @shared_task(bind=True, max_retries=2)
 def generate_record_overview(
     self, record_id: int, chunk_set_id: int, content_hash: str, prompt_version: int

@@ -82,6 +82,8 @@ class DocumentElement:
     html: str = ""
     # Retrieval only. A Figure's printed caption stays in text (ADR-056 §10).
     description: str = ""
+    # The Extractor's image name, joining a Figure element to its stored image.
+    figure: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.bboxes, tuple):
