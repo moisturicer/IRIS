@@ -184,9 +184,9 @@ python manage.py seed_demo --password hunter2
 |---|---|
 | `student@cit.edu` | Student — owns the demo records |
 | `adviser@cit.edu` | Adviser |
-| `rdco@cit.edu` | RDCO — **IRIS's administrator** (`ADMIN_ROLES` is `{RDCO}`) |
+| `rdco@cit.edu` | RDCO — administers people's accounts and the request queues, and gives Student and Adviser (`ADMIN_ROLES` is `{RDCO}`) |
 | `itso@cit.edu` · `ierc@cit.edu` · `ktto@cit.edu` | The three clearing offices |
-| `admin@cit.edu` | Django superuser, **no application role** — `/admin` only (IR-165) |
+| `admin@cit.edu` | **System Admin**, and a Django superuser — the Audit Log, system settings and office roles in IRIS, and Django's admin site (ADR-051, IR-781). Only this demo login holds both |
 
 Re-running is idempotent for records (keyed by title) but **resets all seven passwords** to the default, so say so before a rehearsal if someone has changed one.
 
