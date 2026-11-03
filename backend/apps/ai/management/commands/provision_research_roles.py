@@ -29,6 +29,8 @@ DEFINER_FUNCTIONS = (
     "begin_research(text, text)",
     "research_record_ids()",
     "reader_status(bigint)",
+    "indexing_source()",
+    "indexed_source_current(uuid,uuid,bigint)",
     "processing_source()",
     "lock_processing_source()",
     "pending_manuscript_work(integer, uuid)",
@@ -53,7 +55,8 @@ LEDGER_TABLES = {
 VERIFIER_COLUMNS = {
     "accounts_user": "id, is_active, is_locked, credential_version, role_id",
     "accounts_role": "id, name",
-    "records_record": "id, is_deleted, pipeline_status, adviser_id, abstract_file",
+    "records_record": "id, is_deleted, pipeline_status, adviser_id, abstract_file, title, abstract, dpa_accepted_at, is_ip, ip_released_at, "
+                      "embargo_answered_at, embargo_released_at, embargoed_until",
     "publication_manuscriptwork": "id, record_id, revision, source_file, operation, revoked_at,"
                                   " created_at, grant_token, grant_expires_at, authority_generation",
     "publication_manuscriptinvalidation": "id, record_id, work_id, reason, authority_generation",
@@ -237,7 +240,8 @@ class Command(BaseCommand):
         cursor.execute("GRANT EXECUTE ON FUNCTION iris_authz.processing_source(),"
                        " iris_authz.pending_manuscript_work(integer, uuid),"
                        " iris_authz.manuscript_invalidations(integer, uuid),"
-                       " iris_authz.lock_processing_source() TO iris_ai_runtime")
+                       " iris_authz.lock_processing_source(), iris_authz.indexing_source(),"
+                       " iris_authz.indexed_source_current(uuid,uuid,bigint) TO iris_ai_runtime")
         # The AI runtime reserves and settles in the one shared ledger (IR-725).
         for table, columns in LEDGER_TABLES.items():
             cursor.execute(f"REVOKE UPDATE ON public.{table} FROM iris_ai_runtime")

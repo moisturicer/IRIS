@@ -144,10 +144,7 @@ class Ledger:
                 WHERE campaign_id = $1 AND state = 'open' AND lease_expires_at < $2""",
             campaign["id"], now,
         )
-        run = await conn.fetchrow(
-            "SELECT state, fence, allowance, deadline_at FROM iris_ai.ask_run WHERE id = $1",
-            binding.run_id,
-        )
+        run = await self._work(conn, binding)
         if run is None or run["state"] != "running" or run["fence"] != binding.fence:
             raise _Refused(errors.RUN_CANCELLED)
         timeout = (run["deadline_at"] - now).total_seconds()
@@ -219,6 +216,12 @@ class Ledger:
             wanted["cost_micros"], active_ms,
         )
         return pk, campaign["id"], timeout
+
+    async def _work(self, conn, binding):
+        return await conn.fetchrow(
+            "SELECT state, fence, allowance, deadline_at FROM iris_ai.ask_run WHERE id = $1",
+            binding.run_id,
+        )
 
     @staticmethod
     async def _locked_campaign(conn, key: str):

@@ -34,6 +34,14 @@ APP_NAME = "iris-ai-runs"
 ACTIVE = ("queued", "running")
 TERMINAL = ("completed", "cancelled", "conflict", "expired", "failed", "deleted")
 
+# Only new AI-owned sources use negative revision IDs. Reopening or recalling
+# them must not replay text after source/disclosure authority changes.
+CURRENT_INDEXED_TURN = """NOT EXISTS (
+    SELECT 1 FROM iris_ai.citation ci WHERE ci.turn_id=t.id AND ci.revision LIKE '-%'
+      AND NOT EXISTS(SELECT 1 FROM iris_ai.research_chunksets() cs
+        WHERE cs.record_id=ci.record_id AND cs.is_active
+          AND cs.id::text || ':' || cs.extraction_hash=ci.revision))"""
+
 RUN_COLUMNS = (
     "id, reader_id, conversation_id, request_hash, question, base_revision, state, end_reason,"
     " deadline_at, allowance, pinned, fence, version, turn_id, created_at, finished_at,"
@@ -325,8 +333,8 @@ class RunStore:
         )
         await self._journal(conn, run_id, "started", {"attempt": used + 1})
         prior = await conn.fetch(
-            """SELECT question, answer, kind FROM iris_ai.turn
-                WHERE conversation_id = $1 ORDER BY ordinal DESC LIMIT $2""",
+            f"""SELECT question, answer, kind FROM iris_ai.turn t
+                WHERE conversation_id = $1 AND {CURRENT_INDEXED_TURN} ORDER BY ordinal DESC LIMIT $2""",
             row["conversation_id"], PRIOR_TURNS,
         )
         return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"],
@@ -535,7 +543,7 @@ class RunStore:
             dependencies.update(c["revision"] for c in citations)
             current = await conn.fetch(
                 "SELECT cs.id::text || ':' || cs.extraction_hash AS revision"
-                " FROM public.ai_chunkset cs JOIN public.records_record r ON r.id = cs.record_id"
+                " FROM iris_ai.research_chunksets() cs JOIN public.records_record r ON r.id = cs.record_id"
                 " WHERE cs.is_active AND cs.id::text || ':' || cs.extraction_hash = ANY($1::text[])",
                 list(dependencies),
             ) if dependencies else []
@@ -579,15 +587,15 @@ class RunStore:
                 if revision is None:
                     raise NotFound
                 turns = await conn.fetch(
-                    """SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.created_at, r.pinned
+                    f"""SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.created_at, r.pinned
                          FROM iris_ai.turn t JOIN iris_ai.ask_run r ON r.id = t.run_id
-                        WHERE t.conversation_id = $1 ORDER BY t.ordinal""",
+                        WHERE t.conversation_id = $1 AND {CURRENT_INDEXED_TURN} ORDER BY t.ordinal""",
                     conversation_id,
                 )
                 citations = await conn.fetch(
-                    """SELECT c.turn_id, c.position, c.record_id, c.page, c.quote, c.revision
+                    f"""SELECT c.turn_id, c.position, c.record_id, c.page, c.quote, c.revision
                          FROM iris_ai.citation c JOIN iris_ai.turn t ON t.id = c.turn_id
-                        WHERE t.conversation_id = $1 ORDER BY c.turn_id, c.position""",
+                        WHERE t.conversation_id = $1 AND {CURRENT_INDEXED_TURN} ORDER BY c.turn_id, c.position""",
                     conversation_id,
                 )
                 run_ids = await conn.fetch(
