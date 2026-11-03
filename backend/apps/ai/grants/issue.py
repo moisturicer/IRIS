@@ -122,6 +122,18 @@ def ingestion_grant(job) -> Grant:
     ))
 
 
+def committed_work_grant(work) -> Grant:
+    """Sign a work binding after publication validated it under the Record lock.
+
+    PostgreSQL independently rechecks that binding at every processing read.
+    """
+    cfg = config.read()
+    now = int(time.time())
+    return _sign(cfg, _claims(cfg, INGESTION, now=now, exp=now + cfg.ttl_seconds,
+        wrk=str(work.pk), rec=work.record_id, rev=str(work.revision), op=work.operation,
+        wgen=work.authority_generation))
+
+
 def renew_reader_grant(user, run, token: str, *, using: str = "default") -> Grant:
     """A fresh grant for the same binding, rechecked against current facts."""
     from apps.ai.grants import database

@@ -104,7 +104,9 @@ python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db
                                           # tests skip cleanly with no Postgres reachable.
                                           # One run per Postgres server: a second exits at
                                           # once (IR-835). -m "not slow" skips migration
-                                          # tests and a few others locally; CI runs all
+                                          # tests and a few others locally; CI runs all.
+                                          # Reads only SECRET_KEY, RECOVERY_* and DB_*
+                                          # from backend/.env, as CI supplies (IR-853)
 python manage.py seed_demo                # accounts + Discover catalogue + every workflow_state
                                           # (IR-227). Logins are <role>@cit.edu / IrisDemo123!,
                                           # plus admin@cit.edu (Django superuser, no app role).

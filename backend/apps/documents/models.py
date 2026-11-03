@@ -186,8 +186,9 @@ class PdfExtraction(models.Model):
 
     @property
     def reader_message(self):
-        """A failed extraction's message (IR-839); ``warnings`` stay admin-only."""
-        return (self.error or None) if self.status == "failed" else None
+        """A failed or held extraction's message (IR-839, IR-850); ``warnings`` stay admin-only."""
+        shown = self.status == "failed" or self.phase == ExtractionPhase.AWAITING_DISCLOSURE
+        return (self.error or None) if shown else None
 
     class Meta:
         ordering = ["-created_at"]

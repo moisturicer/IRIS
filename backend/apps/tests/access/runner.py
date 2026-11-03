@@ -44,13 +44,15 @@ def _send(client, route: Route, method: str, call: Call, world: World, user, mis
     if query:
         url = f"{url}?{urlencode(query)}"
     data = resolve_value(call.data, lookup) if call.data is not None else None
+    headers = resolve_value(call.headers, lookup)
 
     client.force_authenticate(user)
     cache.clear()
     try:
         with transaction.atomic():
             sender = getattr(client, method.lower())
-            response = sender(url, data, format=call.format) if data is not None else sender(url)
+            response = (sender(url, data, format=call.format, **headers) if data is not None
+                        else sender(url, **headers))
             # Never `response.close()` here: it sends `request_finished`, whose
             # `close_old_connections` the test client only holds off inside
             # its own request, and the test's connection closes mid-run. The

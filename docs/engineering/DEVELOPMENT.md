@@ -356,6 +356,15 @@ runs and pytest runs started from inside a locked run do not take it.
 the schema backwards and forwards) and a few tests marked by hand. `-m "not slow"`
 saves about five minutes locally. CI selects nothing and runs all of them.
 
+**Tests do not read your AI configuration (IR-853).** A test run reads only what
+CI supplies from `backend/.env`: `SECRET_KEY`, the two `RECOVERY_*` keys and the
+`DB_*` connection. Vendor keys, LLM profiles and AI switches there are ignored,
+so a local run tests the same configuration CI does and cannot reach a paid
+vendor. `testing/hermetic_env.py` sets `IRIS_DOTENV_ALLOWLIST` before Django
+loads; `config/settings/dotenv.py` applies it, and child processes inherit it.
+A value exported in your shell still applies, as it would in CI. To test with
+real settings, run the app, not the suite.
+
 **Backend CI (IR-810)** runs the complete pytest collection across four isolated
 runners/PostgreSQL services. Whole test modules stay together, assigned by test
 count; tests within a shard retain collection order. This avoids sharing the

@@ -492,6 +492,11 @@ AI = {
     "ai-ask-run-grant": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant-renew": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-runtime-grant": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # Invalid scope tests the authentication gate without requiring deployment grant keys.
+    # Configured issuance and actual Record visibility are covered by test_runtime_reader_edge.
+    "ai-runtime-edge-grant": Entry({"GET": _case(
+        SIGNED_IN, headers={"HTTP_X_IRIS_RECORD": "invalid"},
+    )}),
     "ai-embed-record": Entry({"POST": _case(OFFICE_ONLY, kwargs=RECORD, data={})}),
     "ai-embed-all": Entry({"POST": _case(OFFICE_ONLY, data={})}),
     "ai-embed-jobs": Entry({"GET": _case(OFFICE_ONLY)}),

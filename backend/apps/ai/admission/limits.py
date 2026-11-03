@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import math
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from typing import Mapping, Optional
 
 from django.conf import settings
@@ -46,6 +47,14 @@ REQUIRED_SETTINGS = (
     "AI_ADMISSION_MAX_OUTPUT_TOKENS",
     "AI_ADMISSION_QUEUE_DEPTH",
     "AI_ADMISSION_QUEUE_PER_USER",
+)
+
+#: What an off-campus read costs (IR-850). Required only for extraction, so an
+#: unset one refuses extraction and nothing else.
+EXTRACTION_SETTINGS = (
+    "AI_ADMISSION_EXTRACTION_CREDIT_USD",
+    "AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE",
+    "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE",
 )
 
 
@@ -215,6 +224,45 @@ def read_limits() -> Limits:
     )
 
 
+@dataclass(frozen=True)
+class ExtractionPrice:
+    """A credit's price, and the credits one page may cost: the tier's most
+    expensive rate plus every add-on the request turns on (ADR-056 §2-3)."""
+
+    credit_usd: Decimal
+    credits_per_page: Decimal
+    addon_credits_per_page: Decimal
+
+    def micros(self, credits: Decimal) -> int:
+        return math.ceil(credits * self.credit_usd * 1_000_000)
+
+    def reserve_micros(self, pages: int) -> int:
+        return self.micros(pages * (self.credits_per_page + self.addon_credits_per_page))
+
+
+def _decimal(name: str, *, allow_zero: bool = False) -> Decimal:
+    raw = _raw(name)
+    try:
+        value = Decimal(raw)
+    except InvalidOperation:
+        raise ImproperlyConfigured(f"{name} must be a number, not {raw!r}") from None
+    if not value.is_finite() or value < 0 or (value == 0 and not allow_zero):
+        raise ImproperlyConfigured(f"{name} must be {'non-negative' if allow_zero else 'positive'}, not {raw!r}")
+    return value
+
+
+def read_extraction_price() -> ExtractionPrice:
+    """The extraction price, or `NotConfigured` naming the unset settings."""
+    missing = [name for name in EXTRACTION_SETTINGS if not _raw(name)]
+    if missing:
+        raise NotConfigured(", ".join(missing))
+    return ExtractionPrice(
+        credit_usd=_decimal("AI_ADMISSION_EXTRACTION_CREDIT_USD"),
+        credits_per_page=_decimal("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE"),
+        addon_credits_per_page=_decimal("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", allow_zero=True),
+    )
+
+
 def output_cap() -> Optional[int]:
     """The per-call completion cap to send under enforcement, if it is set
     and well-formed; ``None`` otherwise, which admission then refuses."""
@@ -245,7 +293,8 @@ def verify_admission_configuration() -> None:
             "shared limits (IR-545, ADR-041)."
         )
     if enforcing():
-        try:
-            read_limits()
-        except NotConfigured:
-            pass
+        for read in (read_limits, read_extraction_price):
+            try:
+                read()
+            except NotConfigured:
+                pass

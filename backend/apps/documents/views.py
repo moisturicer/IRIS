@@ -5,7 +5,7 @@ from rest_framework.permissions import IsAuthenticated
 from django.http import FileResponse
 from django.db import transaction
 from core.permissions import IsStaff, owns_or_staffs_record
-from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile, PdfExtraction, DocumentKind
+from .models import RecordUpload, UploadSlot, UploadStatus, UploadReview, RecordFile
 from .serializers import RecordUploadSerializer, UploadSlotSerializer, RecordFileSerializer, PdfExtractionSerializer, UploadReviewSerializer
 from .services import create_upload, delete_upload
 from apps.audit.services import create_audit_event
@@ -144,7 +144,7 @@ class SubmitDocumentView(APIView):
 
     @transaction.atomic
     def post(self, request):
-        from .tasks import extract_pdf_text
+        from .sources import queue_upload_read
 
         record_id = request.data.get("record")
         slot_id   = request.data.get("slot")
@@ -207,10 +207,9 @@ class SubmitDocumentView(APIView):
         # form, a Patent Draft -- so this endpoint says so on the row rather
         # than leaving the chunker to infer it (IR-239). If a manuscript slot
         # is ever seeded, this is the line that changes, and nothing else.
-        extraction = PdfExtraction.objects.create(
-            upload=upload, kind=DocumentKind.SUPPLEMENTARY
-        )
-        transaction.on_commit(lambda: extract_pdf_text.delay(upload.id))
+        # `queue_upload_read` writes that kind; an off-campus read waits for
+        # consent or release (IR-850).
+        extraction = queue_upload_read(upload)
 
         return Response(
             {

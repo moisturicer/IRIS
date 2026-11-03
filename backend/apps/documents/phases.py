@@ -9,3 +9,5 @@ class ExtractionPhase(models.TextChoices):
     READY = "ready", "Ready"
     FAILED = "failed", "Failed"
     AWAITING_SUBMISSION = "awaiting_submission", "Awaiting submission"
+    # IR-850: the Extractor leaves campus and the disclosure gate refuses.
+    AWAITING_DISCLOSURE = "awaiting_disclosure", "Not read: awaiting consent or release"

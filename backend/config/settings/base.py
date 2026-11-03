@@ -7,7 +7,10 @@ from corsheaders.defaults import default_headers
 from decouple import UndefinedValueError, config
 from django.core.exceptions import ImproperlyConfigured
 
+from .dotenv import restrict_dotenv
 from .validation import missing_required, non_blank, recovery_problems
+
+restrict_dotenv(config)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -75,6 +78,7 @@ LOCAL_APPS = [
     "apps.records",
     "apps.reviews",
     "apps.documents",
+    "apps.publication",
     "apps.notifications",
     "apps.audit",
     "apps.ai",
@@ -659,6 +663,12 @@ AI_ADMISSION_MAX_OUTPUT_TOKENS = config("AI_ADMISSION_MAX_OUTPUT_TOKENS", defaul
 # Queued questions waiting or running at once, and per asker.
 AI_ADMISSION_QUEUE_DEPTH = config("AI_ADMISSION_QUEUE_DEPTH", default="")
 AI_ADMISSION_QUEUE_PER_USER = config("AI_ADMISSION_QUEUE_PER_USER", default="")
+# IR-850 (ADR-056 §6): what an off-campus read costs. A read reserves its
+# pages x (tier credits + add-on credits) x the credit's price, and settles to
+# the credits reported. Required for extraction only; none has a default.
+AI_ADMISSION_EXTRACTION_CREDIT_USD = config("AI_ADMISSION_EXTRACTION_CREDIT_USD", default="")
+AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", default="")
+AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE = config("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", default="")
 # Added to an attempt's own timeout to make its lease. Not a spending limit.
 AI_ADMISSION_LEASE_GRACE_SECONDS = config("AI_ADMISSION_LEASE_GRACE_SECONDS", default=15.0, cast=float)
 # IR-717 (ADR-049 §6-7): Django-signed research grants, verified inside
