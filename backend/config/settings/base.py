@@ -78,6 +78,7 @@ LOCAL_APPS = [
     "apps.records",
     "apps.reviews",
     "apps.documents",
+    "apps.publication",
     "apps.notifications",
     "apps.audit",
     "apps.ai",

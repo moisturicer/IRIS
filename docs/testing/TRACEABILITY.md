@@ -242,3 +242,25 @@ events not written during the Weeks 11-12 pilot cannot be reconstructed afterwar
 - Never move a row to VERIFIED without a link to actual evidence
 - If a requirement is descoped, set DEFERRED and cite the ADR or SRS amendment — do not delete the row
 - Review the whole table before the technical defence; an unverified requirement reported as unverified is defensible, a false VERIFIED is not
+
+### IR-730 — Safe reader progress and bounded depth (ADR-049 §13–17)
+
+Ask IRIS and Paper Chat share an opt-in `runs-reader-1` transport and reader component.
+Live/reopened plans use actual journalled IDs, statuses and revisions; run activity is
+separate, unknown context has no guessed capacity, and Stop/reconnect/deep requests keep
+the reader grant and Record scope. Public projections exclude internal pins, journals,
+provider/tool state and diagnostic reasons. Reopened evidence and dependent plans are
+withheld when source revisions or current RLS access no longer match. No schema change.
+
+**Tests:** `test_runtime_reader_progress.py`, `test_runtime_reader_edge.py`;
+`RuntimeReader.test.tsx`, existing Ask IRIS/Paper Chat/notice suites. Real PostgreSQL
+checks include queued/live/reopened/completed/deep/cancelled states from the bounded
+AGENT loop. Keyboard/narrow-layout evidence replays those captured public snapshots.
+See [verification, public recording and screenshot](evidence/IR-730/README.md).
+
+**Limits:** disabled by default; the reader refuses the operator echo executor until
+an AGENT service is composed. No paid enablement or cutover. Manual compaction is
+IR-754. Clean-install verification resolves the earlier frontend/typechecking failures;
+publication evidence records 5,696 passing backend tests, 1,706 passing frontend
+tests and the isolated CI-equivalent setup. Automated standards/spec reviews were performed and
+their material findings addressed; independent human approval and CI remain required.
