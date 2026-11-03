@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-02 (IR-837). The decisions are Jive Tyler Revalde's, from a design session. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead. Adviser confirmation is not recorded yet (the IR-189 precedent for the Docling-serve amendment). No CIT-U data protection officer's review is recorded (IR-123). Not built. Decisions 3 and 14 are amended by the IR-851 amendment below.
+**Accepted on merge** — 2026-11-02 (IR-837). The decisions are Jive Tyler Revalde's, from a design session. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead. Adviser confirmation is not recorded yet (the IR-189 precedent for the Docling-serve amendment). No CIT-U data protection officer's review is recorded (IR-123). Not built. Decisions 3 and 14 are amended by the IR-851 amendment below, and decision 8 by the IR-859 amendment.
 
 **Supersedes [ADR-016](016-docling-structured-extraction.md)** (Docling-serve as the extraction path) and **[ADR-025](025-figures-and-formulas-in-extraction.md)** (figures cropped on request, formulas OCR'd, figure contents not described). Both are now `Superseded by ADR-056`. The two ADR-025 amendments (IR-424, IR-437) are carried forward in decision 12 rather than lost.
 
@@ -50,7 +50,7 @@ It is the third-party reader [ADR-054](054-each-person-answers-whether-ai-may-us
 
 ### What IRIS builds from it
 
-8. **LlamaParse's labels are IRIS's labels.** Element kinds follow LlamaParse's item types. Anything else becomes a paragraph that keeps its source label. Heading depth is LlamaParse's `level`. Running headers and footers are LlamaParse's `header` and `footer`. The Docling-era repairs (depth from numbering, repeated-furniture detection, stranded page numbers) are deleted. Rejoining hyphenated words stays only if the acceptance check (decision 14) finds broken words. Skipping whole sections such as the table of contents or references stays a chunking choice, not a shaping rule.
+8. **LlamaParse's labels are IRIS's labels.** Element kinds follow LlamaParse's item types. Anything else becomes a paragraph that keeps its source label. Heading depth is LlamaParse's `level` (amended by IR-859: section numbering sets it). Running headers and footers are LlamaParse's `header` and `footer`. The Docling-era repairs (depth from numbering, repeated-furniture detection, stranded page numbers) are deleted, except depth from numbering, which IR-859 keeps. Rejoining hyphenated words stays only if the acceptance check (decision 14) finds broken words. Skipping whole sections such as the table of contents or references stays a chunking choice, not a shaping rule.
 9. **A Figure is the image LlamaParse cropped, stored by IRIS.** The image is downloaded right after the read and stored with the Manuscript. It is served only through Django's permission layer, resolving its Record through the same visibility predicate as every other read. Rendering crops on request with `pypdfium2` (ADR-025) is dropped.
 10. **Figures are described for retrieval only.** IRIS writes each Figure's description with its own `describe_figure` Inference task (ADR-036), through ADR-041 admission. The description and any chart values are embedded so retrieval and Ask IRIS know what a Figure shows. **They are never displayed and never quoted as a Passage.** A citation that lands on a Figure shows the Figure and the author's printed caption. A Figure is therefore no longer dropped for lacking a caption.
 11. **Formulas are found by their LaTeX delimiters inside LlamaParse's text**, since LlamaParse has no formula item, and stay a declared kind. A formula is displayed but left out of the embedded text, so it never changes a vector.
@@ -173,6 +173,14 @@ Decided by Jive Tyler Revalde while running IR-851, to keep the check inside Lla
 - 14 labelled questions instead of 52: one question moves recall@10 by about 7 points, so the check shows the direction, not a measured difference.
 - The 40-paper Docling baseline is not the comparison.
 
+## Amendment — 2026-11-03 (IR-859): section numbering sets heading depth
+
+Decided by Jive Tyler Revalde after IR-851's run showed 27 of 113 numbered headings at the wrong level in LlamaParse's output. Examples: "1 INTRODUCTION" deeper than "2 METHOD", "1.2 …" shallower than "1 …", and 11 table or figure captions returned as headings.
+
+**Decision 8, as amended.** LlamaParse's labels are still IRIS's labels, and running headers, footers and stranded page numbers still come from LlamaParse. The depth-from-numbering repair is kept and moves into the one shaping function. A numbered heading sits at the depth its decimal, roman or lettered number claims, below the level LlamaParse gives most of the paper's top-level sections. An unnumbered heading is placed against those sections: as high or higher makes it their peer, lower puts it under the open section. Two more rules sit in the same place. A table or figure caption returned as a heading becomes text, and the paper's title is kept above its sections.
+
+**What it costs.** A shaping rule reads the text of a heading again, which decision 8 meant to stop. A section number that a paper gets wrong is now trusted over LlamaParse's level. A heading that is really a short line opening "Table 1" or "Fig. 3" becomes text.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
@@ -187,4 +195,5 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-842: corpus cutover
 - IR-843: Docling retirement
 - IR-851: acceptance check, and the amendment above
+- IR-859: heading depth from numbering, and the amendment above
 - Related: IR-189, IR-292, IR-293, IR-816, IR-123

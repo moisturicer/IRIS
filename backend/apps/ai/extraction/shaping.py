@@ -3,18 +3,25 @@
 The adapter stores its downloaded grounding pages under ``grounded_items``.
 Use those items when present: their line boxes are more precise than the
 coarse boxes in the expanded result. Never infer labels from page position,
-repetition, numbering or the file name.
+repetition or the file name. Two heading repairs are kept (IR-859): section
+numbering sets heading depth, and a caption labelled a heading becomes text.
 """
 
+import re
+from collections import Counter
 from dataclasses import replace
 from typing import Any, Mapping
 
 from apps.ai.chunking.document import BoundingBox, DocumentElement, NormalizedDocument
 from apps.ai.chunking.formulas import DISPLAY_FORMULA
+from apps.ai.chunking.numbering import outline_depths
 from apps.ai.chunking.regions import dedupe_regions
 
 
 _KINDS = {"heading", "text", "list", "table", "image", "code", "link", "header", "footer"}
+# "Table 1:", "TABLE I:", "Fig. 3", but not "Table of Contents".
+_CAPTION = re.compile(r"^(?i:table|tab\.|figure|fig\.)\s*(?:\d+|[IVXLC]+|[A-Z]\d*)\b")
+_FRONT_MATTER = re.compile(r"^(abstract|keywords|contents|table of contents|summary)\b", re.IGNORECASE)
 
 
 def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
@@ -33,7 +40,8 @@ def shape_llamaparse(raw: Mapping[str, Any]) -> NormalizedDocument:
             if item.get("type") == "table" and item.get("merged_into_page"):
                 continue
             elements.extend(_split_formulas(_element(item, number, metadata)))
-    title = next((e.text for e in elements if e.kind == "heading" and e.level == 1 and e.page in (1, 2)), "")
+    elements = _repair_headings(elements)
+    title =next((e.text for e in elements if e.kind == "heading" and e.level == 1 and e.page in (1, 2)), "")
     return NormalizedDocument(
         title=title, elements=tuple(elements), page_sizes=sizes,
         structure_is_authoritative=True, page_metadata=metadata,
@@ -70,6 +78,37 @@ def _element(item, page, metadata, *, nested=False):
     if nested and label == "text" and DISPLAY_FORMULA.search(text):
         element = replace(element, children=tuple(_split_formulas(element)))
     return element
+
+
+def _repair_headings(elements):
+    """Numbered headings sit at their numbering's depth below the paper's top
+    section level; unnumbered ones are placed against the open section."""
+    elements = [
+        replace(e, kind="text", level=None) if e.kind == "heading" and _CAPTION.match(e.text.strip()) else e
+        for e in elements
+    ]
+    positions = [i for i, e in enumerate(elements) if e.kind == "heading"]
+    depths = outline_depths([elements[i].text for i in positions])
+    top = [elements[i].level for i, d in zip(positions, depths) if d == 1 and elements[i].level is not None]
+    if not top:
+        return elements
+    counts = Counter(top)
+    base = max(counts, key=lambda level: (counts[level], -level))
+    first = positions[0]
+    if depths[0] is None and elements[first].page == 1 and not _FRONT_MATTER.match(elements[first].text.strip()):
+        # The paper's title, which must stay above the sections it heads.
+        elements[first] = replace(elements[first], level=1)
+    open_level = None
+    for i, depth in zip(positions, depths):
+        element = elements[i]
+        if depth is not None:
+            level = open_level = base + depth - 1
+        elif open_level is None or element.level is None:
+            continue
+        else:
+            level = base if element.level <= base else open_level + 1
+        elements[i] = replace(element, level=level)
+    return elements
 
 
 def _list_text(children, ordered):
