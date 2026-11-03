@@ -3,7 +3,9 @@ from django.urls import path, include
 from django.conf import settings
 
 urlpatterns = [
-    path("admin/", admin.site.urls),
+    # Not /admin/: IRIS's own pages live there, and production nginx proxies
+    # only this address, behind IR-668's allowlist (IR-782, ADR-051 decision 7).
+    path("django-admin/", admin.site.urls),
     path("api/v1/auth/",          include("apps.accounts.urls.auth")),
     path("api/v1/users/",         include("apps.accounts.urls.users")),
     path("api/v1/",               include("apps.accounts.urls.reference")),  # colleges, depts, courses

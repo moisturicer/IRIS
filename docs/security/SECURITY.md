@@ -99,7 +99,7 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 **TLS.** nginx listens on plain 8080 and takes the scheme from the proxy in front of it, so TLS must end upstream. This repository doesn't configure that proxy (§11).
 
-**Django admin.** nginx closes `/django-admin/` except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)), but **Django still serves its admin at `/admin/`, which nginx leaves open**, because that path also carries IRIS's own pages. The allowlist protects the admin only once [IR-782](https://citiris.atlassian.net/browse/IR-782) moves it.
+**Django admin.** Django serves its admin only at `/django-admin/` ([IR-782](https://citiris.atlassian.net/browse/IR-782)), and nginx closes that path except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)). `/admin/...` and `/rdco/...` are IRIS's own pages: nginx serves them the app and proxies nothing there to Django.
 
 **`ai-gateway`** is adopted by [ADR-014](../adr/014-ai-gateway-as-a-service.md) under preconditions. It sets no CORS, publishes no port and refuses any request without the shared service secret (`ai/main.py`). **It still receives `DATABASE_URL`**, against ADR-014's "no direct DB access" (§11).
 
@@ -179,7 +179,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 
 | # | Risk | Severity | Why | Closed by |
 |---|---|---|---|---|
-| 1 | Django's admin is reachable from the internet at `/admin/`, guarded only by `is_staff`, with no MFA | **High** | One stolen staff password opens a separate path to the database | [IR-782](https://citiris.atlassian.net/browse/IR-782), then [IR-668](https://citiris.atlassian.net/browse/IR-668)'s allowlist applies (spec [IR-655](https://citiris.atlassian.net/browse/IR-655)) |
+| 1 | Django's admin has no MFA. Since IR-782 it is served only at `/django-admin/`, and nginx's network allowlist is the one control in front of `is_staff` | **High** | One stolen staff password, from an allowlisted network, opens a separate path to the database | MFA, once CIT-U IT provides an identity provider ([IR-652](https://citiris.atlassian.net/browse/IR-652)); the allowlist is [IR-668](https://citiris.atlassian.net/browse/IR-668) |
 | 2 | Uploads aren't scanned for malware | **High** | A hostile file reaches the parser and the people who download it | [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)) |
 | 3 | No backups and no rehearsed restore | **High** | A lost disk loses records that can't be recreated | [IR-167](https://citiris.atlassian.net/browse/IR-167) (parent [IR-151](https://citiris.atlassian.net/browse/IR-151)) |
 | 4 | TLS is configured but hasn't run on a deployed domain, and HSTS isn't confirmed for one | **High** | Passwords, tokens and unpublished work could be read in transit until it has | [IR-847](https://citiris.atlassian.net/browse/IR-847), [IR-806](https://citiris.atlassian.net/browse/IR-806) |
