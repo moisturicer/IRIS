@@ -81,6 +81,11 @@ BACKENDS: dict[str, Callable[[], StructuredExtractor]] = {"docling": _docling, "
 _installed: Optional[StructuredExtractor] = None
 
 
+def configured_backend() -> str:
+    """The name of the configured backend, for a caller that must refuse another."""
+    return settings.EXTRACTION_BACKEND
+
+
 def verify_extraction_configuration() -> None:
     """Refuse to start on an unknown backend (the IR-379 posture)."""
     backend = settings.EXTRACTION_BACKEND

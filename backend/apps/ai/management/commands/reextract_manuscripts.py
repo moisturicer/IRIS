@@ -14,11 +14,11 @@ failed one is read again. No ceiling has a default, so a real run must state one
 
 from decimal import Decimal, InvalidOperation
 
-from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai import reextraction
 from apps.ai.admission.limits import NotConfigured
+from apps.ai.extraction import configured_backend
 
 
 class Command(BaseCommand):
@@ -58,9 +58,9 @@ class Command(BaseCommand):
             return
 
         ceiling = self._ceiling(options["credit_ceiling"])
-        if settings.EXTRACTION_BACKEND != "llamaparse":
+        if configured_backend() != "llamaparse":
             raise CommandError(
-                f"EXTRACTION_BACKEND is {settings.EXTRACTION_BACKEND!r}; set it to 'llamaparse' "
+                f"EXTRACTION_BACKEND is {configured_backend()!r}; set it to 'llamaparse' "
                 f"first, or the reads would go to Docling. Nothing was sent."
             )
         if plan.exceeds(ceiling):

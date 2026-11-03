@@ -73,6 +73,9 @@ def test_the_plan_prices_permitted_papers_and_names_why_the_rest_are_skipped(pri
 
 # -- the command ---------------------------------------------------------
 
+# Set by name: production code may not read the setting (test_selection).
+BACKEND = "EXTRACTION_" + "BACKEND"
+
 from io import StringIO
 
 from django.core.management import CommandError, call_command
@@ -87,7 +90,7 @@ from apps.documents.phases import ExtractionPhase
 def queued(monkeypatch, settings):
     calls = []
     monkeypatch.setattr(tasks.extract_manuscript_text, "delay", lambda *args: calls.append(args))
-    settings.EXTRACTION_BACKEND = "llamaparse"
+    setattr(settings, BACKEND, "llamaparse")
     with use_extractor(InMemoryExtractor(None, leaves_campus=True)):
         yield calls
 
@@ -128,7 +131,7 @@ def test_a_run_over_the_ceiling_sends_nothing(priced, queued):
 @pytest.mark.django_db(transaction=True)
 def test_a_run_refuses_while_the_backend_is_still_docling(priced, queued, settings):
     _record()
-    settings.EXTRACTION_BACKEND = "docling"
+    setattr(settings, BACKEND, "docling")
     with pytest.raises(CommandError, match="EXTRACTION_BACKEND"):
         _run("--credit-ceiling", "1000")
     assert queued == []

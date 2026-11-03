@@ -46,6 +46,7 @@ __all__ = [
     "Usage",
     "FigureImage",
     # selection
+    "configured_backend",
     "current_extractor",
     "use_extractor",
     "verify_extraction_configuration",
@@ -66,7 +67,7 @@ __all__ = [
 
 def __getattr__(name):
     # Pure consumers do not need Django's selection/configuration boundary.
-    if name in {'current_extractor', 'use_extractor', 'verify_extraction_configuration'}:
+    if name in {'configured_backend', 'current_extractor', 'use_extractor', 'verify_extraction_configuration'}:
         from importlib import import_module
         return getattr(import_module('.selection', __name__), name)
     raise AttributeError(name)
