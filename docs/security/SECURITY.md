@@ -29,7 +29,7 @@ JWT through SimpleJWT, with rotation and blacklist after rotation.
 | Refresh token | 7 days by default, the absolute limit on a session. Used once, then blacklisted. Only the refresh token is stored in the browser, in `sessionStorage` (`frontend/src/lib/authStorage.ts`) |
 | Refresh in the client | `refreshOnce` shares one refresh between concurrent 401s, and the new pair goes through `setTokens` (`frontend/src/api/client.ts`) |
 | Inactivity | A session idle for 30 minutes is ended on the server for good, and polling doesn't count as activity ([IR-166](https://citiris.atlassian.net/browse/IR-166), `apps/accounts/sessions.py`) |
-| Failed sign-ins | `django-axes` locks a username and client address pair after 3 failures for 10 minutes by default, answering 429 with `unlock_at`. The address comes from `TRUSTED_PROXY_COUNT`, so it is the real client behind nginx ([IR-656](https://citiris.atlassian.net/browse/IR-656)) |
+| Failed sign-ins | **Switched off by default for now** ([IR-865](https://citiris.atlassian.net/browse/IR-865)); `AXES_ENABLED=True` turns it on. When on, `django-axes` locks a username and client address pair after 3 failures for 10 minutes by default, answering 429 with `unlock_at`. The address comes from `TRUSTED_PROXY_COUNT`, so it is the real client behind nginx ([IR-656](https://citiris.atlassian.net/browse/IR-656)) |
 | Manual lock | `User.is_locked`, set by an administrator. It never lifts on its own and ends the person's sessions at once ([IR-644](https://citiris.atlassian.net/browse/IR-644)) |
 | Password change or reset | Ends every session and revokes unused reset links. API passwords meet `AUTH_PASSWORD_VALIDATORS` ([IR-644](https://citiris.atlassian.net/browse/IR-644)) |
 | Session revoke | An administrator's revoke ends the session, so its access token stops working on the next request ([IR-657](https://citiris.atlassian.net/browse/IR-657)) |
@@ -53,7 +53,16 @@ Governed by [ADR-009](../adr/009-authorization-model.md).
 
 ### Who holds administrator powers
 
-`ADMIN_ROLES` is `{RDCO}`, so **RDCO holds them**: accounts, locks, sessions, system settings and the Audit Log. [ADR-051](../adr/051-system-admin-account-deletion-and-consent.md) accepts a separate System Admin role, and it isn't built yet ([IR-781](https://citiris.atlassian.net/browse/IR-781)).
+[ADR-051](../adr/051-system-admin-account-deletion-and-consent.md) splits them between two roles ([IR-781](https://citiris.atlassian.net/browse/IR-781), `core/permissions.py`):
+
+| Power | Who |
+|---|---|
+| The Users page, and giving Student or Adviser to someone outside the offices | RDCO or the System Admin (`IsAccountAdmin`) |
+| Locks, sessions and role requests | RDCO (`IsAdmin`) |
+| Office roles, the coordinator flag, system settings and the Audit Log | The System Admin (`IsSystemAdmin`) |
+| Giving or removing the System Admin role | A Django superuser, in Django's admin site only |
+
+The System Admin holds no workflow access. No API act changes a System Admin's account: RDCO can't edit, lock or unlock one, or revoke its sessions, so a compromised System Admin is stopped in Django's admin site. The role can't be held together with `is_staff` or `is_superuser`.
 
 Django's admin site is separate. It is guarded by Django's own `is_staff` flag, and §7 describes its exposure.
 
@@ -115,10 +124,10 @@ In production, `private` is an internal Compose network with no route to the int
 | `db`, `redis`, `migrate` | Nothing | Internal only |
 | `docling` | Nothing | It parses uploaded PDFs, so a hostile file stays contained. Its models are in the image |
 | `frontend` | Nothing | It serves files and forwards to `backend` |
-| `celery-extraction` | Nothing | It only calls Docling |
 | `celery-beat` | Nothing | It only queues tasks |
 | `backend`, `celery-default` | AI vendors, mail server | Answers and email |
 | `celery-embedding`, `celery-shadow` | AI vendors | Embedding, overviews and evidence decisions |
+| `celery-extraction` | LlamaParse and its result storage | It sends each permitted PDF to be read ([ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md), [IR-842](https://citiris.atlassian.net/browse/IR-842)). It also checks uploads with `pypdf`, so a hostile PDF that exploits that check now has a route out |
 | `ai-gateway` | AI vendors | Chat |
 | `caddy` | The certificate authority | Getting and renewing certificates |
 
@@ -185,7 +194,6 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 4 | TLS is configured but hasn't run on a deployed domain, and HSTS isn't confirmed for one | **High** | Passwords, tokens and unpublished work could be read in transit until it has | [IR-847](https://citiris.atlassian.net/browse/IR-847), [IR-806](https://citiris.atlassian.net/browse/IR-806) |
 | 5 | Security-relevant sign-in events leave no audit row | **Medium** | Password guessing leaves nothing to investigate | [IR-659](https://citiris.atlassian.net/browse/IR-659) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 6 | Registration accepts any email domain | **Medium** | Anyone can get a signed-in account | [IR-660](https://citiris.atlassian.net/browse/IR-660) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
-| 7 | One office holds workflow and system administration powers together | **Medium** | One compromised account reaches both sets of powers | [IR-781](https://citiris.atlassian.net/browse/IR-781) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
 | 8 | Consent has no version and can't be withdrawn, and the notice lacks DPO review | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-789](https://citiris.atlassian.net/browse/IR-789), [IR-791](https://citiris.atlassian.net/browse/IR-791), [IR-123](https://citiris.atlassian.net/browse/IR-123) |
 | 9 | No account deletion, personal data copy or retention job | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-785](https://citiris.atlassian.net/browse/IR-785), [IR-786](https://citiris.atlassian.net/browse/IR-786), [IR-794](https://citiris.atlassian.net/browse/IR-794) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
 | 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | A compromised gateway could read records past Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
@@ -193,6 +201,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | 12 | The ASVS checklist is a draft awaiting review | **Medium** | Its statuses come from reading code, and nobody has confirmed them | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
 | 13 | LlamaParse's retention and region aren't confirmed in writing, and there's no recorded no-training evidence for it | **Medium** | Whole unpublished Manuscripts would go to it at the cutover | ADR-056 open conditions 1–2 ([IR-848](https://citiris.atlassian.net/browse/IR-848)), [IR-827](https://citiris.atlassian.net/browse/IR-827) |
 | 14 | `celery-extraction` gets a route out at the LlamaParse cutover | **Medium** | A PDF that exploits the worker's own checks could then send data out, and `egress` can't filter by host (§7) | Accepted at the cutover ([IR-842](https://citiris.atlassian.net/browse/IR-842)). An outbound proxy would narrow it |
+| 15 | The sign-in lockout is switched off by default for now | **High** | Wrong passwords never lock an account. Only the per-address throttle (300 an hour) slows guessing, and SSO and MFA are deferred | Set `AXES_ENABLED=True` before launch ([IR-865](https://citiris.atlassian.net/browse/IR-865)) |
 
 [`SECURITY_CHECKLIST.md`](../testing/SECURITY_CHECKLIST.md) lists further Level 1 gaps: [IR-819](https://citiris.atlassian.net/browse/IR-819), [IR-820](https://citiris.atlassian.net/browse/IR-820), [IR-821](https://citiris.atlassian.net/browse/IR-821), [IR-822](https://citiris.atlassian.net/browse/IR-822), [IR-823](https://citiris.atlassian.net/browse/IR-823), [IR-824](https://citiris.atlassian.net/browse/IR-824), [IR-825](https://citiris.atlassian.net/browse/IR-825).
 
@@ -217,6 +226,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | A revoked session's access token kept working | [IR-657](https://citiris.atlassian.net/browse/IR-657) |
 | CI didn't run `ai/tests`, including the gateway's service authentication test | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
 | Development `backend`, `frontend` and `docling` listened on every interface | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
+| One office held workflow and system administration powers together | [IR-781](https://citiris.atlassian.net/browse/IR-781) |
 | Production HTTPS redirect loop behind the proxy | [IR-662](https://citiris.atlassian.net/browse/IR-662) |
 | No browser security headers | [IR-663](https://citiris.atlassian.net/browse/IR-663) |
 | Uploads accepted without checking the content was a PDF | [IR-665](https://citiris.atlassian.net/browse/IR-665) |

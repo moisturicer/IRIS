@@ -65,6 +65,14 @@ Supersedes the IR-535 **Entry brand panel**, the IR-586 **Shelf entrance** and t
 | **Entry motion** | The folder settles once on load (`sheet-settle`: 0.5rem rise and fade, 280 ms, `cubic-bezier(0.22, 1, 0.36, 1)`), and register's step panel cross-fades on a step change (`step-fade`, 150 ms, opacity). Both only through `motion-safe:`; `entryTokens.test.ts` fails on an `animate-` utility on an entry screen that is not. **A recorded exception to the Motion row's 150–200 ms**, carried over from the shelf entrance it replaces: the settle runs once, on load, and nobody waits on it | The shelf entrance |
 
 
+### IR-856 amendment: connected entry labels and visitor navigation
+
+This amendment refines the Masthead, Folder, Register stepper and Footer rows above for the entry screens. The masthead keeps the single visible `<h1>` with proportional IRIS and institution marks. Its only right-side action on sign in and registration is Help, shown at every width, opening the existing account-help dialog. Sign in keeps one Create an account link below its form; registration keeps its return link below its form.
+
+The sheet's tab row starts at the sheet's far-left border. The label overlaps the sheet's top border by one pixel on an opaque white surface, and a concave return curves its right edge into the sheet's top border. The sheet leaves its upper-left corner square beneath the label; the exposed upper-right and lower corners remain rounded. The Sign in label is a plain span. Registration's current step is likewise noninteractive, with `aria-current="step"` on its semantic list item; completed steps retain their return links and unfinished steps retain their outlined, disabled markers. The narrow-phone short names and completed/current/not-started cues remain.
+
+The footer puts the existing privacy/terms links at left and copyright at the far right from `sm` upward, stacking in that order on phones. IR-858 owns the follow-up for approved legal destinations; this change retains IR-769's interim dialogs.
+
 ### IR-744 amendment: the Folio Ribbon identity
 
 IRIS's mark is now **Folio Ribbon**: a serif I standing in the gutter of an open folio, whose two leaves twist round it like a ribbon marker. The I is never drawn — it is the white space left between four maroon pieces. The shapes are traced from the approved concept artwork; the asset set, its build script and its README are in `docs/brand/folio-ribbon/final/`, and the app draws the same path data from `frontend/src/components/brand/brandPaths.ts`, which that build script writes. This replaces part of the visual identity the pinned redesign brief kept fixed (PRODUCT.md, Brand Commitments); the palette, type scale and webfonts are unchanged.

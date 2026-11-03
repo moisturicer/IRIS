@@ -117,12 +117,14 @@ class _Refused(Exception):
 
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
-                 scope_record_id: int | None = None):
+                 scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None):
         self.dsn = dsn
         self.grant = grant
         self.run_id = run_id
         self.fence = fence
         self.scope = scope_record_id
+        self.embedding_provider = embedding_provider
+        self.embedding_ledger = embedding_ledger
 
     @asynccontextmanager
     async def _session(self):
@@ -189,7 +191,7 @@ class ResearchTools:
         current = await conn.fetchrow(
             """SELECT r.title, cs.id AS chunk_set_id, cs.extraction_hash
                  FROM public.records_record r
-                 LEFT JOIN public.ai_chunkset cs ON cs.record_id = r.id AND cs.is_active
+                 LEFT JOIN iris_ai.research_chunksets() cs ON cs.record_id = r.id AND cs.is_active
                 WHERE r.id = $1 AND ($2::bigint IS NULL OR r.id = $2)""",
             bound["record_id"], self.scope,
         )
@@ -220,7 +222,7 @@ class ResearchTools:
 
         async def body(conn):
             inspected = await conn.fetchval(
-                """SELECT count(DISTINCT cs.record_id) FROM public.ai_chunkset cs
+                """SELECT count(DISTINCT cs.record_id) FROM iris_ai.research_chunksets() cs
                      JOIN public.records_record r ON r.id = cs.record_id
                     WHERE cs.is_active AND ($1::bigint IS NULL OR cs.record_id = $1)""",
                 self.scope,
@@ -234,8 +236,8 @@ class ResearchTools:
                     hits AS (
                         SELECT c.id, c.record_id, c.chunk_set_id, cs.extraction_hash, c.source_page,
                                c.content, c.context_path, r.title, ts_rank(c.search_vector, q.q) AS rank
-                          FROM q, public.ai_documentchunk c
-                          JOIN public.ai_chunkset cs ON cs.id = c.chunk_set_id AND cs.is_active
+                          FROM q, iris_ai.research_chunks() c
+                          JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active
                           JOIN public.records_record r ON r.id = c.record_id
                          WHERE c.deleted_at IS NULL AND c.search_vector @@ q.q
                            AND ($2::bigint IS NULL OR c.record_id = $2))
@@ -269,7 +271,7 @@ class ResearchTools:
         async def body(conn):
             title, source, chunk_id = await self._resolve(conn, handle, "P")
             row = await conn.fetchrow(
-                """SELECT record_id, source_page, content, context_path FROM public.ai_documentchunk
+                """SELECT record_id, source_page, content, context_path FROM iris_ai.research_chunks()
                     WHERE id = $1 AND chunk_set_id = $2 AND deleted_at IS NULL""",
                 chunk_id, source.chunk_set_id,
             )
@@ -290,7 +292,7 @@ class ResearchTools:
             rows = await conn.fetch(
                 """SELECT id, record_id, source_page, content, context_path,
                           count(*) OVER () AS total
-                     FROM public.ai_documentchunk
+                     FROM iris_ai.research_chunks()
                     WHERE chunk_set_id = $1 AND source_page = $2 AND deleted_at IS NULL
                     ORDER BY sequence LIMIT $3""",
                 source.chunk_set_id, page, PAGE_PASSAGES,
@@ -314,7 +316,7 @@ class ResearchTools:
         async def body(conn):
             title, source, _ = await self._resolve(conn, record_handle, "R")
             rows = await conn.fetch(
-                """SELECT source_page, context_path FROM public.ai_documentchunk
+                """SELECT source_page, context_path FROM iris_ai.research_chunks()
                     WHERE chunk_set_id = $1 AND deleted_at IS NULL ORDER BY sequence LIMIT $2""",
                 source.chunk_set_id, OUTLINE_CHUNKS + 1,
             )
@@ -347,7 +349,7 @@ class ResearchTools:
             rows = await conn.fetch(
                 """SELECT r.id AS record_id, r.title, cs.id AS chunk_set_id, cs.extraction_hash
                      FROM public.records_record r
-                     JOIN public.ai_chunkset cs ON cs.record_id = r.id AND cs.is_active
+                     JOIN iris_ai.research_chunksets() cs ON cs.record_id = r.id AND cs.is_active
                     WHERE r.id = ANY($1::bigint[]) AND ($2::bigint IS NULL OR r.id = $2)""",
                 ids, self.scope,
             )
@@ -377,11 +379,64 @@ class ResearchTools:
             return False
 
     async def semantic_search(self, query: str) -> ToolResult:
-        """Declared, never run: needs embedding and reranking."""
-        async def body(conn):
-            return ToolResult.unavailable(
-                "provider_gated", provider_operations=("embed_query", "rerank"))
+        """One admitted query embedding, pinned to the current document space."""
+        if self.embedding_provider is None or self.embedding_ledger is None:
+            async def gated(conn):
+                return ToolResult.unavailable("provider_gated", provider_operations=("embed_query", "rerank"))
+            return await self._call("semantic_search", gated)
+        if not isinstance(query, str) or not query.strip():
+            return ToolResult.unavailable("invalid_argument")
+        import asyncio
+        from types import SimpleNamespace
+        from ai.admission.errors import AdmissionDenied
+        from ai.admission.guard import SendGuard
+        from ai.admission.ledger import Request, Usage, estimate_tokens
+        from ai.admission.scope import RunBinding
+        from ai.ingestion.indexing import checked_vectors, space
+        provider = self.embedding_provider
+        binding = RunBinding(self.run_id, self.fence)
+        try:
+            async with self._session() as conn:
+                pinned = await space(conn, provider)
+            ticket = await self.embedding_ledger.admit(Request(
+                operation="embed", purpose="query", purpose_version="query-1", lane="research",
+                account=provider.account, models=(provider.model,), input_tokens=estimate_tokens(query),
+                output_tokens=0), binding)
+            usage = Usage()
+            try:
+                await SendGuard(self.dsn).check(binding, SimpleNamespace(data_policy=provider.data_policy))
+                usage.sent = True
+                response = await asyncio.wait_for(provider.embed([query], input_type="query"), ticket.timeout_seconds)
+                vector = checked_vectors(response.vectors, 1, provider.dimensions)[0]
+                usage.input_tokens, usage.output_tokens, usage.model = response.input_tokens, 0, provider.model
+            finally:
+                await ticket.settle(usage)
+        except AdmissionDenied as refused:
+            return ToolResult.unavailable(refused.reason)
+        except _Refused as refused:
+            return ToolResult.unavailable(refused.reason)
 
+        async def body(conn):
+            current = await space(conn, provider)
+            if current["id"] != pinned["id"]:
+                return ToolResult.unavailable("embedding_space_changed")
+            rows = await conn.fetch(
+                "WITH candidates AS (SELECT rv.record_id FROM iris_ai.research_record_vectors($1) rv"
+                " WHERE ($2::bigint IS NULL OR rv.record_id=$2)"
+                " ORDER BY rv.embedding OPERATOR(public.<=>) $3::public.vector LIMIT 20)"
+                " SELECT c.*,r.title,cs.extraction_hash FROM iris_ai.research_chunks() c"
+                " JOIN iris_ai.research_chunksets() cs ON cs.id=c.chunk_set_id AND cs.is_active"
+                " JOIN public.records_record r ON r.id=c.record_id"
+                " JOIN iris_ai.research_vectors($1) v ON v.chunk_id=c.id"
+                " JOIN candidates cr ON cr.record_id=c.record_id"
+                " WHERE c.deleted_at IS NULL AND ($2::bigint IS NULL OR c.record_id=$2)"
+                " ORDER BY v.embedding OPERATOR(public.<=>) $3::public.vector,c.id LIMIT $4",
+                pinned["id"], self.scope, json.dumps(vector), SEARCH_LIMIT)
+            handles = await self._handles(conn, [("P",r["record_id"],r["chunk_set_id"],r["id"]) for r in rows])
+            passages = self._passages(None, rows, handles)
+            return ToolResult(OK if passages else NO_MATCH, passages=passages,
+                coverage=Coverage(len(passages),None, len(passages)==SEARCH_LIMIT),
+                dependencies=frozenset(p.source for p in passages))
         return await self._call("semantic_search", body)
 
     async def _call_on_handle(self, name: str, body) -> ToolResult:

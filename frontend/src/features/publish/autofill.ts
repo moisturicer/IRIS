@@ -96,7 +96,7 @@ export function planAutofill(
 
 /** What a field shows under it once the PDF has been read. */
 export type FieldOffer =
-  | { kind: "filled"; page: number | null }
+  | { kind: "filled"; page: number | null; entry: SuggestionEntry<unknown> | null }
   | { kind: "stale" }
   | { kind: "offer"; value: FormValue; entry: SuggestionEntry<unknown>; replaces: boolean }
   | null;
@@ -110,7 +110,7 @@ export function offerFor(
 ): FieldOffer {
   const entry = fields[field] as SuggestionEntry<unknown> | null;
   if (decision?.state === "automatic") {
-    if (decision.source_revision === revision) return { kind: "filled", page: entry?.page ?? null };
+    if (decision.source_revision === revision) return { kind: "filled", page: entry?.page ?? null, entry };
     // The previous file's value, which this file did not replace.
     return entry == null ? { kind: "stale" } : null;
   }

@@ -39,6 +39,8 @@ def behind_proxies(client_address, forged=""):
     }
 
 
+# The lockout is off by default for now (IR-865); these prove it works when on.
+@override_settings(AXES_ENABLED=True)
 class LoginAttempts(APITestCase):
     def setUp(self):
         self.user = make_user("client.address@cit.edu")

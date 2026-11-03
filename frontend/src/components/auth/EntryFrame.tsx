@@ -134,12 +134,12 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
             wide ? "max-w-5xl" : "max-w-xl",
           )}
         >
-          <div className="relative z-10 flex gap-1 pl-4 sm:pl-5">{tabs}</div>
+          <div className="relative z-10 flex gap-1">{tabs}</div>
           <div
             className="absolute inset-x-0 bottom-0 top-11 -z-10 translate-x-2 translate-y-2 rounded-xl border border-stone-200 bg-stone-100"
             aria-hidden
           />
-          <div className="rounded-xl border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
+          <div className="rounded-b-xl rounded-tr-xl border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
             {children}
           </div>
         </div>
@@ -147,11 +147,11 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
 
       <footer className="border-t border-stone-200">
         <div className="mx-auto flex max-w-page flex-col gap-1 px-4 py-6 text-small text-stone-600 sm:flex-row sm:justify-between sm:px-8 lg:px-12">
-          <p>© 2026 IRIS · Research and IP disclosure</p>
           <nav aria-label="Privacy and terms" className="flex flex-wrap gap-x-5">
             {informationLink("Data privacy", "data-privacy")}
             {informationLink("Terms", "terms")}
           </nav>
+          <p>© 2026 IRIS · Research and IP disclosure</p>
         </div>
       </footer>
     </div>
@@ -168,7 +168,7 @@ export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFr
  */
 export function EntryTab({ children }: { children: ReactNode }) {
   return (
-    <span className="-mb-px rounded-t-lg border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
+    <span className="entry-label -mb-px rounded-tl-xl rounded-tr-xl border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
       {children}
     </span>
   );

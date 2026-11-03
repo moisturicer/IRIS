@@ -6,6 +6,7 @@ COPY ai/ingestion/requirements.txt ai/ingestion/requirements.txt
 RUN pip install --no-cache-dir -r ai/ingestion/requirements.txt
 COPY ai /app/ai
 COPY backend/apps/ai/chunking /app/apps/ai/chunking
+COPY backend/apps/ai/providers/batching.py /app/apps/ai/providers/batching.py
 COPY backend/apps/ai/extraction /app/apps/ai/extraction
 USER 65534:65534
 ENTRYPOINT ["python", "-m", "ai.ingestion.extract_worker"]
