@@ -1,3 +1,5 @@
+import unicodedata
+
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -149,7 +151,37 @@ def enforce_password_policy(password, user, field):
         raise serializers.ValidationError({field: list(exc.messages)})
 
 
+class RegistrationNameField(serializers.CharField):
+    """Trim only the edges; keep the spelling and spacing a person supplied."""
+
+    def __init__(self, label):
+        super().__init__(max_length=100, error_messages={
+            "required": f"{label} is required.",
+            "blank": f"{label} is required.",
+            "null": f"{label} is required.",
+            "invalid": f"{label} must be text.",
+            "max_length": f"{label} must be 100 characters or fewer.",
+        })
+        self.name_label = label
+
+    def to_internal_value(self, data):
+        if not isinstance(data, str):
+            self.fail("invalid")
+        value = super().to_internal_value(data)
+        categories = [unicodedata.category(char)[0] for char in value]
+        if "L" not in categories or any(
+            category not in {"L", "M"} and char not in " '’‐‑-"
+            for char, category in zip(value, categories)
+        ):
+            raise serializers.ValidationError(
+                f"{self.name_label} must contain letters and may include spaces, apostrophes or hyphens."
+            )
+        return value
+
+
 class RegisterSerializer(serializers.ModelSerializer):
+    first_name = RegistrationNameField("First name")
+    last_name = RegistrationNameField("Last name")
     password         = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
     consent_given    = serializers.BooleanField(write_only=True)

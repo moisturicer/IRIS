@@ -91,7 +91,6 @@ export interface LoginResponse {
 export interface RegisterPayload {
   email:            string;
   first_name:       string;
-  middle_initial?:  string;
   last_name:        string;
   password:         string;
   confirm_password: string;
