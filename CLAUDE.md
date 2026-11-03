@@ -100,8 +100,9 @@ pip install -r requirements/development.txt
 python manage.py check
 python manage.py migrate
 python manage.py runserver
-python -m pytest -q                       # pytest.ini + conftest.py (IR-82); db_required
-                                          # tests skip cleanly with no Postgres reachable.
+python -m pytest -n 4 -q                  # Full backend suite for ticket verification (IR-854).
+                                          # Requires Postgres; separate database per worker.
+                                          # Use -n 0 for serial/offline pure-test runs.
                                           # One run per Postgres server: a second exits at
                                           # once (IR-835). -m "not slow" skips migration
                                           # tests and a few others locally; CI runs all.
