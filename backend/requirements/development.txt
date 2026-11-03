@@ -6,3 +6,4 @@ pytest-django>=4.8
 flake8>=7.0
 hypothesis>=6.100
 pytest-xdist>=3.6,<4
+defusedxml>=0.7,<1

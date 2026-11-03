@@ -125,3 +125,36 @@ def test_all_current_research_role_consumers_are_grouped():
                      path.read_text(encoding="utf-8"))
     }
     assert consumers <= ROLE_MODULES, "new role consumers must share the Postgres role scope"
+
+
+@pytest.mark.db_required
+@pytest.mark.django_db
+def test_rollback_tests_keep_migration_seeds_after_a_transactional_flush(tmp_path):
+    from django.conf import settings
+
+    database = settings.DATABASES["default"]
+    env = dict(os.environ, PYTEST_DISABLE_PLUGIN_AUTOLOAD="1")
+    env.pop("PYTEST_ADDOPTS", None)
+    env.update(DB_NAME="ir854_seed_" + uuid.uuid4().hex[:10],
+               DB_USER=database["USER"], DB_PASSWORD=database["PASSWORD"],
+               DB_HOST=database["HOST"], DB_PORT=str(database["PORT"]),
+               PYTHONPATH=str(Path(__file__).resolve().parents[2]))
+    (tmp_path / "pytest.ini").write_text("[pytest]\nDJANGO_SETTINGS_MODULE=config.settings.development\n")
+    (tmp_path / "conftest.py").write_text(
+        "import pytest\n@pytest.hookimpl(trylast=True)\n"
+        "def pytest_collection_modifyitems(items): items.sort(key=lambda item: item.nodeid)\n")
+    (tmp_path / "test_seed.py").write_text(
+        "import pytest\n@pytest.mark.django_db(transaction=True)\n"
+        "def test_00_flush(): pass\n"
+        "@pytest.mark.django_db\n"
+        "def test_01_initial_lookup_data():\n"
+        "    from apps.accounts.models import Role\n"
+        "    from core.permissions import ROLE_STUDENT\n"
+        "    assert Role.objects.filter(name=ROLE_STUDENT).exists()\n")
+    result = subprocess.run(
+        [sys.executable, "-m", "pytest", "-p", "xdist.plugin", "-p", "django",
+         "-p", "testing.parallel", "-n", "1", "-q"],
+        cwd=tmp_path, env=env, capture_output=True, text=True, timeout=240,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "2 passed" in result.stdout

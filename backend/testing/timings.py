@@ -5,7 +5,8 @@ from collections import defaultdict
 import json
 import math
 from pathlib import Path
-import xml.etree.ElementTree as ET
+from defusedxml import ElementTree as ET
+from defusedxml.common import DefusedXmlException
 
 
 def load_timings(path):
@@ -54,7 +55,7 @@ def main():
     try:
         durations = from_junit(args.reports)
         args.output.write_text(json.dumps(durations, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    except (ValueError, OSError, ET.ParseError) as exc:
+    except (ValueError, OSError, ET.ParseError, DefusedXmlException) as exc:
         parser.error(str(exc))
 
 

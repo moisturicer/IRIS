@@ -22,3 +22,13 @@ def test_invalid_weights_refused(tmp_path, value):
     path.write_text(json.dumps({"apps/test_a.py": value}))
     with pytest.raises(ValueError):
         load_timings(path)
+
+
+def test_junit_refuses_xml_entities(tmp_path):
+    from defusedxml.common import DefusedXmlException
+
+    path = tmp_path / "hostile.xml"
+    path.write_text('<!DOCTYPE testsuites [<!ENTITY secret SYSTEM "file:///etc/passwd">]>'
+                    '<testsuites>&secret;</testsuites>')
+    with pytest.raises(DefusedXmlException):
+        from_junit([path])

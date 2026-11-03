@@ -9,6 +9,9 @@ from testing import run_lock
 # These suites provision/use cluster-wide roles. Keep every consumer together,
 # including dispatch which imports the runtime fixture from the run suite.
 ROLE_MODULES = frozenset({
+    "test_runtime_reader_progress.py",
+    "test_runtime_reader_edge.py",
+    "test_manuscript_publication.py",
     "test_research_grants_db.py", "test_research_read_policy_db.py",
     "test_research_reads.py", "test_ai_runtime_runs_db.py",
     "test_ai_runtime_research_db.py", "test_ai_runtime_admission_db.py",
@@ -65,3 +68,63 @@ def isolated_worker_media(request, tmp_path_factory):
 
     with override_settings(MEDIA_ROOT=str(tmp_path_factory.mktemp("media"))):
         yield
+
+
+@pytest.fixture(scope="session")
+def django_db_setup(django_db_setup, django_db_blocker, request):
+    # Capture migration data before any test changes it.
+    if hasattr(request.config, "workerinput"):
+        from django.db import connection
+
+        with django_db_blocker.unblock():
+            request.config._iris_initial_data = connection.creation.serialize_db_to_string()
+        request.config._iris_db_blocker = django_db_blocker
+    yield
+
+
+def database_mode(item):
+    from django.test import TestCase, TransactionTestCase
+
+    cls = getattr(item, "cls", None)
+    if cls is not None and issubclass(cls, TransactionTestCase):
+        return "rollback" if issubclass(cls, TestCase) else "transaction"
+    marker = item.get_closest_marker("django_db")
+    fixtures = set(item.fixturenames)
+    if (marker is not None and (marker.kwargs.get("transaction") or marker.kwargs.get("reset_sequences"))
+            or fixtures & {"transactional_db", "live_server", "django_db_reset_sequences"}):
+        return "transaction"
+    if marker is not None or "db" in fixtures:
+        return "rollback"
+    return None
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_runtest_setup(item):
+    config = item.config
+    if (not getattr(config, "_iris_seed_data_flushed", False)
+            or database_mode(item) != "rollback"):
+        return
+    from django.apps import apps
+    from django.core.management import call_command
+    from django.core.management.color import no_style
+    from django.db import connection
+
+    # Serial pytest-django runs rollback tests before flush tests. Worker queues
+    # mix them; restore the initial DB only when crossing that boundary.
+    with config._iris_db_blocker.unblock():
+        call_command("flush", verbosity=0, interactive=False,
+                     inhibit_post_migrate=True, reset_sequences=False)
+        connection.creation.deserialize_db_from_string(config._iris_initial_data)
+        statements = connection.ops.sequence_reset_sql(no_style(), apps.get_models())
+        if statements:
+            with connection.cursor() as cursor:
+                cursor.execute(";".join(statements))
+    config._iris_seed_data_flushed = False
+
+
+@pytest.hookimpl(hookwrapper=True, tryfirst=True)
+def pytest_runtest_teardown(item):
+    yield
+    if (hasattr(item.config, "_iris_initial_data")
+            and database_mode(item) == "transaction"):
+        item.config._iris_seed_data_flushed = True
