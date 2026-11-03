@@ -32,6 +32,7 @@ from .ports import (
     EmptyExtraction,
     ExtractedDocument,
     ExtractionError,
+    IncompleteExtraction,
     ExtractorUnavailable,
     Provenance,
 )
@@ -104,10 +105,12 @@ class DoclingExtractor:
         do_formula_enrichment: bool = _DEFAULT_DO_FORMULA_ENRICHMENT,
         do_code_enrichment: bool = _DEFAULT_DO_CODE_ENRICHMENT,
         do_picture_classification: bool = _DEFAULT_DO_PICTURE_CLASSIFICATION,
+        require_complete: bool = False,
     ):
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
         self._client = client
+        self._require_complete = require_complete
         self._convert_options: dict[str, Any] = {
             "to_formats": ["json"],
             "do_ocr": _bool_str(do_ocr),
@@ -165,7 +168,7 @@ class DoclingExtractor:
             # something about the container and nothing about the PDF.
             raise ExtractorUnavailable(f"Docling-serve unreachable at {url}: {exc}") from exc
 
-        return _parse_conversion(response, url=url)
+        return _parse_conversion(response, url=url, require_complete=self._require_complete)
 
     def _post(self, client: httpx.Client, url: str, files: dict) -> httpx.Response:
         return client.post(
@@ -176,7 +179,7 @@ class DoclingExtractor:
         return httpx.Timeout(self._timeout, connect=_CONNECT_TIMEOUT_SECONDS)
 
 
-def _parse_conversion(response: httpx.Response, *, url: str) -> Mapping[str, Any]:
+def _parse_conversion(response: httpx.Response, *, url: str, require_complete=False) -> Mapping[str, Any]:
     """Turn one docling-serve conversion envelope into its ``DoclingDocument``.
 
     A 5xx is the service failing; a 4xx is the service rejecting *this*
@@ -202,6 +205,9 @@ def _parse_conversion(response: httpx.Response, *, url: str) -> Mapping[str, Any
         raise ExtractionError(f"Docling-serve returned an unexpected body shape at {url}")
 
     status = str(body.get("status") or "").lower()
+    if require_complete and (status != 'success' or body.get('errors')):
+        if status not in _FAILED_STATUSES:
+            raise IncompleteExtraction('Extraction coverage is incomplete')
     if status in _FAILED_STATUSES:
         raise ExtractionError(
             f"Docling-serve reported status {status!r}: {_errors(body)}"

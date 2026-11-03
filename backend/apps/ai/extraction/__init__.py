@@ -29,7 +29,6 @@ from .ports import (
     Usage,
     classify,
 )
-from .selection import current_extractor, use_extractor, verify_extraction_configuration
 from .serialization import document_from_json, document_to_json, read_document
 from .shaping import shape_llamaparse
 
@@ -63,3 +62,11 @@ __all__ = [
     "extraction_hash",
     "page_report",
 ]
+
+
+def __getattr__(name):
+    # Pure consumers do not need Django's selection/configuration boundary.
+    if name in {'current_extractor', 'use_extractor', 'verify_extraction_configuration'}:
+        from importlib import import_module
+        return getattr(import_module('.selection', __name__), name)
+    raise AttributeError(name)

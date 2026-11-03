@@ -8,6 +8,15 @@ def processing_status(record):
     if work is None:
         return None
     acknowledged = False
+    processing = None
+    try:
+        with transaction.atomic(), connection.cursor() as cursor:
+            cursor.execute("SELECT iris_ai.manuscript_processing(%s, %s)",
+                           [str(work.pk), work.authority_generation])
+            processing = cursor.fetchone()[0]
+    except ProgrammingError as exc:
+        if getattr(exc.__cause__, "pgcode", None) not in ("42883", "3F000"):
+            raise
     try:
         with transaction.atomic(), connection.cursor() as cursor:
             cursor.execute("SELECT iris_ai.manuscript_acknowledged(%s, %s)",
@@ -17,5 +26,5 @@ def processing_status(record):
         # AI migrations are additive and may not have been installed yet.
         if getattr(exc.__cause__, "pgcode", None) not in ("42883", "3F000"):
             raise
-    return {"state": "acknowledged_pending" if acknowledged else "pending_processing",
+    return {"state": processing or ("acknowledged_pending" if acknowledged else "pending_processing"),
             "revision": str(work.revision)}
