@@ -34,6 +34,18 @@ APP_NAME = "iris-ai-runs"
 ACTIVE = ("queued", "running")
 TERMINAL = ("completed", "cancelled", "conflict", "expired", "failed", "deleted")
 
+# Every source used by research, including uncited and legacy revisions, must
+# still be current before its derived answer can be replayed or recalled.
+CURRENT_SOURCE_TURN = """NOT EXISTS (
+    SELECT 1 FROM (
+      SELECT ci.revision FROM iris_ai.citation ci WHERE ci.turn_id=t.id
+      UNION
+      SELECT jsonb_array_elements_text(ev.data->'sources') AS revision
+        FROM iris_ai.run_event ev WHERE ev.run_id=t.run_id AND ev.name='tool'
+    ) dependency WHERE dependency.revision IS NOT NULL AND NOT EXISTS (
+      SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.is_active
+        AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))"""
+
 RUN_COLUMNS = (
     "id, reader_id, conversation_id, request_hash, question, base_revision, state, end_reason,"
     " deadline_at, allowance, pinned, fence, version, turn_id, created_at, finished_at,"
@@ -298,7 +310,7 @@ class RunStore:
                 WHERE r.id = $1 AND c.id = r.conversation_id AND c.deleted_at IS NULL
                   AND r.state IN ('queued', 'running') AND r.deadline_at > now()
                   AND (r.lease_expires_at IS NULL OR r.lease_expires_at <= now())
-            RETURNING r.fence, r.question, r.allowance, r.pinned, r.reader_grant, c.scope_record_id,
+            RETURNING r.fence, r.question, r.allowance, r.pinned, r.reader_grant, r.reader_id, c.scope_record_id,
                       r.depth, r.conversation_id, c.state,
                       extract(epoch FROM r.deadline_at - now()) AS remaining""",
             run_id, worker, float(lease_seconds),
@@ -311,6 +323,14 @@ class RunStore:
             )
             if overdue is not None:
                 await self._end(conn, run_id, "expired", "deadline", move_fence=True)
+            return None
+        try:
+            async with conn.transaction():
+                reader, scope = await self._principal(conn, row["reader_grant"])
+                if reader != row["reader_id"] or scope != row["scope_record_id"]:
+                    raise Unauthorized
+        except Unauthorized:
+            await self._end(conn, run_id, "failed", "authorization_expired", move_fence=True)
             return None
         used = await conn.fetchval(
             "SELECT count(*) FROM iris_ai.attempt_accounting WHERE run_id = $1", run_id,
@@ -325,8 +345,8 @@ class RunStore:
         )
         await self._journal(conn, run_id, "started", {"attempt": used + 1})
         prior = await conn.fetch(
-            """SELECT question, answer, kind FROM iris_ai.turn
-                WHERE conversation_id = $1 ORDER BY ordinal DESC LIMIT $2""",
+            f"""SELECT question, answer, kind FROM iris_ai.turn t
+                WHERE conversation_id = $1 AND {CURRENT_SOURCE_TURN} ORDER BY ordinal DESC LIMIT $2""",
             row["conversation_id"], PRIOR_TURNS,
         )
         return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"],
@@ -535,7 +555,7 @@ class RunStore:
             dependencies.update(c["revision"] for c in citations)
             current = await conn.fetch(
                 "SELECT cs.id::text || ':' || cs.extraction_hash AS revision"
-                " FROM public.ai_chunkset cs JOIN public.records_record r ON r.id = cs.record_id"
+                " FROM iris_ai.research_chunksets() cs JOIN public.records_record r ON r.id = cs.record_id"
                 " WHERE cs.is_active AND cs.id::text || ':' || cs.extraction_hash = ANY($1::text[])",
                 list(dependencies),
             ) if dependencies else []
@@ -579,7 +599,8 @@ class RunStore:
                 if revision is None:
                     raise NotFound
                 turns = await conn.fetch(
-                    """SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.created_at, r.pinned
+                    f"""SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.created_at, r.pinned,
+                              {CURRENT_SOURCE_TURN} AS sources_available
                          FROM iris_ai.turn t JOIN iris_ai.ask_run r ON r.id = t.run_id
                         WHERE t.conversation_id = $1 ORDER BY t.ordinal""",
                     conversation_id,
@@ -607,10 +628,13 @@ class RunStore:
             **({"runs": runs} if include_runs else {}),
             "turns": [{
                 "id": str(t["id"]), "run_id": str(t["run_id"]), "ordinal": t["ordinal"],
-                "question": t["question"], "answer": t["answer"], "kind": t["kind"],
+                "question": t["question"],
+                "answer": (t["answer"] if t["sources_available"] else
+                           "This answer is unavailable because its sources changed or are no longer readable."),
+                "kind": t["kind"],
                 "created_at": t["created_at"].isoformat(),
                 "pinned": t["pinned"],
-                "citations": by_turn.get(t["id"], []),
+                "citations": by_turn.get(t["id"], []) if t["sources_available"] else [],
             } for t in turns],
         }
 

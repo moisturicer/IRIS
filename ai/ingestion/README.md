@@ -203,3 +203,67 @@ Pending-table RLS calls an AI-owned invoker wrapper, which delegates to current
 institutional processing authority and returns no source while that authority is
 unavailable. Its runtime-resolved boundary leaves Django's function/schema
 rollback independent of AI-owned pending output. It never grants source access.
+
+## Current indexed publication (IR-751)
+
+This is additive, separately enabled work. Apply Django publication migration
+`0008`, rerun `provision_research_roles`, then apply AI migration `0011` through
+`ai.runs.migrate`. The latter alone owns indexing jobs, immutable completed
+embedding batches and the active-source pointer. The migration/role checks were
+executed on a separate development-database copy retaining all 63 Records.
+
+The indexing worker accepts only a currently verified exact-work/revision grant,
+rechecks current consent/IP/embargo facts, and pins the active space's model,
+dimensions and metric. It preserves title/abstract Record semantics and the pure
+consecutive contextual Passage windows from the existing embedding path. Each
+physical attempt uses the same provider campaign ledger as reader work, in the
+explicit `ingestion` lane, with a separate process and a persisted job allowance.
+No job consumes a reader execution slot. No service enables itself.
+
+Completed batches are immutable and retain reservation IDs. A redelivery skips
+those batches. A crash between a provider send and durable output has an unknown
+outcome: its reservation remains conservatively charged, and a later attempt is
+separately admitted. There is no exactly-once billing guarantee. Short database
+transactions check authority immediately before sending and again before saving
+output; no transaction or canonical lock stays open during inference. Revoked,
+replaced, expired or superseded results cannot publish.
+
+Publication changes one active pointer atomically after both Record and Passage
+vectors have complete coverage and compatible dimensions. New research reads use
+that permitted revision. The compatibility projection reads legacy data for
+Records without an AI-owned active pointer; it never writes the legacy tables.
+Negative source identifiers distinguish AI-owned revisions from legacy positive
+ChunkSets. A changed or unreadable source withholds its saved answer/citations and
+its use in follow-up context, including sources read but not finally cited.
+The existing owner metadata-suggestions status reports `indexing`,
+`extracted_pending` for recoverable work, or `ready` after publication.
+
+The non-root image's indexing entry point was verified without Django:
+
+```text
+docker run --rm --entrypoint python iris-indexing:ir751 -m ai.ingestion.index_worker --help
+```
+
+Operation requires the restricted `RUNS_DATABASE_URL`, the provider credential,
+every shared `AI_ADMISSION_*` limit (including explicit ingestion capacity and
+pricing), the exact extraction `--pipeline`, model/dimensions and an explicit
+no-training policy. Limit, poll interval, lease, provider timeout and per-job
+attempt/input-token/cost ceilings are mandatory arguments; lease exceeds timeout.
+The original job ceilings survive redelivery even if later command arguments
+increase them. `--once` scans one bounded page; continuous operation pages through
+all current grants and reconciles lost notifications. Provider errors remain
+recoverable processing outcomes and private provider bodies are never printed.
+No production numeric profile is supplied or approved here.
+
+Keyword research resolves current output immediately. Semantic research requires
+explicit embedding provider and shared Ledger injection into `RunService`; with
+no injection its existing `provider_gated` state remains. An admitted query uses
+`query` input semantics and the identical active space used for `document`
+embeddings. The two-stage search ranks Record vectors before Passage vectors.
+No paid campaign, provider policy approval, default traffic switch, writer
+transfer or deployment is authorized by this implementation. Existing extraction
+retirement/ADR-056 operational gates also remain in force.
+
+Research role provisioning also restores the read-only Embedding Space metadata
+grant after Django table recreation. Independent AI migration records do not
+substitute for that ownership step; `provision_research_roles --check` audits it.

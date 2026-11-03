@@ -24,7 +24,9 @@ log = logging.getLogger(__name__)
 
 class RunService:
     def __init__(self, store: RunStore, cfg: runs_config.RunsConfig, executor: Executor,
-                 notifier: Notifier | None = None):
+                 notifier: Notifier | None = None, *, embedding_provider=None, embedding_ledger=None):
+        self.embedding_provider = embedding_provider
+        self.embedding_ledger = embedding_ledger
         self.store = store
         self.cfg = cfg
         self.executor = executor
@@ -81,7 +83,8 @@ class RunService:
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
         try:
-            tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id)
+            tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id,
+                                  embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger)
             # Every provider attempt inside is admitted against this run (IR-725).
             with admission.bound(admission.RunBinding(run_id, claim.fence)):
                 if getattr(self.executor, "takes_context", False):
