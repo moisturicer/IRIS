@@ -44,7 +44,7 @@ class RecordingFailed(RuntimeError):
 
 
 def configuration(version: str) -> dict[str, Any]:
-    """ADR-056 decision 3, less high-effort confidence (amended by IR-851)."""
+    """ADR-056 decision 3, without high-effort confidence (IR-851 amendment)."""
     return {
         "tier": TIER,
         "version": version,

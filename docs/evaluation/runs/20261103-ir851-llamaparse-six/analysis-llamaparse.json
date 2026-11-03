@@ -30,47 +30,6 @@
    "$p \\in R^P$"
   ],
   "headings": 35,
-  "numbered_headings": 30,
-  "heading_level_offsets": [
-   0,
-   1,
-   2,
-   3
-  ],
-  "heading_mismatches": [
-   [
-    3,
-    "1 INTRODUCTION"
-   ],
-   [
-    4,
-    "1.1 Background"
-   ],
-   [
-    2,
-    "1.2 Existing GPU-accelerated ODE libraries"
-   ],
-   [
-    3,
-    "1.2.1 DiffEqGPU.JL"
-   ],
-   [
-    4,
-    "1.2.2 DIFFRAX"
-   ],
-   [
-    4,
-    "1.2.3 TORCHDIFFEQ"
-   ],
-   [
-    4,
-    "1.2.4 GRADSOLVE"
-   ],
-   [
-    2,
-    "2 METHODS"
-   ]
-  ],
   "heading_outline": [
    [
     2,
@@ -251,46 +210,6 @@
    "$\\beta$"
   ],
   "headings": 26,
-  "numbered_headings": 19,
-  "heading_level_offsets": [
-   1,
-   2,
-   3
-  ],
-  "heading_mismatches": [
-   [
-    3,
-    "1 INTRODUCTION"
-   ],
-   [
-    2,
-    "2 METHOD"
-   ],
-   [
-    3,
-    "2.1 Protocluster candidate catalogue by PCFNet"
-   ],
-   [
-    2,
-    "3 RESULTS"
-   ],
-   [
-    3,
-    "3.1 Procluster identification"
-   ],
-   [
-    3,
-    "3.2 Properties of procluster members and others"
-   ],
-   [
-    2,
-    "4 DISCUSSION"
-   ],
-   [
-    3,
-    "4.1 Comparison with previous studies"
-   ]
-  ],
   "heading_outline": [
    [
     2,
@@ -435,45 +354,6 @@
    "$a \\in A$"
   ],
   "headings": 41,
-  "numbered_headings": 30,
-  "heading_level_offsets": [
-   1,
-   2
-  ],
-  "heading_mismatches": [
-   [
-    2,
-    "A PREPRINT"
-   ],
-   [
-    2,
-    "1 Introduction"
-   ],
-   [
-    3,
-    "1.1 Context"
-   ],
-   [
-    2,
-    "2 Stochastic Multiobjective Optimization as a Bayesian decision proble"
-   ],
-   [
-    3,
-    "2.1 Bayesian optimal decision under uncertainties"
-   ],
-   [
-    2,
-    "3 Expected Uncrowded hypervolume"
-   ],
-   [
-    3,
-    "3.1 Uncrowded hypervolume for deterministic MOO"
-   ],
-   [
-    2,
-    "5 Numerical Results"
-   ]
-  ],
   "heading_outline": [
    [
     1,
@@ -634,6 +514,10 @@
    [
     3,
     "BraninCurrin function, u = [0.12, 0.38]"
+   ],
+   [
+    3,
+    "BraninCurrin function, u = [0.11, 0.85]"
    ]
   ],
   "chunks": 78,
@@ -667,46 +551,6 @@
    "$L$"
   ],
   "headings": 26,
-  "numbered_headings": 11,
-  "heading_level_offsets": [
-   1,
-   2,
-   3
-  ],
-  "heading_mismatches": [
-   [
-    2,
-    "I. INTRODUCTION"
-   ],
-   [
-    3,
-    "A. Autoregressive decoding and the bandwidth wall"
-   ],
-   [
-    3,
-    "B. Tiled accelerators and the spoke–hub pathology"
-   ],
-   [
-    3,
-    "C. Observed locality in KV accesses"
-   ],
-   [
-    2,
-    "V. TOPOLOGY-AWARE KV STRIPING (TAKV)"
-   ],
-   [
-    3,
-    "A. Deadlock avoidance"
-   ],
-   [
-    3,
-    "A. Interconnect, throughput, and latency"
-   ],
-   [
-    3,
-    "B. Energy efficiency"
-   ]
-  ],
   "heading_outline": [
    [
     1,
@@ -847,30 +691,6 @@
    "$p$"
   ],
   "headings": 11,
-  "numbered_headings": 5,
-  "heading_level_offsets": [
-   1,
-   2,
-   3
-  ],
-  "heading_mismatches": [
-   [
-    3,
-    "1 Introduction"
-   ],
-   [
-    2,
-    "2 Observed and latent network turnover"
-   ],
-   [
-    2,
-    "3 Calibration, dependence and sparsity"
-   ],
-   [
-    2,
-    "5 Conclusion"
-   ]
-  ],
   "heading_outline": [
    [
     2,
@@ -948,45 +768,6 @@
    "$y$"
   ],
   "headings": 18,
-  "numbered_headings": 16,
-  "heading_level_offsets": [
-   1,
-   2
-  ],
-  "heading_mismatches": [
-   [
-    2,
-    "1. INTRODUCTION"
-   ],
-   [
-    2,
-    "2. QUANTUM STATES AND CIRCUITS"
-   ],
-   [
-    2,
-    "3. REPRESENTATION OF SIGNALS AND SYSTEMS"
-   ],
-   [
-    3,
-    "3.1. Signal representation as a quantum state"
-   ],
-   [
-    3,
-    "3.2. State-space realization of linear systems"
-   ],
-   [
-    3,
-    "3.3. Parallel processing"
-   ],
-   [
-    3,
-    "3.4. Delay gate"
-   ],
-   [
-    3,
-    "3.5. Projection gate"
-   ]
-  ],
   "heading_outline": [
    [
     1,
