@@ -97,4 +97,11 @@ describe("Help", () => {
     expect(section("Coordinating your office")).toBeInTheDocument();
     expect(section("Administration")).toBeInTheDocument();
   });
+
+  it("shows the System Admin its administration too (IR-781)", () => {
+    renderAs({ role_name: ROLES.SYSTEM_ADMIN, review_access: { my_reviews: false, offices: [], is_coordinator: false } });
+
+    expect(section("Administration")).toBeInTheDocument();
+    expect(section("Coordinating your office")).not.toBeInTheDocument();
+  });
 });
