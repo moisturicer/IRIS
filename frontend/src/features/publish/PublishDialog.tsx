@@ -29,7 +29,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link, useSearchParams } from "react-router-dom";
 
 import { accountsApi } from "@/api/accounts";
-import { recordsApi } from "@/api/records";
+import { recordsApi, type ManuscriptMatch } from "@/api/records";
 import { Modal } from "@/components/ui/Modal";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -230,6 +230,10 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [dpaAccepted, setDpaAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitFailure, setSubmitFailure] = useState<ApiFailure | null>(null);
+  const [exactMatches, setExactMatches] = useState<ManuscriptMatch[]>([]);
+  const [likelyMatches, setLikelyMatches] = useState<ManuscriptMatch[]>([]);
+  const [matchesAcknowledged, setMatchesAcknowledged] = useState(false);
+  const [matchFailure, setMatchFailure] = useState("");
   const [confirmingClose, setConfirmingClose] = useState(false);
   // Escape or Close put the question on screen; focus goes with it, once.
   const keepUploadingRef = useRef<HTMLButtonElement>(null);
@@ -398,6 +402,9 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     const controller = new AbortController();
     abortRef.current = controller;
     setUpload({ status: "uploading", fileName: file.name, progress: 0 });
+    setExactMatches([]);
+    setLikelyMatches([]);
+    setMatchesAcknowledged(false);
 
     try {
       let id = draftIdRef.current;
@@ -428,9 +435,12 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       setUpload({ status: "done", fileName: file.name, size: file.size });
       setUploadGeneration((n) => n + 1);
       setDismissed(new Set());
+      void refreshMatches(id).catch(() => setMatchFailure("Matches could not be checked. Try again before submitting."));
     } catch (err) {
       if (controller.signal.aborted) return;
       const failure = describeFailure(err, "The upload failed.");
+      const data = (err as { response?: { data?: { code?: string; matches?: ManuscriptMatch[] } } })?.response?.data;
+      if (data?.code === "exact_duplicate") setExactMatches(data.matches ?? []);
       setUpload({
         status: "failed",
         fileName: file.name,
@@ -473,6 +483,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     setStepFailure(null);
     try {
       await recordsApi.update(id, metadataPayload(values, listsFailed));
+      await refreshMatches(id).catch(() => setMatchFailure("Matches could not be checked. Try again before submitting."));
       goTo(3);
     } catch (err) {
       const failure = describeFailure(err, "We couldn't save these details. Try again.");
@@ -492,6 +503,41 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   }
 
   const continueFromDetails = form.handleSubmit(saveDetails, (errors) => focusFirstInvalid(errors, () => setMoreOpen(true)));
+
+  async function refreshMatches(id: number) {
+    const { data } = await recordsApi.duplicateMatches(id);
+    setExactMatches(data.exact);
+    setLikelyMatches(data.likely);
+    setMatchesAcknowledged(data.acknowledged);
+    setMatchFailure("");
+  }
+
+  useEffect(() => {
+    if (phase.kind !== "form" || step !== 3 || draftId == null) return;
+    let active = true;
+    recordsApi.duplicateMatches(draftId).then(({ data }) => {
+      if (!active) return;
+      setExactMatches(data.exact);
+      setLikelyMatches(data.likely);
+      setMatchesAcknowledged(data.acknowledged);
+    }).catch(() => { if (active) setMatchFailure("Matches could not be checked. Try again before submitting."); });
+    return () => { active = false; };
+  }, [draftId, phase.kind, step, uploadGeneration]);
+
+  async function acknowledgeMatches() {
+    const id = draftIdRef.current;
+    if (id == null) return;
+    try {
+      const { data } = await recordsApi.acknowledgeDuplicates(id, likelyMatches.map((match) => match.id));
+      setLikelyMatches(data.matches);
+      setMatchesAcknowledged(data.acknowledged);
+      setMatchFailure("");
+    } catch {
+      setMatchesAcknowledged(false);
+      await refreshMatches(id).catch(() => undefined);
+      setMatchFailure("The matches changed. Review the current list and acknowledge it again.");
+    }
+  }
 
   // Under an embargo nothing is filled in from the paper (ADR-052 decision 2). These
   // suggestions are read inside IRIS, but the rule is that nothing is automatic.
@@ -529,6 +575,12 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     try {
       await recordsApi.submit(id, dpaAccepted);
     } catch (err) {
+      const data = (err as { response?: { data?: { code?: string; matches?: ManuscriptMatch[] } } })?.response?.data;
+      if (data?.code === "exact_duplicate") setExactMatches(data.matches ?? []);
+      if (data?.code === "acknowledgement_required") {
+        setLikelyMatches(data.matches ?? []);
+        setMatchesAcknowledged(false);
+      }
       const failure = describeFailure(err, "IRIS couldn't submit this. Check the details and try again.");
       applyFieldErrors(failure);
       setSubmitFailure(failure);
@@ -801,6 +853,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               upload={upload}
               onFile={handleFile}
               onRetry={() => void startUpload()}
+              exactMatches={exactMatches}
             />
           )}
 
@@ -844,6 +897,14 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
               dpaAccepted={dpaAccepted}
               onDpaChange={setDpaAccepted}
               failure={submitFailure}
+              exactMatches={exactMatches}
+              likelyMatches={likelyMatches}
+              matchesAcknowledged={matchesAcknowledged}
+              matchFailure={matchFailure}
+              onAcknowledge={() => void acknowledgeMatches()}
+              onCheckAgain={() => {
+                if (draftId != null) void refreshMatches(draftId).catch(() => setMatchFailure("Matches could not be checked. Try again before submitting."));
+              }}
               onRetry={() => void submit()}
               onFixDetails={() => goTo(2)}
               fieldLabels={FIELD_LABELS}

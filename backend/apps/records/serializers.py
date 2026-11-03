@@ -679,6 +679,10 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         from apps.documents.sources import manuscript_changes
         if validated_data.get("abstract_file"):
             validated_data.update(manuscript_changes(None, validated_data["abstract_file"]))
+            from .duplicates import enforce_exact, lock_digest
+            digest = validated_data["manuscript_sha256"]
+            lock_digest(digest)
+            enforce_exact(self.context["request"].user, None, digest)
         record = super().create(validated_data)
         if authors_data:
             self._sync_authors(record, authors_data)
@@ -693,9 +697,16 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         if "abstract_file" in validated_data:
             from apps.documents.sources import manuscript_changes
             changes = manuscript_changes(instance, validated_data["abstract_file"])
+            from .duplicates import enforce_exact, lock_digest
             if changes is None:
+                digest = validated_data["abstract_file"].source_sha256
+                lock_digest(digest)
+                enforce_exact(self.context["request"].user, instance.pk, digest)
                 validated_data.pop("abstract_file")
             else:
+                digest = changes["manuscript_sha256"]
+                lock_digest(digest)
+                enforce_exact(self.context["request"].user, instance.pk, digest)
                 validated_data.update(changes)
         if self._details_changed(instance, validated_data, authors_data):
             # What a new version answers a revision request with, when no file

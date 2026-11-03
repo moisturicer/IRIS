@@ -153,6 +153,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-440** | Retrieval looks past 40 candidates — no FR- id; a bug fix, not a technique | [details](traceability/IR-440.md) | **IMPLEMENTED** |
 | **IR-442** | A retrieval miss is detectable rather than silent — no FR- id; the checker for the failure class ADR-023 measures in aggregate but cannot … | [details](traceability/IR-442.md) | **IMPLEMENTED** |
 | **IR-312** | A proposer sees when their idea was already done here — the Novelty check; FR-M4 (stable label only) | [details](traceability/IR-312.md) | **IMPLEMENTED** |
+| **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
 
 ### Non-functional
 
