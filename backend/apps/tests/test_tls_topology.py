@@ -1,5 +1,5 @@
 """
-Only Caddy is reachable from outside in production (IR-847, ADR-056).
+Only Caddy is reachable from outside in production (IR-847, ADR-057).
 
 nginx passes on a client's X-Forwarded-Proto and Django trusts it, so publishing
 nginx would let anyone claim HTTPS. CI's Docker Compose job runs the real Caddy.
