@@ -66,7 +66,16 @@ class Settings(BaseSettings):
     AI_ADMISSION_PRICES: str = ""
     AI_ADMISSION_MAX_OUTPUT_TOKENS: str = ""
     AI_ADMISSION_LEASE_GRACE_SECONDS: str = ""
-    
+    # The chat-completions AGENT provider (IR-860). Read by
+    # `ai.infrastructure.agent_config`; no defaults, and capacity is declared
+    # per model in AGENT_LLM_CAPACITIES, never inferred.
+    AGENT_LLM_ENDPOINT: str = ""
+    AGENT_LLM_API_KEY: str = ""
+    AGENT_LLM_MODELS: str = ""
+    AGENT_LLM_CAPABILITIES: str = ""
+    AGENT_LLM_DATA_POLICY: str = ""
+    AGENT_LLM_CAPACITIES: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

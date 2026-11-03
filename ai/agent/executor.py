@@ -26,7 +26,7 @@ from ai.agent.protocol import (
     AgentRequest, ModelTurn, NotFinal, Pin, StopReason, Text, ToolGroup, ToolResult, User, final_answer,
 )
 from ai.agent.tools import ENDS_RUN, Investigation, RunEnded
-from ai.domain.ports import LLMProvider, TransientProviderError, UnsupportedCapability
+from ai.domain.ports import LLMProvider, ProviderRejected, TransientProviderError, UnsupportedCapability
 from ai.research.tools import OK
 from ai.runs import config as runs_config
 from ai.runs.executor import Result, RunContext, Unavailable
@@ -155,6 +155,8 @@ class AgentExecutor:
             raise Unavailable("provider_timeout") from None
         except TransientProviderError:
             raise Unavailable("provider_failed") from None
+        except ProviderRejected:
+            raise Unavailable("provider_rejected") from None
 
 
 def _fitted(check, *args):
