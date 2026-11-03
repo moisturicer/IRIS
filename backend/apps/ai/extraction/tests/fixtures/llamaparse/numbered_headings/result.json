@@ -1,0 +1,404 @@
+{
+  "job": {
+    "user_metadata": null,
+    "id": "pjb-fo9lwvmpo69v2ypfur9asmd57g6z",
+    "created_at": "2026-11-02T15:06:38.041523Z",
+    "updated_at": "2026-11-02T15:06:43.297712Z",
+    "project_id": "736ceb96-4c70-415d-a239-339e306e8a0d",
+    "status": "COMPLETED",
+    "error_message": null,
+    "name": "numbered_headings.pdf",
+    "tier": "agentic",
+    "usage": {
+      "credits": 30.0
+    }
+  },
+  "result_content_metadata": {
+    "grounded_items": {
+      "size_bytes": 8647,
+      "exists": true
+    }
+  },
+  "text": null,
+  "markdown": {
+    "pages": [
+      {
+        "page_number": 1,
+        "markdown": "## 1 Introduction\n\nThe introduction states the question this fixture asks.\n\n### 1.1 Background\n\nBackground material follows its numbered heading.\n\n## 2 Methods\n\nMethods are described before any result is reported.",
+        "header": "IRIS contract fixture",
+        "footer": "Page 1",
+        "success": true
+      },
+      {
+        "page_number": 2,
+        "markdown": "## 3 Results\n\nResults close the document on its second page.",
+        "header": "IRIS contract fixture",
+        "footer": "Page 2",
+        "success": true
+      }
+    ]
+  },
+  "items": {
+    "pages": [
+      {
+        "page_number": 1,
+        "items": [
+          {
+            "type": "header",
+            "md": "IRIS contract fixture",
+            "bbox": [
+              {
+                "x": 72.73,
+                "y": 38.1,
+                "w": 69.2,
+                "h": 6.04
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "IRIS contract fixture",
+                "bbox": [
+                  {
+                    "x": 72.73,
+                    "y": 38.1,
+                    "w": 69.2,
+                    "h": 6.04,
+                    "confidence": 0.844,
+                    "start_index": 0,
+                    "end_index": 20,
+                    "label": "header"
+                  }
+                ],
+                "value": "IRIS contract fixture"
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "md": "## 1 Introduction",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 83.16,
+                "w": 93.03,
+                "h": 11.09,
+                "confidence": 0.813,
+                "start_index": 0,
+                "end_index": 16,
+                "label": "paragraph_title"
+              }
+            ],
+            "level": 2,
+            "value": "1 Introduction"
+          },
+          {
+            "type": "text",
+            "md": "The introduction states the question this fixture asks.",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 106.13,
+                "w": 233.18,
+                "h": 10.29,
+                "confidence": 0.969,
+                "start_index": 0,
+                "end_index": 54,
+                "label": "text"
+              }
+            ],
+            "value": "The introduction states the question this fixture asks."
+          },
+          {
+            "type": "heading",
+            "md": "### 1.1 Background",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 142.56,
+                "w": 90.58,
+                "h": 12.67,
+                "confidence": 0.813,
+                "start_index": 0,
+                "end_index": 17,
+                "label": "paragraph_title"
+              }
+            ],
+            "level": 3,
+            "value": "1.1 Background"
+          },
+          {
+            "type": "text",
+            "md": "Background material follows its numbered heading.",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 163.94,
+                "w": 227.06,
+                "h": 10.3,
+                "confidence": 0.938,
+                "start_index": 0,
+                "end_index": 48,
+                "label": "text"
+              }
+            ],
+            "value": "Background material follows its numbered heading."
+          },
+          {
+            "type": "heading",
+            "md": "## 2 Methods",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 202.75,
+                "w": 69.77,
+                "h": 11.43,
+                "confidence": 0.813,
+                "start_index": 0,
+                "end_index": 11,
+                "label": "paragraph_title"
+              }
+            ],
+            "level": 2,
+            "value": "2 Methods"
+          },
+          {
+            "type": "text",
+            "md": "Methods are described before any result is reported.",
+            "bbox": [
+              {
+                "x": 70.99,
+                "y": 225.72,
+                "w": 232.56,
+                "h": 10.41,
+                "confidence": 1.0,
+                "start_index": 0,
+                "end_index": 51,
+                "label": "text"
+              }
+            ],
+            "value": "Methods are described before any result is reported."
+          },
+          {
+            "type": "footer",
+            "md": "Page 1",
+            "bbox": [
+              {
+                "x": 290.69,
+                "y": 752.26,
+                "w": 23.09,
+                "h": 7.49
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "Page 1",
+                "bbox": [
+                  {
+                    "x": 290.69,
+                    "y": 752.26,
+                    "w": 23.09,
+                    "h": 7.49,
+                    "confidence": 0.813,
+                    "start_index": 0,
+                    "end_index": 5,
+                    "label": "footer"
+                  }
+                ],
+                "value": "Page 1"
+              }
+            ]
+          }
+        ],
+        "page_width": 612.0,
+        "page_height": 792.0,
+        "success": true
+      },
+      {
+        "page_number": 2,
+        "items": [
+          {
+            "type": "header",
+            "md": "IRIS contract fixture",
+            "bbox": [
+              {
+                "x": 72.73,
+                "y": 38.1,
+                "w": 69.2,
+                "h": 6.04
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "IRIS contract fixture",
+                "bbox": [
+                  {
+                    "x": 72.73,
+                    "y": 38.1,
+                    "w": 69.2,
+                    "h": 6.04,
+                    "confidence": 0.844,
+                    "start_index": 0,
+                    "end_index": 20,
+                    "label": "header"
+                  }
+                ],
+                "value": "IRIS contract fixture"
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "md": "## 3 Results",
+            "bbox": [
+              {
+                "x": 70.99,
+                "y": 79.99,
+                "w": 63.04,
+                "h": 14.26,
+                "confidence": 0.813,
+                "start_index": 0,
+                "end_index": 11,
+                "label": "paragraph_title"
+              }
+            ],
+            "level": 2,
+            "value": "3 Results"
+          },
+          {
+            "type": "text",
+            "md": "Results close the document on its second page.",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 104.54,
+                "w": 212.98,
+                "h": 11.65,
+                "confidence": 1.0,
+                "start_index": 0,
+                "end_index": 45,
+                "label": "text"
+              }
+            ],
+            "value": "Results close the document on its second page."
+          },
+          {
+            "type": "footer",
+            "md": "Page 2",
+            "bbox": [
+              {
+                "x": 290.69,
+                "y": 752.26,
+                "w": 24.27,
+                "h": 7.49
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "Page 2",
+                "bbox": [
+                  {
+                    "x": 290.69,
+                    "y": 752.26,
+                    "w": 24.27,
+                    "h": 7.49,
+                    "confidence": 0.813,
+                    "start_index": 0,
+                    "end_index": 5,
+                    "label": "footer"
+                  }
+                ],
+                "value": "Page 2"
+              }
+            ]
+          }
+        ],
+        "page_width": 612.0,
+        "page_height": 792.0,
+        "success": true
+      }
+    ]
+  },
+  "metadata": {
+    "pages": [
+      {
+        "page_number": 1,
+        "confidence": 1.0,
+        "printed_page_number": "1",
+        "original_orientation_angle": 0,
+        "cost_optimized": false,
+        "triggered_auto_mode": false
+      },
+      {
+        "page_number": 2,
+        "confidence": 1.0,
+        "printed_page_number": "2",
+        "original_orientation_angle": 0,
+        "cost_optimized": false,
+        "triggered_auto_mode": false
+      }
+    ],
+    "document": {
+      "confidence": 1.0,
+      "confidence_breakdown": {
+        "min_page_score": 1.0,
+        "scored_pages": 2,
+        "total_pages": 2
+      }
+    }
+  },
+  "forms": null,
+  "markdown_full": null,
+  "text_full": null,
+  "images_content_metadata": {
+    "total_count": 0,
+    "images": []
+  },
+  "job_metadata": {
+    "state_transitions": {
+      "pending_at": "2026-11-02T15:06:38.036539Z",
+      "throttled_at": "2026-11-02T15:06:38.208906Z",
+      "running_at": "2026-11-02T15:06:38.366099Z",
+      "completed_at": "2026-11-02T15:06:43.298738Z",
+      "failed_at": null,
+      "cancelled_at": null
+    },
+    "latency": {
+      "decode_ms": 738,
+      "agent_ms": 2554,
+      "output_ms": 177,
+      "page_throttle_wall_ms": 0,
+      "page_throttle_sum_ms": 0,
+      "page_throttle_max_ms": 0,
+      "page_throttle_waits": 1,
+      "job_throttle_ms": 0,
+      "total_ms": 5141
+    },
+    "quarantine": null,
+    "pdf-pages": 2,
+    "pdf-real-pages": 2,
+    "pdf-rawTextLength": 345,
+    "pdf-mdLength": 275,
+    "pdf-time": 2817,
+    "pdf-ocrTime": 0,
+    "pdf-image-convertTime": 0,
+    "pdf-pdfToHTMLTime": 0,
+    "pdf-llmTime": 263,
+    "pdf-inputTokens": 13202,
+    "pdf-outputTokens": 338,
+    "pdf-image-ocr-count": 0,
+    "pdf-image-ocr-failed-count": 0,
+    "pdf-image-ocr-success-count": 2,
+    "pdf-image-ocr-empty-count": 2,
+    "pdf-image-ocr-hadText-count": 0,
+    "pdf-image-ocr-pixels": 15827200,
+    "pdf-multimodal-time": 0,
+    "pdf-multimodal-pdf2Image": 0,
+    "pdf-high-res-ocr": 2
+  },
+  "raw_parameters": null,
+  "debug": null
+}

@@ -1,0 +1,292 @@
+{
+  "job": {
+    "user_metadata": null,
+    "id": "pjb-lvuemvx9ccf5km4a4uct51g5fxtz",
+    "created_at": "2026-11-02T15:07:03.870447Z",
+    "updated_at": "2026-11-02T15:07:08.635457Z",
+    "project_id": "736ceb96-4c70-415d-a239-339e306e8a0d",
+    "status": "COMPLETED",
+    "error_message": null,
+    "name": "figures.pdf",
+    "tier": "agentic",
+    "usage": {
+      "credits": 15.0
+    }
+  },
+  "result_content_metadata": {
+    "grounded_items": {
+      "size_bytes": 5263,
+      "exists": true
+    }
+  },
+  "text": null,
+  "markdown": {
+    "pages": [
+      {
+        "page_number": 1,
+        "markdown": "## **Figures and formulas**\n\nA captioned figure comes first.\n\ndrawing: A captioned rectangle.\n\nFigure 1: A captioned rectangle.\n\nAn uncaptioned figure follows.\n\ndrawing: An uncaptioned figure.\n\n$$a^2 + b^2 = c^2$$\n\nThe formula above closes the page.",
+        "header": "IRIS contract fixture",
+        "footer": "Page 1",
+        "success": true
+      }
+    ]
+  },
+  "items": {
+    "pages": [
+      {
+        "page_number": 1,
+        "items": [
+          {
+            "type": "header",
+            "md": "IRIS contract fixture",
+            "bbox": [
+              {
+                "x": 72.73,
+                "y": 38.1,
+                "w": 69.2,
+                "h": 6.04
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "IRIS contract fixture",
+                "bbox": [
+                  {
+                    "x": 72.73,
+                    "y": 38.1,
+                    "w": 69.2,
+                    "h": 6.04,
+                    "confidence": 0.844,
+                    "start_index": 0,
+                    "end_index": 20,
+                    "label": "header"
+                  }
+                ],
+                "value": "IRIS contract fixture"
+              }
+            ]
+          },
+          {
+            "type": "heading",
+            "md": "## **Figures and formulas**",
+            "bbox": [
+              {
+                "x": 73.06,
+                "y": 73.82,
+                "w": 140.79,
+                "h": 13.2,
+                "confidence": 0.844,
+                "start_index": 0,
+                "end_index": 26,
+                "label": "paragraph_title"
+              }
+            ],
+            "level": 2,
+            "value": "Figures and formulas"
+          },
+          {
+            "type": "text",
+            "md": "A captioned figure comes first.",
+            "bbox": [
+              {
+                "x": 72.14,
+                "y": 96.72,
+                "w": 130.51,
+                "h": 9.47,
+                "confidence": 0.906,
+                "start_index": 0,
+                "end_index": 30,
+                "label": "text"
+              }
+            ],
+            "value": "A captioned figure comes first."
+          },
+          {
+            "type": "text",
+            "md": "drawing: A captioned rectangle.",
+            "value": "drawing: A captioned rectangle."
+          },
+          {
+            "type": "text",
+            "md": "Figure 1: A captioned rectangle.",
+            "bbox": [
+              {
+                "x": 72.77,
+                "y": 242.54,
+                "w": 122.21,
+                "h": 8.43,
+                "confidence": 0.906,
+                "start_index": 0,
+                "end_index": 31,
+                "label": "text"
+              }
+            ],
+            "value": "Figure 1: A captioned rectangle."
+          },
+          {
+            "type": "text",
+            "md": "An uncaptioned figure follows.",
+            "bbox": [
+              {
+                "x": 72.14,
+                "y": 272.72,
+                "w": 128.35,
+                "h": 9.47,
+                "confidence": 0.875,
+                "start_index": 0,
+                "end_index": 29,
+                "label": "form"
+              }
+            ],
+            "value": "An uncaptioned figure follows."
+          },
+          {
+            "type": "text",
+            "md": "drawing: An uncaptioned figure.",
+            "value": "drawing: An uncaptioned figure."
+          },
+          {
+            "type": "text",
+            "md": "$$a^2 + b^2 = c^2$$",
+            "bbox": [
+              {
+                "x": 119.95,
+                "y": 431.64,
+                "w": 83.85,
+                "h": 11.09,
+                "confidence": 0.875,
+                "start_index": 0,
+                "end_index": 18,
+                "label": "formula"
+              }
+            ],
+            "value": "$$a^2 + b^2 = c^2$$"
+          },
+          {
+            "type": "text",
+            "md": "The formula above closes the page.",
+            "bbox": [
+              {
+                "x": 71.6,
+                "y": 460.94,
+                "w": 159.12,
+                "h": 11.25,
+                "confidence": 0.906,
+                "start_index": 0,
+                "end_index": 33,
+                "label": "text"
+              }
+            ],
+            "value": "The formula above closes the page."
+          },
+          {
+            "type": "footer",
+            "md": "Page 1",
+            "bbox": [
+              {
+                "x": 290.69,
+                "y": 752.26,
+                "w": 23.09,
+                "h": 7.49
+              }
+            ],
+            "items": [
+              {
+                "type": "text",
+                "md": "Page 1",
+                "bbox": [
+                  {
+                    "x": 290.69,
+                    "y": 752.26,
+                    "w": 23.09,
+                    "h": 7.49,
+                    "confidence": 0.813,
+                    "start_index": 0,
+                    "end_index": 5,
+                    "label": "footer"
+                  }
+                ],
+                "value": "Page 1"
+              }
+            ]
+          }
+        ],
+        "page_width": 612.0,
+        "page_height": 792.0,
+        "success": true
+      }
+    ]
+  },
+  "metadata": {
+    "pages": [
+      {
+        "page_number": 1,
+        "confidence": 0.85,
+        "printed_page_number": "1",
+        "original_orientation_angle": 0,
+        "cost_optimized": false,
+        "triggered_auto_mode": false
+      }
+    ],
+    "document": {
+      "confidence": 0.85,
+      "confidence_breakdown": {
+        "min_page_score": 0.85,
+        "scored_pages": 1,
+        "total_pages": 1
+      }
+    }
+  },
+  "forms": null,
+  "markdown_full": null,
+  "text_full": null,
+  "images_content_metadata": {
+    "total_count": 0,
+    "images": []
+  },
+  "job_metadata": {
+    "state_transitions": {
+      "pending_at": "2026-11-02T15:07:03.866013Z",
+      "throttled_at": "2026-11-02T15:07:04.050910Z",
+      "running_at": "2026-11-02T15:07:04.248051Z",
+      "completed_at": "2026-11-02T15:07:08.637496Z",
+      "failed_at": null,
+      "cancelled_at": null
+    },
+    "latency": {
+      "decode_ms": 718,
+      "agent_ms": 2261,
+      "output_ms": 190,
+      "page_throttle_wall_ms": 0,
+      "page_throttle_sum_ms": 0,
+      "page_throttle_max_ms": 0,
+      "page_throttle_waits": 1,
+      "job_throttle_ms": 0,
+      "total_ms": 4599
+    },
+    "quarantine": null,
+    "pdf-pages": 1,
+    "pdf-real-pages": 1,
+    "pdf-rawTextLength": 229,
+    "pdf-mdLength": 250,
+    "pdf-time": 2513,
+    "pdf-ocrTime": 0,
+    "pdf-image-convertTime": 0,
+    "pdf-pdfToHTMLTime": 0,
+    "pdf-llmTime": 266,
+    "pdf-inputTokens": 6640,
+    "pdf-outputTokens": 232,
+    "pdf-image-ocr-count": 0,
+    "pdf-image-ocr-failed-count": 0,
+    "pdf-image-ocr-success-count": 1,
+    "pdf-image-ocr-empty-count": 1,
+    "pdf-image-ocr-hadText-count": 0,
+    "pdf-image-ocr-pixels": 7913600,
+    "pdf-multimodal-time": 0,
+    "pdf-multimodal-pdf2Image": 0,
+    "pdf-high-res-ocr": 1
+  },
+  "raw_parameters": null,
+  "debug": null
+}
