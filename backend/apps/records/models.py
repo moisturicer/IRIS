@@ -337,6 +337,24 @@ class Record(models.Model):
             return EmbargoState.ACTIVE
         return EmbargoState.NONE
 
+    # KTTO's release of an IP mark (ADR-052 §11-13, IR-813). The mark stays on
+    # the paper, and this is what opens the disclosure check for it. Stamped by
+    # `apps.records.ip_release` and nothing else. A release can't outlive its
+    # mark (the constraint below), so a paper marked again starts unreleased.
+    ip_released_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="When KTTO released the IP mark for the AI. Null means it has not been released.",
+    )
+    ip_released_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="ip_released_records",
+        help_text="Who released it. SET_NULL so a deleted account cannot erase the timestamp.",
+    )
+
+    @property
+    def ip_released(self) -> bool:
+        return self.ip_released_at is not None
+
     # Soft delete
     is_deleted  = models.BooleanField(default=False, db_index=True)
     deleted_at  = models.DateTimeField(null=True, blank=True)
@@ -386,6 +404,10 @@ class Record(models.Model):
                     | models.Q(embargoed_until__isnull=False)
                 ),
                 name="record_embargo_release_needs_date",
+            ),
+            models.CheckConstraint(
+                condition=models.Q(ip_released_at__isnull=True) | models.Q(is_ip=True),
+                name="record_ip_release_needs_mark",
             ),
         ]
 

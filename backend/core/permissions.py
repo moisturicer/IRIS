@@ -205,6 +205,14 @@ def may_release_embargo(user, record) -> bool:
     return record.adviser_id == user.pk or get_role_name(user) == ROLE_RDCO
 
 
+def may_release_ip(user, record) -> bool:
+    """
+    KTTO alone releases an IP-marked paper, because KTTO evaluates IP (ADR-052
+    §11-12). Not RDCO, not the Adviser and not an owner.
+    """
+    return get_role_name(user) == ROLE_KTTO
+
+
 def is_record_owner(user, record) -> bool:
     """
     Does `user` own `record`? Ownership alone: no staff role, and no seat,
@@ -407,6 +415,10 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
             offered.append("set_embargo")
         if record.embargo_state == EmbargoState.ACTIVE and may_release_embargo(user, record):
             offered.append("release_embargo")
+        from apps.records.ip_release import why_not_releasable
+
+        if may_release_ip(user, record) and why_not_releasable(record) is None:
+            offered.append("release_ip")
 
     # `review-comments/`: the record's participants, once it is submitted
     # (ADR-032 §7, IR-419). A pool member reads the discussion but is not
@@ -436,6 +448,11 @@ class MaySetEmbargo(BasePermission):
 class MayReleaseEmbargo(BasePermission):
     def has_object_permission(self, request, view, obj):
         return may_release_embargo(request.user, obj)
+
+
+class MayReleaseIp(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return may_release_ip(request.user, obj)
 
 
 class IsRecordOwner(BasePermission):

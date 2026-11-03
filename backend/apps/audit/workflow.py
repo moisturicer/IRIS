@@ -304,3 +304,10 @@ def embargo_extended(record, actor, *, until, previous_until) -> None:
 
 def embargo_released(record, actor, *, until) -> None:
     _write(AuditEvent.EMBARGO_RELEASED, actor, record, until=_iso(until))
+
+
+# --- an IP mark (ADR-052 §11) ------------------------------------------------
+
+
+def ip_released(record, actor) -> None:
+    _write(AuditEvent.IP_RELEASED, actor, record, ip_type=record.ip_type or None)

@@ -63,6 +63,39 @@ class RefusingTests:
         assert decision.allowed is False
         assert Reason.UNRELEASED_IP in decision.reasons
 
+    def test_an_ip_mark_is_unreleased_unless_said_otherwise(self):
+        assert DisclosureInputs(
+            is_ip=True, embargo=EmbargoState.NONE, consent_given=True,
+        ).ip_released is False
+
+
+class IpReleaseTests:
+    """ADR-052 §11-13: KTTO's release opens the gate for a marked paper."""
+
+    def test_a_released_mark_allows(self):
+        assert may_disclose(_inputs(is_ip=True, ip_released=True)).allowed is True
+
+    def test_a_release_without_a_mark_changes_nothing(self):
+        assert may_disclose(_inputs(is_ip=False, ip_released=True)).allowed is True
+
+    @pytest.mark.parametrize("state", [EmbargoState.ACTIVE, EmbargoState.UNKNOWN])
+    def test_a_released_mark_does_not_release_an_embargo(self, state):
+        decision = may_disclose(_inputs(is_ip=True, ip_released=True, embargo=state))
+        assert decision.allowed is False
+        assert Reason.UNRELEASED_IP not in decision.reasons
+
+    def test_a_released_embargo_does_not_release_a_mark(self):
+        decision = may_disclose(_inputs(is_ip=True, embargo=EmbargoState.RELEASED))
+        assert decision.reasons == (Reason.UNRELEASED_IP,)
+
+    def test_both_released_still_needs_consent(self):
+        decision = may_disclose(_inputs(
+            is_ip=True, ip_released=True, embargo=EmbargoState.RELEASED, consent_given=False,
+        ))
+        assert decision.reasons == (Reason.NO_CONSENT,)
+
+
+class ReportingTests:
     def test_every_failing_input_is_reported_not_just_the_first(self):
         """A refusal that names one cause sends the reader to fix one thing and
         be refused again."""

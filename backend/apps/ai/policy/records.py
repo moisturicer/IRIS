@@ -19,12 +19,16 @@ def inputs_for_record(record: Any) -> DisclosureInputs:
     unanswered paper and an answered "no" both store, and reading it as "no
     embargo" would clear every paper that was never asked.
 
+    The IP release is ``Record.ip_released`` (ADR-052 §11), KTTO's act. The mark
+    itself stays on the paper, so ``is_ip`` alone still says it is IP.
+
     Consent is ``Record.dpa_accepted`` (IR-226) -- the per-disclosure stamp,
     not ``User.consent_given``, which records that a person accepted terms
     once at signup and says nothing about this submission.
     """
     return DisclosureInputs(
         is_ip=bool(record.is_ip),
+        ip_released=bool(record.ip_released),
         embargo=record.embargo_state,
         consent_given=bool(record.dpa_accepted),
     )
