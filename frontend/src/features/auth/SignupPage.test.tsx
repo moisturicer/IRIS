@@ -65,7 +65,6 @@ const stepHeading = () => screen.getByRole("heading", { level: 3, name: /^Step \
 
 const firstName = () => screen.getByRole("textbox", { name: "First Name" });
 const lastName  = () => screen.getByRole("textbox", { name: "Last Name" });
-const initial   = () => screen.getByRole("textbox", { name: "M.I." });
 const email     = () => screen.getByRole("textbox", { name: "Institutional email" });
 const college   = () => screen.getByRole("combobox", { name: "College" });
 const program   = () => screen.getByRole("combobox", { name: "Program" });
@@ -86,7 +85,6 @@ async function fillIdentity(user: User, role: "Student" | "Adviser" = "Student")
   if (role === "Adviser") await user.click(screen.getByRole("radio", { name: "Adviser" }));
   await user.type(firstName(), " Juan ");
   await user.type(lastName(), "Dela Cruz");
-  await user.type(initial(), "S.");
   await user.type(email(), "juan@cit.edu");
   await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
 }
@@ -159,7 +157,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
   it("starts with every field empty", async () => {
     renderSignup();
 
-    for (const field of [firstName(), lastName(), initial(), email()]) {
+    for (const field of [firstName(), lastName(), email()]) {
       expect(field).toHaveValue("");
       // No sample name or address sits in a field as a placeholder either (IR-704 story 25).
       expect(field).not.toHaveAttribute("placeholder");
@@ -179,13 +177,12 @@ describe("the register steps", { timeout: 30_000 }, () => {
     const user = userEvent.setup();
     renderSignup();
 
-    await user.type(initial(), "S");
     await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
 
     expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity");
     expect(firstName()).toHaveAccessibleDescription("First name is required.");
     expect(lastName()).toHaveAccessibleDescription("Last name is required.");
-    expect(initial()).toHaveAccessibleDescription("Missing (.).");
+    expect(firstName()).toHaveFocus();
     expect(email()).toHaveAccessibleDescription("Email is required.");
     expect(email()).toHaveAttribute("aria-invalid", "true");
     // Nothing from a step not yet seen is mentioned.
@@ -301,12 +298,12 @@ describe("the register steps", { timeout: 30_000 }, () => {
     expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity");
   });
 
-  it("marks each step's required fields, in words and as a state, and leaves M.I. optional", async () => {
+  it("marks each step's required fields, in words and as a state, and omits M.I.", async () => {
     const user = userEvent.setup();
     renderSignup();
 
     for (const field of [firstName(), lastName(), email()]) expect(field).toBeRequired();
-    expect(initial()).not.toBeRequired();
+    expect(screen.queryByRole("textbox", { name: "M.I." })).not.toBeInTheDocument();
     // The word is on screen once per required field, not only a colour.
     expect(screen.getAllByText("(required)")).toHaveLength(3);
 
@@ -333,7 +330,7 @@ describe("the register steps", { timeout: 30_000 }, () => {
 
     inOrder([
       screen.getByRole("radio", { name: "Student" }),
-      firstName(), lastName(), initial(), email(),
+      firstName(), lastName(), email(),
       screen.getByRole("button", { name: "Continue to affiliation" }),
     ]);
     await fillIdentity(user);
@@ -491,6 +488,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
 
     const consent = screen.getByRole("checkbox", { name: CONSENT });
     expect(consent).toHaveAttribute("aria-invalid", "true");
+    expect(consent).toHaveFocus();
     expect(consent).toHaveAccessibleDescription("Agree to the data notice to register.");
     expect(register).not.toHaveBeenCalled();
 
@@ -537,7 +535,7 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
     expect(terms).toEqual(["Role", "Name", "Email", "College", "Program"]);
     expect(values).toEqual([
       expect.stringContaining("Student"),
-      expect.stringContaining("Juan S. Dela Cruz"),
+      expect.stringContaining("Juan Dela Cruz"),
       expect.stringContaining("juan@cit.edu"),
       expect.stringContaining("College of Computer Studies"),
       expect.stringContaining("BS Computer Science"),
@@ -623,9 +621,10 @@ describe("Security & agreement", { timeout: 30_000 }, () => {
  * What IR-539 did not change, and IR-707 did not either. The request and its
  * fields are pinned. One deliberate change since IR-539 (IR-540): the request
  * carries `consent_given: true`, which the serializer always required.
+ * IR-857 deliberately removes middle_initial from the new-account payload.
  */
 describe("what the register screen sends", { timeout: 30_000 }, () => {
-  it("sends a Student's registration unchanged", async () => {
+  it("sends a Student's registration without a middle initial", async () => {
     const user = userEvent.setup();
     const register = acceptRegistration();
     renderSignup();
@@ -637,7 +636,6 @@ describe("what the register screen sends", { timeout: 30_000 }, () => {
     expect(payload).toEqual({
       email: "juan@cit.edu",
       first_name: "Juan",
-      middle_initial: "S.",
       last_name: "Dela Cruz",
       password: "IrisDemo123!",
       confirm_password: "IrisDemo123!",
@@ -646,12 +644,12 @@ describe("what the register screen sends", { timeout: 30_000 }, () => {
       course_id: 100,
     });
     expect(Object.keys(payload)).toEqual([
-      "email", "first_name", "middle_initial", "last_name",
+      "email", "first_name", "last_name",
       "password", "confirm_password", "consent_given", "role_name", "course_id",
     ]);
   });
 
-  it("sends an Adviser's registration unchanged", async () => {
+  it("sends an Adviser's registration without a middle initial", async () => {
     const user = userEvent.setup();
     const register = acceptRegistration();
     renderSignup();
@@ -662,7 +660,6 @@ describe("what the register screen sends", { timeout: 30_000 }, () => {
     expect(register.mock.calls[0][0]).toEqual({
       email: "juan@cit.edu",
       first_name: "Juan",
-      middle_initial: "S.",
       last_name: "Dela Cruz",
       password: "IrisDemo123!",
       confirm_password: "IrisDemo123!",
@@ -816,7 +813,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     await submit(user);
 
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
-    expect(stepHeading()).toHaveFocus();
+    expect(email()).toHaveFocus();
     const alert = screen.getByRole("alert");
     expect(alert).toHaveTextContent(/We brought you back/);
     expect(alert).toHaveTextContent(/everything else you entered is kept/i);
@@ -913,6 +910,7 @@ describe("a refused registration", { timeout: 30_000 }, () => {
 
     await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
     expect(firstName()).toHaveAccessibleDescription("Enter your name as CIT-U records it.");
+    expect(firstName()).toHaveFocus();
     await user.clear(firstName());
     await user.type(firstName(), "Juana");
     await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
@@ -1021,5 +1019,61 @@ describe("form options that fail to load", { timeout: 30_000 }, () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     await user.click(tab(/^Identity, completed$/));
     expect(firstName()).toHaveValue(" Juan ");
+  });
+});
+
+
+describe("registration names (IR-857)", () => {
+  it("focuses an invalid last name after a valid first name and clears its error on correction", async () => {
+    const user = userEvent.setup();
+    renderSignup();
+    await user.type(firstName(), "Ana");
+    await user.type(lastName(), "Cruz4");
+    await user.type(email(), "ana@cit.edu");
+    await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
+    expect(lastName()).toHaveFocus();
+    expect(lastName()).toHaveAccessibleDescription(/Last name must contain letters/);
+    await user.clear(lastName());
+    await user.type(lastName(), "Cruz");
+    expect(lastName()).not.toHaveAttribute("aria-invalid");
+    await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
+    expect(stepHeading()).toHaveTextContent("Affiliation");
+  });
+
+  it.each(["Ana3", "123", "---", "@#$", "\u0301", "Ana\u{1F642}"])("refuses %s on blur and Continue, then clears after correction", async (name) => {
+    const user = userEvent.setup();
+    const register = acceptRegistration();
+    renderSignup();
+    await user.type(firstName(), name);
+    await user.tab();
+    expect(firstName()).toHaveAttribute("aria-invalid", "true");
+    expect(firstName()).toHaveAccessibleDescription(/First name/);
+    await user.type(lastName(), "Cruz");
+    await user.type(email(), "ana@cit.edu");
+    await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
+    expect(firstName()).toHaveFocus();
+    expect(stepHeading()).toHaveTextContent("Identity");
+    expect(register).not.toHaveBeenCalled();
+    await user.clear(firstName());
+    await user.type(firstName(), "Ana");
+    expect(firstName()).not.toHaveAttribute("aria-invalid");
+    await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
+    expect(stepHeading()).toHaveTextContent("Affiliation");
+  });
+
+  it.each(["Student", "Adviser"] as const)("sends Unicode multipart names intact for %s, trimming only edges", async (role) => {
+    const user = userEvent.setup();
+    const register = acceptRegistration();
+    renderSignup();
+    if (role === "Adviser") await user.click(screen.getByRole("radio", { name: "Adviser" }));
+    await user.type(firstName(), "  Jose\u0301 \u674e  Anne-Marie  ");
+    await user.type(lastName(), "  D\u2019Arcy O'Neill  ");
+    await user.type(email(), "newcomer@cit.edu");
+    await user.click(screen.getByRole("button", { name: "Continue to affiliation" }));
+    await fillAffiliation(user, role);
+    await finish(user);
+    await waitFor(() => expect(register).toHaveBeenCalledTimes(1));
+    expect(register.mock.calls[0][0]).toMatchObject({ first_name: "Jose\u0301 \u674e  Anne-Marie", last_name: "D\u2019Arcy O'Neill" });
+    expect(register.mock.calls[0][0]).not.toHaveProperty("middle_initial");
   });
 });
