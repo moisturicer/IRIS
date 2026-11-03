@@ -87,6 +87,10 @@ for path in /admin/ /admin/users /admin/role-requests /admin/audit /rdco/ /rdco/
         fail "$path: expected the app's index.html (200), got '$status'"
     fi
 done
+# The admin's stylesheets and scripts are Django's static files, so they go to
+# the backend even though they end in .css or .js (IR-782).
+expect "the admin's stylesheet goes to Django" 502 /static/admin/css/base.css
+expect "the admin's script goes to Django" 502 /static/admin/js/core.js
 
 echo "== the direct peer is listed, no proxy in front"
 start -e DJANGO_ADMIN_ALLOWED_NETWORKS=127.0.0.1/32 -e TRUSTED_PROXY_COUNT=1 || fail "nginx did not start"
