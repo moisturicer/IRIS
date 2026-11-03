@@ -185,3 +185,15 @@ restricted PostgreSQL roles, out-of-order completion, revocation/deletion,
 independent-process lease takeover, RLS isolation and immutable output grants.
 Set `IRIS_TEST_LOCAL_DOCLING` to an on-prem test endpoint to run its generated
 two-page PDF through the real extractor; without it the check explicitly skips.
+
+
+### ADR-056 transition boundary
+
+ADR-056 supersedes Docling as the long-term extraction choice in favor of
+LlamaParse. The deployed selection remains Docling until the separate cutover.
+This worker is an isolated, transitional local-only pending-output path for
+IR-738; it does not adopt Docling as the future production extractor or bypass
+LlamaParse's disclosure, admission and version requirements. ADR-056 integration
+and the planned Docling retirement (IR-843) must be resolved before any live
+activation of this path. Paid extraction and a live writer switch are outside
+this ticket's authorization. No fallback to another extractor is added.

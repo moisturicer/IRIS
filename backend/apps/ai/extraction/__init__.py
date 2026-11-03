@@ -2,7 +2,7 @@
 
 The stage between an uploaded PDF and the chunker. It produces the
 ``NormalizedDocument`` that ``apps.ai.chunking`` consumes, and the flattened
-string full-text search indexes â€” derived from that same document, so the two
+string full-text search indexes — derived from that same document, so the two
 cannot disagree.
 
 Everything here except ``docling_client`` and ``selection`` is pure. The one module that does
@@ -65,7 +65,7 @@ __all__ = [
 
 
 def __getattr__(name):
-    # Pure extraction consumers do not need Django's selection/configuration boundary.
+    # Pure consumers do not need Django's selection/configuration boundary.
     if name in {'current_extractor', 'use_extractor', 'verify_extraction_configuration'}:
         from importlib import import_module
         return getattr(import_module('.selection', __name__), name)
