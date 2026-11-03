@@ -124,10 +124,10 @@ In production, `private` is an internal Compose network with no route to the int
 | `db`, `redis`, `migrate` | Nothing | Internal only |
 | `docling` | Nothing | It parses uploaded PDFs, so a hostile file stays contained. Its models are in the image |
 | `frontend` | Nothing | It serves files and forwards to `backend` |
-| `celery-extraction` | Nothing | It only calls Docling |
 | `celery-beat` | Nothing | It only queues tasks |
 | `backend`, `celery-default` | AI vendors, mail server | Answers and email |
 | `celery-embedding`, `celery-shadow` | AI vendors | Embedding, overviews and evidence decisions |
+| `celery-extraction` | LlamaParse and its result storage | It sends each permitted PDF to be read ([ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md), [IR-842](https://citiris.atlassian.net/browse/IR-842)). It also checks uploads with `pypdf`, so a hostile PDF that exploits that check now has a route out |
 | `ai-gateway` | AI vendors | Chat |
 | `caddy` | The certificate authority | Getting and renewing certificates |
 

@@ -159,6 +159,14 @@ python manage.py backfill_abstracts --dry-run [--classification NAME ...]
                                    # Record vectors embed title + abstract, so re-embed afterwards.
                                    # Refuses with DEBUG off unless --force. Verified on the dev
                                    # database 2026-10-31: 40 of 40 proxy papers
+python manage.py reextract_manuscripts --dry-run
+                                   # LlamaParse cutover (IR-842): prices every manuscript the consent and
+                                   # embargo gate permits, in credits and US$, and sends nothing. A real run
+                                   # needs --credit-ceiling N and EXTRACTION_BACKEND=llamaparse; it queues
+                                   # reads (gate + admission apply) and leaves the old ChunkSet active until
+                                   # the new one swaps in. --record N narrows it; --rollback reactivates the
+                                   # previous ChunkSet. Verified 2026-11-03 on 5 proxy papers (55 pages,
+                                   # 1,256 credits). Figure descriptions not exercised
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 python manage.py run_research_tool --user EMAIL --call TOOL='{json}' [--call ...]
                                    # run research-lane tools as a user, no model
