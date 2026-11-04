@@ -23,7 +23,7 @@ from typing import Mapping, Optional
 
 from ai.admission.errors import AdmissionDenied
 from ai.admission.limits import Price
-from ai.agent import assurance
+from ai.agent import assurance, checkpoint
 from ai.agent.budget import Bounds, Budget, profiles as checked_profiles
 from ai.agent.context import (
     CONTEXT_EXHAUSTED, REQUEST_BYTES_EXCEEDED, FittedAgentProvider, OverCapacity, Reserves, measure, output_cap,
@@ -250,6 +250,11 @@ class _Run:
             manuscripts=version == MANUSCRIPT_TOOL_VERSION)
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
+        # Whatever an earlier fence spent stays spent, the attempt it left uncertain included (IR-724).
+        spent = context.spent or {}
+        self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0),
+                            attempts=spent.get("attempts", 0))
+        self.task = checkpoint.task_key(question, context.prior, context.state or {})
 
     def request(self, history, *, closed=False) -> AgentRequest:
         pin = self.agent.pin
@@ -258,17 +263,8 @@ class _Run:
                             tools=self.investigation.specs(), tool_choice="none" if closed else "auto")
 
     async def run(self) -> Result:
-        history: list = []
-        for turn in self.prior:
-            answer = DELIVERED_MARKER.sub("", turn.answer)
-            history += [User(turn.question), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
-        shown = await self.investigation.recall(self.context.state or {})
-        if shown:
-            history.append(User("[IRIS conversation state] " + json.dumps(shown, ensure_ascii=False)))
-        # The reader's words, unchanged, whatever queries the agent forms.
-        history.append(User(self.question))
-
-        stale = 0
+        resumed = await self._resume()
+        history, stale = resumed if resumed is not None else (await self._open(), 0)
         while self._may_gather(stale):
             try:
                 request, status = self.agent.estimate(self.request(history))
@@ -306,6 +302,7 @@ class _Run:
             history = list(packed.history)
             self.investigation.packed(history[len(history) - len(results):])
             stale = 0 if progressed else stale + 1
+            await self._save(history, stale)
 
         if self.steps:
             history.append(User(FINAL_NOTE))
@@ -325,6 +322,59 @@ class _Run:
         rest = [ToolResult(c.id, "{}") for c in unanswered]
         closing = self.request([*history, *results, *rest, User(FINAL_NOTE)], closed=True)
         return self.agent.room(closing, self.budget)
+
+    async def _open(self) -> list:
+        history: list = []
+        for turn in self.prior:
+            answer = DELIVERED_MARKER.sub("", turn.answer)
+            history += [User(turn.question), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
+        shown = await self.investigation.recall(self.context.state or {})
+        if shown:
+            history.append(User("[IRIS conversation state] " + json.dumps(shown, ensure_ascii=False)))
+        # The reader's words, unchanged, whatever queries the agent forms.
+        history.append(User(self.question))
+        return history
+
+    async def _resume(self) -> Optional[tuple[list, int]]:
+        """The Conversation an earlier fence completed, verified now; None to start afresh (IR-724).
+
+        A step that no longer matches this run, or whose evidence the reader
+        can no longer read as it was read, is rebuilt from the reader's
+        question and the Conversation instead. Either way what was spent stays
+        spent and the steps taken stay taken, so the bounds are not renewed.
+        """
+        saved = self.context.checkpoint
+        if not saved:
+            return None
+        self.steps = max(self.steps, int(saved.get("step") or 0))
+        restored = checkpoint.load(saved.get("body"), pin=self.agent.pin, bounds=self.bounds, task=self.task)
+        reason = "incompatible" if restored is None else await self.tools.reauthorize(
+            restored.handles(), restored.counted())
+        if reason in ENDS_RUN:
+            raise Unavailable(reason)
+        if reason is not None:
+            await self._journal("recovery", {"outcome": "rebuilt", "reason": reason, "step": self.steps})
+            return None
+        restored.apply(self.investigation)
+        self.steps = max(self.steps, restored.steps)
+        spent = restored.budget
+        self.budget.restore(spent["input"], spent["output"], spent["reported"], spent["attempts"])
+        await self._journal("recovery", {"outcome": "resumed", "step": self.steps})
+        return restored.history, restored.stale
+
+    async def _save(self, history: list, stale: int) -> None:
+        """Keep this completed step for a worker that takes the run over (IR-724)."""
+        if self.context.save is None:
+            return
+        body = checkpoint.dump(pin=self.agent.pin, bounds=self.bounds, task=self.task, history=history,
+                               investigation=self.investigation, budget=self.budget,
+                               steps=self.steps, stale=stale)
+        if not await self.context.save(self.steps, body):
+            raise Unavailable("run_ended")
+
+    async def _journal(self, name: str, data: dict) -> None:
+        if not await self.tools.journal(name, data):
+            raise Unavailable("run_ended")
 
     def _may_gather(self, stale: int) -> bool:
         return (self.steps < self.bounds.max_steps

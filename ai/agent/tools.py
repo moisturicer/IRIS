@@ -215,7 +215,8 @@ class Investigation:
     papers: dict[int, tuple[str, str]] = field(default_factory=dict)
     #: Numbers the tools computed (coverage), which an answer may state.
     figures: set[str] = field(default_factory=set)
-    results: list[Evidence] = field(default_factory=list)
+    #: Evidence reads that returned something.
+    reads: int = 0
     plan: tuple[dict, ...] = ()
     plan_revision: int = 0
     selected: Optional[tuple[int, ...]] = None
@@ -230,7 +231,7 @@ class Investigation:
     terms: set[str] = field(default_factory=set)
     searched: bool = False
     #: Manuscript revision -> what this run read of it (IR-733).
-    reads: dict[str, ManuscriptRead] = field(default_factory=dict)
+    readings: dict[str, ManuscriptRead] = field(default_factory=dict)
     #: Tool call id -> (revision, positions) a read returned, until packing says whether it was shown.
     unpacked: dict[str, tuple[str, tuple[int, ...]]] = field(default_factory=dict)
     #: Tools that failed during the run, in order of first failure (IR-731).
@@ -243,7 +244,7 @@ class Investigation:
 
     @property
     def researched(self) -> bool:
-        return bool(self.results)
+        return self.reads > 0
 
     def titles(self) -> set[str]:
         return {title.casefold().strip() for _, title in self.papers.values()}
@@ -344,7 +345,7 @@ class Investigation:
             withheld = isinstance(body, dict) and "withheld" in body
             if not withheld:
                 revision, positions = pending
-                self.reads[revision].visible.update(positions)
+                self.readings[revision].visible.update(positions)
 
     def _ended(self, result: Evidence) -> None:
         if result.reason in ENDS_RUN:
@@ -357,7 +358,7 @@ class Investigation:
         if result.reason:
             body["reason"] = result.reason
         if result.status in (OK, PARTIAL):
-            self.results.append(result)
+            self.reads += 1
         for record in result.records:
             self.papers.setdefault(record.record_id, (record.handle, record.title))
             new = new or ("paper", record.record_id) not in self.seen
@@ -403,9 +404,9 @@ class Investigation:
         """Fold one manuscript read into the run's coverage and say it to the model (IR-733)."""
         reading = result.reading
         (source,) = result.dependencies
-        read = self.reads.get(source.revision)
+        read = self.readings.get(source.revision)
         if read is None:
-            read = self.reads[source.revision] = ManuscriptRead(source.record_id, reading.title, reading)
+            read = self.readings[source.revision] = ManuscriptRead(source.record_id, reading.title, reading)
         read.reading = reading
         start = reading.covered.first if reading.covered else 0
         positions = tuple(range(start, start + len(result.passages)))
@@ -484,7 +485,7 @@ class Investigation:
         if not await self.research.journal("plan", {
             "revision": self.plan_revision, "steps": list(self.plan),
             # Calls run before this one.
-            "executed": {"tool_calls": self.tool_calls - 1, "evidence_reads": len(self.results)},
+            "executed": {"tool_calls": self.tool_calls - 1, "evidence_reads": self.reads},
         }):
             raise RunEnded("run_ended")
         return Outcome(json.dumps({"status": "ok", "revision": self.plan_revision}))

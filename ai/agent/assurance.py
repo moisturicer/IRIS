@@ -251,7 +251,7 @@ def reading_coverage(citations, investigation: Investigation) -> list[dict]:
         "pages_no_passage_starts_on": len(read.reading.pages_no_passage_starts_on),
         "formula_passages": read.reading.formulas, "caption_passages": read.reading.captions,
         "visual_interpretation": False, "exhaustive": False,
-    } for revision, read in investigation.reads.items() if revision in cited_revisions]
+    } for revision, read in investigation.readings.items() if revision in cited_revisions]
 
 
 def deliver(text: str, investigation: Investigation) -> tuple[str, tuple[Citation, ...]]:

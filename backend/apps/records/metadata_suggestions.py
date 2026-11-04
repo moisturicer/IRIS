@@ -30,8 +30,8 @@ with the page, region and matching text it cites and the confidence
 LlamaExtract reported. While that reading runs the state is ``pending``. If it
 failed, was refused or never ran, the shaped document's title and abstract are
 read by the rules below; LlamaParse papers are not read for labelled front
-matter. A paper the disclosure gate now refuses is ``unsupported``. The Docling
-path is unchanged until IR-843.
+matter. A paper the disclosure gate now refuses is ``unsupported``. A structure
+stored before IR-843 retired Docling is still read by the rules below.
 """
 
 import os
@@ -237,8 +237,8 @@ def _entry(value, basis: Basis, element: Optional[DocumentElement], *, auto: boo
 def _title(document: NormalizedDocument, elements, stored_name: str) -> Optional[dict]:
     """The structure's title, unless it is only the manuscript's file name.
 
-    Docling falls back to the file name when a PDF names itself nothing (see
-    ``normalized_document_from_docling``), and the draft's provisional title
+    An Extractor falls back to the file name when a PDF names itself nothing,
+    and the draft's provisional title
     is the file name too, so offering it would suggest back what is already
     there (spec §4.5).
     """

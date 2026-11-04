@@ -7,6 +7,7 @@ import io
 import json
 import uuid
 from dataclasses import asdict
+from pathlib import Path
 
 import asyncpg
 from pypdf import PdfReader
@@ -18,6 +19,26 @@ from apps.ai.extraction.ports import IncompleteExtraction
 
 class IncompleteCoverage(Exception):
     pass
+
+
+class LocalSource:
+    """Read only the storage key supplied by verified processing authority."""
+
+    def __init__(self, root, max_bytes):
+        self.root = Path(root).resolve(strict=True)
+        if not self.root.is_dir() or max_bytes < 1:
+            raise ValueError('a media directory and positive byte limit are required')
+        self.max_bytes = max_bytes
+
+    def __call__(self, key):
+        path = (self.root / key).resolve(strict=True)
+        if not path.is_relative_to(self.root) or not path.is_file():
+            raise ValueError('source is outside local storage')
+        with path.open('rb') as source:
+            content = source.read(self.max_bytes + 1)
+        if len(content) > self.max_bytes:
+            raise ValueError('source exceeds the configured extraction limit')
+        return content
 
 
 async def _source(conn, token):

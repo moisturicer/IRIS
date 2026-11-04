@@ -835,6 +835,50 @@ export default function PaperViewPage() {
     document.getElementById(tabId(next))?.focus();
   };
 
+  const viewAction = hasPaper && (
+    <button
+      type="button"
+      onClick={() => setViewParam("section", "paper")}
+      className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
+    >
+      <i className="fas fa-book-open text-xs" aria-hidden />
+      View
+    </button>
+  );
+
+  const saveCiteShareActions = (
+    <>
+      <PaperSaveDropdown
+        record={record}
+        variant="pill"
+        emphasis={primary === "save" ? "primary" : "secondary"}
+      />
+
+      <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
+        <i className="fas fa-quote-right text-2xs" aria-hidden />
+        Cite
+      </button>
+
+      <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
+        <i
+          className={cn(
+            "fas text-2xs",
+            shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
+          )}
+          aria-hidden
+        />
+        {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
+      </button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {shareState === "copied"
+          ? "Link to this paper copied"
+          : shareState === "failed"
+            ? "Couldn’t copy the link. Copy it from the address bar."
+            : ""}
+      </span>
+    </>
+  );
+
   return (
     // The `reading` container (IR-569): its width, not the window's, lays
     // out the page. Paper is a full-height workspace (record bar, then the
@@ -918,7 +962,7 @@ export default function PaperViewPage() {
                 what to do with it. Not in Paper mode, where the record bar
                 holds the paper in one line (IR-569). */}
             {!onPaperTab && !reviewerWorkspace && (
-            <header className="space-y-5">
+            <header className={cn("space-y-5", section === "overview" && "pb-1")}>
               <p className="flex items-center gap-x-2 text-small text-stone-500">
                 <span>Added {formatDate(record.created_at)}</span>
                 <span aria-hidden className="text-stone-300">·</span>
@@ -996,70 +1040,34 @@ export default function PaperViewPage() {
                 />
               )}
 
-              {/* View · Save · Cite · Share, plus what the capabilities add.
-                  One filled pill (IR-356): see `primary` above. */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {primary === "continue" && (
-                  <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
-                    <i className="fas fa-pen-to-square text-xs" aria-hidden />
-                    Continue
-                  </Link>
-                )}
+              {(section !== "overview" || primary === "continue" || primary === "open_review" || can.has("edit_details")) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {primary === "continue" && (
+                    <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
+                      <i className="fas fa-pen-to-square text-xs" aria-hidden />
+                      Continue
+                    </Link>
+                  )}
 
-                {primary === "open_review" && (
-                  <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
-                    <i className="fas fa-clipboard-check text-xs" aria-hidden />
-                    Open review
-                  </button>
-                )}
+                  {primary === "open_review" && (
+                    <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
+                      <i className="fas fa-clipboard-check text-xs" aria-hidden />
+                      Open review
+                    </button>
+                  )}
 
-                {hasPaper && (
-                  <button
-                    type="button"
-                    onClick={() => setViewParam("section", "paper")}
-                    className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
-                  >
-                    <i className="fas fa-book-open text-xs" aria-hidden />
-                    View
-                  </button>
-                )}
+                  {section !== "overview" && viewAction}
 
-                {can.has("edit_details") && (
-                  <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
-                    <i className="fas fa-pen text-2xs" aria-hidden />
-                    Edit details
-                  </button>
-                )}
+                  {can.has("edit_details") && (
+                    <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
+                      <i className="fas fa-pen text-2xs" aria-hidden />
+                      Edit details
+                    </button>
+                  )}
 
-                <PaperSaveDropdown
-                  record={record}
-                  variant="pill"
-                  emphasis={primary === "save" ? "primary" : "secondary"}
-                />
-
-                <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
-                  <i className="fas fa-quote-right text-2xs" aria-hidden />
-                  Cite
-                </button>
-
-                <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
-                  <i
-                    className={cn(
-                      "fas text-2xs",
-                      shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
-                    )}
-                    aria-hidden
-                  />
-                  {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
-                </button>
-                <span className="sr-only" role="status" aria-live="polite">
-                  {shareState === "copied"
-                    ? "Link to this paper copied"
-                    : shareState === "failed"
-                      ? "Couldn’t copy the link. Copy it from the address bar."
-                      : ""}
-                </span>
-              </div>
+                  {section !== "overview" && saveCiteShareActions}
+                </div>
+              )}
             </header>
             )}
 
@@ -1191,7 +1199,7 @@ export default function PaperViewPage() {
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="text-lg text-stone-700 leading-7">
+                    <p className="max-w-[68ch] text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (
@@ -1199,6 +1207,10 @@ export default function PaperViewPage() {
                       No abstract was provided for this record.
                     </p>
                   )}
+                  <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-2.5">
+                    {viewAction}
+                    {saveCiteShareActions}
+                  </div>
                 </section>
 
                 <PaperAiOverview record={record} />

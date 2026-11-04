@@ -32,7 +32,7 @@ The existing Record writer commits `abstract_file`, a fresh opaque `manuscript_r
 
 Chunk messages also carry the revision. The chunk task locks the same Record/extraction through activation and scheduling, so replacement cannot race the swap. Persisted `ChunkSet.source_revision` identifies the source consumed; embedding handoffs pin that revision and chunk-set ID and refuse inactive/replaced sets. Existing outbound disclosure guards remain in force. Supplementary uploads remain outside the research corpus by `DocumentKind`, independent of upload route.
 
-While an owner prepares an unsubmitted revised Manuscript, its current extraction is pending with `phase=awaiting_submission`; it is not sent to Docling and the submitted paper's active chunks remain in place. Submission switches extraction/indexing to the new source. Version rows preserve source identity for restoration. Accepted source files are never deleted as part of replacement.
+While an owner prepares an unsubmitted revised Manuscript, its current extraction is pending with `phase=awaiting_submission`; it is not sent to the Extractor and the submitted paper's active chunks remain in place. Submission switches extraction/indexing to the new source. Version rows preserve source identity for restoration. Accepted source files are never deleted as part of replacement.
 
 ## Reader contract and recovery
 

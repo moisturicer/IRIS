@@ -102,9 +102,9 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 ## 7 · Boundaries
 
-**Production** (`docker-compose.prod.yml`) publishes only `frontend`. `db`, `redis`, `backend`, `docling`, `ai-gateway` and the Celery services stay on the Compose network. Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)).
+**Production** (`docker-compose.prod.yml`) publishes only `frontend`. `db`, `redis`, `backend`, `ai-gateway` and the Celery services stay on the Compose network. Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)).
 
-**Development** (`docker-compose.yml`) publishes Postgres and Redis on `127.0.0.1` only, and Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)). `backend`, `frontend` and `docling` are still published on every interface (§11).
+**Development** (`docker-compose.yml`) publishes Postgres and Redis on `127.0.0.1` only, and Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)). `backend` and `frontend` are still published on every interface (§11). The `docling` service was removed by IR-843.
 
 **TLS.** nginx listens on plain 8080 and takes the scheme from the proxy in front of it, so TLS must end upstream. This repository doesn't configure that proxy (§11).
 
@@ -122,7 +122,6 @@ In production, `private` is an internal Compose network with no route to the int
 | Service | Reaches outside | Why |
 |---|---|---|
 | `db`, `redis`, `migrate` | Nothing | Internal only |
-| `docling` | Nothing | It parses uploaded PDFs, so a hostile file stays contained. Its models are in the image |
 | `frontend` | Nothing | It serves files and forwards to `backend` |
 | `celery-beat` | Nothing | It only queues tasks |
 | `backend`, `celery-default` | AI vendors, mail server | Answers and email |
@@ -143,7 +142,7 @@ In production, `private` is an internal Compose network with no route to the int
 2. **Voyage's training opt-out**, an account setting. The repository can't show whether it was exercised (§11).
 3. **`VOYAGE_API_KEY` as a production secret.**
 
-[ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md) sends **whole Manuscript PDFs** to LlamaParse once [IR-842](https://citiris.atlassian.net/browse/IR-842) sets `EXTRACTION_BACKEND=llamaparse`. Until then Docling reads them on campus. Its conditions:
+[ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md) sends **whole Manuscript PDFs** to LlamaParse the only Extractor since [IR-843](https://citiris.atlassian.net/browse/IR-843) removed Docling. Its conditions:
 
 1. **The same disclosure check**, read when a read is queued and again just before sending ([IR-850](https://citiris.atlassian.net/browse/IR-850)).
 2. **ADR-041 admission**, which refuses every read unless admission enforces.
@@ -225,7 +224,7 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | Lockout counted the proxy's address, not the client's | [IR-656](https://citiris.atlassian.net/browse/IR-656) |
 | A revoked session's access token kept working | [IR-657](https://citiris.atlassian.net/browse/IR-657) |
 | CI didn't run `ai/tests`, including the gateway's service authentication test | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
-| Development `backend`, `frontend` and `docling` listened on every interface | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
+| Development `backend` and `frontend` listened on every interface (`docling` removed by IR-843) | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
 | One office held workflow and system administration powers together | [IR-781](https://citiris.atlassian.net/browse/IR-781) |
 | Production HTTPS redirect loop behind the proxy | [IR-662](https://citiris.atlassian.net/browse/IR-662) |
 | No browser security headers | [IR-663](https://citiris.atlassian.net/browse/IR-663) |

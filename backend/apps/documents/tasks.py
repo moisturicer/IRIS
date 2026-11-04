@@ -1,4 +1,4 @@
-"""PDF extraction: Docling-serve in, structure out (IR-107, ADR-016).
+"""PDF extraction: a PDF in, structure out (IR-107, ADR-056).
 
 What this module used to be is worth recording, because it explains the shape
 it has now. It held a three-tier extractor chain — ``unstructured``, PyMuPDF,
@@ -8,13 +8,12 @@ file, so on a clean install all three fell through and extraction raised. It
 was scaffolding, and its own module docstring said so.
 
 It is replaced by one call to the Extractor ``apps.ai.extraction`` chooses
-(IR-838); this task never names a vendor. **There is no fallback extractor.** ADR-016
-retained PyMuPDF for Docling-serve unavailability; that clause is dropped —
-see the divergence note in the ADR. A second extractor produces documents
+(IR-838); this task never names a vendor. **There is no fallback extractor.**
+A second extractor produces documents
 without the structure this pipeline exists to consume, which means the
 fallback path silently yields chunks with no regions and citations that
 cannot be highlighted. Failing and retrying is the honest behaviour: the
-Celery retry below is what covers a container that is briefly down.
+Celery retry below is what covers a vendor that is briefly down.
 
 Only a transient failure retries (IR-839): an unavailable Extractor, after 1,
 3 and 9 minutes. Anything else, an unexpected exception included, fails once.
@@ -22,7 +21,7 @@ Only a transient failure retries (IR-839): an unavailable Extractor, after 1,
 The task stays thin on purpose. Reading bytes, persisting a row and moving a
 status through its states is all it does; every judgement — reading order,
 table shape, coordinate origin, what counts as a failure — lives in
-``apps.ai.extraction``, where it is pure and tested without a container.
+``apps.ai.extraction``, where it is pure and tested without a vendor.
 """
 
 import logging

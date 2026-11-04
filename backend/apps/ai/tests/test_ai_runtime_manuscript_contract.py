@@ -16,6 +16,7 @@ REPO = Path(__file__).resolve().parents[4]
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 
+from ai.agent import checkpoint  # noqa: E402
 from ai.agent.context import Capacity  # noqa: E402
 from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.agent.protocol import ToolCall, ToolResult as Answered  # noqa: E402
@@ -27,7 +28,7 @@ from ai.research.tools import (  # noqa: E402
 from ai.runs.executor import Unavailable  # noqa: E402
 from ai.runs.store import shown_facts  # noqa: E402
 from .test_ai_runtime_agent_loop_contract import (  # noqa: E402
-    ALLOWANCE, PIN, PROFILES, Corpus, call, context, handle, recording, reply, run, tools,
+    ALLOWANCE, ORDINARY, PIN, PROFILES, Corpus, call, context, handle, recording, reply, run, tools,
 )
 from .test_ai_runtime_context_contract import RESERVES  # noqa: E402
 
@@ -299,7 +300,7 @@ def test_a_read_withheld_by_packing_is_inspected_and_recoverable_but_never_count
     found = Investigation(Manuscript(), manuscripts=True)
     run(found.execute(ToolCall("r", "read_manuscript", json.dumps({"paper": PAPER})), room=1_000_000))
     found.packed([Answered("r", json.dumps({"withheld": "exceeds_context", "bytes": 9, "coverage": "none"}))])
-    [read] = found.reads.values()
+    [read] = found.readings.values()
     assert read.inspected == set(range(1, 31))
     assert read.visible == set()
     assert read.recoverable == read.inspected
@@ -309,7 +310,7 @@ def test_a_read_withheld_by_packing_is_inspected_and_recoverable_but_never_count
     shown = Investigation(Manuscript(), manuscripts=True)
     run(shown.execute(ToolCall("r", "read_manuscript", json.dumps({"paper": PAPER})), room=1_000_000))
     shown.packed([Answered("r", "{}")])
-    [read] = shown.reads.values()
+    [read] = shown.readings.values()
     assert read.visible == read.inspected and read.recoverable == set()
 
 
@@ -377,3 +378,27 @@ def test_a_read_cannot_choose_its_own_size_position_or_omit_its_paper(arguments)
     _, corpus = ask(provider)
     assert reads(corpus) == []
     assert sent(provider.requests[1], "r") == {"error": "invalid_arguments"}
+
+
+def test_reading_coverage_survives_a_checkpoint_round_trip():
+    # IR-724's checkpoint must carry IR-733's coverage, or a resumed run reports a different read.
+    body = texts()
+    tail = "and the gauges were recalibrated every fortnight during the season."
+    body[1] = "Section 2 notes " + tail
+    body[2] = tail + " Calibration drift stayed under 3 percent."
+    found = Investigation(Manuscript(body), metadata=True, manuscripts=True)
+    run(found.execute(ToolCall("r", "read_manuscript", json.dumps({"paper": PAPER})), room=3_000))
+    found.packed([Answered("r", "{}")])
+    [read] = found.readings.values()
+    assert read.reading.missing and read.reading.continue_after and read.visible
+
+    class Spent:
+        input, output, reported, attempts = 0, 0, 0, 0
+
+    saved = json.loads(json.dumps(checkpoint.dump(
+        pin=PIN_3, bounds=ORDINARY, task="t", history=[], investigation=found, budget=Spent, steps=1, stale=0)))
+    again = Investigation(None, metadata=True, manuscripts=True)
+    checkpoint.load(saved, pin=PIN_3, bounds=ORDINARY, task="t").apply(again)
+    assert again.readings == found.readings
+    assert again.passages == found.passages
+    assert any(p.overlap for p in again.passages.values())
