@@ -461,6 +461,10 @@ class RecordVersion(models.Model):
         related_name="record_versions",
     )
     created_at = models.DateTimeField(default=timezone.now)
+    #: True when this version's documents were reconstructed from upload
+    #: times rather than recorded at submission (ADR-058 §2, IR-872): every
+    #: version written before IR-872. Shown, so a guess is never read as a record.
+    documents_reconstructed = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["record", "number"]
@@ -472,6 +476,34 @@ class RecordVersion(models.Model):
 
     def __str__(self):
         return f"{self.record_id} v{self.number}"
+
+
+class RecordVersionDocument(models.Model):
+    """
+    One upload slot's document as it stood when a version was submitted
+    (ADR-058 §2, IR-872). `write_version` writes one row per slot that had a
+    file; a slot with nothing uploaded gets no row. A document uploaded
+    between versions is not stored here: "added during vN" is read from upload
+    times (`versions.documents_added_during`).
+
+    **`upload` is `RESTRICT`**: no code may delete a document a version names.
+    A record's own hard delete still cascades through both, because RESTRICT,
+    unlike PROTECT, allows a delete that removes the version too.
+    """
+
+    version = models.ForeignKey(RecordVersion, on_delete=models.CASCADE, related_name="documents")
+    upload  = models.ForeignKey(
+        "documents.RecordUpload", on_delete=models.RESTRICT, related_name="version_documents",
+    )
+
+    class Meta:
+        ordering = ["version", "upload__slot__name", "upload_id"]
+        constraints = [
+            models.UniqueConstraint(fields=["version", "upload"], name="version_document_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.version} · upload {self.upload_id}"
 
 
 class EmbargoReminder(models.Model):

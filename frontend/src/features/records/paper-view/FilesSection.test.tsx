@@ -19,7 +19,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { fireEvent, renderScreen, screen, waitFor, within } from "@/test/render";
-import type { RecordFile, SlotWithUploads } from "@/types/documents";
+import type { RecordFile, RecordUpload, SlotWithUploads } from "@/types/documents";
 import type { DocumentRequest, DocumentRequestItem, RecordDetail } from "@/types/records";
 
 import { FilesSection } from "./FilesSection";
@@ -36,6 +36,7 @@ const uploadForRequestItem = vi.fn();
 const uploadRecordFile = vi.fn();
 const uploadManuscript = vi.fn();
 const deleteFile = vi.fn();
+const deleteUpload = vi.fn();
 
 /** The server's answer to an owner's upload: every open missing item it answers. */
 function answer(match: (item: DocumentRequestItem) => boolean) {
@@ -70,7 +71,7 @@ vi.mock("@/api/documents", () => ({
     deleteFile: (fileId: number) => deleteFile(fileId),
     downloadUpload: vi.fn(),
     downloadFile: vi.fn(),
-    deleteUpload: vi.fn(),
+    deleteUpload: (uploadId: number) => deleteUpload(uploadId),
   },
 }));
 
@@ -249,6 +250,66 @@ describe("the Files section, for the owner of an editable record", () => {
   });
 });
 
+// IR-872 (ADR-058 §2): a file a version names, or one that answered a document
+// request, is kept; the server says which. Every other removal asks first.
+describe("removing a document version", () => {
+  function version(id: number, n: number, refused: string | null): RecordUpload {
+    return {
+      id, record: RECORD_ID, slot: ETHICS, slot_name: "Ethics Clearance", file: "", version: n,
+      status: null, status_name: null, uploaded_by: 50, uploaded_by_name: "Sam Student",
+      created_at: "2026-09-22T02:00:00Z", reviews: [], delete_refused: refused,
+    };
+  }
+
+  beforeEach(() => {
+    requests = [];
+    deleteUpload.mockReset().mockResolvedValue({ data: null });
+    slots = [{
+      ...slot(ETHICS, "Ethics Clearance"),
+      uploads: [
+        version(301, 2, null),
+        version(300, 1, "v1 was submitted with this file, so it can't be deleted. Upload a corrected version instead."),
+      ],
+    }];
+  });
+
+  it("offers no Remove on a kept version, and says why", async () => {
+    const { container } = renderFiles({ editable: true });
+
+    const versions = await screen.findByRole("list", { name: "Versions of Ethics Clearance" });
+    expect(within(versions).queryByRole("button", { name: "Remove Ethics Clearance version 1" })).not.toBeInTheDocument();
+    expect(within(versions).getByText(/v1 was submitted with this file/)).toBeInTheDocument();
+    expect(within(versions).getByRole("button", { name: "Remove Ethics Clearance version 2" })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
+  });
+
+  it("asks before removing, and Cancel removes nothing", async () => {
+    renderFiles({ editable: true });
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Ethics Clearance version 2" }));
+
+    const dialog = await screen.findByRole("dialog", { name: "Remove Ethics Clearance version 2?" });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    expect(deleteUpload).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Remove Ethics Clearance version 2" }));
+    fireEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Remove" }));
+    await waitFor(() => expect(deleteUpload).toHaveBeenCalledWith(301));
+  });
+
+  it("keeps the dialog open with the server's reason when a removal is refused", async () => {
+    deleteUpload.mockRejectedValueOnce({
+      response: { status: 400, data: { detail: "This file answered a document request, so it can't be deleted." } },
+    });
+    renderFiles({ editable: true });
+    fireEvent.click(await screen.findByRole("button", { name: "Remove Ethics Clearance version 2" }));
+    const dialog = await screen.findByRole("dialog");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
+
+    expect(await within(dialog).findByText(/answered a document request/)).toBeInTheDocument();
+  });
+});
+
 describe("the Files section, for a reviewer", () => {
   it("offers no upload, and shows each requested document's state", async () => {
     renderFiles({ owner: false, reviewing: true });
@@ -272,6 +333,10 @@ describe("supplementary attachments", () => {
     await waitFor(() => expect(uploadRecordFile).toHaveBeenCalledWith(RECORD_ID, file, expect.any(Object)));
     const remove = await screen.findByRole("button", { name: "Remove ierc-minutes.docx" });
     fireEvent.click(remove);
+    // Changed on purpose (IR-872): every removal now asks first.
+    const dialog = await screen.findByRole("dialog", { name: "Remove ierc-minutes.docx?" });
+    expect(deleteFile).not.toHaveBeenCalled();
+    fireEvent.click(within(dialog).getByRole("button", { name: "Remove" }));
     await waitFor(() => expect(deleteFile).toHaveBeenCalledWith(70));
     await waitFor(() => expect(screen.queryByText("ierc-minutes.docx")).not.toBeInTheDocument());
   });
