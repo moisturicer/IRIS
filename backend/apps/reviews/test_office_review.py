@@ -246,6 +246,48 @@ class OfficeCompletionNotifiesRdcoTests(OfficeReviewTestBase):
             self.assertTrue(Notification.objects.filter(record=record, recipient=self.rdco,
                 message__contains=f"{party.upper()} finished").exists())
 
+    def test_offices_complete_independently_in_either_order(self):
+        """
+        IR-145: parallel offices finish in either order, and one office's
+        clearance never moves the other's. RDCO holds the record throughout
+        (ADR-047 §4).
+        """
+        from .models import RecordClearance
+
+        orders = (
+            ((Party.ITSO, self.itso), (Party.IERC, self.ierc)),
+            ((Party.IERC, self.ierc), (Party.ITSO, self.itso)),
+        )
+        for order in orders:
+            with self.subTest(first=order[0][0]):
+                record = self.routed(Party.ITSO, Party.IERC)
+                rdco = self.rdco_assignments(record).get()
+                (first, first_reviewer), (second, second_reviewer) = order
+
+                self.opened_seat(record, first, first_reviewer)
+                self.cleared(record, first_reviewer)
+                self.assertEqual(
+                    RecordAssignment.objects.get(record=record, party=first).state,
+                    AssignmentState.COMPLETED,
+                )
+                self.assertEqual(
+                    RecordAssignment.objects.get(record=record, party=second).state,
+                    AssignmentState.ACTIVE,
+                )
+                self.assertNotEqual(
+                    RecordClearance.objects.get(record=record, office=second).status,
+                    ClearanceStatus.CLEARED,
+                )
+
+                self.opened_seat(record, second, second_reviewer)
+                self.cleared(record, second_reviewer)
+                self.assertEqual(
+                    dict(RecordClearance.objects.filter(record=record)
+                         .values_list("office", "status")),
+                    {Party.ITSO: ClearanceStatus.CLEARED, Party.IERC: ClearanceStatus.CLEARED},
+                )
+                self.assertEqual(self.rdco_assignments(record).get().pk, rdco.pk)
+
     def test_the_owners_hear_each_office_finish_and_no_single_verdict(self):
         record = self.routed(Party.IERC)
         self.opened_seat(record, Party.IERC, self.ierc)

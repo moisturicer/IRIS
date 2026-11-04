@@ -54,6 +54,13 @@ import PaperViewPage from "./PaperViewPage";
 import { citationNavigationState } from "@/lib/citedPage";
 import { formatDate } from "@/lib/utils";
 
+// The Django path; which path answers is the deployment's switch (IR-863),
+// tested in RAGChatPage.runtime.test.tsx and RAGChatPage.switchOff.test.tsx.
+vi.mock("@/api/runtimeReader", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/runtimeReader")>()),
+  useReaderPath: () => "django",
+}));
+
 vi.mock("@/config/institution", () => ({
   INSTITUTION: { name: "Example Research University", shortName: "ERU", logo: "example.png", emailDomain: "example.edu" },
 }));

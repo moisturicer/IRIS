@@ -1,7 +1,43 @@
+import { useEffect, useState } from "react";
 import { apiClient } from "./client";
 
 export const READER_PROTOCOL = "runs-reader-1";
-export const runtimeReaderEnabled = import.meta.env.VITE_AI_RUNTIME_READER_ENABLED === "true";
+
+/** Which path answers Ask IRIS: the deployment's choice, never the browser's (IR-863). */
+export type ReaderPath = "runtime" | "django";
+let knownPath: ReaderPath | undefined;
+let readingPath: Promise<ReaderPath> | undefined;
+
+/**
+ * Reads `AI_RUNTIME_READER` once per page load. Unreadable means Django, the
+ * path that answered before the switch existed; that is not remembered, so the
+ * next surface to open asks again.
+ */
+export function loadReaderPath(): Promise<ReaderPath> {
+  readingPath ??= apiClient.get<{ path: string }>("/ai/reader/").then(
+    ({ data }) => (knownPath = data.path === "runtime" ? "runtime" : "django"),
+    () => { readingPath = undefined; return "django" as const; },
+  );
+  return readingPath;
+}
+
+/** `undefined` until the switch has been read. */
+export function useReaderPath(): ReaderPath | undefined {
+  const [path, setPath] = useState(knownPath);
+  useEffect(() => {
+    if (path) return;
+    let current = true;
+    void loadReaderPath().then((next) => { if (current) setPath(next); });
+    return () => { current = false; };
+  }, [path]);
+  return path;
+}
+
+/** Forget the switch, so the next surface reads it again. */
+export function resetReaderPath() {
+  knownPath = undefined;
+  readingPath = undefined;
+}
 export type Depth = "ordinary" | "deep";
 export interface ReaderRun {
   protocol: typeof READER_PROTOCOL;
@@ -29,8 +65,13 @@ export interface ReaderConversation {
 
 export const activeRun = (run: ReaderRun) => run.state === "queued" || run.state === "running";
 
+export const RELOAD_TO_RECONNECT = "Please reload to reconnect to Ask IRIS.";
+
+/** The server speaks a reader protocol this page does not. */
+export class ProtocolMismatch extends Error {}
+
 function checked<T extends { protocol: string }>(data: T): T {
-  if (data.protocol !== READER_PROTOCOL) throw new Error("Please reload to reconnect to Ask IRIS.");
+  if (data.protocol !== READER_PROTOCOL) throw new ProtocolMismatch(RELOAD_TO_RECONNECT);
   return data;
 }
 
