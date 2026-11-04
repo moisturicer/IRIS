@@ -35,7 +35,7 @@ RUN_KEYS = {
     "capabilities",
 }
 CONVERSATION_KEYS = {"protocol", "id", "revision", "runs", "turns"}
-TURN_KEYS = {"id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations"}
+TURN_KEYS = {"id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations", "facts"}
 CITATION_KEYS = {"record_id", "page", "quote", "revision"}
 UUID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
