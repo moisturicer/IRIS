@@ -52,6 +52,8 @@ export interface ReaderRun {
   sources_available: boolean;
   plan: null | { revision: number; steps: { id: string; title: string; status: "pending" | "in_progress" | "done" | "blocked" }[] };
   context: null | { estimated: true; used_tokens: number; capacity_tokens: number };
+  /** Older context condensed into a summary; the original Turns stay (IR-735). Absent from older servers. */
+  compaction?: null | { compactions: number; turns_compacted: number; last: "compacted" | "kept" };
   capabilities: { manual_compaction: boolean };
 }
 export interface ReaderConversation {

@@ -4,7 +4,8 @@ import { MemoryRouter } from "react-router-dom";
 import { vi, expect, test, afterEach } from "vitest";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { apiClient } from "@/api/client";
-import { RuntimeReader } from "./RuntimeReader";
+import { ResearchProgress, RuntimeReader } from "./RuntimeReader";
+import type { ReaderRun } from "@/api/runtimeReader";
 
 afterEach(() => vi.restoreAllMocks());
 
@@ -91,4 +92,20 @@ test("a revision conflict restores the draft and reconnects before resubmission"
   expect(post).toHaveBeenCalledTimes(1);
   await user.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(post.mock.calls[1][1]).toMatchObject({ base_revision: 2 }));
+});
+
+const running = { protocol: "runs-reader-1", id: "run-1", conversation_id: "conversation-1", question: "Compare",
+  state: "running", version: 1, depth: "ordinary", awaiting_reader: false, sources_available: true, plan: null,
+  context: { estimated: true, used_tokens: 900, capacity_tokens: 1000 },
+  capabilities: { manual_compaction: false } } as unknown as ReaderRun;
+
+test("reader is told, without internals, when earlier conversation was condensed", () => {
+  const { rerender } = render(<ResearchProgress run={running} />);
+  expect(screen.queryByText(/condensed/)).not.toBeInTheDocument();
+  rerender(<ResearchProgress run={{ ...running, compaction: { compactions: 1, turns_compacted: 3, last: "compacted" } }} />);
+  expect(screen.getByText(/condensed into a summary/)).toBeInTheDocument();
+  expect(screen.getByText(/Estimated context: 900 of 1,000 tokens/)).toBeInTheDocument();
+  // A summary that was tried and kept nothing says nothing.
+  rerender(<ResearchProgress run={{ ...running, compaction: { compactions: 0, turns_compacted: 0, last: "kept" } }} />);
+  expect(screen.queryByText(/condensed/)).not.toBeInTheDocument();
 });
