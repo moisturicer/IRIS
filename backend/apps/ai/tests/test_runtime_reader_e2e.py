@@ -14,7 +14,6 @@ Regenerate only on a deliberate change to the reader contract, with
 import json
 import os
 import re
-from pathlib import Path
 
 import pytest
 from rest_framework.test import APIClient
