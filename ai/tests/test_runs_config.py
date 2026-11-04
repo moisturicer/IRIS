@@ -45,6 +45,14 @@ def test_runs_need_a_database():
         config.read(settings(RUNS_DATABASE_URL=""))
 
 
+def test_a_running_service_refuses_the_maintenance_login():
+    # ADR-014's IR-826 amendment: only `python -m ai.runs.migrate` holds it.
+    held = settings(RUNS_MIGRATION_DATABASE_URL="postgresql://maintenance@db/iris")
+    assert config.problems(held) == ["RUNS_MIGRATION_DATABASE_URL must not be set on a running service"]
+    with pytest.raises(config.RunsUnavailable):
+        config.read(held)
+
+
 def test_each_depth_keeps_its_own_deadline():
     limits = config.read(settings()).limits
     assert limits.deadline_for("ordinary") == 120

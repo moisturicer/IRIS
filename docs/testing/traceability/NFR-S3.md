@@ -4,7 +4,7 @@
 
 **IR-97, 2026-11-02:** Status unchanged. `IR-58`, named here until IR-826, doesn't exist in Jira. The gateway's `DATABASE_URL` is tracked by IR-826.
 
-**IR-826, 2026-11-03:** Status unchanged. Both Compose files no longer give the gateway `DATABASE_URL`, so the IR-154 credential no longer reaches it. Its `iris_ai_runtime` login waits on ADR-014's Proposed amendment. See [IR-826](IR-826.md).
+**IR-826, 2026-11-03:** Status unchanged. Both Compose files no longer give the gateway `DATABASE_URL`, so the IR-154 credential no longer reaches it. ADR-014's amendment, accepted 2026-11-04, allows its `iris_ai_runtime` login. See [IR-826](IR-826.md).
 
 ## NFR-S3
 
@@ -16,4 +16,4 @@
 
 **Evidence:** `apps/tests/test_settings_validation.py` — **18 executed, 0 skipped**: 16 against the pure rules in `config/settings/validation.py` (blank-vs-absent, every production rule, accumulation) and 2 repository sweeps (no `CORS_ALLOW_ALL_ORIGINS` assignment; no retired credential literal). Plus the real modules booted end to end, six environments: good prod config boots; empty `ALLOWED_HOSTS`, `*`, an http origin, a blank `SECRET_KEY` and a blank `DB_PASSWORD` each raise `ImproperlyConfigured`; development boots unchanged. `docker compose config` validates both files with the vars set and fails by name without them. A CI step repeats the good/empty pair. `apps/ai/inference/tests/test_startup.py` — **20 executed, 0 skipped**: 16 against the pure rules (both mistakes, one typo across several variables reported once, every real task name and every legacy flat `LLM_*` variable accepted, blank-vs-absent key, accumulation) and 4 that run `manage.py check` in a subprocess — a per-task keyless model, the inherited flat `LLM_MODEL` with no key, and an unknown task name each exit non-zero naming the offender, while a run with nothing configured still exits 0. Three more in `test_profiles.py` pin what a refusal may name: a named vendor drops the inherited key from the list but not the inherited model. Verified red by disarming the `ready()` call
 
-**Status:** **PARTIAL** — every code-side criterion is met and tested. Open: **rotating the previously committed credentials is an operations step**, and the interim VPS environment is populated by `IR-157`. The gateway's `DATABASE_URL`, which contradicted [ADR-014](../../adr/014-ai-gateway-as-a-service.md) precondition 4 (no direct DB access), was removed by IR-826. Its `iris_ai_runtime` login waits on that ADR's Proposed amendment
+**Status:** **PARTIAL** — every code-side criterion is met and tested. Open: **rotating the previously committed credentials is an operations step**, and the interim VPS environment is populated by `IR-157`. The gateway's `DATABASE_URL`, which contradicted [ADR-014](../../adr/014-ai-gateway-as-a-service.md) precondition 4 (no direct DB access), was removed by IR-826. That ADR's accepted amendment allows its `iris_ai_runtime` login

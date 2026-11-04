@@ -3,8 +3,8 @@ The AI services are not handed Django's database login (IR-826, ADR-014 precondi
 
 Nothing under `ai/` reads `DATABASE_URL`; the DSN only carried the application
 credential into a process that can reach the internet. AI-owned runs use their
-own `RUNS_DATABASE_URL` login from `ai/.env`, which ADR-014's 2026-11-03
-amendment proposes allowing.
+own `RUNS_DATABASE_URL` login from `ai/.env`, which ADR-014's IR-826
+amendment allows.
 
 No database and no Django settings -- it reads files.
 """
@@ -44,3 +44,9 @@ def test_gateway_comment_names_this_ticket_not_the_missing_one(compose_file):
     block = _service_block(compose_file, "ai-gateway")
     assert "IR-826" in block
     assert re.search(r"\bIR-58\b", block) is None
+
+
+def test_the_shared_env_file_does_not_list_the_maintenance_login():
+    example = (REPO_ROOT / "ai" / ".env.example").read_text(encoding="utf-8")
+    active = [line for line in example.splitlines() if not line.lstrip().startswith("#")]
+    assert not [line for line in active if line.startswith("RUNS_MIGRATION_DATABASE_URL")]

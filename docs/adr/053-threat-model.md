@@ -103,7 +103,7 @@ Figure images go to the `describe_figure` vendor ([IR-852](https://citiris.atlas
 | | Threat | Control or gap |
 |---|---|---|
 | S | An outside caller uses the vendor key | Shared service secret, no published port, no CORS (`ai/main.py`) |
-| E | The gateway bypasses Django's visibility rule | Django's `DATABASE_URL` removed ([IR-826](https://citiris.atlassian.net/browse/IR-826)). Gap: it reads Records as `iris_ai_runtime`, under ADR-014's amendment, which is still Proposed |
+| E | The gateway bypasses Django's visibility rule | Django's `DATABASE_URL` removed ([IR-826](https://citiris.atlassian.net/browse/IR-826)). It reads Records as `iris_ai_runtime` under ADR-014's accepted amendment; `test_research_read_policy_db.py` holds the row policy to `visible_to` |
 
 ## Consequences
 

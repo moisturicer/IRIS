@@ -144,8 +144,8 @@ services:
       # No DATABASE_URL (IR-826, ADR-014 precondition 4): nothing here read
       # it, and it handed Django's login to a service with egress. AI-owned
       # runs still connect as iris_ai_runtime through RUNS_DATABASE_URL in
-      # ./ai/.env, hence depends_on db; ADR-014's 2026-11-03 amendment
-      # proposes allowing that login and is not yet decided.
+      # ./ai/.env, hence depends_on db; ADR-014's IR-826 amendment allows
+      # that login and no other.
       - UVICORN_WORKERS=4
       - MAX_CONCURRENT_LLM=80
     depends_on:
