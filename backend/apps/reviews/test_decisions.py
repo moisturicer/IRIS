@@ -14,7 +14,6 @@ from django.utils import timezone
 from rest_framework import status
 
 
-from apps.ai.policy.disclosure import Reason
 from apps.ai.policy.records import decision_for_record
 from apps.documents.models import DocumentRequest
 from apps.notifications.models import Notification
