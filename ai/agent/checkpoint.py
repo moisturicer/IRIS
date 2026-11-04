@@ -21,8 +21,8 @@ from ai.agent.protocol import (
     AgentRequest, BrokenExchange, IncompatibleContinuation, ModelTurn, Opaque, Pin, StopReason, Text,
     ToolCall, ToolGroup, ToolResult, User, check_history,
 )
-from ai.agent.tools import Investigation
-from ai.research.tools import Count, PassageRef, Source
+from ai.agent.tools import Investigation, ManuscriptRead
+from ai.research.tools import Count, PassageRef, Reading, Source, Span
 
 FORMAT = "agent-checkpoint-1"
 
@@ -121,7 +121,8 @@ def _load_count(raw: dict) -> Count:
 def _investigation(found: Investigation) -> dict:
     return {
         "passages": [{"handle": p.handle, "record_id": p.record_id, "page": p.page, "section": p.section,
-                      "text": p.text, "source": asdict(p.source)} for p in found.passages.values()],
+                      "text": p.text, "source": asdict(p.source), "overlap": p.overlap}
+                     for p in found.passages.values()],
         "papers": [[rid, handle, title] for rid, (handle, title) in found.papers.items()],
         "figures": sorted(found.figures), "exact": sorted(found.exact), "terms": sorted(found.terms),
         "reads": found.reads, "plan": list(found.plan), "plan_revision": found.plan_revision,
@@ -130,12 +131,14 @@ def _investigation(found: Investigation) -> dict:
         "seen": sorted((list(k) for k in found.seen), key=json.dumps),
         "tool_calls": found.tool_calls, "counts": [_count(c) for c in found.counts],
         "searched": found.searched, "outages": list(found.outages),
+        "readings": {revision: _reading(read) for revision, read in found.readings.items()},
     }
 
 
 def _restore_investigation(found: Investigation, raw: dict) -> None:
     found.passages = {p["handle"]: PassageRef(p["handle"], p["record_id"], p["page"], p["section"], p["text"],
-                                              Source(**p["source"])) for p in raw["passages"]}
+                                              Source(**p["source"]), int(p.get("overlap", 0)))
+                      for p in raw["passages"]}
     found.papers = {int(rid): (handle, title) for rid, handle, title in raw["papers"]}
     found.figures, found.exact, found.terms = set(raw["figures"]), set(raw["exact"]), set(raw["terms"])
     found.reads = int(raw["reads"])
@@ -149,6 +152,41 @@ def _restore_investigation(found: Investigation, raw: dict) -> None:
     found.searched = bool(raw["searched"])
     # A tool that failed before the takeover still qualifies the answer (IR-731).
     found.outages = [str(name) for name in raw["outages"]]
+    # What the run read of each Manuscript, so a resumed answer reports the same coverage (IR-733).
+    found.readings = {str(revision): _load_reading(read) for revision, read in raw.get("readings", {}).items()}
+
+
+def _span(span: Optional[Span]) -> Optional[list]:
+    return None if span is None else [span.first, span.last, span.first_page, span.last_page]
+
+
+def _load_span(raw) -> Optional[Span]:
+    return None if raw is None else Span(*raw)
+
+
+def _reading(read: ManuscriptRead) -> dict:
+    r = read.reading
+    return {
+        "record_id": read.record_id, "title": read.title,
+        "handles": [[n, h] for n, h in sorted(read.handles.items())], "visible": sorted(read.visible),
+        "reading": {"passages": r.passages, "covered": _span(r.covered),
+                    "missing": [_span(s) for s in r.missing], "pages": r.pages,
+                    "pages_no_passage_starts_on": list(r.pages_no_passage_starts_on),
+                    "formulas": r.formulas, "captions": r.captions, "overlap_chars": r.overlap_chars,
+                    "continue_after": r.continue_after, "title": r.title},
+    }
+
+
+def _load_reading(raw: dict) -> ManuscriptRead:
+    r = raw["reading"]
+    reading = Reading(passages=int(r["passages"]), covered=_load_span(r["covered"]),
+                      missing=tuple(_load_span(s) for s in r["missing"]), pages=r["pages"],
+                      pages_no_passage_starts_on=tuple(r["pages_no_passage_starts_on"]),
+                      formulas=int(r["formulas"]), captions=int(r["captions"]),
+                      overlap_chars=int(r["overlap_chars"]), continue_after=r["continue_after"],
+                      title=r["title"])
+    return ManuscriptRead(int(raw["record_id"]), raw["title"], reading,
+                          handles={int(n): h for n, h in raw["handles"]}, visible={int(n) for n in raw["visible"]})
 
 
 # --- Saving and restoring ----------------------------------------------------------
