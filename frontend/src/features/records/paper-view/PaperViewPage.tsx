@@ -35,11 +35,12 @@ import { ContinueProposal } from "../ContinueProposal";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
-  asSection,
   capabilitiesFor,
+  hasPaper as recordHasPaper,
   isOwner,
   isParticipant,
   isReviewing,
+  landingSection,
   seatToOpen,
   sectionsFor,
   type PaperSection,
@@ -430,10 +431,19 @@ export default function PaperViewPage() {
   // Before the early returns below, so the hooks that follow can use them.
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
   const sections = record ? sectionsFor(record, viewer) : [];
-  // The section asked for, else the reader for a citation's page, else
-  // Overview. One the viewer may not open is Overview too.
-  const asked = asSection(searchParams.get("section")) ?? (openAtPage != null ? "paper" : "overview");
-  const section: PaperSection = sections.includes(asked) ? asked : "overview";
+  // The section asked for, else the reader for a citation's page -- Paper, or
+  // a participant's Review, which holds their reader (IR-879) -- else
+  // Overview. One the viewer may not open is Overview too, and a
+  // participant's old Paper or Files link lands in Review.
+  const landing = landingSection(searchParams.get("section"), sections);
+  const readerSection: PaperSection = sections.includes("paper")
+    ? "paper"
+    : sections.includes("review")
+      ? "review"
+      : "overview";
+  const section: PaperSection = landing?.section ?? (openAtPage != null ? readerSection : "overview");
+  // Review's Documents drawer (ADR-032 §10, IR-879): `?documents=open`, or an old `?section=files`.
+  const documentsOpen = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
   // Still on the record being left while the next one loads.
   const arriving = loading || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
@@ -687,8 +697,8 @@ export default function PaperViewPage() {
   const chooseVersion = (n: number | null) =>
     setViewParams({
       version: n == null ? null : String(n),
-      ...(section !== "paper" && section !== "review" && sections.includes("paper")
-        ? { section: "paper" }
+      ...(section !== "paper" && section !== "review" && readerSection !== "overview"
+        ? { section: readerSection }
         : {}),
     });
   // A citation's regions and page are the current paper's (ADR-031), so an
@@ -775,7 +785,8 @@ export default function PaperViewPage() {
   // Review section's action bar -- the header fills nothing. The bar fills
   // its first granted action, so any granted review action puts the primary
   // there.
-  const hasPaper = sections.includes("paper");
+  // Where *View* opens the paper: Paper, or a participant's Review (IR-879).
+  const hasPaper = readerSection !== "overview" && recordHasPaper(record);
   const showRail = section === "overview" && !arriving;
   // Ask IRIS open beside the page leaves no room for the rail (IR-569).
   const railHidden = showRail && chat.open && !chatMinimized;
@@ -838,7 +849,7 @@ export default function PaperViewPage() {
   const viewAction = hasPaper && (
     <button
       type="button"
-      onClick={() => setViewParam("section", "paper")}
+      onClick={() => setViewParam("section", readerSection)}
       className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
     >
       <i className="fas fa-book-open text-xs" aria-hidden />
@@ -1246,29 +1257,23 @@ export default function PaperViewPage() {
                 onOpenReview={openReview}
                 onBarInset={setReviewBarInset}
                 can={can}
-                reader={sections.includes("paper") ? reader() : null}
+                reader={recordHasPaper(record) ? reader() : null}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
-                onAskAboutPaper={
-                  sections.includes("paper")
-                    ? () => {
-                        chat.setOpen(true);
-                        setViewParam("section", "paper");
-                      }
-                    : undefined
+                // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
+                documentsOpen={documentsOpen}
+                onDocuments={(open) => setViewParams({ documents: open ? "open" : null, section: "review" })}
+                documents={
+                  <FilesSection
+                    record={record}
+                    owner={userIsOwner}
+                    editable={can.has("edit_details")}
+                    reviewing={reviewing}
+                    attach={can.has("attach_file")}
+                    replaceManuscript={can.has("replace_manuscript")}
+                    onChanged={handleDocumentRequestChanged}
+                  />
                 }
-              />
-            )}
-
-            {section === "files" && (
-              <FilesSection
-                record={record}
-                owner={userIsOwner}
-                editable={can.has("edit_details")}
-                reviewing={reviewing}
-                attach={can.has("attach_file")}
-                replaceManuscript={can.has("replace_manuscript")}
-                onChanged={handleDocumentRequestChanged}
               />
             )}
             </div>
@@ -1304,7 +1309,7 @@ export default function PaperViewPage() {
                 <EmbargoCard record={record} onChanged={reloadRecord} />
                 <PaperDocuments
                   files={record.files}
-                  manageHref={participant ? `/records/${record.id}?section=files` : null}
+                  manageHref={participant ? `/records/${record.id}?section=review&documents=open` : null}
                 />
               </aside>
             </div>

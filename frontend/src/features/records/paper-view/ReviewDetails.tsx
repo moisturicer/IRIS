@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, downloadBlob, formatDate, joinLabels } from "@/lib/utils";
 import type { PaperPerson, RecordDetail, RecordTracker, TrackerPartyRow, TrackerPartyState, TrackerSeat } from "@/types/records";
 
@@ -53,12 +54,14 @@ export const detailsTarget = (ids: string, to: string) => `${ids}-details-${to}`
  * targets) and `addColleague` only when the viewer may take them; the two
  * stay separate controls.
  */
-export function ReviewDetails({ record, tracker, ids, requestReview, addColleague }: {
+export function ReviewDetails({ record, tracker, ids, requestReview, addColleague, onAllDocuments }: {
   record: RecordDetail;
   tracker: RecordTracker;
   ids: string;
   requestReview?: { targets: string[]; onOpen: () => void };
   addColleague?: ReactNode;
+  /** Open the Documents drawer, which replaced the Files section (IR-879). */
+  onAllDocuments?: () => void;
 }) {
   const requestNoteId = useId();
   const readable = tracker.reviews !== null;
@@ -144,6 +147,14 @@ export function ReviewDetails({ record, tracker, ids, requestReview, addColleagu
                   : recordsApi.manuscriptBlob(record.id)} />
               : "No manuscript recorded"}
           </li>
+          {/* The latest version's documents, and what arrived since (IR-872). */}
+          {[...(latest?.documents ?? []), ...(latest?.documents_added ?? [])].map((d) => (
+            <li key={`upload-${d.upload_id}`}>
+              <i className="fas fa-file-pdf mr-2 text-stone-500" aria-hidden />
+              <DocumentDownload name={`${d.slot} · v${d.version}`} filename={`${d.slot} v${d.version}.pdf`}
+                fetch={() => documentsApi.downloadUpload(d.upload_id)} />
+            </li>
+          ))}
           {record.files.map((f) => (
             <li key={f.id}>
               <i className="fas fa-paperclip mr-2 text-stone-500" aria-hidden />
@@ -157,6 +168,18 @@ export function ReviewDetails({ record, tracker, ids, requestReview, addColleagu
             </li>
           ))}
         </ul>
+        {latest?.documents_reconstructed && (latest.documents?.length ?? 0) > 0 && (
+          <p className="text-small text-stone-600">
+            <i className="fas fa-circle-info mr-1.5" aria-hidden />
+            v{latest.number} was submitted before IRIS kept each version&rsquo;s documents, so this list is a best guess.
+          </p>
+        )}
+        {onAllDocuments && (
+          <button type="button" onClick={onAllDocuments} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-3")}>
+            <i className="fas fa-folder-open text-2xs" aria-hidden />
+            All documents
+          </button>
+        )}
       </Section>
       {participants != null && (
         <Section title={`${participants.length} ${participants.length === 1 ? "participant" : "participants"}`}>

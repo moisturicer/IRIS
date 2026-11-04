@@ -17,6 +17,7 @@ import type { DecisionFlags, RecordDetail, ReviewerSeat, SeatState } from "@/typ
 import {
   capabilitiesFor,
   seatToOpen,
+  landingSection,
   sectionsFor,
   type Capability,
   type PaperSection,
@@ -119,6 +120,8 @@ interface Row {
   sections: PaperSection[];
 }
 
+// Changed on purpose by IR-879 (ADR-032 §10, 2026-11-04): a participant's
+// sections are Overview · Review, where their reader is; Paper is a reader's only.
 const ROWS: Row[] = [
   {
     name: "a reader of a published paper may cite it, and nothing else",
@@ -151,7 +154,7 @@ const ROWS: Row[] = [
     name: "the owner of a draft may continue it and edit its details",
     record: record({ pipeline_status: "draft", workflow_state: "draft", workflow_state_label: "Draft" }),
     viewer: owner,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "someone who can read another person's draft may not edit it",
@@ -166,31 +169,31 @@ const ROWS: Row[] = [
     name: "the owner asked for a revision is offered no new version the server did not offer",
     record: record({ pipeline_status: "in_review", workflow_state: "awaiting_resubmission" }),
     viewer: owner,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "a rejected record offers its owner no author action (invariant 5)",
     record: record({ pipeline_status: "rejected", workflow_state: "rejected" }),
     viewer: owner,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "a published record's details are not editable by its owner",
     record: record(),
     viewer: owner,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "an office that may only ask for documents is a participant, without a decision, and may attach files",
     record: record({ pipeline_status: "in_review", workflow_state: "in_review", can_request_document: ["ierc"] }),
     viewer: { id: 52, role_name: "IERC" },
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "an Adviser taking part may not attach files, which is an office's act",
     record: record({ pipeline_status: "in_review", workflow_state: "in_review", can_request_document: ["adviser"] }),
     viewer: adviser,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "a reviewer's role alone opens nothing the server did not grant",
@@ -225,7 +228,7 @@ const ROWS: Row[] = [
       is_participant: true,
     }),
     viewer: itsoStaff,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "a past seat holder keeps Review and Files, with nothing left to do (IR-411's gap, IR-415)",
@@ -236,7 +239,7 @@ const ROWS: Row[] = [
       is_participant: true,
     }),
     viewer: itsoStaff,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "an office member who never held a seat here is not a participant",
@@ -254,7 +257,7 @@ const ROWS: Row[] = [
       routing: { send_to_rdco: true, route_as: null, targets: [] },
     }),
     viewer: adviser,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "an office seat holder may route onward (IR-261)",
@@ -266,7 +269,7 @@ const ROWS: Row[] = [
       routing: { send_to_rdco: false, route_as: "itso", targets: [] },
     }),
     viewer: itsoStaff,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "an office seat holder may clear, record a finding and add a colleague (IR-269)",
@@ -279,7 +282,7 @@ const ROWS: Row[] = [
       office_review: { party: "itso", label: "ITSO", blocked: null, assignment: 11 },
     }),
     viewer: itsoStaff,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "a seat holder may ask for a revision (IR-272)",
@@ -291,7 +294,7 @@ const ROWS: Row[] = [
       revision: { party: "itso", label: "ITSO", blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
     }),
     viewer: itsoStaff,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "a party that has asked is offered the withdrawal, not a second request (IR-272)",
@@ -308,7 +311,7 @@ const ROWS: Row[] = [
       },
     }),
     viewer: itsoStaff,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "the record's Adviser may send to RDCO or reject, never publish (ADR-047)",
@@ -320,7 +323,7 @@ const ROWS: Row[] = [
       decision: { ...NO_DECISION, party: "adviser", outcomes: ["reject"], token: "t" },
     }),
     viewer: adviser,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "a Proposal's Adviser may accept or reject it (IR-271)",
@@ -333,7 +336,7 @@ const ROWS: Row[] = [
       decision: { ...NO_DECISION, party: "adviser", outcomes: ["accept", "reject"], token: "t" },
     }),
     viewer: adviser,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "RDCO's reviewer may also keep the record unlisted (IR-270)",
@@ -346,7 +349,7 @@ const ROWS: Row[] = [
       },
     }),
     viewer: { id: 61, role_name: "RDCO" },
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "on the adviser-first model the owner is offered a new version when the server says so (IR-273)",
@@ -361,13 +364,13 @@ const ROWS: Row[] = [
       },
     }),
     viewer: owner,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "on the adviser-first model, without the server's offer, the owner is not offered the legacy resubmit",
     record: record({ pipeline_status: "in_review", workflow_state: "awaiting_resubmission" }),
     viewer: owner,
-    sections: ["overview", "paper", "review", "files"],
+    sections: ["overview", "review"],
   },
   {
     name: "an accepted Proposal offers no Proposal completion and no continuation yet",
@@ -382,6 +385,27 @@ const ROWS: Row[] = [
     sections: ["overview"],
   },
 ];
+
+describe("where a section link lands (IR-879)", () => {
+  const participant = ["overview", "review"] as const;
+  const reader = ["overview", "paper"] as const;
+
+  it.each([
+    ["files", participant, { section: "review", documents: true }],
+    ["paper", participant, { section: "review", documents: false }],
+    ["review", participant, { section: "review", documents: false }],
+    ["files", reader, { section: "overview", documents: false }],
+    ["review", reader, { section: "overview", documents: false }],
+    ["paper", reader, { section: "paper", documents: false }],
+  ] as const)("?section=%s for %j", (value, sections, landing) => {
+    expect(landingSection(value, sections)).toEqual(landing);
+  });
+
+  it("knows nothing of a value it never had", () => {
+    expect(landingSection("nonsense", participant)).toBeNull();
+    expect(landingSection(null, participant)).toBeNull();
+  });
+});
 
 describe("the capabilities adapter", () => {
   it("returns the server's list even when client-side role and workflow fields suggest otherwise", () => {

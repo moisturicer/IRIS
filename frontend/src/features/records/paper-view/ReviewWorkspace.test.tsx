@@ -78,6 +78,9 @@ function openReviewTab(granted: Capability[], onBarInset: (px: number) => void) 
       timelineVersion={0}
       onChanged={() => {}}
       onBarInset={onBarInset}
+      documents={<p>Every document</p>}
+      documentsOpen={false}
+      onDocuments={() => {}}
     />,
   );
 }
