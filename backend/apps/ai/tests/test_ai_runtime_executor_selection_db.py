@@ -353,8 +353,13 @@ def test_a_killed_workers_agent_run_is_resumed_by_another_under_the_same_pin_and
     queued = queue(worker(runtime, limits=lease), grant, "select-killed")
 
     first = spawn(runtime, "hang", limits=lease)
-    # Killed mid-attempt: its model turn was admitted and never answered.
+    # Killed mid-attempt: its model turn was admitted and never answered. The
+    # `model` event is journaled before admission, so wait for the reservation too.
     wait_for(queued["id"], lambda state, models: state == "running" and models >= 1)
+    deadline = time.monotonic() + 30
+    while not ProviderReservation.objects.exists():
+        assert time.monotonic() < deadline, "the first worker never admitted its attempt"
+        time.sleep(0.05)
     first.kill()
     first.communicate(timeout=30)
 
