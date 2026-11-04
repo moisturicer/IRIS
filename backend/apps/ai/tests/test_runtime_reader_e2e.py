@@ -71,7 +71,7 @@ def _assert_public(snapshot):
 
 def _normalized(recorded, records):
     """Stable placeholders for what differs run to run: ids, Record pks, times, token counts."""
-    names = {}
+    names, chunk_sets = {}, {}
     text = UUID.sub(lambda m: names.setdefault(m.group(), f"00000000-0000-4000-8000-{len(names) + 1:012d}"),
                     json.dumps(recorded))
     data = json.loads(text)
@@ -85,9 +85,9 @@ def _normalized(recorded, records):
                 elif key == "record_id":
                     item = records[item]
                 elif key == "revision" and isinstance(item, str):
-                    # "<record pk>:e-<record pk>-<source revision>"
-                    item = re.sub(r"^(\d+):e-(\d+)-", lambda m: f"{records[int(m[1])]}:e-{records[int(m[2])]}-",
-                                  item)
+                    # "<chunk set id>:<extraction hash>"; the test's hashes are "e-<record pk>-<n>".
+                    item = re.sub(r"^(\d+):e-(\d+)-", lambda m: (
+                        f"{chunk_sets.setdefault(m[1], len(chunk_sets) + 1)}:e-{records[int(m[2])]}-"), item)
                 elif key == "used_tokens":
                     # Measured from payload bytes, which carry the pks above.
                     assert 0 < item
