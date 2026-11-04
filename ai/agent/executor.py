@@ -40,6 +40,9 @@ PROMPT_VERSION = "agent-direct-1"
 TOOL_VERSION = "none-1"
 RESEARCH_PROMPT_VERSION = "agent-research-1"
 RESEARCH_TOOL_VERSION = "research-1"
+#: research-1 plus named papers and exact counts (IR-750); a research-1 run keeps its tool set.
+METADATA_PROMPT_VERSION = "agent-research-2"
+METADATA_TOOL_VERSION = "research-2"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -60,6 +63,12 @@ RESEARCH_INSTRUCTIONS = (
     "papers already shown, in order; resolve references such as 'the second one' against it. Ask a "
     "clarifying question only when ambiguity blocks useful research."
 )
+METADATA_INSTRUCTIONS = RESEARCH_INSTRUCTIONS + (
+    " When the reader names a paper, find it with resolve_papers; when several papers match, ask "
+    "which one they mean. For how many papers match an Area, PSCED area, record type, years or IP "
+    "flag, use count_records: its total is exact over the papers this reader can see, so say it is "
+    "of the records they can see. Never present the number of papers a search found as a total."
+)
 FINAL_NOTE = (
     "Research is now closed. Answer the original question from what you have read, citing passages "
     "by handle, and say plainly what you could not find or read."
@@ -69,7 +78,9 @@ FINAL_NOTE = (
 PROMPTS = {
     (PROMPT_VERSION, TOOL_VERSION): INSTRUCTIONS,
     (RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION): RESEARCH_INSTRUCTIONS,
+    (METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION): METADATA_INSTRUCTIONS,
 }
+RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION)
 SUPPORTED = {"public_version": runs_config.PROTOCOL, "state_version": runs_config.SCHEMA}
 STATE_PAPERS = 50
 #: A delivered Turn's renumbered markers, kept out of the history so the model cannot copy them.
@@ -102,7 +113,7 @@ class AgentExecutor:
 
     @property
     def researches(self) -> bool:
-        return self.pin.tool_version == RESEARCH_TOOL_VERSION
+        return self.pin.tool_version in RESEARCH_TOOL_VERSIONS
 
     def supported(self) -> bool:
         if (self.pin.prompt_version, self.pin.tool_version) not in PROMPTS:
@@ -190,12 +201,15 @@ class _Run:
         self.deadline = time.monotonic() + context.remaining_seconds
         # One clarification at a time: not twice in a row, however much history is carried.
         asked = bool(context.prior) and context.prior[-1].kind == "clarification"
-        self.investigation = Investigation(tools, clarify=not asked)
+        self.investigation = Investigation(tools, clarify=not asked,
+                                           metadata=agent.pin.tool_version == METADATA_TOOL_VERSION)
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
 
     def request(self, history, *, closed=False) -> AgentRequest:
-        return AgentRequest(pin=self.agent.pin, instructions=RESEARCH_INSTRUCTIONS, history=tuple(history),
+        pin = self.agent.pin
+        return AgentRequest(pin=pin, instructions=PROMPTS[(pin.prompt_version, pin.tool_version)],
+                            history=tuple(history),
                             tools=self.investigation.specs(), tool_choice="none" if closed else "auto")
 
     async def run(self) -> Result:
@@ -323,6 +337,13 @@ class _Run:
             before = self.investigation.passages[handle]
             if now.status != OK or not now.passages or now.passages[0].source != before.source:
                 raise Unavailable("source_changed")
+        # Each stated count is recomputed under current policy; a population that moved fences it (IR-750).
+        for fact in assurance.stated_counts(text, self.investigation):
+            now = await self.tools.count(dict(fact.filters), fact.group_by)
+            if now.reason in ENDS_RUN:
+                raise Unavailable(now.reason)
+            if now.count is None or now.count != fact:
+                raise Unavailable("source_changed")
 
     def _focus(self, name: str) -> list[int]:
         chosen = getattr(self.investigation, name)
@@ -343,5 +364,6 @@ class _Run:
         shown = list(dict.fromkeys(c.record_id for c in citations)) or list(previous.get("shown", ()))
         state = {"shown": shown[:STATE_PAPERS], "selected": self._focus("selected"),
                  "excluded": self._focus("excluded")}
+        facts = assurance.facts(answer, citations, self.investigation) if kind == "answer" else ()
         return Result(answer=answer, citations=tuple(citations), reported_units=self.budget.reported,
-                      kind=kind, state=state)
+                      kind=kind, state=state, facts=facts)

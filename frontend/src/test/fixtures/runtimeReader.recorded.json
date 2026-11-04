@@ -93,6 +93,13 @@
             "quote": "pond water sampled weekly for turbidity",
             "revision": "2:e-2-1"
           }
+        ],
+        "facts": [
+          {
+            "kind": "keyword_sample",
+            "papers": 2,
+            "exhaustive": false
+          }
         ]
       }
     ]
