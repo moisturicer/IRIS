@@ -95,13 +95,14 @@ describe("Help", () => {
     renderAs({ role_name: ROLES.RDCO, review_access: { my_reviews: true, offices: ["rdco"], is_coordinator: true } });
 
     expect(section("Coordinating your office")).toBeInTheDocument();
-    expect(section("Administration")).toBeInTheDocument();
+    expect(section("RDCO")).toBeInTheDocument();
   });
 
-  it("shows the System Admin its administration too (IR-781)", () => {
+  it("shows the System Admin its own administration (IR-783)", () => {
     renderAs({ role_name: ROLES.SYSTEM_ADMIN, review_access: { my_reviews: false, offices: [], is_coordinator: false } });
 
     expect(section("Administration")).toBeInTheDocument();
+    expect(section("RDCO")).not.toBeInTheDocument();
     expect(section("Coordinating your office")).not.toBeInTheDocument();
   });
 });

@@ -33,40 +33,31 @@
 
 ## 3 · MVP sidebar
 
-Five sections, each rendered only when the signed-in role has at least one item in it. Built from `frontend/src/lib/access.ts` — the same map the router gates on — so this listing describes code rather than intent.
+Three sections in `NAV_SECTION_ORDER`: Main (unlabelled), RDCO, and Administration. A section appears only when it has an item the signed-in role can open. Routes and links share `frontend/src/lib/access.ts`.
 
-```
-RESEARCH EXPLORATION                                  (every role)
-  Discover                /
-  Ask IRIS                /ai
-  My Library              /records/mine
-  Calls & Conferences     /opportunities
+```text
+MAIN
+  Discover                /                       (every role)
+  Ask IRIS                /ai                     (research roles)
+  My Library              /records/mine           (research roles)
+  My Reviews              /review                 (reviewers with review work)
+  Calls & Conferences     /opportunities          (research roles)
 
-IP MANAGEMENT
-  Submit Disclosure       /records/add          (Student, Adviser)
-  My Workspace            /workspace            (Student, Adviser)  · badge = pending
-  Import Records          /records/import       (RDCO)
+RDCO                                               (RDCO alone)
+  Import Records          /records/import
+  Users                   /rdco/users
+  Role Requests           /rdco/role-requests       (badge = waiting)
+  Download Requests       /rdco/download-requests
+  Delete Requests         /rdco/delete-requests
 
-REVIEW QUEUE                                          (reviewers)
-  Pending Records         /review/pending
-  Approved                /review/approved
-  Declined                /review/declined
-  (Approved Proposals: removed by IR-271; ADR-032 §2 retires complete)
-
-TOOLS                                                 (every role)
-  Notifications           /notifications        · badge = unread
-  Settings & Profile      /settings
-
-ADMINISTRATION                                        (RDCO)
-  Role Requests           /admin/role-requests  · badge = pending
-  Download Requests       /admin/download-requests
-  Delete Requests         /admin/delete-requests
+ADMINISTRATION                                     (System Admin alone)
+  Users                   /admin/users
   Audit Log               /admin/audit
 ```
 
-**Amended 2026-09-06.** This section described three sections, `Published Records` (deleted — Discover took the browse role) and `Notifications` in the header rather than the sidebar. It now matches what ships. **Manage Users and Active Sessions are gone from the app entirely**: account administration belongs to the Django admin site, and per-user session management is a separate screen tracked as `IR-124`.
+**IR-783, 2026-11-04 (ADR-051 and its IR-781 amendment).** RDCO approves Student and Adviser roles and coordinates research. The System Admin assigns office roles and coordinators and alone reads the Audit Log. Both Users addresses render the same page; the server controls the actions offered. `/admin/users` remains the System Admin's address, while RDCO now uses `/rdco/users`. The old role, download and delete request addresses under `/admin/` are removed, with no redirects.
 
-**Amended 2026-10-29 (IR-478).** *Users* is back in RDCO's Administration group, after Import Records: the Django admin site never registered `User`, and RDCO, not the superuser, holds the coordinator grant. See [02](02-information-architecture.md) §5. Active Sessions stays out.
+The System Admin lands on `/admin/users` after sign-in. Its sidebar shows Discover plus its Administration section, with no research-tool or workflow links. Other roles land on My Reviews when the server reports review work, otherwise Discover. Settings & Profile and Help are in the account menu; Notifications is reached through the bell. No separate Active Sessions page is routed.
 
 ### Rules
 
@@ -74,7 +65,7 @@ ADMINISTRATION                                        (RDCO)
 |---|---|
 | **No "coming soon" items.** If it is not in the pilot, it is not in the nav | A dead end is worse than an absence, and it invites evaluation participants to comment on things that do not exist. The `comingSoon` flag has been **removed from `NavItem`** — nav entries now come from a map of screens that exist and are routed, so a dead end is no longer something to remember not to add |
 | Sections appear only if they contain a permitted item | An empty "ADMINISTRATION" heading for a student is noise. Falls out of the map rather than being a second rule |
-| Badge counts only where actionable | My Workspace, Review Queue, Notifications, Role Requests |
+| Badge counts only where actionable | My Library action dot, notification bell, Role Requests |
 | Labels come from configuration post-MVP | "Review Queue" may be "Clearance Queue" elsewhere ([11](11-saas-admin.md)) |
 | **One source of role truth — `lib/access.ts`** | Was `useRole()`, but `Sidebar` re-derived staff status inline anyway — four definitions of "staff" in one component. Now the router and the sidebar read one map, so a link cannot exist without a matching gate (`IR-160`) |
 
@@ -82,16 +73,15 @@ ADMINISTRATION                                        (RDCO)
 
 ## 4 · Role-dependent navigation
 
-| Section | Student | Adviser | RDCO | ITSO | IERC | KTTO |
-|---|:--:|:--:|:--:|:--:|:--:|:--:|
-| Research Exploration | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Submit Disclosure | ✅ | ✅ | — | — | — | — |
-| My Workspace | ✅ | ✅ | — | — | — | — |
-| Import Records | — | — | ✅ | — | — | — |
-| Review Queue | — | ✅ | ✅ | ✅ | ✅ | ✅ |
-| ~~Approved Proposals~~ (removed by IR-271) | — | — | — | — | — | — |
-| Tools | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Administration | — | — | ✅ | — | — | — |
+| Destination or section | Student | Adviser | RDCO | ITSO | IERC | KTTO | System Admin |
+|---|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| Discover | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
+| Ask IRIS, My Library, Calls & Conferences in nav | Yes | Yes | Yes | Yes | Yes | Yes | No |
+| Publish from Discover | Yes | Yes | No | No | No | No | No |
+| My Reviews (when review work exists) | No | Yes | Yes | Yes | Yes | Yes | No |
+| RDCO | No | No | Yes | No | No | No | No |
+| Administration | No | No | No | No | No | No | Yes |
+| Settings, Help, Notifications | Yes | Yes | Yes | Yes | Yes | Yes | Yes |
 
 **The three offices are separate columns, deliberately.** Collapsing ITSO, IERC and KTTO into one "office reviewer" column would erase the distinction the thesis contribution rests on — parallel multi-office clearance, where one office requiring revision resets only its own clearance. They share a *screen*; they are not one role.
 

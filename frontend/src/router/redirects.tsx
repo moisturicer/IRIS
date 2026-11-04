@@ -4,7 +4,7 @@
  * Bookmarks, notification links and emails already sent point at these paths,
  * so a removed screen redirects rather than 404s. One entry per URL, and
  * `redirects.test.tsx` follows every entry. The table is complete for §4.1's
- * six (IR-534); IR-783 adds its own.
+ * six (IR-534). IR-783 removes old RDCO addresses without redirects (ADR-051).
  *
  * A `:param` in `path` carries into the same `:param` in `to`, so an old link
  * to a record's documents lands on that record.

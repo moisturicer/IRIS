@@ -467,14 +467,11 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
           </ul>
         )}
 
-        {/* Role changes are an administrative act: RoleRequest rows are created
-            at signup, and both the list and decide endpoints are Django-staff
-            only. There is no self-service request endpoint to call, so this
-            says who to ask rather than rendering a button that has no API. */}
+        {/* Role changes are administrative acts, with no self-service request endpoint. */}
         <p className="text-[13px] text-stone-500 mt-5 pt-4 border-t border-stone-100">
-          Roles are assigned by a system administrator. If your role is wrong, or you need adviser
-          or office access, contact the Research and Development Coordinating Office — it cannot be
-          changed from this screen.
+          RDCO approves Student and Adviser roles. The System Admin assigns office roles and office
+          coordinators. If your role is wrong, contact the Research and Development Coordinating
+          Office. Your role cannot be changed from this screen.
         </p>
       </Panel>
     </div>

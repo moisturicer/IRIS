@@ -5,7 +5,7 @@ import type { ReviewAccess } from "@/types/auth";
 /**
  * Where a user lands after signing in (IR-534, spec §4.2).
  *
- * **My Reviews when the server says there is review work, otherwise Discover.**
+ * **System Admin: Users. Reviewers with work: My Reviews. Otherwise: Discover.**
  * This replaced a per-role table (IR-201) that sent every Adviser and office
  * user to the queue, including an Adviser with no advisees, who then met an
  * empty page or `ReviewAccessRoute`'s bounce back to Discover. The flag is
@@ -24,6 +24,7 @@ export function landingPathFor(user: {
   role_name: RoleName | null | undefined;
   review_access?: Pick<ReviewAccess, "my_reviews"> | null;
 }): string {
+  if (canAccess(user.role_name, "adminUsers")) return pathFor("adminUsers");
   if (canAccess(user.role_name, "reviewQueue") && hasReviewWork(user.review_access)) {
     return pathFor("reviewQueue");
   }

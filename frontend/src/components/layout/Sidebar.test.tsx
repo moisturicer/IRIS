@@ -130,15 +130,34 @@ describe("the sidebar's list", () => {
     expect(mainLinks()).not.toContain("My Reviews");
   });
 
-  it("names RDCO's Administration group and counts its waiting role requests", async () => {
+  it("names RDCO's group and counts its waiting role requests", async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { count: 3, results: [] } } as never);
     signIn(ROLES.RDCO, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    const admin = screen.getByRole("list", { name: "Administration" });
+    const admin = screen.getByRole("list", { name: "RDCO" });
     expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import Records");
-    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 waiting" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 waiting" })).toHaveAttribute("href", "/rdco/role-requests");
+    expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/rdco/users");
+    expect(within(admin).getByRole("link", { name: "Download Requests" })).toHaveAttribute("href", "/rdco/download-requests");
+    expect(within(admin).getByRole("link", { name: "Delete Requests" })).toHaveAttribute("href", "/rdco/delete-requests");
+    expect(screen.queryByRole("link", { name: "Audit Log" })).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("gives the System Admin only its administration and catalogue links (collapsed: %s)", async (collapsed) => {
+    useUIStore.setState({ sidebarCollapsed: collapsed });
+    signIn(ROLES.SYSTEM_ADMIN, true);
+    const { container } = renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Discover", "Users", "Audit Log"]);
+    const admin = within(nav).getByRole("list", { name: "Administration" });
+    expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
+    expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
+    expect(within(nav).queryByRole("list", { name: "RDCO" })).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("keeps every link named on the collapsed rail", async () => {
