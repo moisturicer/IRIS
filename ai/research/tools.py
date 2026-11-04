@@ -25,6 +25,17 @@ SEARCH_LIMIT = 20
 PAGE_PASSAGES = 20
 OUTLINE_CHUNKS = 2000
 RECALL_LIMIT = 50
+#: Passages one Manuscript may hold before a whole read is refused, not cut short (IR-733).
+MANUSCRIPT_PASSAGES = 10000
+#: Bytes a returned passage's handle, page and section add around its text, as an allowance.
+PASSAGE_FRAME_BYTES = 200
+#: Bytes a read's coverage block (spans, ranges, counts) adds, as an allowance; each listed page adds more.
+READING_FRAME_BYTES = 800
+PAGE_ENTRY_BYTES = 8
+#: The shortest repeat at a passage's start taken as extraction overlap rather than coincidence.
+MIN_OVERLAP_CHARS = 24
+#: Element kinds whose rendering is not interpreted: the text carries them, never what they show.
+FORMULA, CAPTION = "formula", "caption"
 
 OK, NO_MATCH, PARTIAL, UNAVAILABLE = "ok", "no_match", "partial", "unavailable"
 #: A reference fits several papers; the reader is asked, never answered for (IR-750).
@@ -61,6 +72,8 @@ class PassageRef:
     section: str
     text: str
     source: Source
+    #: Leading characters of `text` that repeat the previous passage, left out when shown (IR-733).
+    overlap: int = 0
 
 
 @dataclass(frozen=True)
@@ -80,6 +93,45 @@ class Coverage:
     truncated: bool = False
     #: Readable Records with an active Manuscript that the call looked at.
     inspected_records: int | None = None
+
+
+@dataclass(frozen=True)
+class Span:
+    """Passages `first`..`last`, 1-based in document order, and the pages they fall on."""
+
+    first: int
+    last: int
+    first_page: int | None
+    last_page: int | None
+
+
+@dataclass(frozen=True)
+class Reading:
+    """What one read of a whole Manuscript returned, and what it did not (IR-733).
+
+    Text is extracted text only: nothing here interprets a figure or a formula.
+    """
+
+    #: Passages in the Manuscript, all of which a complete read returns.
+    passages: int
+    #: The stretch this read returned; None when nothing fitted or nothing was left.
+    covered: Span | None = None
+    #: The stretches this read did not return, in document order.
+    missing: tuple[Span, ...] = ()
+    #: Pages the extraction reported; None when it did not say.
+    pages: int | None = None
+    #: Reported pages no passage starts on: either no text was extracted from them, or a
+    #: passage starting on an earlier page runs onto them. Never claimed as either.
+    pages_no_passage_starts_on: tuple[int, ...] = ()
+    #: Passages carrying a formula or a caption, whose visual content is not interpreted.
+    formulas: int = 0
+    captions: int = 0
+    #: Repeated characters left out of the returned passages.
+    overlap_chars: int = 0
+    #: The passage to continue after; None once the Manuscript is read to its end, or when a
+    #: first read had no room for even one passage (`exceeds_room`).
+    continue_after: str | None = None
+    title: str = ""
 
 
 @dataclass(frozen=True)
@@ -138,6 +190,7 @@ class ToolResult:
     count: Count | None = None
     passages: tuple[PassageRef, ...] = ()
     sections: tuple[Section, ...] = ()
+    reading: Reading | None = None
     coverage: Coverage = field(default_factory=Coverage)
     dependencies: frozenset[Source] = frozenset()
     #: Provider calls the tool would make; none runs here.
@@ -160,6 +213,44 @@ def section_id(path: tuple[str, ...]) -> str:
 
 def _is_int(value) -> bool:
     return type(value) is int
+
+
+def overlap(previous: str, text: str) -> int:
+    """Characters at the start of `text` that repeat the end of `previous`.
+
+    Only a repeat of at least MIN_OVERLAP_CHARS counts, so a shared word is never dropped.
+    """
+    if len(text) < MIN_OVERLAP_CHARS:
+        return 0
+    probe = text[:MIN_OVERLAP_CHARS]
+    start = previous.find(probe, max(0, len(previous) - len(text)))
+    while start != -1:
+        if text.startswith(previous[start:]):
+            return len(previous) - start
+        start = previous.find(probe, start + 1)
+    return 0
+
+
+def shown_bytes(text: str) -> int:
+    """What `text` costs once JSON-encoded in a tool result and again as message content."""
+    return len(json.dumps(json.dumps(text, ensure_ascii=False), ensure_ascii=False).encode("utf-8"))
+
+
+def _span(rows, first: int, last: int) -> Span:
+    """Rows `first`..`last` (0-based, inclusive) as a 1-based Span."""
+    pages = [r["source_page"] for r in rows[first:last + 1] if r["source_page"] is not None]
+    return Span(first + 1, last + 1, min(pages, default=None), max(pages, default=None))
+
+
+def _journalled(reading: Reading) -> dict:
+    """A read's coverage as numbers only, for the run journal."""
+    covered = reading.covered
+    return {
+        "passages": reading.passages, "covered": [covered.first, covered.last] if covered else None,
+        "missing": [[m.first, m.last] for m in reading.missing], "pages": reading.pages,
+        "pages_no_passage_starts_on": len(reading.pages_no_passage_starts_on), "formulas": reading.formulas,
+        "captions": reading.captions, "overlap_chars": reading.overlap_chars,
+    }
 
 
 class _Refused(Exception):
@@ -213,6 +304,7 @@ class ResearchTools:
                     "total": coverage.total, "truncated": coverage.truncated,
                     "inspected_records": coverage.inspected_records,
                     "sources": sorted(d.revision for d in result.dependencies),
+                    **({"reading": _journalled(result.reading)} if result.reading else {}),
                 })
                 return result
         except _Refused as refused:
@@ -261,15 +353,16 @@ class ResearchTools:
         source = Source(bound["record_id"], current["chunk_set_id"], current["extraction_hash"])
         return current["title"], source, bound["chunk_id"]
 
-    def _passages(self, title, rows, handles, source=None):
+    def _passages(self, title, rows, handles, source=None, overlaps=None):
         return tuple(
             PassageRef(
                 handle=h, record_id=row["record_id"], page=row["source_page"],
                 section=" > ".join(_headings(title or row["title"], row["context_path"])),
                 text=row["content"],
                 source=source or Source(row["record_id"], row["chunk_set_id"], row["extraction_hash"]),
+                overlap=overlaps[n] if overlaps else 0,
             )
-            for row, h in zip(rows, handles)
+            for n, (row, h) in enumerate(zip(rows, handles))
         )
 
     async def search(self, query: str, limit: int = 10) -> ToolResult:
@@ -399,6 +492,77 @@ class ResearchTools:
                               dependencies=frozenset({source}))
 
         return await self._call_on_handle("outline", body)
+
+    async def read_manuscript(self, record_handle: str, after: str | None = None, *,
+                              max_bytes: int) -> ToolResult:
+        """A paper's active Manuscript in document order, as much as `max_bytes` holds (IR-733).
+
+        Starts at the beginning, or just after `after`, a passage handle an earlier
+        read returned from the same Manuscript revision. Text repeated from the
+        previous passage is left out of what is shown, never out of the passage a
+        citation binds. What did not fit is reported as missing, never clipped.
+        """
+        if not _is_int(max_bytes) or max_bytes < 1 or (after is not None and not isinstance(after, str)):
+            return ToolResult.unavailable("invalid_argument")
+
+        async def body(conn):
+            title, source, _ = await self._resolve(conn, record_handle, "R")
+            if source is None:
+                return ToolResult(NO_MATCH, coverage=Coverage(total=0))
+            cursor = None
+            if after is not None:
+                _, from_source, cursor = await self._resolve(conn, after, "P")
+                # A continuation reads on only in the Manuscript revision it came from.
+                if from_source != source:
+                    raise _Refused("foreign_continuation")
+            rows = await conn.fetch(
+                """SELECT id, record_id, source_page, content, context_path, element_kinds
+                     FROM iris_ai.research_manuscript($1) ORDER BY sequence, id LIMIT $2""",
+                source.chunk_set_id, MANUSCRIPT_PASSAGES + 1,
+            )
+            if len(rows) > MANUSCRIPT_PASSAGES:
+                raise _Refused("manuscript_too_long")
+            if not rows:
+                return ToolResult(NO_MATCH, coverage=Coverage(total=0), dependencies=frozenset({source}))
+            start = 0
+            if cursor is not None:
+                start = next((n + 1 for n, row in enumerate(rows) if row["id"] == cursor), None)
+                if start is None:
+                    raise _Refused("source_replaced")
+            pages = await conn.fetchval("SELECT iris_ai.research_manuscript_pages($1)", source.chunk_set_id)
+            starts = {r["source_page"] for r in rows}
+            unstarted = tuple(p for p in range(1, (pages or 0) + 1) if p not in starts)
+            repeats = [0, *(overlap(a["content"], b["content"]) for a, b in zip(rows, rows[1:]))]
+            end, used = start, READING_FRAME_BYTES + PAGE_ENTRY_BYTES * len(unstarted)
+            while end < len(rows):
+                cost = shown_bytes(rows[end]["content"][repeats[end]:]) + PASSAGE_FRAME_BYTES
+                if used + cost > max_bytes:
+                    break
+                used += cost
+                end += 1
+            chosen = rows[start:end]
+            handles = await self._handles(
+                conn, [("P", source.record_id, source.chunk_set_id, r["id"]) for r in chosen])
+            passages = self._passages(title, chosen, handles, source, repeats[start:end])
+            kinds = [set(r["element_kinds"] or ()) for r in rows]
+            remaining = end < len(rows)
+            reading = Reading(
+                passages=len(rows), covered=_span(rows, start, end - 1) if chosen else None,
+                missing=tuple(_span(rows, a, b) for a, b in ((0, start - 1), (end, len(rows) - 1)) if a <= b),
+                pages=pages,
+                pages_no_passage_starts_on=unstarted,
+                formulas=sum(FORMULA in k for k in kinds), captions=sum(CAPTION in k for k in kinds),
+                overlap_chars=sum(p.overlap for p in passages),
+                continue_after=(handles[-1] if chosen else after) if remaining else None, title=title,
+            )
+            return ToolResult(
+                PARTIAL if remaining else OK, reason="exceeds_room" if remaining and not chosen else None,
+                passages=passages, reading=reading,
+                coverage=Coverage(len(chosen), len(rows), remaining),
+                dependencies=frozenset({source}),
+            )
+
+        return await self._call_on_handle("read_manuscript", body)
 
     async def resolve(self, references=(), record_ids=()) -> ToolResult:
         """Papers the reader named, by title or Record id, as fresh paper handles (IR-750).

@@ -16,7 +16,7 @@ from typing import Optional
 
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
-from ai.research.tools import OK, PARTIAL, Count, PassageRef, ToolResult as Evidence
+from ai.research.tools import OK, PARTIAL, Count, PassageRef, Reading, ToolResult as Evidence
 
 PLAN_STEPS = 12
 FOCUS_PAPERS = 20
@@ -76,9 +76,17 @@ COUNT_RECORDS = ToolSpec(
         "group_by": {"type": "string", "enum": list(metadata.GROUPS)},
     }))
 
+READ_MANUSCRIPT = ToolSpec(
+    "read_manuscript",
+    "Read a paper's extracted text in document order, as much as fits now, with what was not read. "
+    "Pass the continue_after handle a read returned to go on where it stopped.", _object(
+        {"paper": _HANDLE, "continue_after": _HANDLE}, ["paper"]))
+
 RESEARCH = (SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE)
 #: Named papers and exact counts, offered only under the research-2 tool version (IR-750).
 METADATA = (RESOLVE_PAPERS, COUNT_RECORDS)
+#: Whole-Manuscript reading, offered only under the research-3 tool version (IR-733).
+MANUSCRIPTS = (READ_MANUSCRIPT,)
 
 
 class InvalidArguments(Exception):
@@ -135,6 +143,52 @@ def _key(passage: PassageRef) -> tuple:
     return (passage.source.revision, passage.page, hashlib.sha256(passage.text.encode()).hexdigest())
 
 
+def _ranges(positions) -> list[list[int]]:
+    """Sorted positions as [first, last] runs."""
+    runs: list[list[int]] = []
+    for n in sorted(positions):
+        if runs and runs[-1][1] == n - 1:
+            runs[-1][1] = n
+        else:
+            runs.append([n, n])
+    return runs
+
+
+@dataclass
+class ManuscriptRead:
+    """One Manuscript revision as this run has read it (IR-733).
+
+    Inspected is what a tool returned; visible is what the model was shown,
+    which packing may have withheld; the rest is recoverable by its handles
+    while the run lasts and the source stands.
+    """
+
+    record_id: int
+    title: str
+    reading: Reading
+    #: Position (1-based, document order) -> passage handle.
+    handles: dict[int, str] = field(default_factory=dict)
+    visible: set[int] = field(default_factory=set)
+
+    @property
+    def inspected(self) -> set[int]:
+        return set(self.handles)
+
+    @property
+    def recoverable(self) -> set[int]:
+        return self.inspected - self.visible
+
+    @property
+    def complete(self) -> bool:
+        return len(self.handles) == self.reading.passages
+
+    def summary(self) -> dict:
+        return {
+            "passages": self.reading.passages, "read": _ranges(self.inspected),
+            "not_read": _ranges(set(range(1, self.reading.passages + 1)) - self.inspected),
+        }
+
+
 @dataclass
 class Investigation:
     """Everything one run has read, planned and been told; nothing outlives the run."""
@@ -143,6 +197,8 @@ class Investigation:
     clarify: bool = False
     #: Offer resolve_papers and count_records (the research-2 tool version).
     metadata: bool = False
+    #: Offer read_manuscript (the research-3 tool version, IR-733).
+    manuscripts: bool = False
     #: Passage handle -> what was shown for it.
     passages: dict[str, PassageRef] = field(default_factory=dict)
     #: Record id -> (paper handle, title).
@@ -163,10 +219,15 @@ class Investigation:
     #: Taxonomy names those counts used, casefolded, which an answer may quote.
     terms: set[str] = field(default_factory=set)
     searched: bool = False
+    #: Manuscript revision -> what this run read of it (IR-733).
+    reads: dict[str, ManuscriptRead] = field(default_factory=dict)
+    #: Tool call id -> (revision, positions) a read returned, until packing says whether it was shown.
+    unpacked: dict[str, tuple[str, tuple[int, ...]]] = field(default_factory=dict)
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
-        return (*RESEARCH, *(METADATA if self.metadata else ()), UPDATE_PLAN, UPDATE_FOCUS, *extra)
+        return (*RESEARCH, *(METADATA if self.metadata else ()), *(MANUSCRIPTS if self.manuscripts else ()),
+                UPDATE_PLAN, UPDATE_FOCUS, *extra)
 
     @property
     def researched(self) -> bool:
@@ -195,7 +256,8 @@ class Investigation:
                  for n, i in enumerate((i for i in state.get("shown", ()) if i in self.papers), start=1)]
         return {"shown": shown, "selected": listed("selected"), "excluded": listed("excluded")}
 
-    async def execute(self, call: ToolCall) -> Outcome:
+    async def execute(self, call: ToolCall, *, room: int = 0) -> Outcome:
+        """Run one call; `room` is the bytes a manuscript read may return (IR-733)."""
         self.tool_calls += 1
         spec = next((s for s in self.specs() if s.name == call.name), None)
         if spec is None:
@@ -214,6 +276,8 @@ class Investigation:
             if spec is COUNT_RECORDS:
                 filters = {k: v for k, v in args.items() if k != "group_by"}
                 return self._counted(await self.research.count(filters, args.get("group_by")))
+            if spec is READ_MANUSCRIPT:
+                return self._evidence(await self._read(args, room), call.id)
             return self._evidence(await self._research(spec, args))
         except InvalidArguments:
             return Outcome(json.dumps({"error": "invalid_arguments"}))
@@ -240,11 +304,32 @@ class Investigation:
             return await self.research.read_page(args["paper"], args["page"])
         return await self.research.outline(args["paper"])
 
+    async def _read(self, args: dict, room: int) -> Evidence:
+        after = args.get("continue_after")
+        if not _str(args["paper"]) or (after is not None and not _str(after)):
+            raise InvalidArguments
+        return await self.research.read_manuscript(args["paper"], after, max_bytes=max(1, room))
+
+    def packed(self, results) -> None:
+        """Record which reads the model was shown: a withheld result was inspected, not seen (IR-733)."""
+        for result in results:
+            pending = self.unpacked.pop(result.call_id, None)
+            if pending is None:
+                continue
+            try:
+                body = json.loads(result.content)
+            except ValueError:
+                body = None
+            withheld = isinstance(body, dict) and "withheld" in body
+            if not withheld:
+                revision, positions = pending
+                self.reads[revision].visible.update(positions)
+
     def _ended(self, result: Evidence) -> None:
         if result.reason in ENDS_RUN:
             raise RunEnded(result.reason)
 
-    def _evidence(self, result: Evidence) -> Outcome:
+    def _evidence(self, result: Evidence, call_id: Optional[str] = None) -> Outcome:
         self._ended(result)
         new = False
         body: dict = {"status": result.status}
@@ -272,10 +357,14 @@ class Investigation:
             new = new or key not in self.seen
             self.seen.add(key)
             paper = self.papers.get(passage.record_id)
+            # Text repeated from the previous passage is shown once; the passage keeps all of it.
             body["passages"].append({
                 "passage": passage.handle, "paper": paper[0] if paper else None,
-                "page": passage.page, "section": passage.section, "text": passage.text,
+                "page": passage.page, "section": passage.section, "text": passage.text[passage.overlap:],
+                **({"repeats_previous_chars": passage.overlap} if passage.overlap else {}),
             })
+        if result.reading is not None:
+            new = self._read_into(result, call_id, body) or new
         if result.sections:
             outline = ("outline", *sorted(d.revision for d in result.dependencies))
             new = new or outline not in self.seen
@@ -288,6 +377,43 @@ class Investigation:
                             "truncated": coverage.truncated}
         self.figures.update(str(n) for n in (coverage.returned, coverage.total) if n is not None)
         return Outcome(json.dumps(body, ensure_ascii=False), progress=new)
+
+    def _read_into(self, result: Evidence, call_id: Optional[str], body: dict) -> bool:
+        """Fold one manuscript read into the run's coverage and say it to the model (IR-733)."""
+        reading = result.reading
+        (source,) = result.dependencies
+        read = self.reads.get(source.revision)
+        if read is None:
+            read = self.reads[source.revision] = ManuscriptRead(source.record_id, reading.title, reading)
+        read.reading = reading
+        start = reading.covered.first if reading.covered else 0
+        positions = tuple(range(start, start + len(result.passages)))
+        before = read.inspected
+        read.handles.update(zip(positions, (p.handle for p in result.passages)))
+        if call_id is not None and positions:
+            self.unpacked[call_id] = (source.revision, positions)
+
+        def span(s):
+            return {"passages": [s.first, s.last], "pages": [s.first_page, s.last_page]}
+
+        body["reading"] = {
+            "covered": span(reading.covered) if reading.covered else None,
+            "missing": [span(m) for m in reading.missing],
+            "read_so_far": read.summary(),
+            "pages": reading.pages, "pages_no_passage_starts_on": list(reading.pages_no_passage_starts_on),
+            "formula_passages": reading.formulas, "caption_passages": reading.captions,
+            # Extracted text only: what a figure or formula shows is never interpreted.
+            "visual_content": "not_interpreted",
+            "repeated_chars_omitted": reading.overlap_chars,
+            "continue_after": reading.continue_after,
+        }
+        self.figures.update(str(n) for n in (
+            reading.passages, reading.pages, reading.formulas, reading.captions, len(read.inspected),
+            *reading.pages_no_passage_starts_on,
+            *(n for s in (reading.covered, *reading.missing) if s
+              for n in (s.first, s.last, s.first_page, s.last_page)),
+        ) if n is not None)
+        return read.inspected != before
 
     def _counted(self, result: Evidence) -> Outcome:
         """An exact count, typed for the model; the counted Records never leave the run (IR-750)."""

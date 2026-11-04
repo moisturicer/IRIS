@@ -21,6 +21,7 @@ ROLE_MODULES = frozenset({
     "test_ai_runtime_dispatch_db.py", "test_ai_runtime_agent_db.py",
     "test_ai_runtime_agent_loop_db.py", "test_ai_runtime_openai_agent_db.py",
     "test_ai_runtime_executor_selection_db.py", "test_ai_runtime_metadata_db.py",
+    "test_ai_runtime_manuscript_db.py",
 })
 
 

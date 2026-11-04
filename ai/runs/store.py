@@ -68,6 +68,12 @@ def shown_facts(facts) -> list[dict]:
             })
         elif fact.get("kind") == "keyword_sample":
             shown.append({"kind": "keyword_sample", "papers": fact.get("papers"), "exhaustive": False})
+        elif fact.get("kind") == "reading_coverage":
+            shown.append({
+                **{k: fact.get(k) for k in ("kind", "title", "passages", "read", "complete", "pages",
+                                            "pages_no_passage_starts_on", "formula_passages", "caption_passages")},
+                "visual_interpretation": False, "exhaustive": False,
+            })
     return shown
 
 RUN_COLUMNS = (

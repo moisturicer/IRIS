@@ -204,7 +204,23 @@ def facts(answer: str, citations, investigation: Investigation) -> tuple[dict, .
     if investigation.searched and citations:
         papers = len({c.record_id for c in citations})
         kept.append({"kind": "keyword_sample", "papers": papers, "exhaustive": False})
+    kept += reading_coverage(citations, investigation)
     return tuple(kept)
+
+
+def reading_coverage(citations, investigation: Investigation) -> list[dict]:
+    """How much of each cited Manuscript the run read, and what text cannot show (IR-733).
+
+    Never a claim of exhaustive research, nor of a figure or formula interpreted.
+    """
+    cited_revisions = {c.revision for c in citations}
+    return [{
+        "kind": "reading_coverage", "title": read.title, "passages": read.reading.passages,
+        "read": len(read.inspected), "complete": read.complete, "pages": read.reading.pages,
+        "pages_no_passage_starts_on": len(read.reading.pages_no_passage_starts_on),
+        "formula_passages": read.reading.formulas, "caption_passages": read.reading.captions,
+        "visual_interpretation": False, "exhaustive": False,
+    } for revision, read in investigation.reads.items() if revision in cited_revisions]
 
 
 def deliver(text: str, investigation: Investigation) -> tuple[str, tuple[Citation, ...]]:

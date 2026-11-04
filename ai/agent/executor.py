@@ -18,17 +18,20 @@ import json
 import logging
 import re
 import time
+from dataclasses import replace
 from typing import Mapping, Optional
 
 from ai.admission.errors import AdmissionDenied
 from ai.admission.limits import Price
 from ai.agent import assurance
 from ai.agent.budget import Bounds, Budget, profiles as checked_profiles
-from ai.agent.context import FittedAgentProvider, OverCapacity, Reserves
+from ai.agent.context import (
+    CONTEXT_EXHAUSTED, REQUEST_BYTES_EXCEEDED, FittedAgentProvider, OverCapacity, Reserves, measure, output_cap,
+)
 from ai.agent.protocol import (
     AgentRequest, ModelTurn, NotFinal, Pin, StopReason, Text, ToolGroup, ToolResult, User, final_answer,
 )
-from ai.agent.tools import ENDS_RUN, Investigation, RunEnded
+from ai.agent.tools import ENDS_RUN, READ_MANUSCRIPT, Investigation, RunEnded
 from ai.domain.ports import LLMProvider, ProviderRejected, TransientProviderError, UnsupportedCapability
 from ai.research.tools import OK
 from ai.runs import config as runs_config
@@ -43,6 +46,9 @@ RESEARCH_TOOL_VERSION = "research-1"
 #: research-1 plus named papers and exact counts (IR-750); a research-1 run keeps its tool set.
 METADATA_PROMPT_VERSION = "agent-research-2"
 METADATA_TOOL_VERSION = "research-2"
+#: research-2 plus whole-Manuscript reading (IR-733).
+MANUSCRIPT_PROMPT_VERSION = "agent-research-3"
+MANUSCRIPT_TOOL_VERSION = "research-3"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -69,6 +75,13 @@ METADATA_INSTRUCTIONS = RESEARCH_INSTRUCTIONS + (
     "flag, use count_records: its total is exact over the papers this reader can see, so say it is "
     "of the records they can see. Never present the number of papers a search found as a total."
 )
+MANUSCRIPT_INSTRUCTIONS = METADATA_INSTRUCTIONS + (
+    " To answer from a whole paper, including its middle and late sections, read it with "
+    "read_manuscript: it returns the extracted text in document order as far as it fits and says which "
+    "passages and pages it did not return; pass its continue_after handle to read on. Say plainly "
+    "which parts you did not read, that figures and formulas were not interpreted, and that reading "
+    "one paper is not a search of the repository."
+)
 FINAL_NOTE = (
     "Research is now closed. Answer the original question from what you have read, citing passages "
     "by handle, and say plainly what you could not find or read."
@@ -79,8 +92,13 @@ PROMPTS = {
     (PROMPT_VERSION, TOOL_VERSION): INSTRUCTIONS,
     (RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION): RESEARCH_INSTRUCTIONS,
     (METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION): METADATA_INSTRUCTIONS,
+    (MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION): MANUSCRIPT_INSTRUCTIONS,
 }
-RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION)
+RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION)
+#: Of the bytes a read may fill, the share kept for JSON escaping of its text.
+ESCAPE_SHARE = 0.9
+#: Over-capacity codes that close research rather than end the run; the final answer must still fit.
+WINDOW_FULL = (CONTEXT_EXHAUSTED, REQUEST_BYTES_EXCEEDED)
 SUPPORTED = {"public_version": runs_config.PROTOCOL, "state_version": runs_config.SCHEMA}
 STATE_PAPERS = 50
 #: A delivered Turn's renumbered markers, kept out of the history so the model cannot copy them.
@@ -155,6 +173,30 @@ class AgentExecutor:
     def pack(self, request: AgentRequest, results):
         return _fitted(self.sender.pack, request, results)
 
+    def room(self, request: AgentRequest, budget: Budget) -> int:
+        """Bytes one more tool result may add to `request` (IR-733).
+
+        It must leave every reserve free in the model's verified capacity, plus one
+        more gathering exchange (its turn and its results' markers), and the final
+        answer and one repair must still fit the run allowance with it carried.
+        """
+        capacity = self.sender.capacity(request.pin)
+        if capacity is None:
+            return 0
+        cap = output_cap(capacity, self.reserves)
+        status = measure(replace(request, max_output_tokens=cap), self.sender.dialect, capacity, self.reserves)
+        exchange = self.reserves.output_tokens + self.reserves.next_result_tokens
+        tokens = capacity.context_tokens - status.occupancy_tokens - self.reserves.total - exchange
+        low, high = 0, max(0, tokens)
+        while low < high:
+            mid = (low + high + 1) // 2
+            if budget.can_finish(status.occupancy_tokens + mid, cap, self.reserves):
+                low = mid
+            else:
+                high = mid - 1
+        room = min(low * capacity.min_bytes_per_token, capacity.max_request_bytes - status.request_bytes)
+        return max(0, int(room * ESCAPE_SHARE))
+
     async def send(self, request: AgentRequest) -> ModelTurn:
         try:
             return await self.sender.converse(request)
@@ -201,8 +243,11 @@ class _Run:
         self.deadline = time.monotonic() + context.remaining_seconds
         # One clarification at a time: not twice in a row, however much history is carried.
         asked = bool(context.prior) and context.prior[-1].kind == "clarification"
-        self.investigation = Investigation(tools, clarify=not asked,
-                                           metadata=agent.pin.tool_version == METADATA_TOOL_VERSION)
+        version = agent.pin.tool_version
+        self.investigation = Investigation(
+            tools, clarify=not asked,
+            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION),
+            manuscripts=version == MANUSCRIPT_TOOL_VERSION)
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
 
@@ -225,7 +270,16 @@ class _Run:
 
         stale = 0
         while self._may_gather(stale):
-            request, status = self.agent.estimate(self.request(history))
+            try:
+                request, status = self.agent.estimate(self.request(history))
+            except Unavailable as full:
+                # A window filled by what was read closes research; the answer is still owed (IR-733).
+                if full.code not in WINDOW_FULL:
+                    raise
+                break
+            # Another exchange must leave room to close research and answer; otherwise answer now.
+            if self.steps and not self._room(history, [], []):
+                break
             if not self.budget.can_gather(status.occupancy_tokens, request.max_output_tokens, self.agent.reserves):
                 break
             turn = await self._attempt(request, status, "gather")
@@ -236,12 +290,13 @@ class _Run:
             calls = [c for item in turn.items if isinstance(item, ToolGroup) for c in item.calls]
             results = []
             progressed = False
-            for call in calls:
+            for n, call in enumerate(calls):
                 if self.investigation.tool_calls >= self.bounds.max_tool_calls:
                     # The exchange stays whole; the call is answered, not run.
                     results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"})))
                     continue
-                outcome = await self.investigation.execute(call)
+                room = self._room(history, results, calls[n:]) if call.name == READ_MANUSCRIPT.name else 0
+                outcome = await self.investigation.execute(call, room=room)
                 if outcome.clarification is not None:
                     self._checked(outcome.clarification)
                     return self._result(outcome.clarification, (), kind="clarification")
@@ -249,6 +304,7 @@ class _Run:
                 results.append(ToolResult(call.id, outcome.content))
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
+            self.investigation.packed(history[len(history) - len(results):])
             stale = 0 if progressed else stale + 1
 
         if self.steps:
@@ -259,6 +315,16 @@ class _Run:
         turn = await self._attempt(request, status, "final")
         history.append(turn)
         return await self._deliver(turn, history)
+
+    def _room(self, history, results, unanswered) -> int:
+        """What a read may return now, leaving room to close research and answer.
+
+        Measured after the results so far, with every later call answered and the
+        closing note sent, so a read never leaves the final request over capacity.
+        """
+        rest = [ToolResult(c.id, "{}") for c in unanswered]
+        closing = self.request([*history, *results, *rest, User(FINAL_NOTE)], closed=True)
+        return self.agent.room(closing, self.budget)
 
     def _may_gather(self, stale: int) -> bool:
         return (self.steps < self.bounds.max_steps
