@@ -1204,7 +1204,7 @@ export default function PaperViewPage() {
                 )}
 
                 {/* Reading sections are separated by space. */}
-                <div className="space-y-12 pt-8">
+                <div className="space-y-8">
                 {/* The abstract shares the reading column with its heading and actions. */}
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
@@ -1298,7 +1298,7 @@ export default function PaperViewPage() {
             >
               <aside
                 aria-labelledby={`${tabsId}-details`}
-                className="min-h-0 space-y-4 overflow-hidden pt-8 overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible overview-wide:pt-0"
+                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible"
               >
                 <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
                   Record details

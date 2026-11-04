@@ -2922,7 +2922,7 @@ describe("the Overview's header (IR-569)", () => {
 
     const abstract = screen.getByRole("heading", { level: 2, name: "Abstract" }).closest("section");
     const group = abstract?.parentElement;
-    expect(group).toHaveClass("space-y-12");
+    expect(group).toHaveClass("space-y-8");
     const sections = within(group as HTMLElement).getAllByRole("heading", { level: 2 });
     expect(sections[sections.length - 1]).toHaveTextContent("Comments");
   });
