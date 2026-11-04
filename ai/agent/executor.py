@@ -23,8 +23,9 @@ from typing import Mapping, Optional
 
 from ai.admission.errors import AdmissionDenied
 from ai.admission.limits import Price
-from ai.agent import assurance, checkpoint
+from ai.agent import assurance, checkpoint, compaction as compacting
 from ai.agent.budget import Bounds, Budget, profiles as checked_profiles
+from ai.agent.compaction import STATE_PREFIX, Compaction, Handoff
 from ai.agent.context import (
     CONTEXT_EXHAUSTED, REQUEST_BYTES_EXCEEDED, FittedAgentProvider, OverCapacity, Reserves, measure, output_cap,
 )
@@ -113,10 +114,14 @@ class AgentExecutor:
     takes_context = True
 
     def __init__(self, provider: LLMProvider, pin: Pin, reserves: Reserves, *,
-                 profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None):
+                 profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None,
+                 compaction: Optional[Compaction] = None):
         self.provider = provider
         self.pin = pin
         self.reserves = reserves
+        #: None never compacts: a full window then closes research, as before (IR-734).
+        self.compaction = compaction
+        self.summarizer = FittedAgentProvider(provider, compaction.reserves(reserves)) if compaction else None
         #: Research needs configured bounds per depth; none are defaulted.
         self.profiles = checked_profiles(profiles) if profiles is not None else None
         #: The pinned model's price; a paid provider without one cannot bound cost.
@@ -137,6 +142,8 @@ class AgentExecutor:
         if (self.pin.prompt_version, self.pin.tool_version) not in PROMPTS:
             return False
         if self.researches and self.profiles is None:
+            return False
+        if self.compaction and not self.compaction.fits(self.sender.capacity(self.pin), self.reserves):
             return False
         return (all(getattr(self.pin, k) == v for k, v in SUPPORTED.items())
                 and self.provider.accepts(self.pin))
@@ -197,9 +204,24 @@ class AgentExecutor:
         room = min(low * capacity.min_bytes_per_token, capacity.max_request_bytes - status.request_bytes)
         return max(0, int(room * ESCAPE_SHARE))
 
-    async def send(self, request: AgentRequest) -> ModelTurn:
+    def occupancy(self, request: AgentRequest) -> Optional[int]:
+        """The estimated occupancy of `request` whether or not it fits; None with capacity unknown."""
+        capacity = self.sender.capacity(request.pin)
+        if capacity is None:
+            return None
+        sized = replace(request, max_output_tokens=output_cap(capacity, self.reserves))
+        return measure(sized, self.sender.dialect, capacity, self.reserves).occupancy_tokens
+
+    def estimate_summary(self, request: AgentRequest):
+        return _fitted(self.summarizer.estimate, request)
+
+    async def summarize(self, request: AgentRequest) -> ModelTurn:
+        """A compaction summary: the same AGENT and admission, its own completion cap (IR-734)."""
+        return await self.send(request, sender=self.summarizer)
+
+    async def send(self, request: AgentRequest, *, sender=None) -> ModelTurn:
         try:
-            return await self.sender.converse(request)
+            return await (sender or self.sender).converse(request)
         except OverCapacity as refused:
             # The status, numbers only, is logged by the sender.
             raise Unavailable(refused.code) from None
@@ -254,7 +276,16 @@ class _Run:
         spent = context.spent or {}
         self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0),
                             attempts=spent.get("attempts", 0))
-        self.task = checkpoint.task_key(question, context.prior, context.state or {})
+        self.task = checkpoint.task_key(question, context.prior, context.state or {},
+                                        handoff=(context.handoff or {}).get("revision"))
+        # The compact handoff the history now opens with, and the original Turns still carried whole (IR-734).
+        self.handoff = (context.handoff or {}).get("body")
+        self.handoff_revision = (context.handoff or {}).get("revision")
+        self.handoff_through = int((context.handoff or {}).get("through_ordinal") or 0)
+        self.carried = [t.ordinal for t in self.prior]
+        # Every summary attempt counts, those of earlier fences included.
+        self.compactions = context.compactions
+        self.compact_failed_at: Optional[int] = None
 
     def request(self, history, *, closed=False) -> AgentRequest:
         pin = self.agent.pin
@@ -266,6 +297,7 @@ class _Run:
         resumed = await self._resume()
         history, stale = resumed if resumed is not None else (await self._open(), 0)
         while self._may_gather(stale):
+            history = await self._compacted(history)
             try:
                 request, status = self.agent.estimate(self.request(history))
             except Unavailable as full:
@@ -304,6 +336,7 @@ class _Run:
             stale = 0 if progressed else stale + 1
             await self._save(history, stale)
 
+        history = await self._compacted(history)
         if self.steps:
             history.append(User(FINAL_NOTE))
         request, status = self.agent.estimate(self.request(history, closed=True))
@@ -325,12 +358,19 @@ class _Run:
 
     async def _open(self) -> list:
         history: list = []
+        state = self.context.state or {}
+        if self.handoff:
+            # Earlier Turns arrive compacted; its excluded and shown papers are recalled with the state's.
+            await self.investigation.recall({**state, "shown": [*state.get("shown", ()), *self.handoff["shown"]],
+                                             "excluded": [*state.get("excluded", ()), *self.handoff["excluded"]],
+                                             "selected": [*state.get("selected", ()), *self.handoff["selected"]]})
+            history.append(compacting.render(self.handoff, self.investigation.papers, passages=False))
         for turn in self.prior:
             answer = DELIVERED_MARKER.sub("", turn.answer)
             history += [User(turn.question), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
-        shown = await self.investigation.recall(self.context.state or {})
+        shown = await self.investigation.recall(state)
         if shown:
-            history.append(User("[IRIS conversation state] " + json.dumps(shown, ensure_ascii=False)))
+            history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False)))
         # The reader's words, unchanged, whatever queries the agent forms.
         history.append(User(self.question))
         return history
@@ -348,6 +388,8 @@ class _Run:
             return None
         self.steps = max(self.steps, int(saved.get("step") or 0))
         restored = checkpoint.load(saved.get("body"), pin=self.agent.pin, bounds=self.bounds, task=self.task)
+        if restored is not None and not self._resumable(restored.compaction):
+            restored = None
         reason = "incompatible" if restored is None else await self.tools.reauthorize(
             restored.handles(), restored.counted())
         if reason in ENDS_RUN:
@@ -356,19 +398,103 @@ class _Run:
             await self._journal("recovery", {"outcome": "rebuilt", "reason": reason, "step": self.steps})
             return None
         restored.apply(self.investigation)
+        if restored.compaction:
+            state = restored.compaction
+            self.handoff, self.handoff_revision = state["body"], state["revision"]
+            self.handoff_through, self.carried = int(state["through"]), list(state["carried"])
         self.steps = max(self.steps, restored.steps)
         spent = restored.budget
         self.budget.restore(spent["input"], spent["output"], spent["reported"], spent["attempts"])
         await self._journal("recovery", {"outcome": "resumed", "step": self.steps})
         return restored.history, restored.stale
 
+    async def _compacted(self, history: list) -> list:
+        """`history` with its older exchanges compacted once it reaches the threshold (IR-734).
+
+        Anything short of a complete, committed handoff -- a refused, empty or
+        malformed summary, or a Conversation that moved -- leaves `history` as
+        it was. Every attempt counts against the run's own bound, allowance
+        and deadline; a failed one is not retried until the history grows.
+        """
+        rule = self.agent.compaction
+        if rule is None or self.context.commit_handoff is None:
+            return history
+        if self.compactions >= rule.max_attempts or self.compact_failed_at == len(history):
+            return history
+        occupancy = self.agent.occupancy(self.request(history))
+        if occupancy is None or occupancy < rule.threshold_tokens:
+            return history
+        cut = compacting.split(history, rule.keep_exchanges)
+        if cut is None:
+            return history
+        try:
+            request, status = self.agent.estimate_summary(self.request(cut.summary(), closed=True))
+        except Unavailable:
+            return await self._compaction_failed(history, "summary_exceeds_context")
+        # The summary must leave the final answer and its repair affordable at today's size.
+        cap = output_cap(self.agent.sender.capacity(request.pin), self.agent.reserves)
+        if not self.budget.fits([(status.occupancy_tokens, request.max_output_tokens), (occupancy, cap),
+                                 (occupancy + cap + self.agent.reserves.repair_tokens, cap)]):
+            return await self._compaction_failed(history, "allowance")
+        self.compactions += 1
+        turn = await self._attempt(request, status, "compact")
+        try:
+            summary = compacting.parse(final_answer(turn))
+        except NotFinal:
+            summary = None
+        if summary is None:
+            return await self._compaction_failed(history, "invalid_summary")
+        compacted = [o for o in self.carried[:len(cut.gone_turns)] if o is not None]
+        state = self.context.state or {}
+        body = compacting.build(
+            summary, previous=self.handoff, compacted=compacted, passages=self.investigation.passages,
+            plan=self.investigation.plan,
+            state={"shown": state.get("shown", ()), "selected": self._focus("selected"),
+                   "excluded": self._focus("excluded")})
+        through = max([self.handoff_through, *compacted])
+        outcome, revision = await self.context.commit_handoff(Handoff(
+            body=body, through_ordinal=through, turns=tuple(body["turns"]), sources=tuple(body["sources"]),
+            binding=self.agent.pin.binding(),
+            usage={"input_tokens": turn.input_tokens, "output_tokens": turn.output_tokens}))
+        if outcome == "fenced":
+            raise Unavailable("run_ended")
+        if outcome != "committed":
+            return await self._compaction_failed(history, outcome)
+        self.handoff, self.handoff_revision = body, revision
+        self.handoff_through = through
+        self.carried = self.carried[len(cut.gone_turns):]
+        await self._journal("compaction", {"outcome": "compacted", "revision": revision,
+                                           "turns": len(cut.gone_turns), "exchanges": len(cut.gone_exchanges)})
+        return cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True))
+
+    async def _compaction_failed(self, history: list, reason: str) -> list:
+        self.compact_failed_at = len(history)
+        await self._journal("compaction", {"outcome": "kept", "reason": reason})
+        return history
+
+    def _resumable(self, compaction: Optional[dict]) -> bool:
+        """A saved history opens only with a handoff that is committed and still this run's to use (IR-734)."""
+        if not compaction:
+            return self.handoff_revision is None
+        try:
+            revision = compaction["revision"]
+            compacting.render(compaction["body"], {}, passages=False)
+            int(compaction["through"]), list(compaction["carried"])
+        except (KeyError, TypeError, ValueError):
+            return False
+        return revision in self.context.committed or revision == self.handoff_revision
+
     async def _save(self, history: list, stale: int) -> None:
         """Keep this completed step for a worker that takes the run over (IR-724)."""
         if self.context.save is None:
             return
+        compaction = None if self.handoff is None else {
+            "revision": self.handoff_revision, "through": self.handoff_through, "carried": self.carried,
+            "body": self.handoff,
+        }
         body = checkpoint.dump(pin=self.agent.pin, bounds=self.bounds, task=self.task, history=history,
                                investigation=self.investigation, budget=self.budget,
-                               steps=self.steps, stale=stale)
+                               steps=self.steps, stale=stale, compaction=compaction)
         if not await self.context.save(self.steps, body):
             raise Unavailable("run_ended")
 
@@ -390,9 +516,10 @@ class _Run:
         # Recorded before sending; a stopped run admits no further attempt.
         if not await self.tools.journal("model", {"purpose": PURPOSE, "phase": phase, "step": self.steps + 1}):
             raise Unavailable("run_ended")
+        send = self.agent.summarize if phase == "compact" else self.agent.send
         try:
             # The run's deadline bounds every send, admitted or not.
-            turn = await asyncio.wait_for(self.agent.send(request), max(0.0, self.deadline - time.monotonic()))
+            turn = await asyncio.wait_for(send(request), max(0.0, self.deadline - time.monotonic()))
         except asyncio.TimeoutError:
             raise Unavailable("deadline") from None
         self.steps += phase == "gather"
