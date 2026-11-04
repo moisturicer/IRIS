@@ -48,7 +48,7 @@ It is adopted **subject to five preconditions**, each of which must be met befor
 - **`RUNS_DATABASE_URL`.** AI-owned runs (IR-722, IR-723) connect as `iris_ai_runtime` and write schema `iris_ai`. That is direct database access, from `ai-gateway` and from `ai-runs-worker` (development Compose only; `docker-compose.prod.yml` has no worker yet).
 - **Research tools (IR-719).** Under a Django-issued `reader_session` grant, `iris_ai_runtime` reads the Passages its reader may see, through `research_record_ids()` (migration `ai/0037`). That is retrieval outside Django.
 
-These come from ADR-049, **which is cited across the repository but is not on `main`**. This amendment can't amend text that isn't there, so it states the boundary on ADR-014's side.
+These come from [ADR-049](049-dedicated-ai-runtime-and-local-research.md), whose Reconciliation section replaces ADR-014's stateless-gateway restriction. This amendment states the same boundary on ADR-014's side.
 
 **Decision.**
 
