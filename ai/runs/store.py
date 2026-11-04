@@ -29,6 +29,7 @@ from typing import Mapping
 
 import asyncpg
 
+from ai.admission.scope import run_key
 from ai.runs.executor import PriorTurn, Result
 
 APP_NAME = "iris-ai-runs"
@@ -135,6 +136,11 @@ class Claim:
     #: Earlier Turns, oldest first, and the Conversation state they left (IR-728).
     prior: tuple[PriorTurn, ...] = ()
     state: dict | None = None
+    #: The last completed step an earlier fence saved, unverified: `step` and `body` (IR-724).
+    checkpoint: dict | None = None
+    #: Tokens the shared ledger has charged this run over every fence, open
+    #: and uncertain attempts at their reservation (IR-724).
+    spent: dict | None = None
 
 
 def request_hash(question: str, conversation_id, base_revision) -> str:
@@ -382,12 +388,23 @@ class RunStore:
                 WHERE conversation_id = $1 AND {CURRENT_SOURCE_TURN} ORDER BY ordinal DESC LIMIT $2""",
             row["conversation_id"], PRIOR_TURNS,
         )
+        checkpoint = await conn.fetchrow(
+            "SELECT step, body FROM iris_ai.run_checkpoint WHERE run_id = $1", run_id,
+        )
+        # Every fence's attempts, including one a dead worker left open (IR-725).
+        spent = await conn.fetchrow(
+            """SELECT coalesce(sum(charge_input_tokens), 0) AS input_tokens,
+                      coalesce(sum(charge_output_tokens), 0) AS output_tokens
+                 FROM public.ai_providerreservation WHERE run_key = $1""",
+            run_key(run_id),
+        )
         return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"],
                      scope_record_id=row["scope_record_id"], run_id=run_id,
                      grant=row["reader_grant"], depth=row["depth"], allowance=row["allowance"],
                      remaining_seconds=float(row["remaining"]),
                      prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"]) for t in reversed(prior)),
-                     state=row["state"])
+                     state=row["state"], checkpoint=dict(checkpoint) if checkpoint else None,
+                     spent={k: int(v) for k, v in spent.items()})
 
     async def claim_next(self, *, worker: str, lease_seconds: int, executor: str | None,
                          reserved_units: int | Mapping[str, int], deep_concurrency: int,
@@ -464,8 +481,43 @@ class RunStore:
                 WHERE run_id = $1 AND outcome = 'reserved'""",
             run_id, state, reported_units,
         )
+        # An ended run is never resumed; its evidence is not kept for one (IR-724).
+        await conn.execute("DELETE FROM iris_ai.run_checkpoint WHERE run_id = $1", run_id)
         await self._journal(conn, run_id, state, {"reason": reason})
         return state
+
+    async def save_checkpoint(self, run_id, fence: int, step: int, body: dict, *,
+                              lease_seconds: int) -> None:
+        """Replace the run's checkpoint after a completed step, and renew its lease (IR-724).
+
+        Only the current fence of a running run, before its deadline, may
+        write; anything else raises Fenced and writes nothing. A step never
+        goes backwards.
+        """
+        async with self._connect() as conn:
+            async with conn.transaction():
+                renewed = await conn.fetchval(
+                    """UPDATE iris_ai.ask_run
+                          SET lease_expires_at = now() + make_interval(secs => $3)
+                        WHERE id = $1 AND fence = $2 AND state = 'running' AND deadline_at > now()
+                    RETURNING id""",
+                    run_id, fence, float(lease_seconds),
+                )
+                if renewed is None:
+                    raise Fenced
+                saved = await conn.fetchval(
+                    """INSERT INTO iris_ai.run_checkpoint (run_id, fence, step, body)
+                       VALUES ($1, $2, $3, $4)
+                       ON CONFLICT (run_id) DO UPDATE
+                          SET fence = excluded.fence, step = excluded.step, body = excluded.body,
+                              saved_at = now()
+                        WHERE run_checkpoint.fence <= excluded.fence
+                          AND run_checkpoint.step <= excluded.step
+                    RETURNING step""",
+                    run_id, fence, step, body,
+                )
+                if saved is None:
+                    raise Fenced
 
     async def commit_final(self, run_id, fence: int, result: Result) -> str:
         """Turn, citations, Conversation revision and terminal journal, atomically.

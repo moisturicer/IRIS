@@ -55,6 +55,12 @@ class Budget:
         self.output = 0
         self.reported = 0
 
+    def restore(self, input_tokens: int = 0, output_tokens: int = 0, reported: int = 0) -> None:
+        """Continue from what the run already spent, never below it (IR-724)."""
+        self.input = max(self.input, int(input_tokens))
+        self.output = max(self.output, int(output_tokens))
+        self.reported = max(self.reported, int(reported))
+
     def spend(self, turn, estimated_input: int, cap: int) -> None:
         """Missing usage counts at its estimate and cap, never as zero."""
         self.input += estimated_input if turn.input_tokens is None else turn.input_tokens

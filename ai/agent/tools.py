@@ -149,7 +149,8 @@ class Investigation:
     papers: dict[int, tuple[str, str]] = field(default_factory=dict)
     #: Numbers the tools computed (coverage), which an answer may state.
     figures: set[str] = field(default_factory=set)
-    results: list[Evidence] = field(default_factory=list)
+    #: Evidence reads that returned something.
+    reads: int = 0
     plan: tuple[dict, ...] = ()
     plan_revision: int = 0
     selected: Optional[tuple[int, ...]] = None
@@ -170,7 +171,7 @@ class Investigation:
 
     @property
     def researched(self) -> bool:
-        return bool(self.results)
+        return self.reads > 0
 
     def titles(self) -> set[str]:
         return {title.casefold().strip() for _, title in self.papers.values()}
@@ -251,7 +252,7 @@ class Investigation:
         if result.reason:
             body["reason"] = result.reason
         if result.status in (OK, PARTIAL):
-            self.results.append(result)
+            self.reads += 1
         for record in result.records:
             self.papers.setdefault(record.record_id, (record.handle, record.title))
             new = new or ("paper", record.record_id) not in self.seen
@@ -337,7 +338,7 @@ class Investigation:
         if not await self.research.journal("plan", {
             "revision": self.plan_revision, "steps": list(self.plan),
             # Calls run before this one.
-            "executed": {"tool_calls": self.tool_calls - 1, "evidence_reads": len(self.results)},
+            "executed": {"tool_calls": self.tool_calls - 1, "evidence_reads": self.reads},
         }):
             raise RunEnded("run_ended")
         return Outcome(json.dumps({"status": "ok", "revision": self.plan_revision}))
