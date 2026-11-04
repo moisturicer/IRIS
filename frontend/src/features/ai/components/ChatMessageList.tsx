@@ -68,10 +68,8 @@ export function ChatMessageList({
 
   if (messages.length === 0 && !isLoading) {
     return (
-      // `m-auto`, not `justify-center`: centred content taller than a phone's
-      // screen would overflow upward and clip its top; this scrolls (IR-570).
-      <div className="flex-1 overflow-y-auto flex flex-col p-8 text-center">
-        <div className="m-auto max-w-xl w-full animate-fade-in-up motion-reduce:animate-none">
+      <div className="shrink-0 px-4 pb-1 pt-6 text-center sm:px-6">
+        <div className="mx-auto w-full max-w-xl animate-fade-in-up motion-reduce:animate-none">
           <AskIrisEmblem className="w-16 h-16 mx-auto mb-5" />
           <h2 className="text-[26px] font-bold text-stone-900 mb-2">What do you want to ask?</h2>
           <p className="text-[15px] text-stone-500 leading-relaxed">
@@ -90,11 +88,12 @@ export function ChatMessageList({
                   type="button"
                   onClick={() => onSuggestion?.(prompt)}
                   style={{ animationDelay: `${i * 60}ms` }}
-                  className="px-4 py-3.5 rounded-xl border border-stone-200 text-[14px] text-stone-700
-                    hover:border-brand/40 hover:text-brand hover:shadow-sm transition-all duration-200
+                  className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 px-4 py-3 text-left text-[14px] text-stone-700
+                    hover:border-brand/40 hover:bg-brand-50 hover:text-brand transition-colors duration-200
                     animate-fade-in-up motion-reduce:animate-none [animation-fill-mode:backwards]"
                 >
-                  {prompt}
+                  <span>{prompt}</span>
+                  <i className="fas fa-arrow-right shrink-0 text-xs text-brand" aria-hidden />
                 </button>
               ))}
             </div>

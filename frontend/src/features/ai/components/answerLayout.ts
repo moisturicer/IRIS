@@ -50,3 +50,12 @@ export const CHAT_COLUMN = "w-full max-w-[min(92vw,60rem)] mx-auto";
  * not the window's, so the app sidebar's state counts.
  */
 export const ASK_PANELS_INLINE_PX = 900;
+
+// Auto margins center the opening content and collapse when it needs to scroll.
+export const CHAT_OPENING = "overflow-y-auto before:my-auto before:content-[''] after:my-auto after:content-['']";
+
+export const CHAT_COMPOSER_SURFACE =
+  "rounded-2xl border border-stone-300 bg-surface transition-colors focus-within:border-brand motion-reduce:transition-none";
+
+export const CHAT_STREAM_CARET =
+  "[&>p:last-child]:after:ml-1 [&>p:last-child]:after:inline-block [&>p:last-child]:after:h-[0.85em] [&>p:last-child]:after:w-0.5 [&>p:last-child]:after:bg-brand [&>p:last-child]:after:content-[''] motion-safe:[&>p:last-child]:after:animate-pulse";

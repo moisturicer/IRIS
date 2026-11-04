@@ -31,6 +31,7 @@ import { recordsApi } from "@/api/records";
 import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
 import { ChatInput } from "./components/ChatInput";
+import { CHAT_OPENING } from "./components/answerLayout";
 import { ComparisonPicker } from "./components/ComparisonPicker";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ChatToolbar } from "./components/ChatToolbar";
@@ -408,6 +409,8 @@ function LegacyRAGChatPage() {
     }
   };
 
+  const centered = !unavailable && !loading && !client.streaming && messages.length === 0;
+
   return (
     // `dvh`, not `vh`: the page is the height of what a phone shows, so the
     // composer stays above the software keyboard rather than under it (IR-570).
@@ -474,6 +477,7 @@ function LegacyRAGChatPage() {
             </div>
           )}
 
+          <div className={`flex min-h-0 flex-1 flex-col ${centered ? CHAT_OPENING : ""}`}>
           {unavailable ? (
             <div role="status" className="flex-1 flex items-center justify-center p-8 text-center">
               <div className={`max-w-md rounded-xl px-6 py-5 ${TONES.attention}`}>
@@ -510,6 +514,7 @@ function LegacyRAGChatPage() {
             />
           )}
           <ChatInput
+            centered={centered}
             onSend={client.send}
             draft={client.draft}
             onDraftChange={client.setDraft}
@@ -522,6 +527,7 @@ function LegacyRAGChatPage() {
             <ComparisonPicker key={activeId} selected={client.comparisonRecords} onChange={client.setComparisonRecords}
               limit={comparisonLimit} scoped={client.record !== null} disabled={loading || !activeId} />
           </ChatInput>
+          </div>
         </div>
 
         {!panelsAsDrawers && (

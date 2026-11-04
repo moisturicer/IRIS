@@ -11,6 +11,7 @@ import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessag
 import { AskIrisNotice } from "@/features/ai/components/AskIrisNotice";
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
+import { CHAT_COMPOSER_SURFACE, CHAT_OPENING } from "@/features/ai/components/answerLayout";
 import { cn } from "@/lib/utils";
 import { useReaderPath } from "@/api/runtimeReader";
 import { useAuthStore } from "@/store/auth.store";
@@ -478,6 +479,7 @@ function LegacyPaperChatPanel({
         )}
       </div>
 
+      <div className={cn("min-h-0 flex-1 flex-col", minimized ? "hidden" : "flex", ready && !busy && messages.length === 0 && CHAT_OPENING)}>
       {/* Transcript */}
       <div
         ref={transcriptRef}
@@ -487,7 +489,7 @@ function LegacyPaperChatPanel({
         hidden={minimized}
         // Only while shown: hiding it is not the reader scrolling it.
         onScroll={minimized ? undefined : (e) => { transcriptScrollTop.current = e.currentTarget.scrollTop; }}
-        className="flex-1 overflow-y-auto px-4 py-5 space-y-5"
+        className={cn("space-y-5 px-4 py-5", ready && !busy && messages.length === 0 ? "shrink-0 pb-1" : "flex-1 overflow-y-auto")}
       >
         {ready && messages.length === 0 && (
           <div className="pt-2">
@@ -503,9 +505,10 @@ function LegacyPaperChatPanel({
                   key={question}
                   type="button"
                   onClick={() => chooseStarter(question)}
-                  className={cn("px-3 text-left font-normal hover:bg-brand-50", CONTROL_BASE, CONTROL_OUTLINE)}
+                  className={cn("justify-between gap-3 px-3 text-left font-normal hover:bg-brand-50", CONTROL_BASE, CONTROL_OUTLINE)}
                 >
-                  {question}
+                  <span>{question}</span>
+                  <i className="fas fa-arrow-right shrink-0 text-xs text-brand" aria-hidden />
                 </button>
               ))}
             </div>
@@ -526,8 +529,8 @@ function LegacyPaperChatPanel({
       </div>
 
       {/* Composer: the question, then its scope and Send (IR-569). */}
-      <div className="shrink-0 border-t border-stone-200 p-3" hidden={minimized}>
-        <div className="rounded-lg border border-stone-300 focus-within:border-brand/60 focus-within:ring-2 focus-within:ring-brand/20 transition-colors duration-200">
+      <div className={cn("shrink-0 p-3", (!ready || busy || messages.length > 0) && "border-t border-stone-200")} hidden={minimized}>
+        <div className={CHAT_COMPOSER_SURFACE}>
           <textarea
             ref={composerRef}
             rows={2}
@@ -543,7 +546,7 @@ function LegacyPaperChatPanel({
             // a screen reader on Y must not hear "this paper" and mean X.
             aria-label={pinned ? `Ask about ${subject.title}` : "Ask about this paper"}
             placeholder="Ask about methodology, findings, datasets…"
-            className="block w-full resize-none bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 outline-none"
+            className="block w-full resize-none bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 caret-brand outline-none"
           />
           <div className="flex items-center justify-between gap-2 px-2 pb-2">
             {/* The scope control (IR-298, ADR-026 section 9): visible, and the
@@ -584,6 +587,7 @@ function LegacyPaperChatPanel({
         </div>
         <p className="mt-1.5 px-1 text-2xs text-stone-500">Enter to send · Shift+Enter for a new line</p>
         <AskIrisNotice className="mt-1 px-1 text-2xs" />
+      </div>
       </div>
     </aside>
   );

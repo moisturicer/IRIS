@@ -39,18 +39,18 @@ const WORKFLOW_ICONS: Partial<Record<WorkflowState, string>> = {
   rejected:              "fa-ban",         // terminal
   pending_delete:        "fa-trash-can",
 };
-type StatusBadgeProps = { state: WorkflowState; label: string };
+type StatusBadgeProps = { state: WorkflowState; label: string; compact?: boolean };
 
 /**
  * The stored-status fallback the Evaluation screen used is gone with that
  * screen (IR-274): every caller passes the server's state and its label.
  */
-export function StatusBadge({ state, label }: StatusBadgeProps) {
+export function StatusBadge({ state, label, compact }: StatusBadgeProps) {
   const color = WORKFLOW_COLORS[state];
   const icon = WORKFLOW_ICONS[state];
 
   return (
-    <span className={cn("inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-2xs font-semibold", color)}>
+    <span className={cn("inline-flex items-center gap-1 px-2.5 rounded-full text-2xs font-semibold", compact ? "min-h-5 leading-4" : "py-0.5", color)}>
       {icon && <i className={cn("fas", icon)} aria-hidden />}
       {label}
     </span>

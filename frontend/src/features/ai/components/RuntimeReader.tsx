@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { activeRun, ProtocolMismatch, RELOAD_TO_RECONNECT, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import { ChatInput } from "./ChatInput";
+import { CHAT_OPENING } from "./answerLayout";
 
 const STATES: Record<ReaderRun["state"], string> = {
   queued: "Queued", running: "Research in progress", completed: "Answer ready", cancelled: "Stopped",
@@ -175,10 +176,12 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     finally { setBusy(false); }
   };
 
-  return <div className="flex h-full min-h-0 min-w-0 flex-col bg-canvas">
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 sm:px-6">
+  const centered = !conversation?.runs.length && !run && !busy && !error;
+
+  return <div className={`flex h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : ""}`}>
+    <div className={`px-4 py-6 sm:px-6 ${centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto"}`}>
       <div className="mx-auto max-w-3xl space-y-6">
-        {!conversation && !run && !busy && !error && <p className="font-display text-2xl text-stone-900">What would you like to investigate?</p>}
+        {centered && <p className="font-display text-2xl text-stone-900">What would you like to investigate?</p>}
         {conversation?.runs.map(item => {
           const turn = conversation.turns.find(t => t.run_id === item.id);
           const current = item.id === run?.id ? run : item;
@@ -207,13 +210,14 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
           className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">Stop research</button>}
       </div>
     </div>
-    <label className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-2 text-sm text-stone-700">
-      <input type="checkbox" checked={depth === "deep"} onChange={e => setDepth(e.target.checked ? "deep" : "ordinary")}
-        className="h-4 w-4 accent-brand" /> Thorough research
-    </label>
-    <ChatInput onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
+    <ChatInput centered={centered} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
       maxLength={4000}
       placeholder={recordId ? "Ask about this paper…" : "Ask about the research corpus…"}
-      disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"} />
+      disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"}>
+      <label className="inline-flex min-h-11 items-center gap-2 text-sm text-stone-700">
+        <input type="checkbox" checked={depth === "deep"} onChange={e => setDepth(e.target.checked ? "deep" : "ordinary")}
+          className="h-4 w-4 accent-brand" /> Thorough research
+      </label>
+    </ChatInput>
   </div>;
 }

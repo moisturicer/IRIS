@@ -292,8 +292,8 @@ function LoadingSkeleton() {
 }
 
 /** An outlined fact about the record: its type, classification, programme flags. */
-const META_CHIP =
-  "px-2.5 py-1 rounded-full ring-1 ring-stone-300 text-xs font-semibold text-stone-700";
+const META_PILL = "inline-flex min-h-5 items-center rounded-full px-2.5 text-2xs font-semibold leading-4";
+const META_CHIP = cn(META_PILL, "ring-1 ring-inset ring-stone-300 text-stone-700");
 
 /** Initials for the byline's mark. */
 function initials(name: string): string {
@@ -987,11 +987,11 @@ export default function PaperViewPage() {
               </h1>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
+                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />
                 {record.record_type_name && <span className={META_CHIP}>{record.record_type_name}</span>}
                 {record.classification_name && <span className={META_CHIP}>{record.classification_name}</span>}
                 {record.is_ip && (
-                  <span className="px-2.5 py-1 rounded-full bg-brand-50 text-brand ring-1 ring-brand-200 text-xs font-semibold inline-flex items-center gap-1.5">
+                  <span className={cn(META_PILL, "gap-1.5 bg-brand-50 text-brand ring-1 ring-inset ring-brand-200")}>
                     <i className="fas fa-shield-halved text-2xs" aria-hidden />
                     Intellectual Property
                   </span>
