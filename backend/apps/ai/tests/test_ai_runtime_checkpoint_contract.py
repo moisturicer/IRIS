@@ -199,6 +199,7 @@ def test_counts_focus_plan_and_seen_evidence_survive_the_round_trip():
     found.plan, found.plan_revision = ({"id": "a", "title": "Count", "status": "done"},), 1
     found.seen = {("count", found.counts[0].filters, "year"), ("paper", 4)}
     found.tool_calls, found.reads, found.searched = 2, 1, True
+    found.outages = ["search"]
 
     class Spent:
         input, output, reported, attempts = 10, 5, 15, 2
@@ -209,7 +210,7 @@ def test_counts_focus_plan_and_seen_evidence_survive_the_round_trip():
     again = Investigation(None, metadata=True)
     restored.apply(again)
     for name in ("counts", "exact", "figures", "terms", "papers", "selected", "excluded", "plan",
-                 "plan_revision", "seen", "tool_calls", "reads", "searched"):
+                 "plan_revision", "seen", "tool_calls", "reads", "searched", "outages"):
         assert getattr(again, name) == getattr(found, name), name
     assert restored.counted() == [4, 5, 6]
     assert restored.budget == {"input": 10, "output": 5, "reported": 15, "attempts": 2}

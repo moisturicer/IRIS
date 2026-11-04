@@ -129,7 +129,7 @@ def _investigation(found: Investigation) -> dict:
         "excluded": list(found.excluded) if found.excluded is not None else None,
         "seen": sorted((list(k) for k in found.seen), key=json.dumps),
         "tool_calls": found.tool_calls, "counts": [_count(c) for c in found.counts],
-        "searched": found.searched,
+        "searched": found.searched, "outages": list(found.outages),
     }
 
 
@@ -147,6 +147,8 @@ def _restore_investigation(found: Investigation, raw: dict) -> None:
     found.tool_calls = int(raw["tool_calls"])
     found.counts = [_load_count(c) for c in raw["counts"]]
     found.searched = bool(raw["searched"])
+    # A tool that failed before the takeover still qualifies the answer (IR-731).
+    found.outages = [str(name) for name in raw["outages"]]
 
 
 # --- Saving and restoring ----------------------------------------------------------
