@@ -12,6 +12,10 @@ ended for `idle_seconds`, then prints how many runs it ran.
 point of a step: `{"at": "response" | "tool" | "before_checkpoint" |
 "after_checkpoint", "after": n}`, the n-th time it is reached. It exits
 `KILLED`.
+
+`spec["admitted"] = false` builds it with `unadmitted` instead: IR-725's
+guard withholds every request carrying a tool result from a paid provider,
+so only an unadmitted worker can continue past a completed step.
 """
 
 import asyncio
@@ -23,6 +27,7 @@ from types import SimpleNamespace
 
 from ai.agent.tools import Investigation
 from ai.infrastructure.recording_adapter import HANG, RecordingAgentProvider
+from ai.runs.service import RunService
 from ai.runs.store import RunStore
 from ai.runs.worker import Worker, build
 
@@ -48,6 +53,22 @@ class Vendor(RecordingAgentProvider):
         turn = await super().converse(request)
         await asyncio.sleep(self.delay)
         return turn
+
+
+def unadmitted(settings, provider) -> RunService:
+    """As `build`, but the AGENT executor sends to the recording provider with no admission."""
+    from ai.agent.executor import AgentExecutor
+    from ai.runs import agent_profile
+    from ai.runs import config as runs_config
+    from ai.runs.dispatch import notifier_for
+    from ai.runs.executor import DeterministicExecutor
+
+    cfg = runs_config.read(settings)
+    profile = agent_profile.selected(settings)
+    executor = AgentExecutor(provider, profile.pin, profile.reserves, profiles=profile.bounds,
+                             price=profile.limits.prices[profile.pin.model])
+    return RunService(RunStore(cfg.database_url), cfg, executor, notifier_for(cfg.redis_url),
+                      serves=(DeterministicExecutor(),))
 
 
 def reply(text):
@@ -106,7 +127,11 @@ async def main(dsn, raw):
     vendor = Vendor(values, [reply(text) for text in spec["responses"]], spec.get("delay", 0.0))
     if spec.get("die"):
         arm(spec["die"], vendor)
-    service = build(SimpleNamespace(**values), agent_provider=vendor)
+    settings = SimpleNamespace(**values)
+    if spec.get("admitted", True):
+        service = build(settings, agent_provider=vendor)
+    else:
+        service = unadmitted(settings, vendor)
     ran = 0
     in_flight = 0
     last = time.monotonic()

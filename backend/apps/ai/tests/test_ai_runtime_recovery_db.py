@@ -1,10 +1,16 @@
 """A replacement worker resumes an interrupted investigation, on real PostgreSQL (IR-724, ADR-049 §12, §14).
 
 The first worker is an independent process (`ai.tests.agent_worker`) built
-from settings, killed outright at one point of its second step; its
-replacement is built the same way in-process, so its requests can be read.
-Restricted runtime login, Django-issued grants, the real admission ledger
-and guard. The recording vendor proves the contract, never paid capacity;
+from settings, killed outright at one point of a step; its replacement is
+built the same way in-process, so its requests can be read. Restricted
+runtime login and Django-issued grants throughout.
+
+IR-725's guard withholds every request carrying a tool result from a paid
+provider, so an admitted run never sends after a completed step. Resuming
+and continuing to an answer is therefore proven unadmitted (`unadmitted`);
+the real ledger and guard prove what a takeover keeps at the step-1 kill
+point, and that an admitted run resumed today is withheld at its next
+request. The recording vendor proves the contract, never paid capacity;
 every bound and limit here is a test value.
 """
 
@@ -14,6 +20,7 @@ import subprocess
 import sys
 import uuid
 from dataclasses import replace
+from types import SimpleNamespace
 from urllib.parse import unquote, urlparse
 
 import asyncpg
@@ -34,7 +41,7 @@ from ai.admission.ledger import Ledger  # noqa: E402
 from ai.admission.scope import RunBinding, run_key  # noqa: E402
 from ai.runs.executor import Result  # noqa: E402
 from ai.runs.store import Fenced, RunStore  # noqa: E402
-from ai.tests.agent_worker import KILLED  # noqa: E402
+from ai.tests.agent_worker import KILLED, unadmitted  # noqa: E402
 from apps.ai.models.admission import ProviderReservation  # noqa: E402
 from apps.records.models import Record  # noqa: E402
 
@@ -67,14 +74,19 @@ STEP_1 = tools(call("s1", "search", query="rainfall"))
 STEP_2 = tools(call("s2", "search", query="tilapia"))
 
 
-def doomed(dsn, die, *, limits=ROOMY):
+def doomed(dsn, die, *, limits=ROOMY, admitted=False):
     """The first worker: two search steps, killed at `die`, never answering."""
     spec = json.dumps({"values": values(dsn, limits=limits), "responses": [STEP_1, STEP_2, "Never sent."],
-                       "idle_seconds": 30, "die": die})
+                       "idle_seconds": 30, "die": die, "admitted": admitted})
     proc = subprocess.Popen([sys.executable, "-m", "ai.tests.agent_worker", dsn, spec],
                             cwd=REPO, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     _, err = proc.communicate(timeout=120)
     assert proc.returncode == KILLED, err
+
+
+def replacement(dsn, vendor, *, limits=ROOMY):
+    """The worker that takes the run over, sending without admission."""
+    return unadmitted(SimpleNamespace(**values(dsn, limits=limits)), vendor)
 
 
 def lease_lapses(run_id):
@@ -165,11 +177,10 @@ def test_a_replacement_worker_resumes_the_completed_step_with_one_final_answer(r
     doomed(runtime, die)
     assert checkpoints(queued["id"]) == [1]
     dead_models = [m["step"] for m in events(queued["id"], "model")]
-    dead_reservations = len(reservations(queued["id"]))
     lease_lapses(queued["id"])
 
     vendor = Watching(runtime, resumed, answered)
-    assert run(worker(runtime, vendor, limits=ROOMY).run_next())
+    assert run(replacement(runtime, vendor).run_next())
 
     state, reason, turn_id = ended(queued["id"])
     assert (state, reason) == ("completed", "answered") and turn_id is not None
@@ -186,37 +197,60 @@ def test_a_replacement_worker_resumes_the_completed_step_with_one_final_answer(r
     # No live database connection across any inference.
     assert vendor.open_connections == [0, 0]
 
-    # Two claims; every physical attempt of both is in the ledger, none released.
+    # Two claims, each accounted to the AGENT.
     assert accounted(queued["id"]) == ["agent", "agent"]
-    held = reservations(queued["id"])
-    assert len(held) == dead_reservations + 2
-    assert "released" not in {r.state for r in held}
-    if die["at"] == "response":
-        # The attempt whose outcome the dead worker never learned keeps its reservation.
-        assert held[dead_reservations - 1].state == "open"
-        assert held[dead_reservations - 1].charge_attempts == 1
     # A finished run keeps no checkpoint.
     assert checkpoints(queued["id"]) == []
 
 
 def test_a_takeover_does_not_renew_the_runs_allowance(runtime):
+    """On the real ledger, at the one kill point an admitted run reaches: its first response."""
     paper("Flood forecasting", {4: [("Methods", FLOOD)]})
-    paper("Pond sampling", {2: [("Methods", POND)]})
-    tight = replace(LIMITS, max_attempts=3)
+    tight = replace(LIMITS, max_attempts=2)
     grant = session(make_user("recover-allowance@cit.edu"))
     queued = queue(worker(runtime, limits=tight), grant, "recover-allowance")
 
-    # Two attempts spent, the second uncertain.
-    doomed(runtime, {"at": "response", "after": 2}, limits=tight)
+    # One attempt spent, its outcome never learned and nothing saved.
+    doomed(runtime, {"at": "response", "after": 1}, limits=tight, admitted=True)
+    assert checkpoints(queued["id"]) == []
     lease_lapses(queued["id"])
 
-    vendor = Vendor(resumed, answered)
+    vendor = Vendor(STEP_1, "Never sent.")
     assert run(worker(runtime, vendor, limits=tight).run_next())
-    # One more attempt fits the allowance; the answer would be a fourth.
+    # The second attempt is the allowance's last; a third is refused before it is reserved.
     assert len(vendor.requests) == 1
     assert ended(queued["id"]) == ("failed", "unavailable", None)
     assert turns(queued["conversation_id"]) == 0
-    assert len(reservations(queued["id"])) == 3
+    held = reservations(queued["id"])
+    assert len(held) == 2
+    assert "released" not in {r.state for r in held}
+    # The attempt whose outcome the dead worker never learned keeps its reservation.
+    assert (held[0].state, held[0].charge_attempts) == ("open", 1)
+
+
+def test_an_admitted_run_resumed_today_is_withheld_at_its_next_request(runtime):
+    """IR-725's guard: a restored Conversation carries tool results, so nothing more is sent."""
+    paper("Flood forecasting", {4: [("Methods", FLOOD)]})
+    grant = session(make_user("recover-withheld@cit.edu"))
+    queued = queue(worker(runtime, limits=ROOMY), grant, "recover-withheld")
+
+    doomed(runtime, {"at": "after_checkpoint", "after": 1}, admitted=True)
+    assert checkpoints(queued["id"]) == [1]
+    dead = [r.id for r in reservations(queued["id"])]
+    lease_lapses(queued["id"])
+
+    vendor = Vendor(resumed, answered)
+    assert run(worker(runtime, vendor, limits=ROOMY).run_next())
+    assert events(queued["id"], "recovery") == [{"outcome": "resumed", "step": 1}]
+    assert vendor.requests == []
+    assert ended(queued["id"]) == ("failed", "unavailable", None)
+    assert turns(queued["conversation_id"]) == 0
+    # The dead worker's attempt stays charged; the withheld one was reserved and never sent.
+    held = reservations(queued["id"])
+    assert [r.id for r in held[:len(dead)]] == dead
+    assert held[0].charge_attempts == 1
+    assert [r.sent for r in held[len(dead):]] == [False]
+    assert checkpoints(queued["id"]) == []
 
 
 def test_recovered_evidence_whose_source_changed_is_rebuilt_from_the_question(runtime):
@@ -241,7 +275,7 @@ def test_recovered_evidence_whose_source_changed_is_rebuilt_from_the_question(ru
         return reply(f"«Flood forecasting» forecasts floods from rainfall gauges [{found['passages'][0]['passage']}].")
 
     vendor = Vendor(fresh, cite_fresh)
-    assert run(worker(runtime, vendor, limits=ROOMY).run_next())
+    assert run(replacement(runtime, vendor).run_next())
 
     assert ended(queued["id"])[:2] == ("completed", "answered")
     assert events(queued["id"], "recovery") == [{"outcome": "rebuilt", "reason": "stale", "step": 1}]
@@ -277,7 +311,7 @@ def test_recovered_evidence_the_reader_can_no_longer_read_is_never_resent(runtim
         return reply("I could not find a readable paper on that.")
 
     vendor = Vendor(fresh)
-    assert run(worker(runtime, vendor, limits=ROOMY).run_next())
+    assert run(replacement(runtime, vendor).run_next())
     assert events(queued["id"], "recovery") == [{"outcome": "rebuilt", "reason": "stale", "step": 1}]
     assert len(vendor.requests) == 1
 
@@ -326,8 +360,8 @@ def test_two_replacements_racing_for_one_interrupted_run_answer_it_once(runtime)
     doomed(runtime, {"at": "after_checkpoint", "after": 1})
     lease_lapses(queued["id"])
 
-    first = worker(runtime, Vendor(resumed, answered), limits=ROOMY)
-    second = worker(runtime, Vendor(resumed, answered), limits=ROOMY)
+    first = replacement(runtime, Vendor(resumed, answered))
+    second = replacement(runtime, Vendor(resumed, answered))
 
     async def both():
         return await asyncio.gather(first.run_next(), second.run_next())
