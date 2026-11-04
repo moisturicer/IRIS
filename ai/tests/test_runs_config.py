@@ -2,6 +2,7 @@
 
 import pytest
 
+from ai.api.runs import SubmitRequest
 from ai.infrastructure.settings import Settings
 from ai.runs import config
 
@@ -43,6 +44,19 @@ def test_only_a_known_executor_can_be_selected():
 def test_runs_need_a_database():
     with pytest.raises(config.RunsUnavailable):
         config.read(settings(RUNS_DATABASE_URL=""))
+
+
+def test_a_submission_is_deep_unless_it_names_a_depth():
+    assert SubmitRequest(question="q").depth == "deep"
+    assert SubmitRequest(question="q", depth="ordinary").depth == "ordinary"
+
+
+def test_a_running_service_refuses_the_maintenance_login():
+    # ADR-014's IR-826 amendment: only `python -m ai.runs.migrate` holds it.
+    held = settings(RUNS_MIGRATION_DATABASE_URL="postgresql://maintenance@db/iris")
+    assert config.problems(held) == ["RUNS_MIGRATION_DATABASE_URL must not be set on a running service"]
+    with pytest.raises(config.RunsUnavailable):
+        config.read(held)
 
 
 def test_each_depth_keeps_its_own_deadline():

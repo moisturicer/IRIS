@@ -234,7 +234,7 @@ export type Capability =
 
 /**
  * `GET /records/<id>/metadata-suggestions/` (IR-406; spec §4.5). `pending`
- * while Docling reads the manuscript, `ready` once it has, `failed` when it
+ * while the manuscript is being read, `ready` once it has, `failed` when it
  * could not (an image-only scan included), `unsupported` when there is no
  * manuscript extraction at all. A `ready` field with nothing found is null.
  * `source` is `llamaextract` when LlamaExtract read a LlamaParse Manuscript
@@ -492,6 +492,21 @@ export interface RecordVersion {
   created_by_name: string | null;
   /** Null when this version was submitted with no manuscript. */
   manuscript_url:  string | null;
+  /** What it was submitted with, one per upload slot (ADR-058 §2, IR-872). */
+  documents?:               VersionDocument[];
+  /** Uploads made while it was the latest version: "added during vN". */
+  documents_added?:         VersionDocument[];
+  /** True when `documents` is a best guess, for versions older than IR-872. */
+  documents_reconstructed?: boolean;
+}
+
+/** One slot's file, as a version names it (IR-872). */
+export interface VersionDocument {
+  upload_id:    number;
+  slot:         string;
+  version:      number;
+  uploaded_at:  string;
+  download_url: string;
 }
 
 /**

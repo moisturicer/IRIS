@@ -18,7 +18,6 @@ from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai import reextraction
 from apps.ai.admission.limits import NotConfigured
-from apps.ai.extraction import configured_backend
 
 
 class Command(BaseCommand):
@@ -58,11 +57,6 @@ class Command(BaseCommand):
             return
 
         ceiling = self._ceiling(options["credit_ceiling"])
-        if configured_backend() != "llamaparse":
-            raise CommandError(
-                f"EXTRACTION_BACKEND is {configured_backend()!r}; set it to 'llamaparse' "
-                f"first, or the reads would go to Docling. Nothing was sent."
-            )
         if plan.exceeds(ceiling):
             raise CommandError(
                 f"Estimated {plan.credits:,} credits, over the ceiling of {ceiling:,}. Nothing was sent. "

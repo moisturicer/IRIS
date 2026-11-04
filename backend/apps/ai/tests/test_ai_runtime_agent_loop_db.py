@@ -246,8 +246,9 @@ def test_a_bad_page_and_a_wrong_count_are_corrected_once_and_reopen_as_delivered
     assert (citation["record_id"], citation["page"]) == (flood.pk, 4)
     status = client.get(f"/api/v1/ai/runs/{live['id']}", headers=as_reader(grant))
     # The refused draft and the validation codes are in neither the run nor the history.
+    # "912 floods", not "912": bare digits can occur inside a random run id or timestamp.
     for body in (json.dumps(live), reopened.text, status.text):
-        assert "912" not in body and "page 9" not in body
+        assert "912 floods" not in body and "page 9" not in body
         assert not any(code in body for code in VALIDATION_CODES)
 
 

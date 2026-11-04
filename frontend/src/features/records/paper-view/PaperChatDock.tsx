@@ -12,7 +12,7 @@ import { AskIrisNotice } from "@/features/ai/components/AskIrisNotice";
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { runtimeReaderEnabled } from "@/api/runtimeReader";
+import { useReaderPath } from "@/api/runtimeReader";
 import { useAuthStore } from "@/store/auth.store";
 import { RuntimeReader } from "@/features/ai/components/RuntimeReader";
 import {
@@ -175,7 +175,14 @@ function subjectOf(record: RecordDetail): ChatSubject {
  * any other way all bring back the page's own record.
  */
 export function PaperChatPanel(props: PaperChatPanelProps) {
-  return runtimeReaderEnabled ? <RuntimePaperChatPanel key={props.record.id} {...props} /> : <LegacyPaperChatPanel {...props} />;
+  const path = useReaderPath();
+  if (path === "runtime") return <RuntimePaperChatPanel key={props.record.id} {...props} />;
+  if (path === "django") return <LegacyPaperChatPanel {...props} />;
+  // The deployment's switch is still being read (IR-863); the panel holds its place.
+  return <aside ref={props.panelRef} style={props.style} tabIndex={-1} aria-label="Ask IRIS"
+    className={cn("bg-canvas flex flex-col overflow-hidden", props.className)}>
+    <p role="status" className="p-4 text-sm text-stone-600">Opening Ask IRIS…</p>
+  </aside>;
 }
 
 function RuntimePaperChatPanel(props: PaperChatPanelProps) {

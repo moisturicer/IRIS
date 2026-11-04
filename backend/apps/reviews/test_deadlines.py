@@ -3,15 +3,17 @@ from datetime import datetime
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
+from django.test import override_settings
+
 from apps.audit.models import AuditEvent
 from apps.documents.models import DocumentRequest
 from apps.documents.requests import withdraw_request
-from core.enums import Party
+from core.enums import AssignmentState, Party
 
 from .deadlines import deadline_payload
 from .models import Holiday, RecordAssignment, Turnaround
 from .test_seats import SeatTestBase
-from .test_new_version import NewVersionTestBase
+from .test_new_version import RESTART_ALL, NewVersionTestBase
 
 MANILA = ZoneInfo("Asia/Manila")
 
@@ -234,6 +236,73 @@ class VersionDeadlineTests(NewVersionTestBase):
         itso.refresh_from_db()
         self.assertEqual(ierc.due_at, at(31, 23, 59))
         self.assertEqual((itso.due_at, itso.original_due_at, itso.clock_started_at), before)
+
+    @override_settings(WORKFLOW_TABLE=RESTART_ALL)
+    def test_restart_all_gives_every_reopened_office_a_fresh_date(self):
+        """
+        ADR-043 §5: each assignment that reopens gets a fresh due date. Under
+        `RESTART_ALL` ITSO reopens beside IERC (ADR-032 §5, IR-632), so it gets
+        one too, or the arms differ in reminders as well as re-review (IR-869).
+        RDCO was still reviewing, reopened nothing, and keeps its date.
+        """
+        with patch("django.utils.timezone.now", return_value=at(22)):
+            record = self.itso_cleared_and_ierc_asked()
+        itso = RecordAssignment.objects.get(record=record, party=Party.ITSO)
+        ierc = RecordAssignment.objects.get(record=record, party=Party.IERC)
+        rdco = RecordAssignment.objects.get(record=record, party=Party.RDCO)
+        rdco_before = (rdco.due_at, rdco.original_due_at, rdco.clock_started_at)
+        with patch("django.utils.timezone.now", return_value=at(29)):
+            self.edit_title(record)
+            self.submitted(record)
+        for assignment in (itso, ierc, rdco):
+            assignment.refresh_from_db()
+        self.assertEqual(itso.state, AssignmentState.ACTIVE)
+        self.assertEqual(
+            (itso.due_at, itso.original_due_at, itso.clock_started_at),
+            (at(31, 23, 59), at(31, 23, 59), at(29)),
+        )
+        self.assertEqual(ierc.due_at, at(31, 23, 59))
+        self.assertEqual((rdco.due_at, rdco.original_due_at, rdco.clock_started_at), rdco_before)
+
+    @override_settings(WORKFLOW_TABLE=RESTART_ALL)
+    def test_restart_all_reopened_office_is_reminded_on_its_fresh_date(self):
+        """
+        What the date is for (ADR-043 §7): the reopened ITSO reviewer is told
+        two working days before the fresh date, as IERC's is, and nobody is
+        escalated as overdue on a date from the previous round (IR-869).
+        """
+        from apps.notifications.models import Notification
+
+        from .reminders import run_deadline_notifications
+
+        with patch("django.utils.timezone.now", return_value=at(22)):
+            record = self.itso_cleared_and_ierc_asked()
+        with patch("django.utils.timezone.now", return_value=at(29)):
+            self.edit_title(record)
+            self.submitted(record)
+        before = set(Notification.objects.values_list("pk", flat=True))
+
+        run_deadline_notifications(at(29))
+
+        sent = Notification.objects.exclude(pk__in=before)
+        kinds = {(n.recipient, n.notif_type.name) for n in sent}
+        self.assertIn((self.itso, "Review Due Soon"), kinds)
+        self.assertIn((self.ierc, "Review Due Soon"), kinds)
+        self.assertNotIn("Review Overdue", {kind for _, kind in kinds})
+
+    @override_settings(WORKFLOW_TABLE=RESTART_ALL)
+    def test_restart_all_reopened_office_with_no_turnaround_gets_no_date(self):
+        """ADR-043 §2: a party with no Turnaround row has no clock, reopened or not."""
+        Turnaround.objects.filter(party=Party.ITSO).delete()
+        with patch("django.utils.timezone.now", return_value=at(22)):
+            record = self.itso_cleared_and_ierc_asked()
+        with patch("django.utils.timezone.now", return_value=at(29)):
+            self.edit_title(record)
+            self.submitted(record)
+        itso = RecordAssignment.objects.get(record=record, party=Party.ITSO)
+        self.assertEqual(itso.state, AssignmentState.ACTIVE)
+        self.assertIsNone(itso.due_at)
+        self.assertEqual(itso.clock_started_at, at(29))
 
     def test_submission_routing_and_handback_all_start_configured_clocks(self):
         with patch("django.utils.timezone.now", return_value=at(25)):

@@ -8,7 +8,7 @@ import { RuntimeReader } from "./RuntimeReader";
 
 afterEach(() => vi.restoreAllMocks());
 
-test("reader sees persisted work, stops by keyboard and chooses thoroughness for the next request", async () => {
+test("reader sees persisted work, stops by keyboard and asks deeply unless they turn it off", async () => {
   const queued = { protocol: "runs-reader-1", id: "run-1", conversation_id: "conversation-1", question: "Compare",
     state: "running", version: 1, depth: "ordinary", awaiting_reader: false,
     plan: { revision: 2, steps: [{ id: "compare", title: "Compare methods", status: "in_progress" }] },
@@ -29,7 +29,7 @@ test("reader sees persisted work, stops by keyboard and chooses thoroughness for
   screen.getByRole("button", { name: "Stop research" }).focus();
   await user.keyboard("{Enter}");
   expect(await screen.findByText("Stopped")).toBeInTheDocument();
-  await user.click(screen.getByRole("checkbox", { name: "Be more thorough" }));
+  expect(screen.getByRole("checkbox", { name: "Thorough research" })).toBeChecked();
   await user.type(screen.getByRole("textbox"), "Compare further");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(post).toHaveBeenCalledWith("/ai/runtime/runs", expect.objectContaining({
@@ -39,9 +39,25 @@ test("reader sees persisted work, stops by keyboard and chooses thoroughness for
   post.mockRestore();
 });
 
+test("a reader can ask one question at ordinary depth", async () => {
+  const user = userEvent.setup();
+  const post = vi.spyOn(apiClient, "post").mockResolvedValue({ data: { protocol: "runs-reader-1", id: "r",
+    conversation_id: "c", state: "queued", plan: null, context: null, capabilities: { manual_compaction: false } } });
+  vi.spyOn(apiClient, "get").mockResolvedValue({ data: {
+    protocol: "runs-reader-1", id: "c", revision: 0, runs: [], turns: [],
+  } });
+  render(<MemoryRouter><RuntimeReader /></MemoryRouter>);
+  await user.click(screen.getByRole("checkbox", { name: "Thorough research" }));
+  await user.type(screen.getByRole("textbox"), "Quick question");
+  await user.click(screen.getByRole("button", { name: "Send message" }));
+  await waitFor(() => expect(post).toHaveBeenCalledWith("/ai/runtime/runs",
+    expect.objectContaining({ question: "Quick question", depth: "ordinary" }), expect.anything()));
+});
+
 test("a busy submission can reconnect with the same request identity and Paper Chat scope", async () => {
   const user = userEvent.setup();
-  const post = vi.spyOn(apiClient, "post").mockRejectedValueOnce(new Error("busy"))
+  const post = vi.spyOn(apiClient, "post").mockRejectedValueOnce(
+    { isAxiosError: true, response: { status: 503, data: { status: "busy" } } })
     .mockResolvedValue({ data: { protocol: "runs-reader-1", id: "r", conversation_id: "c",
       state: "queued", plan: null, context: null, capabilities: { manual_compaction: false } } });
   vi.spyOn(apiClient, "get").mockResolvedValue({ data: {

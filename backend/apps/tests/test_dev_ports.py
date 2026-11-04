@@ -17,5 +17,5 @@ def test_every_published_port_binds_to_localhost():
         for block in re.findall(r"^    ports:\n((?:      - .*\n)+)", active, re.MULTILINE)
         for entry in re.findall(r'- "?([^"\n]+)"?', block)
     ]
-    assert len(published) == 5, published
+    assert len(published) == 4, published
     assert [entry for entry in published if not entry.startswith("127.0.0.1:")] == []

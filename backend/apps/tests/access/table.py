@@ -520,6 +520,7 @@ AI = {
     "ai-runtime-edge-grant": Entry({"GET": _case(
         SIGNED_IN, headers={"HTTP_X_IRIS_RECORD": "invalid"},
     )}),
+    "ai-reader-path": Entry({"GET": _case(SIGNED_IN)}),
     "ai-embed-record": Entry({"POST": _case(OFFICE_ONLY, kwargs=RECORD, data={})}),
     "ai-embed-all": Entry({"POST": _case(OFFICE_ONLY, data={})}),
     "ai-embed-jobs": Entry({"GET": _case(OFFICE_ONLY)}),

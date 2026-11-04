@@ -91,7 +91,7 @@ class RunService:
             raise ValueError("bounds") from None
 
     async def submit(self, grant, *, key, question, conversation_id, base_revision,
-                     depth="ordinary"):
+                     depth=runs_config.DEFAULT_DEPTH):
         """The run's projection, and whether this submission admitted it."""
         dispatch = self.cfg.dispatch
         row, created = await self.store.admit(
@@ -123,6 +123,15 @@ class RunService:
         await self.execute(claim)
         return True
 
+    async def _save(self, claim: Claim, step: int, body: dict) -> bool:
+        """Store a completed step under the claim's fence; False once it lost the run (IR-724)."""
+        try:
+            await self.store.save_checkpoint(claim.run_id, claim.fence, step, body,
+                                             lease_seconds=self.cfg.limits.lease_seconds)
+        except Fenced:
+            return False
+        return True
+
     async def execute(self, claim: Claim) -> None:
         """The run's tools read under the reader's stored grant (IR-719)."""
         run_id = claim.run_id
@@ -147,7 +156,8 @@ class RunService:
                     result = await executor.answer(claim.question, tools, context=RunContext(
                         allowance=claim.allowance, remaining_seconds=claim.remaining_seconds,
                         depth=claim.depth, prior=claim.prior, state=claim.state or {},
-                        bounds=bounds,
+                        bounds=bounds, checkpoint=claim.checkpoint, spent=claim.spent or {},
+                        save=lambda step, body: self._save(claim, step, body),
                     ))
                 else:
                     result = await executor.answer(claim.question, tools)

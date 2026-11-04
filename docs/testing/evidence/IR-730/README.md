@@ -8,7 +8,7 @@ requests. The browser receives an explicit public allowlist rather than the inte
 run journal. Source revisions and current RLS access are rechecked before delivering
 stored answers, quotes or dependent task plans. Legacy internal responses remain separate.
 
-The UI is off by default (`VITE_AI_RUNTIME_READER_ENABLED=false`). The production
+The UI is off by default (`VITE_AI_RUNTIME_READER_ENABLED=false`; superseded by IR-863's server-side `AI_RUNTIME_READER`, which the browser reads from `/api/v1/ai/reader/`). The production
 frontend build accepts that flag as a build argument. Its nginx startup requires
 `AI_GATEWAY_SERVICE_SECRET` when enabled; the secret must match the private gateway's
 service secret and stays in server configuration. Requests use the same-origin edge,

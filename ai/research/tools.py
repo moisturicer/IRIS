@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 import asyncpg
 
+from ai.research import metadata
 from ai.runs.store import RunStore
 
 APP_NAME = "iris-ai-research"
@@ -24,8 +25,23 @@ SEARCH_LIMIT = 20
 PAGE_PASSAGES = 20
 OUTLINE_CHUNKS = 2000
 RECALL_LIMIT = 50
+#: Passages one Manuscript may hold before a whole read is refused, not cut short (IR-733).
+MANUSCRIPT_PASSAGES = 10000
+#: Bytes a returned passage's handle, page and section add around its text, as an allowance.
+PASSAGE_FRAME_BYTES = 200
+#: Bytes a read's coverage block (spans, ranges, counts) adds, as an allowance; each listed page adds more.
+READING_FRAME_BYTES = 800
+PAGE_ENTRY_BYTES = 8
+#: The shortest repeat at a passage's start taken as extraction overlap rather than coincidence.
+MIN_OVERLAP_CHARS = 24
+#: Element kinds whose rendering is not interpreted: the text carries them, never what they show.
+FORMULA, CAPTION = "formula", "caption"
 
 OK, NO_MATCH, PARTIAL, UNAVAILABLE = "ok", "no_match", "partial", "unavailable"
+#: A reference fits several papers; the reader is asked, never answered for (IR-750).
+AMBIGUOUS = "ambiguous"
+#: A paper that can be named but has no Manuscript read: nothing to read, not nothing found (IR-731).
+NO_MANUSCRIPT = "no_manuscript"
 
 
 @dataclass(frozen=True)
@@ -46,7 +62,8 @@ class RecordRef:
     handle: str
     record_id: int
     title: str
-    source: Source
+    #: None for a paper with no Manuscript read yet: it can be named, not read (IR-750).
+    source: Source | None
 
 
 @dataclass(frozen=True)
@@ -57,6 +74,8 @@ class PassageRef:
     section: str
     text: str
     source: Source
+    #: Leading characters of `text` that repeat the previous passage, left out when shown (IR-733).
+    overlap: int = 0
 
 
 @dataclass(frozen=True)
@@ -79,12 +98,101 @@ class Coverage:
 
 
 @dataclass(frozen=True)
+class Span:
+    """Passages `first`..`last`, 1-based in document order, and the pages they fall on."""
+
+    first: int
+    last: int
+    first_page: int | None
+    last_page: int | None
+
+
+@dataclass(frozen=True)
+class Reading:
+    """What one read of a whole Manuscript returned, and what it did not (IR-733).
+
+    Text is extracted text only: nothing here interprets a figure or a formula.
+    """
+
+    #: Passages in the Manuscript, all of which a complete read returns.
+    passages: int
+    #: The stretch this read returned; None when nothing fitted or nothing was left.
+    covered: Span | None = None
+    #: The stretches this read did not return, in document order.
+    missing: tuple[Span, ...] = ()
+    #: Pages the extraction reported; None when it did not say.
+    pages: int | None = None
+    #: Reported pages no passage starts on: either no text was extracted from them, or a
+    #: passage starting on an earlier page runs onto them. Never claimed as either.
+    pages_no_passage_starts_on: tuple[int, ...] = ()
+    #: Passages carrying a formula or a caption, whose visual content is not interpreted.
+    formulas: int = 0
+    captions: int = 0
+    #: Repeated characters left out of the returned passages.
+    overlap_chars: int = 0
+    #: The passage to continue after; None once the Manuscript is read to its end, or when a
+    #: first read had no room for even one passage (`exceeds_room`).
+    continue_after: str | None = None
+    title: str = ""
+
+
+@dataclass(frozen=True)
+class Match:
+    """One reference a reader used and the papers it names (IR-750)."""
+
+    #: 1-based position among the call's references, names first, then ids.
+    reference: int
+    #: "title" or "record_id".
+    kind: str
+    #: exact_title, short_title, title_phrase, record_id, ambiguous or none.
+    match: str
+    records: tuple[RecordRef, ...] = ()
+    #: The title tier an ambiguous reference matched at.
+    basis: str | None = None
+
+
+@dataclass(frozen=True)
+class Count:
+    """An exact metadata count over the reader's readable Records (IR-750).
+
+    A total of the catalogue as this reader may see it, never a topic estimate.
+    """
+
+    total: int
+    #: (name, value) pairs as applied, taxonomy names as the catalogue spells them.
+    filters: tuple[tuple[str, object], ...] = ()
+    group_by: str | None = None
+    #: (value, count) per group, in value order.
+    groups: tuple[tuple[object, int], ...] = ()
+    #: Counted Records with no value for `group_by`.
+    ungrouped: int = 0
+    #: The Paper Chat Record the count was confined to, if any.
+    scope_record_id: int | None = None
+    #: The Records counted: provenance for rechecks, never shown to a model or reader.
+    population: frozenset[int] = frozenset()
+    relative_to: str = metadata.RELATIVE_TO
+
+    @property
+    def figures(self) -> set[int]:
+        """Every number this count computed."""
+        return {self.total, self.ungrouped, *(n for _, n in self.groups)}
+
+    @property
+    def stated(self) -> set[int]:
+        """Numbers that, stated in an answer, report this count: its total or a group's size."""
+        return {self.total, *(n for _, n in self.groups)}
+
+
+@dataclass(frozen=True)
 class ToolResult:
     status: str
     reason: str | None = None
     records: tuple[RecordRef, ...] = ()
+    matches: tuple[Match, ...] = ()
+    count: Count | None = None
     passages: tuple[PassageRef, ...] = ()
     sections: tuple[Section, ...] = ()
+    reading: Reading | None = None
     coverage: Coverage = field(default_factory=Coverage)
     dependencies: frozenset[Source] = frozenset()
     #: Provider calls the tool would make; none runs here.
@@ -107,6 +215,44 @@ def section_id(path: tuple[str, ...]) -> str:
 
 def _is_int(value) -> bool:
     return type(value) is int
+
+
+def overlap(previous: str, text: str) -> int:
+    """Characters at the start of `text` that repeat the end of `previous`.
+
+    Only a repeat of at least MIN_OVERLAP_CHARS counts, so a shared word is never dropped.
+    """
+    if len(text) < MIN_OVERLAP_CHARS:
+        return 0
+    probe = text[:MIN_OVERLAP_CHARS]
+    start = previous.find(probe, max(0, len(previous) - len(text)))
+    while start != -1:
+        if text.startswith(previous[start:]):
+            return len(previous) - start
+        start = previous.find(probe, start + 1)
+    return 0
+
+
+def shown_bytes(text: str) -> int:
+    """What `text` costs once JSON-encoded in a tool result and again as message content."""
+    return len(json.dumps(json.dumps(text, ensure_ascii=False), ensure_ascii=False).encode("utf-8"))
+
+
+def _span(rows, first: int, last: int) -> Span:
+    """Rows `first`..`last` (0-based, inclusive) as a 1-based Span."""
+    pages = [r["source_page"] for r in rows[first:last + 1] if r["source_page"] is not None]
+    return Span(first + 1, last + 1, min(pages, default=None), max(pages, default=None))
+
+
+def _journalled(reading: Reading) -> dict:
+    """A read's coverage as numbers only, for the run journal."""
+    covered = reading.covered
+    return {
+        "passages": reading.passages, "covered": [covered.first, covered.last] if covered else None,
+        "missing": [[m.first, m.last] for m in reading.missing], "pages": reading.pages,
+        "pages_no_passage_starts_on": len(reading.pages_no_passage_starts_on), "formulas": reading.formulas,
+        "captions": reading.captions, "overlap_chars": reading.overlap_chars,
+    }
 
 
 class _Refused(Exception):
@@ -160,6 +306,7 @@ class ResearchTools:
                     "total": coverage.total, "truncated": coverage.truncated,
                     "inspected_records": coverage.inspected_records,
                     "sources": sorted(d.revision for d in result.dependencies),
+                    **({"reading": _journalled(result.reading)} if result.reading else {}),
                 })
                 return result
         except _Refused as refused:
@@ -178,7 +325,10 @@ class ResearchTools:
         return handles
 
     async def _resolve(self, conn, handle, kind: str):
-        """(title, Source, chunk id) for a live handle of this run, or raise _Refused."""
+        """(title, Source or None, chunk id) for a live handle of this run, or raise _Refused.
+
+        The Source is None for a paper with no Manuscript read, which has nothing to read.
+        """
         if not isinstance(handle, str) or not handle.startswith(kind):
             raise _Refused("unknown_handle")
         bound = await conn.fetchrow(
@@ -200,18 +350,21 @@ class ResearchTools:
             raise _Refused("unknown_handle")
         if current["chunk_set_id"] != bound["chunk_set_id"]:
             raise _Refused("source_replaced")
+        if current["chunk_set_id"] is None:
+            return current["title"], None, None
         source = Source(bound["record_id"], current["chunk_set_id"], current["extraction_hash"])
         return current["title"], source, bound["chunk_id"]
 
-    def _passages(self, title, rows, handles, source=None):
+    def _passages(self, title, rows, handles, source=None, overlaps=None):
         return tuple(
             PassageRef(
                 handle=h, record_id=row["record_id"], page=row["source_page"],
                 section=" > ".join(_headings(title or row["title"], row["context_path"])),
                 text=row["content"],
                 source=source or Source(row["record_id"], row["chunk_set_id"], row["extraction_hash"]),
+                overlap=overlaps[n] if overlaps else 0,
             )
-            for row, h in zip(rows, handles)
+            for n, (row, h) in enumerate(zip(rows, handles))
         )
 
     async def search(self, query: str, limit: int = 10) -> ToolResult:
@@ -289,6 +442,9 @@ class ResearchTools:
 
         async def body(conn):
             title, source, _ = await self._resolve(conn, record_handle, "R")
+            # Named but never read: absent, not a page with no match (IR-731).
+            if source is None:
+                return ToolResult(NO_MATCH, NO_MANUSCRIPT, coverage=Coverage(total=0))
             rows = await conn.fetch(
                 """SELECT id, record_id, source_page, content, context_path,
                           count(*) OVER () AS total
@@ -315,6 +471,8 @@ class ResearchTools:
     async def outline(self, record_handle: str) -> ToolResult:
         async def body(conn):
             title, source, _ = await self._resolve(conn, record_handle, "R")
+            if source is None:
+                return ToolResult(NO_MATCH, NO_MANUSCRIPT)
             rows = await conn.fetch(
                 """SELECT source_page, context_path FROM iris_ai.research_chunks()
                     WHERE chunk_set_id = $1 AND deleted_at IS NULL ORDER BY sequence LIMIT $2""",
@@ -337,6 +495,207 @@ class ResearchTools:
                               dependencies=frozenset({source}))
 
         return await self._call_on_handle("outline", body)
+
+    async def read_manuscript(self, record_handle: str, after: str | None = None, *,
+                              max_bytes: int) -> ToolResult:
+        """A paper's active Manuscript in document order, as much as `max_bytes` holds (IR-733).
+
+        Starts at the beginning, or just after `after`, a passage handle an earlier
+        read returned from the same Manuscript revision. Text repeated from the
+        previous passage is left out of what is shown, never out of the passage a
+        citation binds. What did not fit is reported as missing, never clipped.
+        """
+        if not _is_int(max_bytes) or max_bytes < 1 or (after is not None and not isinstance(after, str)):
+            return ToolResult.unavailable("invalid_argument")
+
+        async def body(conn):
+            title, source, _ = await self._resolve(conn, record_handle, "R")
+            if source is None:
+                return ToolResult(NO_MATCH, coverage=Coverage(total=0))
+            cursor = None
+            if after is not None:
+                _, from_source, cursor = await self._resolve(conn, after, "P")
+                # A continuation reads on only in the Manuscript revision it came from.
+                if from_source != source:
+                    raise _Refused("foreign_continuation")
+            rows = await conn.fetch(
+                """SELECT id, record_id, source_page, content, context_path, element_kinds
+                     FROM iris_ai.research_manuscript($1) ORDER BY sequence, id LIMIT $2""",
+                source.chunk_set_id, MANUSCRIPT_PASSAGES + 1,
+            )
+            if len(rows) > MANUSCRIPT_PASSAGES:
+                raise _Refused("manuscript_too_long")
+            if not rows:
+                return ToolResult(NO_MATCH, coverage=Coverage(total=0), dependencies=frozenset({source}))
+            start = 0
+            if cursor is not None:
+                start = next((n + 1 for n, row in enumerate(rows) if row["id"] == cursor), None)
+                if start is None:
+                    raise _Refused("source_replaced")
+            pages = await conn.fetchval("SELECT iris_ai.research_manuscript_pages($1)", source.chunk_set_id)
+            starts = {r["source_page"] for r in rows}
+            unstarted = tuple(p for p in range(1, (pages or 0) + 1) if p not in starts)
+            repeats = [0, *(overlap(a["content"], b["content"]) for a, b in zip(rows, rows[1:]))]
+            end, used = start, READING_FRAME_BYTES + PAGE_ENTRY_BYTES * len(unstarted)
+            while end < len(rows):
+                cost = shown_bytes(rows[end]["content"][repeats[end]:]) + PASSAGE_FRAME_BYTES
+                if used + cost > max_bytes:
+                    break
+                used += cost
+                end += 1
+            chosen = rows[start:end]
+            handles = await self._handles(
+                conn, [("P", source.record_id, source.chunk_set_id, r["id"]) for r in chosen])
+            passages = self._passages(title, chosen, handles, source, repeats[start:end])
+            kinds = [set(r["element_kinds"] or ()) for r in rows]
+            remaining = end < len(rows)
+            reading = Reading(
+                passages=len(rows), covered=_span(rows, start, end - 1) if chosen else None,
+                missing=tuple(_span(rows, a, b) for a, b in ((0, start - 1), (end, len(rows) - 1)) if a <= b),
+                pages=pages,
+                pages_no_passage_starts_on=unstarted,
+                formulas=sum(FORMULA in k for k in kinds), captions=sum(CAPTION in k for k in kinds),
+                overlap_chars=sum(p.overlap for p in passages),
+                continue_after=(handles[-1] if chosen else after) if remaining else None, title=title,
+            )
+            return ToolResult(
+                PARTIAL if remaining else OK, reason="exceeds_room" if remaining and not chosen else None,
+                passages=passages, reading=reading,
+                coverage=Coverage(len(chosen), len(rows), remaining),
+                dependencies=frozenset({source}),
+            )
+
+        return await self._call_on_handle("read_manuscript", body)
+
+    async def resolve(self, references=(), record_ids=()) -> ToolResult:
+        """Papers the reader named, by title or Record id, as fresh paper handles (IR-750).
+
+        Several title matches are an ambiguity, never a silent choice. A Record the
+        reader may not read is the same `none` as one that does not exist.
+        """
+        if (not isinstance(references, (list, tuple)) or not isinstance(record_ids, (list, tuple))
+                or not all(isinstance(r, str) for r in references)
+                or not all(_is_int(i) for i in record_ids)
+                or not 0 < len(references) + len(record_ids) <= metadata.MAX_REFERENCES):
+            return ToolResult.unavailable("invalid_argument")
+
+        async def body(conn):
+            rows = await conn.fetch(
+                """SELECT r.id AS record_id, r.title, cs.id AS chunk_set_id, cs.extraction_hash
+                     FROM public.records_record r
+                     LEFT JOIN iris_ai.research_chunksets() cs ON cs.record_id = r.id AND cs.is_active
+                    WHERE ($1::bigint IS NULL OR r.id = $1)
+                    ORDER BY r.title, r.id""",
+                self.scope,
+            )
+            by_id = {row["record_id"]: row for row in rows}
+            found: list[tuple[str, str, list, str | None]] = []
+            truncated = False
+            for reference in references:
+                basis, named = metadata.title_matches(rows, reference)
+                truncated = truncated or len(named) > metadata.MAX_CANDIDATES
+                if len(named) > 1:
+                    found.append(("title", "ambiguous", named[:metadata.MAX_CANDIDATES], basis))
+                else:
+                    found.append(("title", basis, named, None))
+            for record_id in record_ids:
+                row = by_id.get(record_id)
+                found.append(("record_id", "record_id", [row], None) if row
+                             else ("record_id", "none", [], None))
+            named = list({row["record_id"]: row for *_, chosen, _ in found for row in chosen}.values())
+            handles = dict(zip(
+                (row["record_id"] for row in named),
+                await self._handles(conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in named]),
+            ))
+            refs = {
+                row["record_id"]: RecordRef(
+                    handles[row["record_id"]], row["record_id"], row["title"],
+                    Source(row["record_id"], row["chunk_set_id"], row["extraction_hash"])
+                    if row["chunk_set_id"] is not None else None)
+                for row in named
+            }
+            matches = tuple(
+                Match(n, kind, match, tuple(refs[row["record_id"]] for row in chosen), basis)
+                for n, (kind, match, chosen, basis) in enumerate(found, start=1)
+            )
+            resolved = sum(1 for m in matches if m.match not in ("ambiguous", "none"))
+            if any(m.match == "ambiguous" for m in matches):
+                status = AMBIGUOUS
+            elif resolved == len(matches):
+                status = OK
+            else:
+                status = PARTIAL if resolved else NO_MATCH
+            return ToolResult(
+                status, records=tuple(refs.values()), matches=matches,
+                coverage=Coverage(resolved, len(matches), truncated),
+                dependencies=frozenset(r.source for r in refs.values() if r.source is not None),
+            )
+
+        return await self._call("resolve", body)
+
+    async def count(self, filters: dict, group_by: str | None = None) -> ToolResult:
+        """Exactly how many readable Records match metadata filters, optionally grouped (IR-750).
+
+        Computed afresh on every call under the run's grant, so a paper the reader
+        lost access to is never counted. There is no topic filter: a topic total
+        is a screened subset, never a count.
+        """
+        if (not isinstance(filters, dict) or set(filters) - set(metadata.FILTERS)
+                or (group_by is not None and group_by not in metadata.GROUPS)
+                or not all(isinstance(filters[n], str) and filters[n].strip()
+                           for n in metadata.TAXONOMIES if n in filters)
+                or not all(_is_int(filters[n]) and metadata.YEAR_RANGE[0] <= filters[n] <= metadata.YEAR_RANGE[1]
+                           for n in ("year_from", "year_to") if n in filters)
+                or ("is_ip" in filters and type(filters["is_ip"]) is not bool)):
+            return ToolResult.unavailable("invalid_argument")
+
+        async def body(conn):
+            applied, ids = [], {}
+            for name, (table, _) in metadata.TAXONOMIES.items():
+                if name not in filters:
+                    continue
+                rows = await conn.fetch(
+                    f"SELECT id, name FROM public.{table} WHERE lower(name) = lower($1)",
+                    filters[name].strip())
+                if not rows:
+                    return ToolResult.unavailable("unknown_filter_value")
+                # Entries differing only by case are never chosen between.
+                if len(rows) > 1:
+                    return ToolResult.unavailable("ambiguous_filter_value")
+                ids[name] = rows[0]["id"]
+                applied.append((name, rows[0]["name"]))
+            applied += [(n, filters[n]) for n in ("year_from", "year_to", "is_ip") if n in filters]
+            rows = await conn.fetch(
+                """SELECT r.id, c.name AS classification, p.name AS psced, t.name AS record_type,
+                          r.year_completed AS year
+                     FROM public.records_record r
+                     LEFT JOIN public.records_classification c ON c.id = r.classification_id
+                     LEFT JOIN public.records_pscedclassification p ON p.id = r.psced_id
+                     LEFT JOIN public.records_recordtype t ON t.id = r.record_type_id
+                    WHERE ($1::bigint IS NULL OR r.id = $1)
+                      AND ($2::bigint IS NULL OR r.classification_id = $2)
+                      AND ($3::bigint IS NULL OR r.psced_id = $3)
+                      AND ($4::bigint IS NULL OR r.record_type_id = $4)
+                      AND ($5::int IS NULL OR r.year_completed >= $5)
+                      AND ($6::int IS NULL OR r.year_completed <= $6)
+                      AND ($7::boolean IS NULL OR r.is_ip = $7)""",
+                self.scope, ids.get("classification"), ids.get("psced"), ids.get("record_type"),
+                filters.get("year_from"), filters.get("year_to"), filters.get("is_ip"),
+            )
+            groups: dict = {}
+            for row in rows:
+                if group_by is not None:
+                    groups[row[group_by]] = groups.get(row[group_by], 0) + 1
+            fact = Count(
+                total=len(rows), filters=tuple(sorted(applied)), group_by=group_by,
+                groups=tuple(sorted((v, n) for v, n in groups.items() if v is not None)),
+                ungrouped=groups.get(None, 0), scope_record_id=self.scope,
+                population=frozenset(row["id"] for row in rows),
+            )
+            return ToolResult(OK if rows else NO_MATCH, count=fact,
+                              coverage=Coverage(len(rows), len(rows)))
+
+        return await self._call("count", body)
 
     async def recall(self, record_ids) -> ToolResult:
         """Fresh paper handles for Records a Conversation showed, still readable now (IR-728).
@@ -368,6 +727,36 @@ class ResearchTools:
                               dependencies=frozenset(r.source for r in records))
 
         return await self._call("recall", body)
+
+    async def reauthorize(self, handles, counted=()) -> str | None:
+        """None when every recovered handle still reads its own source now (IR-724).
+
+        A replacement worker's restored evidence confers nothing: each handle
+        must resolve under the run's grant, scope and fence to the source it
+        was issued on, each passage must still exist, and every Record an
+        exact count counted must still be readable. "stale" otherwise, or the
+        reason the run cannot continue. Journals nothing.
+        """
+        try:
+            async with self._session() as conn:
+                for handle in handles:
+                    try:
+                        async with conn.transaction():
+                            _, source, chunk_id = await self._resolve(conn, handle, str(handle)[:1])
+                            if chunk_id is not None and not await conn.fetchval(
+                                    """SELECT EXISTS (SELECT 1 FROM iris_ai.research_chunks()
+                                        WHERE id = $1 AND chunk_set_id = $2 AND deleted_at IS NULL)""",
+                                    chunk_id, source.chunk_set_id):
+                                return "stale"
+                    except _Refused:
+                        return "stale"
+                ids = sorted({i for i in counted if _is_int(i)})
+                if ids and await conn.fetchval(
+                        "SELECT count(*) FROM public.records_record WHERE id = ANY($1::bigint[])", ids) != len(ids):
+                    return "stale"
+        except _Refused as refused:
+            return refused.reason
+        return None
 
     async def journal(self, name: str, data: dict) -> bool:
         """Append a run event under the grant; False once the run has ended (IR-728)."""

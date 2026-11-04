@@ -7,6 +7,8 @@
 **Companions:** [RAG Architecture](rag_architecture.md) — the end-to-end view · [RAG Third-Party Services](rag_third_party_services_architecture.md)
 **Prior art reviewed:** `Docling-Studio/document-parser` · `teammind/packages/ai`
 
+> **Extraction status, updated 2026-11-04 (IR-843).** LlamaParse is the only Extractor ([ADR-056](adr/056-manuscript-extraction-moves-to-llamaparse.md)). `extraction/shaping.py` turns its stored raw result into a `NormalizedDocument` with `structure_is_authoritative`, chunked by `labeled-structure-v1` at LlamaParse's own heading levels, with section numbering setting depth (IR-859). Docling, its mapping and the Docling-era repairs described below (heading depth in the mapper and context path, repeated furniture, stranded page numbers, hyphen rejoining) are deleted. Every mention of Docling below is the history of how this design was reached.
+
 > **Extraction status, updated 2026-09-04 — IR-107 has landed.** This document assumes structured extraction output carrying `prov` page and bbox data, and that input now exists. `backend/apps/ai/extraction/` is a `StructuredExtractor` port with Docling-serve as its only adapter; `PdfExtraction.structure` holds the serialized `NormalizedDocument`, and `PdfExtraction.as_normalized_document()` reads it back. [ADR-016](adr/016-docling-structured-extraction.md) governs it, **amended the same day to drop the PyMuPDF fallback**: a flat-text fallback produces chunks with no regions, which is the loss the ADR exists to prevent, so unavailability fails and retries instead. The chunker is no longer blocked; what is still missing is the ingestion task joining extraction to chunking.
 
 > **Revision 2 — what changed and why.** Citation provenance became a requirement: the reader must be able to click a cited passage and see it highlighted in the source PDF. That is not a display feature bolted on at the end — it decides **what the chunker consumes**. Normalizing markdown-to-markdown destroys the coordinates a highlight anchors to, so stages 3 and 4 now operate on the structured `DoclingDocument` rather than on a markdown string. Sections 3, 4, 5, 6, 9 and the new section 11 carry the change.
@@ -222,7 +224,7 @@ flowchart LR
 | Stage | Owner | Input | Output | Status |
 |---|---|---|---|---|
 | 1 · Upload | `backend/apps/documents` | file | `RecordUpload` | works |
-| 2 · Extract | `celery-extraction` → `docling` | PDF bytes | `NormalizedDocument` + FTS text | works — IR-107 |
+| 2 · Extract | `celery-extraction` → LlamaParse | PDF bytes | stored raw result, shaped to `NormalizedDocument` + FTS text | works — IR-841, IR-840 (Docling until IR-843) |
 | 3 · Normalize | `Normalizer` (pure) | `NormalizedDocument` | `NormalizedDocument` | works — IR-89 E |
 | 4 · Chunk | `Chunker` port | `NormalizedDocument` | `ChunkSet` | works — IR-89 A–D, called by `ingestion/pipeline.py` (IR-116) |
 | 5 · Embed | `EmbeddingProvider` port | `ChunkSet` | vectors | partial — record-level only; chunk vectors are IR-108 |
@@ -319,6 +321,8 @@ Note it is **synchronous and pure.** Docling-Studio's port is `async` because it
 
 > **Amended 2026-09-04 — see [section 14](#14-open-questions).** `voyage-context-4`'s contextualized embeddings now do inside the model roughly what this decorator does by string concatenation, so the prefixed string this section describes is no longer what gets sent to Voyage. The decorator, and `Chunk.context_path`, are unchanged in shape and stay for one reason: display — a citation's breadcrumb. There is no local-model fallback in this architecture (see ADR-008 and ADR-015) for the prefix to otherwise serve.
 
+> **Superseded 2026-11-04 (IR-843).** The repair below went with Docling. LlamaParse supplies heading levels, and `extraction/shaping.py` corrects them from section numbering (IR-859).
+>
 > **Amended 2026-09-15 (IR-242) — the trail depends on heading levels the extractor does not supply.**
 > `context_path.py` keys its stack on `DocumentElement.level`, evicting everything at level >= N. Docling does not
 > infer outline depth: it labels every heading `section_header` and reports `level` 1 for all of them — all 74 of

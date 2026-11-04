@@ -1,6 +1,6 @@
 """Which Extractor runs (IR-838).
 
-``EXTRACTION_BACKEND``, ``DOCLING_*`` and ``LLAMAPARSE_*`` are read here and
+``EXTRACTION_BACKEND`` and ``LLAMAPARSE_*`` are read here and
 nowhere else, so no caller learns which vendor reads its PDFs.
 ``use_extractor`` mirrors ``use_composition_root``: a test installs an
 adapter for one block instead of monkeypatching a builder.
@@ -14,20 +14,7 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 
-from .ports import StructuredExtractor
-
-
-def _docling() -> StructuredExtractor:
-    from .docling_client import DoclingExtractor
-
-    return DoclingExtractor(
-        settings.DOCLING_API_URL,
-        timeout=settings.DOCLING_TIMEOUT_SECONDS,
-        do_ocr=settings.DOCLING_DO_OCR,
-        do_formula_enrichment=settings.DOCLING_DO_FORMULA_ENRICHMENT,
-        do_code_enrichment=settings.DOCLING_DO_CODE_ENRICHMENT,
-        do_picture_classification=settings.DOCLING_DO_PICTURE_CLASSIFICATION,
-    )
+from .ports import ExtractorUnavailable, StructuredExtractor
 
 
 def _llamaparse_shape():
@@ -93,7 +80,7 @@ def _verify_llamaextract() -> None:
         )
 
 
-BACKENDS: dict[str, Callable[[], StructuredExtractor]] = {"docling": _docling, "llamaparse": _llamaparse}
+BACKENDS: dict[str, Callable[[], StructuredExtractor]] = {"llamaparse": _llamaparse}
 
 # A module global, not a contextvar: worker threads in tests must see it.
 _installed: Optional[StructuredExtractor] = None
@@ -101,19 +88,35 @@ _installed: Optional[StructuredExtractor] = None
 _installed_reader: Optional[object] = None
 
 
-def configured_backend() -> str:
-    """The name of the configured backend, for a caller that must refuse another."""
-    return settings.EXTRACTION_BACKEND
+class UnconfiguredExtractor:
+    """Stands in, in development only, until LlamaParse is configured (IR-843)."""
+
+    leaves_campus = False
+    timeout_seconds = 60
+
+    def __init__(self, reason: str):
+        self.reason = reason
+
+    def extract(self, pdf_bytes: bytes, *, filename: str):
+        raise ExtractorUnavailable(self.reason)
 
 
-def verify_extraction_configuration() -> None:
-    """Refuse to start on an unknown backend (the IR-379 posture)."""
+def _verify_backend() -> None:
     backend = settings.EXTRACTION_BACKEND
     if backend not in BACKENDS:
         raise ImproperlyConfigured(
-            f"EXTRACTION_BACKEND={backend!r} is not one of: {', '.join(sorted(BACKENDS))} (IR-838)."
+            f"EXTRACTION_BACKEND={backend!r} is not one of: {', '.join(sorted(BACKENDS))} (IR-843)."
         )
-    if backend == "llamaparse":
+
+
+def verify_extraction_configuration() -> None:
+    """Refuse to start on a bad configuration (the IR-379 posture).
+
+    Development starts without a LlamaParse account (IR-843); its reads then
+    fail as unavailable.
+    """
+    _verify_backend()
+    if not settings.DEBUG:
         _verify_llamaparse()
     if settings.LLAMAEXTRACT_VERSION:
         _verify_llamaextract()
@@ -128,8 +131,13 @@ def current_extractor() -> StructuredExtractor:
     if _installed is not None:
         adapter = _installed
     else:
-        verify_extraction_configuration()
-        adapter = BACKENDS[settings.EXTRACTION_BACKEND]()
+        try:
+            _verify_backend()
+            _verify_llamaparse()
+            adapter = BACKENDS[settings.EXTRACTION_BACKEND]()
+        except ImproperlyConfigured as error:
+            # Reachable only where startup allowed it: nothing is sent.
+            adapter = UnconfiguredExtractor(str(error))
     if leaves_campus(adapter) and not isinstance(adapter, AdmittedExtractor):
         return AdmittedExtractor(adapter)
     return adapter

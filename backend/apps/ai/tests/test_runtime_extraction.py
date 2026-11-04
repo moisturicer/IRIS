@@ -236,7 +236,7 @@ def test_new_profile_status_is_not_hidden_by_an_older_long_lease(runtime):
 
 
 def test_local_storage_refuses_escape_and_byte_limit(tmp_path):
-    from ai.ingestion.extract_worker import LocalSource
+    from ai.ingestion.extraction import LocalSource
     media = tmp_path / 'media'
     media.mkdir()
     (media / 'inside.pdf').write_bytes(b'12345')
@@ -276,33 +276,6 @@ def test_final_write_lock_serializes_canonical_revocation(runtime):
         finally:
             await conn.close()
     asyncio.run(hold_source())
-
-
-def test_local_docling_extracts_synthetic_pdf_into_pending_output(runtime):
-    import io
-    import os
-    from reportlab.pdfgen.canvas import Canvas
-    from ai.ingestion.extraction import process
-    from apps.ai.chunking import ChunkingOptions
-    from apps.ai.extraction import DoclingExtractor
-
-    endpoint = os.environ.get('IRIS_TEST_LOCAL_DOCLING')
-    if not endpoint:
-        pytest.skip('set IRIS_TEST_LOCAL_DOCLING to the on-prem test extractor')
-    buffer = io.BytesIO()
-    pdf = Canvas(buffer)
-    pdf.drawString(72, 720, 'Synthetic pond study: twelve ponds were sampled weekly.')
-    pdf.showPage()
-    pdf.drawString(72, 720, 'Synthetic result: all twelve ponds improved.')
-    pdf.save()
-    owner, record, token = source()
-    result = asyncio.run(process(runtime, token, load=lambda key: buffer.getvalue(),
-        extractor=DoclingExtractor(endpoint, timeout=120, require_complete=True,
-            do_ocr=False, do_formula_enrichment=False, do_code_enrichment=False,
-            do_picture_classification=False),
-        options=ChunkingOptions(), pipeline='synthetic-live-docling-1.36.0', lease_seconds=180))
-    assert result == 'extracted'
-    assert status(owner, record)['state'] == 'extracted_pending'
 
 
 def test_reported_failed_page_prevents_complete_pending_output(runtime):

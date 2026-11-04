@@ -166,7 +166,10 @@ class AccessMatrixTests(APITestCase):
 
         with ExitStack() as stack:
             if app == "ai":
-                stack.enter_context(override_settings(AI_DURABLE_ASK=False, AI_RESEARCH_LANE="off"))
+                # The runtime edge refuses everyone while its switch is off
+                # (IR-863); on, its row says who it authenticates.
+                stack.enter_context(override_settings(
+                    AI_DURABLE_ASK=False, AI_RESEARCH_LANE="off", AI_RUNTIME_READER=True))
                 stack.enter_context(use_composition_root(root_with(
                     embedder=DeterministicEmbeddingProvider(dimensions=VECTOR_COLUMN_DIMENSIONS))))
             self._run_app(app)

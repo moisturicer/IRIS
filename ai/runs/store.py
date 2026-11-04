@@ -29,12 +29,22 @@ from typing import Mapping
 
 import asyncpg
 
+from ai.admission.scope import run_key
 from ai.runs.executor import PriorTurn, Result
 
 APP_NAME = "iris-ai-runs"
 ACTIVE = ("queued", "running")
 TERMINAL = ("completed", "cancelled", "conflict", "expired", "failed", "deleted")
 
+# An exact count stands only while the reader may still read every Record it
+# counted; the row policy decides (IR-750). Correlated on Turn `t`.
+COUNTED_UNREADABLE = """EXISTS (
+    SELECT 1 FROM jsonb_array_elements(t.facts) fact,
+                  jsonb_array_elements_text(coalesce(fact->'population', '[]'::jsonb)) counted(id)
+     WHERE NOT EXISTS (SELECT 1 FROM public.records_record r WHERE r.id=counted.id::bigint))"""
+
+#: Research a rebuilt investigation discarded no longer backs its answer (IR-724).
+REBUILT = "rebuilt"
 # Every source used by research, including uncited and legacy revisions, must
 # still be current before its derived answer can be replayed or recalled.
 CURRENT_SOURCE_TURN = """NOT EXISTS (
@@ -43,9 +53,34 @@ CURRENT_SOURCE_TURN = """NOT EXISTS (
       UNION
       SELECT jsonb_array_elements_text(ev.data->'sources') AS revision
         FROM iris_ai.run_event ev WHERE ev.run_id=t.run_id AND ev.name='tool'
+         AND ev.sequence > coalesce((
+             SELECT max(rb.sequence) FROM iris_ai.run_event rb
+              WHERE rb.run_id=ev.run_id AND rb.name='recovery' AND rb.data->>'outcome'='""" + REBUILT + """'), 0)
     ) dependency WHERE dependency.revision IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.is_active
-        AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))"""
+        AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))
+  AND NOT """ + COUNTED_UNREADABLE
+
+
+def shown_facts(facts) -> list[dict]:
+    """A Turn's facts as a reader sees them: allowlisted keys, never the counted Records (IR-750)."""
+    shown = []
+    for fact in facts or ():
+        if fact.get("kind") == "exact_count":
+            shown.append({
+                **{k: fact.get(k) for k in ("kind", "total", "filters", "group_by", "groups", "ungrouped")},
+                "scope": "paper_chat" if fact.get("scope_record_id") is not None else "readable_records",
+                "relative_to": fact.get("relative_to"),
+            })
+        elif fact.get("kind") == "keyword_sample":
+            shown.append({"kind": "keyword_sample", "papers": fact.get("papers"), "exhaustive": False})
+        elif fact.get("kind") == "reading_coverage":
+            shown.append({
+                **{k: fact.get(k) for k in ("kind", "title", "passages", "read", "complete", "pages",
+                                            "pages_no_passage_starts_on", "formula_passages", "caption_passages")},
+                "visual_interpretation": False, "exhaustive": False,
+            })
+    return shown
 
 RUN_COLUMNS = (
     "id, reader_id, conversation_id, request_hash, question, base_revision, state, end_reason,"
@@ -112,6 +147,11 @@ class Claim:
     #: Earlier Turns, oldest first, and the Conversation state they left (IR-728).
     prior: tuple[PriorTurn, ...] = ()
     state: dict | None = None
+    #: The last completed step an earlier fence saved, unverified: `step` and `body` (IR-724).
+    checkpoint: dict | None = None
+    #: Tokens the shared ledger has charged this run over every fence, open
+    #: and uncertain attempts at their reservation (IR-724).
+    spent: dict | None = None
 
 
 def request_hash(question: str, conversation_id, base_revision) -> str:
@@ -359,12 +399,24 @@ class RunStore:
                 WHERE conversation_id = $1 AND {CURRENT_SOURCE_TURN} ORDER BY ordinal DESC LIMIT $2""",
             row["conversation_id"], PRIOR_TURNS,
         )
+        checkpoint = await conn.fetchrow(
+            "SELECT step, body FROM iris_ai.run_checkpoint WHERE run_id = $1", run_id,
+        )
+        # Every fence's attempts, including one a dead worker left open (IR-725).
+        spent = await conn.fetchrow(
+            """SELECT coalesce(sum(charge_attempts), 0) AS attempts,
+                      coalesce(sum(charge_input_tokens), 0) AS input_tokens,
+                      coalesce(sum(charge_output_tokens), 0) AS output_tokens
+                 FROM public.ai_providerreservation WHERE run_key = $1""",
+            run_key(run_id),
+        )
         return Claim(fence=row["fence"], question=row["question"], pinned=row["pinned"],
                      scope_record_id=row["scope_record_id"], run_id=run_id,
                      grant=row["reader_grant"], depth=row["depth"], allowance=row["allowance"],
                      remaining_seconds=float(row["remaining"]),
                      prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"]) for t in reversed(prior)),
-                     state=row["state"])
+                     state=row["state"], checkpoint=dict(checkpoint) if checkpoint else None,
+                     spent={k: int(v) for k, v in spent.items()})
 
     async def claim_next(self, *, worker: str, lease_seconds: int, executor: str | None,
                          reserved_units: int | Mapping[str, int], deep_concurrency: int,
@@ -441,8 +493,43 @@ class RunStore:
                 WHERE run_id = $1 AND outcome = 'reserved'""",
             run_id, state, reported_units,
         )
+        # An ended run is never resumed; its evidence is not kept for one (IR-724).
+        await conn.execute("DELETE FROM iris_ai.run_checkpoint WHERE run_id = $1", run_id)
         await self._journal(conn, run_id, state, {"reason": reason})
         return state
+
+    async def save_checkpoint(self, run_id, fence: int, step: int, body: dict, *,
+                              lease_seconds: int) -> None:
+        """Replace the run's checkpoint after a completed step, and renew its lease (IR-724).
+
+        Only the current fence of a running run, before its deadline, may
+        write; anything else raises Fenced and writes nothing. A step never
+        goes backwards.
+        """
+        async with self._connect() as conn:
+            async with conn.transaction():
+                renewed = await conn.fetchval(
+                    """UPDATE iris_ai.ask_run
+                          SET lease_expires_at = now() + make_interval(secs => $3)
+                        WHERE id = $1 AND fence = $2 AND state = 'running' AND deadline_at > now()
+                    RETURNING id""",
+                    run_id, fence, float(lease_seconds),
+                )
+                if renewed is None:
+                    raise Fenced
+                saved = await conn.fetchval(
+                    """INSERT INTO iris_ai.run_checkpoint (run_id, fence, step, body)
+                       VALUES ($1, $2, $3, $4)
+                       ON CONFLICT (run_id) DO UPDATE
+                          SET fence = excluded.fence, step = excluded.step, body = excluded.body,
+                              saved_at = now()
+                        WHERE run_checkpoint.fence <= excluded.fence
+                          AND run_checkpoint.step <= excluded.step
+                    RETURNING step""",
+                    run_id, fence, step, body,
+                )
+                if saved is None:
+                    raise Fenced
 
     async def commit_final(self, run_id, fence: int, result: Result) -> str:
         """Turn, citations, Conversation revision and terminal journal, atomically.
@@ -482,9 +569,10 @@ class RunStore:
                 turn_id = uuid.uuid4()
                 ordinal = conversation["revision"] + 1
                 await conn.execute(
-                    """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer, kind)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                    """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer, kind, facts)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
                     turn_id, conversation_id, run_id, ordinal, run["question"], result.answer, result.kind,
+                    list(result.facts),
                 )
                 if result.citations:
                     await conn.executemany(
@@ -565,8 +653,12 @@ class RunStore:
         evidence = {}
         if reader:
             # Recheck every evidence dependency under begin_research's live RLS,
-            # including papers read but not finally cited (ADR-049 §8).
-            dependencies = {source for event in events if event["name"] == "tool"
+            # including papers read but not finally cited (ADR-049 §8), since the
+            # last rebuild: what a rebuilt investigation discarded backs nothing (IR-724).
+            rebuilt = max((event["sequence"] for event in events if event["name"] == "recovery"
+                           and event["data"].get("outcome") == REBUILT), default=0)
+            dependencies = {source for event in events
+                            if event["name"] == "tool" and event["sequence"] > rebuilt
                             for source in event["data"].get("sources", [])}
             citations = await conn.fetch(
                 "SELECT c.revision FROM iris_ai.citation c JOIN iris_ai.turn t ON t.id = c.turn_id"
@@ -579,7 +671,12 @@ class RunStore:
                 " WHERE cs.is_active AND cs.id::text || ':' || cs.extraction_hash = ANY($1::text[])",
                 list(dependencies),
             ) if dependencies else []
-            evidence["sources_available"] = {row["revision"] for row in current} == dependencies
+            counted_unreadable = await conn.fetchval(
+                f"SELECT EXISTS (SELECT 1 FROM iris_ai.turn t WHERE t.run_id = $1 AND {COUNTED_UNREADABLE})",
+                run_id,
+            )
+            evidence["sources_available"] = (
+                {row["revision"] for row in current} == dependencies and not counted_unreadable)
         return {
             **evidence,
             "id": str(run["id"]),
@@ -619,7 +716,7 @@ class RunStore:
                 if revision is None:
                     raise NotFound
                 turns = await conn.fetch(
-                    f"""SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.created_at, r.pinned,
+                    f"""SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.facts, t.created_at, r.pinned,
                               {CURRENT_SOURCE_TURN} AS sources_available
                          FROM iris_ai.turn t JOIN iris_ai.ask_run r ON r.id = t.run_id
                         WHERE t.conversation_id = $1 ORDER BY t.ordinal""",
@@ -655,6 +752,7 @@ class RunStore:
                 "created_at": t["created_at"].isoformat(),
                 "pinned": t["pinned"],
                 "citations": by_turn.get(t["id"], []) if t["sources_available"] else [],
+                "facts": shown_facts(t["facts"]) if t["sources_available"] else [],
             } for t in turns],
         }
 

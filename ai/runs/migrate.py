@@ -29,6 +29,7 @@ GRANTS = (
     "GRANT SELECT, INSERT ON iris_ai.manuscript_invalidation_receipt TO {role}",
     "GRANT SELECT, INSERT, UPDATE ON iris_ai.extraction_job TO {role}",
     "GRANT SELECT, INSERT ON iris_ai.extraction_revision TO {role}",
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON iris_ai.run_checkpoint TO {role}",
 )
 
 

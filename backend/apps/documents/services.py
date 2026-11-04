@@ -37,6 +37,14 @@ def delete_upload(upload: RecordUpload, deleted_by, force: bool = False) -> None
 
     Raises ValueError with a human-readable message on rule violations.
     """
+    # Review history first, for everyone (ADR-058 §2, IR-872): `force` is an
+    # office's override of the slot rule below, never of this one.
+    from apps.records.versions import deletion_refused_reason
+
+    refused = deletion_refused_reason(upload)
+    if refused:
+        raise ValueError(refused)
+
     if upload.version == 1 and not force:
         raise ValueError(
             "The first version of an upload cannot be deleted without staff override. "

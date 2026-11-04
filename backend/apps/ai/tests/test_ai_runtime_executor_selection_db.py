@@ -373,7 +373,7 @@ def test_a_killed_workers_agent_run_is_resumed_by_another_under_the_same_pin_and
     assert accounted(queued["id"]) == ["agent", "agent"]
     # Both attempts were admitted under the run's pin: the dead one's and the resumed one's.
     assert [(r.owner, r.purpose_version, r.model) for r in ProviderReservation.objects.order_by("id")] == [
-        ("ai", "agent-research-1", MODEL)] * 2
+        ("ai", "agent-research-3", MODEL)] * 2
 
 
 def test_two_workers_settle_agent_runs_within_the_deep_and_per_reader_caps(runtime):

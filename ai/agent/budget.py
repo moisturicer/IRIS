@@ -54,9 +54,20 @@ class Budget:
         self.input = 0
         self.output = 0
         self.reported = 0
+        #: Physical attempts sent; admission enforces the allowance's count (IR-725).
+        self.attempts = 0
+
+    def restore(self, input_tokens: int = 0, output_tokens: int = 0, reported: int = 0,
+                attempts: int = 0) -> None:
+        """Continue from what the run already spent, never below it (IR-724)."""
+        self.input = max(self.input, int(input_tokens))
+        self.output = max(self.output, int(output_tokens))
+        self.reported = max(self.reported, int(reported))
+        self.attempts = max(self.attempts, int(attempts))
 
     def spend(self, turn, estimated_input: int, cap: int) -> None:
         """Missing usage counts at its estimate and cap, never as zero."""
+        self.attempts += 1
         self.input += estimated_input if turn.input_tokens is None else turn.input_tokens
         self.output += cap if turn.output_tokens is None else turn.output_tokens
         self.reported += (turn.input_tokens or 0) + (turn.output_tokens or 0)

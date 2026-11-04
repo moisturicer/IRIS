@@ -52,7 +52,11 @@ LEDGER_TABLES = {
                               " charge_active_ms",
 }
 # Non-content metadata is read-only, without per-reader row filtering.
-RUNTIME_METADATA_TABLES = ("ai_embeddingspace",)
+RUNTIME_METADATA_TABLES = (
+    "ai_embeddingspace",
+    # Catalogue vocabulary the AI runtime counts by (IR-750); names, no Record.
+    "records_classification", "records_pscedclassification", "records_recordtype",
+)
 #: Columns the verifier reads, and nothing else (no password hashes).
 VERIFIER_COLUMNS = {
     "accounts_user": "id, is_active, is_locked, credential_version, role_id",

@@ -43,7 +43,7 @@ DISPATCH = runs_config.Dispatch(
     deep_concurrency=1, worker_concurrency=2, poll_seconds=0.1,
 )
 IRIS_AI_TABLES = "iris_ai.research_handle, iris_ai.citation,iris_ai.run_event, iris_ai.turn, iris_ai.ask_run," \
-                 " iris_ai.conversation, iris_ai.attempt_accounting"
+                 " iris_ai.conversation, iris_ai.attempt_accounting, iris_ai.run_checkpoint"
 
 
 def dsn(user, password):

@@ -35,11 +35,12 @@ import { ContinueProposal } from "../ContinueProposal";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
-  asSection,
   capabilitiesFor,
+  hasPaper as recordHasPaper,
   isOwner,
   isParticipant,
   isReviewing,
+  landingSection,
   seatToOpen,
   sectionsFor,
   type PaperSection,
@@ -430,10 +431,19 @@ export default function PaperViewPage() {
   // Before the early returns below, so the hooks that follow can use them.
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
   const sections = record ? sectionsFor(record, viewer) : [];
-  // The section asked for, else the reader for a citation's page, else
-  // Overview. One the viewer may not open is Overview too.
-  const asked = asSection(searchParams.get("section")) ?? (openAtPage != null ? "paper" : "overview");
-  const section: PaperSection = sections.includes(asked) ? asked : "overview";
+  // The section asked for, else the reader for a citation's page -- Paper, or
+  // a participant's Review, which holds their reader (IR-879) -- else
+  // Overview. One the viewer may not open is Overview too, and a
+  // participant's old Paper or Files link lands in Review.
+  const landing = landingSection(searchParams.get("section"), sections);
+  const readerSection: PaperSection = sections.includes("paper")
+    ? "paper"
+    : sections.includes("review")
+      ? "review"
+      : "overview";
+  const section: PaperSection = landing?.section ?? (openAtPage != null ? readerSection : "overview");
+  // Review's Documents drawer (ADR-032 §10, IR-879): `?documents=open`, or an old `?section=files`.
+  const documentsOpen = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
   // Still on the record being left while the next one loads.
   const arriving = loading || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
@@ -687,8 +697,8 @@ export default function PaperViewPage() {
   const chooseVersion = (n: number | null) =>
     setViewParams({
       version: n == null ? null : String(n),
-      ...(section !== "paper" && section !== "review" && sections.includes("paper")
-        ? { section: "paper" }
+      ...(section !== "paper" && section !== "review" && readerSection !== "overview"
+        ? { section: readerSection }
         : {}),
     });
   // A citation's regions and page are the current paper's (ADR-031), so an
@@ -775,7 +785,8 @@ export default function PaperViewPage() {
   // Review section's action bar -- the header fills nothing. The bar fills
   // its first granted action, so any granted review action puts the primary
   // there.
-  const hasPaper = sections.includes("paper");
+  // Where *View* opens the paper: Paper, or a participant's Review (IR-879).
+  const hasPaper = readerSection !== "overview" && recordHasPaper(record);
   const showRail = section === "overview" && !arriving;
   // Ask IRIS open beside the page leaves no room for the rail (IR-569).
   const railHidden = showRail && chat.open && !chatMinimized;
@@ -834,6 +845,50 @@ export default function PaperViewPage() {
     setViewParam("section", next);
     document.getElementById(tabId(next))?.focus();
   };
+
+  const viewAction = hasPaper && (
+    <button
+      type="button"
+      onClick={() => setViewParam("section", readerSection)}
+      className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
+    >
+      <i className="fas fa-book-open text-xs" aria-hidden />
+      View
+    </button>
+  );
+
+  const saveCiteShareActions = (
+    <>
+      <PaperSaveDropdown
+        record={record}
+        variant="pill"
+        emphasis={primary === "save" ? "primary" : "secondary"}
+      />
+
+      <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
+        <i className="fas fa-quote-right text-2xs" aria-hidden />
+        Cite
+      </button>
+
+      <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
+        <i
+          className={cn(
+            "fas text-2xs",
+            shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
+          )}
+          aria-hidden
+        />
+        {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
+      </button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {shareState === "copied"
+          ? "Link to this paper copied"
+          : shareState === "failed"
+            ? "Couldn’t copy the link. Copy it from the address bar."
+            : ""}
+      </span>
+    </>
+  );
 
   return (
     // The `reading` container (IR-569): its width, not the window's, lays
@@ -918,7 +973,7 @@ export default function PaperViewPage() {
                 what to do with it. Not in Paper mode, where the record bar
                 holds the paper in one line (IR-569). */}
             {!onPaperTab && !reviewerWorkspace && (
-            <header className="space-y-5">
+            <header className={cn("space-y-5", section === "overview" && "pb-1")}>
               <p className="flex items-center gap-x-2 text-small text-stone-500">
                 <span>Added {formatDate(record.created_at)}</span>
                 <span aria-hidden className="text-stone-300">·</span>
@@ -996,70 +1051,34 @@ export default function PaperViewPage() {
                 />
               )}
 
-              {/* View · Save · Cite · Share, plus what the capabilities add.
-                  One filled pill (IR-356): see `primary` above. */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {primary === "continue" && (
-                  <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
-                    <i className="fas fa-pen-to-square text-xs" aria-hidden />
-                    Continue
-                  </Link>
-                )}
+              {(section !== "overview" || primary === "continue" || primary === "open_review" || can.has("edit_details")) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {primary === "continue" && (
+                    <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
+                      <i className="fas fa-pen-to-square text-xs" aria-hidden />
+                      Continue
+                    </Link>
+                  )}
 
-                {primary === "open_review" && (
-                  <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
-                    <i className="fas fa-clipboard-check text-xs" aria-hidden />
-                    Open review
-                  </button>
-                )}
+                  {primary === "open_review" && (
+                    <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
+                      <i className="fas fa-clipboard-check text-xs" aria-hidden />
+                      Open review
+                    </button>
+                  )}
 
-                {hasPaper && (
-                  <button
-                    type="button"
-                    onClick={() => setViewParam("section", "paper")}
-                    className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
-                  >
-                    <i className="fas fa-book-open text-xs" aria-hidden />
-                    View
-                  </button>
-                )}
+                  {section !== "overview" && viewAction}
 
-                {can.has("edit_details") && (
-                  <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
-                    <i className="fas fa-pen text-2xs" aria-hidden />
-                    Edit details
-                  </button>
-                )}
+                  {can.has("edit_details") && (
+                    <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
+                      <i className="fas fa-pen text-2xs" aria-hidden />
+                      Edit details
+                    </button>
+                  )}
 
-                <PaperSaveDropdown
-                  record={record}
-                  variant="pill"
-                  emphasis={primary === "save" ? "primary" : "secondary"}
-                />
-
-                <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
-                  <i className="fas fa-quote-right text-2xs" aria-hidden />
-                  Cite
-                </button>
-
-                <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
-                  <i
-                    className={cn(
-                      "fas text-2xs",
-                      shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
-                    )}
-                    aria-hidden
-                  />
-                  {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
-                </button>
-                <span className="sr-only" role="status" aria-live="polite">
-                  {shareState === "copied"
-                    ? "Link to this paper copied"
-                    : shareState === "failed"
-                      ? "Couldn’t copy the link. Copy it from the address bar."
-                      : ""}
-                </span>
-              </div>
+                  {section !== "overview" && saveCiteShareActions}
+                </div>
+              )}
             </header>
             )}
 
@@ -1191,7 +1210,7 @@ export default function PaperViewPage() {
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="text-lg text-stone-700 leading-7">
+                    <p className="max-w-[68ch] text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (
@@ -1199,6 +1218,10 @@ export default function PaperViewPage() {
                       No abstract was provided for this record.
                     </p>
                   )}
+                  <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-2.5">
+                    {viewAction}
+                    {saveCiteShareActions}
+                  </div>
                 </section>
 
                 <PaperAiOverview record={record} />
@@ -1234,29 +1257,23 @@ export default function PaperViewPage() {
                 onOpenReview={openReview}
                 onBarInset={setReviewBarInset}
                 can={can}
-                reader={sections.includes("paper") ? reader() : null}
+                reader={recordHasPaper(record) ? reader() : null}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
-                onAskAboutPaper={
-                  sections.includes("paper")
-                    ? () => {
-                        chat.setOpen(true);
-                        setViewParam("section", "paper");
-                      }
-                    : undefined
+                // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
+                documentsOpen={documentsOpen}
+                onDocuments={(open) => setViewParams({ documents: open ? "open" : null, section: "review" })}
+                documents={
+                  <FilesSection
+                    record={record}
+                    owner={userIsOwner}
+                    editable={can.has("edit_details")}
+                    reviewing={reviewing}
+                    attach={can.has("attach_file")}
+                    replaceManuscript={can.has("replace_manuscript")}
+                    onChanged={handleDocumentRequestChanged}
+                  />
                 }
-              />
-            )}
-
-            {section === "files" && (
-              <FilesSection
-                record={record}
-                owner={userIsOwner}
-                editable={can.has("edit_details")}
-                reviewing={reviewing}
-                attach={can.has("attach_file")}
-                replaceManuscript={can.has("replace_manuscript")}
-                onChanged={handleDocumentRequestChanged}
               />
             )}
             </div>
@@ -1292,7 +1309,7 @@ export default function PaperViewPage() {
                 <EmbargoCard record={record} onChanged={reloadRecord} />
                 <PaperDocuments
                   files={record.files}
-                  manageHref={participant ? `/records/${record.id}?section=files` : null}
+                  manageHref={participant ? `/records/${record.id}?section=review&documents=open` : null}
                 />
               </aside>
             </div>
