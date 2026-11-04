@@ -11,7 +11,7 @@ import json
 import pytest
 
 from .test_ai_runtime_agent_loop_contract import (
-    ALLOWANCE, ORDINARY, PIN, PROFILES, Corpus, agent, call, context, handle, models, recording, reply, run,
+    ALLOWANCE, Corpus, agent, call, context, handle, models, recording, reply, run,
     tools,
 )
 from .test_ai_runtime_checkpoint_contract import Recovering
