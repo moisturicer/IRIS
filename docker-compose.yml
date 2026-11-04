@@ -1,7 +1,7 @@
 # =============================================================================
-# IRIS — Development Docker Compose (10 Services)
+# IRIS — Development Docker Compose
 #
-# Architecture: Django API + FastAPI AI Gateway + Docling-serve + 3 Celery
+# Architecture: Django API + FastAPI AI Gateway + 3 Celery
 # queues + Celery Beat + PostgreSQL/pgvector + Redis + Vite Frontend
 #
 # See: docs/docker_compose_rag_services.md for full architecture rationale
@@ -104,7 +104,6 @@ services:
       - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-      - DOCLING_API_URL=http://docling:5001
     depends_on:
       db:
         condition: service_healthy
@@ -129,20 +128,6 @@ services:
       # Bind-mounted source on Windows/macOS emits no inotify events — poll instead
       # so edits on the host hot-reload. See frontend/vite.config.ts.
       - VITE_USE_POLLING=1
-
-  # AI services
-  docling:
-    # Variant (GPU or CPU) is chosen once by scripts/setup_env.py, which writes
-    # DOCLING_VARIANT to the repo-root .env. Sizing, workers, the VRAM cap and
-    # the reasoning are in docling/compose.yml and
-    # docs/engineering/DOCLING_RESOURCES.md.
-    extends:
-      file: docling/compose.yml
-      service: ${DOCLING_VARIANT:-docling-gpu}
-    ports:
-      - "127.0.0.1:5001:5001"
-    environment:
-      - DOCLING_SERVE_ENABLE_UI=1
 
   ai-gateway:
     build:
@@ -275,19 +260,10 @@ services:
       - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-      - DOCLING_API_URL=http://docling:5001
-      # Read by config.settings.base.DOCLING_TIMEOUT_SECONDS. Replaces
-      # EXTRACTION_TIMEOUT, which was declared here and read by nothing.
-      # Must stay equal to DOCLING_SERVE_MAX_SYNC_WAIT on the docling service
-      # above -- that one is the real ceiling, and this one alone buys nothing
-      # (IR-249).
-      - DOCLING_TIMEOUT_SECONDS=900
     depends_on:
       db:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      docling:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully

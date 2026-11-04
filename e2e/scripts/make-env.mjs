@@ -99,8 +99,10 @@ const lines = [
   "PDF_VALIDATION_MAX_OBJECTS=200000",
   "PDF_VALIDATION_MAX_DEPTH=100",
   "",
-  "# Docling on CPU: CI runners have no GPU",
-  "DOCLING_VARIANT=docling-cpu",
+  "# Production settings refuse to start without LlamaParse (IR-843). A",
+  "# placeholder: no journey needs a paper read, and any read fails.",
+  "LLAMAPARSE_API_KEY=e2e-placeholder-not-a-key",
+  "LLAMAPARSE_VERSION=2026-09-28",
   "",
 ];
 

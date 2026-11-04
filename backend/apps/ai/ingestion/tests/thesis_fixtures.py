@@ -86,12 +86,11 @@ TEXT_LAYER_THESIS = NormalizedDocument(
 
 
 # ---------------------------------------------------------------------------
-# 2 · A scanned thesis — OCR artefacts the normalizer is there to remove
+# 2 · A scanned thesis — running headers and footers the normalizer removes
 # ---------------------------------------------------------------------------
 #
-# Docling emits coordinates for OCR'd text too, so the regions are present;
-# what a scan adds is running headers on every page, stranded folios, and
-# words hyphenated across a line or page break.
+# The stray folios and split word stay as content: their repairs went with
+# Docling (IR-843).
 
 SCANNED_THESIS = NormalizedDocument(
     title="Water Quality Monitoring in Coastal Barangays",

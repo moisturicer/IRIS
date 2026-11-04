@@ -65,7 +65,7 @@ def test_a_complete_agent_profile_pins_new_runs_to_the_agent_and_still_serves_de
     agent = service.pinned("ordinary")["agent"]
     assert (agent["model"], agent["endpoint"], agent["adapter"]) == (
         "model-a", "https://llm.example.test/v1", "openai-compatible")
-    assert (agent["prompt_version"], agent["tool_version"]) == ("agent-research-1", "research-1")
+    assert (agent["prompt_version"], agent["tool_version"]) == ("agent-research-2", "research-2")
     assert service.pinned("deep")["bounds"]["max_steps"] == 8
     assert service.pinned("ordinary")["bounds"]["max_steps"] == 4
 

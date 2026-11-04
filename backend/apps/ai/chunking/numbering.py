@@ -1,10 +1,9 @@
 """Outline numbering: the depth a heading's own number claims (IR-314).
 
-Docling does not infer outline depth — it labels every heading
-``section_header`` and reports level 1 for all of them — so the document's
-own numbering is the only reliable signal of nesting. Reading it used to
-mean dotted decimals and nothing else, which is the CIT-U thesis
-convention but not the scientific-paper one:
+Read by LlamaParse shaping (IR-859, ADR-056 §8 as amended): an extractor's
+heading level is unreliable, and the document's own numbering is the best
+signal of nesting. Reading it used to mean dotted decimals and nothing else,
+which is the CIT-U thesis convention but not the scientific-paper one:
 
     I. INTRODUCTION
        A. Transition Path Sampling
@@ -67,7 +66,7 @@ def outline_depths(headings: Sequence[str]) -> list[Optional[int]]:
     ``None`` for a heading that carries no number — front matter
     ("Abstract"), an unnumbered sub-subsection ("Self-consistency loop"),
     or a document that numbers nothing at all. Placing those is the
-    caller's job (IR-248), and it needs to know which headings are
+    caller's job (shaping, IR-859), and it needs to know which headings are
     numbered in order to do it.
 
     Takes the whole sequence because neither of the two new styles can be

@@ -120,8 +120,8 @@ class StructuredExtractor(Protocol):
     Synchronous: it runs in a Celery worker, which has no event loop to
     block, and the one caller has nothing else to do while it waits.
 
-    ``filename`` is passed because the extractor may use it — Docling-serve
-    sniffs the content type from it — and because it is the last-resort
+    ``filename`` is passed because the extractor may use it — an upload
+    names the file — and because it is the last-resort
     document title when the PDF names itself nothing.
 
     Raises ``ExtractionError`` (or a subclass) rather than returning an empty

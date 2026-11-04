@@ -1,5 +1,7 @@
 # Docling resources
 
+> **Historical (IR-843, 2026-11-04).** ADR-056 replaced Docling with LlamaParse, and IR-843 removed the `docling` service, its `docling/` build, `DoclingExtractor` and the GPU detection in `scripts/setup_env.py`. The commands and files below no longer exist in the repository. Kept as the record of what was measured.
+
 What the Docling container runs, what it needs, and what was measured.
 For repeatable CPU/RAM/VRAM sweeps and raw timing data, see
 [DOCLING_BENCHMARK.md](DOCLING_BENCHMARK.md).

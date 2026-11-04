@@ -1,5 +1,5 @@
 // A small, valid, single-page PDF built in memory: enough for the upload
-// validators and for Docling to extract a page of text. Synthetic content only.
+// validators and for an Extractor to read a page of text. Synthetic content only.
 export function manuscriptPdf(title: string, body = "Synthetic manuscript for IR-631 journey verification."): Buffer {
   const esc = (s: string) => s.replace(/[\()]/g, (c) => `\${c}`);
   const stream = `BT /F1 14 Tf 72 720 Td (${esc(title)}) Tj 0 -24 Td /F1 11 Tf (${esc(body)}) Tj ET`;

@@ -317,21 +317,15 @@ CELERY_RESULT_SERIALIZER = "json"
 # (they run `-Q default` / `-Q extraction` / `-Q embedding`) -- so nothing
 # dispatched is ever picked up. CELERY_TASK_DEFAULT_QUEUE catches any task
 # with no explicit route below, present or future, and lands it on the
-# worker with no special dependencies. Tasks with a real dependency (a
-# Docling container, the embedding vendor) are routed to the workers built
+# worker with no special dependencies. Tasks with a real dependency (the
+# extraction vendor, the embedding vendor) are routed to the workers built
 # for them.
 #
-# IR-240: `default` is the safe fallback for a task that needs nothing, and
-# the wrong one for a task that needs Docling -- `celery-default` is not
-# given DOCLING_API_URL, so an unrouted extractor task falls back to
-# http://localhost:5001 and fails against its own container. That is what
-# happened to extract_manuscript_text between IR-195 and IR-240, and it
-# broke the manuscript path in every Docker deployment while the test suite
-# stayed green, because the tasks are tested against a fake extractor with
-# no queue involved. **Every task that reaches an extractor belongs on
-# `extraction`** -- apps/ai/tests/test_celery_routing.py now derives that
-# set from the source and enforces it, rather than trusting this list to be
-# kept in step by hand.
+# IR-240: an unrouted extractor task once ran on `default`, which lacked the
+# extractor's configuration, and broke the manuscript path in every Docker
+# deployment while the suite stayed green. **Every task that reaches an
+# extractor belongs on `extraction`** -- apps/ai/tests/test_celery_routing.py
+# derives that set from the source and enforces it.
 CELERY_TASK_DEFAULT_QUEUE = "default"
 CELERY_TASK_ROUTES = {
     "apps.documents.tasks.extract_pdf_text": {"queue": "extraction"},
@@ -1128,34 +1122,11 @@ AI_EMBEDDING_COST_PER_MILLION_TOKENS = config(
 # inference provider is configured by LLM_BASE_URL / LLM_API_KEY / LLM_MODEL
 # above.
 # Which Extractor reads manuscripts (IR-838); read only in apps.ai.extraction.
-EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="docling")
-DOCLING_API_URL        = config("DOCLING_API_URL", default="http://localhost:5001")  # FR-M3-01: on-prem Docling-serve PDF extraction; Compose sets this to the service name
-# A scanned thesis through OCR is minutes of work, not seconds. This bounds
-# one conversion, not the Celery retry that wraps it.
-DOCLING_TIMEOUT_SECONDS= config("DOCLING_TIMEOUT_SECONDS", default=600, cast=int)
-# IR-367: these three were a hardcoded dict on every conversion, so a CPU-only
-# deployment paid RapidOCR plus accurate table/formula passes even on a
-# born-digital PDF whose text layer is already exact. Defaults keep today's
-# behaviour — measurement on the dev stack did not produce a reliable,
-# reproducible win from changing any of them (see the IR-367 ticket comments:
-# repeat runs of the identical option set varied by over 30x, which tracks to
-# docling-serve's own worker/model-loading state under
-# DOCLING_SERVE_CONCURRENCY, not to these flags). OCR stays on because a
-# meaningful share of the corpus is scanned submissions with no text layer at
-# all, and ADR-016 dropped the fallback extractor that used to cover that case.
-# **Superseded:** OCR now defaults off. The corpus is born-digital (an exact
-# text layer), and OCR costs time and memory for nothing there. Turn it on for a
-# deployment that accepts scanned submissions -- nothing else extracts them.
-DOCLING_DO_OCR = config("DOCLING_DO_OCR", default=False, cast=bool)
-# Table mode is not a setting: the extractor always asks for "accurate".
-DOCLING_DO_FORMULA_ENRICHMENT = config("DOCLING_DO_FORMULA_ENRICHMENT", default=True, cast=bool)
-# Code blocks use the same CodeFormula model as formulas, so this adds little.
-DOCLING_DO_CODE_ENRICHMENT = config("DOCLING_DO_CODE_ENRICHMENT", default=True, cast=bool)
-# A 4M-parameter classifier; the mapper does not store its output yet.
-DOCLING_DO_PICTURE_CLASSIFICATION = config("DOCLING_DO_PICTURE_CLASSIFICATION", default=True, cast=bool)
-# LlamaParse (IR-841, ADR-056); read only in apps.ai.extraction. With
-# EXTRACTION_BACKEND=llamaparse Django refuses to start without a key and a
-# dated version ("latest" only with DEBUG on).
+# LlamaParse is the only value (IR-843, ADR-056).
+EXTRACTION_BACKEND = config("EXTRACTION_BACKEND", default="llamaparse")
+# LlamaParse (IR-841, ADR-056); read only in apps.ai.extraction. With DEBUG
+# off Django refuses to start without a key and a dated version; with DEBUG on
+# it starts, and reads fail as unavailable until both are set (IR-843).
 LLAMAPARSE_API_KEY = config("LLAMAPARSE_API_KEY", default="")
 LLAMAPARSE_TIER = config("LLAMAPARSE_TIER", default="agentic")
 LLAMAPARSE_VERSION = config("LLAMAPARSE_VERSION", default="")
@@ -1229,7 +1200,7 @@ AI_CHUNK_CONTEXT_PATH_MAX_TOKENS = config(
 # search.
 #
 # The navigation indexes join it as of IR-246. IR-116's run on two real CIT-U
-# submissions answered the open question this comment used to pose: Docling
+# submissions answered the open question this comment used to pose: the extractor
 # does emit a real `Table of Contents` heading, so these are detectable by
 # name. They earn exclusion on the same grounds as a bibliography and then
 # some -- a table of contents holds every section name in the document and

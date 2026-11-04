@@ -129,6 +129,9 @@ jobs:
           FRONTEND_URL: https://iris.example.edu
           EMAIL_HOST_USER: ci@example.edu
           EMAIL_HOST_PASSWORD: ci-only-not-a-real-password
+          # Production refuses to start without LlamaParse (IR-843). Throwaway values.
+          LLAMAPARSE_API_KEY: ci-only-not-a-real-key
+          LLAMAPARSE_VERSION: '2026-09-28'
           SECRET_KEY: ci-only-not-a-real-secret
           # ADR-045 §8 (IR-642): Django refuses to start without these. Throwaway values.
           RECOVERY_COUNTER_HMAC_KEY: ci-only-not-a-real-counter-key

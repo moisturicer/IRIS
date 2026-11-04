@@ -1,4 +1,4 @@
-"""Chunk authoritative structure without Docling's label repairs (IR-840)."""
+"""Chunk authoritative structure at its declared heading depth (IR-840)."""
 
 from dataclasses import replace
 from html import escape

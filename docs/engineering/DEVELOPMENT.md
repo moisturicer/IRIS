@@ -230,7 +230,7 @@ docker compose logs -f backend
 docker compose down                # add -v to drop volumes
 ```
 
-**Services:** `db` (PostgreSQL) · `redis` · `backend` (Django) · `frontend` (nginx) · `docling` (docling-serve, structured extraction — ADR-016) · `ai-gateway` (FastAPI, ADR-014) · `celery-default` / `celery-extraction` / `celery-embedding` / `celery-shadow` / `celery-beat` (Celery workers, routed by queue).
+**Services:** `db` (PostgreSQL) · `redis` · `backend` (Django) · `frontend` (nginx) · `ai-gateway` (FastAPI, ADR-014) · `celery-default` / `celery-extraction` / `celery-embedding` / `celery-shadow` / `celery-beat` (Celery workers, routed by queue).
 
 **`ai-gateway` now has a real build context (`./ai`)** and builds, given `./ai/.env` (gitignored, absent in CI and on a fresh checkout) — but it crashes at runtime: `ai/api/chat.py` imports `ai.services.chat_service` and `ai.services.embedding_service` from an `ai/services/` package that contains only an `__init__.py`. [ADR-014](../adr/014-ai-gateway-as-a-service.md) supersedes ADR-010/012's earlier rejection and adopts the gateway as a service under five preconditions, none yet met — this is what's tracked in IR-58, not a missing file to bolt on. Do not deploy it.
 
@@ -439,7 +439,7 @@ Full process: [`SDLC.md`](SDLC.md). Done gates: [`DEFINITION_OF_DONE.md`](DEFINI
 | Compose will not start / `ai-gateway` container exits | IR-58 — `ai-gateway` has no `ai/.env`, and even with one, its service package is missing (`ai.services.chat_service`, `ai.services.embedding_service`); do not deploy it |
 | Celery task never runs | First check the worker is actually up: `docker ps` for `unhealthy` or `Restarting`, then `docker compose up -d --build <service>` — a stale image missing a dependency crash-loops silently (IR-225). Routing itself is fixed (IR-164, §6 above), so once the worker is healthy, look at the task, not queue names |
 | Frontend up, not reachable | Prod port mapping, `80:80` vs `8080` |
-| Uploads not extracted | `DoclingExtractor` calls `POST {DOCLING_API_URL}/v1/convert/file` — check the `docling` service is up and reachable; there is no fallback extractor (ADR-016) |
+| Uploads not extracted | LlamaParse reads every Manuscript (ADR-056). With `DEBUG` on and no `LLAMAPARSE_API_KEY`/`LLAMAPARSE_VERSION`, every read fails as unavailable (IR-843). Otherwise check the `celery-extraction` worker's outbound access, and the consent and embargo gate, which holds a paper with no answer unread; there is no fallback extractor |
 | Migrations conflict | `showmigrations`, then resolve deliberately; never edit an applied migration |
 | Type error on build | Intended — `npm run build` runs `tsc` first. Fix the type |
 | `npm run lint` can't find a config | Shouldn't happen — `eslint.config.js` is committed. If it does, check it wasn't accidentally removed |

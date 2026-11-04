@@ -7,7 +7,7 @@ paid capacity or answer quality. `tools` is `ai.research.tools.ResearchTools`.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional, Protocol
+from typing import TYPE_CHECKING, Awaitable, Callable, Optional, Protocol
 
 if TYPE_CHECKING:
     from ai.agent.budget import Bounds
@@ -32,6 +32,9 @@ class Result:
     kind: str = "answer"
     #: The Conversation state this Turn leaves; None keeps the previous one.
     state: dict | None = None
+    #: Typed facts the answer stated: exact counts (with their counted Records, private)
+    #: and keyword samples, which are never totals (IR-750).
+    facts: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -55,6 +58,12 @@ class RunContext:
     state: dict = field(default_factory=dict)
     #: The research Bounds pinned at admission; the worker cannot widen them (IR-862).
     bounds: Optional["Bounds"] = None
+    #: An earlier fence's last completed step, `step` and `body`, unverified (IR-724).
+    checkpoint: Optional[dict] = None
+    #: Tokens already charged to the run over every fence; never spent again.
+    spent: dict = field(default_factory=dict)
+    #: `await save(step, body)` stores a completed step; False once this fence lost the run.
+    save: Optional[Callable[[int, dict], Awaitable[bool]]] = None
 
 
 class Unavailable(Exception):

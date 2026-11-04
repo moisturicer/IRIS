@@ -98,70 +98,29 @@ The AI runtime has insert-only access to immutable extraction revisions;
 row policies require a verified grant for that exact current work. Django
 receives only the safe status function, with no output-table grant.
 
-The new worker reuses the pure Docling mapper, normalizer, context-path
-chunker and pinned tokenizer. It does not import Django or write its derived
-tables. It stores source-byte SHA-256, Manuscript revision, structured
-extraction hash, extractor/configuration pin, chunk hash/options, page sizes,
-element/page regions and citation/embedding text together in one immutable
-pending revision. The pipeline pin includes the operator's deployed Docling
-revision; changing extractor code/models requires a new pin. Storage keys
-remain immutable, as required by IR-737. Local filesystem storage is the
-supported isolated path; this worker does not add an object-storage adapter.
+The worker core (`ai/ingestion/extraction.py`) takes any Extractor, plus the
+pure normalizer, context-path chunker and pinned tokenizer. It does not import
+Django or write its derived tables. It stores source-byte SHA-256, Manuscript
+revision, structured extraction hash, extractor/configuration pin, chunk
+hash/options, page sizes, element/page regions and citation/embedding text
+together in one immutable pending revision. Changing extractor code or models
+requires a new pipeline pin. Storage keys remain immutable, as required by
+IR-737. `LocalSource` reads only from local filesystem storage; there is no
+object-storage adapter.
 
-Create a JSON profile from the existing deployment's extraction/chunking
-settings. For example, these are the current repository defaults, **not a
-newly approved production profile**; replace `extractor_revision` with the
-actual pinned local image/model identity:
+**It has no launcher (IR-843).** Its only Extractor was the on-prem Docling
+service, which ADR-056 retired. The `extract_worker` entry point, its image
+and the live-Docling test are deleted. A later ticket gives it LlamaParse,
+behind the consent and embargo gate and ADR-041 admission, before it can run.
 
-```json
-{
-  "extractor_revision": "your pinned local Docling image and model revision",
-  "extraction": {
-    "do_ocr": false,
-    "do_formula_enrichment": true,
-    "do_code_enrichment": true,
-    "do_picture_classification": true
-  },
-  "chunks": {
-    "strategy": "structural-markdown-v1",
-    "max_tokens": 700,
-    "min_tokens": null,
-    "context_path_max_tokens": 64,
-    "exclude_sections": ["References", "Bibliography", "Works Cited", "Literature Cited",
-                         "Table of Contents", "Contents", "List of Tables", "List of Figures"]
-  }
-}
-```
+The lease must exceed the Extractor's request timeout, with time left for
+chunking. A lease lost during computation fences the write. Grant expiry also
+fences it; reconciliation must issue fresh authority and a later sweep retries
+unfinished work. No open database transaction is held during extraction. A
+crash leaves a recoverable lease, not a completed output. Polling reconciles
+lost hints; the extraction worker uses no reader execution slots.
 
-Build the isolated image from the repository root:
-
-```text
-docker build -f ai/ingestion/Dockerfile -t iris-local-extraction .
-```
-
-Its entry point is `python -m ai.ingestion.extract_worker`. Supply the
-restricted `RUNS_DATABASE_URL`, a read-only media mount and a profile mount,
-and join only the deployment's local PostgreSQL/Docling network. The endpoint
-must be the existing on-prem Docling service; no public extraction/provider
-service is authorized. Example entry-point arguments (synthetic bounds only):
-
-```text
---once --limit 10 --poll-seconds 5 --lease-seconds 180 --max-source-bytes 10485760
---media-root /media --profile /config/profile.json
---docling-url http://docling:5001 --docling-timeout 120
-```
-
-For a local interpreter, install `ai/ingestion/requirements.txt` and put
-`backend/` on `PYTHONPATH` to expose the same pure modules. All worker timing,
-source size and deployed profile inputs are explicit. The lease must exceed
-the Docling request timeout; allow additional local chunking time. A lease
-lost during computation fences the write. Grant expiry also fences it;
-reconciliation must issue fresh authority and a later sweep retries unfinished
-work. No open database transaction is held during extraction. A crash leaves
-a recoverable lease, not a completed output. Polling reconciles lost hints;
-the extraction worker uses no reader execution slots.
-
-Duplicate completed work returns before reading bytes or calling Docling.
+Duplicate completed work returns before reading bytes or calling the Extractor.
 An independent claimant receives `busy` until the lease expires; takeover
 replaces the attempt UUID, so a late worker cannot commit. Final persistence
 locks canonical Record facts and rechecks grant, generation and current
@@ -170,7 +129,7 @@ pointer here to replace: even successful output is pending for IR-751.
 
 The owner-only metadata-suggestions endpoint now reports `processing`,
 `extracted_pending`, `failed` or `incomplete`, in addition to the receipt
-states. It returns only state and revision. A partial-success Docling
+states. It returns only state and revision. A partial-success extraction
 envelope, coverage that differs from the actual PDF page count, or absent page provenance cannot be reported
 as a complete extraction. Conservative coverage can also withhold blank or
 unmapped pages; it makes no claim about semantic extraction quality. Private
@@ -180,90 +139,15 @@ select a new corrected pipeline profile to retry them. Superseded jobs may
 remain as historical pending metadata but cannot authorize reads or appear
 as the current revision's output.
 
-`test_runtime_extraction.py` exercises the public worker/status boundary with
+`test_runtime_extraction.py` exercises the worker/status boundary with
 restricted PostgreSQL roles, out-of-order completion, revocation/deletion,
 independent-process lease takeover, RLS isolation and immutable output grants.
-Set `IRIS_TEST_LOCAL_DOCLING` to an on-prem test endpoint to run its generated
-two-page PDF through the real extractor; without it the check explicitly skips.
 
 
 ### ADR-056 transition boundary
 
-ADR-056 supersedes Docling as the long-term extraction choice in favor of
-LlamaParse. The deployed selection remains Docling until the separate cutover.
-This worker is an isolated, transitional local-only pending-output path for
-IR-738; it does not adopt Docling as the future production extractor or bypass
-LlamaParse's disclosure, admission and version requirements. ADR-056 integration
-and the planned Docling retirement (IR-843) must be resolved before any live
-activation of this path. Paid extraction and a live writer switch are outside
-this ticket's authorization. No fallback to another extractor is added.
-
-
-Pending-table RLS calls an AI-owned invoker wrapper, which delegates to current
-institutional processing authority and returns no source while that authority is
-unavailable. Its runtime-resolved boundary leaves Django's function/schema
-rollback independent of AI-owned pending output. It never grants source access.
-
-## Current indexed publication (IR-751)
-
-This is additive, separately enabled work. Apply Django publication migration
-`0008`, rerun `provision_research_roles`, then apply AI migration `0011` through
-`ai.runs.migrate`. The latter alone owns indexing jobs, immutable completed
-embedding batches and the active-source pointer. The migration/role checks were
-executed on a separate development-database copy retaining all 63 Records.
-
-The indexing worker accepts only a currently verified exact-work/revision grant,
-rechecks current consent/IP/embargo facts, and pins the active space's model,
-dimensions and metric. It preserves title/abstract Record semantics and the pure
-consecutive contextual Passage windows from the existing embedding path. Each
-physical attempt uses the same provider campaign ledger as reader work, in the
-explicit `ingestion` lane, with a separate process and a persisted job allowance.
-No job consumes a reader execution slot. No service enables itself.
-
-Completed batches are immutable and retain reservation IDs. A redelivery skips
-those batches. A crash between a provider send and durable output has an unknown
-outcome: its reservation remains conservatively charged, and a later attempt is
-separately admitted. There is no exactly-once billing guarantee. Short database
-transactions check authority immediately before sending and again before saving
-output; no transaction or canonical lock stays open during inference. Revoked,
-replaced, expired or superseded results cannot publish.
-
-Publication changes one active pointer atomically after both Record and Passage
-vectors have complete coverage and compatible dimensions. New research reads use
-that permitted revision. The compatibility projection reads legacy data for
-Records without an AI-owned active pointer; it never writes the legacy tables.
-Negative source identifiers distinguish AI-owned revisions from legacy positive
-ChunkSets. A changed or unreadable source withholds its saved answer/citations and
-its use in follow-up context, including sources read but not finally cited.
-The existing owner metadata-suggestions status reports `indexing`,
-`extracted_pending` for recoverable work, or `ready` after publication.
-
-The non-root image's indexing entry point was verified without Django:
-
-```text
-docker run --rm --entrypoint python iris-indexing:ir751 -m ai.ingestion.index_worker --help
-```
-
-Operation requires the restricted `RUNS_DATABASE_URL`, the provider credential,
-every shared `AI_ADMISSION_*` limit (including explicit ingestion capacity and
-pricing), the exact extraction `--pipeline`, model/dimensions and an explicit
-no-training policy. Limit, poll interval, lease, provider timeout and per-job
-attempt/input-token/cost ceilings are mandatory arguments; lease exceeds timeout.
-The original job ceilings survive redelivery even if later command arguments
-increase them. `--once` scans one bounded page; continuous operation pages through
-all current grants and reconciles lost notifications. Provider errors remain
-recoverable processing outcomes and private provider bodies are never printed.
-No production numeric profile is supplied or approved here.
-
-Keyword research resolves current output immediately. Semantic research requires
-explicit embedding provider and shared Ledger injection into `RunService`; with
-no injection its existing `provider_gated` state remains. An admitted query uses
-`query` input semantics and the identical active space used for `document`
-embeddings. The two-stage search ranks Record vectors before Passage vectors.
-No paid campaign, provider policy approval, default traffic switch, writer
-transfer or deployment is authorized by this implementation. Existing extraction
-retirement/ADR-056 operational gates also remain in force.
-
-Research role provisioning also restores the read-only Embedding Space metadata
-grant after Django table recreation. Independent AI migration records do not
-substitute for that ownership step; `provision_research_roles --check` audits it.
+ADR-056 replaced Docling with LlamaParse, and IR-843 removed Docling. This
+worker stays a local-only pending-output path with no Extractor wired in. Paid
+extraction, LlamaParse's disclosure and admission requirements, and a live
+writer switch must be resolved before it is activated. No fallback extractor
+is added.
