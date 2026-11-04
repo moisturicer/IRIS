@@ -42,28 +42,34 @@ class RunService:
     def pinned(self, depth: str = "ordinary", executor: Executor | None = None) -> dict:
         """What fixes a run's interpretation, persisted at admission."""
         executor = executor or self.executor
+        identity = self._identity(executor)
         pinned = {
-            "executor": executor.name, "executor_version": executor.version,
+            "executor": identity["executor"], "executor_version": identity["executor_version"],
             "protocol": runs_config.PROTOCOL, "schema": runs_config.SCHEMA,
         }
-        pin = getattr(executor, "pin", None)
-        if pin is not None:
-            pinned["agent"] = pin.as_dict()
+        if identity["agent"] is not None:
+            pinned["agent"] = identity["agent"]
         profiles = getattr(executor, "profiles", None)
         if profiles:
             # The run keeps these bounds whichever worker answers it (IR-862).
             pinned["bounds"] = asdict(profiles[depth])
         return pinned
 
+    @staticmethod
+    def _identity(executor: Executor) -> dict:
+        """The part of a pin that names who may answer the run."""
+        pin = getattr(executor, "pin", None)
+        return {"executor": executor.name, "executor_version": executor.version,
+                "agent": pin.as_dict() if pin is not None else None}
+
     def _executor_for(self, pinned: dict | None) -> Executor | None:
         """The executor the run was pinned to, unchanged, or None."""
         pinned = pinned or {}
         executor = self.executors.get(pinned.get("executor"))
-        if executor is None or pinned.get("executor_version") != executor.version:
-            return None
-        pin = getattr(executor, "pin", None)
-        # Never continue a run under another AGENT pin (IR-727).
-        if pinned.get("agent") != (pin.as_dict() if pin is not None else None):
+        # Never continue a run under another executor or AGENT pin (IR-727).
+        if executor is None or self._identity(executor) != {
+                "executor": pinned.get("executor"), "executor_version": pinned.get("executor_version"),
+                "agent": pinned.get("agent")}:
             return None
         return executor
 
@@ -109,6 +115,8 @@ class RunService:
             executor=None, reserved_units={n: e.reserved_units for n, e in self.executors.items()},
             deep_concurrency=self.cfg.dispatch.deep_concurrency,
             max_running_per_reader=self.cfg.dispatch.max_running_per_reader,
+            # A run pinned to anything else waits for a worker that serves it (IR-862).
+            serves=[self._identity(e) for e in self.executors.values()],
         )
         if claim is None:
             return False
@@ -120,7 +128,7 @@ class RunService:
         run_id = claim.run_id
         executor = self._executor_for(claim.pinned)
         if executor is None:
-            # Not served here under its pin; never substituted (IR-727, IR-862).
+            # Claimed directly (`claim`), or its pin changed under it; never substituted.
             log.info("run %s unavailable: pin_changed", run_id)
             await self.store.fail(run_id, claim.fence, "unavailable")
             return

@@ -168,21 +168,42 @@ def test_each_run_is_answered_by_the_executor_its_pin_names(runtime):
     assert (accounted(deterministic["id"]), accounted(agent["id"])) == (["deterministic"], ["agent"])
 
 
-def test_an_upgraded_worker_refuses_a_run_pinned_to_another_model_rather_than_substituting(runtime):
+def test_an_upgraded_worker_leaves_a_run_pinned_to_another_model_for_a_worker_that_serves_it(runtime):
     grant = session(make_user("select-repinned@cit.edu"))
     queued = queue(worker(runtime), grant, "select-repinned")
     upgraded = {**AGENT, "RUNS_AGENT_MODEL": "model-b", "AGENT_LLM_MODELS": f"{MODEL},model-b",
                 "AGENT_LLM_CAPACITIES": json.dumps({MODEL: asdict(MILLION), "model-b": asdict(MILLION)}),
                 "AI_ADMISSION_PRICES": json.dumps({m: {"input": 1.0, "output": 2.0} for m in (MODEL, "model-b")})}
-    vendor = Vendor(reply("The wrong interpretation."))
-    vendor.models = frozenset((MODEL, "model-b"))
-    svc = build(SimpleNamespace(**{**values(runtime), **upgraded}), agent_provider=vendor)
-    assert run(svc.run_next())
+    other = Vendor(reply("The wrong interpretation."))
+    other.models = frozenset((MODEL, "model-b"))
+    svc = build(SimpleNamespace(**{**values(runtime), **upgraded}), agent_provider=other)
+    # Never substituted: the run is not even claimed.
+    assert run(svc.run_next()) is False
+    assert run(RunStore(runtime).status(grant, queued["id"]))["state"] == "queued"
 
+    vendor = Vendor(reply("Answered under its own pin."))
+    assert run(worker(runtime, vendor).run_next())
     status = run(RunStore(runtime).status(grant, queued["id"]))
-    assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
+    assert status["state"] == "completed"
     assert status["pinned"]["agent"]["model"] == MODEL
-    assert vendor.requests == []
+    assert (other.requests, len(vendor.requests)) == ([], 1)
+    assert accounted(queued["id"]) == ["agent"]
+
+
+def test_a_deterministic_worker_leaves_an_agent_run_queued_in_a_mixed_fleet(runtime):
+    grant = session(make_user("select-mixed@cit.edu"))
+    agent = queue(worker(runtime), grant, "select-mixed-agent")
+    echo = queue(worker(runtime, executor="deterministic"), grant, "select-mixed-echo", "Echo me?")
+    deterministic = worker(runtime, executor="deterministic")
+    assert run(deterministic.run_next()) and run(deterministic.run_next()) is False
+
+    store = RunStore(runtime)
+    assert run(store.status(grant, echo["id"]))["state"] == "completed"
+    assert run(store.status(grant, agent["id"]))["state"] == "queued"
+    assert accounted(agent["id"]) == []
+
+    assert run(worker(runtime, Vendor(reply("Answered by an agent worker."))).run_next())
+    assert run(store.status(grant, agent["id"]))["state"] == "completed"
 
 
 # --- What the run was admitted with, the worker cannot widen ----------------------
