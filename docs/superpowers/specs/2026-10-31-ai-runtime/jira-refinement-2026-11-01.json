@@ -1,0 +1,1423 @@
+{
+  "date": "2026-11-01",
+  "state": "published-and-verified",
+  "approval": "User approved the 32-ticket breakdown, six additions and revised blockers.",
+  "epic": "IR-146",
+  "parentsUnchanged": [
+    "IR-712",
+    "IR-713",
+    "IR-714",
+    "IR-715",
+    "IR-716"
+  ],
+  "mapping": {
+    "draft-metadata-tools": "IR-750",
+    "draft-index-publication": "IR-751",
+    "draft-pending-space": "IR-752",
+    "draft-evaluation-casepack": "IR-753",
+    "draft-manual-compact": "IR-754",
+    "draft-release-campaign": "IR-755"
+  },
+  "counts": {
+    "specs": 5,
+    "children": 32,
+    "existingRevised": 26,
+    "new": 6,
+    "userStoriesMapped": 110,
+    "acceptanceChecks": 167,
+    "desiredBlockingLinks": 52,
+    "currentBlockingLinks": 52,
+    "obsoleteBlockingLinksPendingRemoval": 0
+  },
+  "verification": {
+    "date": "2026-11-01",
+    "childBodiesVerified": 32,
+    "parentIssuesVerifiedUnchanged": 5,
+    "acceptanceChecksVerified": 167,
+    "userStoriesMapped": 110,
+    "blockingLinks": 52,
+    "relatedLinks": [
+      "IR-703<->IR-728",
+      "IR-605<->IR-740"
+    ],
+    "missingLinks": [],
+    "extraLinks": [],
+    "obsoleteLinksRemaining": 0,
+    "newChildren": {
+      "draft-metadata-tools": "IR-750",
+      "draft-index-publication": "IR-751",
+      "draft-pending-space": "IR-752",
+      "draft-evaluation-casepack": "IR-753",
+      "draft-manual-compact": "IR-754",
+      "draft-release-campaign": "IR-755"
+    },
+    "allChildrenToDo": true,
+    "existingAssignmentsPreserved": true,
+    "errors": []
+  },
+  "tickets": [
+    {
+      "key": "IR-717",
+      "parent": "IR-712",
+      "summary": "Open a research session with a verified reader identity",
+      "blockers": [],
+      "labels": [
+        "area-backend",
+        "area-rag",
+        "area-security",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 1,
+      "stories": [
+        1,
+        17,
+        18,
+        21
+      ],
+      "description": "## Parent\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA signed-in reader opens an owned research session; the AI runtime can verify the delegated identity without holding an issuer secret or acquiring unrestricted research access.\n\n## Acceptance criteria\n\n- [ ] Django issues a bounded grant for an existing, owned run/session binding; issuing a grant never creates a fictitious AskRun or trusts a client-supplied reader ID. Existing Django-owned runs remain authoritative until IR-722 transfers ownership.\n- [ ] Real PostgreSQL verification rejects forged signatures, wrong key/audience/deployment, expired validity, revoked account/generation and wrong run or scope. A raw session setting cannot establish a principal.\n- [ ] Ordinary authenticated Django Record reads require no Conversation/AskRun; reader-run and ingestion-purpose grants cannot be replayed across purposes. Job execution and canonical work-item validation are completed in IR-737.\n- [ ] Runtime roles cannot mint grants, read the HMAC key, own protected institutional tables or bypass row protection. Verifier privileges/search paths and transaction-local identity remain safe across pooled readers, rollback and retry.\n- [ ] Renewal revalidates current ownership/account/scope and preserves the original run allowance; key identifiers permit a bounded rotation overlap. Invalid or unavailable authorization produces a safe public session outcome.\n\n## Blocked by\n\nNone (can start immediately).\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nWith two authenticated readers and actual restricted PostgreSQL roles, open one owned session, try foreign/forged/expired grants and reuse the same pool connection; show that no identity or protected content crosses sessions.\n\n## Scope boundary\n\nIdentity expansion/prefactor first. Preserve the existing reader route; no full research-policy switch, institutional writer transfer or model call is enabled here.\n\n## Spec coverage\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) user stories: 1, 17, 18, 21. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": "Jive Tyler Revalde",
+      "status": "To Do"
+    },
+    {
+      "key": "IR-718",
+      "parent": "IR-712",
+      "summary": "Read the same permitted research in Django and the AI runtime",
+      "blockers": [
+        "IR-717"
+      ],
+      "labels": [
+        "area-backend",
+        "area-rag",
+        "area-security",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 2,
+      "stories": [
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        10,
+        16,
+        20,
+        21
+      ],
+      "description": "## Parent\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader sees the same authorized Record population through both runtimes, including direct dependent-content reads and counts.\n\n## Acceptance criteria\n\n- [ ] Owner, adviser, office reviewer, catalogue reader, anonymous/disabled account and scope fixtures preserve the intended current access outcomes in both runtimes.\n- [ ] Shared database enforcement protects dependent extracted text, metadata, vectors, provenance and aggregation as well as Record rows; direct access to dependent relations cannot evade the policy.\n- [ ] Missing verified context, deleted/revoked Records and mismatched purpose return no protected rows. Missing and denied public references reveal no differing private titles or counts.\n- [ ] Switch research-read callers only after real restricted-role parity passes; replace the duplicate research-read predicate without changing workflow-write authorization.\n- [ ] Migration and startup checks reject runtime owner/bypass credentials; an additive rollout keeps the existing application green until the explicit switch. No two competing research access policies become the destination.\n- [ ] Job-purpose content reads remain unavailable until IR-737 can verify the committed canonical work item; recognizing a signed grant format alone does not authorize ingestion.\n\n## Blocked by\n\n- [IR-717](https://citiris.atlassian.net/browse/IR-717)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nRun the same role/scope matrix through an authenticated Django read and an AI-side authorized read against one PostgreSQL database, then attempt a direct dependent-table bypass.\n\n## Scope boundary\n\nOwn shared research-read policy and its migration, not institutional workflow policy or later Conversation storage.\n\n## Spec coverage\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) user stories: 2, 3, 4, 5, 7, 8, 10, 16, 20, 21. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-722",
+      "parent": "IR-713",
+      "summary": "Submit and reopen one AI-owned research run",
+      "blockers": [
+        "IR-717"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 3,
+      "stories": [
+        1,
+        2,
+        4,
+        5,
+        8,
+        9,
+        12,
+        17,
+        20
+      ],
+      "description": "## Parent\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader submits a question once, sees its owned run state and reopens exactly one committed Turn even when the submission is repeated.\n\n## Acceptance criteria\n\n- [ ] The authenticated submit/status/reopen surface creates AI-owned AskRun/Conversation state using a deterministic result executor, with one authoritative migration/writer owner in the new path.\n- [ ] Duplicate request identities return the same run; another reader cannot inspect, mutate or cancel it. Concurrent Conversation revisions and ordinal-sensitive follow-ups return a recoverable conflict.\n- [ ] Final Turn, citations, Conversation-state revision and terminal journal commit atomically. A transaction failure or terminal cancellation cannot leave a partial or duplicate answer.\n- [ ] Persist the original deadline and bounded allowance plus the lease/fencing/version contract. Missing production limits do not silently enable paid work; provider transport is outside database transactions.\n- [ ] Conversation/account deletion immediately fences access and future state advancement; content cleanup follows the documented retention rule while minimum required non-content attempt accounting survives.\n- [ ] Use additive schema/route expansion until release transfer; Django remains the current writer outside this isolated target path. Do not switch two writers onto the same dataset.\n\n## Blocked by\n\n- [IR-717](https://citiris.atlassian.net/browse/IR-717)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nSubmit twice with one idempotency identity, reopen the result, attempt a foreign-owner request and race two final commits in separate PostgreSQL connections; observe one coherent Turn.\n\n## Scope boundary\n\nOwn run admission, terminal commitment and deletion fencing. Queue execution, real provider transport and durable exchange recovery are subsequent slices.\n\n## Spec coverage\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) user stories: 1, 2, 4, 5, 8, 9, 12, 17, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-719",
+      "parent": "IR-712",
+      "summary": "Find and read permitted Passages through local research tools",
+      "blockers": [
+        "IR-718",
+        "IR-722"
+      ],
+      "labels": [
+        "area-backend",
+        "area-rag",
+        "area-security",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 4,
+      "stories": [
+        6,
+        7,
+        10,
+        14,
+        16,
+        20
+      ],
+      "description": "## Parent\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAn authenticated research request can find permitted Records and read page-bound Passages locally, without a Django request for each tool.\n\n## Acceptance criteria\n\n- [ ] Search and bounded read/outline/page operations use the shared Evidence authority; a scripted authenticated request returns Record and Passage references bound to the exact Manuscript revision and page.\n- [ ] Selected-Record handles belong to the run and scope; forged, expired or foreign handles and attempted Paper Chat widening disclose no unrelated Record.\n- [ ] Tools return original evidence and explicit success/no-match/unavailable/partial states. They never call hidden SCREEN, BRIEF, resolver or writer inference; embedding/reranking remain separately declared provider operations.\n- [ ] Every tool result records inspected coverage and source dependencies. A source replacement invalidates a stale read handle rather than silently resolving it to a different revision.\n- [ ] Capture local tool traffic to prove no per-tool Django HTTP dependency. Research-provider paths remain unavailable until disclosure and spending gates are installed; deterministic keyword/read fixtures prove this slice without paid inference.\n\n## Blocked by\n\n- [IR-718](https://citiris.atlassian.net/browse/IR-718)\n- [IR-722](https://citiris.atlassian.net/browse/IR-722)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nThrough the authenticated request seam with a scripted transport, find one permitted paper, open a Passage at its page, then attempt to read another reader's paper and reuse a handle in a second run.\n\n## Scope boundary\n\nReuse existing retrieval and read contracts rather than rebuilding ranking. Exact metadata counts/resolution are split into IR-750; context-sized full reads belong to IR-733.\n\n## Spec coverage\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) user stories: 6, 7, 10, 14, 16, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-720",
+      "parent": "IR-712",
+      "summary": "Prevent withheld or revoked evidence from reaching a provider",
+      "blockers": [
+        "IR-718",
+        "IR-250"
+      ],
+      "labels": [
+        "area-backend",
+        "area-rag",
+        "area-security",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 5,
+      "stories": [
+        11,
+        12,
+        13,
+        15,
+        19
+      ],
+      "description": "## Parent\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader can keep independently permitted findings while withheld or newly revoked material is excluded from each outgoing research request.\n\n## Acceptance criteria\n\n- [ ] Use IR-250's canonical embargo facts, writer and deliberate backfill; missing consent/IP/embargo/provider-policy facts refuse disclosure. Reading permission alone never permits transmission.\n- [ ] An outbound guard rechecks current principal/scope, source revision, disclosure and provider policy for each physical attempt, including embedding, reranking, model retry, repair and compaction. Callers receive a reusable dependency-aware authorization result.\n- [ ] Changing a governing fact after a read and before send or commit invalidates affected evidence, cached excerpts, plan text, handoffs and native continuation; reconstruct from permitted dependencies or stop safely.\n- [ ] Unknown or withheld material contributes no identifying clues, titles, counts or raw diagnostics to reader-facing limitations. Independently permitted evidence remains usable.\n- [ ] Tests inspect actual fake-provider payloads for a read/send/commit interleaving, including derived artifacts. State the boundary honestly: data already transmitted cannot be recalled and network transmission cannot be atomically revoked.\n\n## Blocked by\n\n- [IR-718](https://citiris.atlassian.net/browse/IR-718)\n- [IR-250](https://citiris.atlassian.net/browse/IR-250)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nRead permitted and withheld fixtures, revoke one permitted source immediately before a recorded outbound attempt, and show the outgoing payload and resulting safe limitation retain only independent permitted content.\n\n## Scope boundary\n\nOwn disclosure and invalidation enforcement, not IR-250's institutional policy/backfill. Synthetic fixtures can exercise development before that prerequisite, but ordinary real-Record acceptance stays blocked.\n\n## Spec coverage\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) user stories: 11, 12, 13, 15, 19. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-723",
+      "parent": "IR-713",
+      "summary": "Keep queued research running after the browser disconnects",
+      "blockers": [
+        "IR-722"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 6,
+      "stories": [
+        1,
+        2,
+        10,
+        11,
+        12,
+        13,
+        14,
+        18,
+        21
+      ],
+      "description": "## Parent\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader submits work, closes the browser and later reconnects to the same bounded run while ordinary and deep work receive fair worker capacity.\n\n## Acceptance criteria\n\n- [ ] Commit durable work before notifying Redis. Lose a notification, restart dispatch and redeliver: independent workers recover the committed run without duplicate terminal delivery.\n- [ ] Separate request handling, interactive/deep execution and ingestion capacity; configured per-reader and per-Conversation populations and pool sizes remain bounded.\n- [ ] At most one run advances a Conversation revision. A second stale/conflicting request is rejected or queued by the declared contract without silently remapping selected paper order.\n- [ ] A declared synthetic workload proves protected ordinary capacity and eventual deep scheduling; ingestion cannot consume the interactive pool. Do not invent production concurrency values.\n- [ ] Queue waiting counts against the original deadline and queue-inclusive latency. Busy, capped and expired work expose safe public states; disconnect alone never cancels.\n\n## Blocked by\n\n- [IR-722](https://citiris.atlassian.net/browse/IR-722)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nSubmit ordinary and deep questions through authenticated requests, disconnect, suppress a Redis wakeup, restart dispatch and reconnect while independent workers run a declared bounded test workload.\n\n## Scope boundary\n\nOwn durable dispatch and admission fairness. A completed-step worker crash is handled in IR-724; reader Stop races are integrated in IR-726.\n\n## Spec coverage\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) user stories: 1, 2, 10, 11, 12, 13, 14, 18, 21. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-727",
+      "parent": "IR-714",
+      "summary": "Answer a direct question through the pinned AGENT provider contract",
+      "blockers": [
+        "IR-722"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-uiux",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 7,
+      "stories": [
+        1,
+        3,
+        6,
+        10,
+        12,
+        17,
+        20
+      ],
+      "description": "## Parent\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAn authenticated direct question completes through one named AGENT responsibility and reopens with the same model/protocol identity.\n\n## Acceptance criteria\n\n- [ ] Carry the original request and pinned model/endpoint, adapter/dialect, prompt/tool/public/state versions and data policy through a deterministic authenticated direct-question run.\n- [ ] Expand the existing provider interface additively so current callers remain green. Represent assistant text, complete parallel tool groups, matching IDs, stop reasons and opaque continuation without dropping or reordering items.\n- [ ] Length-truncated, reasoning-only, malformed or tool-only output is not accepted as a final answer. Unsupported capabilities return a safe unavailable result rather than silently selecting a smaller/incompatible model.\n- [ ] Private continuation artifacts can round-trip only to a compatible endpoint; the public response, saved transcript and diagnostics contain no raw/opaque provider payload.\n- [ ] The direct-question integration uses a recording deterministic adapter until IR-725 and IR-732 gate real transport. No unchecked live provider route is added.\n\n## Blocked by\n\n- [IR-722](https://citiris.atlassian.net/browse/IR-722)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nSubmit and reopen a direct question with a scripted provider, then exercise parallel-call/opaque-artifact fixtures through the same typed adapter and reject unsupported pins.\n\n## Scope boundary\n\nProvider-contract prefactor/first direct-answer slice. The local tool loop is IR-728; existing callers are retired only under controlled cutover.\n\n## Spec coverage\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) user stories: 1, 3, 6, 10, 12, 17, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-725",
+      "parent": "IR-713",
+      "summary": "Admit and account for every outgoing provider attempt",
+      "blockers": [
+        "IR-722",
+        "IR-720"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 8,
+      "stories": [
+        15,
+        16,
+        17,
+        19
+      ],
+      "description": "## Parent\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA bounded run can send an authorized model or retrieval request only after shared budget admission, and every retry remains visible in its total spending.\n\n## Acceptance criteria\n\n- [ ] Use one shared PostgreSQL reservation/settlement authority for each model, embedding, reranking, repair, compaction, retry and permitted fallback attempt; transport consumes current disclosure authorization from IR-720.\n- [ ] Disable hidden SDK retries or admit each physical send explicitly. Two independent processes competing for the last allowance cannot both overspend it.\n- [ ] Reported usage settles the reservation; missing usage, timeout and unknown remote outcome retain a conservative amount. Worker death is not proof that an attempt was free.\n- [ ] Missing required profile, deadline, attempt/token/cost/concurrency cap, revoked access, cancellation or exhausted protected reserve prevents transport before a request is sent.\n- [ ] Expose purpose/version/usage/reservation evidence without protected prompt bodies or opaque payloads. Preserve the current accounting semantics and an additive ownership migration rather than a duplicate ledger.\n\n## Blocked by\n\n- [IR-722](https://citiris.atlassian.net/browse/IR-722)\n- [IR-720](https://citiris.atlassian.net/browse/IR-720)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nThrough a bounded run with a recording fake transport, race two processes for a final reservation, force a retry and unknown-usage timeout, then inspect the safe cost report and original remaining allowance.\n\n## Scope boundary\n\nOwn physical-attempt transport/accounting integration. Concrete compaction and repair callers must use this contract in their own feature tickets.\n\n## Spec coverage\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) user stories: 15, 16, 17, 19. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-737",
+      "parent": "IR-716",
+      "summary": "Track a committed Manuscript change as recoverable research work",
+      "blockers": [
+        "IR-718",
+        "IR-723"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-mvp-validation",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 9,
+      "stories": [
+        1,
+        3,
+        4,
+        6,
+        7
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAn owner saves a Manuscript change and can see that processing is pending/recoverable even if a queue notification is lost.\n\n## Acceptance criteria\n\n- [ ] Commit canonical Manuscript/revision changes and their outbox work atomically; a rolled-back save publishes no job. A duplicate notification maps to one durable work identity.\n- [ ] Issue and verify a Django-authorized ingestion grant bound to the committed item, exact Manuscript revision and permitted processing purpose; reject forged/unrelated/stale/revoked job authority.\n- [ ] An AI worker acknowledges durable work and exposes a safe existing processing-status surface; lose Redis delivery and recover the committed item through reconciliation.\n- [ ] Out-of-order deletion/access/revision facts never restore permission. Canonical database rules deny access before projection cleanup; renewal rechecks current work rather than extending obsolete authority.\n- [ ] Keep institutional outbox writes in Django and AI receipt/derived state in the AI owner. Processing status cannot be mistaken for completed extraction/indexing or a research finding.\n\n## Blocked by\n\n- [IR-718](https://citiris.atlassian.net/browse/IR-718)\n- [IR-723](https://citiris.atlassian.net/browse/IR-723)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nSave a Manuscript through its existing authenticated flow, roll back one save, lose another wakeup and reconcile; observe one recoverable current-revision job with a restricted processing grant.\n\n## Scope boundary\n\nOwn committed institutional publication/receipt and job authority. Pure extraction is IR-738; provider indexing and active research publication are IR-751.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 1, 3, 4, 6, 7. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-732",
+      "parent": "IR-715",
+      "summary": "Fit the complete outgoing request within verified model capacity",
+      "blockers": [
+        "IR-727",
+        "IR-725"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 10,
+      "stories": [
+        1,
+        2,
+        7,
+        8,
+        9,
+        20
+      ],
+      "description": "## Parent\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA bounded question either sends a fully accounted request that fits the selected endpoint or returns an honest capacity outcome before transport.\n\n## Acceptance criteria\n\n- [ ] Count the actual serialized instructions, tool schemas, complete history/exchanges, evidence, opaque continuation and framing, with provider-specific input/output/reasoning and byte constraints.\n- [ ] Verify model/endpoint capabilities; test both a small and a declared million-token-capable fixture. Unknown capacity never defaults to a million and no unsupported smaller-model fallback occurs.\n- [ ] Reserve output/reasoning, next-result headroom, final answer and at most one repair before admitting evidence. Explicitly repack, request compaction when supported, or refuse; never silently clip a tool group or invent full coverage.\n- [ ] Single-request occupancy, cumulative AskRun allowance and stored Conversation size remain distinct; token estimates do not replace conservative byte-based paid reservations.\n- [ ] Through the direct AGENT request seam, record the actual outgoing payload and safe capacity status. An oversized tool-result fixture is rejected/bounded before another send, and opaque payload size is accounted without logging it.\n\n## Blocked by\n\n- [IR-727](https://citiris.atlassian.net/browse/IR-727)\n- [IR-725](https://citiris.atlassian.net/browse/IR-725)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nSend a direct question with large schema/history/opaque fixtures under small and verified large capacities; inspect the recorded serialized size and prove no over-limit transport or silent clipping occurs.\n\n## Scope boundary\n\nOwn provider-capacity packing before the research loop is enabled. Automatic compaction and full-paper allocation extend this contract later.\n\n## Spec coverage\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) user stories: 1, 2, 7, 8, 9, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-738",
+      "parent": "IR-716",
+      "summary": "Extract a Manuscript revision without activating stale research",
+      "blockers": [
+        "IR-737"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-mvp-validation",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 11,
+      "stories": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        7
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAn owner sees a Manuscript progress from pending to extracted or failed, with page-bound text available to the next processing stage and no stale activation.\n\n## Acceptance criteria\n\n- [ ] Run the existing chosen extraction/chunking semantics in isolated AI ingestion workers, pinning the exact Manuscript/content/extraction revision and preserving page/structured-content provenance.\n- [ ] Write immutable pending extraction/chunk revisions under one AI migration/writer owner in the isolated target path; duplicate work reuses completed output.\n- [ ] Failed extraction and incomplete coverage are processing states, not zero research findings. Reader/owner status reflects the actual outcome without exposing unrelated data.\n- [ ] Superseded or revoked work cannot publish as current. Inject out-of-order completion and source deletion before write; stale pending output never replaces the active revision.\n- [ ] Use additive ownership expansion and verify local extraction behavior on a synthetic document plus deterministic failure fixtures; no embedding/provider stage or live writer switch is hidden in this task.\n\n## Blocked by\n\n- [IR-737](https://citiris.atlassian.net/browse/IR-737)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nUpload two revisions in quick succession, complete the older extraction last and fail a third synthetic document; inspect safe processing status and page-bound pending output.\n\n## Scope boundary\n\nSplit the former extraction/indexing/publication bundle. Own local extraction and chunk revisions only; active indexed publication belongs to IR-751.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 1, 2, 3, 4, 5, 7. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-728",
+      "parent": "IR-714",
+      "summary": "Investigate and answer using one bounded model Conversation",
+      "blockers": [
+        "IR-719",
+        "IR-732"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-uiux",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 12,
+      "stories": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        16,
+        18,
+        21
+      ],
+      "description": "## Parent\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader asks a paper question; one agent searches, reads, assesses evidence and answers while retaining the whole ordered investigation.\n\n## Acceptance criteria\n\n- [ ] A direct question and a search/read question use the same pinned AGENT responsibility and preserve original intent, complete exchanges and compatible opaque artifacts.\n- [ ] Local core tools expose original evidence without mandatory RESOLVE/PLAN/ANSWER/SCREEN/BRIEF inference. Outgoing attempt-purpose records demonstrate the absence of hidden specialist writers.\n- [ ] Task-state updates use bounded stable IDs/revisions and actual execution state; tools cannot widen Paper Chat, forge identity or extend allowance.\n- [ ] Time/token/cost/step/tool/no-progress bounds disable further research and retain final-answer plus at-most-one-repair capacity. A tool-only or truncated completion cannot become a delivered answer.\n- [ ] Reuse existing deterministic citation/source/fact safeguards for the first answer and commit atomically; IR-729 adds actionable same-Conversation repair, not permission to emit unchecked drafts meanwhile.\n- [ ] Follow-up shown ordering, selections/exclusions and one materially necessary clarification are preserved. Optional thoroughness selects a configured bounded profile without an engine/provider selector.\n\n## Blocked by\n\n- [IR-719](https://citiris.atlassian.net/browse/IR-719)\n- [IR-732](https://citiris.atlassian.net/browse/IR-732)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nAsk a two-paper question through the authenticated entry point using a recording provider, follow up with 'the second one', force a no-progress loop and show bounded supported finalization with no second writer.\n\n## Scope boundary\n\nOwn the continuous search/read agent. Exact resolve/count tools, full-paper expansion, durable recovery and partial-outage integration are separately owned slices.\n\n## Spec coverage\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) user stories: 1, 2, 3, 4, 5, 7, 8, 9, 10, 11, 12, 16, 18, 21. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-721",
+      "parent": "IR-712",
+      "summary": "Remove revoked evidence from reopened Conversations and review exports",
+      "blockers": [
+        "IR-728"
+      ],
+      "labels": [
+        "area-backend",
+        "area-rag",
+        "area-security",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 13,
+      "stories": [
+        3,
+        13,
+        14,
+        15,
+        16,
+        19,
+        22
+      ],
+      "description": "## Parent\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAfter access changes, a reader or reviewer cannot recover revoked research by reopening a saved answer, reconnecting, exporting it or opening an evaluation packet.\n\n## Acceptance criteria\n\n- [ ] Create a delivered research Turn through the new authenticated path, then revoke/replace/delete its dependencies. History, reconnect, citation resolution and export enforce current access rather than trusting the stored result.\n- [ ] IR-605/IR-608-compatible packet creation and packet access enforce the reviewer's own access; a copied artifact address never becomes a capability for hidden Records.\n- [ ] Derived plans, cached excerpts, native context and later follow-up requests cannot reintroduce removed content. Preserve unrelated permitted findings or use a safe unavailable outcome.\n- [ ] Exercise direct restricted-role reads, pooled readers and read/send/commit races against real PostgreSQL; security fixtures belong to this integrated flow in addition to the tests already required by IR-717–IR-720.\n- [ ] Record executed and unavailable evidence classes separately; do not represent deterministic security results as human-reviewed quality or remote-provider capacity.\n\n## Blocked by\n\n- [IR-728](https://citiris.atlassian.net/browse/IR-728)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nDeliver a cited answer, remove the source's authorization, and attempt live/reopened/replayed/exported/reviewer-packet access as owner, another reader and a reviewer.\n\n## Scope boundary\n\nOwn saved-surface and review-artifact revocation integration. Do not postpone the prerequisite tickets' security tests until this ticket.\n\n## Spec coverage\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) user stories: 3, 13, 14, 15, 16, 19, 22. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-724",
+      "parent": "IR-713",
+      "summary": "Resume a worker-interrupted investigation without restarting its allowance",
+      "blockers": [
+        "IR-723",
+        "IR-728"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 14,
+      "stories": [
+        6,
+        7,
+        8,
+        16,
+        17,
+        18,
+        19
+      ],
+      "description": "## Parent\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA replacement worker resumes a real agent investigation from completed exchanges, keeping its original evidence, remaining allowance and single final result.\n\n## Acceptance criteria\n\n- [ ] Persist complete ordered assistant/tool-call/result groups, stable call IDs, task/context revision, source pointers, pinned compatibility and consumed/reserved attempts after completed steps.\n- [ ] Kill an independent worker after a tool result, after a provider response and around checkpoint commit; the next worker restores verified completed work and preserves original deadline/spend reservations.\n- [ ] Takeover advances a fencing token. A delayed old worker can neither admit new work nor commit a checkpoint/final Turn after losing its lease.\n- [ ] Recovered evidence is reauthorized; access-stale or incompatible state is rebuilt from permitted originals or fails safely. No live database connection is held across model inference.\n- [ ] An uncertain remote attempt retains its reservation; a repeat is a separately admitted physical attempt. Recovery guarantees at most one terminal Turn, not exactly-once remote billing.\n\n## Blocked by\n\n- [IR-723](https://citiris.atlassian.net/browse/IR-723)\n- [IR-728](https://citiris.atlassian.net/browse/IR-728)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nInterrupt a two-step tool-using investigation in a separate process, replace the worker, and show one final saved answer with restored call groups and no allowance reset.\n\n## Scope boundary\n\nOwn step recovery for the actual agent protocol. Do not build a second placeholder checkpoint format before the agent loop exists; compact-state recovery is extended in IR-734.\n\n## Spec coverage\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) user stories: 6, 7, 8, 16, 17, 18, 19. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-729",
+      "parent": "IR-714",
+      "summary": "Correct an invalid draft once before delivering the answer",
+      "blockers": [
+        "IR-728"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-uiux",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 15,
+      "stories": [
+        7,
+        8,
+        13,
+        14,
+        15,
+        18,
+        19,
+        20
+      ],
+      "description": "## Parent\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader receives a supported final answer after one bounded correction when a citation, calculated number or completeness claim is invalid.\n\n## Acceptance criteria\n\n- [ ] Validate current source identity/version/access, Passage/page bindings, typed facts/counts and exhaustive-reading claims before factual prose is delivered.\n- [ ] Return actionable validation feedback to the same ordered AGENT Conversation; permit at most one repair and charge it through the original allowance/reserved capacity.\n- [ ] If repair fails, preserve independently supported units with an honest limitation where safe, or return the appropriate safe failure. Do not loop judges/writers or claim semantic truth is mechanically proven.\n- [ ] Recheck authorization/source state before final commit; a stale/revoked source fences delivery instead of being repaired into a plausible unsupported answer.\n- [ ] Live delivery and reopened answer/citations agree; no unvalidated factual tokens, raw validation codes or hidden tool/provider state appear in progress or history.\n\n## Blocked by\n\n- [IR-728](https://citiris.atlassian.net/browse/IR-728)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nMake a scripted agent draft a bad page citation and a wrong typed count, then correct them once; repeat with a second invalid draft and with revocation before commit.\n\n## Scope boundary\n\nOwn final assurance and bounded repair. Human semantic review remains part of IR-605; it is not replaced by this validator.\n\n## Spec coverage\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) user stories: 7, 8, 13, 14, 15, 18, 19, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-730",
+      "parent": "IR-714",
+      "summary": "Follow research progress and control depth from the reader screen",
+      "blockers": [
+        "IR-728",
+        "IR-723"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-uiux",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 16,
+      "stories": [
+        3,
+        4,
+        5,
+        6,
+        16,
+        20
+      ],
+      "description": "## Parent\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader follows a concise research task list, sees queued/running/context-estimate states and can Stop or request more thorough work without choosing an engine.\n\n## Acceptance criteria\n\n- [ ] Ask IRIS and Paper Chat render persisted bounded task IDs/status/revisions from the actual loop; simple requests can omit a plan, and generic activity never fabricates completed research or percentages.\n- [ ] Live, reopened and reconnected views agree on task state, safe context estimate and run outcome; estimates are labelled and unknown capacity is not displayed as a million tokens.\n- [ ] Existing Stop/reconnect controls use the versioned run contract; requested thoroughness changes only the configured bounded depth, not access, selected-Record scope or provider.\n- [ ] Keyboard/screen-reader and narrow-layout checks cover progress, Stop, busy/error states and the persistent mistake/citation notice.\n- [ ] Live/history/replay/export projections exclude raw reasoning, model/provider IDs, tool arguments/results and debug codes. Render compaction controls only when the manual-compaction feature is available.\n\n## Blocked by\n\n- [IR-728](https://citiris.atlassian.net/browse/IR-728)\n- [IR-723](https://citiris.atlassian.net/browse/IR-723)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nRun a queued multi-paper request in the browser, reconnect, change to a thorough request in a new run and operate Stop by keyboard; compare live and reopened public state.\n\n## Scope boundary\n\nOwn safe reader progress and depth controls. This no longer waits for all context features: manual compaction is IR-754 and the combined Stop race contract is IR-726.\n\n## Spec coverage\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) user stories: 3, 4, 5, 6, 16, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-750",
+      "parent": "IR-712",
+      "summary": "Resolve selected Records and answer exact metadata counts",
+      "blockers": [
+        "IR-728"
+      ],
+      "labels": [
+        "area-backend",
+        "area-rag",
+        "area-security",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 17,
+      "stories": [
+        6,
+        7,
+        8,
+        9,
+        14,
+        16,
+        20
+      ],
+      "description": "## Parent\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader can identify a named paper and ask exact counts/facets over the permitted population without a model inventing catalogue totals.\n\n## Acceptance criteria\n\n- [ ] Resolve titles/identifiers into validated run-scoped Record handles through the existing agent tool registry; ambiguous names yield candidates or a focused clarification without leaking denied Records.\n- [ ] Aggregate/count/facet operations compute typed results in the authorized database population, with scope, filters and provenance sufficient for final validation.\n- [ ] Semantic screening is labelled as a classified subset and never promoted to an exhaustive catalogue total. Missing, withheld and no-match outcomes do not expose private populations.\n- [ ] Paper Chat cannot expand scope through a metadata operation; foreign/stale handles and counts after revocation are denied/recomputed under current policy.\n- [ ] A recording provider receives typed metadata facts and original evidence without a hidden screening/brief writer; the reader answer and reopened state retain the distinction between exact totals and semantic subsets.\n\n## Blocked by\n\n- [IR-728](https://citiris.atlassian.net/browse/IR-728)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nAsk 'Which paper is this?' followed by an exact Area count as two different readers, then request a semantic subset; compare the grounded answers to each reader's authorized database result.\n\n## Scope boundary\n\nSplit from IR-719. Own deterministic resolve/aggregate tools and their reader integration; search/read remains IR-719 and general agent execution remains IR-728.\n\n## Spec coverage\n\n[IR-712](https://citiris.atlassian.net/browse/IR-712) user stories: 6, 7, 8, 9, 14, 16, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-733",
+      "parent": "IR-715",
+      "summary": "Answer from full Manuscripts with honest reading coverage",
+      "blockers": [
+        "IR-728"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 18,
+      "stories": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        9
+      ],
+      "description": "## Parent\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader can ask about middle and late sections of selected papers; the agent reads the complete extracted text when it fits and follows explicit ranges when it does not.\n\n## Acceptance criteria\n\n- [ ] When useful and affordable, load the active permitted extracted Manuscript in document order through the unified context budget, including middle/late evidence rather than a fixed first-Passage prefix.\n- [ ] Deduplicate overlapping extracted content while retaining canonical page/Passage/source-revision bindings for citations.\n- [ ] Oversized selections produce bounded explicit covered/missing ranges and source-bound continuation. Track inspected, currently model-visible and recoverable content separately.\n- [ ] Source replacement, revoked access or foreign continuation cannot silently move a read to a different Manuscript; exact citation identities survive prompt reordering/eviction.\n- [ ] Incomplete extraction and uninterpreted Figures/Formulas are honest coverage limitations. Full extracted text does not claim visual interpretation or exhaustive research.\n\n## Blocked by\n\n- [IR-728](https://citiris.atlassian.net/browse/IR-728)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nAsk for a fact planted in the middle and at the end of two synthetic long papers, then repeat with a small verified window, overlap and an extraction gap; reopen the cited answer and its page binding.\n\n## Scope boundary\n\nOwn complete-document reading and coverage in the actual agent. Do not introduce a new extractor or load the whole corpus by default.\n\n## Spec coverage\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) user stories: 1, 2, 3, 4, 5, 6, 9. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-751",
+      "parent": "IR-716",
+      "summary": "Publish a fully indexed current Manuscript for research",
+      "blockers": [
+        "IR-738",
+        "IR-728"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-rag",
+        "area-security",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 19,
+      "stories": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        7,
+        9,
+        10
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader can research a newly processed Manuscript once its permitted extraction and embeddings are complete, with citations bound to that active version.\n\n## Acceptance criteria\n\n- [ ] Continue committed extracted work through admitted/disclosure-checked document embeddings using the existing embedding semantics; preserve completed attempt/output identity on redelivery.\n- [ ] Build immutable pending Record/Passage vectors for the current Embedding Space and source revision; a duplicate job does not repeat a known completed paid step.\n- [ ] Atomically activate only a complete current permitted revision; failed, stale, deleted or superseded work cannot become active even when its worker finishes last.\n- [ ] Actual local research queries and saved citations resolve the new active permitted revision; query/document embedding identities and dimensions match.\n- [ ] Unknown remote outcomes retain conservative reservations and any repeat is separately admitted; do not promise exactly-once billing. Separate ingestion capacity from interactive research.\n\n## Blocked by\n\n- [IR-738](https://citiris.atlassian.net/browse/IR-738)\n- [IR-728](https://citiris.atlassian.net/browse/IR-728)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nProcess a synthetic revision with recording embedding/model transports, interrupt after a completed embedding batch, redeliver and ask a cited question; then finish an older job and prove it cannot reactivate.\n\n## Scope boundary\n\nSplit from IR-738. Own admitted embedding and active-source publication in the existing space; parallel embedding-model upgrades are IR-752 and IR-739.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 1, 2, 3, 4, 5, 7, 9, 10. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-740",
+      "parent": "IR-716",
+      "summary": "Collect and rescore the new runtime through IR-605",
+      "blockers": [
+        "IR-728"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-mvp-validation",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 20,
+      "stories": [
+        13,
+        14,
+        15,
+        17,
+        18,
+        20
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAn evaluator runs the existing authenticated collection/review workflow against the new engine and can still rescore original baseline artifacts.\n\n## Acceptance criteria\n\n- [ ] Add an explicit engine/transport/schema identity for the dedicated runtime; collect via the real authenticated submit/progress/reopen seam without relabelling it as controller-v1.\n- [ ] Preserve old artifact readers/scoring, the current metric denominators, independent human review/adjudication and original baseline evidence.\n- [ ] Normalize actual effective model identities; preflight matched model/corpus/questions/data policy/limits/cache conditions and reject architecture comparisons with unequal effective conditions.\n- [ ] Report larger-allowance capability and model comparisons separately; retain failed/cancelled/capped attempts, physical purposes, reported/reserved/missing usage and cold/warm identity.\n- [ ] A deterministic end-to-end smoke creates a valid review packet and rescores known baseline fixtures; it proves transport/contracts only. Held-out case authoring and real campaigns are separate tickets.\n\n## Blocked by\n\n- [IR-728](https://citiris.atlassian.net/browse/IR-728)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nCollect a fake-provider new-engine Conversation through IR-605, build its review packet, rescore an old baseline export and deliberately fail an unequal-budget comparison.\n\n## Scope boundary\n\nSplit tooling from case review and paid measurement. Extend IR-605 rather than introducing an evaluation framework or permanent reader engine selector.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 13, 14, 15, 17, 18, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-726",
+      "parent": "IR-713",
+      "summary": "Stop and reconnect to the same investigation across worker races",
+      "blockers": [
+        "IR-724"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 21,
+      "stories": [
+        1,
+        2,
+        3,
+        4,
+        7,
+        8,
+        17,
+        19,
+        20
+      ],
+      "description": "## Parent\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader can Stop, reconnect or explicitly Retry without duplicate delivery, continued admissions or hidden budget renewal.\n\n## Acceptance criteria\n\n- [ ] Authenticated Stop fences new tool/provider admissions and final state advancement atomically; an already transmitted request may finish and remain charged.\n- [ ] Race Stop against final commitment and worker takeover in independent processes: there is one coherent terminal outcome and at most one Turn.\n- [ ] Reconnect with a journal cursor replays safe ordered progress from the existing run; foreign ownership, stale/deleted Conversation access and private traces are denied.\n- [ ] A reader-requested Retry creates an explicitly linked new AskRun with separately admitted original limits; worker redelivery and reconnect never reset the first run's allowance.\n- [ ] Browser disconnect, lost wakeup, run deletion and delayed worker completion are covered through the real request/worker seam and recorded in an IR-608-compatible result.\n\n## Blocked by\n\n- [IR-724](https://citiris.atlassian.net/browse/IR-724)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nDisconnect during a queued investigation, reconnect, race Stop with the final response, then use explicit Retry; show original/new run identities, terminal state and conservative spending.\n\n## Scope boundary\n\nOwn reader lifecycle and cross-process race integration, not a deferred test gate for the foundational run/queue/accounting tickets.\n\n## Spec coverage\n\n[IR-713](https://citiris.atlassian.net/browse/IR-713) user stories: 1, 2, 3, 4, 7, 8, 17, 19, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-731",
+      "parent": "IR-714",
+      "summary": "Keep supported findings when a research tool fails",
+      "blockers": [
+        "IR-729",
+        "IR-730",
+        "IR-750"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-uiux",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 22,
+      "stories": [
+        2,
+        7,
+        8,
+        9,
+        11,
+        13,
+        14,
+        15,
+        20,
+        22
+      ],
+      "description": "## Parent\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader still receives independent supported findings when one research operation fails, with an accurate explanation of what could not be established.\n\n## Acceptance criteria\n\n- [ ] Inject the A09-style partial outage after useful evidence is acquired; preserve supported findings and distinguish unavailable tool, absent metadata, no matches and insufficient evidence.\n- [ ] Do not convert an outage into a zero count, claim a complete literature search or invent a missing paper value. Typed counts and completeness claims still pass final assurance.\n- [ ] Exercise malformed calls, parallel results, necessary clarification and complete continuation groups through authenticated saved Conversations, allowing multiple valid safe tool orders.\n- [ ] A01–A15-compatible core task cases produce safe live/reopened/replayed/exported projections and stable paper ordering. Add end-to-end regression coverage here without deferring feature tests from earlier slices.\n- [ ] Export the deterministic contract results through existing evaluation-compatible artifacts and label them as contract evidence, not human-reviewed quality. Dedicated long-context scenarios are owned by IR-736.\n\n## Blocked by\n\n- [IR-729](https://citiris.atlassian.net/browse/IR-729)\n- [IR-730](https://citiris.atlassian.net/browse/IR-730)\n- [IR-750](https://citiris.atlassian.net/browse/IR-750)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nCompare two permitted papers, fail a later operation for one paper, and show a cited partial answer with accurate limitations that remains the same after reopening/export.\n\n## Scope boundary\n\nOwn partial-outage behavior and integrated core task regressions. Remove the unnecessary wait for the entire long-context suite.\n\n## Spec coverage\n\n[IR-714](https://citiris.atlassian.net/browse/IR-714) user stories: 2, 7, 8, 9, 11, 13, 14, 15, 20, 22. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-734",
+      "parent": "IR-715",
+      "summary": "Continue a long Conversation through automatic compaction",
+      "blockers": [
+        "IR-724"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 23,
+      "stories": [
+        9,
+        10,
+        12,
+        13,
+        14,
+        16,
+        17,
+        18,
+        19
+      ],
+      "description": "## Parent\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader continues a long investigation after older active context is compacted, while the task, recent exchanges and original references remain intact.\n\n## Acceptance criteria\n\n- [ ] Before overflow, use configured capacity-aware thresholds that leave room for compaction/finalization; charge same-AGENT summary inference through the existing attempt allowance and current disclosure guard.\n- [ ] Create a portable handoff containing goals/preferences, shown Record order, selections/exclusions, bounded plan, supported findings/dependencies, limitations and original Turn references; retain recent complete exchanges as capacity permits.\n- [ ] Never compact half a tool-call/result group. Summaries are derived context, not new research evidence or trusted instructions; originals remain stored under ownership/retention rules.\n- [ ] Activate only a complete handoff whose source/Conversation/access revisions still match. A concurrent Turn remains in the suffix or forces reconstruction; failed/stale/empty compaction preserves the preceding valid context.\n- [ ] Bound repeated compaction attempts under original limits. Worker restart resumes the committed compact revision and cannot reset spending or reuse revoked dependencies.\n- [ ] Portable compaction works with no native provider compaction. Native state is used only if capability/compatibility is verified; incompatible opaque items are not blindly replayed.\n\n## Blocked by\n\n- [IR-724](https://citiris.atlassian.net/browse/IR-724)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nUse a small-capacity fixture to force compaction during a multi-Turn investigation, retain 'the second paper' and exclusions, then inject a failed summary and a concurrent Turn.\n\n## Scope boundary\n\nOwn automatic compaction. Manual reader action is IR-754; bounded original-detail recovery is IR-735.\n\n## Spec coverage\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) user stories: 9, 10, 12, 13, 14, 16, 17, 18, 19. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-752",
+      "parent": "IR-716",
+      "summary": "Build a new Embedding Space while current search stays usable",
+      "blockers": [
+        "IR-751"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 24,
+      "stories": [
+        4,
+        7,
+        8,
+        9,
+        10
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAn operator builds a pending embedding upgrade alongside the active one while readers continue to search the active compatible vectors.\n\n## Acceptance criteria\n\n- [ ] Expand Record-level vectors to explicit space-keyed storage alongside the existing Passage-space identity; preserve current search during additive migration/backfill.\n- [ ] Build pending Record and Passage vectors with pinned embedding/query-document semantics, dimensions and source revisions without overwriting active vectors.\n- [ ] Current queries use the active compatible space only. Partially built or incompatible pending vectors cannot leak into search, counts or similarity results.\n- [ ] Restart/redeliver a bounded build safely, retain completed charged work and enforce current source/disclosure and shared admission at each attempt.\n- [ ] Report readiness/coverage and dimension/retrieval checks using existing operator surfaces; this ticket cannot activate a pending space. Record migration verification on a realistic synthetic database copy.\n\n## Blocked by\n\n- [IR-751](https://citiris.atlassian.net/browse/IR-751)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nCreate two deterministic embedding identities, partially build the second, search as a reader and restart the build; show unchanged active results and isolated pending Record/Passage vectors.\n\n## Scope boundary\n\nSplit from IR-739. This is an additive expand-and-migrate slice; final activation/rollback is IR-739 and removal of legacy storage/callers waits for the controlled contract phase.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 4, 7, 8, 9, 10. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-753",
+      "parent": "IR-716",
+      "summary": "Review and freeze long-context evaluation cases before collection",
+      "blockers": [
+        "IR-740"
+      ],
+      "labels": [
+        "area-mvp-validation",
+        "area-rag",
+        "area-research",
+        "area-testing",
+        "blocked",
+        "not-ready",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 25,
+      "stories": [
+        13,
+        16,
+        17,
+        19,
+        20
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nHuman reviewers receive a versioned long-paper/Conversation case pack with clear labels and rubrics, frozen before counted outputs are opened.\n\n## Acceptance criteria\n\n- [ ] Add long-Manuscript, middle/late evidence, repeated/manual compaction, exact-detail recovery, revocation, partial-outage and interrupted-research cases grounded in the accepted specs.\n- [ ] Retain reviewed task expectations, source/page bindings and independent review/adjudication roles. Include at least ten distinct cases in each family proposed for reporting; a smaller family remains explicitly inconclusive.\n- [ ] Separate development/proxy from held-out material; lock prompts, labels, rubric, quality thresholds and scenario identity before counted collection, preserving old baseline sets.\n- [ ] Run IR-605 manifest/count/preflight checks without opening counted outputs; do not tune held-out labels from model answers or replace human label approval with agent-generated labels.\n- [ ] Record named human label review and freeze evidence. Until that review exists, publish a draft pack with not-ready/blocked state rather than claiming approved ground truth.\n\n## Blocked by\n\n- [IR-740](https://citiris.atlassian.net/browse/IR-740)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nInspect and validate the proposed case pack without model outputs, reject a seven-case reported family and record a named human-reviewed freeze manifest.\n\n## Scope boundary\n\nSplit from IR-740. Agents can draft and validate mechanics; named human review is required before the pack is ready for counted collection.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 13, 16, 17, 19, 20. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-741",
+      "parent": "IR-716",
+      "summary": "Produce an honest release-evidence report with explicit missing gates",
+      "blockers": [
+        "IR-740"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-mvp-validation",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 26,
+      "stories": [
+        13,
+        15,
+        17,
+        18,
+        19,
+        20,
+        23
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA release owner receives one reproducible quality/safety/performance/cost report that refuses to call missing or incomparable evidence a pass.\n\n## Acceptance criteria\n\n- [ ] Score the selected 90% task-completion and 95% claim/citation/applicable-page objectives per reported repetition/family with existing denominators and Wilson intervals; require three repetitions and ten distinct cases per reported family.\n- [ ] Compare matched-condition aggregate metrics with the frozen baseline and keep expanded capability/model results separate. Missing review, insufficient families and incomparable manifests remain explicit.\n- [ ] Require recorded access/disclosure, real PostgreSQL/independent-worker, browser/accessibility and workload evidence; any access/disclosure breach blocks readiness regardless of average quality.\n- [ ] Preflight a declared workload and authorized latency/cost profile; report ordinary/deep queue-inclusive p95, tool/model time, memory, connections/lock pressure and total cost per successful task, including failures and conservative unknown usage.\n- [ ] Exercise the report with passing, failed, breached, mismatched and not-measured fixtures. Fake values never become measured production evidence; missing operational caps or paid/provider/data approvals block live collection.\n- [ ] Emit a versioned machine-checkable readiness manifest with evidence references and human-review gaps, usable by cutover preflight. Actual campaign collection is IR-755.\n\n## Blocked by\n\n- [IR-740](https://citiris.atlassian.net/browse/IR-740)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nGenerate reports from preserved baseline and synthetic result fixtures, omit a worker/browser result, inject a breach and unknown usage, and observe accurate blocked readiness rather than a green summary.\n\n## Scope boundary\n\nSplit report/gate implementation from live campaign execution. This task can finish while feature work continues because it must correctly report missing evidence.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 13, 15, 17, 18, 19, 20, 23. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-735",
+      "parent": "IR-715",
+      "summary": "Recover original details after compaction and respect deletion",
+      "blockers": [
+        "IR-734"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 27,
+      "stories": [
+        5,
+        12,
+        13,
+        14,
+        15,
+        17,
+        20,
+        21
+      ],
+      "description": "## Parent\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader asks for an exact earlier detail after compaction; the same agent checks the authorized original Turn/source rather than guessing from the summary.\n\n## Acceptance criteria\n\n- [ ] Expose bounded run/owner-authorized recovery of original Turns and current permitted source references through the existing tool contract.\n- [ ] Restored details use stable original identity/page/source bindings; summary text alone is never evidence for a quoted exact value. Shown paper order, exclusions and preferences remain consistent.\n- [ ] Check current account/Conversation/source access before recovery and the next send/commit. Revoked or replaced material cannot reappear from handoffs, detail indexes, plans or opaque state.\n- [ ] Conversation/account deletion invalidates/removes content-bearing derived state idempotently according to policy; minimum required non-content spend audit is not erased.\n- [ ] Publish safe estimated context/compaction state for the reader contract without raw reasoning, private source identifiers or opaque payloads.\n\n## Blocked by\n\n- [IR-734](https://citiris.atlassian.net/browse/IR-734)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nCompact a Conversation, ask for a precise value from an older Turn, then revoke the source and delete a test Conversation; verify permitted recovery and denial across live/history/export.\n\n## Scope boundary\n\nOwn bounded exact-detail recovery, derived-content cleanup and context-status producer. Manual UI compaction and native-compatibility integration remain separate.\n\n## Spec coverage\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) user stories: 5, 12, 13, 14, 15, 17, 20, 21. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-739",
+      "parent": "IR-716",
+      "summary": "Promote or roll back a verified Embedding Space safely",
+      "blockers": [
+        "IR-752"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-mvp-validation",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 28,
+      "stories": [
+        2,
+        6,
+        8,
+        9,
+        10,
+        11,
+        12
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAn operator can deliberately activate a complete compatible embedding upgrade or restore a compatible prior version without exposing revoked research.\n\n## Acceptance criteria\n\n- [ ] Refuse promotion for incomplete source coverage, wrong dimensions/query-document semantics, failed retrieval checks or stale canonical revisions.\n- [ ] Activate the verified Record/Passage space pair atomically; readers and in-flight runs obey the declared pin/compatibility contract rather than mixing vector spaces.\n- [ ] Keep a compatible previous revision for deliberate rollback. Current access/deletion/disclosure constraints still apply; rollback cannot resurrect revoked sources.\n- [ ] Exercise promotion/query races and a failed activation transaction against real PostgreSQL; partial activation leaves the previous active space intact.\n- [ ] Expose a safe operator check/dry-run/result and verify the reader's search/current-version citation before and after promotion/rollback without authorizing a live production upgrade.\n\n## Blocked by\n\n- [IR-752](https://citiris.atlassian.net/browse/IR-752)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nRefuse an incomplete two-space fixture, promote the complete one, delete/revoke a source and roll back; query results must remain compatible and currently authorized throughout.\n\n## Scope boundary\n\nOwn activation and rollback only. Building and schema expansion belong to IR-752; production upgrade execution remains a deliberate operational action.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 2, 6, 8, 9, 10, 11, 12. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-754",
+      "parent": "IR-715",
+      "summary": "Compact a Conversation from the reader screen",
+      "blockers": [
+        "IR-735",
+        "IR-730"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-testing",
+        "area-uiux",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 29,
+      "stories": [
+        10,
+        11,
+        15,
+        16,
+        20,
+        21
+      ],
+      "description": "## Parent\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader deliberately compacts an owned Conversation, sees what happened and continues with original history still available.\n\n## Acceptance criteria\n\n- [ ] An accessible Compact conversation action invokes the same authorized bounded mechanism as automatic compaction; it does not create a second summarizer or bypass spending/disclosure.\n- [ ] Manual work has an explicit bounded run identity/allowance or uses the active run only where the revision contract permits; it never silently extends an active investigation's budget.\n- [ ] Handle active-run conflicts, duplicate clicks, Stop, expired authorization, failure and stale revisions with one coherent outcome and preserved prior valid context.\n- [ ] Live/reconnected/reopened UI distinguishes compacting, compacted, unavailable and estimated capacity states. Original history is not described as deleted; detail recovery remains possible while permitted.\n- [ ] Keyboard/screen-reader and narrow-layout behavior works in Ask IRIS and Paper Chat; the action never widens Record scope or renders raw/opaque/private state.\n\n## Blocked by\n\n- [IR-735](https://citiris.atlassian.net/browse/IR-735)\n- [IR-730](https://citiris.atlassian.net/browse/IR-730)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nUse the reader action on an owned Conversation, reconnect during compaction, double-click the action and inject failure; then ask for an older exact detail.\n\n## Scope boundary\n\nSplit from IR-734/IR-735/IR-730. Own the manual action and its run/UI contract; reuse automatic compaction and detail recovery.\n\n## Spec coverage\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) user stories: 10, 11, 15, 16, 20, 21. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-742",
+      "parent": "IR-716",
+      "summary": "Rehearse one-writer cutover and version-compatible rollback",
+      "blockers": [
+        "IR-741",
+        "IR-739",
+        "IR-726"
+      ],
+      "labels": [
+        "area-backend",
+        "area-deployment",
+        "area-mvp-validation",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 30,
+      "stories": [
+        7,
+        11,
+        12,
+        20,
+        21,
+        22,
+        23
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nAn operator can rehearse the switch and rollback on a disposable copy, with tooling that refuses a live cutover without passing evidence and human release approval.\n\n## Acceptance criteria\n\n- [ ] Prepare compatible reader-before-writer format migration, per-run version pins, draining/fencing and exactly one migration/writer authority for each dataset.\n- [ ] Rehearse new-run routing and rollback against a disposable realistic copy; refuse unsupported in-flight formats/models/native state instead of silently corrupting a Conversation.\n- [ ] Cutover preflight requires a passing measured readiness manifest from IR-755 plus named human release approval. A missing, stale, forged or failed report blocks live execution.\n- [ ] Define and rehearse the scoped development-Conversation reset in dry-run only, enumerating preserved Records/Manuscripts/accounts/workflow/audit, paid-attempt accounting and required evaluation artifacts.\n- [ ] Plan the contract/removal phase after all new callers are migrated: retire old execution and old storage only then; keep a compatible deployment rollback, not permanent dual reader engines.\n- [ ] No live deployment, deletion, traffic switch, production embedding promotion or retirement is executed by this preparation ticket. Record rehearsal checks and the operator's explicit remaining release actions.\n\n## Blocked by\n\n- [IR-741](https://citiris.atlassian.net/browse/IR-741)\n- [IR-739](https://citiris.atlassian.net/browse/IR-739)\n- [IR-726](https://citiris.atlassian.net/browse/IR-726)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nOn a disposable copy, rehearse drain/one-writer switch/rollback, reject an incomplete readiness manifest, and produce a deletion dry-run that excludes all protected institutional and audit data.\n\n## Scope boundary\n\nPreparation can run before live campaign collection. Production execution remains gated by the campaign manifest and release owner, rather than blocking preparation work on measurements it can safely report as missing.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 7, 11, 12, 20, 21, 22, 23. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-736",
+      "parent": "IR-715",
+      "summary": "Continue research across repeated compactions and incompatible native state",
+      "blockers": [
+        "IR-733",
+        "IR-754"
+      ],
+      "labels": [
+        "area-backend",
+        "area-frontend",
+        "area-rag",
+        "area-testing",
+        "ready-for-agent",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 31,
+      "stories": [
+        3,
+        4,
+        5,
+        12,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        22
+      ],
+      "description": "## Parent\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nA reader completes a long-paper investigation across several compactions and safely continues when optional native continuation is incompatible.\n\n## Acceptance criteria\n\n- [ ] Exercise middle/late/contradictory facts from full Manuscripts across repeated automatic/manual compactions, exact-detail recovery and reopened history.\n- [ ] Preserve goals, order, exclusions and original evidence bindings; evicted text is not represented as still model-visible and coverage gaps remain explicit.\n- [ ] Change a prefix/tool schema or adapter capability so opaque state is incompatible: reconstruct supported portable context from permitted originals or stop safely, without forwarding stale artifacts.\n- [ ] An explicit supported model change requires reauthorization/reconstruction and verified new capacity; an in-flight run never silently switches to a smaller/incompatible model.\n- [ ] Record complete serialized-request fit, original allowance, atomic revision and citation checks in IR-605-compatible deterministic cases; absence of native support still permits the portable path.\n\n## Blocked by\n\n- [IR-733](https://citiris.atlassian.net/browse/IR-733)\n- [IR-754](https://citiris.atlassian.net/browse/IR-754)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nCarry one synthetic investigation through two compactions, ask for a late-paper contradiction and an old exact value, then invalidate the native prefix/schema and demonstrate safe portable continuation.\n\n## Scope boundary\n\nOwn cross-compaction/provider-compatibility integration and capability regression cases. Not a substitute for the feature tests in IR-732–IR-735 or paid long-context quality evidence.\n\n## Spec coverage\n\n[IR-715](https://citiris.atlassian.net/browse/IR-715) user stories: 3, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 22. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    },
+    {
+      "key": "IR-755",
+      "parent": "IR-716",
+      "summary": "Collect human-reviewed quality and approved capacity evidence",
+      "blockers": [
+        "IR-721",
+        "IR-726",
+        "IR-731",
+        "IR-736",
+        "IR-739",
+        "IR-741",
+        "IR-753"
+      ],
+      "labels": [
+        "area-deployment",
+        "area-mvp-validation",
+        "area-rag",
+        "area-research",
+        "area-testing",
+        "blocked",
+        "not-ready",
+        "s2-active",
+        "thesis-critical"
+      ],
+      "number": 32,
+      "stories": [
+        13,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        23
+      ],
+      "description": "## Parent\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) under [IR-146](https://citiris.atlassian.net/browse/IR-146). Authority: ADR-049 and the accepted parent specification. Do not close or modify the parent.\n\n## What to build\n\nThe release owner obtains actual reviewed repeated-campaign and workload evidence for the new runtime, or a precise blocked report when approvals/environments are absent.\n\n## Acceptance criteria\n\n- [ ] Before any live send, record funding/provider/data-transmission approval, explicit operational caps, the frozen case pack, model/corpus/data/cache conditions and predeclared workload/latency/cost profile.\n- [ ] Collect at least three repetitions through IR-605; retain unsuccessful/capped/cancelled attempts and conservative unknown usage, with separate cold/warm and matched-versus-expanded reports.\n- [ ] Obtain two independent human reviews and adjudication as required, preserving original baseline/held-out artifacts. An AI judge cannot substitute for missing people or make a small family reportable.\n- [ ] Execute required real-database/independent-worker, browser/accessibility and bounded ordinary/deep/ingestion load exercises; record queue-inclusive timing, resource pressure and complete cost.\n- [ ] Use IR-741 to publish observed objectives, uncertainty, baseline comparison and safety gates. Failed or unavailable required evidence prevents release; completion of a report does not imply that the architecture passed.\n- [ ] Without external approvals or environments, stop before paid collection and record not-ready/blocked. This ticket authorizes no deployment, institutional-data bypass or Conversation reset.\n\n## Blocked by\n\n- [IR-721](https://citiris.atlassian.net/browse/IR-721)\n- [IR-726](https://citiris.atlassian.net/browse/IR-726)\n- [IR-731](https://citiris.atlassian.net/browse/IR-731)\n- [IR-736](https://citiris.atlassian.net/browse/IR-736)\n- [IR-739](https://citiris.atlassian.net/browse/IR-739)\n- [IR-741](https://citiris.atlassian.net/browse/IR-741)\n- [IR-753](https://citiris.atlassian.net/browse/IR-753)\n\nPrerequisites are recorded as native Jira blocking links. Pull only when all prerequisites are complete; ready-for-agent describes specification quality, not permission to bypass a blocker.\n\n## Independent demonstration\n\nRun the frozen authorized campaign and declared workload, collect independent human reviews, and regenerate the readiness manifest from retained raw evidence; otherwise show the exact unmet collection gate.\n\n## Scope boundary\n\nSplit from IR-741. Human-led measured execution, not an AFK implementation task; acceptance cannot be satisfied with deterministic smoke tests.\n\n## Spec coverage\n\n[IR-716](https://citiris.atlassian.net/browse/IR-716) user stories: 13, 15, 16, 17, 18, 19, 20, 23. This is specified implementation work, not evidence that those stories are implemented.\n\n## Delivery and evidence\n\nInclude the minimal persistence, authenticated entry point, public projection or operator surface, and behavioral tests needed for this outcome. Reuse existing reader components where no new control is needed. Each feature must land with its own applicable tests; later integration tickets do not postpone them.\n\nUse real restricted-role PostgreSQL and independent workers where database permissions, leases, races or shared limits are claimed. A deterministic provider proves contracts, never paid capacity or human-reviewed quality. Record actual checks, failures and unavailable environments.\n\nKeep prerequisites independently green through additive expansion, controlled migration and final contraction. Preserve current institutional authority, one writer per dataset, source/disclosure rules and the original AskRun allowance. Ticket publication does not authorize a live provider campaign, deployment, traffic switch or data reset. A PR and independent human approval remain required.\n",
+      "assignee": null,
+      "status": "To Do"
+    }
+  ],
+  "desiredLinks": [
+    {
+      "from": "IR-717",
+      "to": "IR-718"
+    },
+    {
+      "from": "IR-717",
+      "to": "IR-722"
+    },
+    {
+      "from": "IR-718",
+      "to": "IR-719"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-719"
+    },
+    {
+      "from": "IR-718",
+      "to": "IR-720"
+    },
+    {
+      "from": "IR-250",
+      "to": "IR-720"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-723"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-727"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-725"
+    },
+    {
+      "from": "IR-720",
+      "to": "IR-725"
+    },
+    {
+      "from": "IR-718",
+      "to": "IR-737"
+    },
+    {
+      "from": "IR-723",
+      "to": "IR-737"
+    },
+    {
+      "from": "IR-727",
+      "to": "IR-732"
+    },
+    {
+      "from": "IR-725",
+      "to": "IR-732"
+    },
+    {
+      "from": "IR-737",
+      "to": "IR-738"
+    },
+    {
+      "from": "IR-719",
+      "to": "IR-728"
+    },
+    {
+      "from": "IR-732",
+      "to": "IR-728"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-721"
+    },
+    {
+      "from": "IR-723",
+      "to": "IR-724"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-724"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-729"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-730"
+    },
+    {
+      "from": "IR-723",
+      "to": "IR-730"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-750"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-733"
+    },
+    {
+      "from": "IR-738",
+      "to": "IR-751"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-751"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-740"
+    },
+    {
+      "from": "IR-724",
+      "to": "IR-726"
+    },
+    {
+      "from": "IR-729",
+      "to": "IR-731"
+    },
+    {
+      "from": "IR-730",
+      "to": "IR-731"
+    },
+    {
+      "from": "IR-750",
+      "to": "IR-731"
+    },
+    {
+      "from": "IR-724",
+      "to": "IR-734"
+    },
+    {
+      "from": "IR-751",
+      "to": "IR-752"
+    },
+    {
+      "from": "IR-740",
+      "to": "IR-753"
+    },
+    {
+      "from": "IR-740",
+      "to": "IR-741"
+    },
+    {
+      "from": "IR-734",
+      "to": "IR-735"
+    },
+    {
+      "from": "IR-752",
+      "to": "IR-739"
+    },
+    {
+      "from": "IR-735",
+      "to": "IR-754"
+    },
+    {
+      "from": "IR-730",
+      "to": "IR-754"
+    },
+    {
+      "from": "IR-741",
+      "to": "IR-742"
+    },
+    {
+      "from": "IR-739",
+      "to": "IR-742"
+    },
+    {
+      "from": "IR-726",
+      "to": "IR-742"
+    },
+    {
+      "from": "IR-733",
+      "to": "IR-736"
+    },
+    {
+      "from": "IR-754",
+      "to": "IR-736"
+    },
+    {
+      "from": "IR-721",
+      "to": "IR-755"
+    },
+    {
+      "from": "IR-726",
+      "to": "IR-755"
+    },
+    {
+      "from": "IR-731",
+      "to": "IR-755"
+    },
+    {
+      "from": "IR-736",
+      "to": "IR-755"
+    },
+    {
+      "from": "IR-739",
+      "to": "IR-755"
+    },
+    {
+      "from": "IR-741",
+      "to": "IR-755"
+    },
+    {
+      "from": "IR-753",
+      "to": "IR-755"
+    }
+  ],
+  "pendingRemoval": [],
+  "preserveRelatedLinks": [
+    {
+      "from": "IR-605",
+      "to": "IR-740"
+    },
+    {
+      "from": "IR-703",
+      "to": "IR-728"
+    }
+  ],
+  "removedObsoleteLinks": [
+    {
+      "from": "IR-719",
+      "to": "IR-721",
+      "id": "10685"
+    },
+    {
+      "from": "IR-720",
+      "to": "IR-721",
+      "id": "10686"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-724",
+      "id": "10689"
+    },
+    {
+      "from": "IR-723",
+      "to": "IR-726",
+      "id": "10691"
+    },
+    {
+      "from": "IR-725",
+      "to": "IR-726",
+      "id": "10693"
+    },
+    {
+      "from": "IR-717",
+      "to": "IR-727",
+      "id": "10694"
+    },
+    {
+      "from": "IR-727",
+      "to": "IR-728",
+      "id": "10696"
+    },
+    {
+      "from": "IR-725",
+      "to": "IR-728",
+      "id": "10698"
+    },
+    {
+      "from": "IR-720",
+      "to": "IR-729",
+      "id": "10700"
+    },
+    {
+      "from": "IR-727",
+      "to": "IR-730",
+      "id": "10701"
+    },
+    {
+      "from": "IR-726",
+      "to": "IR-730",
+      "id": "10702"
+    },
+    {
+      "from": "IR-735",
+      "to": "IR-730",
+      "id": "10703"
+    },
+    {
+      "from": "IR-736",
+      "to": "IR-731",
+      "id": "10706"
+    },
+    {
+      "from": "IR-719",
+      "to": "IR-733",
+      "id": "10709"
+    },
+    {
+      "from": "IR-732",
+      "to": "IR-733",
+      "id": "10710"
+    },
+    {
+      "from": "IR-732",
+      "to": "IR-734",
+      "id": "10711"
+    },
+    {
+      "from": "IR-720",
+      "to": "IR-734",
+      "id": "10713"
+    },
+    {
+      "from": "IR-733",
+      "to": "IR-735",
+      "id": "10715"
+    },
+    {
+      "from": "IR-735",
+      "to": "IR-736",
+      "id": "10717"
+    },
+    {
+      "from": "IR-719",
+      "to": "IR-738",
+      "id": "10721"
+    },
+    {
+      "from": "IR-725",
+      "to": "IR-738",
+      "id": "10722"
+    },
+    {
+      "from": "IR-738",
+      "to": "IR-739",
+      "id": "10723"
+    },
+    {
+      "from": "IR-727",
+      "to": "IR-740",
+      "id": "10724"
+    },
+    {
+      "from": "IR-732",
+      "to": "IR-740",
+      "id": "10725"
+    },
+    {
+      "from": "IR-721",
+      "to": "IR-741",
+      "id": "10727"
+    },
+    {
+      "from": "IR-726",
+      "to": "IR-741",
+      "id": "10728"
+    },
+    {
+      "from": "IR-731",
+      "to": "IR-741",
+      "id": "10729"
+    },
+    {
+      "from": "IR-736",
+      "to": "IR-741",
+      "id": "10730"
+    },
+    {
+      "from": "IR-739",
+      "to": "IR-741",
+      "id": "10731"
+    }
+  ]
+}

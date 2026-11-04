@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     EMBEDDING_MODEL: str = "text-embedding-3-small"
 
     # AI-owned runs (IR-722). The runtime login, and the maintenance login
-    # `python -m ai.runs.migrate` uses.
+    # only `python -m ai.runs.migrate` may hold (ADR-014, IR-826).
     RUNS_DATABASE_URL: str = ""
     RUNS_MIGRATION_DATABASE_URL: str = ""
     # What new runs are pinned to: "deterministic", or "agent", which needs

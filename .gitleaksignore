@@ -1,3 +1,5 @@
 # IR-489's deleted synthetic report recorded a tokenizer SHA-256 digest here.
 # This exact historical finding is a checksum, not an API credential.
 2238d124259a4b14941b9a928a6fe82614fe2f23:docs/evaluation/runs/ir489-offline-answers.json:generic-api-key:904
+# IR-884: the prose words "anonymous/disabled" in the evidence spec, not a credential.
+9b7032a1e3ec1c5fb7bd7442d416d63164098ccd:docs/superpowers/specs/2026-10-31-ai-runtime/01-evidence.md:generic-api-key:57

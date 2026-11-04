@@ -154,10 +154,12 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-440** | Retrieval looks past 40 candidates — no FR- id; a bug fix, not a technique | [details](traceability/IR-440.md) | **IMPLEMENTED** |
 | **IR-442** | A retrieval miss is detectable rather than silent — no FR- id; the checker for the failure class ADR-023 measures in aggregate but cannot … | [details](traceability/IR-442.md) | **IMPLEMENTED** |
 | **IR-312** | A proposer sees when their idea was already done here — the Novelty check; FR-M4 (stable label only) | [details](traceability/IR-312.md) | **IMPLEMENTED** |
+| **IR-826** | The AI gateway gets no Django database login; ADR-014's accepted amendment allows its runs login only | [details](traceability/IR-826.md) | **VERIFIED** |
 | **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
 | **IR-833** | Publish fills in a reliable title and abstract from the PDF and never overwrites the author's edits — no FR- id; IR-830 decisions 14–18 | [details](traceability/IR-833.md) | **IMPLEMENTED** |
 | **IR-846** | Publish suggestions for a LlamaParse Manuscript come from LlamaExtract, each with its page, cited text and reported confidence — no FR- id; ADR-056 §15 within IR-830's contract | [details](traceability/IR-846.md) | **IMPLEMENTED** |
 | **IR-885** | A runtime question runs at deep depth unless the reader chooses ordinary | [details](traceability/IR-885.md) | **PARTIAL** |
+| **IR-884** | ADR-049 and the AI runtime spec are on `main`; IR-714's resume, export and review questions have owners | [details](traceability/IR-884.md) | **PARTIAL** |
 | **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
 
 ### Non-functional

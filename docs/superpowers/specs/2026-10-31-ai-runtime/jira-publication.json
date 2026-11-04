@@ -1,0 +1,421 @@
+{
+  "epic": "IR-146",
+  "specs": [
+    {
+      "id": "evidence",
+      "key": "IR-712",
+      "summary": "Spec: Authorized Evidence and database-enforced research access"
+    },
+    {
+      "id": "execution",
+      "key": "IR-713",
+      "summary": "Spec: Durable AskRun execution, recovery and shared spending"
+    },
+    {
+      "id": "agent",
+      "key": "IR-714",
+      "summary": "Spec: Single-model Conversation research with local tools and validated answers"
+    },
+    {
+      "id": "context",
+      "key": "IR-715",
+      "summary": "Spec: Large-context Manuscript reading and recoverable Conversation compaction"
+    },
+    {
+      "id": "publication",
+      "key": "IR-716",
+      "summary": "Spec: Versioned research publication, upgrades and IR-605 cutover evidence"
+    }
+  ],
+  "tasks": [
+    {
+      "code": "A1",
+      "key": "IR-717",
+      "parent": "IR-712",
+      "summary": "Establish delegated reader grants and restricted database identities"
+    },
+    {
+      "code": "A2",
+      "key": "IR-718",
+      "parent": "IR-712",
+      "summary": "Enforce one row-protected research-read policy in both runtimes"
+    },
+    {
+      "code": "A3",
+      "key": "IR-719",
+      "parent": "IR-712",
+      "summary": "Run local research tools through authorized Evidence"
+    },
+    {
+      "code": "A4",
+      "key": "IR-720",
+      "parent": "IR-712",
+      "summary": "Fence disclosure and revoke derived evidence before reuse"
+    },
+    {
+      "code": "A5",
+      "key": "IR-721",
+      "parent": "IR-712",
+      "summary": "Prove cross-runtime access parity and evidence safety"
+    },
+    {
+      "code": "B1",
+      "key": "IR-722",
+      "parent": "IR-713",
+      "summary": "Establish AI-owned durable run and atomic Conversation commitment"
+    },
+    {
+      "code": "B2",
+      "key": "IR-723",
+      "parent": "IR-713",
+      "summary": "Add durable queue dispatch and fair bounded worker admission"
+    },
+    {
+      "code": "B3",
+      "key": "IR-724",
+      "parent": "IR-713",
+      "summary": "Checkpoint agent progress and recover fenced workers"
+    },
+    {
+      "code": "B4",
+      "key": "IR-725",
+      "parent": "IR-713",
+      "summary": "Move shared provider admission to every AI physical attempt"
+    },
+    {
+      "code": "B5",
+      "key": "IR-726",
+      "parent": "IR-713",
+      "summary": "Prove Stop reconnect recovery and shared spending across processes"
+    },
+    {
+      "code": "C1",
+      "key": "IR-727",
+      "parent": "IR-714",
+      "summary": "Define the named AGENT protocol and compatible provider adapters"
+    },
+    {
+      "code": "C2",
+      "key": "IR-728",
+      "parent": "IR-714",
+      "summary": "Run the bounded single-model loop with deterministic local tools"
+    },
+    {
+      "code": "C3",
+      "key": "IR-729",
+      "parent": "IR-714",
+      "summary": "Validate and repair final drafts inside the agent Conversation"
+    },
+    {
+      "code": "C4",
+      "key": "IR-730",
+      "parent": "IR-714",
+      "summary": "Show safe research plans context status and accessible controls"
+    },
+    {
+      "code": "C5",
+      "key": "IR-731",
+      "parent": "IR-714",
+      "summary": "Prove the new agent through the authenticated reader contract"
+    },
+    {
+      "code": "D1",
+      "key": "IR-732",
+      "parent": "IR-715",
+      "summary": "Budget complete provider requests against verified model capacity"
+    },
+    {
+      "code": "D2",
+      "key": "IR-733",
+      "parent": "IR-715",
+      "summary": "Read full Manuscripts with stable page coverage and continuations"
+    },
+    {
+      "code": "D3",
+      "key": "IR-734",
+      "parent": "IR-715",
+      "summary": "Compact the active Conversation safely using portable handoffs"
+    },
+    {
+      "code": "D4",
+      "key": "IR-735",
+      "parent": "IR-715",
+      "summary": "Recover original details and publish safe context status"
+    },
+    {
+      "code": "D5",
+      "key": "IR-736",
+      "parent": "IR-715",
+      "summary": "Prove large-context and compaction continuity contracts"
+    },
+    {
+      "code": "E1",
+      "key": "IR-737",
+      "parent": "IR-716",
+      "summary": "Publish committed institutional research changes through durable work"
+    },
+    {
+      "code": "E2",
+      "key": "IR-738",
+      "parent": "IR-716",
+      "summary": "Move versioned extraction indexing and active-source publication to AI workers"
+    },
+    {
+      "code": "E3",
+      "key": "IR-739",
+      "parent": "IR-716",
+      "summary": "Support parallel Embedding Spaces and safe promotion rollback"
+    },
+    {
+      "code": "E4",
+      "key": "IR-740",
+      "parent": "IR-716",
+      "summary": "Extend IR-605 for the new engine and large-context evaluation"
+    },
+    {
+      "code": "E5",
+      "key": "IR-741",
+      "parent": "IR-716",
+      "summary": "Record IR-605 quality safety and scalability acceptance evidence"
+    },
+    {
+      "code": "E6",
+      "key": "IR-742",
+      "parent": "IR-716",
+      "summary": "Prepare controlled AI cutover retirement and version-compatible rollback"
+    }
+  ],
+  "links": [
+    {
+      "from": "IR-717",
+      "to": "IR-718"
+    },
+    {
+      "from": "IR-718",
+      "to": "IR-719"
+    },
+    {
+      "from": "IR-718",
+      "to": "IR-720"
+    },
+    {
+      "from": "IR-719",
+      "to": "IR-721"
+    },
+    {
+      "from": "IR-720",
+      "to": "IR-721"
+    },
+    {
+      "from": "IR-717",
+      "to": "IR-722"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-723"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-724"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-725"
+    },
+    {
+      "from": "IR-723",
+      "to": "IR-726"
+    },
+    {
+      "from": "IR-724",
+      "to": "IR-726"
+    },
+    {
+      "from": "IR-725",
+      "to": "IR-726"
+    },
+    {
+      "from": "IR-717",
+      "to": "IR-727"
+    },
+    {
+      "from": "IR-722",
+      "to": "IR-727"
+    },
+    {
+      "from": "IR-727",
+      "to": "IR-728"
+    },
+    {
+      "from": "IR-719",
+      "to": "IR-728"
+    },
+    {
+      "from": "IR-725",
+      "to": "IR-728"
+    },
+    {
+      "from": "IR-728",
+      "to": "IR-729"
+    },
+    {
+      "from": "IR-720",
+      "to": "IR-729"
+    },
+    {
+      "from": "IR-727",
+      "to": "IR-730"
+    },
+    {
+      "from": "IR-726",
+      "to": "IR-730"
+    },
+    {
+      "from": "IR-735",
+      "to": "IR-730"
+    },
+    {
+      "from": "IR-729",
+      "to": "IR-731"
+    },
+    {
+      "from": "IR-730",
+      "to": "IR-731"
+    },
+    {
+      "from": "IR-736",
+      "to": "IR-731"
+    },
+    {
+      "from": "IR-727",
+      "to": "IR-732"
+    },
+    {
+      "from": "IR-725",
+      "to": "IR-732"
+    },
+    {
+      "from": "IR-719",
+      "to": "IR-733"
+    },
+    {
+      "from": "IR-732",
+      "to": "IR-733"
+    },
+    {
+      "from": "IR-732",
+      "to": "IR-734"
+    },
+    {
+      "from": "IR-724",
+      "to": "IR-734"
+    },
+    {
+      "from": "IR-720",
+      "to": "IR-734"
+    },
+    {
+      "from": "IR-734",
+      "to": "IR-735"
+    },
+    {
+      "from": "IR-733",
+      "to": "IR-735"
+    },
+    {
+      "from": "IR-733",
+      "to": "IR-736"
+    },
+    {
+      "from": "IR-735",
+      "to": "IR-736"
+    },
+    {
+      "from": "IR-718",
+      "to": "IR-737"
+    },
+    {
+      "from": "IR-723",
+      "to": "IR-737"
+    },
+    {
+      "from": "IR-737",
+      "to": "IR-738"
+    },
+    {
+      "from": "IR-719",
+      "to": "IR-738"
+    },
+    {
+      "from": "IR-725",
+      "to": "IR-738"
+    },
+    {
+      "from": "IR-738",
+      "to": "IR-739"
+    },
+    {
+      "from": "IR-727",
+      "to": "IR-740"
+    },
+    {
+      "from": "IR-732",
+      "to": "IR-740"
+    },
+    {
+      "from": "IR-740",
+      "to": "IR-741"
+    },
+    {
+      "from": "IR-721",
+      "to": "IR-741"
+    },
+    {
+      "from": "IR-726",
+      "to": "IR-741"
+    },
+    {
+      "from": "IR-731",
+      "to": "IR-741"
+    },
+    {
+      "from": "IR-736",
+      "to": "IR-741"
+    },
+    {
+      "from": "IR-739",
+      "to": "IR-741"
+    },
+    {
+      "from": "IR-741",
+      "to": "IR-742"
+    },
+    {
+      "from": "IR-605",
+      "to": "IR-740",
+      "type": "Relates"
+    },
+    {
+      "from": "IR-703",
+      "to": "IR-728",
+      "type": "Relates"
+    },
+    {
+      "from": "IR-250",
+      "to": "IR-720",
+      "external": true
+    }
+  ],
+  "verification": {
+    "date": "2026-10-31",
+    "epic": "IR-146",
+    "specs": 5,
+    "subtasks": 26,
+    "issuesVerified": 31,
+    "blockingLinks": 52,
+    "relatedLinks": 2,
+    "allUnassignedToDoReadyForAgent": true,
+    "errors": [],
+    "isLast": true
+  }
+}

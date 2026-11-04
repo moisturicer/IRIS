@@ -1,8 +1,9 @@
 import { useEffect, useRef, type ReactNode } from "react";
 
+import { Modal } from "@/components/ui/Modal";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { useElementHeight } from "@/hooks/useElementHeight";
-import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import type { Capability } from "@/features/records/capabilities";
 import { cn } from "@/lib/utils";
 import type { RecordDetail } from "@/types/records";
@@ -22,8 +23,14 @@ export interface ReviewWorkspaceProps {
   timelineVersion: number;
   /** Something changed: re-read the record and the timeline. */
   onChanged: () => void;
-  /** Go to the Paper tab with Ask IRIS open. Absent when there is no paper. */
-  onAskAboutPaper?: () => void;
+  /**
+   * Everything the Files section held, shown in the Documents drawer
+   * (ADR-032 §10, 2026-11-04; IR-879). There is no Ask IRIS in Review (IR-372).
+   */
+  documents: ReactNode;
+  /** Whether the drawer is open; kept in the URL as `?documents=open`. */
+  documentsOpen: boolean;
+  onDocuments: (open: boolean) => void;
   /** Authors retain their existing timeline and reader. */
   authorView?: boolean;
   onOpenReview?: () => Promise<void>;
@@ -36,7 +43,27 @@ export interface ReviewWorkspaceProps {
 }
 
 export function ReviewWorkspace(props: ReviewWorkspaceProps) {
-  return props.authorView ? <AuthorReviewWorkspace {...props} /> : <ReviewWorkspaceLayout {...props} />;
+  return (
+    <>
+      {props.authorView ? <AuthorReviewWorkspace {...props} /> : <ReviewWorkspaceLayout {...props} />}
+      <DocumentsDrawer open={props.documentsOpen} onClose={() => props.onDocuments(false)}>
+        {props.documents}
+      </DocumentsDrawer>
+    </>
+  );
+}
+
+/**
+ * All of a record's documents, in one dialog over Review (ADR-032 §10,
+ * 2026-11-04; IR-879): the Files section as it was, moved, with the same
+ * endpoints and checks. Full screen on a phone, a wide dialog above it.
+ */
+function DocumentsDrawer({ open, onClose, children }: { open: boolean; onClose: () => void; children: ReactNode }) {
+  return (
+    <Modal open={open} onClose={onClose} title="All documents" size="max-w-3xl" sheet>
+      {children}
+    </Modal>
+  );
 }
 
 /**
@@ -55,8 +82,9 @@ export function ReviewWorkspace(props: ReviewWorkspaceProps) {
  * tab's pane geometry (IR-352). Narrower, the paper stacks above the pane, and the action bar sticks to the
  * bottom of the screen the whole way down, paper included.
  *
- * **No Ask IRIS here** (spec §4.6, decided 2026-09-26): *Ask about this
- * paper* goes to the Paper tab, where the conversation is waiting.
+ * **No Ask IRIS here** (spec §4.6, decided 2026-09-26; kept by IR-879): a
+ * participant opens Ask IRIS on Overview or at `/ai`, for example in a new
+ * tab. *Documents* opens the drawer that replaced the Files section.
  *
  * The bar's measured height goes to `onBarInset`, so the reader lands a
  * citation above the bar rather than under it (IR-477; spec Appendix K,
@@ -71,7 +99,7 @@ function AuthorReviewWorkspace({
   reader,
   timelineVersion,
   onChanged,
-  onAskAboutPaper,
+  onDocuments,
   onBarInset,
 }: ReviewWorkspaceProps) {
   const [measureBar, barHeight] = useElementHeight<HTMLDivElement>();
@@ -105,19 +133,14 @@ function AuthorReviewWorkspace({
             "reading-wide:min-h-0 reading-wide:overflow-y-auto",
           )}
         >
-          {onAskAboutPaper && (
-            <button
-              type="button"
-              onClick={onAskAboutPaper}
-              className={cn(
-                "inline-flex items-center gap-2 min-h-11 text-small font-semibold text-brand hover:underline",
-                FOCUS_RING,
-              )}
-            >
-              <AskIrisMark className="w-4 h-4" />
-              Ask about this paper
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={() => onDocuments(true)}
+            className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-11 px-4")}
+          >
+            <i className="fas fa-folder-open text-xs" aria-hidden />
+            Documents
+          </button>
           <ReviewTimeline key={timelineVersion} recordId={record.id} canComment={can.has("comment_review")} />
         </div>
 

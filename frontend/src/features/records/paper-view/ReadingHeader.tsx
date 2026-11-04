@@ -10,7 +10,6 @@ const SECTION_LABELS: Record<PaperSection, string> = {
   overview: "Overview",
   paper: "Paper",
   review: "Review",
-  files: "Files",
 };
 
 interface ReadingHeaderProps {

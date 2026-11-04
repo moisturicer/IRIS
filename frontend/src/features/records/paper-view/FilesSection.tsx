@@ -238,10 +238,10 @@ export function FilesSection({
             <p className="text-body text-stone-700">
               The manuscript is the paper itself.{" "}
               <Link
-                to={`/records/${record.id}?section=paper`}
+                to={`/records/${record.id}?section=review`}
                 className={cn("font-semibold text-brand hover:underline", FOCUS_RING)}
               >
-                Read it in the Paper section
+                Read it beside the review
               </Link>
             </p>
             <DownloadButton
