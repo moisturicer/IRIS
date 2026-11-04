@@ -4,6 +4,10 @@
 
 **Accepted on merge** — 2026-11-01. The decisions are Hermoine Zozobrado's, from a design session under IR-250. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead, as relayed by Hermoine Zozobrado. Being built: IR-811 adds decisions 1 to 4, 15 and 18 (the answer, the gate and who sees it), IR-816 adds the question itself, IR-815 adds decisions 16 and 17 (test data answers for itself, and IR-317's bypass is gone), and IR-812 adds decisions 5 to 8 and 10 (setting, extending and releasing). IR-813 adds decisions 11 to 13 (KTTO's release of an IP mark), IR-817 puts decisions 5, 6 and 11 on Paper View, IR-818 adds decision 14's warning to RDCO's Decision dialog, and IR-814 adds decision 9's reminders. Decision 6 is clarified in the IR-812 Amendment below. Decision 2 is amended and decision 18 added in the Amendment below.
 
+**Corrected 2026-11-04: what is built.** Beyond the slices named above, the code also holds KTTO's IP release (decisions 11–12: `apps/records/ip_release.py`, and `tags/` refusing to clear `is_ip`, `apps/records/views.py:1202-1204`), decision 9's daily reminder job (`config/settings/base.py:356-360`) and decision 14's embargo warning in RDCO's Decision (`apps/reviews/decisions.py:366`).
+
+**Amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted): decision 14 is reversed.** See the *Amendment — 2026-11-04* section at the end.
+
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
 ## Context
@@ -162,3 +166,15 @@ Decided by Hermoine Zozobrado while building IR-812.
 - **An earlier chat answer is the paper's text.** A Turn citing a paper the check now refuses stays out of chat history, recall and the answer backfill, and the reader keeps it in their own transcript.
 
 **What this doesn't catch.** IRIS knows what an answer drew on from what it cites, because a Turn stores nothing else. An answer that repeats a paper without citing it, or a later answer that restates an earlier one while citing a different paper, still goes back to the model. Closing that means storing every passage a model was shown, per Turn, which is a schema change and isn't built.
+
+## Amendment — 2026-11-04: an embargo stops publishing
+
+Decided by Hermoine Zozobrado in a design session on the review workflow. Transcribed by an agent.
+
+**Decision 14, as amended.** **A paper under an Active embargo, or with no answer, can't be published.** RDCO's Decision offers *Accept, keep unlisted* instead of *Accept & publish*, and says to release the embargo first. Once the Adviser or RDCO releases it (decision 6), RDCO publishes the Unlisted paper through ADR-047 §10's `publish_unlisted`. The release has already queued it for the AI (decision 10).
+
+**What this supersedes.** Decision 14's "An embargo doesn't stop RDCO publishing" and its warning-only dialog. The rejected alternative "An embargo blocks publishing" is now the rule. The Consequences line "RDCO can publish a paper that's meant to stay private" no longer holds.
+
+**Why.** An Active embargo means a person has said the paper isn't free yet, and publishing is as public as an act gets. Keep unlisted already gives RDCO a way to accept the work without waiting.
+
+**What it costs.** Two acts instead of one: release, then publish. RDCO can do both itself (decision 6). The objection the original decision raised, that RDCO would wait "even when publishing is fine", is met by releasing, which is the statement that publishing is fine.

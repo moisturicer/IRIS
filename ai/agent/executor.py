@@ -1,9 +1,12 @@
-"""Investigate and answer in one pinned AGENT Conversation (IR-727, IR-728, ADR-049 §13-16).
+"""Investigate and answer in one pinned AGENT Conversation (IR-727, IR-728, IR-729, ADR-049 §13-16).
 
 The same model turns search, read, plan and draft, keeping every exchange
 in order. Bounds close research while the final answer and one repair still
 fit; the final turn keeps the tools declared with `tool_choice: none`. Only
-a checked, completed answer is delivered. The pin is checked against what
+a checked, completed answer is delivered: a failing draft is repaired once in
+the same Conversation, and a failing repair keeps only what each sentence's
+own citations support, or nothing. A changed source is never repaired
+around; it fences delivery. The pin is checked against what
 this code and the provider support before anything is sent; a mismatch is
 `unavailable`, never a substitute model or dialect.
 """
@@ -215,7 +218,7 @@ class _Run:
             history.append(turn)
             if turn.stop is not StopReason.TOOLS:
                 # Only a turn that ended on its calls has them run; a truncated one is refused whole.
-                return await self._deliver(turn)
+                return await self._deliver(turn, history)
             calls = [c for item in turn.items if isinstance(item, ToolGroup) for c in item.calls]
             results = []
             progressed = False
@@ -239,7 +242,9 @@ class _Run:
         request, status = self.agent.estimate(self.request(history, closed=True))
         if not self.budget.can_finish(status.occupancy_tokens, request.max_output_tokens, self.agent.reserves):
             raise Unavailable("allowance_exhausted")
-        return await self._deliver(await self._attempt(request, status, "final"))
+        turn = await self._attempt(request, status, "final")
+        history.append(turn)
+        return await self._deliver(turn, history)
 
     def _may_gather(self, stale: int) -> bool:
         return (self.steps < self.bounds.max_steps
@@ -264,10 +269,53 @@ class _Run:
         self.budget.spend(turn, status.occupancy_tokens, request.max_output_tokens)
         return turn
 
-    async def _deliver(self, turn: ModelTurn) -> Result:
+    async def _deliver(self, turn: ModelTurn, history: list) -> Result:
         text = _final(turn)
-        self._checked(text)
-        for handle in assurance.cited(text):
+        found = self._findings(text)
+        if not found:
+            return await self._commit(text)
+        log.info("agent draft refused: %s", ",".join(sorted(found)))
+        # A source that changed since it was read fences delivery; it is never repaired around.
+        await self._recheck(text)
+        repaired = await self._repair(history, found)
+        if repaired is not None:
+            again = self._findings(repaired)
+            if not again:
+                return await self._commit(repaired)
+            log.info("agent repair refused: %s", ",".join(sorted(again)))
+        # No second repair: what each sentence supports on its own is kept, and the gap is said.
+        for draft in (repaired, text):
+            kept = draft and assurance.supported_units(
+                draft, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
+            if kept:
+                partial = f"{kept}\n\n{assurance.LIMITATION}"
+                self._checked(partial)
+                return await self._commit(partial)
+        raise Unavailable("invalid_draft")
+
+    async def _repair(self, history: list, found) -> Optional[str]:
+        """One more turn in the same Conversation, inside the reserve held for it; None if it cannot."""
+        if not self.agent.reserves.repair_tokens:
+            return None
+        # `history` already ends with the draft; the feedback follows it.
+        history = [*history, User(assurance.feedback(found))]
+        request, status = self.agent.estimate(self.request(history, closed=True))
+        if not self.budget.fits([(status.occupancy_tokens, request.max_output_tokens)]):
+            return None
+        repaired = await self._attempt(request, status, "repair")
+        try:
+            return final_answer(repaired)
+        except NotFinal:
+            return None
+
+    async def _commit(self, text: str) -> Result:
+        await self._recheck(text)
+        answer, citations = assurance.deliver(text, self.investigation)
+        return self._result(answer, citations)
+
+    async def _recheck(self, text: str) -> None:
+        # A handle this run was never shown has no source to recheck; the checks refuse it.
+        for handle in (h for h in assurance.cited(text) if h in self.investigation.passages):
             # Each cited source is still readable and unreplaced just before commit.
             now = await self.tools.open_passage(handle)
             if now.reason in ENDS_RUN:
@@ -275,18 +323,18 @@ class _Run:
             before = self.investigation.passages[handle]
             if now.status != OK or not now.passages or now.passages[0].source != before.source:
                 raise Unavailable("source_changed")
-        answer, citations = assurance.deliver(text, self.investigation)
-        return self._result(answer, citations)
 
     def _focus(self, name: str) -> list[int]:
         chosen = getattr(self.investigation, name)
         return list(chosen if chosen is not None else (self.context.state or {}).get(name, ()))
 
+    def _findings(self, text: str) -> dict:
+        return assurance.findings(text, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
+
     def _checked(self, text: str) -> None:
-        failures = assurance.check(text, self.investigation, prior=self.prior,
-                                   excluded=self._focus("excluded"))
+        """A clarification or a salvaged answer that fails a check is never delivered."""
+        failures = sorted(self._findings(text))
         if failures:
-            # IR-729 repairs in the same Conversation; until then nothing unchecked is delivered.
             log.info("agent draft refused: %s", ",".join(failures))
             raise Unavailable("invalid_draft")
 

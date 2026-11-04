@@ -6,6 +6,13 @@
 > retires the `intake` party. Every rule below still holds for the remaining parties (Adviser,
 > ITSO, IERC, KTTO, RDCO). Read "including `intake`" as historical.
 
+> **Corrected 2026-11-04.** **Built** (IR-262, IR-263), not "not yet built" as the index said. A Decision withdraws open requests with `closed_by_decision` (`apps/reviews/decisions.py:467-473`). Two statements below are out of date:
+>
+> - **"No escalation, due dates or reminders"** is superseded by [ADR-043](043-review-turnaround-reminders-and-escalation.md), whose §4 pauses the requesting party's clock while its own request is open.
+> - **"Other parties' work continues, but nobody may clear or decide"** no longer holds. Other offices may clear (`apps/reviews/revisions.py:24-27`), and RDCO may decide (ADR-047 §5). What a document request blocks is its own party's finishing act (ADR-032 §4, IR-269 amendment).
+>
+> Uploads answering a request now join the current Version ([ADR-058](058-each-version-keeps-its-text-and-its-files.md) §2).
+
 **Accepted** — 2026-09-15 · **amended 2026-09-24, §Amendment (fulfilment, who may read request data, refusals)**. Settled as a business decision by **Lee Jasmin Adolfo** (project lead);
 takes effect when [PR #81](https://github.com/moisturicer/IRIS/pull/81) merges. Tracked on
 [IR-254](https://citiris.atlassian.net/browse/IR-254); implemented by
