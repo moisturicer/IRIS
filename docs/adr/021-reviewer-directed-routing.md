@@ -9,6 +9,15 @@
 > (§4, §6, §8, §11, §12, §14) is kept. The body below is left as decided, per this project's
 > supersede-don't-edit rule.
 
+> **Corrected 2026-11-04.** Kept sections that no longer match the code, besides what ADR-032 already replaced:
+>
+> - **The banner above says RDCO as a mandatory gate was replaced.** [ADR-047](047-rdco-routes-and-decides-at-any-time.md) made it the rule again: the Adviser sends every accepted Thesis/Research or Project to RDCO, and only RDCO publishes.
+> - **§7: only specialist offices clear.** Intake is gone, and the Adviser and RDCO hold no Clearance (`apps/reviews/office_review.py:59-60`).
+> - **§10: there is no hand-back.** An office finishing records its Clearance and notifies RDCO (`office_review.py:210-220`, ADR-047 §4).
+> - **§11: a Revision request doesn't set the Clearance to `declined`.** *Changes requested* is derived from the open request, and the Clearance is untouched until the new Version (`apps/reviews/revisions.py:8-13`, ADR-032 §5 IR-272). The entry point is `POST /records/<id>/new-version/`. `/reviews/resubmit/` and `/reviews/submit/` answer 410 (`apps/reviews/views.py:51-62`).
+> - **§11 and §12: an open request blocks less than they say.** Other offices may still clear and record findings. RDCO may decide, and doing so withdraws open requests (ADR-047 §5). The Adviser's acts stay blocked.
+> - **§3: a Proposal's *complete* is retired** (ADR-032 §2).
+
 **Accepted** — 2026-09-15 · **corrected 2026-09-16, §8 (schema compatibility: the
 `RecordClearance.status` column width).** The workflow was settled as a business decision by
 **Lee Jasmin Adolfo** (project lead). This ADR records that decision and the design that implements it. It

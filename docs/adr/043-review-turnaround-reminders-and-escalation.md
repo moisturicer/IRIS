@@ -10,6 +10,12 @@ Amends ADR-032 by adding a time dimension to its assignments. It changes no ADR-
 
 **Amended 2026-11-01 (IR-767, ADR-047):** RDCO's turnaround starts when the Adviser sends the record. RDCO's clock runs alongside specialist-office clocks. The hand-back no longer opens an assignment. Cutover assignments start a new clock at cutover and are identifiable by the migration reason.
 
+**Corrected and amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted):**
+
+- **§1** still reads "for RDCO at the Hand-back". Read it as *"for RDCO when the Adviser sends the Record"* (ADR-047 §4). There is no hand-back.
+- **§7's rejected alternative** cites "the Adviser accept & publish path", where "ADR-032 keeps RDCO out of the workflow". That path is gone (ADR-047 §1), and RDCO holds every sent Record. The rejection still stands for its first reason: RDCO has no act to reassign an Adviser until ADR-051 is built.
+- **§5 under `RESTART_ALL`: every assignment that reopens gets a fresh due date.** §5 says so ("each assignment that reopens"), but the code starts a clock only for the requesting parties. `submit_new_version` loops over `party__in=parties`, the parties that asked, not over the reopened offices (`apps/reviews/new_version.py:256-264`). So under `RESTART_ALL` an office reopened by ADR-032 §5's IR-632 amendment reviews again with no due date and is never reminded. That is a defect against §5, not a new rule. The fix starts a clock for every assignment that reopens, with a test that every reopened office has a due date. `CLEARANCE_AWARE` is unaffected, since there the reopened parties are the requesting ones.
+
 ## Context
 
 ADR-032's routing is largely built: adviser-first entry, office Pools and Seats, coordinator assignment, Versions and clearance-aware resubmission. None of it has a time dimension. No review carries a due date, nothing reminds a reviewer, and a Record left in a Pool stays there with nobody told. `apps/reviews`, `apps/records` and `apps/notifications` hold no due, deadline or overdue field or logic, and `backend/config` defines no Celery beat schedule.
