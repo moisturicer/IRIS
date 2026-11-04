@@ -1,6 +1,6 @@
 # Development-pilot limits — decision record (IR-861)
 
-**Status: PROPOSED. Nothing here is approved until the signature below is complete.** An agent prepared this record and, on Jive Tyler I. Revalde's instruction (2026-11-04), copied in the values below. **A named person must review, sign and date them.** An agent must not fill in the approver, the date or the signature (CLAUDE.md, "What AI does not decide").
+**Status: APPROVED for development only, by Jive Tyler I. Revalde, 2026-11-04.** An AI agent entered the values, the approver, the date and the signature on Jive Tyler I. Revalde's explicit instruction in chat. The decision is that person's, and the entry is not an independent signature or a code review. A later change needs its own approval by a named person.
 
 Authority: [ADR-041](../../adr/041-shared-provider-admission.md) (shared provider admission) and ADR-049 (AI-owned runs). Gates this record answers: [pilot README §6](README.md#6-pilot-metrics-and-gates-ac-7) — per-stage/per-run values, queue sizing and shared quotas. The proposed campaign in [§7](README.md#7-campaign-budget-and-deferred-scope-ac-8) is a starting point only.
 
@@ -15,11 +15,11 @@ Authority: [ADR-041](../../adr/041-shared-provider-admission.md) (shared provide
 
 | | |
 |---|---|
-| Approver (name) | |
-| Role (budget owner) | |
-| Budget owner's stated amount (US$) | |
-| Date approved | |
-| Valid until / review date | |
+| Approver (name) | Jive Tyler I. Revalde |
+| Role (budget owner) | Approver, and set the amount below. No other budget owner is named |
+| Budget owner's stated amount (US$) | 30 |
+| Date approved | 2026-11-04 |
+| Valid until / review date | Review after the smoke test. No end date set |
 
 ## 1. Campaign ceiling — total spend (both runtimes share one ledger)
 
@@ -41,7 +41,7 @@ Read by Django (`backend/apps/ai/admission/limits.py`) and the AI runtime (`ai/a
 | Setting | What it bounds | Value | Format |
 |---|---|---|---|
 | `AI_ADMISSION_MAX_OUTPUT_TOKENS` | The completion cap every chat-model request carries, and is reserved at | `8000` | positive integer |
-| `AI_ADMISSION_PRICES` | US$ per million tokens per model. **An unpriced model is refused**, so this also lists the models allowed to spend | `{"openai/gpt-oss-120b":{"input":0.15,"output":0.60}}` | JSON `{"model": {"input": n, "output": n}}` |
+| `AI_ADMISSION_PRICES` | US$ per million tokens per model. **An unpriced model is refused**, so this also lists the models allowed to spend | `{"openai/gpt-oss-120b":{"input":0.35,"output":0.95},"voyage-context-4":{"input":0.12,"output":0},"rerank-3":{"input":0.05,"output":0}}` | JSON `{"model": {"input": n, "output": n}}` |
 
 ## 3. Concurrency — calls in flight at once
 
@@ -69,7 +69,7 @@ Every one is required; while any is unset, every run submission is refused.
 
 | Setting | What it bounds | Value | Format |
 |---|---|---|---|
-| `RUNS_MAX_COST_USD` | **Per-run cap**: one run's spend allowance | `0.20` | positive number |
+| `RUNS_MAX_COST_USD` | **Per-run cap**: one run's spend allowance | `0.35` | positive number |
 | `RUNS_MAX_ATTEMPTS` | Per-run cap: paid calls in one run | `14` | positive integer |
 | `RUNS_MAX_INPUT_TOKENS` | Per-run cap: tokens sent | `700000` | positive integer |
 | `RUNS_MAX_OUTPUT_TOKENS` | Per-run cap: tokens generated | `100000` | positive integer |
@@ -110,16 +110,21 @@ Decision (2026-11-04): a US$30 ceiling, with each value that changed for deep-by
 | `RUNS_LEASE_SECONDS` | 180 | 240 | 210 |
 | `RUNS_MAX_QUEUED` | 20 | 12 | **10, not the midpoint.** With 2 deep slots and about 2 minutes per run, the last of 16 would wait about 14 minutes and expire at the 10-minute deadline |
 
-**All cost figures are estimates.** No paid AGENT call has run. They assume a 3k-token prompt, 6k tokens per tool result, 1.5k output tokens per call and Groq's listed US$0.15 / US$0.60 per million tokens (checked 2026-11-04). A typical deep question is taken as 8 calls and about US$0.036; the most one run can spend is about US$0.165.
+**Provider (decided 2026-11-04): OpenRouter, not Groq.** `AGENT_LLM_ENDPOINT` is `https://openrouter.ai/api/v1` and the model stays `openai/gpt-oss-120b`.
 
-**What US$30 covers.** US$22.50 is spendable with the reserve held, and input tokens run out first, at about 585 typical deep questions. A full evaluation of 756 turns (about US$27) does not fit unless the budget owner releases the reserve for it. Run a smoke test of about 20 deep questions first and replace these estimates.
+**Prices checked 2026-11-04.** The AGENT adapter (`ai/infrastructure/openai_adapter.py`) sends OpenRouter no provider list and no `data_collection` setting, so the router may choose any provider it lists for the model. Listed prices run from US$0.022 to US$0.35 input and US$0.083 to US$0.95 output per million tokens. The ledger charges reported tokens at the price recorded here, so that price must not be below what a request can cost: the record uses the highest of each, US$0.35 and US$0.95. A provider allowlist on the OpenRouter key would allow a lower price, through a new approval. Voyage's price page lists `voyage-context-4` at US$0.12 and `rerank-3` at US$0.05 per million tokens, with the first 200 million tokens free; the record ignores the free tier.
 
-**Still open before this can be signed:**
+**All cost figures are estimates.** No paid AGENT call has run. They assume a 3k-token prompt, 6k tokens per tool result and 1.5k output tokens per call. At the recorded price a typical deep question (8 calls) is charged about US$0.079, and the most one run can spend is about US$0.34, which is why `RUNS_MAX_COST_USD` is `0.35`. The real bill may be lower than the ledger shows.
 
-- `AI_ADMISSION_PRICES` needs `voyage-context-4` and `rerank-3` from Voyage's price page, because an unpriced model is refused.
-- `AI_ADMISSION_ACCOUNT_CONCURRENCY` and the deep concurrency need checking against the Groq account's rate limit.
+**What US$30 covers.** US$22.50 is spendable with the reserve held: about 286 typical deep questions, or about 381 if the reserve is released. A full evaluation of 756 turns (about US$59 at this price) does not fit either way. Run a smoke test of about 20 deep questions first (about US$1.60, at most US$6.80) and replace these estimates.
 
-**Signing does not enable paid research.** `ai/admission/guard.py` still refuses Record evidence until the disclosure decision in ADR-049 is made, and Groq's no-training terms are unconfirmed.
+**Before sending anything to OpenRouter:**
+
+- Require no-training on the OpenRouter key or account (a guardrail or privacy setting). The adapter does not ask for it per request, and `AGENT_LLM_DATA_POLICY` may say `no-training` only once this is confirmed.
+- Set the key's credit limit to the approved amount, so OpenRouter stops spending if the estimates are wrong.
+- `AI_ADMISSION_PRICES` holds the AGENT model and Voyage only. With `AI_PROVIDER_ADMISSION=enforce`, any other chat model a deployment configures is refused until it is priced in a new approval.
+
+**This approval does not enable paid research.** `ai/admission/guard.py` still refuses Record evidence until the disclosure decision in ADR-049 is made.
 
 ## Not decided here
 
@@ -138,9 +143,13 @@ Expected: `campaign <name>` then `nothing charged yet`. Then remove one required
 
 | Check | Result | Run by | Date |
 |---|---|---|---|
-| `provider_campaign` with every value set | | | |
-| `provider_campaign` with one value removed | | | |
+| `provider_campaign` with every value set | Exit 0: `campaign ir861-dev-pilot-2026-11`, `nothing charged yet` | AI agent, for Jive Tyler I. Revalde | 2026-11-04 |
+| `provider_campaign` with one value removed | Exit 1: names `AI_ADMISSION_CAMPAIGN_MAX_COST_USD` | AI agent, for Jive Tyler I. Revalde | 2026-11-04 |
+
+Run on the local development database with the values set for that process only, not written to `.env`. That run also set `AI_CONTROLLER_ANSWER_RESERVE_TOKENS=5223`, because the local `.env`'s 4000 fails Django's startup check. It is not a limit in this record.
 
 ## Signature
 
-> I, [name], approve the values above for **development only** in the IR-861 pilot, within a budget of US$[amount]. This does not approve any production value, endpoint, data transmission, deployment or campaign beyond the ceiling in §1. Date: [ ].
+> I, Jive Tyler I. Revalde, approve the values above for **development only** in the IR-861 pilot, within a budget of US$30. This does not approve any production value, endpoint, data transmission, deployment or campaign beyond the ceiling in §1. Date: 2026-11-04.
+>
+> Entered by an AI agent on Jive Tyler I. Revalde's instruction in chat.
