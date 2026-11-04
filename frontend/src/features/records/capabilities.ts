@@ -14,9 +14,15 @@ import type { Capability, RecordDetail, ReviewerSeat } from "@/types/records";
 /** ADR-032 §10's action keys; the union lives with the payload that carries it. */
 export type { Capability } from "@/types/records";
 
-/** Paper View's sections, in tab order (spec §4.6). */
-export const PAPER_SECTIONS = ["overview", "paper", "review", "files"] as const;
+/**
+ * Paper View's sections, in tab order (spec §4.6). Participants see Overview ·
+ * Review; everyone else Overview · Paper (ADR-032 §10, 2026-11-04; IR-879).
+ * Files lives in Review's Documents drawer now, so it is no section: an old
+ * `?section=files` link is a participant's Review with the drawer open.
+ */
+export const PAPER_SECTIONS = ["overview", "paper", "review"] as const;
 export type PaperSection = (typeof PAPER_SECTIONS)[number];
+
 
 /** Who is looking: the signed-in user, or nobody. */
 export type Viewer = { id: number; role_name: RoleName | null };
@@ -66,7 +72,7 @@ export function seatToOpen(record: Pick<RecordDetail, "my_seats">): ReviewerSeat
 }
 
 /** Whether there is a paper to read: the manuscript, else any attached file. */
-function hasPaper(record: CapabilityInputs): boolean {
+export function hasPaper(record: Pick<RecordDetail, "abstract_file" | "files">): boolean {
   return Boolean(record.abstract_file) || record.files.length > 0;
 }
 
@@ -80,7 +86,10 @@ export function asSection(value: string | null): PaperSection | null {
   return (PAPER_SECTIONS as readonly string[]).includes(value ?? "") ? (value as PaperSection) : null;
 }
 
-/** The sections this viewer may open, in tab order. */
+/**
+ * The sections this viewer may open, in tab order. A participant reads the
+ * paper in Review, beside the review, so has no Paper section (IR-879).
+ */
 export function sectionsFor(record: CapabilityInputs, viewer: Viewer | null): PaperSection[] {
   const participant = isParticipant(record, viewer);
   return PAPER_SECTIONS.filter((section) => {
@@ -88,10 +97,27 @@ export function sectionsFor(record: CapabilityInputs, viewer: Viewer | null): Pa
       case "overview":
         return true;
       case "paper":
-        return hasPaper(record);
+        return !participant && hasPaper(record);
       case "review":
-      case "files":
         return participant;
     }
   });
+}
+
+/**
+ * Where a `?section=` value lands for this viewer (IR-879): a participant's
+ * old Paper or Files link opens Review, and Files also opens the Documents
+ * drawer. Null for a value Paper View doesn't know.
+ */
+export function landingSection(
+  value: string | null,
+  sections: readonly PaperSection[],
+): { section: PaperSection; documents: boolean } | null {
+  if (value === "files") return { section: sections.includes("review") ? "review" : "overview", documents: sections.includes("review") };
+  const section = asSection(value);
+  if (section == null) return null;
+  if (section === "paper" && !sections.includes("paper") && sections.includes("review")) {
+    return { section: "review", documents: false };
+  }
+  return { section: sections.includes(section) ? section : "overview", documents: false };
 }

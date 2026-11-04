@@ -8,6 +8,8 @@
 
 **Amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted): decision 14 is reversed.** See the *Amendment — 2026-11-04* section at the end.
 
+**Amended again 2026-11-04 (Hermoine Zozobrado, IR-879 design session; Accepted): every paper is embargoed by default.** Decisions 2, 3, 5 and 16 and the IR-816 and IR-812 amendments change. See *Amendment — 2026-11-04 (IR-879): embargoed by default* at the end. Built by IR-882.
+
 It answers the four questions IR-250 left open, and it amends [ADR-015](015-voyage-embedding-and-reranking.md)'s disclosure gate. ADR-015 calls these questions CIT-U has to answer. The answers here come from the project team, and no CIT-U office's sign-off is recorded.
 
 ## Context
@@ -178,3 +180,23 @@ Decided by Hermoine Zozobrado in a design session on the review workflow. Transc
 **Why.** An Active embargo means a person has said the paper isn't free yet, and publishing is as public as an act gets. Keep unlisted already gives RDCO a way to accept the work without waiting.
 
 **What it costs.** Two acts instead of one: release, then publish. RDCO can do both itself (decision 6). The objection the original decision raised, that RDCO would wait "even when publishing is fine", is met by releasing, which is the statement that publishing is fine.
+
+## Amendment — 2026-11-04 (IR-879): embargoed by default
+
+Decided by Hermoine Zozobrado in the review-workspace design session. Transcribed by an agent. Built by IR-882.
+
+**Decisions 2 and 3, as amended: no question, and every paper starts embargoed.** Publish no longer opens on the embargo question (the IR-816 amendment's "Every paper answers one question first" is withdrawn). A paper starts **Active with no date**: the AI can't read it (ADR-015's gate) and RDCO can't publish it (the first 2026-11-04 amendment). A first submission no longer needs an embargo answer. **Unknown** stays a state only for rows nobody has touched. The migration moves those to Active, and "no embargo" answers to Released.
+
+**Decision 5, as amended: only the Adviser or RDCO set or extend a date.** They add one during review when they see IP or patent potential. Owners no longer set or extend an embargo, before or after submission. The IR-812 amendment's "a student owner can overrule their Adviser's release" goes with it, while its other rules stand: a release doesn't recall text already sent, a released paper can be embargoed again by the Adviser or RDCO, and a date may move earlier.
+
+**Unchanged:** only the Adviser or RDCO release (decision 6). A date never ends an embargo and is only a reminder (decision 9), so a paper with no date gets no reminder. Releasing queues the paper for the AI (decision 10). KTTO's IP release is separate (decisions 11–13).
+
+**Decision 16, as amended: test data.** `seed_demo` leaves some submitted papers Released and some Active, so both paths can be shown. `load_corpus --clear-for-ai` and `mark_corpus_cleared` mark test papers **Released** instead of answering "no embargo".
+
+**Why.** "Nothing goes out until a person releases it" is one rule, applied to every paper. The question first, as amended by IR-816, still let a student send text out with one "No", and it put a decision about IP in front of the person least placed to judge it.
+
+**What it costs.**
+
+- Every paper needs an explicit release, by the Adviser or RDCO, before Ask IRIS can use it or RDCO can publish it. Unreleased papers stay out of Ask IRIS, and keyword search still finds them (ADR-008).
+- Students can no longer say their paper is free of agreements. They tell their Adviser.
+- One more act on every reviewed paper.

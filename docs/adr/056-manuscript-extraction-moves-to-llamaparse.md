@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted on merge** — 2026-11-02 (IR-837). The decisions are Jive Tyler Revalde's, from a design session. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead. Adviser confirmation is not recorded yet (the IR-189 precedent for the Docling-serve amendment). No CIT-U data protection officer's review is recorded (IR-123). Not built. Decisions 3 and 14 are amended by the IR-851 amendment below, and decision 8 by the IR-859 amendment.
+**Accepted on merge** — 2026-11-02 (IR-837). The decisions are Jive Tyler Revalde's, from a design session. Merging this PR records acceptance by Lee Jasmin Adolfo, the project lead. Adviser confirmation is not recorded yet (the IR-189 precedent for the Docling-serve amendment). No CIT-U data protection officer's review is recorded (IR-123). Not built. Decisions 3 and 14 are amended by the IR-851 amendment below, and decision 8 by the IR-859 amendment. **Amended 2026-11-04 by Hermoine Zozobrado (IR-879, IR-883):** decision 15 (LlamaExtract auto-fill) is withdrawn; see the last amendment. Decision 1's Docling removal stands, built by IR-843 the same day.
 
 **Supersedes [ADR-016](016-docling-structured-extraction.md)** (Docling-serve as the extraction path) and **[ADR-025](025-figures-and-formulas-in-extraction.md)** (figures cropped on request, formulas OCR'd, figure contents not described). Both are now `Superseded by ADR-056`. The two ADR-025 amendments (IR-424, IR-437) are carried forward in decision 12 rather than lost.
 
@@ -181,6 +181,22 @@ Decided by Jive Tyler Revalde after IR-851's run showed 27 of 113 numbered headi
 
 **What it costs.** A shaping rule reads the text of a heading again, which decision 8 meant to stop. A section number that a paper gets wrong is now trusted over LlamaParse's level. A heading that is really a short line opening "Table 1" or "Fig. 3" becomes text.
 
+## Amendment — 2026-11-04 (IR-879, IR-883): no AI auto-fill
+
+Decided by Hermoine Zozobrado in the review-workspace design session. Transcribed by an agent. **The decisions in this ADR are Jive Tyler Revalde's, and this amendment reverses two of them without his sign-off recorded.** IR-883 asks him to confirm.
+
+**Decision 15 is withdrawn: Publish suggestions don't use LlamaExtract.** IRIS doesn't fill in a submission's fields with AI. Publish keeps the no-AI suggestions read from the Manuscript's stored structure (IR-406, IR-833, `apps/records/metadata_suggestions.py`), for every LlamaParse paper: title and abstract by the existing rules, and labelled front matter where the structure has it. Nothing a paper suggests is sent to a vendor to be read again.
+
+**Decision 1 stands: Docling is retired.** IR-843 (PR #527, merged 2026-11-04) removed the Docling service, adapter, mapping and tests, so LlamaParse is the only Extractor. Keeping Docling as a fallback was decided in the same session and then withdrawn on finding that it had already been removed. If IRIS ever stops using a third-party Extractor, Docling is restored from PR #527's history and tested again. It isn't maintained in the meantime.
+
+**Why.** Auto-filling with AI added a paid vendor call and a pending state to every submission, for fields an author can type.
+
+**What it costs.**
+
+- Authors get fewer pre-filled fields on LlamaParse papers (no authors, keywords or year from LlamaExtract).
+- IR-846's built LlamaExtract path is removed (IR-883).
+- There is no ready Extractor fallback: going back to Docling means restoring and re-testing it.
+
 ## Related Requirements
 
 FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
@@ -193,7 +209,8 @@ FR-M3-01, FR-M4: stable labels only, per the frozen-SRS rule.
 - IR-840: one shaping function
 - IR-841: LlamaParse Extractor
 - IR-842: corpus cutover
-- IR-843: Docling retirement
+- IR-843: Docling retirement (done, PR #527)
+- IR-883: remove the LlamaExtract Publish suggestions
 - IR-851: acceptance check, and the amendment above
 - IR-859: heading depth from numbering, and the amendment above
 - Related: IR-189, IR-292, IR-293, IR-816, IR-123
