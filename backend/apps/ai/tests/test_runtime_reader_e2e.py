@@ -32,7 +32,7 @@ RECORDING = runs_db.REPO / "frontend" / "src" / "test" / "fixtures" / "runtimeRe
 RUN_KEYS = {
     "protocol", "id", "conversation_id", "state", "question", "base_revision", "version", "turn_id",
     "depth", "awaiting_reader", "created_at", "finished_at", "plan", "context", "sources_available",
-    "capabilities",
+    "capabilities", "compaction",
 }
 CONVERSATION_KEYS = {"protocol", "id", "revision", "runs", "turns"}
 TURN_KEYS = {"id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations", "facts"}
