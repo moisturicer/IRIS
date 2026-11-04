@@ -564,6 +564,36 @@ class ResearchTools:
 
         return await self._call("recall", body)
 
+    async def reauthorize(self, handles, counted=()) -> str | None:
+        """None when every recovered handle still reads its own source now (IR-724).
+
+        A replacement worker's restored evidence confers nothing: each handle
+        must resolve under the run's grant, scope and fence to the source it
+        was issued on, each passage must still exist, and every Record an
+        exact count counted must still be readable. "stale" otherwise, or the
+        reason the run cannot continue. Journals nothing.
+        """
+        try:
+            async with self._session() as conn:
+                for handle in handles:
+                    try:
+                        async with conn.transaction():
+                            _, source, chunk_id = await self._resolve(conn, handle, str(handle)[:1])
+                            if chunk_id is not None and not await conn.fetchval(
+                                    """SELECT EXISTS (SELECT 1 FROM iris_ai.research_chunks()
+                                        WHERE id = $1 AND chunk_set_id = $2 AND deleted_at IS NULL)""",
+                                    chunk_id, source.chunk_set_id):
+                                return "stale"
+                    except _Refused:
+                        return "stale"
+                ids = sorted({i for i in counted if _is_int(i)})
+                if ids and await conn.fetchval(
+                        "SELECT count(*) FROM public.records_record WHERE id = ANY($1::bigint[])", ids) != len(ids):
+                    return "stale"
+        except _Refused as refused:
+            return refused.reason
+        return None
+
     async def journal(self, name: str, data: dict) -> bool:
         """Append a run event under the grant; False once the run has ended (IR-728)."""
         try:
