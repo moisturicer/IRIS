@@ -50,7 +50,7 @@ function fitWidths(width: number, wanted: Widths) {
   return { mid: Math.floor(mid), side: Math.floor(Math.min(side, mid - 40)) };
 }
 
-export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, onChanged, onAskAboutPaper, onOpenReview }: ReviewWorkspaceProps) {
+export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, onChanged, onDocuments, onOpenReview }: ReviewWorkspaceProps) {
   const [observe, width] = useElementWidth<HTMLDivElement>();
   const [wanted, setWanted] = useState(readWidths);
   const sizes = fitWidths(width, wanted);
@@ -144,7 +144,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const onReadinessAction = (action: { kind: string; target: string | null }) => {
     if (action.kind === "open_review") void onOpenReview?.();
     else if (action.kind === "claim") void claim();
-    else if (action.kind === "open_documents") goTo("documents");
+    // Documents moved into a drawer (IR-879): a document request's link opens it.
+    else if (action.kind === "open_documents") onDocuments(true);
     else if (action.kind === "show_party") goTo(action.target ?? "reviewers");
     // The footer's own Withdraw asks first, as it always has.
     else if (action.kind === "withdraw_revision") {
@@ -160,7 +161,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     <ReviewDetails record={record} tracker={tracker} ids={ids}
       requestReview={mayRequest ? { targets: targets.map((t) => t.label), onOpen: () => { setRouted(""); setRequesting(true); } } : undefined}
       addColleague={<ReviewActionBar record={record} can={can} actions={ADD_COLLEAGUE} label="Reviewer actions"
-        primary={false} onChanged={onChanged} className="pt-1" />} />
+        primary={false} onChanged={onChanged} className="pt-1" />}
+      onAllDocuments={() => onDocuments(true)} />
   );
   const RouteDialog = ROUTE?.Dialog;
   const ownSeat = record.my_seats.find((s) => s.state === "assigned" || s.state === "in_review") ?? record.my_seats[record.my_seats.length - 1];
@@ -235,7 +237,6 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             className={cn("review-pane-body", FOCUS_RING)}
           >
             <div role="tabpanel" id={`${ids}-conversation`} aria-labelledby={`${ids}-tab-conversation`} hidden={tab !== "conversation"} className="p-4">
-              {onAskAboutPaper && <button type="button" onClick={onAskAboutPaper} className={cn("review-control text-brand hover:underline", FOCUS_RING)}>Ask about this paper</button>}
               <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
                 renderStatus={renderDetails}
                 beforeComment={record.readiness ? <ReadinessPanel id={`${ids}-readiness`} readiness={record.readiness} onAction={onReadinessAction} /> : null} />

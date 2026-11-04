@@ -492,6 +492,21 @@ export interface RecordVersion {
   created_by_name: string | null;
   /** Null when this version was submitted with no manuscript. */
   manuscript_url:  string | null;
+  /** What it was submitted with, one per upload slot (ADR-058 §2, IR-872). */
+  documents?:               VersionDocument[];
+  /** Uploads made while it was the latest version: "added during vN". */
+  documents_added?:         VersionDocument[];
+  /** True when `documents` is a best guess, for versions older than IR-872. */
+  documents_reconstructed?: boolean;
+}
+
+/** One slot's file, as a version names it (IR-872). */
+export interface VersionDocument {
+  upload_id:    number;
+  slot:         string;
+  version:      number;
+  uploaded_at:  string;
+  download_url: string;
 }
 
 /**
