@@ -137,6 +137,7 @@ def _investigation(found: Investigation) -> dict:
         "tool_calls": found.tool_calls, "counts": [_count(c) for c in found.counts],
         "searched": found.searched, "outages": list(found.outages),
         "readings": {revision: _reading(read) for revision, read in found.readings.items()},
+        "recovered": {str(ordinal): answer for ordinal, answer in found.recovered.items()},
     }
 
 
@@ -159,6 +160,8 @@ def _restore_investigation(found: Investigation, raw: dict) -> None:
     found.outages = [str(name) for name in raw["outages"]]
     # What the run read of each Manuscript, so a resumed answer reports the same coverage (IR-733).
     found.readings = {str(revision): _load_reading(read) for revision, read in raw.get("readings", {}).items()}
+    # Original Turns recovered before the takeover (IR-735); a body from before it has none.
+    found.recovered = {int(ordinal): str(answer) for ordinal, answer in raw.get("recovered", {}).items()}
 
 
 def _span(span: Optional[Span]) -> Optional[list]:
@@ -213,6 +216,10 @@ class Restored:
 
     def counted(self) -> list[int]:
         return [i for c in self.investigation["counts"] for i in c["population"]]
+
+    def turns(self) -> list[int]:
+        """Original Turns recovered, whose text this history carries (IR-735)."""
+        return sorted(int(ordinal) for ordinal in self.investigation.get("recovered", {}))
 
     def apply(self, found: Investigation) -> None:
         _restore_investigation(found, self.investigation)

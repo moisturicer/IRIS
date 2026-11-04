@@ -8,6 +8,7 @@ PROTOCOL = "runs-reader-1"
 def progress(events):
     plan = None
     context = None
+    compaction = None
     for event in events:
         data = event["data"]
         if event["name"] == "plan":
@@ -29,12 +30,23 @@ def progress(events):
                 previous = {s["id"] for s in plan["steps"]} if plan else set()
                 if len(set(ids)) == len(ids) and previous <= set(ids):
                     plan = {"revision": revision, "steps": clean}
+        elif event["name"] == "compaction":
+            # Outcome and counts only: never a reason code, summary text, revision or source.
+            turns = data.get("turns")
+            if data.get("outcome") not in ("compacted", "kept") or (
+                    data["outcome"] == "compacted" and (type(turns) is not int or turns < 0)):
+                continue
+            compaction = compaction or {"compactions": 0, "turns_compacted": 0, "last": None}
+            compaction["last"] = data["outcome"]
+            if data["outcome"] == "compacted":
+                compaction["compactions"] += 1
+                compaction["turns_compacted"] += turns
         elif event["name"] == "context":
             used, capacity = data.get("used_tokens"), data.get("capacity_tokens")
             context = ({"estimated": True, "used_tokens": used, "capacity_tokens": capacity}
                        if type(used) is int and type(capacity) is int and 0 <= used <= capacity
                        and capacity > 0 else None)
-    return {"plan": plan, "context": context}
+    return {"plan": plan, "context": context, "compaction": compaction}
 
 
 def run(snapshot):

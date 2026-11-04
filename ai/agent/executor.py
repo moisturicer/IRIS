@@ -50,6 +50,9 @@ METADATA_TOOL_VERSION = "research-2"
 #: research-2 plus whole-Manuscript reading (IR-733).
 MANUSCRIPT_PROMPT_VERSION = "agent-research-3"
 MANUSCRIPT_TOOL_VERSION = "research-3"
+#: research-3 plus recovery of original Turns after compaction (IR-735).
+RECOVERY_PROMPT_VERSION = "agent-research-4"
+RECOVERY_TOOL_VERSION = "research-4"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -83,6 +86,13 @@ MANUSCRIPT_INSTRUCTIONS = METADATA_INSTRUCTIONS + (
     "which parts you did not read, that figures and formulas were not interpreted, and that reading "
     "one paper is not a search of the repository."
 )
+RECOVERY_INSTRUCTIONS = MANUSCRIPT_INSTRUCTIONS + (
+    " Earlier Turns of a long conversation may arrive as a derived summary. A summary is not evidence and "
+    "never a source for an exact value, quotation, page or number. When the reader asks for an exact "
+    "detail from an earlier Turn, reread that Turn with recover_turn by its number, or read the paper "
+    "again, and cite the passage handles it returns. If recovery is unavailable, say that you cannot "
+    "confirm the detail."
+)
 FINAL_NOTE = (
     "Research is now closed. Answer the original question from what you have read, citing passages "
     "by handle, and say plainly what you could not find or read."
@@ -94,8 +104,10 @@ PROMPTS = {
     (RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION): RESEARCH_INSTRUCTIONS,
     (METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION): METADATA_INSTRUCTIONS,
     (MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION): MANUSCRIPT_INSTRUCTIONS,
+    (RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION): RECOVERY_INSTRUCTIONS,
 }
-RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION)
+RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
+                          RECOVERY_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -268,8 +280,9 @@ class _Run:
         version = agent.pin.tool_version
         self.investigation = Investigation(
             tools, clarify=not asked,
-            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION),
-            manuscripts=version == MANUSCRIPT_TOOL_VERSION)
+            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION),
+            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION),
+            recovery=version == RECOVERY_TOOL_VERSION)
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         # Whatever an earlier fence spent stays spent, the attempt it left uncertain included (IR-724).
@@ -394,7 +407,7 @@ class _Run:
         if restored is not None and not self._resumable(restored.compaction):
             restored = None
         reason = "incompatible" if restored is None else await self.tools.reauthorize(
-            restored.handles(), restored.counted())
+            restored.handles(), restored.counted(), turns=restored.turns())
         if reason in ENDS_RUN:
             raise Unavailable(reason)
         if reason is not None:
@@ -509,7 +522,23 @@ class _Run:
                 and stale < self.bounds.max_no_progress
                 and self.deadline - time.monotonic() > self.bounds.final_seconds)
 
+    async def _handoff_current(self) -> None:
+        """A handoff in the history stands only while its Turns and sources are readable now (IR-735).
+
+        Checked before every send and the commit, so revoked or replaced
+        material cannot reach the model or the reader through a summary. The run
+        stops safely rather than keep context it can no longer vouch for.
+        """
+        if self.handoff is None:
+            return
+        reason = await self.tools.handoff_current(self.handoff["turns"], self.handoff["sources"])
+        if reason in ENDS_RUN:
+            raise Unavailable(reason)
+        if reason is not None:
+            raise Unavailable("source_changed")
+
     async def _attempt(self, request: AgentRequest, status, phase: str) -> ModelTurn:
+        await self._handoff_current()
         if not await self.tools.journal("context", {
             "used_tokens": status.occupancy_tokens, "capacity_tokens": status.context_tokens,
         }):
@@ -576,6 +605,7 @@ class _Run:
 
     async def _recheck(self, text: str) -> None:
         try:
+            await self._handoff_current()
             await self._recheck_sources(text)
         except OUTAGES as failure:
             # A source that cannot be reached cannot be vouched for; nothing is delivered (IR-731).

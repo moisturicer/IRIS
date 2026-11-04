@@ -36,7 +36,7 @@ class Recovering(Corpus):
         super().__init__()
         self.reauthorized = []
 
-    async def reauthorize(self, handles, counted=()):
+    async def reauthorize(self, handles, counted=(), turns=()):
         self.reauthorized.append(list(handles))
         live = {h for rid, (_, _, passage) in self.papers.items() if rid not in self.replaced
                 for h in (passage.handle, handle("R", rid))}

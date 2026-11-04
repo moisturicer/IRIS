@@ -28,6 +28,9 @@ export function ResearchProgress({ run }: { run: ReaderRun }) {
     <p className="mt-2 text-xs">{run.context
       ? `Estimated context: ${run.context.used_tokens.toLocaleString()} of ${run.context.capacity_tokens.toLocaleString()} tokens`
       : "Context estimate unavailable"}</p>
+    {run.compaction && run.compaction.compactions > 0 && <p className="mt-1 text-xs">
+      Earlier conversation was condensed into a summary to make room. The original answers are kept, and a
+      summary is never used as a source for exact details.</p>}
   </section>;
 }
 

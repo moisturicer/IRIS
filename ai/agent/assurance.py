@@ -89,6 +89,9 @@ def findings(text: str, investigation: Investigation, *, prior=(), excluded=(),
     supported = {Decimal(f) for f in investigation.figures}
     for turn in prior:
         supported |= numbers(turn.answer)
+    # An original Turn this run recovered was checked when delivered (IR-735).
+    for answer in investigation.recovered.values():
+        supported |= numbers(answer)
     for handle in handles:
         passage = investigation.passages.get(handle)
         if passage is not None:
@@ -172,7 +175,7 @@ LIMITATION = "Part of the drafted answer could not be checked against its source
 _STEPS = {
     "search": "searching passages", "open_passage": "rereading a passage", "read_page": "reading a page",
     "outline": "listing a paper's sections", "resolve_papers": "finding a named paper",
-    "count_records": "counting records", "update_plan": "updating the research plan",
+    "count_records": "counting records", "recover_turn": "rereading an earlier answer", "update_plan": "updating the research plan",
 }
 
 
