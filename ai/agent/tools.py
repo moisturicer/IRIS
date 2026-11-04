@@ -8,15 +8,21 @@ AI-owned run state that confers nothing.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Optional
 
+import asyncpg
+
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
-from ai.research.tools import OK, PARTIAL, Count, PassageRef, Reading, ToolResult as Evidence
+from ai.research.tools import OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence
+
+log = logging.getLogger(__name__)
 
 PLAN_STEPS = 12
 FOCUS_PAPERS = 20
@@ -25,6 +31,10 @@ STEP_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,31}$")
 STEP_STATUS = ("pending", "in_progress", "done", "blocked")
 #: A run cannot continue past these; anything else is the model's to handle.
 ENDS_RUN = ("unauthorized", "run_ended")
+#: A tool that raised instead of answering: its result is unknown, never empty (IR-731).
+TOOL_UNAVAILABLE = "tool_unavailable"
+#: What a failed connection, timeout or database error raises; a local bug is not an outage.
+OUTAGES = (OSError, asyncio.TimeoutError, asyncpg.PostgresError, asyncpg.InterfaceError)
 
 
 def _object(properties: dict, required=()) -> dict:
@@ -223,6 +233,8 @@ class Investigation:
     reads: dict[str, ManuscriptRead] = field(default_factory=dict)
     #: Tool call id -> (revision, positions) a read returned, until packing says whether it was shown.
     unpacked: dict[str, tuple[str, tuple[int, ...]]] = field(default_factory=dict)
+    #: Tools that failed during the run, in order of first failure (IR-731).
+    outages: list[str] = field(default_factory=list)
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
@@ -281,6 +293,15 @@ class Investigation:
             return self._evidence(await self._research(spec, args))
         except InvalidArguments:
             return Outcome(json.dumps({"error": "invalid_arguments"}))
+        except asyncpg.InsufficientPrivilegeError:
+            # A policy refusal is not an outage: the reader may no longer read.
+            raise RunEnded("unauthorized") from None
+        except OUTAGES as failure:
+            # An outage leaves what was already read; the model is told the result is unknown.
+            log.warning("agent tool %s failed: %s", spec.name, type(failure).__name__)
+            if spec.name not in self.outages:
+                self.outages.append(spec.name)
+            return Outcome(json.dumps({"status": UNAVAILABLE, "reason": TOOL_UNAVAILABLE}))
 
     async def _research(self, spec: ToolSpec, args: dict) -> Evidence:
         if spec is SEARCH:

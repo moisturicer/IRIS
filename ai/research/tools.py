@@ -40,6 +40,8 @@ FORMULA, CAPTION = "formula", "caption"
 OK, NO_MATCH, PARTIAL, UNAVAILABLE = "ok", "no_match", "partial", "unavailable"
 #: A reference fits several papers; the reader is asked, never answered for (IR-750).
 AMBIGUOUS = "ambiguous"
+#: A paper that can be named but has no Manuscript read: nothing to read, not nothing found (IR-731).
+NO_MANUSCRIPT = "no_manuscript"
 
 
 @dataclass(frozen=True)
@@ -440,8 +442,9 @@ class ResearchTools:
 
         async def body(conn):
             title, source, _ = await self._resolve(conn, record_handle, "R")
+            # Named but never read: absent, not a page with no match (IR-731).
             if source is None:
-                return ToolResult(NO_MATCH, coverage=Coverage(total=0))
+                return ToolResult(NO_MATCH, NO_MANUSCRIPT, coverage=Coverage(total=0))
             rows = await conn.fetch(
                 """SELECT id, record_id, source_page, content, context_path,
                           count(*) OVER () AS total
@@ -469,7 +472,7 @@ class ResearchTools:
         async def body(conn):
             title, source, _ = await self._resolve(conn, record_handle, "R")
             if source is None:
-                return ToolResult(NO_MATCH)
+                return ToolResult(NO_MATCH, NO_MANUSCRIPT)
             rows = await conn.fetch(
                 """SELECT source_page, context_path FROM iris_ai.research_chunks()
                     WHERE chunk_set_id = $1 AND deleted_at IS NULL ORDER BY sequence LIMIT $2""",
