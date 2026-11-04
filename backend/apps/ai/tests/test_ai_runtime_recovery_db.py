@@ -247,10 +247,20 @@ def test_recovered_evidence_whose_source_changed_is_rebuilt_from_the_question(ru
     assert events(queued["id"], "recovery") == [{"outcome": "rebuilt", "reason": "stale", "step": 1}]
     # The step the dead worker took stays taken.
     assert [m["step"] for m in events(queued["id"], "model")] == [1, 2, 3]
-    with connection.cursor() as cursor:
-        cursor.execute("SELECT c.quote FROM iris_ai.citation c JOIN iris_ai.turn t ON t.id = c.turn_id"
-                       " WHERE t.run_id = %s", [queued["id"]])
-        assert [row[0] for row in cursor.fetchall()] == [revised]
+
+    # What the rebuild discarded no longer backs the answer: it reopens whole,
+    # though the dead worker's read of the replaced source stays in the journal.
+    store = RunStore(runtime)
+    reopened = run(store.reopen(grant, queued["conversation_id"]))
+    [turn] = reopened["turns"]
+    assert [c["quote"] for c in turn["citations"]] == [revised]
+    assert run(store.status(grant, queued["id"], reader_projection=True))["sources_available"] is True
+
+    # A source the rebuilt answer did read still fences it when it changes.
+    write_source(flood, {4: [("Methods", "revised again")]}, "3")
+    [turn] = run(store.reopen(grant, queued["conversation_id"]))["turns"]
+    assert turn["citations"] == []
+    assert run(store.status(grant, queued["id"], reader_projection=True))["sources_available"] is False
 
 
 def test_recovered_evidence_the_reader_can_no_longer_read_is_never_resent(runtime):

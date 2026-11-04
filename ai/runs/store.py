@@ -43,6 +43,8 @@ COUNTED_UNREADABLE = """EXISTS (
                   jsonb_array_elements_text(coalesce(fact->'population', '[]'::jsonb)) counted(id)
      WHERE NOT EXISTS (SELECT 1 FROM public.records_record r WHERE r.id=counted.id::bigint))"""
 
+#: Research a rebuilt investigation discarded no longer backs its answer (IR-724).
+REBUILT = "rebuilt"
 # Every source used by research, including uncited and legacy revisions, must
 # still be current before its derived answer can be replayed or recalled.
 CURRENT_SOURCE_TURN = """NOT EXISTS (
@@ -51,6 +53,9 @@ CURRENT_SOURCE_TURN = """NOT EXISTS (
       UNION
       SELECT jsonb_array_elements_text(ev.data->'sources') AS revision
         FROM iris_ai.run_event ev WHERE ev.run_id=t.run_id AND ev.name='tool'
+         AND ev.sequence > coalesce((
+             SELECT max(rb.sequence) FROM iris_ai.run_event rb
+              WHERE rb.run_id=ev.run_id AND rb.name='recovery' AND rb.data->>'outcome'='""" + REBUILT + """'), 0)
     ) dependency WHERE dependency.revision IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.is_active
         AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))
@@ -642,8 +647,12 @@ class RunStore:
         evidence = {}
         if reader:
             # Recheck every evidence dependency under begin_research's live RLS,
-            # including papers read but not finally cited (ADR-049 §8).
-            dependencies = {source for event in events if event["name"] == "tool"
+            # including papers read but not finally cited (ADR-049 §8), since the
+            # last rebuild: what a rebuilt investigation discarded backs nothing (IR-724).
+            rebuilt = max((event["sequence"] for event in events if event["name"] == "recovery"
+                           and event["data"].get("outcome") == REBUILT), default=0)
+            dependencies = {source for event in events
+                            if event["name"] == "tool" and event["sequence"] > rebuilt
                             for source in event["data"].get("sources", [])}
             citations = await conn.fetch(
                 "SELECT c.revision FROM iris_ai.citation c JOIN iris_ai.turn t ON t.id = c.turn_id"
