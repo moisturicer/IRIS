@@ -24,15 +24,20 @@ from ai.agent.protocol import (
 from ai.agent.tools import Investigation, ManuscriptRead
 from ai.research.tools import Count, PassageRef, Reading, Source, Span
 
-FORMAT = "agent-checkpoint-1"
+#: -2 adds the compact handoff the history opens with (IR-734); a -1 body is rebuilt, never misread.
+FORMAT = "agent-checkpoint-2"
 
 
-def task_key(question: str, prior, state: dict) -> str:
-    """What the run is answering: the reader's words and the Conversation they follow."""
+def task_key(question: str, prior, state: dict, *, handoff: Optional[int] = None) -> str:
+    """What the run is answering: the reader's words and the Conversation they follow.
+
+    `handoff` is the compact handoff revision the Conversation opens with (IR-734).
+    """
     body = json.dumps({
         "question": question,
         "prior": [[t.question, t.answer, t.kind] for t in prior],
         "state": state or {},
+        **({"handoff": handoff} if handoff is not None else {}),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(body.encode()).hexdigest()
 
@@ -198,6 +203,8 @@ class Restored:
     stale: int
     budget: dict
     investigation: dict
+    #: The handoff the history opens with: `revision`, `through`, `carried` and `body`, or None (IR-734).
+    compaction: Optional[dict] = None
 
     def handles(self) -> list[str]:
         """Every handle the restored Investigation may cite or read again."""
@@ -212,8 +219,9 @@ class Restored:
 
 
 def dump(*, pin: Pin, bounds, task: str, history, investigation: Investigation, budget,
-         steps: int, stale: int) -> dict:
+         steps: int, stale: int, compaction: Optional[dict] = None) -> dict:
     return {
+        "compaction": compaction,
         "format": FORMAT,
         "pin": pin.as_dict(), "bounds": asdict(bounds) if bounds is not None else None,
         "task": task, "steps": steps, "stale": stale,
@@ -236,7 +244,7 @@ def load(body, *, pin: Pin, bounds, task: str) -> Optional[Restored]:
         history = [_load_entry(e) for e in body["history"]]
         restored = Restored(history=history, steps=int(body["steps"]), stale=int(body["stale"]),
                             budget={k: int(body["budget"][k]) for k in ("input", "output", "reported", "attempts")},
-                            investigation=body["investigation"])
+                            investigation=body["investigation"], compaction=body.get("compaction"))
         # Parsed in full now, so a malformed body is refused before anything is applied.
         _restore_investigation(Investigation(None), restored.investigation)
     except (KeyError, TypeError, ValueError, AttributeError):

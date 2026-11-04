@@ -106,3 +106,28 @@ def test_an_unknown_executor_refuses_to_start():
 ])
 def test_an_invalid_agent_profile_refuses_to_start_and_names_it(overrides, named):
     assert named in refusal(**overrides)
+
+
+# --- Compaction (IR-734) --------------------------------------------------------
+
+COMPACTION = dict(threshold_tokens=100_000, summary_tokens=2_000, keep_exchanges=2, max_attempts=2)
+
+
+def test_compaction_is_off_unless_configured():
+    assert build(settings()).executor.compaction is None
+
+
+def test_a_configured_compaction_reaches_the_agent():
+    service = build(settings(RUNS_AGENT_COMPACTION=json.dumps(COMPACTION)))
+    assert service.executor.compaction.threshold_tokens == 100_000
+
+
+@pytest.mark.parametrize("compaction", [
+    {**COMPACTION, "max_attempts": 0},
+    {"threshold_tokens": 100_000},
+    # No room left to summarize or to finish under the model's verified capacity.
+    {**COMPACTION, "threshold_tokens": 127_900},
+    {**COMPACTION, "summary_tokens": 9_000},
+])
+def test_an_invalid_compaction_refuses_to_start_and_names_it(compaction):
+    assert "RUNS_AGENT_COMPACTION" in refusal(RUNS_AGENT_COMPACTION=json.dumps(compaction))

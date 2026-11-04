@@ -252,9 +252,13 @@ class Investigation:
     def paper(self, handle) -> Optional[int]:
         return next((rid for rid, (h, _) in self.papers.items() if h == handle), None)
 
-    async def recall(self, state: dict) -> dict:
-        """Fresh handles for the papers the Conversation showed, still readable now."""
-        ids = [*state.get("shown", ()), *state.get("selected", ()), *state.get("excluded", ())]
+    async def recall(self, state: dict, *, also=()) -> dict:
+        """Fresh handles for the papers the Conversation showed, still readable now.
+
+        `also` names more Records to give handles to in the same read, such as
+        a compact handoff's (IR-734); the state message describes `state` only.
+        """
+        ids = [*state.get("shown", ()), *state.get("selected", ()), *state.get("excluded", ()), *also]
         if not ids:
             return {}
         found = await self.research.recall(list(dict.fromkeys(ids)))

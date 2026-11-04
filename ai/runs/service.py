@@ -132,6 +132,10 @@ class RunService:
             return False
         return True
 
+    async def _commit_handoff(self, claim: Claim, handoff) -> tuple:
+        """Commit a compact handoff under the claim's fence (IR-734)."""
+        return await self.store.commit_handoff(claim.run_id, claim.fence, handoff)
+
     async def execute(self, claim: Claim) -> None:
         """The run's tools read under the reader's stored grant (IR-719)."""
         run_id = claim.run_id
@@ -158,6 +162,8 @@ class RunService:
                         depth=claim.depth, prior=claim.prior, state=claim.state or {},
                         bounds=bounds, checkpoint=claim.checkpoint, spent=claim.spent or {},
                         save=lambda step, body: self._save(claim, step, body),
+                        handoff=claim.handoff, compactions=claim.compactions, committed=claim.committed,
+                        commit_handoff=lambda handoff: self._commit_handoff(claim, handoff),
                     ))
                 else:
                     result = await executor.answer(claim.question, tools)

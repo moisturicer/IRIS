@@ -42,6 +42,8 @@ class PriorTurn:
     question: str
     answer: str
     kind: str = "answer"
+    #: Its place in the Conversation, which a compact handoff refers to (IR-734).
+    ordinal: int | None = None
 
 
 @dataclass(frozen=True)
@@ -64,6 +66,15 @@ class RunContext:
     spent: dict = field(default_factory=dict)
     #: `await save(step, body)` stores a completed step; False once this fence lost the run.
     save: Optional[Callable[[int, dict], Awaitable[bool]]] = None
+    #: The Conversation's latest valid compact handoff: `revision`, `through_ordinal` and `body`;
+    #: `prior` then holds only the Turns after it (IR-734).
+    handoff: Optional[dict] = None
+    #: Summary attempts this run already made, over every fence; never renewed.
+    compactions: int = 0
+    #: Handoff revisions this run committed, which a checkpoint may name.
+    committed: frozenset = frozenset()
+    #: `await commit_handoff(handoff)` returns ("committed", revision), ("stale", None) or ("fenced", None).
+    commit_handoff: Optional[Callable[..., Awaitable[tuple]]] = None
 
 
 class Unavailable(Exception):
