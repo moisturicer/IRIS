@@ -2916,13 +2916,13 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.queryByRole("region", { name: "Record details" })).not.toBeInTheDocument();
   });
 
-  it("sets the reading sections apart with hairlines, and draws Comments last (IR-569)", async () => {
+  it("sets the reading sections apart with spacing, and draws Comments last (IR-569)", async () => {
     renderPaperView();
     await waitForRecord(record.title);
 
     const abstract = screen.getByRole("heading", { level: 2, name: "Abstract" }).closest("section");
     const group = abstract?.parentElement;
-    expect(group).toHaveClass("divide-y", "divide-stone-200");
+    expect(group).toHaveClass("space-y-12");
     const sections = within(group as HTMLElement).getAllByRole("heading", { level: 2 });
     expect(sections[sections.length - 1]).toHaveTextContent("Comments");
   });

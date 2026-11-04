@@ -1203,8 +1203,8 @@ export default function PaperViewPage() {
                   </div>
                 )}
 
-                {/* The reading sections, each under a hairline (IR-569). */}
-                <div className="border-t border-stone-200 divide-y divide-stone-200 [&>*]:py-8 [&>:last-child]:pb-0">
+                {/* Reading sections are separated by space. */}
+                <div className="space-y-12 pt-8">
                 {/* The abstract shares the reading column with its heading and actions. */}
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
@@ -1298,7 +1298,7 @@ export default function PaperViewPage() {
             >
               <aside
                 aria-labelledby={`${tabsId}-details`}
-                className="min-h-0 space-y-4 overflow-hidden border-t border-stone-200 pt-8 overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible overview-wide:border-t-0 overview-wide:pt-0"
+                className="min-h-0 space-y-4 overflow-hidden pt-8 overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible overview-wide:pt-0"
               >
                 <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
                   Record details
