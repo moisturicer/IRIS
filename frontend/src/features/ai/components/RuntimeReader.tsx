@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { activeRun, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
+import { activeRun, ProtocolMismatch, RELOAD_TO_RECONNECT, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import { ChatInput } from "./ChatInput";
 
 const STATES: Record<ReaderRun["state"], string> = {
@@ -31,6 +31,31 @@ export function ResearchProgress({ run }: { run: ReaderRun }) {
   </section>;
 }
 
+/** What went wrong, in the reader's terms, and whether reconnecting can help (IR-863). */
+interface Trouble { message: string; retry: boolean; missing?: boolean }
+
+function trouble(failure: unknown): Trouble {
+  if (failure instanceof ProtocolMismatch) return { message: failure.message, retry: false };
+  const response = isAxiosError(failure) ? failure.response : undefined;
+  const code = (response?.data as { status?: unknown } | undefined)?.status;
+  if (response?.status === 429 || (response?.status === 503 && code === "busy")) {
+    return { message: "IRIS is busy right now. Reconnect in a moment to try again.", retry: true };
+  }
+  if (response?.status === 401) return { message: "Your session has ended. Sign in again to continue.", retry: false };
+  if (response?.status === 403) {
+    return { message: "Ask IRIS can't open research for you right now.", retry: false };
+  }
+  if (response?.status === 404) {
+    return { message: "This conversation is not available. It may have been deleted, or the link may be wrong.",
+      retry: false, missing: true };
+  }
+  if (response?.status === 406) return { message: RELOAD_TO_RECONNECT, retry: false };
+  if (response && response.status >= 500) {
+    return { message: "Ask IRIS is unavailable right now. Reconnect to try again later.", retry: true };
+  }
+  return { message: "IRIS could not connect. Reconnect to try again.", retry: true };
+}
+
 interface Props {
   recordId?: number;
   conversationId?: string;
@@ -45,28 +70,28 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
   const [depth, setDepth] = useState<Depth>("ordinary");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<Trouble>();
   const generation = useRef(0);
   const pending = useRef<{ question: string; depth: Depth; key: string; conversation?: ReaderConversation }>();
   const sending = useRef(false);
 
-  const fail = useCallback(() => setError("IRIS could not connect or is busy. Reconnect to try again."), []);
+  const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
   const reopen = useCallback(async (id: string, version = generation.current) => {
     const next = await api.reopen(id);
     if (version !== generation.current) return;
     setConversation(next);
     setRun(next.runs[next.runs.length - 1]);
-    setError("");
+    setError(undefined);
   }, [api]);
 
   useEffect(() => {
     const version = ++generation.current;
-    setConversation(undefined); setRun(undefined); setError("");
+    setConversation(undefined); setRun(undefined); setError(undefined);
     pending.current = undefined;
     if (conversationId) {
       setBusy(true);
-      void reopen(conversationId, version).catch(() => {
-        if (version === generation.current) fail();
+      void reopen(conversationId, version).catch((failure) => {
+        if (version === generation.current) fail(failure);
       }).finally(() => { if (version === generation.current) setBusy(false); });
     }
     const epoch = generation;
@@ -82,7 +107,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
         if (version !== generation.current) return;
         setRun(next);
         if (!activeRun(next)) await reopen(next.conversation_id, version);
-      }).catch(() => { if (version === generation.current) fail(); });
+      }).catch((failure) => { if (version === generation.current) fail(failure); });
     }, 1000);
     return () => clearTimeout(timer);
   }, [api, run, error, fail, reopen]);
@@ -93,7 +118,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     if (!request) return;
     pending.current = request;
     sending.current = true;
-    setBusy(true); setError("");
+    setBusy(true); setError(undefined);
     const version = generation.current;
     try {
       const next = await api.submit(request.question, request.depth, request.key, request.conversation);
@@ -109,10 +134,17 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
         pending.current = undefined;
         setDraft(request.question);
         if (request.conversation) {
-          try { await reopen(request.conversation.id, version); } catch { fail(); }
+          try { await reopen(request.conversation.id, version); } catch (reopenFailure) { fail(reopenFailure); }
         }
-        if (version === generation.current) setError("This conversation changed. Reconnect, then send your question again.");
-      } else fail();
+        if (version === generation.current) {
+          setError({ message: "This conversation changed. Reconnect, then send your question again.", retry: true });
+        }
+      } else {
+        const next = trouble(failure);
+        // Only a request that may still succeed is kept for Reconnect.
+        if (!next.retry) pending.current = undefined;
+        setError(next);
+      }
     }
     finally {
       sending.current = false;
@@ -127,10 +159,10 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     try {
       const next = await api.stop(run.id);
       if (version !== generation.current) return;
-      setRun(next); setError("");
+      setRun(next); setError(undefined);
       // A final answer can win the Stop race. Reopen that committed outcome.
       if (next.state === "completed") await reopen(next.conversation_id, version);
-    } catch { if (version === generation.current) fail(); }
+    } catch (failure) { if (version === generation.current) fail(failure); }
     finally { if (version === generation.current) setBusy(false); }
   };
 
@@ -139,7 +171,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     const id = run?.conversation_id ?? conversationId;
     if (!id) return;
     setBusy(true);
-    try { await reopen(id); } catch { fail(); }
+    try { await reopen(id); } catch (failure) { fail(failure); }
     finally { setBusy(false); }
   };
 
@@ -167,8 +199,9 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
         {run && !conversation?.runs.some(item => item.id === run.id) && <ResearchProgress run={run} />}
         {busy && !run && <p role="status">Connecting to Ask IRIS…</p>}
         {error && <div role="alert" className="space-y-2 text-sm text-stone-700">
-          <p>{error}</p>
-          <button type="button" disabled={busy} onClick={() => void reconnect()} className="min-h-11 underline text-brand">Reconnect</button>
+          <p>{error.message}</p>
+          {error.retry && <button type="button" disabled={busy} onClick={() => void reconnect()} className="min-h-11 underline text-brand">Reconnect</button>}
+          {error.missing && <Link to="/ai" className="inline-flex min-h-11 items-center underline text-brand">Start a new conversation</Link>}
         </div>}
         {run && activeRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
           className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">Stop research</button>}

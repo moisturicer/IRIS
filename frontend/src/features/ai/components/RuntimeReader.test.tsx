@@ -41,7 +41,8 @@ test("reader sees persisted work, stops by keyboard and chooses thoroughness for
 
 test("a busy submission can reconnect with the same request identity and Paper Chat scope", async () => {
   const user = userEvent.setup();
-  const post = vi.spyOn(apiClient, "post").mockRejectedValueOnce(new Error("busy"))
+  const post = vi.spyOn(apiClient, "post").mockRejectedValueOnce(
+    { isAxiosError: true, response: { status: 503, data: { status: "busy" } } })
     .mockResolvedValue({ data: { protocol: "runs-reader-1", id: "r", conversation_id: "c",
       state: "queued", plan: null, context: null, capabilities: { manual_compaction: false } } });
   vi.spyOn(apiClient, "get").mockResolvedValue({ data: {

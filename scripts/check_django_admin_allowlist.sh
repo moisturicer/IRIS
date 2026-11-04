@@ -13,8 +13,6 @@ html=$(mktemp -d)
 # mktemp makes it private, and the container's nginx is another user.
 chmod 755 "$html"
 echo '<!doctype html><title>IRIS</title>' > "$html/index.html"
-printf false > "$html/runtime-reader-enabled"
-chmod 644 "$html/runtime-reader-enabled"
 html_mount=$(cd "$html" && { pwd -W 2>/dev/null || pwd; })
 failed=0
 
@@ -29,7 +27,6 @@ run_nginx() {
     docker run --add-host backend:127.0.0.1 --add-host ai-gateway:127.0.0.1 $mode "$@" \
         -v "$root/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro" \
         -v "$root/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro" \
-        -v "$html_mount/runtime-reader-enabled:/etc/nginx/iris/runtime-reader-enabled:ro" \
         -v "$root/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro" \
         -v "$root/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro" \
         -v "$html_mount:/usr/share/nginx/html:ro" \

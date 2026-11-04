@@ -40,7 +40,7 @@ import { SourceContextPanel, SourcePassages } from "./components/SourceContextPa
 import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useConversationClient } from "./conversation/useConversationClient";
-import { runtimeReaderEnabled } from "@/api/runtimeReader";
+import { useReaderPath } from "@/api/runtimeReader";
 import { RuntimeReader } from "./components/RuntimeReader";
 
 /** History or sources: the two panels that sit beside the answer, or open over it (IR-570). */
@@ -86,7 +86,11 @@ function useLegacyConversationsNotice() {
 
 export default function RAGChatPage() {
   const rawId = useParams().conversationId;
-  if (runtimeReaderEnabled && (!rawId || /^[0-9a-f-]{36}$/i.test(rawId))) return <RuntimeAskPage />;
+  // The server's switch decides the path (IR-863). Neither page mounts before
+  // it is known, so the Django page's requests are exactly what they were.
+  const path = useReaderPath();
+  if (!path) return <p role="status" className="p-6 text-sm text-stone-600">Opening Ask IRIS…</p>;
+  if (path === "runtime" && (!rawId || /^[0-9a-f-]{36}$/i.test(rawId))) return <RuntimeAskPage />;
   return <LegacyRAGChatPage />;
 }
 

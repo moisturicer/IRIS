@@ -4,6 +4,7 @@ Outcomes: 404 missing or foreign, 409 `ended`, 403 `unauthorized`,
 200 `unavailable` (ADR-008) for anything else.
 """
 
+from django.conf import settings
 from django.http import Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -93,6 +94,10 @@ class RuntimeEdgeGrantView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
+        if not settings.AI_RUNTIME_READER:
+            # The switch is the deployment's, so the edge refuses rather than
+            # letting a browser reach the runtime on its own (IR-863).
+            return Response(status=403)
         raw = request.headers.get("X-IRIS-Record")
         record_id = None
         if raw:
@@ -109,3 +114,17 @@ class RuntimeEdgeGrantView(APIView):
         return Response(status=204, headers={
             "X-IRIS-Reader-Grant": result.data["grant"], "Cache-Control": "no-store",
         })
+
+
+class ReaderPathView(APIView):
+    """Which path answers this deployment's Ask IRIS questions (IR-863).
+
+    `runtime` or `django`, from `AI_RUNTIME_READER` alone: nothing the request
+    carries changes it.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        path = "runtime" if settings.AI_RUNTIME_READER else "django"
+        return Response({"path": path}, headers={"Cache-Control": "no-store"})
