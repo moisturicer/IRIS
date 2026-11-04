@@ -201,7 +201,7 @@ def test_counts_focus_plan_and_seen_evidence_survive_the_round_trip():
     found.tool_calls, found.reads, found.searched = 2, 1, True
 
     class Spent:
-        input, output, reported = 10, 5, 15
+        input, output, reported, attempts = 10, 5, 15, 2
 
     body = json.loads(json.dumps(checkpoint.dump(
         pin=PIN, bounds=ORDINARY, task="t", history=[], investigation=found, budget=Spent, steps=1, stale=0)))
@@ -212,5 +212,5 @@ def test_counts_focus_plan_and_seen_evidence_survive_the_round_trip():
                  "plan_revision", "seen", "tool_calls", "reads", "searched"):
         assert getattr(again, name) == getattr(found, name), name
     assert restored.counted() == [4, 5, 6]
-    assert restored.budget == {"input": 10, "output": 5, "reported": 15}
+    assert restored.budget == {"input": 10, "output": 5, "reported": 15, "attempts": 2}
     assert dataclasses.asdict(ORDINARY) == body["bounds"]

@@ -393,7 +393,8 @@ class RunStore:
         )
         # Every fence's attempts, including one a dead worker left open (IR-725).
         spent = await conn.fetchrow(
-            """SELECT coalesce(sum(charge_input_tokens), 0) AS input_tokens,
+            """SELECT coalesce(sum(charge_attempts), 0) AS attempts,
+                      coalesce(sum(charge_input_tokens), 0) AS input_tokens,
                       coalesce(sum(charge_output_tokens), 0) AS output_tokens
                  FROM public.ai_providerreservation WHERE run_key = $1""",
             run_key(run_id),

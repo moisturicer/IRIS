@@ -177,7 +177,8 @@ def dump(*, pin: Pin, bounds, task: str, history, investigation: Investigation, 
         "format": FORMAT,
         "pin": pin.as_dict(), "bounds": asdict(bounds) if bounds is not None else None,
         "task": task, "steps": steps, "stale": stale,
-        "budget": {"input": budget.input, "output": budget.output, "reported": budget.reported},
+        "budget": {"input": budget.input, "output": budget.output, "reported": budget.reported,
+                   "attempts": budget.attempts},
         "history": [_entry(e) for e in history],
         "investigation": _investigation(investigation),
     }
@@ -194,7 +195,7 @@ def load(body, *, pin: Pin, bounds, task: str) -> Optional[Restored]:
     try:
         history = [_load_entry(e) for e in body["history"]]
         restored = Restored(history=history, steps=int(body["steps"]), stale=int(body["stale"]),
-                            budget={k: int(body["budget"][k]) for k in ("input", "output", "reported")},
+                            budget={k: int(body["budget"][k]) for k in ("input", "output", "reported", "attempts")},
                             investigation=body["investigation"])
         # Parsed in full now, so a malformed body is refused before anything is applied.
         _restore_investigation(Investigation(None), restored.investigation)

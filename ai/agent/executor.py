@@ -207,7 +207,8 @@ class _Run:
         self.steps = 0
         # Whatever an earlier fence spent stays spent, the attempt it left uncertain included (IR-724).
         spent = context.spent or {}
-        self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0))
+        self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0),
+                            attempts=spent.get("attempts", 0))
         self.task = checkpoint.task_key(question, context.prior, context.state or {})
 
     def request(self, history, *, closed=False) -> AgentRequest:
@@ -290,7 +291,8 @@ class _Run:
             return None
         restored.apply(self.investigation)
         self.steps = max(self.steps, restored.steps)
-        self.budget.restore(restored.budget["input"], restored.budget["output"], restored.budget["reported"])
+        spent = restored.budget
+        self.budget.restore(spent["input"], spent["output"], spent["reported"], spent["attempts"])
         await self._journal("recovery", {"outcome": "resumed", "step": self.steps})
         return restored.history, restored.stale
 
