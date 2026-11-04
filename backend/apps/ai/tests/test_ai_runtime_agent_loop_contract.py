@@ -408,6 +408,39 @@ def test_a_second_invalid_draft_keeps_only_sentences_supported_on_their_own_and_
     assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair"]
 
 
+def test_a_citation_after_the_full_stop_stays_with_its_sentence_and_never_stands_alone():
+    p1 = handle("P", 1)
+    bad = f"Rainfall gauges fed the network. [{p1}] It predicted 912 floods. [{p1}]"
+    provider = recording(tools(call("a", "search", query="flood")), reply(bad), reply(bad))
+    result, _ = ask(provider)
+    assert result.answer == f"Rainfall gauges fed the network. [1]\n\n{LIMITATION}"
+
+
+def test_without_a_repair_reserve_the_first_draft_keeps_its_supported_sentences():
+    no_repair = dataclasses.replace(RESERVES, repair_tokens=0)
+    draft = f"It predicted 87 floods [{handle('P', 1)}]. It predicted 912 more [{handle('P', 1)}]."
+    provider = recording(tools(call("a", "search", query="flood")), reply(draft), reply("Never sent."))
+    result = run(AgentExecutor(provider, PIN, no_repair, profiles=PROFILES).answer("q", Corpus(), context()))
+    assert result.answer == f"It predicted 87 floods [1].\n\n{LIMITATION}"
+    assert len(provider.requests) == 2
+
+
+def test_access_revoked_during_the_repair_ends_the_run_without_delivery():
+    corpus = Corpus()
+
+    def revoke_then_answer(payload):
+        async def unauthorized(passage):
+            return ToolResult.unavailable("unauthorized")
+        corpus.open_passage = unauthorized
+        return reply(f"It predicted 87 floods [{handle('P', 1)}].")
+
+    provider = recording(tools(call("a", "search", query="flood")),
+                         reply(f"It predicted 912 floods [{handle('P', 1)}]."), revoke_then_answer)
+    with pytest.raises(Unavailable) as refused:
+        ask(provider, corpus)
+    assert refused.value.code == "unauthorized"
+
+
 def test_a_truncated_repair_falls_back_to_what_the_first_draft_supports():
     first = f"It predicted 87 floods [{handle('P', 1)}]. It predicted 912 more."
     provider = recording(tools(call("a", "search", query="flood")), reply(first), reply("Half", finish="length"))

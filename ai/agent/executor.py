@@ -242,7 +242,9 @@ class _Run:
         request, status = self.agent.estimate(self.request(history, closed=True))
         if not self.budget.can_finish(status.occupancy_tokens, request.max_output_tokens, self.agent.reserves):
             raise Unavailable("allowance_exhausted")
-        return await self._deliver(await self._attempt(request, status, "final"), history)
+        turn = await self._attempt(request, status, "final")
+        history.append(turn)
+        return await self._deliver(turn, history)
 
     def _may_gather(self, stale: int) -> bool:
         return (self.steps < self.bounds.max_steps
@@ -275,7 +277,7 @@ class _Run:
         log.info("agent draft refused: %s", ",".join(sorted(found)))
         # A source that changed since it was read fences delivery; it is never repaired around.
         await self._recheck(text)
-        repaired = await self._repair(turn, history, found)
+        repaired = await self._repair(history, found)
         if repaired is not None:
             again = self._findings(repaired)
             if not again:
@@ -291,12 +293,11 @@ class _Run:
                 return await self._commit(partial)
         raise Unavailable("invalid_draft")
 
-    async def _repair(self, turn: ModelTurn, history: list, found) -> Optional[str]:
+    async def _repair(self, history: list, found) -> Optional[str]:
         """One more turn in the same Conversation, inside the reserve held for it; None if it cannot."""
         if not self.agent.reserves.repair_tokens:
             return None
-        if not history or history[-1] is not turn:
-            history = [*history, turn]
+        # `history` already ends with the draft; the feedback follows it.
         history = [*history, User(assurance.feedback(found))]
         request, status = self.agent.estimate(self.request(history, closed=True))
         if not self.budget.fits([(status.occupancy_tokens, request.max_output_tokens)]):
@@ -331,7 +332,7 @@ class _Run:
         return assurance.findings(text, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
 
     def _checked(self, text: str) -> None:
-        """For text delivered without repair: a failing check is never delivered."""
+        """A clarification or a salvaged answer that fails a check is never delivered."""
         failures = sorted(self._findings(text))
         if failures:
             log.info("agent draft refused: %s", ",".join(failures))

@@ -138,7 +138,21 @@ def feedback(found: dict[str, list[str]]) -> str:
 
 _LINE = re.compile(r"\n+")
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
+_LEADING_CITES = re.compile(r"(?:\[P[0-9a-f]{20}\]\s*)+")
 LIMITATION = "Part of the drafted answer could not be checked against its sources and was left out."
+
+
+def _sentences(line: str) -> list[str]:
+    """Sentences, each keeping citations placed after its full stop; a citation never stands alone."""
+    units: list[str] = []
+    for piece in _SENTENCE.split(line.strip()):
+        lead = _LEADING_CITES.match(piece)
+        if lead and units:
+            units[-1] = f"{units[-1]} {lead.group().strip()}"
+            piece = piece[lead.end():]
+        if piece.strip():
+            units.append(piece)
+    return units
 
 
 def supported_units(text: str, investigation: Investigation, *, prior=(), excluded=()) -> Optional[str]:
@@ -148,7 +162,7 @@ def supported_units(text: str, investigation: Investigation, *, prior=(), exclud
     """
     lines = []
     for line in _LINE.split(text.strip()):
-        kept = [unit for unit in _SENTENCE.split(line.strip())
+        kept = [unit for unit in _sentences(line)
                 if cited(unit) and not check(unit, investigation, prior=prior, excluded=excluded)]
         if kept:
             lines.append(" ".join(kept))
