@@ -80,7 +80,7 @@ def test_a_committed_handoff_opens_the_next_run_and_the_original_turns_stay(runt
     # Compaction removes nothing from the Conversation's own history.
     assert turn_count(conversation) == 4
 
-    _, later = follow_up(runtime, grant, "compact-next-2", conversation, 4)
+    _, later = follow_up(runtime, grant, "compact-next-later", conversation, 4)
     assert later.handoff["revision"] == 1 and later.handoff["through_ordinal"] == 2
     assert later.handoff["body"]["excluded"] == [1]
     # Only the Turns after it are carried whole, with their places in the Conversation.
@@ -134,7 +134,7 @@ def test_a_handoff_on_a_replaced_source_is_never_activated(runtime):
 
     # The paper is replaced: the summary written from the old one no longer opens the Conversation.
     write_source(flood, {4: [("Methods", "replaced text")]}, "2")
-    _, later = follow_up(runtime, grant, "compact-source-2", conversation, 4)
+    _, later = follow_up(runtime, grant, "compact-source-later", conversation, 4)
     assert later.handoff is None
     assert [t.ordinal for t in later.prior] == [1, 2, 3, 4]
 
@@ -146,7 +146,7 @@ def test_a_failed_runs_handoff_never_opens_a_later_run(runtime):
     assert run(store.commit_handoff(row["id"], claim.fence, handoff())) == ("committed", 1)
     run(store.fail(row["id"], claim.fence, "unavailable"))
 
-    _, later = follow_up(runtime, grant, "compact-failed-2", conversation, 2)
+    _, later = follow_up(runtime, grant, "compact-failed-later", conversation, 2)
     assert later.handoff is None and [t.ordinal for t in later.prior] == [1, 2]
 
 
