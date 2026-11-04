@@ -33,8 +33,8 @@ class SubmitRequest(BaseModel):
     conversation_id: uuid.UUID | None = None
     #: The Conversation revision the question was asked against.
     base_revision: int | None = Field(default=None, ge=0)
-    #: "deep" asks for the larger configured profile (ADR-049 §16).
-    depth: Literal["ordinary", "deep"] = "ordinary"
+    #: The larger configured profile unless the reader chooses "ordinary" (ADR-049 §16 as amended).
+    depth: Literal["ordinary", "deep"] = runs_config.DEFAULT_DEPTH
 
 
 @functools.cache
