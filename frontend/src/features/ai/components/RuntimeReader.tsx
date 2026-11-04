@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { activeRun, ProtocolMismatch, RELOAD_TO_RECONNECT, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
+import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import { ChatInput } from "./ChatInput";
 
 const STATES: Record<ReaderRun["state"], string> = {
@@ -31,6 +31,34 @@ export function ResearchProgress({ run }: { run: ReaderRun }) {
     {run.compaction && run.compaction.compactions > 0 && <p className="mt-1 text-xs">
       Earlier conversation was condensed into a summary to make room. The original answers are kept, and a
       summary is never used as a source for exact details.</p>}
+  </section>;
+}
+
+const COMPACTION_HELP = "Condenses older answers into a summary to make room. Original answers are kept.";
+
+/** A compaction's status: the same words live, reconnected and reopened, and never an internal (IR-754). */
+export function CompactionStatus({ run }: { run: ReaderRun }) {
+  const done = run.state === "completed";
+  const message = activeRun(run) ? "Compacting conversation"
+    : done && run.compaction?.last === "kept" ? "Nothing older to condense yet"
+    : done ? "Conversation compacted"
+    : run.state === "cancelled" ? "Compaction stopped"
+    : run.state === "conflict" ? "Conversation changed"
+    : run.state === "deleted" ? "Conversation removed"
+    : "Compaction unavailable";
+  return <section aria-label="Conversation compaction" className="min-w-0 border-l-2 border-brand/30 pl-4 py-1 text-sm text-stone-600">
+    <p role="status" aria-live="polite" className="font-medium text-stone-900">{message}</p>
+    {activeRun(run) && run.awaiting_reader && <p>Reconnect to continue.</p>}
+    {activeRun(run) && <p>The conversation stays as it is until this finishes. You can stop it.</p>}
+    {done && run.compaction?.last === "compacted" && <p>
+      Earlier answers were condensed into a summary to make room. Original answers are kept, and asking for an
+      exact detail checks them, since a summary is never a source.</p>}
+    {done && run.compaction?.last === "kept" && <p>Your conversation is unchanged.</p>}
+    {(run.state === "failed" || run.state === "expired" || run.state === "cancelled") && <p>Your conversation is unchanged.</p>}
+    {run.state === "conflict" && <p>Reconnect, then compact again.</p>}
+    {run.state !== "deleted" && <p className="mt-2 text-xs">{run.context
+      ? `Estimated context: ${run.context.used_tokens.toLocaleString()} of ${run.context.capacity_tokens.toLocaleString()} tokens`
+      : "Context estimate unavailable"}</p>}
   </section>;
 }
 
@@ -76,6 +104,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
   const [error, setError] = useState<Trouble>();
   const generation = useRef(0);
   const pending = useRef<{ question: string; depth: Depth; key: string; conversation?: ReaderConversation }>();
+  const pendingCompact = useRef<{ key: string; conversation: ReaderConversation }>();
   const sending = useRef(false);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
@@ -85,12 +114,13 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     setConversation(next);
     setRun(next.runs[next.runs.length - 1]);
     setError(undefined);
+    return next;
   }, [api]);
 
   useEffect(() => {
     const version = ++generation.current;
     setConversation(undefined); setRun(undefined); setError(undefined);
-    pending.current = undefined;
+    pending.current = undefined; pendingCompact.current = undefined;
     if (conversationId) {
       setBusy(true);
       void reopen(conversationId, version).catch((failure) => {
@@ -155,6 +185,45 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     }
   };
 
+  /** The reader asks to condense the conversation: one run, however many times it is clicked. */
+  const compact = async (retry = false) => {
+    if (sending.current) return;
+    const request = retry ? pendingCompact.current
+      : conversation && { key: crypto.randomUUID(), conversation };
+    if (!request) return;
+    pendingCompact.current = request;
+    sending.current = true;
+    setBusy(true); setError(undefined);
+    const version = generation.current;
+    try {
+      const next = await api.compact(request.conversation, request.key);
+      if (version !== generation.current) return;
+      pendingCompact.current = undefined;
+      setRun(next);
+      await reopen(next.conversation_id, version);
+    } catch (failure) {
+      if (version !== generation.current) return;
+      if (isAxiosError(failure) && failure.response?.status === 409) {
+        // Another run is active, or the conversation moved on: show what is true now, not a guess.
+        pendingCompact.current = undefined;
+        try {
+          const latest = await reopen(request.conversation.id, version);
+          const last = latest?.runs[latest.runs.length - 1];
+          if (version === generation.current && !(last && activeRun(last))) {
+            setError({ message: "This conversation changed. Reconnect, then compact it again.", retry: true });
+          }
+        } catch (reopenFailure) { fail(reopenFailure); }
+      } else {
+        const next = trouble(failure);
+        if (!next.retry) pendingCompact.current = undefined;
+        setError(next);
+      }
+    } finally {
+      sending.current = false;
+      if (version === generation.current) setBusy(false);
+    }
+  };
+
   const stop = async () => {
     if (!run) return;
     const version = ++generation.current;
@@ -171,12 +240,17 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
 
   const reconnect = async () => {
     if (pending.current) return send(pending.current.question, true);
+    if (pendingCompact.current) return compact(true);
     const id = run?.conversation_id ?? conversationId;
     if (!id) return;
     setBusy(true);
     try { await reopen(id); } catch (failure) { fail(failure); }
     finally { setBusy(false); }
   };
+
+  // Only where the deployment can condense, once there is something to condense, and never beside an active run.
+  const canCompact = !!conversation && conversation.turns.length > 0 && !error && !!run
+    && !activeRun(run) && run.capabilities?.manual_compaction === true;
 
   return <div className="flex h-full min-h-0 min-w-0 flex-col bg-canvas">
     <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 sm:px-6">
@@ -185,6 +259,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
         {conversation?.runs.map(item => {
           const turn = conversation.turns.find(t => t.run_id === item.id);
           const current = item.id === run?.id ? run : item;
+          if (compactionRun(item)) return <CompactionStatus key={item.id} run={current} />;
           return <article key={item.id} aria-label="Research question" className="min-w-0 space-y-4">
             <p className="font-medium text-stone-900 [overflow-wrap:anywhere]">{item.question}</p>
             <ResearchProgress run={current} />
@@ -199,7 +274,8 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
             </div>}
           </article>;
         })}
-        {run && !conversation?.runs.some(item => item.id === run.id) && <ResearchProgress run={run} />}
+        {run && !conversation?.runs.some(item => item.id === run.id)
+          && (compactionRun(run) ? <CompactionStatus run={run} /> : <ResearchProgress run={run} />)}
         {busy && !run && <p role="status">Connecting to Ask IRIS…</p>}
         {error && <div role="alert" className="space-y-2 text-sm text-stone-700">
           <p>{error.message}</p>
@@ -207,9 +283,16 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
           {error.missing && <Link to="/ai" className="inline-flex min-h-11 items-center underline text-brand">Start a new conversation</Link>}
         </div>}
         {run && activeRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
-          className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">Stop research</button>}
+          className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
+          {compactionRun(run) ? "Stop compaction" : "Stop research"}</button>}
       </div>
     </div>
+    {canCompact && <div className="mx-auto flex w-full max-w-3xl flex-wrap items-center gap-x-4 gap-y-1 px-4 pt-2 text-sm text-stone-700">
+      <button type="button" disabled={busy} onClick={() => void compact()} aria-describedby="compact-help"
+        className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand disabled:opacity-60">
+        Compact conversation</button>
+      <p id="compact-help" className="min-w-0 flex-1 basis-56 text-xs text-stone-600">{COMPACTION_HELP}</p>
+    </div>}
     <label className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-2 text-sm text-stone-700">
       <input type="checkbox" checked={depth === "deep"} onChange={e => setDepth(e.target.checked ? "deep" : "ordinary")}
         className="h-4 w-4 accent-brand" /> Thorough research

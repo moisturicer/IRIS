@@ -30,7 +30,7 @@ from typing import Mapping
 import asyncpg
 
 from ai.admission.scope import run_key
-from ai.runs.executor import PriorTurn, Result
+from ai.runs.executor import Compacted, PriorTurn, Result
 
 APP_NAME = "iris-ai-runs"
 ACTIVE = ("queued", "running")
@@ -172,12 +172,12 @@ class Claim:
     committed: frozenset = frozenset()
 
 
-def request_hash(question: str, conversation_id, base_revision) -> str:
-    body = json.dumps(
-        {"q": question, "c": str(conversation_id) if conversation_id else None, "r": base_revision},
-        sort_keys=True,
-    )
-    return hashlib.sha256(body.encode()).hexdigest()
+def request_hash(question: str | None, conversation_id, base_revision, *, compaction: bool = False) -> str:
+    body = {"q": question, "c": str(conversation_id) if conversation_id else None, "r": base_revision}
+    if compaction:
+        # An Ask's identity is unchanged; a compaction can never replay as one under the same key (IR-754).
+        body["k"] = "compact"
+    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
 class RunStore:
@@ -238,16 +238,22 @@ class RunStore:
         if not alive:
             raise NotFound
 
-    async def admit(self, grant, *, key: str, question: str, conversation_id, base_revision,
+    async def admit(self, grant, *, key: str, question: str | None, conversation_id, base_revision,
                     deadline_seconds: int, allowance: dict, pinned: dict, depth: str = "ordinary",
                     max_queued: int | None = None,
-                    max_active_per_reader: int | None = None) -> tuple[dict, bool]:
+                    max_active_per_reader: int | None = None,
+                    compaction: bool = False) -> tuple[dict, bool]:
         """The run for this request identity, and whether it is new.
 
         The queued run is committed before this returns; a caller notifies
         workers only afterwards. Raises Busy when a population is full.
+
+        `compaction` admits the reader's request to condense an existing
+        Conversation (IR-754): a run of its own, with no question and no Turn,
+        under the same rules as an Ask -- one active run per Conversation, the
+        revision the reader saw, the population bounds -- and its own allowance.
         """
-        digest = request_hash(question, conversation_id, base_revision)
+        digest = request_hash(question, conversation_id, base_revision, compaction=compaction)
         bounds = (max_queued, max_active_per_reader)
         async with self._connect() as conn:
             for _ in range(2):
@@ -255,7 +261,7 @@ class RunStore:
                     async with conn.transaction():
                         return await self._admit(
                             conn, grant, key, question, conversation_id, base_revision,
-                            digest, deadline_seconds, allowance, pinned, depth, bounds,
+                            digest, deadline_seconds, allowance, pinned, depth, bounds, compaction,
                         )
                 except _Raced:
                     continue
@@ -278,7 +284,7 @@ class RunStore:
             raise Busy("queue_full")
 
     async def _admit(self, conn, grant, key, question, conversation_id, base_revision,
-                     digest, deadline_seconds, allowance, pinned, depth, bounds):
+                     digest, deadline_seconds, allowance, pinned, depth, bounds, compaction=False):
         claims = await self._verify(conn, grant)
         reader, scope = self._reader(claims)
         existing = await conn.fetchrow(
@@ -296,6 +302,9 @@ class RunStore:
                 raise Conflict("request_mismatch")
             return dict(existing), False
         if conversation_id is None:
+            if compaction:
+                # There is nothing to condense in a Conversation that does not exist.
+                raise NotFound
             conversation_id = uuid.uuid4()
             await conn.execute(
                 "INSERT INTO iris_ai.conversation (id, reader_id, scope_record_id) VALUES ($1, $2, $3)",
@@ -629,6 +638,42 @@ class RunStore:
                     return "stale", None
                 return "committed", inserted
 
+    async def _finishing(self, conn, run_id, fence: int):
+        """Lock the Conversation and run to finish the run; `(run, conversation, ended)`.
+
+        `ended` is the terminal state when nothing may be written: the run had
+        already ended, or this call ended it because the Conversation, reader
+        or deadline no longer allows its result. A superseded fence raises
+        Fenced. Otherwise `ended` is None and the result may be committed.
+        """
+        conversation_id = await conn.fetchval(
+            "SELECT conversation_id FROM iris_ai.ask_run WHERE id = $1", run_id,
+        )
+        if conversation_id is None:
+            raise NotFound
+        conversation = await conn.fetchrow(
+            "SELECT revision, deleted_at FROM iris_ai.conversation WHERE id = $1 FOR UPDATE",
+            conversation_id,
+        )
+        run = await conn.fetchrow(
+            f"SELECT {RUN_COLUMNS}, now() AS now FROM iris_ai.ask_run WHERE id = $1 FOR UPDATE",
+            run_id,
+        )
+        if run["state"] in TERMINAL:
+            return run, conversation, run["state"]
+        if run["fence"] != fence:
+            raise Fenced
+        if conversation["deleted_at"] is not None:
+            return run, conversation, await self._end(conn, run_id, "deleted", "conversation_deleted")
+        reader = await conn.fetchval("SELECT iris_authz.reader_status($1)", run["reader_id"])
+        if reader != "active":
+            return run, conversation, await self._end(conn, run_id, "cancelled", "reader_departed")
+        if run["deadline_at"] <= run["now"]:
+            return run, conversation, await self._end(conn, run_id, "expired", "deadline")
+        if conversation["revision"] != run["base_revision"]:
+            return run, conversation, await self._end(conn, run_id, "conflict", "revision_moved")
+        return run, conversation, None
+
     async def commit_final(self, run_id, fence: int, result: Result) -> str:
         """Turn, citations, Conversation revision and terminal journal, atomically.
 
@@ -637,32 +682,10 @@ class RunStore:
         """
         async with self._connect() as conn:
             async with conn.transaction():
-                conversation_id = await conn.fetchval(
-                    "SELECT conversation_id FROM iris_ai.ask_run WHERE id = $1", run_id,
-                )
-                if conversation_id is None:
-                    raise NotFound
-                conversation = await conn.fetchrow(
-                    "SELECT revision, deleted_at FROM iris_ai.conversation WHERE id = $1 FOR UPDATE",
-                    conversation_id,
-                )
-                run = await conn.fetchrow(
-                    f"SELECT {RUN_COLUMNS}, now() AS now FROM iris_ai.ask_run WHERE id = $1 FOR UPDATE",
-                    run_id,
-                )
-                if run["state"] in TERMINAL:
-                    return run["state"]
-                if run["fence"] != fence:
-                    raise Fenced
-                if conversation["deleted_at"] is not None:
-                    return await self._end(conn, run_id, "deleted", "conversation_deleted")
-                reader = await conn.fetchval("SELECT iris_authz.reader_status($1)", run["reader_id"])
-                if reader != "active":
-                    return await self._end(conn, run_id, "cancelled", "reader_departed")
-                if run["deadline_at"] <= run["now"]:
-                    return await self._end(conn, run_id, "expired", "deadline")
-                if conversation["revision"] != run["base_revision"]:
-                    return await self._end(conn, run_id, "conflict", "revision_moved")
+                run, conversation, ended = await self._finishing(conn, run_id, fence)
+                if ended is not None:
+                    return ended
+                conversation_id = run["conversation_id"]
 
                 turn_id = uuid.uuid4()
                 ordinal = conversation["revision"] + 1
@@ -688,6 +711,26 @@ class RunStore:
                 )
                 return await self._end(
                     conn, run_id, "completed", "answered", reported_units=result.reported_units,
+                )
+
+    async def commit_compaction(self, run_id, fence: int, result: Compacted) -> str:
+        """End a manual compaction run (IR-754): `completed`, with no Turn and no new revision.
+
+        Its handoff, if any, was committed by `commit_handoff` under this fence,
+        and a later run opens with it only now that this run has completed.
+        The gates are `commit_final`'s: a Stop, deletion, departed reader,
+        deadline or moved revision ends it as that, and a handoff of a run
+        that did not complete is never used. Fenced like a commit.
+        """
+        async with self._connect() as conn:
+            async with conn.transaction():
+                _, _, ended = await self._finishing(conn, run_id, fence)
+                if ended is not None:
+                    return ended
+                return await self._end(
+                    conn, run_id, "completed",
+                    "compacted" if result.revision is not None else "nothing_to_compact",
+                    reported_units=result.reported_units,
                 )
 
     async def fail(self, run_id, fence: int, reason: str) -> None:
