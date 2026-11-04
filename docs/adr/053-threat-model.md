@@ -53,7 +53,7 @@ STRIDE means Spoofing, Tampering, Repudiation, Information disclosure, Denial of
 | T | Traffic altered in transit | Caddy serves HTTPS, and nginx isn't published ([IR-847](https://citiris.atlassian.net/browse/IR-847), ADR-057). Gap: not yet run on a deployed domain |
 | R | Denying a sign-in or an act | Insert-only audit log ([IR-166](https://citiris.atlassian.net/browse/IR-166)), workflow events ([IR-144](https://citiris.atlassian.net/browse/IR-144)). Gap: refused sign-ins aren't audited ([IR-659](https://citiris.atlassian.net/browse/IR-659)) |
 | I | Reading a record or file by guessing its id | One `visible_to` predicate ([IR-153](https://citiris.atlassian.net/browse/IR-153)), route matrix ([IR-615](https://citiris.atlassian.net/browse/IR-615), [IR-616](https://citiris.atlassian.net/browse/IR-616)), no public `/media/` ([IR-152](https://citiris.atlassian.net/browse/IR-152)) |
-| I | Script injection reading tokens | React escaping, report-only CSP. Gap: enforce it ([IR-823](https://citiris.atlassian.net/browse/IR-823)). Gap: unpinned CDN stylesheet ([IR-822](https://citiris.atlassian.net/browse/IR-822)) |
+| I | Script injection reading tokens | React escaping, report-only CSP. Gap: enforce it ([IR-823](https://citiris.atlassian.net/browse/IR-823)). CDN stylesheet pinned with SRI; built-page icon check pending ([IR-822](../testing/traceability/IR-822.md)) |
 | I | Cached responses on a shared computer | Gap: [IR-821](https://citiris.atlassian.net/browse/IR-821) |
 | D | Request floods, huge uploads | Rate limits, 50 MB upload limit |
 | E | Role escalation through the API | Application role only ([IR-165](https://citiris.atlassian.net/browse/IR-165)), route matrix |
