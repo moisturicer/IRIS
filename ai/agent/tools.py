@@ -15,7 +15,8 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from ai.agent.protocol import ToolCall, ToolSpec
-from ai.research.tools import OK, PARTIAL, PassageRef, ToolResult as Evidence
+from ai.research import metadata
+from ai.research.tools import OK, PARTIAL, Count, PassageRef, ToolResult as Evidence
 
 PLAN_STEPS = 12
 FOCUS_PAPERS = 20
@@ -56,7 +57,28 @@ ASK_CLARIFICATION = ToolSpec(
     "ask_clarification", "Ask the reader one question when ambiguity blocks useful research.",
     _object({"question": {"type": "string"}}, ["question"]))
 
+RESOLVE_PAPERS = ToolSpec(
+    "resolve_papers",
+    "Turn papers the reader named, by title, short name or Record id, into paper handles. "
+    "Several matches come back as candidates to ask the reader about.", _object({
+        "references": {"type": "array", "maxItems": metadata.MAX_REFERENCES, "items": {"type": "string"}},
+        "record_ids": {"type": "array", "maxItems": metadata.MAX_REFERENCES, "items": {"type": "integer"}},
+    }))
+_NAME = {"type": "string"}
+_YEAR = {"type": "integer", "minimum": metadata.YEAR_RANGE[0], "maximum": metadata.YEAR_RANGE[1]}
+COUNT_RECORDS = ToolSpec(
+    "count_records",
+    "Exactly how many papers this reader can see match metadata: Area (classification), PSCED "
+    "area, record type, completion years or IP flag, optionally grouped. Cannot count by topic.",
+    _object({
+        "classification": _NAME, "psced": _NAME, "record_type": _NAME,
+        "year_from": _YEAR, "year_to": _YEAR, "is_ip": {"type": "boolean"},
+        "group_by": {"type": "string", "enum": list(metadata.GROUPS)},
+    }))
+
 RESEARCH = (SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE)
+#: Named papers and exact counts, offered only under the research-2 tool version (IR-750).
+METADATA = (RESOLVE_PAPERS, COUNT_RECORDS)
 
 
 class InvalidArguments(Exception):
@@ -98,6 +120,17 @@ def _arguments(call: ToolCall, spec: ToolSpec) -> dict:
     return args
 
 
+def counted(fact: Count) -> dict:
+    """An exact count as the model and the reader see it: no Record ids."""
+    return {
+        "kind": "exact_count", "total": fact.total, "filters": dict(fact.filters),
+        "group_by": fact.group_by, "groups": [{"value": v, "count": n} for v, n in fact.groups],
+        "ungrouped": fact.ungrouped,
+        "scope": "paper_chat" if fact.scope_record_id is not None else "readable_records",
+        "relative_to": fact.relative_to,
+    }
+
+
 def _key(passage: PassageRef) -> tuple:
     return (passage.source.revision, passage.page, hashlib.sha256(passage.text.encode()).hexdigest())
 
@@ -108,6 +141,8 @@ class Investigation:
 
     research: object
     clarify: bool = False
+    #: Offer resolve_papers and count_records (the research-2 tool version).
+    metadata: bool = False
     #: Passage handle -> what was shown for it.
     passages: dict[str, PassageRef] = field(default_factory=dict)
     #: Record id -> (paper handle, title).
@@ -121,10 +156,17 @@ class Investigation:
     excluded: Optional[tuple[int, ...]] = None
     seen: set = field(default_factory=set)
     tool_calls: int = 0
+    #: Exact counts this run computed, in order (IR-750).
+    counts: list[Count] = field(default_factory=list)
+    #: Those counts' totals: the only numbers a completeness claim may rest on.
+    exact: set[str] = field(default_factory=set)
+    #: Taxonomy names those counts used, casefolded, which an answer may quote.
+    terms: set[str] = field(default_factory=set)
+    searched: bool = False
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
-        return (*RESEARCH, UPDATE_PLAN, UPDATE_FOCUS, *extra)
+        return (*RESEARCH, *(METADATA if self.metadata else ()), UPDATE_PLAN, UPDATE_FOCUS, *extra)
 
     @property
     def researched(self) -> bool:
@@ -169,6 +211,9 @@ class Investigation:
                 if not _str(question) or len(question) > CLARIFICATION_CHARS:
                     raise InvalidArguments
                 return Outcome("", clarification=question.strip())
+            if spec is COUNT_RECORDS:
+                filters = {k: v for k, v in args.items() if k != "group_by"}
+                return self._counted(await self.research.count(filters, args.get("group_by")))
             return self._evidence(await self._research(spec, args))
         except InvalidArguments:
             return Outcome(json.dumps({"error": "invalid_arguments"}))
@@ -177,7 +222,14 @@ class Investigation:
         if spec is SEARCH:
             if not _str(args["query"]) or ("limit" in args and not _int(args["limit"])):
                 raise InvalidArguments
+            self.searched = True
             return await self.research.search(args["query"], args.get("limit", 10))
+        if spec is RESOLVE_PAPERS:
+            references, record_ids = args.get("references", []), args.get("record_ids", [])
+            if not (isinstance(references, list) and isinstance(record_ids, list)
+                    and all(_str(r) for r in references) and all(_int(i) for i in record_ids)):
+                raise InvalidArguments
+            return await self.research.resolve(references, record_ids)
         if spec is OPEN_PASSAGE:
             if not _str(args["passage"]):
                 raise InvalidArguments
@@ -202,7 +254,15 @@ class Investigation:
             self.results.append(result)
         for record in result.records:
             self.papers.setdefault(record.record_id, (record.handle, record.title))
-        if result.records:
+            new = new or ("paper", record.record_id) not in self.seen
+            self.seen.add(("paper", record.record_id))
+        if result.matches:
+            body["matches"] = [{
+                "reference": m.reference, "kind": m.kind, "match": m.match,
+                **({"basis": m.basis} if m.basis else {}),
+                "papers": [{"paper": r.handle, "title": r.title} for r in m.records],
+            } for m in result.matches]
+        elif result.records:
             body["papers"] = [{"paper": r.handle, "title": r.title} for r in result.records]
         if result.passages:
             body["passages"] = []
@@ -227,6 +287,32 @@ class Investigation:
         body["coverage"] = {"returned": coverage.returned, "total": coverage.total,
                             "truncated": coverage.truncated}
         self.figures.update(str(n) for n in (coverage.returned, coverage.total) if n is not None)
+        return Outcome(json.dumps(body, ensure_ascii=False), progress=new)
+
+    def _counted(self, result: Evidence) -> Outcome:
+        """An exact count, typed for the model; the counted Records never leave the run (IR-750)."""
+        self._ended(result)
+        body: dict = {"status": result.status}
+        if result.reason:
+            body["reason"] = result.reason
+        fact = result.count
+        if fact is None:
+            return Outcome(json.dumps(body))
+        self.counts.append(fact)
+        # Only the total speaks for the whole population; a group or remainder never does.
+        self.exact.add(str(fact.total))
+        self.figures.update(str(n) for n in fact.figures)
+        # Years a count was filtered or grouped by may be stated; they are not totals.
+        self.figures.update(str(v) for name, v in fact.filters if name in ("year_from", "year_to"))
+        if fact.group_by == "year":
+            self.figures.update(str(v) for v, _ in fact.groups)
+        else:
+            self.terms.update(str(v).casefold() for v, _ in fact.groups)
+        self.terms.update(v.casefold() for _, v in fact.filters if isinstance(v, str))
+        body["count"] = counted(fact)
+        key = ("count", fact.filters, fact.group_by)
+        new = key not in self.seen
+        self.seen.add(key)
         return Outcome(json.dumps(body, ensure_ascii=False), progress=new)
 
     async def _plan(self, steps) -> Outcome:

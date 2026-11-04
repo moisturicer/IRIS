@@ -32,6 +32,9 @@ class Result:
     kind: str = "answer"
     #: The Conversation state this Turn leaves; None keeps the previous one.
     state: dict | None = None
+    #: Typed facts the answer stated: exact counts (with their counted Records, private)
+    #: and keyword samples, which are never totals (IR-750).
+    facts: tuple[dict, ...] = ()
 
 
 @dataclass(frozen=True)

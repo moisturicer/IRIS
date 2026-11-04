@@ -15,10 +15,12 @@ import re
 from decimal import Decimal
 from typing import Optional
 
-from ai.agent.tools import Investigation
+from ai.agent.tools import Investigation, counted
+from ai.research.tools import Count
 from ai.runs.executor import Citation
 
 CITE = re.compile(r"\[(P[0-9a-f]{20})\]")
+_MARKER = re.compile(r"\[\d+\]")
 _NUMBER = re.compile(r"(?<![\w.])-?\d+(?:,\d{3})*(?:\.\d+)?(?!\w)")
 _WORD_NUMBERS = {
     "zero": "0", "one": "1", "two": "2", "three": "3", "four": "4",
@@ -34,6 +36,8 @@ _INTRODUCED_TITLE = re.compile(
 _EXHAUSTIVE = re.compile(
     r"\b(all (?:the )?(?:papers|records|studies)|every (?:paper|record|study)|there are|exhaustive"
     r"|complete (?:list|corpus)|only \d+ (?:papers|records|studies))\b", re.I)
+_LINE = re.compile(r"\n+")
+_SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
 
 def numbers(text: str) -> set[Decimal]:
@@ -70,7 +74,7 @@ def findings(text: str, investigation: Investigation, *, prior=(), excluded=()) 
     for label in re.findall(r"\[[^\]\n]+\]", body):
         fail("unknown_citation", label)
     # A question answered with no repository context is general background.
-    if not (investigation.researched or investigation.papers):
+    if not (investigation.researched or investigation.papers or investigation.counts):
         return found
     supported = {Decimal(f) for f in investigation.figures}
     for turn in prior:
@@ -85,7 +89,8 @@ def findings(text: str, investigation: Investigation, *, prior=(), excluded=()) 
         supported |= numbers(title)
     for value in sorted(numbers(body) - supported):
         fail("unsupported_number", format(value, "f"))
-    titles = investigation.titles()
+    # Area and other catalogue names an exact count used may be quoted like titles (IR-750).
+    titles = investigation.titles() | investigation.terms
     for match in _TITLE.finditer(body):
         title = next(value for value in match.groups() if value is not None).strip()
         if title.casefold() not in titles:
@@ -93,9 +98,15 @@ def findings(text: str, investigation: Investigation, *, prior=(), excluded=()) 
     for match in _INTRODUCED_TITLE.finditer(body):
         if match.group(1).casefold().strip() not in titles:
             fail("unknown_title", match.group(1).strip())
-    # Keyword search is a sample of matching passages, never the whole corpus.
-    for match in _EXHAUSTIVE.finditer(body):
-        fail("completeness_overclaim", match.group())
+    # Keyword search is a sample of matching passages, never the whole corpus; only a
+    # sentence stating an exact count's own figure may speak of a total (IR-750).
+    exact = {Decimal(f) for f in investigation.exact}
+    for line in _LINE.split(body.strip()):
+        for sentence in _SENTENCE.split(line):
+            if numbers(sentence) & exact:
+                continue
+            for match in _EXHAUSTIVE.finditer(sentence):
+                fail("completeness_overclaim", match.group())
     for match in re.finditer(r"\bscreened\b", body, re.I):
         fail("completeness_overclaim", match.group())
     return found
@@ -117,7 +128,8 @@ _FEEDBACK = {
     "unknown_title": "These are not titles of papers you read: {items}. Name only papers this "
                      "conversation returned, exactly as titled.",
     "completeness_overclaim": "A search returns a sample of matching passages, never the whole "
-                              "repository; remove claims of completeness such as {items}.",
+                              "repository; remove claims of completeness such as {items}. State a "
+                              "total only in the sentence giving the exact figure count_records returned.",
 }
 _ITEMS = 8
 _ITEM_CHARS = 80
@@ -136,8 +148,6 @@ def feedback(found: dict[str, list[str]]) -> str:
     return "\n".join(lines)
 
 
-_LINE = re.compile(r"\n+")
-_SENTENCE = re.compile(r"(?<=[.!?])\s+")
 _LEADING_CITES = re.compile(r"(?:\[P[0-9a-f]{20}\]\s*)+")
 LIMITATION = "Part of the drafted answer could not be checked against its sources and was left out."
 
@@ -167,6 +177,34 @@ def supported_units(text: str, investigation: Investigation, *, prior=(), exclud
         if kept:
             lines.append(" ".join(kept))
     return "\n".join(lines) if lines else None
+
+
+def stated_counts(answer: str, investigation: Investigation) -> list[Count]:
+    """The latest count per question whose total or group size the answer states (IR-750)."""
+    # Citation handles and delivered [n] markers are not numbers the answer states.
+    stated = numbers(_MARKER.sub("", CITE.sub("", answer)))
+    latest: dict = {}
+    for fact in investigation.counts:
+        latest[(fact.filters, fact.group_by, fact.scope_record_id)] = fact
+    return [fact for fact in latest.values() if stated & {Decimal(n) for n in fact.stated}]
+
+
+def facts(answer: str, citations, investigation: Investigation) -> tuple[dict, ...]:
+    """What kind of number the delivered answer rests on, kept with its Turn (IR-750).
+
+    A stated exact count is kept with the Records it counted, so a reopen can withhold
+    it once any is no longer readable. A cited keyword search is a sample, never exhaustive.
+    """
+    kept = []
+    for fact in stated_counts(answer, investigation):
+        stored = counted(fact)
+        stored.pop("scope")
+        kept.append({**stored, "scope_record_id": fact.scope_record_id,
+                     "population": sorted(fact.population)})
+    if investigation.searched and citations:
+        papers = len({c.record_id for c in citations})
+        kept.append({"kind": "keyword_sample", "papers": papers, "exhaustive": False})
+    return tuple(kept)
 
 
 def deliver(text: str, investigation: Investigation) -> tuple[str, tuple[Citation, ...]]:

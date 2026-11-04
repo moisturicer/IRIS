@@ -35,6 +35,13 @@ APP_NAME = "iris-ai-runs"
 ACTIVE = ("queued", "running")
 TERMINAL = ("completed", "cancelled", "conflict", "expired", "failed", "deleted")
 
+# An exact count stands only while the reader may still read every Record it
+# counted; the row policy decides (IR-750). Correlated on Turn `t`.
+COUNTED_UNREADABLE = """EXISTS (
+    SELECT 1 FROM jsonb_array_elements(t.facts) fact,
+                  jsonb_array_elements_text(coalesce(fact->'population', '[]'::jsonb)) counted(id)
+     WHERE NOT EXISTS (SELECT 1 FROM public.records_record r WHERE r.id=counted.id::bigint))"""
+
 # Every source used by research, including uncited and legacy revisions, must
 # still be current before its derived answer can be replayed or recalled.
 CURRENT_SOURCE_TURN = """NOT EXISTS (
@@ -45,7 +52,23 @@ CURRENT_SOURCE_TURN = """NOT EXISTS (
         FROM iris_ai.run_event ev WHERE ev.run_id=t.run_id AND ev.name='tool'
     ) dependency WHERE dependency.revision IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.is_active
-        AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))"""
+        AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))
+  AND NOT """ + COUNTED_UNREADABLE
+
+
+def shown_facts(facts) -> list[dict]:
+    """A Turn's facts as a reader sees them: allowlisted keys, never the counted Records (IR-750)."""
+    shown = []
+    for fact in facts or ():
+        if fact.get("kind") == "exact_count":
+            shown.append({
+                **{k: fact.get(k) for k in ("kind", "total", "filters", "group_by", "groups", "ungrouped")},
+                "scope": "paper_chat" if fact.get("scope_record_id") is not None else "readable_records",
+                "relative_to": fact.get("relative_to"),
+            })
+        elif fact.get("kind") == "keyword_sample":
+            shown.append({"kind": "keyword_sample", "papers": fact.get("papers"), "exhaustive": False})
+    return shown
 
 RUN_COLUMNS = (
     "id, reader_id, conversation_id, request_hash, question, base_revision, state, end_reason,"
@@ -482,9 +505,10 @@ class RunStore:
                 turn_id = uuid.uuid4()
                 ordinal = conversation["revision"] + 1
                 await conn.execute(
-                    """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer, kind)
-                       VALUES ($1, $2, $3, $4, $5, $6, $7)""",
+                    """INSERT INTO iris_ai.turn (id, conversation_id, run_id, ordinal, question, answer, kind, facts)
+                       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)""",
                     turn_id, conversation_id, run_id, ordinal, run["question"], result.answer, result.kind,
+                    list(result.facts),
                 )
                 if result.citations:
                     await conn.executemany(
@@ -579,7 +603,12 @@ class RunStore:
                 " WHERE cs.is_active AND cs.id::text || ':' || cs.extraction_hash = ANY($1::text[])",
                 list(dependencies),
             ) if dependencies else []
-            evidence["sources_available"] = {row["revision"] for row in current} == dependencies
+            counted_unreadable = await conn.fetchval(
+                f"SELECT EXISTS (SELECT 1 FROM iris_ai.turn t WHERE t.run_id = $1 AND {COUNTED_UNREADABLE})",
+                run_id,
+            )
+            evidence["sources_available"] = (
+                {row["revision"] for row in current} == dependencies and not counted_unreadable)
         return {
             **evidence,
             "id": str(run["id"]),
@@ -619,7 +648,7 @@ class RunStore:
                 if revision is None:
                     raise NotFound
                 turns = await conn.fetch(
-                    f"""SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.created_at, r.pinned,
+                    f"""SELECT t.id, t.run_id, t.ordinal, t.question, t.answer, t.kind, t.facts, t.created_at, r.pinned,
                               {CURRENT_SOURCE_TURN} AS sources_available
                          FROM iris_ai.turn t JOIN iris_ai.ask_run r ON r.id = t.run_id
                         WHERE t.conversation_id = $1 ORDER BY t.ordinal""",
@@ -655,6 +684,7 @@ class RunStore:
                 "created_at": t["created_at"].isoformat(),
                 "pinned": t["pinned"],
                 "citations": by_turn.get(t["id"], []) if t["sources_available"] else [],
+                "facts": shown_facts(t["facts"]) if t["sources_available"] else [],
             } for t in turns],
         }
 
