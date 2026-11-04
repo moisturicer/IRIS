@@ -81,6 +81,8 @@ def problems(values) -> list[str]:
     found = []
     if not getattr(values, "RUNS_DATABASE_URL", ""):
         found.append("RUNS_DATABASE_URL is required")
+    if getattr(values, "RUNS_MIGRATION_DATABASE_URL", ""):
+        found.append("RUNS_MIGRATION_DATABASE_URL must not be set on a running service")
     if getattr(values, "RUNS_EXECUTOR", None) not in EXECUTORS:
         found.append(f"RUNS_EXECUTOR must be one of {', '.join(EXECUTORS)}")
     for name in LIMIT_NAMES:

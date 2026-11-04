@@ -1784,22 +1784,39 @@ describe("the sections follow the capabilities (IR-411)", () => {
     expect(tabNames()).toEqual(["Overview", "Paper"]);
   });
 
-  it("gives the owner Review and Files as well", async () => {
+  // Changed on purpose by IR-879 (ADR-032 §10, 2026-11-04): a participant
+  // reads the paper in Review, and Files moved into Review's Documents drawer.
+  it("gives the owner Overview and Review, where the paper is", async () => {
     shownRecord = inReview;
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
     await waitForRecord(inReview.title);
-    expect(tabNames()).toEqual(["Overview", "Paper", "Review", "Files"]);
+    expect(tabNames()).toEqual(["Overview", "Review"]);
   });
 
-  it("gives a reviewer the API names Review and Files", async () => {
+  it("gives a reviewer the API names Overview and Review", async () => {
     shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     renderPaperView();
 
     await waitForRecord(inReview.title);
-    expect(tabNames()).toEqual(["Overview", "Paper", "Review", "Files"]);
+    expect(tabNames()).toEqual(["Overview", "Review"]);
+  });
+
+  it("lands a participant's old Paper link in Review", async () => {
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+  });
+
+  it("opens a participant's cited page in Review", async () => {
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?page=3`);
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(await screen.findByText(/paper reader open at page 3/i)).toBeInTheDocument();
   });
 
   it("has no Paper section on a record with no paper to read", async () => {
@@ -1811,13 +1828,26 @@ describe("the sections follow the capabilities (IR-411)", () => {
     expect(tabNames()).toEqual(["Overview"]);
   });
 
-  it("opens the section the URL names", async () => {
+  it("opens an old Files link as Review with the Documents drawer open (IR-879)", async () => {
     shownRecord = inReview;
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?section=files`);
 
-    expect(await screen.findByRole("tab", { name: "Files", selected: true })).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Supporting documents" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    const drawer = await screen.findByRole("dialog", { name: "All documents" });
+    expect(await within(drawer).findByRole("heading", { name: "Supporting documents" })).toBeInTheDocument();
+
+    await userEvent.click(within(drawer).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument());
+  });
+
+  it("opens the Documents drawer from the author's Review pane", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Documents" }));
+    expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
   });
 
   it("shows Overview, not the section, to a viewer who may not open it", async () => {
@@ -1852,7 +1882,8 @@ describe("the sections follow the capabilities (IR-411)", () => {
     overview.focus();
     await userEvent.keyboard("{ArrowRight}");
 
-    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toHaveFocus();
+    // Changed on purpose by IR-879: an owner's next section is Review.
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toHaveFocus();
   });
 });
 
@@ -2529,20 +2560,18 @@ describe("the Review section (IR-412)", () => {
       expect(due).not.toHaveTextContent("Blocker");
       expect(within(due).queryByRole("button")).not.toBeInTheDocument();
 
+      // Changed on purpose by IR-879: Documents is a drawer, not a sidebar target.
       await userEvent.click(within(request).getByRole("button", { name: "Open Documents" }));
-      const side = screen.getByRole("complementary", { name: "Review details" });
-      await waitFor(() => expect(document.activeElement).toHaveTextContent(/^Documents/));
-      expect(side).toContainElement(document.activeElement as HTMLElement);
+      expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
     });
 
-    it("takes a folded Open Documents to the Details tab", async () => {
+    it("opens the Documents drawer from a folded workspace too", async () => {
       workspaceAt(1100);
       shownRecord = { ...inReview, ...reviewing, readiness: documentsAndDue() };
       signInAs(2, "ITSO");
       renderPaper(`/records/${RECORD_ID}?section=review`);
       await userEvent.click(await screen.findByRole("button", { name: "Open Documents" }));
-      expect(screen.getByRole("tab", { name: "Details", selected: true })).toBeInTheDocument();
-      await waitFor(() => expect(document.activeElement).toHaveTextContent(/^Documents/));
+      expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
     });
   });
 
@@ -2620,22 +2649,17 @@ describe("the Review section (IR-412)", () => {
     await waitFor(() => expect(recordsApi.tracker).toHaveBeenCalledTimes(2));
   });
 
-  it("has no Ask IRIS, and Ask about this paper takes the reader to the Paper tab with the chat open", async () => {
+  // Changed on purpose by IR-879 (ADR-032 §10, IR-372 kept): no Ask IRIS in
+  // Review, and nothing that sends a participant to a Paper tab they no longer have.
+  it("has no Ask IRIS and no Ask about this paper", async () => {
     shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
-    renderWithProbe(`/records/${RECORD_ID}?section=review`);
+    renderPaper(`/records/${RECORD_ID}?section=review`);
 
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
-
-    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
-    expect(await screen.findByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(
-      `/records/${RECORD_ID}?section=paper`,
-    );
+    expect(screen.queryByRole("button", { name: "Ask about this paper" })).not.toBeInTheDocument();
   });
 
   it("offers no Ask about this paper when there is no paper to ask about", async () => {
