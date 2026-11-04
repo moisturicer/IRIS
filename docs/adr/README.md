@@ -23,7 +23,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [010](010-deployment-topology.md) | Five-service topology and interim VPS deployment | Accepted · **amended by 014** | Deployment |
 | [011](011-evaluation-framework.md) | ISO 9241-11 as the evaluation spine | Accepted · **amended 2026-09-10** | Research |
 | [013](013-chunk-level-rag-pipeline.md) | Chunk-level RAG pipeline with reranking | Accepted · **amended 2026-09-04, 2026-09-08** | Scope · Cost · Security · **Research** |
-| [014](014-ai-gateway-as-a-service.md) | The AI gateway is adopted as a deployed service, subject to five preconditions | Accepted · **completed by 017** | Architecture · Security · Deployment |
+| [014](014-ai-gateway-as-a-service.md) | The AI gateway is adopted as a deployed service, subject to five preconditions | Accepted · **completed by 017** · **amended 2026-11-04** (runtime database login) | Architecture · Security · Deployment |
 | [015](015-voyage-embedding-and-reranking.md) | Voyage for embedding and reranking, always — `voyage-context-4` | Accepted · **amended 2026-09-20 (awaiting acceptance)** | Architecture · Security · Cost |
 | [016](016-docling-structured-extraction.md) | Docling-serve restored as the extraction path | **Superseded** by [056](056-manuscript-extraction-moves-to-llamaparse.md) · accepted 2026-09-03, amended 2026-09-04 (twice) | Architecture · Scope · **Research** |
 | [017](017-asgi-deployment-for-gateway-streaming.md) | ASGI deployment so Django can call the gateway asynchronously | Accepted | Architecture · Deployment · Performance |
