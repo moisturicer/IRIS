@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. Not built.
+**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 and §3 are not built.
 
 **Amends:**
 
@@ -44,6 +44,14 @@ So "what exactly did the reviewers see at v2?" has no answer today. That is the 
 - **No file a Version names can be deleted** through the API, which matches ADR-032 §5's rule for the manuscript. A draft's files are free to delete until it is first submitted.
 - **Office files (`RecordFile`) stay outside the Version.** They are the office's own review record (ADR-032 §10, IR-474 amendment), not the author's submission, and they keep their existing removal rule.
 - **Versions from before this change get a best-guess list** from upload times. Each is labelled *"files reconstructed"*, so it is never mistaken for a record.
+
+**Amendment, 2026-11-04 (IR-872; decided by Hermoine Zozobrado while building it, Accepted).** Five points §2 left open:
+
+1. **An empty slot gets no row.** A Version lists only the documents it had. "Not uploaded at vN" is read from the Record type's slots.
+2. **"Added during vN" is read from upload times, not stored.** An upload after vN was submitted, and before vN+1 if there is one, was added during vN. One writer (`write_version`) means no upload path can forget to record it. The times stay true because of point 3.
+3. **Nobody deletes what the review relied on, staff included.** Through the API, a file is refused deletion when a Version names it, **or when it answered a document request** (`DocumentRequestItem.upload`), because the requesting party accepted or rejected it. This goes beyond §2's "a Version names", and it holds even for the office override the slot rule allows. The database enforces the first part too: `RecordVersionDocument.upload` is `RESTRICT`, so a bug can't delete a named file, while a Record's own delete still cascades. Only a superuser in Django admin can remove such a file, after unlinking it on purpose.
+4. **Every other removal asks first.** Paper View confirms before deleting a document version or an office file, and it offers no Remove at all on a file the server says is kept (`delete_refused`), showing the server's reason instead.
+5. **The reconstructed label is one flag per Version** (`RecordVersion.documents_reconstructed`), true for every Version written before IR-872, because within one old Version every row is equally a guess.
 
 ### 3. Comparison
 
