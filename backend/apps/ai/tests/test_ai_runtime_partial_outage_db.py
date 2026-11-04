@@ -113,10 +113,11 @@ def test_a_draft_turning_the_outage_into_an_absence_is_repaired_before_anything_
     seen = {}
 
     def read_pond(payload):
+        # "water" is in both papers, so the search names both.
         found = last_result(payload)
-        seen["flood"] = found["passages"][0]["passage"]
-        pond = next(p["paper"] for p in found["papers"] if p["title"] == "Pond sampling")
-        return tools(call("p", "read_page", paper=pond, page=2))
+        handles = {p["title"]: p["paper"] for p in found["papers"]}
+        seen["flood"] = next(p["passage"] for p in found["passages"] if p["paper"] == handles["Flood forecasting"])
+        return tools(call("p", "read_page", paper=handles["Pond sampling"], page=2))
 
     def absent(payload):
         return reply(f"Floods were forecast from gauges [{seen['flood']}]. No pond studies report methods.")
@@ -125,7 +126,7 @@ def test_a_draft_turning_the_outage_into_an_absence_is_repaired_before_anything_
         assert "No pond studies" in payload["messages"][-1]["content"]
         return reply(f"Floods were forecast from gauges [{seen['flood']}]. The pond paper could not be read.")
 
-    provider = recording(tools(call("s", "search", query="floods")), read_pond, absent, honest)
+    provider = recording(tools(call("s", "search", query="water")), read_pond, absent, honest)
     holder["service"] = agent_service(runtime, provider)
     live = submit(client, grant, "agent-outage-absence", "How were floods and ponds studied?").json()
     assert live["state"] == "completed", live
