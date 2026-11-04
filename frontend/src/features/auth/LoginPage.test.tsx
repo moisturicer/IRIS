@@ -420,13 +420,16 @@ describe("what a failed sign-in says", () => {
 
   it("asks for the email to be verified on a 403 'not verified'", async () => {
     failSignInWith(serverReplied(403, { detail: "Email not verified." }));
-    renderScreen(<LoginPage />, { route: "/login" });
+    const { container } = renderScreen(<LoginPage />, { route: "/login" });
 
     await signIn();
 
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Email not verified");
+    expect(alert).toHaveTextContent("Check your inbox for the verification link, or register again if it expired.");
     expect(alert).not.toHaveTextContent(/password/i);
+    expect(screen.getByRole("link", { name: "Create an account" })).toHaveAttribute("href", "/signup");
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("opens the account-locked dialog on a 403 'locked', as before", async () => {

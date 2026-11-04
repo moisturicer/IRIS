@@ -5,7 +5,20 @@ describe("reader-facing API errors", () => {
   it("prefers Retry-After and rounds the wait upward", () => {
     expect(errorDetail({ response: { status: 429, headers: { "retry-after": "841" }, data: {
       detail: "Request was throttled. Expected available in 30 seconds.",
+      retry_after: 60,
     } } }, "Failed")).toBe("Too many requests — try again in about 15 minutes.");
+  });
+
+  it.each([90, "90"])("uses the recovery body's retry_after %s when the header is unusable", (retryAfter) => {
+    expect(errorDetail({ response: { status: 429, headers: { "retry-after": "invalid" }, data: {
+      detail: "Too many requests. Try again later.", retry_after: retryAfter,
+    } } }, "Failed")).toBe("Too many requests — try again in about 2 minutes.");
+  });
+
+  it.each([null, true, "", -1, "invalid", Infinity])("ignores an unusable recovery retry_after %s", (retryAfter) => {
+    expect(errorDetail({ response: { status: 429, data: {
+      retry_after: retryAfter, detail: "Request was throttled. Expected available in 30 seconds.",
+    } } }, "Failed")).toBe("Too many requests — try again in about 30 seconds.");
   });
 
   it("uses the DRF detail when the header is missing or malformed", () => {

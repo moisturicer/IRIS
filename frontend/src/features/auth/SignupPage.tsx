@@ -454,12 +454,8 @@ export default function SignupPage() {
           <p className="mt-section text-pretty text-body text-stone-700">
             You can sign in once it is verified. Signing in shows that your request is waiting.
           </p>
-          {/* Not "contact RDCO": an email is read-only to every IRIS screen,
-              RDCO's included, so the only fix IRIS offers is a fresh registration.
-              Correcting it in place is IR-705. */}
           <p className="mt-section text-pretty text-small text-stone-600">
-            If that address is wrong, register again with the right one. Your first request stays pending until
-            an administrator declines it.
+            If that address is wrong, register again with the right one. An unverified signup is deleted after 30 days.
           </p>
           <ButtonLink to="/login" size="full" className="mt-section-lg">
             Go to sign in
