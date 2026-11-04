@@ -124,7 +124,7 @@ Decision (2026-11-04): a US$30 ceiling, with each value that changed for deep-by
 - Set the key's credit limit to the approved amount, so OpenRouter stops spending if the estimates are wrong.
 - `AI_ADMISSION_PRICES` holds the AGENT model and Voyage only. With `AI_PROVIDER_ADMISSION=enforce`, any other chat model a deployment configures is refused until it is priced in a new approval.
 
-**This approval does not enable paid research.** `ai/admission/guard.py` still refuses Record evidence until the disclosure decision in ADR-049 is made.
+**This approval alone does not enable paid research.** The development-only disclosure decision is now recorded in [IR-889's decision record](runtime-paid-research-approval.md). `ai/admission/guard.py` still refuses Record evidence until IR-889's source-aware guard and the decision's vendor and per-Record conditions are met.
 
 ## Not decided here
 
