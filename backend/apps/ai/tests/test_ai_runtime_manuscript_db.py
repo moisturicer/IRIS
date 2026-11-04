@@ -283,7 +283,7 @@ def test_a_paper_the_reader_cannot_read_is_never_read(research):
 
 PIN_3 = dataclasses.replace(loop_db.PIN, prompt_version="agent-research-3", tool_version="research-3")
 # Fixture capacity only; it describes no vendor.
-WINDOW = Capacity(context_tokens=28_000, max_output_tokens=400, max_reasoning_tokens=None,
+WINDOW = Capacity(context_tokens=26_500, max_output_tokens=400, max_reasoning_tokens=None,
                   max_request_bytes=256_000, min_bytes_per_token=1.0, framing_tokens_per_message=4)
 
 
