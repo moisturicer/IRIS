@@ -580,3 +580,35 @@ def test_reprovisioning_restores_space_reads_after_table_recreation(runtime):
         cursor.execute("REVOKE SELECT ON public.ai_embeddingspace FROM iris_ai_runtime")
     call_command("provision_research_roles")
     assert index(runtime, token, Recording()) == "ready"
+
+
+def test_a_whole_manuscript_is_read_from_the_active_indexed_revision(runtime, api):
+    # IR-733: read_manuscript's index_job branch, with no Django chunk set to fall back on.
+    owner, record, token = permitted()
+    assert extraction.run(runtime, token) == "extracted"
+    assert index(runtime, token, Recording()) == "ready"
+    with connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT j.id,j.payload FROM iris_ai.index_job j"
+            " JOIN iris_ai.active_source a ON a.job_id=j.id WHERE a.record_id=%s",
+            [record.pk],
+        )
+        job, payload = cursor.fetchone()
+        cursor.execute("SELECT count(*) FROM ai_chunkset WHERE record_id=%s", [record.pk])
+        assert cursor.fetchone()[0] == 0
+    payload = json.loads(payload) if isinstance(payload, str) else payload
+    api[1]["dsn"] = runtime
+
+    async def script(tools):
+        found = await tools.resolve(["Pond research"])
+        await tools.read_manuscript(found.records[0].handle, max_bytes=1_000_000)
+
+    response, seen, _ = ask(api, owner, script, key="indexed-manuscript-0001")
+    assert response.json()["state"] == "completed"
+    _, (_, read) = seen
+    assert read.status == "ok"
+    assert [p.text for p in read.passages] == [c["content"] for c in payload["chunks"]]
+    assert [p.page for p in read.passages] == [c["source_page"] for c in payload["chunks"]]
+    assert {p.source.revision for p in read.passages} == {f"{-job}:{payload['extraction_hash']}"}
+    assert read.reading.pages == len(payload["document"]["page_sizes"])
+    assert read.reading.missing == () and read.reading.continue_after is None

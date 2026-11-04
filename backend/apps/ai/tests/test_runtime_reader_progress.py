@@ -66,6 +66,20 @@ def test_queued_stop_and_reopen_keep_unknown_context_and_no_invented_plan(api, r
                       headers={**headers, "X-IRIS-Protocol": "unknown"}).status_code == 406
 
 
+def test_a_question_runs_deep_unless_it_names_ordinary(api, runtime):
+    from ai.runs.dispatch import PollingNotifier
+
+    client, holder = api
+    holder["service"] = agent_service(runtime, recording(reply("Background.")))
+    holder["service"].notifier = PollingNotifier()
+    for email, body, depth in (("default-depth@cit.edu", {}, "deep"),
+                               ("named-depth@cit.edu", {"depth": "ordinary"}, "ordinary")):
+        headers = {**as_reader(session(make_user(email))), **PUBLIC}
+        queued = client.post("/api/v1/ai/runs", headers={**headers, "Idempotency-Key": f"depth-{depth}-01"},
+                             json={"question": "Explain", **body}).json()
+        assert (queued["state"], queued["depth"]) == ("queued", depth)
+
+
 def test_reader_refuses_operator_echo_and_withholds_revoked_evidence(api, runtime):
     from .test_ai_runtime_research_db import paper
     from .test_ai_runtime_agent_loop_db import last_result

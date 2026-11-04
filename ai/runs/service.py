@@ -91,7 +91,7 @@ class RunService:
             raise ValueError("bounds") from None
 
     async def submit(self, grant, *, key, question, conversation_id, base_revision,
-                     depth="ordinary"):
+                     depth=runs_config.DEFAULT_DEPTH):
         """The run's projection, and whether this submission admitted it."""
         dispatch = self.cfg.dispatch
         row, created = await self.store.admit(

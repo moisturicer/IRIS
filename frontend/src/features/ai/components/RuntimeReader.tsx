@@ -67,7 +67,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
   const api = useMemo(() => runtimeReader(recordId), [recordId]);
   const [conversation, setConversation] = useState<ReaderConversation>();
   const [run, setRun] = useState<ReaderRun>();
-  const [depth, setDepth] = useState<Depth>("ordinary");
+  const [depth, setDepth] = useState<Depth>("deep");
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Trouble>();
@@ -209,7 +209,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     </div>
     <label className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-2 text-sm text-stone-700">
       <input type="checkbox" checked={depth === "deep"} onChange={e => setDepth(e.target.checked ? "deep" : "ordinary")}
-        className="h-4 w-4 accent-brand" /> Be more thorough
+        className="h-4 w-4 accent-brand" /> Thorough research
     </label>
     <ChatInput onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
       maxLength={4000}
