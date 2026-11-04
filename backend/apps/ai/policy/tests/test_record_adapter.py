@@ -15,7 +15,7 @@ class _Record:
     """The attributes the adapter reads, and nothing else."""
 
     def __init__(self, *, is_ip=False, ip_released=False, dpa_accepted=True,
-                 embargo_state=EmbargoState.NONE):
+                 embargo_state=EmbargoState.RELEASED):
         self.is_ip = is_ip
         self.ip_released = ip_released
         self.dpa_accepted = dpa_accepted
@@ -44,4 +44,4 @@ class RecordAdapterTests:
 
     def test_the_verdict_is_the_policy_applied_to_those_inputs(self):
         assert decision_for_record(_Record()).allowed is True
-        assert decision_for_record(_Record(embargo_state=EmbargoState.UNKNOWN)).allowed is False
+        assert decision_for_record(_Record(embargo_state=EmbargoState.ACTIVE)).allowed is False

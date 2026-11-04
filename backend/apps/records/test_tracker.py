@@ -20,7 +20,7 @@ from rest_framework.test import APITestCase
 
 from apps.accounts.models import Role, User
 from apps.records.models import Record, RecordOwner, RecordType
-from apps.records.testing import answered_no_embargo
+from apps.records.testing import released_embargo
 from apps.reviews.models import RecordAssignment
 from core.enums import PipelineStatus, RecordTypeName, RoleName
 
@@ -66,7 +66,7 @@ class TrackerTestBase(APITestCase):
 
     def submitted(self, type_name, **extra):
         record = self.make_record(type_name, **extra)
-        answered_no_embargo(record.pk)
+        released_embargo(record.pk)
         self.client.force_authenticate(self.owner)
         response = self.client.post(
             reverse("record-submit", args=[record.pk]),

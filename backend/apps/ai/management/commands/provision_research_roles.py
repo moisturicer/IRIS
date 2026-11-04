@@ -62,7 +62,7 @@ VERIFIER_COLUMNS = {
     "accounts_user": "id, is_active, is_locked, credential_version, role_id",
     "accounts_role": "id, name",
     "records_record": "id, is_deleted, pipeline_status, adviser_id, abstract_file, title, abstract, dpa_accepted_at, is_ip, ip_released_at, "
-                      "embargo_answered_at, embargo_released_at, embargoed_until",
+                      "is_embargoed, embargo_answered_at, embargo_released_at, embargoed_until",
     "publication_manuscriptwork": "id, record_id, revision, source_file, operation, revoked_at,"
                                   " created_at, grant_token, grant_expires_at, authority_generation",
     "publication_manuscriptinvalidation": "id, record_id, work_id, reason, authority_generation",

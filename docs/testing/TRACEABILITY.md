@@ -160,6 +160,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-846** | Publish suggestions for a LlamaParse Manuscript come from LlamaExtract, each with its page, cited text and reported confidence — no FR- id; ADR-056 §15 within IR-830's contract | [details](traceability/IR-846.md) | **IMPLEMENTED** |
 | **IR-884** | ADR-049 and the AI runtime spec are on `main`; IR-714's resume, export and review questions have owners | [details](traceability/IR-884.md) | **PARTIAL** |
 | **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
+| **IR-882** | Every paper starts embargoed; Publish asks no embargo question; only the Adviser or RDCO date or release one, and RDCO publishes only a released paper — extends FR-M3-02 (stable label only); ADR-052 IR-879 amendment | [details](traceability/IR-882.md) | **IMPLEMENTED** |
 
 ### Non-functional
 

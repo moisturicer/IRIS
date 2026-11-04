@@ -35,13 +35,14 @@ Needs LlamaParse and a worker on the ``extraction`` queue to actually complete;
 chunking is queued automatically after
 (``documents.tasks._queue_chunking_if_manuscript``). No vendor account
 needed -- chunking does not embed, and the disclosure gate refuses to embed a
-paper with no embargo answer (ADR-052), which is what one loaded here has.
+paper whose embargo hasn't been released (ADR-052), and every paper starts
+embargoed.
 
-``--clear-for-ai`` answers for each new paper instead (decision 16): "no embargo",
-with consent. The gate then lets it through, so **after chunking the worker embeds
+``--clear-for-ai`` releases each new paper instead (decision 16, as amended for
+IR-882), with consent. The gate then lets it through, so **after chunking the worker embeds
 its chunks and queues its AI Overview, which spends credits**. Retrieval can't find
 the paper until ``backfill_embeddings`` adds its title-and-abstract vector. A paper
-already loaded is skipped as ever, and ``mark_corpus_cleared`` answers for those.
+already loaded is skipped as ever, and ``mark_corpus_cleared`` releases those.
 
 Refuses to run with ``DEBUG`` off unless ``--force``, matching ``seed_demo``.
 ``--force`` doesn't reach ``--clear-for-ai``, which refuses with ``DEBUG`` off
@@ -94,9 +95,9 @@ class Command(BaseCommand):
         )
         parser.add_argument(
             "--clear-for-ai", action="store_true",
-            help="Answer 'no embargo', with consent, for each new test paper. The worker "
+            help="Release the embargo, with consent, for each new test paper. The worker "
                  "then embeds its chunks and queues its AI Overview, which spends credits. "
-                 "Without this a paper stays Unknown and the AI refuses it. Refuses with "
+                 "Without this a paper stays embargoed and the AI refuses it. Refuses with "
                  "DEBUG off, even with --force.",
         )
         parser.add_argument(
@@ -120,7 +121,7 @@ class Command(BaseCommand):
             if options["origin"] == Record.Origin.INSTITUTIONAL:
                 raise CommandError(
                     "refusing --clear-for-ai: a paper declared institutional is a real "
-                    "CIT-U paper, and only its owners may answer for it, through Publish."
+                    "CIT-U paper, and only its Adviser or RDCO may release it."
                 )
 
         root = Path(options["directory"])
@@ -191,7 +192,7 @@ class Command(BaseCommand):
         ))
         if self.clearing:
             self.stdout.write(
-                "Each new paper is answered 'no embargo', with consent. After chunking, the "
+                "Each new paper is released from its embargo, with consent. After chunking, the "
                 "worker embeds its chunks and queues its AI Overview, which spends credits. "
                 "Then, for retrieval to find it: python manage.py backfill_embeddings --dry-run"
             )

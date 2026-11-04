@@ -301,29 +301,37 @@ class Record(models.Model):
         """
         return self.dpa_accepted_at is not None
 
-    # The paper's embargo answer (ADR-052). Its own fact: separate from status,
-    # IP and consent, because a published paper can still be under an agreement.
-    # Stamped by `apps.records.embargo` and by nothing else; none of these is
-    # writable through a serializer.
+    # The paper's embargo (ADR-052, embargoed by default as amended for IR-882).
+    # Its own fact: separate from status, IP and consent, because a published
+    # paper can still be under an agreement. Stamped by `apps.records.embargo`
+    # and by nothing else; none of these is writable through a serializer.
     #
-    # **The answer's timestamp is what makes a blank date mean "no embargo".**
-    # An unanswered paper stores a blank date too, and it must stay refused.
+    # **Every paper starts embargoed.** Only a release by the Adviser or RDCO
+    # clears `is_embargoed`, so a code path that forgets to stamp anything
+    # leaves the paper blocked, never open.
+    is_embargoed = models.BooleanField(
+        default=True,
+        help_text="True until the Adviser or RDCO releases it. Only a released paper reaches the AI or can be published.",
+    )
     embargoed_until = models.DateField(
         null=True, blank=True,
         help_text="The date to review the embargo. A reminder: it never ends the embargo.",
     )
-    embargo_answered_at = models.DateTimeField(
-        null=True, blank=True,
-        help_text="When the embargo question was answered. Null means never, so the paper stays blocked.",
+    # Renamed from the answer stamps by `records/0032` in Django only: the columns
+    # keep their old names, which `publication`'s SQL functions read.
+    embargo_date_set_at = models.DateTimeField(
+        null=True, blank=True, db_column="embargo_answered_at",
+        help_text="When the review date was last set. Null when no date was ever set.",
     )
-    embargo_answered_by = models.ForeignKey(
+    embargo_date_set_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="embargo_answered_records",
-        help_text="Who answered. SET_NULL so a deleted account cannot erase the timestamp.",
+        db_column="embargo_answered_by_id",
+        related_name="embargo_dated_records",
+        help_text="Who set the date. SET_NULL so a deleted account cannot erase the timestamp.",
     )
     embargo_released_at = models.DateTimeField(
         null=True, blank=True,
-        help_text="When a person ended the embargo. Null means it has not been released.",
+        help_text="When a person released the embargo. Null while it is embargoed.",
     )
     embargo_released_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
@@ -333,18 +341,12 @@ class Record(models.Model):
 
     @property
     def embargo_state(self) -> EmbargoState:
-        """Where the embargo stands (ADR-052 §3).
+        """Where the embargo stands (ADR-052 §3 as amended for IR-882).
 
-        Derived, never stored, so it cannot drift from the stamps it describes,
-        and it reads no clock: a passed date stays `ACTIVE` until a person acts.
+        Derived from `is_embargoed`, and it reads no clock: a passed date stays
+        `ACTIVE` until a person releases it (§9).
         """
-        if self.embargo_answered_at is None:
-            return EmbargoState.UNKNOWN
-        if self.embargo_released_at is not None:
-            return EmbargoState.RELEASED
-        if self.embargoed_until is not None:
-            return EmbargoState.ACTIVE
-        return EmbargoState.NONE
+        return EmbargoState.ACTIVE if self.is_embargoed else EmbargoState.RELEASED
 
     # KTTO's release of an IP mark (ADR-052 §11-13, IR-813). The mark stays on
     # the paper, and this is what opens the disclosure check for it. Stamped by
@@ -399,20 +401,21 @@ class Record(models.Model):
                 fields=["derived_from"],
                 name="record_one_continuation",
             ),
-            # Rows that would read as something nobody said (ADR-052 §3).
+            # A release is stamped exactly when the paper is not embargoed, and a
+            # date always says who set it (ADR-052, IR-882).
             models.CheckConstraint(
                 condition=(
-                    models.Q(embargoed_until__isnull=True)
-                    | models.Q(embargo_answered_at__isnull=False)
+                    models.Q(is_embargoed=True, embargo_released_at__isnull=True)
+                    | models.Q(is_embargoed=False, embargo_released_at__isnull=False)
                 ),
-                name="record_embargo_date_needs_answer",
+                name="record_embargo_release_matches_state",
             ),
             models.CheckConstraint(
                 condition=(
-                    models.Q(embargo_released_at__isnull=True)
-                    | models.Q(embargoed_until__isnull=False)
+                    models.Q(embargoed_until__isnull=True)
+                    | models.Q(embargo_date_set_at__isnull=False)
                 ),
-                name="record_embargo_release_needs_date",
+                name="record_embargo_date_says_when_set",
             ),
             models.CheckConstraint(
                 condition=models.Q(ip_released_at__isnull=True) | models.Q(is_ip=True),
@@ -512,7 +515,7 @@ class EmbargoReminder(models.Model):
 
     The unique key is the idempotency, as with `DeadlineMoment`: a re-run, a
     missed tick or two beat instances insert the same row, and only one wins.
-    `embargo_set_at` is the paper's `embargo_answered_at`, which every set and
+    `embargo_set_at` is the paper's `embargo_date_set_at`, which every set and
     extend restamps, so a new date, or a released paper held again, starts the
     reminders over. `step` is 0 on the date, then one more per 5 working days.
     """

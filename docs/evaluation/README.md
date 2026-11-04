@@ -444,14 +444,15 @@ before its `declared_at`, so a confirmatory figure cannot come from data seen
 before the plan. The 200 decisions that circulated during design is an
 exploratory planning estimate with no statistical basis and is not used.
 
-## Clearing the proxy corpus (IR-815)
+## Clearing the proxy corpus (IR-815, IR-882)
 
-The disclosure gate refuses a paper nobody has answered for (ADR-052), and a
-loaded test paper has no owner to ask. These steps answer for test papers only: a
-CIT-U paper gets its answer from its owners, through Publish. Both commands refuse
+Every paper starts embargoed and the disclosure gate refuses it until it is
+released (ADR-052 as amended 2026-11-04), and a loaded test paper has no Adviser
+to release it. These steps release test papers only: a CIT-U paper is released by
+its Adviser or RDCO. Both commands refuse
 with `DEBUG` off, and `--force` doesn't change that. `load_corpus` also refuses
 `--clear-for-ai` with `--origin institutional`, and `mark_corpus_cleared` leaves
-such a paper Unknown and names it. Neither can recognise a real paper whose origin
+such a paper embargoed and names it. Neither can recognise a real paper whose origin
 was never declared, so don't point them at one.
 
 **A database that already holds the proxy papers**, once:
@@ -464,12 +465,13 @@ python manage.py backfill_embeddings --dry-run   # what any missing vectors woul
 python manage.py backfill_embeddings             # only if that shows some; spends Voyage credits
 ```
 
-Marking sends nothing to anyone, and never answers for a draft. A paper that
+Marking sends nothing to anyone, never releases a draft, and never overrides a
+date someone set. A paper that
 already has both vectors needs no backfill, and the dry run counts nothing for it.
 An AI Overview someone opened before marking stays `unavailable` until it's
 retried.
 
-**Loading papers fresh**, answering as they load:
+**Loading papers fresh**, releasing them as they load:
 
 ```bash
 python manage.py load_corpus <dir> --origin imported_reference --clear-for-ai --dry-run
@@ -486,8 +488,8 @@ adds its title-and-abstract vector, because that's what its first stage ranks. A
 paper the load finds already there is skipped, so mark those with the first set of
 steps.
 
-**`seed_demo`** answers for its own papers. On a database seeded earlier, run it
-again.
+**`seed_demo`** releases its own papers, except the two it keeps embargoed. On a
+database seeded earlier, run it again.
 
 Run files from before this have `"disclosure_bypass": true` in their provenance:
 they measured the same papers with the gate stepped around, through IR-317's
@@ -499,7 +501,7 @@ bypass, now deleted. Later files don't have the key.
   the deterministic fake. Indexing is `manage.py backfill_embeddings` (measured
   on the dev database: 26 records, 1,236 chunks, ~381,073 tokens; a proxy number that decides
   engineering and is never cited as a finding about CIT-U research, per ADR-023).
-- **The disclosure gate refuses a paper nobody has answered for** (ADR-052), so
+- **The disclosure gate refuses a paper nobody has released** (ADR-052), so
   until they're marked the final set is empty and final-set recall is 0. See
   [Clearing the proxy corpus](#clearing-the-proxy-corpus-ir-815). The command
   warns when it sees this.

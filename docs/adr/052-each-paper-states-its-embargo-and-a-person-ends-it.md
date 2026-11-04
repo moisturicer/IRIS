@@ -200,3 +200,12 @@ Decided by Hermoine Zozobrado in the review-workspace design session. Transcribe
 - Every paper needs an explicit release, by the Adviser or RDCO, before Ask IRIS can use it or RDCO can publish it. Unreleased papers stay out of Ask IRIS, and keyword search still finds them (ADR-008).
 - Students can no longer say their paper is free of agreements. They tell their Adviser.
 - One more act on every reviewed paper.
+
+**Built by IR-882 (2026-11-04).** Decided by Hermoine Zozobrado while building it, and transcribed by an agent:
+
+- **What is stored.** `Record.is_embargoed` (default true) says whether the paper is held. It is false exactly when `embargo_released_at`/`_by` are set, and a database check holds the two together. `embargoed_until` is the optional reminder date, and `embargo_date_set_at`/`_by` say who set it and when. They are the old answer stamps, renamed, so the values are kept. There are two states, Active and Released, and the gate passes only Released. None and Unknown are gone from the code.
+- **Existing rows** (migration `records/0032`): a "no embargo" answer becomes a release by whoever answered, at that time, with no date stamp. Every other paper stays embargoed, its date and who set it kept.
+- **Setting a date always needs one.** "Embargo again" on a released paper sets a date too. There is no act to remove a date.
+- **Test data.** `seed_demo` keeps two submitted papers embargoed: one dated a year ahead, in front of RDCO, which can't publish it, and one with no date, at its Adviser. Its Adviser releases every other paper. `mark_corpus_cleared` releases only papers that are embargoed with no date and were never released, so a date someone set is never overridden.
+- **The Decision's half of the first 2026-11-04 amendment is built here:** RDCO's Decision offers no *Accept & publish* on an embargoed paper, and `decide/` refuses it with *"Under embargo [until <date>]. Release the embargo, then publish."* `publish_unlisted` (ADR-047 §10) is IR-878's.
+- **Extraction waits for the release too.** LlamaParse reads a PDF only once the gate passes, so a paper under review has no extracted text until it is released. IR-871's version text and the comparison built on it inherit this. Whether review text should be read inside IRIS instead is an open question for ADR-058, not decided here.

@@ -88,7 +88,6 @@ def test_likely_matches_require_current_acknowledgement(author):
     current = draft(user, kind, "Water quality in Cebu 2025")
     current.adviser = make_user("duplicates-adviser@cit.edu", "Adviser")
     current.save(update_fields=["adviser"])
-    assert client.post(reverse("record-embargo-answer", args=[current.pk]), {"embargoed": False}, format="json").status_code == 200
     Author.objects.create(record=prior, name="A. Researcher")
     Author.objects.create(record=current, name="Another Author")
     url = reverse("record-duplicate-matches", args=[current.pk])

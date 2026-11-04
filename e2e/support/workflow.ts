@@ -45,7 +45,7 @@ export async function createDraft(owner: Client, opts: DraftOptions): Promise<nu
 }
 
 export async function submit(owner: Client, recordId: number) {
-  await owner.act(`/records/${recordId}/embargo-answer/`, { embargoed: false });
+  // No embargo question: every paper starts embargoed (ADR-052, IR-882).
   return owner.act(`/records/${recordId}/submit/`, { dpa_accepted: true });
 }
 
@@ -117,6 +117,11 @@ export async function reviseAbstract(owner: Client, recordId: number, note: stri
 
 export async function newVersion(owner: Client, recordId: number) {
   return owner.act(`/records/${recordId}/new-version/`);
+}
+
+/** The Adviser or RDCO releases the embargo, which publishing needs (ADR-052 §6, §14; IR-882). */
+export async function releaseEmbargo(releaser: Client, recordId: number) {
+  return releaser.act(`/records/${recordId}/embargo-release/`);
 }
 
 export async function decide(decider: Client, recordId: number, outcome: "accept" | "publish" | "keep_unlisted" | "reject", comment = "") {

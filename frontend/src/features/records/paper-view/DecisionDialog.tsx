@@ -28,21 +28,23 @@ const CONFIRM: Record<DecisionOutcome, { label: string; done: string }> = {
 /** RDCO's warnings: the executive Decision, and an embargo (ADR-047, ADR-052 §14). */
 const WARNING_CALLOUT = "rounded-lg border border-brand/30 bg-brand/5 p-3 text-small text-brand";
 
-/** What RDCO is told about an active embargo before accepting the paper. */
-function embargoWarning(outcome: DecisionOutcome, until: string | null): string {
-  const dated = until ? `, with a review date of ${formatDate(until)}` : "";
-  const after =
-    outcome === "publish"
-      ? "You can still publish it. It goes into Discover, but Ask IRIS won't read or cite it"
-      : "You can still keep it unlisted. Its text stays away from outside AI companies";
-  return `This paper is under embargo${dated}. ${after} until the Adviser or RDCO releases the embargo.`;
+/**
+ * Why RDCO isn't offered *Publish* (ADR-052 §14 as amended, IR-882): an
+ * embargoed paper is never published, so it is released first.
+ */
+function embargoWarning(until: string | null): string {
+  const dated = until ? ` until ${formatDate(until)}` : "";
+  return (
+    `This paper is under embargo${dated}, so it can't be published. To publish it, release the ` +
+    "embargo first. Kept unlisted, its text stays away from outside AI companies."
+  );
 }
 
 /**
  * The title and the consequence, stated before anyone commits to it
  * (ui-ux/16 §4). Only RDCO publishes a Thesis or Project (ADR-047 §5).
  */
-function wording(outcome: DecisionOutcome, kind: string, embargoed: boolean) {
+function wording(outcome: DecisionOutcome, kind: string) {
   if (outcome === "accept") {
     // IR-271: promises nothing about continuing it as a Thesis or Project,
     // which IRIS does not offer yet (IR-417).
@@ -63,8 +65,7 @@ function wording(outcome: DecisionOutcome, kind: string, embargoed: boolean) {
     return {
       title: `Publish this ${kind}?`,
       body:
-        "This publishes it to Discover, where any signed-in user can read it" +
-        (embargoed ? "." : " and Ask IRIS can cite it."),
+        "This publishes it to Discover, where any signed-in user can read it and Ask IRIS can cite it.",
     };
   }
   if (outcome === "keep_unlisted") {
@@ -127,18 +128,19 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
   const [sending, setSending] = useState(false);
 
   const reject = outcome === "reject";
-  const ready = !reject || text.trim() !== "";
   const kind =
     record.record_type_name === "Project"
       ? "project"
       : record.record_type_name === "Proposal"
         ? "proposal"
         : "thesis";
-  // RDCO may publish through an embargo, warned first (ADR-052 §14). The text
-  // still stays away from AI companies until a person releases it.
-  const embargo = flags.embargo?.state === "active" ? flags.embargo : null;
-  const warnEmbargo = embargo !== null && (outcome === "publish" || outcome === "keep_unlisted");
-  const { title, body } = wording(outcome, kind, warnEmbargo);
+  // An embargoed paper is never published, so `decide/` offers no publish for it
+  // (ADR-052 §14 as amended). Keeping it unlisted says why, and what to do; a
+  // Publish dialog an embargo overtook (a 409) says so and can't be confirmed.
+  const embargo = flags.embargo && flags.embargo.state !== "released" ? flags.embargo : null;
+  const warnEmbargo = embargo !== null && (outcome === "keep_unlisted" || outcome === "publish");
+  const ready = (!reject || text.trim() !== "") && !(outcome === "publish" && embargo !== null);
+  const { title, body } = wording(outcome, kind);
   const stillReviewing = (flags.closes?.assignments ?? []).map((a) => a.label);
   const withdrawsRevisions = (flags.closes?.revision_requests ?? []).length > 0;
   const closing = closingLines(flags.closes);
@@ -211,7 +213,7 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
         {warnEmbargo && (
           <section aria-label="Under embargo" className={WARNING_CALLOUT}>
             <i className="fas fa-lock mr-1.5" aria-hidden />
-            {embargoWarning(outcome, embargo.until)}
+            {embargoWarning(embargo.until)}
           </section>
         )}
         {!!flags.closes?.findings?.length && <section aria-label="Recorded findings">
