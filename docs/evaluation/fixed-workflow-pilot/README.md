@@ -148,6 +148,8 @@ All metrics are **declared before measurement**. They are reported separately an
 
 **Gates. Each one blocks only the enablement it names.**
 
+The development values for the first three gates are recorded in [development-limits.md](development-limits.md) (IR-861). Jive Tyler I. Revalde approved them for development only on 2026-11-04; production stays unapproved.
+
 | Gate | Blocks | Status |
 |---|---|---|
 | Per-stage and per-run values: physical attempts, output tokens, cost | IR-545 enablement and any paid run | **OPEN.** Proposed values need owner approval. The enforcing mechanism exists (§10); every value is an unset, required setting |
