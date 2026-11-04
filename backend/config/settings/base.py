@@ -627,6 +627,12 @@ AI_RESEARCH_LANE = config("AI_RESEARCH_LANE", default="off")
 # Off until IR-545's queue sizing and spend gates are approved (fixed-workflow
 # pilot README §6).
 AI_DURABLE_ASK = config("AI_DURABLE_ASK", default=False, cast=bool)
+# IR-863: which path answers a reader's Ask IRIS question. Off, Django answers
+# exactly as before; on, the reader opens AI-runtime runs (ADR-049) through the
+# same-origin edge, which issues no grant while this is off. The browser reads
+# it from /ai/reader/ and cannot choose for itself. Enabling it on a real
+# deployment needs IR-861's recorded limits and a person's approval.
+AI_RUNTIME_READER = config("AI_RUNTIME_READER", default=False, cast=bool)
 # Fixed at submission and never moved by a redelivery (pilot contract §1).
 AI_DURABLE_ASK_DEADLINE_SECONDS = config("AI_DURABLE_ASK_DEADLINE_SECONDS", default=30, cast=int)
 # How long past its deadline an unfinished run waits before a reader expires it.

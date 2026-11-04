@@ -103,6 +103,9 @@ services:
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - DOCLING_API_URL=http://docling:5001
       - AI_GATEWAY_URL=http://ai-gateway:8001
+      # The Ask IRIS reader path (IR-863), from the repo-root .env so nginx and
+      # Django read one value. Off: Django answers as before.
+      - AI_RUNTIME_READER=${AI_RUNTIME_READER:-false}
     depends_on:
       db:
         condition: service_healthy
@@ -381,8 +384,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        VITE_AI_RUNTIME_READER_ENABLED: ${VITE_AI_RUNTIME_READER_ENABLED:-false}
     restart: unless-stopped
     # Not published (IR-847): Caddy is the only way in. nginx listens on 8080
     # because the runtime image is nginx-unprivileged (IR-156).
@@ -393,6 +394,9 @@ services:
       - TRUSTED_PROXY_COUNT=${TRUSTED_PROXY_COUNT:-}
       # Server-only nginx credential. Never use a VITE_ prefix for this secret.
       - AI_GATEWAY_SERVICE_SECRET=${AI_GATEWAY_SERVICE_SECRET:-}
+      # The Ask IRIS reader path (IR-863): the same value backend reads, so nginx
+      # requires the gateway secret exactly when Django opens the path.
+      - AI_RUNTIME_READER=${AI_RUNTIME_READER:-false}
     # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
     # longer serves /media/, so the web container has no reason to be able to
     # read uploaded documents at all.

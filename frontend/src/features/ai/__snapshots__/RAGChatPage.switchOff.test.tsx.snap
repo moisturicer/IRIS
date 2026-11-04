@@ -1,0 +1,43 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`asks through Django with the same requests as before the switch existed 1`] = `
+[
+  {
+    "method": "GET",
+    "url": "/ai/conversations/",
+  },
+  {
+    "method": "GET",
+    "url": "/ai/status/",
+  },
+  {
+    "method": "GET",
+    "url": "/records/classifications/",
+  },
+  {
+    "body": {},
+    "method": "POST",
+    "protocol": "public-1",
+    "url": "/ai/conversations/",
+  },
+  {
+    "method": "GET",
+    "url": "/ai/conversations/",
+  },
+  {
+    "body": {
+      "conversation_id": 7,
+      "question": "What predicts flooding?",
+      "request_id": "<uuid>",
+      "top_k": 5,
+    },
+    "method": "POST",
+    "protocol": "public-1",
+    "url": "/api/v1/ai/ask/stream/",
+  },
+  {
+    "method": "GET",
+    "url": "/ai/conversations/",
+  },
+]
+`;
