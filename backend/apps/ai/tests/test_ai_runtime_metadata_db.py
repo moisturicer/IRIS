@@ -113,7 +113,8 @@ def test_a_paper_with_no_manuscript_is_named_but_has_nothing_to_read(research):
     assert found.status == "ok"
     assert found.matches[0].match == "record_id"
     assert found.matches[0].records[0].source is None
-    assert page.status == "no_match"
+    # Absent, not unmatched: the model can tell "no Manuscript" from "no such page" (IR-731).
+    assert (page.status, page.reason) == ("no_match", "no_manuscript")
 
 
 def test_paper_chat_resolves_only_its_own_record(research):

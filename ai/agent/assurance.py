@@ -35,7 +35,13 @@ _INTRODUCED_TITLE = re.compile(
 )
 _EXHAUSTIVE = re.compile(
     r"\b(all (?:the )?(?:papers|records|studies)|every (?:paper|record|study)|there are|exhaustive"
-    r"|complete (?:list|corpus)|only \d+ (?:papers|records|studies))\b", re.I)
+    r"|complete (?:list|corpus)|only \d+ (?:papers|records|studies)"
+    # A search is a sample, so it is never complete or comprehensive (IR-731).
+    r"|(?<!not a )(?<!not an )(?:complete|comprehensive|exhaustive) (?:literature )?search|search(?:ed|ing)? (?:all|every))\b", re.I)
+#: A claim that nothing matched, which a failed tool can never support (IR-731).
+_ABSENCE = re.compile(
+    r"\b(?:no|zero|0)\s+(?!(?:more|less|fewer)\b)(?:[\w-]+\s+){0,2}?(?:papers?|records?|stud(?:y|ies)|theses|thesis|matches|results)\b"
+    r"|\bnone\b|\bnothing\b", re.I)
 _LINE = re.compile(r"\n+")
 _SENTENCE = re.compile(r"(?<=[.!?])\s+")
 
@@ -51,10 +57,12 @@ def cited(text: str) -> list[str]:
     return list(dict.fromkeys(CITE.findall(text)))
 
 
-def findings(text: str, investigation: Investigation, *, prior=(), excluded=()) -> dict[str, list[str]]:
+def findings(text: str, investigation: Investigation, *, prior=(), excluded=(),
+             clarification: bool = False) -> dict[str, list[str]]:
     """Each failing rule's code and the draft's own items that broke it, in order.
 
-    `prior` Turns were checked when delivered, so their numbers count as supported.
+    `prior` Turns were checked when delivered, so their numbers count as supported. A
+    `clarification` asks the reader a question, so it states no absence (IR-731).
     """
     found: dict[str, list[str]] = {}
 
@@ -73,8 +81,10 @@ def findings(text: str, investigation: Investigation, *, prior=(), excluded=()) 
     # Passage handles are the only citation namespace.
     for label in re.findall(r"\[[^\]\n]+\]", body):
         fail("unknown_citation", label)
-    # A question answered with no repository context is general background.
-    if not (investigation.researched or investigation.papers or investigation.counts):
+    # A question answered with no repository context is general background; one whose
+    # research failed is not, and its claims are still checked (IR-731).
+    if not (investigation.researched or investigation.papers or investigation.counts
+            or investigation.outages):
         return found
     supported = {Decimal(f) for f in investigation.figures}
     for turn in prior:
@@ -103,10 +113,14 @@ def findings(text: str, investigation: Investigation, *, prior=(), excluded=()) 
     exact = {Decimal(f) for f in investigation.exact}
     for line in _LINE.split(body.strip()):
         for sentence in _SENTENCE.split(line):
-            if numbers(sentence) & exact:
-                continue
-            for match in _EXHAUSTIVE.finditer(sentence):
-                fail("completeness_overclaim", match.group())
+            stated = numbers(sentence) & exact
+            if not stated:
+                for match in _EXHAUSTIVE.finditer(sentence):
+                    fail("completeness_overclaim", match.group())
+            # A failed tool's result is unknown: only an exact zero may say nothing matched (IR-731).
+            if investigation.outages and not clarification and Decimal(0) not in stated:
+                for match in _ABSENCE.finditer(sentence):
+                    fail("outage_absence", match.group())
     for match in re.finditer(r"\bscreened\b", body, re.I):
         fail("completeness_overclaim", match.group())
     return found
@@ -127,6 +141,8 @@ _FEEDBACK = {
                           "cite, or leave it out.",
     "unknown_title": "These are not titles of papers you read: {items}. Name only papers this "
                      "conversation returned, exactly as titled.",
+    "outage_absence": "A research step failed, so its result is unknown, not empty; do not say that "
+                      "nothing matched, such as {items}. Say what could not be checked instead.",
     "completeness_overclaim": "A search returns a sample of matching passages, never the whole "
                               "repository; remove claims of completeness such as {items}. State a "
                               "total only in the sentence giving the exact figure count_records returned.",
@@ -150,6 +166,21 @@ def feedback(found: dict[str, list[str]]) -> str:
 
 _LEADING_CITES = re.compile(r"(?:\[P[0-9a-f]{20}\]\s*)+")
 LIMITATION = "Part of the drafted answer could not be checked against its sources and was left out."
+
+
+#: What each tool does, in the reader's words, for the outage limitation (IR-731).
+_STEPS = {
+    "search": "searching passages", "open_passage": "rereading a passage", "read_page": "reading a page",
+    "outline": "listing a paper's sections", "resolve_papers": "finding a named paper",
+    "count_records": "counting records", "update_plan": "updating the research plan",
+}
+
+
+def outage_limitation(outages) -> str:
+    """The fixed line a delivered answer ends with when a research step failed."""
+    steps = ", ".join(_STEPS.get(name, "a research step") for name in outages)
+    return (f"A research step failed while this answer was prepared ({steps}), so it covers only "
+            "what could be read and is not a complete search.")
 
 
 def _sentences(line: str) -> list[str]:
