@@ -28,7 +28,7 @@ from ai.agent.context import FittedAgentProvider, OverCapacity, Reserves
 from ai.agent.protocol import (
     AgentRequest, ModelTurn, NotFinal, Pin, StopReason, Text, ToolGroup, ToolResult, User, final_answer,
 )
-from ai.agent.tools import ENDS_RUN, Investigation, RunEnded
+from ai.agent.tools import ENDS_RUN, OUTAGES, TOOL_UNAVAILABLE, Investigation, RunEnded
 from ai.domain.ports import LLMProvider, ProviderRejected, TransientProviderError, UnsupportedCapability
 from ai.research.tools import OK
 from ai.runs import config as runs_config
@@ -243,7 +243,7 @@ class _Run:
                     continue
                 outcome = await self.investigation.execute(call)
                 if outcome.clarification is not None:
-                    self._checked(outcome.clarification)
+                    self._checked(outcome.clarification, clarification=True)
                     return self._result(outcome.clarification, (), kind="clarification")
                 progressed = progressed or outcome.progress
                 results.append(ToolResult(call.id, outcome.content))
@@ -325,9 +325,20 @@ class _Run:
     async def _commit(self, text: str) -> Result:
         await self._recheck(text)
         answer, citations = assurance.deliver(text, self.investigation)
+        if self.investigation.outages:
+            # Said by the application, not left to the model; it is part of the stored Turn (IR-731).
+            answer = f"{answer}\n\n{assurance.outage_limitation(self.investigation.outages)}"
         return self._result(answer, citations)
 
     async def _recheck(self, text: str) -> None:
+        try:
+            await self._recheck_sources(text)
+        except OUTAGES as failure:
+            # A source that cannot be reached cannot be vouched for; nothing is delivered (IR-731).
+            log.warning("agent recheck failed: %s", type(failure).__name__)
+            raise Unavailable(TOOL_UNAVAILABLE) from None
+
+    async def _recheck_sources(self, text: str) -> None:
         # A handle this run was never shown has no source to recheck; the checks refuse it.
         for handle in (h for h in assurance.cited(text) if h in self.investigation.passages):
             # Each cited source is still readable and unreplaced just before commit.
@@ -349,12 +360,13 @@ class _Run:
         chosen = getattr(self.investigation, name)
         return list(chosen if chosen is not None else (self.context.state or {}).get(name, ()))
 
-    def _findings(self, text: str) -> dict:
-        return assurance.findings(text, self.investigation, prior=self.prior, excluded=self._focus("excluded"))
+    def _findings(self, text: str, *, clarification: bool = False) -> dict:
+        return assurance.findings(text, self.investigation, prior=self.prior, excluded=self._focus("excluded"),
+                                  clarification=clarification)
 
-    def _checked(self, text: str) -> None:
+    def _checked(self, text: str, *, clarification: bool = False) -> None:
         """A clarification or a salvaged answer that fails a check is never delivered."""
-        failures = sorted(self._findings(text))
+        failures = sorted(self._findings(text, clarification=clarification))
         if failures:
             log.info("agent draft refused: %s", ",".join(failures))
             raise Unavailable("invalid_draft")
