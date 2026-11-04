@@ -18,7 +18,6 @@ EXPECTED = {
     "db": ["private"],
     "redis": ["private"],
     "migrate": ["private"],
-    "docling": ["private"],
     "frontend": ["private"],
     "celery-beat": ["private"],
     "backend": ["private", "egress"],

@@ -118,6 +118,9 @@ class ProductionSettingTests(APITestCase):
             "EMAIL_HOST": "smtp.example.edu",
             "EMAIL_HOST_USER": "iris@example.edu",
             "EMAIL_HOST_PASSWORD": "test-only",
+            # LlamaParse is required in production too (IR-843).
+            "LLAMAPARSE_API_KEY": "llx-test",
+            "LLAMAPARSE_VERSION": "2026-09-28",
         }
         env.pop("TRUSTED_PROXY_COUNT", None)
         env.update(extra)

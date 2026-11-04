@@ -234,7 +234,7 @@ export type Capability =
 
 /**
  * `GET /records/<id>/metadata-suggestions/` (IR-406; spec §4.5). `pending`
- * while Docling reads the manuscript, `ready` once it has, `failed` when it
+ * while the manuscript is being read, `ready` once it has, `failed` when it
  * could not (an image-only scan included), `unsupported` when there is no
  * manuscript extraction at all. A `ready` field with nothing found is null.
  * `source` is `llamaextract` when LlamaExtract read a LlamaParse Manuscript

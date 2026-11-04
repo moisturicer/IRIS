@@ -58,6 +58,9 @@ def production():
         "EMAIL_HOST": "smtp.example.edu",
         "EMAIL_HOST_USER": "iris@example.edu",
         "EMAIL_HOST_PASSWORD": "test-only",
+        # LlamaParse is required in production too (IR-843).
+        "LLAMAPARSE_API_KEY": "llx-test",
+        "LLAMAPARSE_VERSION": "2026-09-28",
     }
     done = subprocess.run(
         [sys.executable, "-c", PROBE], cwd=BACKEND, env=env,

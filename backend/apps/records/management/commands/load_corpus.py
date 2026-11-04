@@ -31,7 +31,7 @@ re-created. A non-PDF file in a category folder is skipped with a message,
 not a failure. A file whose storage path Django refuses to write (IR-422)
 is skipped the same way, per-record, rather than aborting the whole run.
 
-Needs Docling and a worker on the ``extraction`` queue to actually complete;
+Needs LlamaParse and a worker on the ``extraction`` queue to actually complete;
 chunking is queued automatically after
 (``documents.tasks._queue_chunking_if_manuscript``). No vendor account
 needed -- chunking does not embed, and the disclosure gate refuses to embed a

@@ -53,7 +53,7 @@ def make_user(email, role_name=ROLE_STUDENT):
 
 #: `page_sizes` for a letter-size page 4 -- `make_record`'s chunk is always
 #: `source_page=4`, and `page_sizes` is keyed by page number as a string,
-#: the same shape `apps.ai.extraction.docling_mapping._page_sizes` writes.
+#: the same shape `document_to_json` writes.
 LETTER = {"4": [612.0, 792.0]}
 
 

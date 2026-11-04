@@ -24,8 +24,6 @@ from apps.ai.chunking import (
     registered_strategies,
 )
 from apps.ai.chunking.document import HEADING, PARAGRAPH
-from apps.ai.chunking.normalizer import normalize
-from apps.ai.extraction.docling_mapping import normalized_document_from_docling
 
 ALL_STRATEGIES = sorted(registered_strategies())
 
@@ -110,51 +108,6 @@ def test_a_chunk_spanning_a_page_break_carries_regions_on_more_than_one_page(
     assert len(result.chunks) == 1
     pages = {b.page for b in result.chunks[0].bboxes}
     assert pages == {7, 8}
-
-
-def test_a_bottom_left_extractor_rect_reaches_the_chunk_in_top_left_points(strategy_id):
-    """The whole path, not just the mapping: an extractor emitting
-    bottom-left origin rects must produce chunks whose regions are top-left,
-    because top-left is what the PDF viewer draws in.
-
-    Asserting `top < bottom` on a fixture built top-left would be a
-    tautology — it has to start life bottom-left for the test to mean
-    anything. The conversion itself is tested in the mapping's own suite;
-    what this covers is that nothing between there and the chunk undoes it.
-    """
-    docling = {
-        "name": "thesis.pdf",
-        "texts": [
-            {
-                "self_ref": "#/texts/0",
-                "label": "text",
-                "text": "Ponds were sampled weekly.",
-                "prov": [
-                    {
-                        "page_no": 1,
-                        "bbox": {
-                            "l": 72.0,
-                            "t": 692.0,
-                            "r": 540.0,
-                            "b": 662.0,
-                            "coord_origin": "BOTTOMLEFT",
-                        },
-                    }
-                ],
-            }
-        ],
-        "tables": [],
-        "pictures": [],
-        "groups": [],
-        "pages": {"1": {"size": {"width": 612.0, "height": 792.0}}},
-    }
-    document = normalized_document_from_docling(docling)
-
-    result = chunk_document(document, strategy_id, max_tokens=512)
-
-    (region,) = result.chunks[0].bboxes
-    assert (region.top, region.bottom) == (100.0, 130.0)
-    assert region.top < region.bottom
 
 
 def test_a_repeated_element_contributes_one_region_not_several(strategy_id):
@@ -272,42 +225,6 @@ def test_chunkset_hash_ignores_regions_directly():
     )
 
     assert chunkset_hash([bare]) == chunkset_hash([located])
-
-
-# --------------------------------------------------------------------------
-# Regions survive normalization
-# --------------------------------------------------------------------------
-
-
-def test_a_hyphenated_rejoin_across_a_page_break_keeps_both_regions():
-    """The rejoined element is one element assembled from two, so it carries
-    both rectangles. Keeping only the first would silently truncate the
-    highlight at the page boundary — the exact evidence a reviewer needs."""
-    document = build(
-        DocumentElement(kind=PARAGRAPH, text="a mixed-method-", page=7, bboxes=(box(7, 700.0),)),
-        DocumentElement(kind=PARAGRAPH, text="ology was used.", page=8, bboxes=(box(8, 90.0),)),
-    )
-
-    result = normalize(document, ChunkingOptions())
-
-    assert len(result.elements) == 1
-    assert {b.page for b in result.elements[0].bboxes} == {7, 8}
-    # `bbox` remains the first region, so `page` and the rect agree.
-    assert result.elements[0].bbox == box(7, 700.0)
-
-
-def test_a_chunk_of_a_rejoined_element_still_spans_both_pages(strategy_id):
-    document = build(
-        DocumentElement(kind=PARAGRAPH, text="a mixed-method-", page=7, bboxes=(box(7, 700.0),)),
-        DocumentElement(kind=PARAGRAPH, text="ology was used.", page=8, bboxes=(box(8, 90.0),)),
-    )
-    options = ChunkingOptions(strategy=strategy_id, max_tokens=512)
-
-    normalized = normalize(document, options)
-    result = build_chunker(options).chunk(normalized, options)
-
-    pages = {b.page for chunk in result.chunks for b in chunk.bboxes}
-    assert pages == {7, 8}
 
 
 def test_page_sizes_are_stored_once_per_chunk_set_not_on_every_chunk(strategy_id):

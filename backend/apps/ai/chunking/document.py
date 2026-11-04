@@ -1,8 +1,8 @@
 """The document the chunker consumes.
 
 This type is **owned by IRIS**. The chunker must never import a vendor model:
-Docling is the extractor today, but swapping extractors has to change an
-adapter, not this type, the port, or its contract suite.
+swapping extractors has to change an adapter, not this type, the port, or its
+contract suite.
 
 It is also what lets the chunker be built and tested before any extractor
 exists, against documents assembled by hand.
@@ -24,10 +24,8 @@ LIST_ITEM = "list_item"
 CAPTION = "caption"
 FORMULA = "formula"
 
-# Not mapped by the Docling adapter (see docling_mapping.py's module
-# docstring) — these arrive as Docling's own labels, carried through
-# unchanged specifically so the normalizer can drop them without guessing
-# at running headers/footers from their text.
+# Docling's running header and footer labels, still carried by structures it
+# stored before IR-843. LlamaParse's are ``header`` and ``footer``.
 PAGE_HEADER = "page_header"
 PAGE_FOOTER = "page_footer"
 
@@ -57,7 +55,7 @@ class DocumentElement:
     """One structural element of a document, with where it came from.
 
     ``page`` and ``bboxes`` are populated by the extraction adapter (CURRENT
-    — ``apps.ai.extraction.docling_mapping``, IR-107) and carried through to
+    — ``apps.ai.extraction.shaping``, IR-840) and carried through to
     chunks so a citation can be highlighted. They stay optional because the
     chunker core does not need them: a document assembled by hand in a test
     chunks identically without them.
