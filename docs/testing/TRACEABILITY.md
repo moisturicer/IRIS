@@ -157,6 +157,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
 | **IR-833** | Publish fills in a reliable title and abstract from the PDF and never overwrites the author's edits — no FR- id; IR-830 decisions 14–18 | [details](traceability/IR-833.md) | **IMPLEMENTED** |
 | **IR-846** | Publish suggestions for a LlamaParse Manuscript come from LlamaExtract, each with its page, cited text and reported confidence — no FR- id; ADR-056 §15 within IR-830's contract | [details](traceability/IR-846.md) | **IMPLEMENTED** |
+| **IR-884** | ADR-049 and the AI runtime spec are on `main`; IR-714's resume, export and review questions have owners | [details](traceability/IR-884.md) | **PARTIAL** |
 | **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
 
 ### Non-functional
