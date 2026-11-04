@@ -10,6 +10,8 @@ from dataclasses import dataclass
 
 EXECUTORS = ("deterministic", "agent")
 DEPTHS = ("ordinary", "deep")
+#: Owner decision, ADR-049's 2026-11-04 amendment (IR-885).
+DEFAULT_DEPTH = "deep"
 PROTOCOL = "runs-1"
 SCHEMA = "0004_agent.sql"
 
@@ -60,6 +62,7 @@ class Dispatch:
     #: Running at once per reader, so one account cannot hold every slot.
     max_running_per_reader: int
     #: Deep runs running at once; every other slot is kept for ordinary ones.
+    #: Deep is the default depth, so this caps most runs.
     deep_concurrency: int
     #: Slots per worker process.
     worker_concurrency: int
