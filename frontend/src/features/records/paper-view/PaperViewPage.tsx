@@ -949,7 +949,7 @@ export default function PaperViewPage() {
                   "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   railHidden
                     ? "gap-y-0 overview-wide:grid-cols-[minmax(0,1fr)_0rem] overview-wide:gap-x-0"
-                    : "overview-wide:grid-cols-[minmax(0,1fr)_22rem] overview-wide:gap-x-12",
+                    : "overview-wide:grid-cols-[minmax(0,1fr)_clamp(17rem,25cqw,22rem)] overview-wide:gap-x-8",
                 ),
             )}
           >
@@ -1205,12 +1205,11 @@ export default function PaperViewPage() {
 
                 {/* The reading sections, each under a hairline (IR-569). */}
                 <div className="border-t border-stone-200 divide-y divide-stone-200 [&>*]:py-8 [&>:last-child]:pb-0">
-                {/* Abstract, as a reading column: a measure of ~65 characters
-                    and relaxed leading, not justified text (IR-356). */}
+                {/* The abstract shares the reading column with its heading and actions. */}
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="max-w-[68ch] text-lg text-stone-700 leading-7">
+                    <p className="text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (
@@ -1299,7 +1298,7 @@ export default function PaperViewPage() {
             >
               <aside
                 aria-labelledby={`${tabsId}-details`}
-                className="min-h-0 space-y-4 overflow-hidden border-t border-stone-200 pt-8 overview-wide:w-[22rem] overview-wide:overflow-visible overview-wide:border-t-0 overview-wide:pt-0"
+                className="min-h-0 space-y-4 overflow-hidden border-t border-stone-200 pt-8 overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible overview-wide:border-t-0 overview-wide:pt-0"
               >
                 <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
                   Record details
