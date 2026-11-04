@@ -65,7 +65,7 @@ class Compaction:
             if not (isinstance(value, int) and not isinstance(value, bool) and value > 0):
                 raise ValueError(f"compaction {f.name} must be a positive integer")
 
-    def reserves(self, reserves: Reserves) -> Reserves:
+    def summary_reserves(self, reserves: Reserves) -> Reserves:
         """What a summary request holds back: its own output, nothing for tools or repair."""
         return Reserves(output_tokens=self.summary_tokens, reasoning_tokens=reserves.reasoning_tokens,
                         next_result_tokens=0, repair_tokens=0)
@@ -74,7 +74,7 @@ class Compaction:
         """The threshold leaves room both to summarize and to finish under the verified capacity."""
         if capacity is None:
             return False
-        summary = self.reserves(reserves)
+        summary = self.summary_reserves(reserves)
         generated = summary.output_tokens + (summary.reasoning_tokens if capacity.max_reasoning_tokens is None
                                              else 0)
         return (generated <= capacity.max_output_tokens
@@ -127,6 +127,11 @@ def is_handoff(entry) -> bool:
 
 def is_state(entry) -> bool:
     return isinstance(entry, User) and entry.text.startswith(STATE_PREFIX)
+
+
+def reader(text: str) -> str:
+    """Reader text, marked when it starts like a handoff or the state message so it never passes for one."""
+    return "(reader) " + text if text.startswith((PREFIX, STATE_PREFIX)) else text
 
 
 def split(history, keep: int) -> Optional[Split]:
@@ -213,8 +218,8 @@ def build(summary: dict, *, previous: Optional[dict], compacted: list[int], pass
         if cited or came_from:
             findings.append({"text": raw["text"].strip(), "passages": list(dict.fromkeys(cited)),
                              "turns": sorted(set(came_from))})
-    sources = {*(previous or {}).get("sources", ()),
-               *(passages[h].source.revision for f in findings for h in f["passages"])}
+    # Every passage read, not only those a finding cites: the goal and limitations may draw on any.
+    sources = {*(previous or {}).get("sources", ()), *(p.source.revision for p in passages.values())}
     return {
         "format": FORMAT, "derived": True, "goal": summary["goal"].strip(),
         "preferences": _texts(summary.get("preferences")), "findings": findings,
@@ -222,6 +227,16 @@ def build(summary: dict, *, previous: Optional[dict], compacted: list[int], pass
         "shown": list(state.get("shown", ())), "selected": list(state.get("selected", ())),
         "excluded": list(state.get("excluded", ())), "turns": turns, "sources": sorted(sources),
     }
+
+
+#: What every handoff body carries; a saved body missing any is not one.
+BODY_KEYS = frozenset({"format", "derived", "goal", "preferences", "findings", "limitations", "plan", "shown",
+                       "selected", "excluded", "turns", "sources"})
+
+
+def well_formed(body) -> bool:
+    return (isinstance(body, dict) and BODY_KEYS <= set(body) and body["format"] == FORMAT
+            and all(isinstance(body[k], list) for k in BODY_KEYS - {"format", "derived", "goal"}))
 
 
 def render(body: dict, papers: dict, *, passages: bool) -> User:

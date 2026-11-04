@@ -121,7 +121,7 @@ class AgentExecutor:
         self.reserves = reserves
         #: None never compacts: a full window then closes research, as before (IR-734).
         self.compaction = compaction
-        self.summarizer = FittedAgentProvider(provider, compaction.reserves(reserves)) if compaction else None
+        self.summarizer = FittedAgentProvider(provider, compaction.summary_reserves(reserves)) if compaction else None
         #: Research needs configured bounds per depth; none are defaulted.
         self.profiles = checked_profiles(profiles) if profiles is not None else None
         #: The pinned model's price; a paid provider without one cannot bound cost.
@@ -359,20 +359,23 @@ class _Run:
     async def _open(self) -> list:
         history: list = []
         state = self.context.state or {}
-        if self.handoff:
-            # Earlier Turns arrive compacted; its excluded and shown papers are recalled with the state's.
-            await self.investigation.recall({**state, "shown": [*state.get("shown", ()), *self.handoff["shown"]],
-                                             "excluded": [*state.get("excluded", ()), *self.handoff["excluded"]],
-                                             "selected": [*state.get("selected", ()), *self.handoff["selected"]]})
-            history.append(compacting.render(self.handoff, self.investigation.papers, passages=False))
+        handoff = self.handoff
+        if handoff and self.context.state is not None:
+            # What is shown, selected and excluded now, not when the handoff was written.
+            handoff = {**handoff, **{k: list(state.get(k, ())) for k in ("shown", "selected", "excluded")}}
+        # One read gives the handoff's papers the same handles the state message uses.
+        also = [*handoff["shown"], *handoff["selected"], *handoff["excluded"]] if handoff else ()
+        shown = await self.investigation.recall(state, also=also)
+        if handoff:
+            # Earlier Turns arrive compacted (IR-734).
+            history.append(compacting.render(handoff, self.investigation.papers, passages=False))
         for turn in self.prior:
             answer = DELIVERED_MARKER.sub("", turn.answer)
-            history += [User(turn.question), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
-        shown = await self.investigation.recall(state)
+            history += [User(compacting.reader(turn.question)), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
         if shown:
             history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False)))
-        # The reader's words, unchanged, whatever queries the agent forms.
-        history.append(User(self.question))
+        # The reader's words, unchanged unless they would pass for derived context.
+        history.append(User(compacting.reader(self.question)))
         return history
 
     async def _resume(self) -> Optional[tuple[list, int]]:
@@ -476,12 +479,10 @@ class _Run:
         """A saved history opens only with a handoff that is committed and still this run's to use (IR-734)."""
         if not compaction:
             return self.handoff_revision is None
-        try:
-            revision = compaction["revision"]
-            compacting.render(compaction["body"], {}, passages=False)
-            int(compaction["through"]), list(compaction["carried"])
-        except (KeyError, TypeError, ValueError):
+        if not (isinstance(compaction, dict) and compacting.well_formed(compaction.get("body"))
+                and type(compaction.get("through")) is int and isinstance(compaction.get("carried"), list)):
             return False
+        revision = compaction.get("revision")
         return revision in self.context.committed or revision == self.handoff_revision
 
     async def _save(self, history: list, stale: int) -> None:
