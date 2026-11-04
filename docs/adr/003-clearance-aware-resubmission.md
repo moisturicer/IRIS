@@ -4,6 +4,13 @@
 
 Accepted — 2026-09-01. **This ADR records the primary research contribution.**
 
+**Corrected 2026-11-04.** The Decision below still holds and is built. The Context describes code that is gone:
+
+- **The route table is gone.** There are no `rdco_intake`, `parallel_review` or `rdco_review` stages. Every Record enters with its Adviser (ADR-032 §1). The Adviser sends a Thesis/Research or Project to RDCO, and RDCO requests offices in parallel (ADR-047).
+- **`reviews/services.py` no longer exists.** The reset now lives in `apps/reviews/new_version.py`. Under `CLEARANCE_AWARE` it resets only the clearances of the parties whose Revision requests the new Version answers, and reopens only their Seats (`:112-117`, `:242-255`).
+- **"A sequential-stage decline resets everything" no longer applies.** There are no sequential stages, and a revision request by the Adviser or RDCO reopens only that party.
+- **"Decline" is now a *Revision request*,** which leaves `RecordClearance` untouched until the new Version (ADR-032 §5, IR-272).
+
 ## Context
 
 IRIS routes research and IP submissions through parallel clearance by up to three offices (ITSO, IERC, KTTO) after RDCO intake, with routing differentiated by record type:

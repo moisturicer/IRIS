@@ -10,6 +10,8 @@
 
 **Amended 2026-11-01, after the build,** by Hermoine Zozobrado, to record two behaviours PR #410 added and this text did not state: §5's return to the last submitted manuscript, and §7's refusal to reverse once work exists.
 
+**Amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted): §9 and §10 added.** §9 records where a resubmission goes and what the Adviser may do after the send. Both were built in IR-767 and stated only in code (`apps/reviews/new_version.py:18-24`) and in an ADR-032 §5 line. §10 lets RDCO publish an Unlisted paper later, and makes publishing, at the Decision or later, require the embargo to be None or Released. That reverses [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) decision 14. Not built.
+
 **Supersedes, in part, [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md):**
 
 - §3: *Accept & publish* for the Adviser, *Accept & route*, "RDCO enters only on the specialist path", "Nobody routes to RDCO by hand", and the hand-back
@@ -156,6 +158,26 @@ At the REST seam, replacing ADR-032 §12's two hand-back tests:
 - The Adviser's accept & send and rejection are still refused while a Revision request is open.
 - The cutover migration opens exactly one RDCO assignment for an in-flight specialist Record and none for an Adviser-stage or RDCO-held one.
 - Clearance-aware: unchanged. IERC requests a revision after ITSO cleared, and the new Version resets IERC only.
+
+### 9. After the send, and after a revision (amendment, 2026-11-04)
+
+- **A revision goes to the author, and the next Version goes back to whoever asked.** Every Revision request is answered by the owner's new Version (ADR-032 §5, IR-273). That Version reopens only the parties whose requests it answers. An RDCO request returns the paper to RDCO, an office's request to that office, and an Adviser-stage request to the Adviser. Nobody else re-reviews under `CLEARANCE_AWARE`, and the Adviser's acceptance stands, as an office's Clearance does. This is ADR-003 applied to every party.
+  - *Rejected: every resubmission returns to the Adviser first.* The Adviser would check every change, at the cost of a second step on every revision and against the rule that only the party that asked reviews again.
+- **After the send, the Adviser's part is over.** Their assignment completes (§1). They stay a participant, so they read the review and may comment (ADR-032 §7, IR-419). They can't request a revision, reject, or re-accept a later Version. A Version RDCO or an office asked for doesn't reopen them.
+- Tests: an RDCO Revision request's answering Version reopens RDCO's Seat and no Adviser Seat. An Adviser after the send is offered `comment_review` and neither `request_revision` nor `reject`.
+
+### 10. Publishing an Unlisted paper, and the embargo (amendment, 2026-11-04)
+
+**Unlisted** is `completed`: a Thesis/Research or Project RDCO accepted and kept out of Discover, for example ahead of a patent filing. Reviewing is over. Only the people `visible_to` already admits read it. Until now it was terminal (`DecisionDialog.tsx:75`: "Publishing it later is not yet possible in IRIS").
+
+- **RDCO may publish an Unlisted paper later.** A new act, capability `publish_unlisted`, offered to RDCO members on a `completed` Record. It asks for confirmation and an optional note, moves the status to `published`, writes an `AuditEvent`, and tells the owners and the Adviser. Nothing else changes: no Version, no Clearance, no review reopens.
+- **Publishing needs the embargo answered and not Active.** It is allowed only when the Record's embargo state is **None** or **Released** (ADR-052). This applies to *Accept & publish* in RDCO's Decision and to `publish_unlisted` alike:
+  - **While the embargo is Active**, the Decision offers *Accept, keep unlisted* and *Reject*, not *Accept & publish*. It says why: *"Under embargo until <date>. Release the embargo, then publish."* `publish_unlisted` is refused with a 400 naming the state.
+  - **A paper with no embargo answer (Unknown)** can't be published either. A first submission already needs an answer (ADR-052, IR-816), so this concerns only older or imported Records.
+  - **Release first, then publish.** The Adviser or RDCO releases the embargo (ADR-052 decision 6). That release already queues the paper for the AI (decision 10), so a published paper reaches Ask IRIS through the same gate, and IP and consent still apply.
+- *Rejected: Unlisted stays terminal.* A paper held for a patent would then stay hidden forever once the patent is filed.
+- *Rejected: publishing releases the embargo itself.* It saves a step, but ending an embargo would happen as a side effect, and ADR-052's rule is that a person ends it on purpose.
+- Tests: RDCO publishes a `completed` Record with a Released embargo, and it is `published` and audited. The same with an Active or Unknown embargo is refused with a 400. RDCO's Decision on an embargoed Record offers no `accept_publish`. Nobody outside RDCO is offered `publish_unlisted`.
 
 ## Alternatives Considered
 
