@@ -181,7 +181,8 @@ class _Run:
         self.question = question
         self.tools = tools
         self.context = context
-        self.bounds = agent.profiles[context.depth]
+        # The run's own pinned bounds when it has them, never this worker's (IR-862).
+        self.bounds = context.bounds or agent.profiles[context.depth]
         self.budget = Budget(context.allowance, agent.price)
         self.deadline = time.monotonic() + context.remaining_seconds
         # One clarification at a time: not twice in a row, however much history is carried.

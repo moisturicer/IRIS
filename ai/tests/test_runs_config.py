@@ -33,9 +33,10 @@ def test_any_unset_limit_refuses_runs(name):
     assert f"{name} must be set and positive" in config.problems(settings(**{name: None}))
 
 
-def test_no_paid_executor_can_be_selected():
+def test_only_a_known_executor_can_be_selected():
+    # IR-862 adds "agent", which also needs the whole AGENT profile (test_agent_profile.py).
     assert config.problems(settings(RUNS_EXECUTOR="openai")) == [
-        "RUNS_EXECUTOR must be one of deterministic"
+        "RUNS_EXECUTOR must be one of deterministic, agent"
     ]
 
 

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-EXECUTORS = ("deterministic",)
+EXECUTORS = ("deterministic", "agent")
 DEPTHS = ("ordinary", "deep")
 PROTOCOL = "runs-1"
 SCHEMA = "0004_agent.sql"
@@ -96,8 +96,9 @@ def problems(values) -> list[str]:
 
 def read(values) -> RunsConfig:
     """From the gateway's settings; raises RunsUnavailable when incomplete."""
-    if problems(values):
-        raise RunsUnavailable
+    found = problems(values)
+    if found:
+        raise RunsUnavailable("; ".join(found))
     return RunsConfig(
         database_url=values.RUNS_DATABASE_URL,
         executor=values.RUNS_EXECUTOR,

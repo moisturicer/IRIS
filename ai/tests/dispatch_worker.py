@@ -21,7 +21,9 @@ from ai.runs.worker import Worker
 
 
 class SleepingExecutor:
-    name = "sleeping"
+    # A slowed deterministic executor: runs are answered by the executor their
+    # pin names (IR-862), and these runs are pinned to the deterministic one.
+    name = "deterministic"
     version = "1"
     reserved_units = 1
 

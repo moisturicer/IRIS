@@ -25,6 +25,7 @@ import json
 import uuid
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Mapping
 
 import asyncpg
 
@@ -293,9 +294,13 @@ class RunStore:
         for run in overdue:
             await self._end(conn, run["id"], "expired", "deadline", move_fence=True)
 
-    async def claim(self, run_id, *, worker: str, lease_seconds: int, executor: str,
-                    reserved_units: int) -> Claim | None:
-        """Take the run's lease under a new fence; None if it cannot run now."""
+    async def claim(self, run_id, *, worker: str, lease_seconds: int, executor: str | None,
+                    reserved_units: int | Mapping[str, int]) -> Claim | None:
+        """Take the run's lease under a new fence; None if it cannot run now.
+
+        `executor` None accounts the attempt to the run's pinned executor, with
+        `reserved_units` then given per executor name (IR-862).
+        """
         async with self._connect() as conn:
             async with conn.transaction():
                 return await self._claim(conn, run_id, worker, lease_seconds, executor, reserved_units)
@@ -338,6 +343,11 @@ class RunStore:
         if used >= row["allowance"]["max_attempts"]:
             await self._end(conn, run_id, "failed", "attempts_exhausted")
             return None
+        if executor is None:
+            # The executor the run is pinned to answers it (IR-862).
+            executor = (row["pinned"] or {}).get("executor", "")
+        if isinstance(reserved_units, Mapping):
+            reserved_units = reserved_units.get(executor, 0)
         await conn.execute(
             """INSERT INTO iris_ai.attempt_accounting (run_id, fence, executor, reserved_units)
                VALUES ($1, $2, $3, $4)""",
@@ -356,9 +366,9 @@ class RunStore:
                      prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"]) for t in reversed(prior)),
                      state=row["state"])
 
-    async def claim_next(self, *, worker: str, lease_seconds: int, executor: str,
-                         reserved_units: int, deep_concurrency: int,
-                         max_running_per_reader: int) -> Claim | None:
+    async def claim_next(self, *, worker: str, lease_seconds: int, executor: str | None,
+                         reserved_units: int | Mapping[str, int], deep_concurrency: int,
+                         max_running_per_reader: int, serves: list[dict] | None = None) -> Claim | None:
         """Claim the next runnable run, or None.
 
         Overdue runs are expired first. Deep runs are preferred while fewer
@@ -366,6 +376,10 @@ class RunStore:
         it, so ordinary runs keep the other slots. A reader already running
         `max_running_per_reader` waits. A run whose grant will not cover a
         whole lease waits for its reader to reconnect, until its deadline.
+
+        `serves` lists the pins this worker can answer (`executor`,
+        `executor_version`, `agent`); a run pinned otherwise waits for a
+        worker that can, until its deadline (IR-862). None claims any run.
         """
         async with self._connect() as conn:
             async with conn.transaction():
@@ -387,9 +401,15 @@ class RunStore:
                           AND (SELECT count(*) FROM iris_ai.ask_run o
                                 WHERE o.reader_id = r.reader_id AND o.state = 'running'
                                   AND o.lease_expires_at > now()) < $2
+                          AND ($4::jsonb IS NULL OR EXISTS (
+                                SELECT 1 FROM jsonb_array_elements($4::jsonb) s
+                                 WHERE s->'executor' = r.pinned->'executor'
+                                   AND s->'executor_version' = r.pinned->'executor_version'
+                                   -- A deterministic run has no `agent` key; its entry holds JSON null.
+                                   AND nullif(s->'agent', 'null'::jsonb) IS NOT DISTINCT FROM r.pinned->'agent'))
                         ORDER BY (r.depth = 'deep') DESC, r.created_at
                         LIMIT 1""",
-                    deep_open, max_running_per_reader, float(lease_seconds),
+                    deep_open, max_running_per_reader, float(lease_seconds), serves,
                 )
                 if run_id is None:
                     return None
