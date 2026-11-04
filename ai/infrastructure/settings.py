@@ -32,8 +32,14 @@ class Settings(BaseSettings):
     # `python -m ai.runs.migrate` uses.
     RUNS_DATABASE_URL: str = ""
     RUNS_MIGRATION_DATABASE_URL: str = ""
-    # Only the deterministic executor exists; no paid work is possible.
+    # What new runs are pinned to: "deterministic", or "agent", which needs
+    # the whole AGENT profile below and refuses to start without it (IR-862).
     RUNS_EXECUTOR: str = "deterministic"
+    # The AGENT profile (IR-862). No defaults: the model AGENT runs are pinned
+    # to, per-depth Bounds and the context Reserves, as JSON.
+    RUNS_AGENT_MODEL: str = ""
+    RUNS_AGENT_BOUNDS: str = ""
+    RUNS_AGENT_RESERVES: str = ""
     # No defaults: unset limits refuse every submission.
     RUNS_DEADLINE_SECONDS: int | None = None
     RUNS_LEASE_SECONDS: int | None = None
@@ -66,7 +72,16 @@ class Settings(BaseSettings):
     AI_ADMISSION_PRICES: str = ""
     AI_ADMISSION_MAX_OUTPUT_TOKENS: str = ""
     AI_ADMISSION_LEASE_GRACE_SECONDS: str = ""
-    
+    # The chat-completions AGENT provider (IR-860). Read by
+    # `ai.infrastructure.agent_config`; no defaults, and capacity is declared
+    # per model in AGENT_LLM_CAPACITIES, never inferred.
+    AGENT_LLM_ENDPOINT: str = ""
+    AGENT_LLM_API_KEY: str = ""
+    AGENT_LLM_MODELS: str = ""
+    AGENT_LLM_CAPABILITIES: str = ""
+    AGENT_LLM_DATA_POLICY: str = ""
+    AGENT_LLM_CAPACITIES: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()

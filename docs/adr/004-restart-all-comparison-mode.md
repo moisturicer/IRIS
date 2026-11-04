@@ -4,6 +4,11 @@
 
 Accepted — 2026-09-01
 
+**Corrected 2026-11-04.** Two facts about the built control that bear on the evaluation:
+
+- **Reopened offices kept a stale due date.** Under `RESTART_ALL` they reviewed again on their previous round's past due date, because only the requesting party's clock restarted (`apps/reviews/new_version.py:256-264`). Their coordinators were escalated as overdue at once, and their reviewers got no "due soon" reminder, so the two arms differed in reminders and escalation as well as in re-review. It's a defect against [ADR-043](043-review-turnaround-reminders-and-escalation.md) §5. **Fixed by IR-869** ([PR #518](https://github.com/moisturicer/IRIS/pull/518)), and it must be merged before any evaluation run.
+- **The review-thread features** ([ADR-032](032-adviser-first-review-and-office-reviewer-pools.md) §7, 2026-11-04) and **Version comparison** ([ADR-058](058-each-version-keeps-its-text-and-its-files.md)) shorten re-review under both policies. They are live before any evaluation run, so both arms have them.
+
 ## Context
 
 The original evaluation plan measured the contribution by counting **preserved clearances**: for each resubmission, how many offices' completed reviews were retained rather than repeated.

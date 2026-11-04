@@ -39,7 +39,7 @@ from apps.ai.providers.openai_compatible import LLMUnavailable
 from apps.ai.providers.ports import LLMProvider
 from apps.ai.resilience.llm import LLMProviderConfig, build_task_llm
 
-from .profiles import Profile
+from .profiles import DataPolicy, Profile
 from .tasks import InferenceTask
 
 BRIEF_OUTPUT_TOKENS = 4096
@@ -117,6 +117,7 @@ def build_profile_llm(
             max_tokens=max_tokens,
             provider_only=pins.get(model, profile.provider_only),
             lane=lane or task_lane(profile.task),
+            zero_retention=profile.data_policy is DataPolicy.ZERO_RETENTION,
         )
 
     if pins or profile.task is InferenceTask.BRIEF or application_fallbacks:

@@ -40,5 +40,8 @@ def test_django_startup_runs_the_check(settings):
 
     enable_grants(settings)
     settings.AI_RESEARCH_GRANT_KEYS = ""
+    # Production startup also requires LlamaParse (IR-843).
+    for name, value in {"LLAMAPARSE_API_KEY": "llx-test", "LLAMAPARSE_VERSION": "2026-09-28"}.items():
+        setattr(settings, name, value)
     with pytest.raises(ImproperlyConfigured, match="AI_RESEARCH_GRANT_KEYS is required"):
         apps.get_app_config("ai").ready()

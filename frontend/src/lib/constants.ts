@@ -6,6 +6,8 @@ export const ROLES = {
   RDCO:    "RDCO",
   ITSO:    "ITSO",
   IERC:    "IERC",
+  /** Runs IRIS itself, with no workflow access (ADR-051 §1-2). */
+  SYSTEM_ADMIN: "System Admin",
 } as const;
 
 export type RoleName = (typeof ROLES)[keyof typeof ROLES];

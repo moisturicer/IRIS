@@ -99,10 +99,10 @@ interface MetadataFormProps {
    */
   submitted?:      boolean;
   /**
-   * Shown under the title and abstract. Publish puts its prefill here
-   * (IR-409); the form itself knows nothing of where a suggestion came from.
+   * Shown under the fields Publish can fill in from the PDF (IR-409, IR-833);
+   * the form itself knows nothing of where a suggestion came from.
    */
-  fieldNotes?:     Partial<Record<Extract<keyof MetadataValues, "title" | "abstract">, ReactNode>>;
+  fieldNotes?:     Partial<Record<Extract<keyof MetadataValues, "title" | "abstract" | "authors" | "keywords" | "publication_year">, ReactNode>>;
 }
 
 const MAX_ABSTRACT = 5000;
@@ -176,6 +176,7 @@ export function MetadataForm({
           aria-invalid={Boolean(errors.keywords)} aria-describedby={describedBy("keywords", "keywords-hint")}
           className={fieldClasses(Boolean(errors.keywords))} />
         <p id="keywords-hint" className="text-small text-stone-600">Separate keywords with commas.</p>
+        {fieldNotes?.keywords}
       </Field>
       {!submitted && (
         <Field label="Owner emails" htmlFor={ids.owner_emails} error={errors.owner_emails?.message} errorId={errorId("owner_emails")}>
@@ -275,6 +276,7 @@ export function MetadataForm({
             aria-invalid={Boolean(errors.publication_year) || undefined} aria-describedby={describedBy("publication_year")}
             className={fieldClasses(Boolean(errors.publication_year))} />
           <p className="mt-1 text-small text-stone-600">Leave blank if not recorded. This is separate from the completion year.</p>
+          {fieldNotes?.publication_year}
         </Field>
       </div>
 
@@ -330,6 +332,7 @@ export function MetadataForm({
             {errors.authors.message ?? "Add at least one author."}
           </FieldError>
         )}
+        {fieldNotes?.authors}
       </div>
 
       <details

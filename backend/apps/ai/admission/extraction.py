@@ -2,7 +2,8 @@
 
 One read is one attempt: refused unless admission enforces, reserved at pages x
 the dearest per-page credits, gated again just before sending, and settled to
-the credits reported or kept at the reservation.
+the credits reported or kept at the reservation. A LlamaExtract reading of the
+parsed Manuscript (IR-846) is admitted the same way, on its own price.
 """
 
 from __future__ import annotations
@@ -19,7 +20,7 @@ from apps.ai.extraction.ports import ExtractedDocument
 
 from . import errors, scope
 from .ledger import Request, provider_attempt
-from .limits import NotConfigured, enforcing, read_extraction_price
+from .limits import NotConfigured, enforcing, read_extraction_price, read_metadata_price
 
 logger = logging.getLogger(__name__)
 
@@ -93,3 +94,56 @@ class AdmittedExtractor:
                     cost_usd=price.micros(usage.credits) / 1_000_000,
                 )
             return extracted
+
+
+class AdmittedMetadataReader:
+    """A LlamaExtract reading as one admitted attempt (IR-846).
+
+    ``pages`` is what the parse reported; an unknown count reserves the most
+    intake accepts, as an unreadable PDF does above.
+    """
+
+    leaves_campus = True
+
+    def __init__(self, adapter) -> None:
+        self._adapter = adapter
+
+    @property
+    def model(self) -> str:
+        return self._adapter.model
+
+    @property
+    def timeout_seconds(self) -> float:
+        return self._adapter.timeout_seconds
+
+    def read(self, parse_job_id: str, *, pages: Optional[int]):
+        if not enforcing():
+            raise _refuse(errors.ADMISSION_OFF)
+        try:
+            price = read_metadata_price()
+        except (NotConfigured, ImproperlyConfigured):
+            raise _refuse(errors.NOT_CONFIGURED) from None
+        pages = pages or getattr(settings, "PDF_VALIDATION_MAX_PAGES", None)
+        if not pages:
+            raise _refuse(errors.NOT_CONFIGURED)
+        adapter = self._adapter
+        request = Request(
+            operation="metadata",
+            default_lane=LANE,
+            account=adapter.account,
+            models=(adapter.model,),
+            input_tokens=0,
+            output_tokens=0,
+            timeout_seconds=float(self.timeout_seconds),
+            cost_micros=price.reserve_micros(int(pages)),
+        )
+        with provider_attempt(lambda: request):
+            gate.require_disclosure()
+            scope.mark_sent(model=adapter.model)
+            reading = adapter.read(parse_job_id)
+            if reading.credits is not None:
+                scope.report_usage(
+                    input_tokens=0, output_tokens=0, model=adapter.model,
+                    cost_usd=price.micros(reading.credits) / 1_000_000,
+                )
+            return reading

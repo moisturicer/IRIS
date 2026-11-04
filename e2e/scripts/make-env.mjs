@@ -86,6 +86,9 @@ const lines = [
   "# at its default of three failures. A run record states this deviation.",
   "API_THROTTLE_ANON=20000/day",
   "API_THROTTLE_USER=20000/day",
+  "# The lockout is off by default for now (IR-865); the lifecycle journey",
+  "# checks it, so this stack keeps it on.",
+  "AXES_ENABLED=True",
   "",
   "# PDF intake refuses every PDF unless these are set (IR-831). The candidate",
   "# values from docs/engineering/PDF_INTAKE.md. A run here doesn't verify them",
@@ -96,8 +99,10 @@ const lines = [
   "PDF_VALIDATION_MAX_OBJECTS=200000",
   "PDF_VALIDATION_MAX_DEPTH=100",
   "",
-  "# Docling on CPU: CI runners have no GPU",
-  "DOCLING_VARIANT=docling-cpu",
+  "# Production settings refuse to start without LlamaParse (IR-843). A",
+  "# placeholder: no journey needs a paper read, and any read fails.",
+  "LLAMAPARSE_API_KEY=e2e-placeholder-not-a-key",
+  "LLAMAPARSE_VERSION=2026-09-28",
   "",
 ];
 

@@ -26,8 +26,11 @@
 import { ROLES, type RoleName } from "./constants";
 
 const EVERYONE: RoleName[] = [
-  ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO,
+  ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO, ROLES.SYSTEM_ADMIN,
 ];
+
+/** The research navigation; System Admin uses its own Administration section. */
+const RESEARCH_ROLES = EVERYONE.filter((role) => role !== ROLES.SYSTEM_ADMIN);
 
 /**
  * Student and Adviser. The SRS names the actor of "Create IP Disclosure Draft"
@@ -54,14 +57,17 @@ const COORDINATOR: RoleName[] = [ROLES.RDCO];
 
 /** The four offices (`IsStaff` on the server). Not the Adviser, who has no office. */
 const OFFICES: RoleName[] = [ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO];
+/** The System Admin alone: the Audit Log (ADR-051 §3, IR-781). */
+const SYSTEM_ADMIN: RoleName[] = [ROLES.SYSTEM_ADMIN];
 
 /**
  * The sidebar's groups (IR-413, spec §4.1). "Main" is one short, unlabelled
- * list every role shares; "Administration" is RDCO's labelled group. The five
+ * list with Discover for every role; "RDCO" groups office coordination.
+ * "Administration" is the System Admin's group. The five
  * sections before IR-413 (Research Exploration, IP Management, Review Queue,
  * Tools, Administration) made a one-item "Tools" heading the commonest sight.
  */
-export type NavSectionName = "Main" | "Administration";
+export type NavSectionName = "Main" | "RDCO" | "Administration";
 
 interface ScreenDef {
   /** Route path, as registered in `router/index.tsx`. */
@@ -91,9 +97,9 @@ export const SCREEN_ACCESS = {
   discover:      { path: "/",              roles: EVERYONE,
                    nav: { label: "Discover", icon: "fa-compass", section: "Main" } },
   ai:            { path: "/ai",            roles: EVERYONE,
-                   nav: { label: "Ask IRIS", icon: "fa-brain", section: "Main" } },
+                   nav: { label: "Ask IRIS", icon: "fa-brain", section: "Main", onlyFor: RESEARCH_ROLES } },
   library:       { path: "/records/mine",  roles: EVERYONE,
-                   nav: { label: "My Library", icon: "fa-bookmark", section: "Main" } },
+                   nav: { label: "My Library", icon: "fa-bookmark", section: "Main", onlyFor: RESEARCH_ROLES } },
   // The bell at the top of the sidebar is the entry; its "View all" opens the
   // page, so a sidebar link would say the same thing twice (IR-519).
   notifications: { path: "/notifications", roles: EVERYONE },
@@ -134,22 +140,24 @@ export const SCREEN_ACCESS = {
   // Declared after My Reviews because the sidebar lists entries in
   // declaration order, and spec §4.1 puts it last in the main list.
   opportunities: { path: "/opportunities", roles: EVERYONE,
-                   nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Main" } },
+                   nav: { label: "Calls & Conferences", icon: "fa-bullhorn", section: "Main", onlyFor: RESEARCH_ROLES } },
 
-  // --- RDCO coordination -------------------------------------------------
+  // --- RDCO coordination (ADR-051, IR-783) ----------------------------
   importRecords: { path: "/records/import", roles: COORDINATOR,
-                 nav: { label: "Import Records", icon: "fa-file-import", section: "Administration" } },
-  // Restored for RDCO by IR-478 after IR-160 removed it: the Django admin it
-  // was to move to never registered `User`, so nothing could reach this.
-  users:         { path: "/admin/users", roles: COORDINATOR,
+                 nav: { label: "Import Records", icon: "fa-file-import", section: "RDCO" } },
+  users:         { path: "/rdco/users", roles: COORDINATOR,
+                 nav: { label: "Users", icon: "fa-users", section: "RDCO" } },
+  roleRequests:  { path: "/rdco/role-requests", roles: COORDINATOR,
+                 nav: { label: "Role Requests", icon: "fa-user-check", section: "RDCO" } },
+  downloadRequests: { path: "/rdco/download-requests", roles: COORDINATOR,
+                 nav: { label: "Download Requests", icon: "fa-download", section: "RDCO" } },
+  deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
+                 nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "RDCO" } },
+
+  // Both roles use the same Users page, with distinct addresses and server permissions.
+  adminUsers:    { path: "/admin/users", roles: SYSTEM_ADMIN,
                  nav: { label: "Users", icon: "fa-users", section: "Administration" } },
-  roleRequests:  { path: "/admin/role-requests", roles: COORDINATOR,
-                 nav: { label: "Role Requests", icon: "fa-user-check", section: "Administration" } },
-  downloadRequests: { path: "/admin/download-requests", roles: COORDINATOR,
-                 nav: { label: "Download Requests", icon: "fa-download", section: "Administration" } },
-  deleteRequests: { path: "/admin/delete-requests", roles: COORDINATOR,
-                 nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "Administration" } },
-  audit:         { path: "/admin/audit", roles: COORDINATOR,
+  audit:         { path: "/admin/audit", roles: SYSTEM_ADMIN,
                  nav: { label: "Audit Log", icon: "fa-clipboard-list", section: "Administration" } },
 } as const satisfies Record<string, ScreenDef>;
 
@@ -227,4 +235,4 @@ export function hasReviewWork(reviewAccess?: { my_reviews: boolean } | null): bo
 }
 
 /** The sidebar's section order. */
-export const NAV_SECTION_ORDER: NavSectionName[] = ["Main", "Administration"];
+export const NAV_SECTION_ORDER: NavSectionName[] = ["Main", "RDCO", "Administration"];

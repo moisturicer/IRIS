@@ -26,6 +26,7 @@ import { Link } from "react-router-dom";
 
 import { documentsApi } from "@/api/documents";
 import { recordsApi } from "@/api/records";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { UploadDropzone, type UploadState } from "@/components/shared/UploadDropzone";
 import { Skeleton } from "@/components/ui/Skeleton";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -121,6 +122,26 @@ export function FilesSection({
   const [failed, setFailed] = useState(false);
   const [uploads, setUploads] = useState<Record<string, UploadState | undefined>>({});
   const [notice, setNotice] = useState<string | null>(null);
+  // Every removal asks first (IR-872): a removed file is gone from storage.
+  const [removing, setRemoving] = useState<{ name: string; run: () => Promise<void> } | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
+  const askToRemove = (name: string, run: () => Promise<void>) => {
+    setRemoveError(null);
+    setRemoving({ name, run });
+  };
+  const confirmRemove = async () => {
+    if (!removing) return;
+    setRemoveBusy(true);
+    try {
+      await removing.run();
+      setRemoving(null);
+    } catch (err) {
+      setRemoveError(errorDetail(err, `Could not remove ${removing.name}. Please try again.`));
+    } finally {
+      setRemoveBusy(false);
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -288,14 +309,12 @@ export function FilesSection({
                     onDownload={(u) =>
                       download(() => documentsApi.downloadUpload(u.id), `${slot.name} v${u.version}.pdf`)
                     }
-                    onRemove={async (u) => {
-                      try {
+                    onRemove={(u) =>
+                      askToRemove(`${slot.name} version ${u.version}`, async () => {
                         await documentsApi.deleteUpload(u.id);
                         await changed();
-                      } catch (err) {
-                        setNotice(errorDetail(err, `Could not remove version ${u.version}. Please try again.`));
-                      }
-                    }}
+                      })
+                    }
                   />
                 </DocumentCard>
               );
@@ -363,14 +382,12 @@ export function FilesSection({
                     {f.can_remove && (
                       <RemoveButton
                         name={f.filename}
-                        onClick={async () => {
-                          try {
+                        onClick={() =>
+                          askToRemove(f.filename, async () => {
                             await documentsApi.deleteFile(f.id);
                             await changed();
-                          } catch (err) {
-                            setNotice(errorDetail(err, `Could not remove ${f.filename}. Please try again.`));
-                          }
-                        }}
+                          })
+                        }
                       />
                     )}
                   </span>
@@ -384,6 +401,19 @@ export function FilesSection({
       <p role="status" className="text-small text-brand empty:hidden">
         {notice ?? ""}
       </p>
+
+      <ConfirmDialog
+        open={removing !== null}
+        title={removing ? `Remove ${removing.name}?` : "Remove this file?"}
+        message="The file is deleted from IRIS and can't be restored. To correct a document, you can upload a new version instead."
+        confirmLabel="Remove"
+        danger
+        focusCancel
+        confirming={removeBusy}
+        error={removeError}
+        onConfirm={() => void confirmRemove()}
+        onCancel={() => setRemoving(null)}
+      />
     </div>
   );
 }
@@ -441,7 +471,17 @@ function Versions({
           </span>
           <span className="flex items-center gap-2">
             <DownloadButton name={`${name} version ${u.version}`} onClick={() => onDownload(u)} />
-            {removable && <RemoveButton name={`${name} version ${u.version}`} onClick={() => onRemove(u)} />}
+            {removable && !u.delete_refused && (
+              <RemoveButton name={`${name} version ${u.version}`} onClick={() => onRemove(u)} />
+            )}
+            {removable && u.delete_refused && (
+              // The server's own reason (ADR-058 §2, IR-872): part of the review, so kept.
+              <span className="inline-flex items-center gap-1 text-small text-stone-600">
+                <i className="fas fa-lock text-2xs" aria-hidden />
+                Kept
+                <span className="sr-only">: {u.delete_refused}</span>
+              </span>
+            )}
           </span>
         </li>
       ))}

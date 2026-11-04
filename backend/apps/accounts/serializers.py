@@ -1,3 +1,5 @@
+import unicodedata
+
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
@@ -149,7 +151,37 @@ def enforce_password_policy(password, user, field):
         raise serializers.ValidationError({field: list(exc.messages)})
 
 
+class RegistrationNameField(serializers.CharField):
+    """Trim only the edges; keep the spelling and spacing a person supplied."""
+
+    def __init__(self, label):
+        super().__init__(max_length=100, error_messages={
+            "required": f"{label} is required.",
+            "blank": f"{label} is required.",
+            "null": f"{label} is required.",
+            "invalid": f"{label} must be text.",
+            "max_length": f"{label} must be 100 characters or fewer.",
+        })
+        self.name_label = label
+
+    def to_internal_value(self, data):
+        if not isinstance(data, str):
+            self.fail("invalid")
+        value = super().to_internal_value(data)
+        categories = [unicodedata.category(char)[0] for char in value]
+        if "L" not in categories or any(
+            category not in {"L", "M"} and char not in " '’‐‑-"
+            for char, category in zip(value, categories)
+        ):
+            raise serializers.ValidationError(
+                f"{self.name_label} must contain letters and may include spaces, apostrophes or hyphens."
+            )
+        return value
+
+
 class RegisterSerializer(serializers.ModelSerializer):
+    first_name = RegistrationNameField("First name")
+    last_name = RegistrationNameField("Last name")
     password         = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
     consent_given    = serializers.BooleanField(write_only=True)
@@ -193,6 +225,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         enforce_password_policy(data["password"], candidate, "password")
 
         role_name = data.get("role_name")
+        # Sign-up asks only for an author's role. Office accounts are the System
+        # Admin's to make, and the System Admin role is given in Django's admin
+        # site (ADR-051 §4-5, amended).
+        if role_name and role_name not in (RoleName.STUDENT, RoleName.ADVISER):
+            raise serializers.ValidationError({"role_name": "Sign up as a Student or an Adviser."})
         if role_name == RoleName.STUDENT and not data.get("course_id"):
             raise serializers.ValidationError({"course_id": "Course is required for students."})
         if role_name == RoleName.ADVISER:

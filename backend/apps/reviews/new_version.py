@@ -255,8 +255,12 @@ def submit_new_version(record, actor):
     requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
     from .deadlines import start_clock
 
+    # Every assignment that reopens gets a fresh due date (ADR-043 §5): the
+    # requesting parties', and under `RESTART_ALL` each reopened office's, so
+    # the arms differ in nothing but who reviews again (IR-869). An office
+    # still reviewing reopened nothing and keeps its date.
     for assignment in RecordAssignment.objects.select_for_update().filter(
-        record=record, party__in=parties, state=AssignmentState.ACTIVE,
+        record=record, party__in=rereview, state=AssignmentState.ACTIVE,
     ):
         start_clock(assignment, now)
         assignment.save(update_fields=[

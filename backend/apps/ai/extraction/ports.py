@@ -46,6 +46,10 @@ class EmptyExtraction(ExtractionError):
     """
 
 
+class IncompleteExtraction(ExtractionError):
+    """The extractor reports partial coverage rather than a complete document."""
+
+
 @dataclass(frozen=True)
 class Provenance:
     """Which Extractor produced an Extraction, at which version, with which
@@ -68,13 +72,15 @@ class Usage:
 @dataclass(frozen=True)
 class FigureImage:
     """A figure the Extractor cropped, downloaded before its copy is deleted
-    (IR-841). ``bbox`` is the vendor's page-point box; IR-845 stores it."""
+    (IR-841). ``bbox`` is the vendor's page-point box; IR-845 stores it.
+    ``name`` is the vendor's image filename, which its image item also names."""
 
     page: int
     bbox: Mapping[str, float]
     media_type: str
     data: bytes
     caption: Optional[str] = None
+    name: str = ""
 
 
 @dataclass(frozen=True)
@@ -114,8 +120,8 @@ class StructuredExtractor(Protocol):
     Synchronous: it runs in a Celery worker, which has no event loop to
     block, and the one caller has nothing else to do while it waits.
 
-    ``filename`` is passed because the extractor may use it — Docling-serve
-    sniffs the content type from it — and because it is the last-resort
+    ``filename`` is passed because the extractor may use it — an upload
+    names the file — and because it is the last-resort
     document title when the PDF names itself nothing.
 
     Raises ``ExtractionError`` (or a subclass) rather than returning an empty

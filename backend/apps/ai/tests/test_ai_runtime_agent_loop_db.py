@@ -7,12 +7,13 @@ vendor's behaviour; the admitted case shows every attempt's purpose.
 """
 
 import json
+import threading
 
 import pytest
 
 from . import test_ai_runtime_runs_db as runs_db
 from .test_ai_runtime_runs_db import Drain, as_reader, run, submit
-from .test_ai_runtime_research_db import paper
+from .test_ai_runtime_research_db import paper, write_source
 from ai.admission.ledger import Ledger  # noqa: E402
 from ai.admission.transport import AdmittedAgentProvider  # noqa: E402
 from ai.agent.budget import Bounds  # noqa: E402
@@ -192,17 +193,88 @@ def test_paper_chat_stays_on_its_record_whatever_the_model_asks(api, runtime):
     assert [c["record_id"] for c in reopened["turns"][0]["citations"]] == [flood.pk]
 
 
-def test_an_invalid_first_draft_commits_no_turn(api, runtime):
+def test_an_invalid_draft_and_an_invalid_repair_commit_no_turn(api, runtime):
     client, holder = api
     paper("Flood forecasting", {4: [("Methods", FLOOD)]})
     grant = issue.reader_session_grant(make_user("agent-invalid@cit.edu")).token
-    holder["service"] = agent_service(runtime, recording(
-        tools(call("s", "search", query="water")), reply("It forecast 912 floods [P00000000000000000009]."),
-    ))
+    invalid = reply("It forecast 912 floods [P00000000000000000009].")
+    provider = recording(tools(call("s", "search", query="water")), invalid, invalid)
+    holder["service"] = agent_service(runtime, provider)
     run_ = submit(client, grant, "agent-invalid", "How many floods?").json()
     assert (run_["state"], run_["end_reason"]) == ("failed", "unavailable")
+    assert [m["phase"] for m in models(run_)] == ["gather", "gather", "repair"]
     reopened = client.get(f"/api/v1/ai/conversations/{run_['conversation_id']}", headers=as_reader(grant)).json()
     assert reopened["revision"] == 0 and reopened["turns"] == []
+
+
+# --- One repair (IR-729) -------------------------------------------------------
+
+VALIDATION_CODES = ("unknown_citation", "excluded_citation", "unsupported_number", "unknown_title",
+                    "completeness_overclaim")
+
+
+def passage_of(payload):
+    return last_result(payload)["passages"][0]["passage"]
+
+
+def test_a_bad_page_and_a_wrong_count_are_corrected_once_and_reopen_as_delivered(api, runtime):
+    client, holder = api
+    flood = paper("Flood forecasting", {4: [("Methods", FLOOD)]})
+    grant = issue.reader_session_grant(make_user("agent-repair@cit.edu")).token
+    drafts = {}
+
+    def bad(payload):
+        drafts["handle"] = passage_of(payload)
+        return reply(f"On page 9 rainfall gauges forecast 912 floods [{drafts['handle']}].")
+
+    def corrected(payload):
+        note = payload["messages"][-1]["content"]
+        assert "912" in note and not any(code in note for code in VALIDATION_CODES)
+        assert payload["tool_choice"] == "none"
+        return reply(f"On page 4 rainfall gauges and river levels forecast floods [{drafts['handle']}].")
+
+    provider = recording(tools(call("s", "search", query="floods")), bad, corrected)
+    holder["service"] = agent_service(runtime, provider)
+    live = submit(client, grant, "agent-repair", "How were floods forecast?").json()
+    assert live["state"] == "completed", live
+    assert [m["phase"] for m in models(live)] == ["gather", "gather", "repair"]
+
+    reopened = client.get(f"/api/v1/ai/conversations/{live['conversation_id']}", headers=as_reader(grant))
+    [turn] = reopened.json()["turns"]
+    assert turn["answer"] == "On page 4 rainfall gauges and river levels forecast floods [1]."
+    [citation] = turn["citations"]
+    assert (citation["record_id"], citation["page"]) == (flood.pk, 4)
+    status = client.get(f"/api/v1/ai/runs/{live['id']}", headers=as_reader(grant))
+    # The refused draft and the validation codes are in neither the run nor the history.
+    # "912 floods", not "912": bare digits can occur inside a random run id or timestamp.
+    for body in (json.dumps(live), reopened.text, status.text):
+        assert "912 floods" not in body and "page 9" not in body
+        assert not any(code in body for code in VALIDATION_CODES)
+
+
+def test_a_source_replaced_during_the_repair_fences_delivery(api, runtime):
+    client, holder = api
+    flood = paper("Flood forecasting", {4: [("Methods", FLOOD)]})
+    grant = issue.reader_session_grant(make_user("agent-repair-revoked@cit.edu")).token
+    drafts = {}
+
+    def bad(payload):
+        drafts["handle"] = passage_of(payload)
+        return reply(f"Rainfall gauges forecast 912 floods [{drafts['handle']}].")
+
+    def replace_then_correct(payload):
+        # The paper's source changes while the repair is being written; Django owns that write.
+        worker = threading.Thread(target=write_source, args=(flood, {4: [("Methods", "revised")]}, "2"))
+        worker.start()
+        worker.join()
+        return reply(f"Rainfall gauges forecast floods [{drafts['handle']}].")
+
+    holder["service"] = agent_service(runtime, recording(
+        tools(call("s", "search", query="floods")), bad, replace_then_correct))
+    run_ = submit(client, grant, "agent-repair-revoked", "How were floods forecast?").json()
+    assert (run_["state"], run_["end_reason"]) == ("failed", "unavailable")
+    reopened = client.get(f"/api/v1/ai/conversations/{run_['conversation_id']}", headers=as_reader(grant)).json()
+    assert reopened["turns"] == []
 
 
 def test_every_admitted_attempt_records_the_agent_purpose_and_no_other_writer(runtime):

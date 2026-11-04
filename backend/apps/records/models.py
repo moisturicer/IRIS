@@ -258,6 +258,14 @@ class Record(models.Model):
     # that, because every workflow save moves it too. The manuscript is not a
     # detail: a new one is told apart by the file a version names.
     details_edited_at    = models.DateTimeField(null=True, blank=True)
+    # Moved by every detail save (IR-833), so a save made from an older view of
+    # the draft can be refused instead of overwriting a newer one. A
+    # manuscript alone does not move it: the file is not a detail.
+    details_revision     = models.PositiveIntegerField(default=0)
+    # The author's decision about each field Publish can fill in from the PDF
+    # (IR-833): which it filled in, and which the author typed, accepted,
+    # cleared or dismissed. Validated by `RecordWriteSerializer`; owners only.
+    metadata_sources     = models.JSONField(default=dict, blank=True)
 
     # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). Stamped by
     # `RecordViewSet.submit`, and for test data by `seed_demo` and
@@ -453,6 +461,10 @@ class RecordVersion(models.Model):
         related_name="record_versions",
     )
     created_at = models.DateTimeField(default=timezone.now)
+    #: True when this version's documents were reconstructed from upload
+    #: times rather than recorded at submission (ADR-058 §2, IR-872): every
+    #: version written before IR-872. Shown, so a guess is never read as a record.
+    documents_reconstructed = models.BooleanField(default=False)
 
     class Meta:
         ordering = ["record", "number"]
@@ -464,6 +476,57 @@ class RecordVersion(models.Model):
 
     def __str__(self):
         return f"{self.record_id} v{self.number}"
+
+
+class RecordVersionDocument(models.Model):
+    """
+    One upload slot's document as it stood when a version was submitted
+    (ADR-058 §2, IR-872). `write_version` writes one row per slot that had a
+    file; a slot with nothing uploaded gets no row. A document uploaded
+    between versions is not stored here: "added during vN" is read from upload
+    times (`versions.documents_added_during`).
+
+    **`upload` is `RESTRICT`**: no code may delete a document a version names.
+    A record's own hard delete still cascades through both, because RESTRICT,
+    unlike PROTECT, allows a delete that removes the version too.
+    """
+
+    version = models.ForeignKey(RecordVersion, on_delete=models.CASCADE, related_name="documents")
+    upload  = models.ForeignKey(
+        "documents.RecordUpload", on_delete=models.RESTRICT, related_name="version_documents",
+    )
+
+    class Meta:
+        ordering = ["version", "upload__slot__name", "upload_id"]
+        constraints = [
+            models.UniqueConstraint(fields=["version", "upload"], name="version_document_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.version} · upload {self.upload_id}"
+
+
+class EmbargoReminder(models.Model):
+    """
+    A reminder already sent about one embargo's review date (ADR-052 §9).
+
+    The unique key is the idempotency, as with `DeadlineMoment`: a re-run, a
+    missed tick or two beat instances insert the same row, and only one wins.
+    `embargo_set_at` is the paper's `embargo_answered_at`, which every set and
+    extend restamps, so a new date, or a released paper held again, starts the
+    reminders over. `step` is 0 on the date, then one more per 5 working days.
+    """
+
+    record = models.ForeignKey("Record", on_delete=models.CASCADE, related_name="embargo_reminders")
+    embargo_set_at = models.DateTimeField()
+    step = models.PositiveIntegerField()
+    sent_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["sent_at", "pk"]
+        constraints = [models.UniqueConstraint(
+            fields=["record", "embargo_set_at", "step"], name="one_embargo_reminder_per_step",
+        )]
 
 
 class RecordOwner(models.Model):

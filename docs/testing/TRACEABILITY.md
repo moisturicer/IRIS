@@ -115,6 +115,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-665** | An uploaded PDF must really be one: its bytes carry the signature and it opens with at least one page; `uploads/create/` no longer skips … | [details](traceability/IR-665.md) | **IMPLEMENTED** |
 | **IR-383** | Question resolution runs as its own Inference task, on a model that exists — no FR- id; part E of IR-375's spec, and the ticket that closes … | [details](traceability/IR-383.md) | **IMPLEMENTED** |
 | **IR-382** | Groq dialect: the vendor's request shape behind the adapter, with citation-marker normalisation — no FR- id; part H of IR-375's spec, and … | [details](traceability/IR-382.md) | **IMPLEMENTED** |
+| **IR-852** | Figures are described for retrieval only, never shown to readers — no FR- id; part of IR-848 (ADR-056 §10) | [details](traceability/IR-852.md) | **IMPLEMENTED** |
 | **IR-647** | The API enforces the configured password policy — no FR- id; subtask 4 of IR-644 (account-security findings, 2026-10-30) | [details](traceability/IR-647.md) | **VERIFIED** |
 | **IR-645** | A refused session's 401 says why it ended — no FR- id; subtask 1 of IR-644 (account-security findings, 2026-10-30), extends NFR-S2 (IR-166) | [details](traceability/IR-645.md) | **IMPLEMENTED** |
 | **FR-M5-01** | Hierarchical submission workflow | [details](traceability/FR-M5-01.md) | **VERIFIED** |
@@ -155,6 +156,9 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-312** | A proposer sees when their idea was already done here — the Novelty check; FR-M4 (stable label only) | [details](traceability/IR-312.md) | **IMPLEMENTED** |
 | **IR-826** | The AI gateway gets no Django database login; ADR-014's amendment on its runs login is proposed | [details](traceability/IR-826.md) | **IN PROGRESS** |
 | **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
+| **IR-833** | Publish fills in a reliable title and abstract from the PDF and never overwrites the author's edits — no FR- id; IR-830 decisions 14–18 | [details](traceability/IR-833.md) | **IMPLEMENTED** |
+| **IR-846** | Publish suggestions for a LlamaParse Manuscript come from LlamaExtract, each with its page, cited text and reported confidence — no FR- id; ADR-056 §15 within IR-830's contract | [details](traceability/IR-846.md) | **IMPLEMENTED** |
+| **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
 
 ### Non-functional
 
@@ -260,7 +264,7 @@ checks include queued/live/reopened/completed/deep/cancelled states from the bou
 AGENT loop. Keyboard/narrow-layout evidence replays those captured public snapshots.
 See [verification, public recording and screenshot](evidence/IR-730/README.md).
 
-**Limits:** disabled by default; the reader refuses the operator echo executor until
+**Limits:** disabled by default (since IR-863 by the server's `AI_RUNTIME_READER`, not a build flag); the reader refuses the operator echo executor until
 an AGENT service is composed. No paid enablement or cutover. Manual compaction is
 IR-754. Clean-install verification resolves the earlier frontend/typechecking failures;
 publication evidence records 5,696 passing backend tests, 1,706 passing frontend

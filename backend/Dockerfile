@@ -76,7 +76,7 @@ USER appuser
 # The original set is SECRET_KEY, DB_NAME, DB_USER and DB_PASSWORD from base.py,
 # plus ALLOWED_HOSTS, CORS_ALLOWED_ORIGINS and TRUSTED_PROXY_COUNT, which
 # production.py adds. Recovery (IR-642) additionally requires its keys and
-# frontend/SMTP configuration.
+# frontend/SMTP configuration. Production also requires LlamaParse (IR-843).
 # Every one is a throwaway that lives only for this RUN. Enumerating them keeps
 # the image built against the *real* production settings path rather than
 # quietly switching to development settings for the build -- and the static
@@ -89,6 +89,8 @@ RUN SECRET_KEY=build-time-only \
     EMAIL_HOST=smtp.build.invalid \
     EMAIL_HOST_USER=build@build.invalid \
     EMAIL_HOST_PASSWORD=build-time-only \
+    LLAMAPARSE_API_KEY=build-time-only \
+    LLAMAPARSE_VERSION=2026-09-28 \
     DB_NAME=build-time-only \
     DB_USER=build-time-only \
     DB_PASSWORD=build-time-only \

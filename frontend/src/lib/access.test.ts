@@ -31,7 +31,7 @@ import { expect, test } from "vitest";
 
 
 const EVERY_ROLE: RoleName[] = [
-  ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO,
+  ROLES.STUDENT, ROLES.ADVISER, ROLES.RDCO, ROLES.ITSO, ROLES.IERC, ROLES.KTTO, ROLES.SYSTEM_ADMIN,
 ];
 
 // --- assertions ------------------------------------------------------------
@@ -117,11 +117,18 @@ test("every role shares one short main list, in the spec's order", () => {
   }
 });
 
-test("RDCO's coordination screens, Import Records included, are one Administration group", () => {
+test("RDCO's coordination screens, Import Records included, are one RDCO group", () => {
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
-    "Administration: Import Records", "Administration: Users", "Administration: Role Requests", "Administration: Download Requests",
-    "Administration: Delete Requests", "Administration: Audit Log",
+    "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
+    "RDCO: Delete Requests",
+  ]);
+});
+
+test("the System Admin's nav is Discover, Users and Audit Log (IR-783)", () => {
+  expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
+    "Main: Discover",
+    "Administration: Users", "Administration: Audit Log",
   ]);
 });
 
@@ -162,13 +169,17 @@ test("My Reviews is listed only when the server says the user has review work", 
 // --- RDCO coordination -----------------------------------------------------
 
 test("RDCO alone holds the coordination screens", () => {
-  // Audit is the headline case: AUDIT_LOG_ROLES has said [RDCO] all along and
-  // was never wired to anything.
-  only("audit", [ROLES.RDCO]);
   only("roleRequests", [ROLES.RDCO]);
   only("downloadRequests", [ROLES.RDCO]);
   only("deleteRequests", [ROLES.RDCO]);
   only("importRecords", [ROLES.RDCO]);
+});
+
+test("the System Admin alone reads the Audit Log, and has its own Users address beside RDCO (ADR-051 §3-4)", () => {
+  // Changed deliberately by IR-781: the Audit Log was RDCO's.
+  only("audit", [ROLES.SYSTEM_ADMIN]);
+  only("users", [ROLES.RDCO]);
+  only("adminUsers", [ROLES.SYSTEM_ADMIN]);
 });
 
 test("KTTO is not an administrator", () => {
@@ -225,3 +236,14 @@ test("Student sees no administration section at all", () => {
 });
 
 // --- report ----------------------------------------------------------------
+
+// IR-783: each office has its own addresses and named section.
+test("RDCO coordination links use the RDCO section and addresses", () => {
+  expect(navFor(ROLES.RDCO).filter((item) => item.section !== "Main").map(({ label, to, section }) => ({ label, to, section }))).toEqual([
+    { label: "Import Records", to: "/records/import", section: "RDCO" },
+    { label: "Users", to: "/rdco/users", section: "RDCO" },
+    { label: "Role Requests", to: "/rdco/role-requests", section: "RDCO" },
+    { label: "Download Requests", to: "/rdco/download-requests", section: "RDCO" },
+    { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
+  ]);
+});

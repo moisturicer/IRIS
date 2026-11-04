@@ -9,14 +9,19 @@ from testing import run_lock
 # These suites provision/use cluster-wide roles. Keep every consumer together,
 # including dispatch which imports the runtime fixture from the run suite.
 ROLE_MODULES = frozenset({
+    "test_runtime_indexing.py",
+    "test_runtime_extraction.py",
     "test_runtime_reader_progress.py",
     "test_runtime_reader_edge.py",
+    "test_runtime_reader_e2e.py",
     "test_manuscript_publication.py",
     "test_research_grants_db.py", "test_research_read_policy_db.py",
     "test_research_reads.py", "test_ai_runtime_runs_db.py",
     "test_ai_runtime_research_db.py", "test_ai_runtime_admission_db.py",
     "test_ai_runtime_dispatch_db.py", "test_ai_runtime_agent_db.py",
-    "test_ai_runtime_agent_loop_db.py",
+    "test_ai_runtime_agent_loop_db.py", "test_ai_runtime_openai_agent_db.py",
+    "test_ai_runtime_executor_selection_db.py", "test_ai_runtime_metadata_db.py",
+    "test_ai_runtime_partial_outage_db.py", "test_ai_runtime_recovery_db.py",
 })
 
 

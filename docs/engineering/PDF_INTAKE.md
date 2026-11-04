@@ -32,11 +32,13 @@ The existing Record writer commits `abstract_file`, a fresh opaque `manuscript_r
 
 Chunk messages also carry the revision. The chunk task locks the same Record/extraction through activation and scheduling, so replacement cannot race the swap. Persisted `ChunkSet.source_revision` identifies the source consumed; embedding handoffs pin that revision and chunk-set ID and refuse inactive/replaced sets. Existing outbound disclosure guards remain in force. Supplementary uploads remain outside the research corpus by `DocumentKind`, independent of upload route.
 
-While an owner prepares an unsubmitted revised Manuscript, its current extraction is pending with `phase=awaiting_submission`; it is not sent to Docling and the submitted paper's active chunks remain in place. Submission switches extraction/indexing to the new source. Version rows preserve source identity for restoration. Accepted source files are never deleted as part of replacement.
+While an owner prepares an unsubmitted revised Manuscript, its current extraction is pending with `phase=awaiting_submission`; it is not sent to the Extractor and the submitted paper's active chunks remain in place. Submission switches extraction/indexing to the new source. Version rows preserve source identity for restoration. Accepted source files are never deleted as part of replacement.
 
 ## Reader contract and recovery
 
 Owner-only `GET /records/<id>/metadata-suggestions/` retains `state`, legacy `suggestions` and `source`; it adds `manuscript_revision`, `phase` and `retryable`. `queued`, `reading`, `retrying` and `awaiting_submission` are pending. `ready` may contain no suggestions. Final `failed` is retryable by an authorized explicit action, never by ordinary task redelivery.
+
+IR-833 adds `fields`: per title, abstract, authors, keywords and publication year, a `value`, its `basis`, `page`/`region` only when the stored structure records them, `auto_apply` (a title or abstract within its limit, nothing else) and `exceeds_limit`. Authors, keywords and year come only from labelled front matter; ambiguous ones are absent. Publish fills only empty or placeholder fields, records each field's decision in owner-only `Record.metadata_sources`, and saves Details with `expected_details_revision`, which the record update refuses with `409 stale_edit` when a newer save exists. Foreground polling backs off to 15 s and stops after two minutes with *Check again*; it replaces the earlier 90-second limit. See [IR-833](../testing/traceability/IR-833.md).
 
 `POST /records/<id>/retry-extraction/` accepts `manuscript_revision`, is owner-only, locks/rechecks the source, refuses stale revisions with 409, and requeues only a terminal failure. It refuses an unsubmitted revision. Upload extraction status omits parser errors, storage paths, fingerprints and task IDs. Refusals return safe field errors.
 

@@ -59,6 +59,13 @@ const findForRecord = vi.fn();
 const create = vi.fn();
 const askStream = vi.fn();
 
+// The Django path; which path answers is the deployment's switch (IR-863),
+// tested in RAGChatPage.runtime.test.tsx and RAGChatPage.switchOff.test.tsx.
+vi.mock("@/api/runtimeReader", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/runtimeReader")>()),
+  useReaderPath: () => "django",
+}));
+
 vi.mock("@/api/ai", () => ({
   aiApi: {
     conversations: {

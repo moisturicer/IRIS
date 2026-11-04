@@ -101,10 +101,10 @@ class AuditRowsAreInsertOnlyTests(TestCase):
 
 
 class NoRouteMutatesTheAuditLogTests(APITestCase):
-    """The audit API is read-only even for RDCO, its only reader."""
+    """The audit API is read-only even for the System Admin, its only reader (IR-781)."""
 
     def setUp(self):
-        self.client.force_authenticate(make_user("rdco@cit.edu", RoleName.RDCO))
+        self.client.force_authenticate(make_user("sysadmin@cit.edu", RoleName.SYSTEM_ADMIN))
 
     def test_the_list_is_readable(self):
         self.assertEqual(self.client.get(AUDIT).status_code, 200)

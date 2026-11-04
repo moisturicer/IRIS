@@ -1,4 +1,4 @@
-"""PDF extraction: Docling-serve in, structure out (IR-107, ADR-016).
+"""PDF extraction: a PDF in, structure out (IR-107, ADR-056).
 
 What this module used to be is worth recording, because it explains the shape
 it has now. It held a three-tier extractor chain — ``unstructured``, PyMuPDF,
@@ -8,13 +8,12 @@ file, so on a clean install all three fell through and extraction raised. It
 was scaffolding, and its own module docstring said so.
 
 It is replaced by one call to the Extractor ``apps.ai.extraction`` chooses
-(IR-838); this task never names a vendor. **There is no fallback extractor.** ADR-016
-retained PyMuPDF for Docling-serve unavailability; that clause is dropped —
-see the divergence note in the ADR. A second extractor produces documents
+(IR-838); this task never names a vendor. **There is no fallback extractor.**
+A second extractor produces documents
 without the structure this pipeline exists to consume, which means the
 fallback path silently yields chunks with no regions and citations that
 cannot be highlighted. Failing and retrying is the honest behaviour: the
-Celery retry below is what covers a container that is briefly down.
+Celery retry below is what covers a vendor that is briefly down.
 
 Only a transient failure retries (IR-839): an unavailable Extractor, after 1,
 3 and 9 minutes. Anything else, an unexpected exception included, fails once.
@@ -22,7 +21,7 @@ Only a transient failure retries (IR-839): an unavailable Extractor, after 1,
 The task stays thin on purpose. Reading bytes, persisting a row and moving a
 status through its states is all it does; every judgement — reading order,
 table shape, coordinate origin, what counts as a failure — lives in
-``apps.ai.extraction``, where it is pure and tested without a container.
+``apps.ai.extraction``, where it is pure and tested without a vendor.
 """
 
 import logging
@@ -77,6 +76,7 @@ def _run_extraction(self, extraction_id, source_revision):
         document_to_json, extraction_hash, flatten_for_search,
     )
     from apps.ai.extraction.gate import NotDisclosed, reading
+    from .figures import replace_figures
 
     attempt = uuid.uuid4()
     with transaction.atomic():
@@ -162,7 +162,9 @@ def _run_extraction(self, extraction_id, source_revision):
         for key, value in values.items():
             setattr(extraction, key, value)
         extraction.save(update_fields=list(values))
+        replace_figures(extraction, extracted.figures)
         _queue_chunking_if_manuscript(extraction)
+        _queue_metadata_if_llamaparse(extraction)
 
 
 class ExtractionTask(Task):
@@ -200,7 +202,13 @@ def _queue_chunking_if_manuscript(extraction: "PdfExtraction") -> None:
     from apps.documents.models import DocumentKind
 
     if extraction.kind == DocumentKind.MANUSCRIPT:
-        _queue_chunk_extraction(extraction.pk, str(extraction.source_revision) if extraction.source_revision else None)
+        pinned = str(extraction.source_revision) if extraction.source_revision else None
+        _queue_chunk_extraction(extraction.pk, pinned)
+        if extraction.figures.exists():
+            from django.db import transaction
+            from apps.ai.tasks import describe_extraction_figures
+
+            transaction.on_commit(lambda: describe_extraction_figures.delay(extraction.pk, pinned))
 
 
 def _queue_chunk_extraction(extraction_id: int, source_revision=None) -> None:
@@ -208,3 +216,104 @@ def _queue_chunk_extraction(extraction_id: int, source_revision=None) -> None:
     from apps.ai.tasks import chunk_extraction
 
     transaction.on_commit(lambda: chunk_extraction.delay(extraction_id, source_revision))
+
+
+def _queue_metadata_if_llamaparse(extraction: "PdfExtraction") -> None:
+    """Publish's LlamaExtract reading of this parse (IR-846, ADR-056 §15).
+
+    Only a Manuscript LlamaParse read, and only when LlamaExtract is set up;
+    otherwise Publish reads the shaped document instead. Under the caller's
+    lock, so the row and the source revision it names are the current ones.
+    """
+    from django.db import transaction
+    from apps.ai.extraction.llamaparse_client import EXTRACTOR_NAME
+    from apps.ai.extraction.selection import metadata_reader_configured
+    from apps.documents.models import DocumentKind, ManuscriptMetadata
+
+    if (extraction.kind != DocumentKind.MANUSCRIPT or extraction.extractor != EXTRACTOR_NAME
+            or extraction.source_revision is None or not metadata_reader_configured()):
+        return
+    reading, _ = ManuscriptMetadata.objects.update_or_create(
+        extraction=extraction, source_revision=extraction.source_revision,
+        defaults={"status": ManuscriptMetadata.QUEUED, "attempt": None, "result": {},
+                  "credits": None, "completed_at": None},
+    )
+    transaction.on_commit(lambda: read_manuscript_metadata.delay(reading.pk))
+
+
+def _locked_metadata(reading_id):
+    """The reading and its extraction, locked, while both still name the
+    Record's current Manuscript; ``None`` once anything has moved on."""
+    from apps.documents.models import ManuscriptMetadata
+
+    reading = ManuscriptMetadata.objects.filter(pk=reading_id).first()
+    if not reading:
+        return None
+    extraction = _locked_extraction(reading.extraction_id)
+    if not extraction or str(extraction.source_revision) != str(reading.source_revision):
+        return None
+    if str(extraction.record.manuscript_revision) != str(reading.source_revision):
+        return None
+    return ManuscriptMetadata.objects.select_for_update().filter(pk=reading_id).first()
+
+
+def _run_metadata(reading_id) -> None:
+    import uuid
+    from django.db import transaction
+    from apps.ai.extraction.gate import NotDisclosed, reading as sending_for
+    from apps.ai.extraction.selection import current_metadata_reader
+    from apps.documents.models import ManuscriptMetadata
+
+    attempt = uuid.uuid4()
+    with transaction.atomic():
+        row = _locked_metadata(reading_id)
+        if not row or row.status != ManuscriptMetadata.QUEUED:
+            return
+        extraction = row.extraction
+        parse_job_id = ((extraction.raw_result or {}).get("job") or {}).get("id")
+        if not parse_job_id:
+            row.status = ManuscriptMetadata.FAILED
+            row.save(update_fields=["status"])
+            return
+        row.status = ManuscriptMetadata.RUNNING
+        row.attempt = attempt
+        row.started_at = timezone.now()
+        row.save(update_fields=["status", "attempt", "started_at"])
+        record_id, pages = extraction.record_id, extraction.pages_read
+
+    try:
+        with sending_for(record_id):
+            result = current_metadata_reader().read(parse_job_id, pages=pages)
+        values = {"status": ManuscriptMetadata.DONE, "result": result.as_json(), "credits": result.credits}
+    except NotDisclosed:
+        values = {"status": ManuscriptMetadata.REFUSED}
+    except Exception:
+        # Not retried: Publish falls back to the shaped document at once
+        # rather than keep the author waiting on a second vendor attempt.
+        logger.warning("LlamaExtract reading %s failed; Publish falls back", reading_id, exc_info=True)
+        values = {"status": ManuscriptMetadata.FAILED}
+
+    with transaction.atomic():
+        row = _locked_metadata(reading_id)
+        if not row or row.attempt != attempt:
+            return
+        for key, value in {**values, "completed_at": timezone.now()}.items():
+            setattr(row, key, value)
+        row.save(update_fields=[*values, "completed_at"])
+
+
+class MetadataTask(Task):
+    """Carries the LlamaExtract reader's own time limit."""
+
+    def apply_async(self, args=None, kwargs=None, **options):
+        from django.conf import settings
+
+        limit = settings.LLAMAEXTRACT_TIMEOUT_SECONDS + TIME_LIMIT_MARGIN_SECONDS
+        options.setdefault("time_limit", limit)
+        options.setdefault("soft_time_limit", limit - SOFT_LIMIT_HEADROOM_SECONDS)
+        return super().apply_async(args, kwargs, **options)
+
+
+@shared_task(base=MetadataTask)
+def read_manuscript_metadata(reading_id: int):
+    _run_metadata(reading_id)

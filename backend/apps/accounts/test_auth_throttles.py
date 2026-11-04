@@ -103,6 +103,8 @@ class ClientAddressTests(AuthEndpoints):
             self.assertEqual(self.login(**behind_proxies(ALICE)).status_code, status.HTTP_200_OK)
 
 
+# The lockout is off by default for now (IR-865); these prove it works when on.
+@override_settings(AXES_ENABLED=True)
 class LockoutIsUnaffectedTests(AuthEndpoints):
 
     def test_the_axes_lockout_still_answers_with_its_own_code(self):

@@ -5,6 +5,15 @@
 **Does not own.** Any accepted decision: each phase below names the ADR it needs, and that ADR is the authority once accepted. Screen structure stays in [`ui-ux/16-paper-view-and-review.md`](ui-ux/16-paper-view-and-review.md); vocabulary in [`../CONTEXT.md`](../CONTEXT.md).
 **Update when.** A phase is accepted, built or dropped, or an open decision is settled.
 
+> **Superseded 2026-11-04. Don't build from this page.** Every open decision in §7 is settled, and Phase 0 (observe first) was dropped because the work is being built now. The decisions live in:
+>
+> - [ADR-032](adr/032-adviser-first-review-and-office-reviewer-pools.md): §7, review threads (Phases 3–5 and open decisions #1–3, #5 and #6), and §10, Overview · Review only, with Files moved into Review.
+> - [ADR-058](adr/058-each-version-keeps-its-text-and-its-files.md): Version text, documents and the comparison (Phase 2 and open decision #4).
+> - [ADR-047](adr/047-rdco-routes-and-decides-at-any-time.md): §9, where a resubmission goes, and §10, publishing an Unlisted paper.
+> - [ADR-052](adr/052-each-paper-states-its-embargo-and-a-person-ends-it.md): an embargo stops publishing.
+>
+> Where this page and an ADR differ, the ADR is right. Two differences: open threads block, by severity (#1), and anyone in the review may resolve except an owner on a reviewer's thread (#2). The prototype still shows the Adviser's *Accept & publish* and the Paper and Files items, and both are stale. Kept as the record of the planning.
+>
 > **Status: Proposed (2026-10-30).** Nothing here is decided except the routing change in §5a, which ADR-047 accepted on 2026-11-01. The thesis contribution — type-differentiated routing, parallel multi-office clearance and clearance-aware resubmission — is unchanged by every phase: this is a layer over Versions, Seats and Revision requests, never a replacement for them.
 
 ---

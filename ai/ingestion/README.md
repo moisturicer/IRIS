@@ -65,9 +65,10 @@ PostgreSQL remains authoritative. Ingestion never takes reader-run slots.
 No Compose service is started. Example bounds are demonstration inputs, not
 approved production capacity values.
 
-The worker acknowledges durable work only. Extraction belongs to IR-738;
-indexing and active publication belong to IR-751. No model is called. Existing
-extraction writers and reader behavior remain in place.
+The receipt worker above acknowledges durable work only. IR-738 adds the
+separately enabled pending extraction worker below. Indexing and active
+publication belong to IR-751. No model is called. Existing extraction writers
+and reader behavior remain in place.
 
 ## Owner status and verification
 
@@ -87,3 +88,66 @@ because bounded intake requires Linux; also run it on Linux.
 On 2026-11-02, additive Django and AI migrations ran on a development DB copy
 containing 63 Records, without switching live writers. Deployment and human
 approval remain separate from implementation.
+
+## Pending local extraction (IR-738)
+
+Apply Django migrations `publication/0006–0007`, rerun `provision_research_roles`,
+then apply AI migrations `0008–0010` through `python -m ai.runs.migrate`.
+The latter remains the only migration/writer authority for `iris_ai`.
+The AI runtime has insert-only access to immutable extraction revisions;
+row policies require a verified grant for that exact current work. Django
+receives only the safe status function, with no output-table grant.
+
+The worker core (`ai/ingestion/extraction.py`) takes any Extractor, plus the
+pure normalizer, context-path chunker and pinned tokenizer. It does not import
+Django or write its derived tables. It stores source-byte SHA-256, Manuscript
+revision, structured extraction hash, extractor/configuration pin, chunk
+hash/options, page sizes, element/page regions and citation/embedding text
+together in one immutable pending revision. Changing extractor code or models
+requires a new pipeline pin. Storage keys remain immutable, as required by
+IR-737. `LocalSource` reads only from local filesystem storage; there is no
+object-storage adapter.
+
+**It has no launcher (IR-843).** Its only Extractor was the on-prem Docling
+service, which ADR-056 retired. The `extract_worker` entry point, its image
+and the live-Docling test are deleted. A later ticket gives it LlamaParse,
+behind the consent and embargo gate and ADR-041 admission, before it can run.
+
+The lease must exceed the Extractor's request timeout, with time left for
+chunking. A lease lost during computation fences the write. Grant expiry also
+fences it; reconciliation must issue fresh authority and a later sweep retries
+unfinished work. No open database transaction is held during extraction. A
+crash leaves a recoverable lease, not a completed output. Polling reconciles
+lost hints; the extraction worker uses no reader execution slots.
+
+Duplicate completed work returns before reading bytes or calling the Extractor.
+An independent claimant receives `busy` until the lease expires; takeover
+replaces the attempt UUID, so a late worker cannot commit. Final persistence
+locks canonical Record facts and rechecks grant, generation and current
+source, in the same transaction as the output write. There is no active
+pointer here to replace: even successful output is pending for IR-751.
+
+The owner-only metadata-suggestions endpoint now reports `processing`,
+`extracted_pending`, `failed` or `incomplete`, in addition to the receipt
+states. It returns only state and revision. A partial-success extraction
+envelope, coverage that differs from the actual PDF page count, or absent page provenance cannot be reported
+as a complete extraction. Conservative coverage can also withhold blank or
+unmapped pages; it makes no claim about semantic extraction quality. Private
+errors and extracted text never enter this projection. Terminal failed or
+incomplete jobs are not automatically repeated by polling; an operator must
+select a new corrected pipeline profile to retry them. Superseded jobs may
+remain as historical pending metadata but cannot authorize reads or appear
+as the current revision's output.
+
+`test_runtime_extraction.py` exercises the worker/status boundary with
+restricted PostgreSQL roles, out-of-order completion, revocation/deletion,
+independent-process lease takeover, RLS isolation and immutable output grants.
+
+
+### ADR-056 transition boundary
+
+ADR-056 replaced Docling with LlamaParse, and IR-843 removed Docling. This
+worker stays a local-only pending-output path with no Extractor wired in. Paid
+extraction, LlamaParse's disclosure and admission requirements, and a live
+writer switch must be resolved before it is activated. No fallback extractor
+is added.

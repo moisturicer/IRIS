@@ -9,9 +9,11 @@
  *   1. **Your manuscript** — the type, and the PDF. Choosing the file creates
  *      the draft at once, titled from the file name, so nothing typed later
  *      can be lost, and the server starts reading the PDF straight away.
- *   2. **Details** — `MetadataForm`, patched onto the draft on Continue. The
- *      manuscript's own title and abstract are offered as chips while it is
- *      shown (IR-409, `usePrefill`); they never block it.
+ *   2. **Details** — `MetadataForm`, saved as the author works and again on
+ *      Continue, each save checked against the draft's revision (`useAutosave`).
+ *      The manuscript's own title and abstract are filled in once it has been
+ *      read, with Undo, and its labelled authors, keywords and publication year
+ *      offered (IR-833, `usePrefill` and `autofill`); none of it blocks Details.
  *   3. **Review & submit** — every value, consent, Submit.
  *
  * **Opened by the URL**: `/?publish=new` starts one, `/?publish=<draftId>`
@@ -40,7 +42,7 @@ import { tabbableWithin } from "@/lib/focusTrap";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
 import type { AdviserOption, User } from "@/types/auth";
-import type { Classification, PSCEDClassification, RecordType, TrackerHolder } from "@/types/records";
+import type { Classification, MetadataSources, PSCEDClassification, RecordFormData, RecordType, TrackerHolder } from "@/types/records";
 
 import { FORM_FIELD, MetadataForm, focusFirstInvalid } from "@/features/records/metadata/MetadataForm";
 import {
@@ -70,8 +72,10 @@ import {
 } from "./draft";
 import { EMBARGO_FIELD_IDS, EmbargoStep } from "./EmbargoStep";
 import { acceptedManuscript, ManuscriptStep, type ManuscriptUpload } from "./ManuscriptStep";
-import { PrefillChip } from "./PrefillChip";
-import { usePrefill, type PrefillStatus } from "./prefill";
+import { AUTOFILL_FIELDS, offerFor, planAutofill, sameValue, type AutofillField, type FieldOffer, type FormValue } from "./autofill";
+import { isStaleEdit, useAutosave, type SaveStatus } from "./autosave";
+import { AutofilledNote, PrefillChip } from "./PrefillChip";
+import { usePrefill, type Prefill } from "./prefill";
 import { PublishSuccess, successHeadline } from "./PublishSuccess";
 import { ReviewStep } from "./ReviewStep";
 import { IrisLoader } from "@/components/brand/IrisBrand";
@@ -161,10 +165,14 @@ interface Lists {
   psceds:          PSCEDClassification[];
 }
 
-const PREFILL_FIELDS = ["title", "abstract"] as const;
-type PrefillField = (typeof PREFILL_FIELDS)[number];
-
 const NEUTRAL_PREFILL = "We couldn't read details from this file — fill them in below.";
+const NOTHING_FOUND = "We read your PDF but found no details to fill in.";
+const STALE_DRAFT = "This draft was changed somewhere else, so your latest changes weren't saved. Reload it to see the newer version.";
+
+/** The field names the prefill's notes and announcements use. */
+const FIELD_NAMES: Record<AutofillField, string> = {
+  title: "title", abstract: "abstract", authors: "authors", keywords: "keywords", publication_year: "publication year",
+};
 
 const NO_LISTS: Lists = { recordTypes: [], advisers: [], classifications: [], psceds: [] };
 
@@ -216,13 +224,34 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [upload, setUpload] = useState<ManuscriptUpload>({ status: "idle" });
   const fileRef = useRef<File | null>(null);
   const abortRef = useRef<AbortController | null>(null);
-  // Which uploaded file the prefill is about; a replacement bumps it, which
-  // forgets the old file's suggestions and anything the author dismissed.
+  // Which uploaded file the prefill is about; a replacement bumps it as it
+  // begins, which forgets the old file's reading and any reply still coming.
   const [uploadGeneration, setUploadGeneration] = useState(0);
-  const [dismissed, setDismissed] = useState<ReadonlySet<PrefillField>>(new Set());
-  // The title the dialog itself wrote from the file name. Replacing it is not
-  // replacing the author's words, so its chip offers a plain Use.
-  const provisionalTitleRef = useRef<string | null>(null);
+  // The author's decision about each field the PDF can fill (`autofill`),
+  // saved with the draft. `systemValues` is what the dialog itself last put
+  // in a field, so any other change to it is the author's.
+  const [decisions, setDecisions] = useState<MetadataSources>({});
+  const systemValues = useRef<Partial<Record<AutofillField, unknown>>>({});
+  // The draft revision last seen, which every Details save names (IR-833).
+  const detailsRevision = useRef<number | null>(null);
+  const [retryingRead, setRetryingRead] = useState(false);
+
+  // Details saves itself while it is shown, unless a save met a newer draft.
+  const watched = form.watch();
+  const complete = completeBody(watched, decisions, listsFailed);
+  const invalid = new Set((schema.safeParse(watched).error?.issues ?? []).map((issue) => String(issue.path[0])));
+  const autosaveBody = Object.fromEntries(
+    Object.entries(complete).filter(([key]) => !UNSAVED_UNTIL_CONTINUE.has(key) && !invalid.has(FORM_FIELD[key] ?? key)),
+  );
+  const autosave = useAutosave({
+    enabled: phase.kind === "form" && step === 2 && draftId != null,
+    payload: autosaveBody,
+    complete,
+    save: async (body) => {
+      const id = draftIdRef.current;
+      if (id != null) await patchDetails(id, body);
+    },
+  });
 
   const [moreOpen, setMoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -275,12 +304,14 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       const listFailure = [advisers, classifications, psceds].find((result) => result.status === "rejected");
       setListError(listFailure ? errorDetail(listFailure.reason, "We couldn't load the adviser and classification lists. Close this and try again.") : null);
 
-      if (startTarget === "new") {
+      // A reload after a save conflict reopens the draft this flow created.
+      const target = draftIdRef.current != null ? String(draftIdRef.current) : startTarget;
+      if (target === "new") {
         setPhase({ kind: "form" });
         return;
       }
 
-      const id = Number(startTarget);
+      const id = Number(target);
       if (!Number.isInteger(id) || id <= 0) {
         setPhase({ kind: "notFound" });
         return;
@@ -295,16 +326,29 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         const state = stateFromDraft(record, loaded);
         setIsContinuation(Boolean(record.lineage?.derived_from));
         form.reset(state.values);
+        // Saved decisions come back as they were. A value the dialog or the
+        // PDF supplied is still the system's until it changes.
+        const onDraft = record.metadata_sources ?? {};
+        setDecisions(onDraft);
+        systemValues.current = Object.fromEntries(
+          AUTOFILL_FIELDS.filter((field) => ["placeholder", "automatic", "accepted"].includes(onDraft[field]?.state ?? ""))
+            .map((field) => [field, state.values[field]]),
+        );
+        detailsRevision.current = record.details_revision ?? null;
+        autosave.reset(completeBody(state.values, onDraft, {
+          classification: classifications.status === "rejected",
+          psced: psceds.status === "rejected",
+        }));
         draftIdRef.current = id;
         setDraftId(id);
         setTypeId(state.typeId);
         savedTypeId.current = state.typeId;
         const hasManuscript = Boolean(record.abstract_file);
         setUpload(hasManuscript ? { status: "done", fileName: null, size: null } : { status: "idle" });
-        const onDraft = embargoFromDraft(record);
-        setEmbargo(onDraft);
-        savedEmbargo.current = onDraft.choice == null ? null : onDraft;
-        setStep(firstIncompleteStep({ embargo: onDraft, typeId: state.typeId, hasManuscript, values: state.values }, selfId));
+        const answer = embargoFromDraft(record);
+        setEmbargo(answer);
+        savedEmbargo.current = answer.choice == null ? null : answer;
+        setStep(firstIncompleteStep({ embargo: answer, typeId: state.typeId, hasManuscript, values: state.values }, selfId));
         setPhase({ kind: "form" });
       } catch (err) {
         if (cancelled) return;
@@ -402,6 +446,8 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     const controller = new AbortController();
     abortRef.current = controller;
     setUpload({ status: "uploading", fileName: file.name, progress: 0 });
+    // The old file's reading stops counting the moment a replacement begins.
+    if (acceptedBeforeAttempt) setUploadGeneration((n) => n + 1);
     setExactMatches([]);
     setLikelyMatches([]);
     setMatchesAcknowledged(false);
@@ -410,7 +456,11 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       let id = draftIdRef.current;
       if (id == null) {
         const title = provisionalTitle(file.name);
-        const { data } = await recordsApi.create({ title, record_type: typeId });
+        // The title made from the file name is a placeholder, saved as one, so
+        // the PDF's own title may replace it, now or after a reopening.
+        const placeholder = !form.getValues("title");
+        const metadata_sources: MetadataSources = placeholder ? { title: { state: "placeholder" } } : {};
+        const { data } = await recordsApi.create({ title, record_type: typeId, metadata_sources });
         // Closed while the draft was being created: keep the draft, but do not
         // write its id into the URL, which would reopen the dialog.
         if (controller.signal.aborted) return;
@@ -418,10 +468,13 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
         draftIdRef.current = id;
         setDraftId(id);
         savedTypeId.current = typeId;
+        detailsRevision.current = data.details_revision ?? null;
+        autosave.reset({ title, metadata_sources });
         onDraftCreated(id);
-        if (!form.getValues("title")) {
+        if (placeholder) {
+          systemValues.current.title = title;
           form.setValue("title", title);
-          provisionalTitleRef.current = title;
+          setDecisions((prev) => ({ ...prev, title: { state: "placeholder" } }));
         }
       }
       // Before the file, so nothing that runs at upload meets a paper with no answer.
@@ -434,7 +487,6 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
       });
       setUpload({ status: "done", fileName: file.name, size: file.size });
       setUploadGeneration((n) => n + 1);
-      setDismissed(new Set());
       void refreshMatches(id).catch(() => setMatchFailure("Matches could not be checked. Try again before submitting."));
     } catch (err) {
       if (controller.signal.aborted) return;
@@ -463,10 +515,12 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     if (typeId !== savedTypeId.current) {
       setSaving(true);
       try {
-        await recordsApi.update(id, { record_type: typeId });
+        await patchDetails(id, { record_type: typeId });
         savedTypeId.current = typeId;
       } catch (err) {
-        setStepFailure(describeFailure(err, "We couldn't save the type. Try again."));
+        setStepFailure(isStaleEdit(err)
+          ? { message: STALE_DRAFT, fields: {}, network: false }
+          : describeFailure(err, "We couldn't save the type. Try again."));
         return;
       } finally {
         setSaving(false);
@@ -475,23 +529,41 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     goTo(2);
   }
 
-  /* ── Step 2: validate, then patch the draft ──────────────────────────── */
+  /* ── Step 2: saved as the author works, then validated and saved ─────── */
+  /** One Details save, conditional on the revision this dialog last saw. */
+  async function patchDetails(id: number, body: Partial<RecordFormData>) {
+    const expected = detailsRevision.current;
+    const { data } = await recordsApi.update(id, expected == null ? body : { ...body, expected_details_revision: expected });
+    if (data?.details_revision != null) detailsRevision.current = data.details_revision;
+  }
+
   async function saveDetails(values: MetadataValues) {
     const id = draftIdRef.current;
     if (id == null) return;
     setSaving(true);
     setStepFailure(null);
     try {
-      await recordsApi.update(id, metadataPayload(values, listsFailed));
+      // In the autosave queue, so no autosave names the same revision.
+      const body = completeBody(values, decisions, listsFailed);
+      await autosave.exclusive(() => patchDetails(id, body));
+      autosave.markSaved(body);
       await refreshMatches(id).catch(() => setMatchFailure("Matches could not be checked. Try again before submitting."));
       goTo(3);
     } catch (err) {
+      if (isStaleEdit(err)) {
+        autosave.conflict();
+        return;
+      }
       const failure = describeFailure(err, "We couldn't save these details. Try again.");
       applyFieldErrors(failure);
       setStepFailure(failure);
     } finally {
       setSaving(false);
     }
+  }
+
+  function reloadDraft() {
+    setAttempt((n) => n + 1);
   }
 
   /** Put the server's field errors on the form, so Details shows them in place. */
@@ -548,22 +620,78 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     active: phase.kind === "form" && step === 2 && acceptedUpload != null && !underEmbargo,
     generation: uploadGeneration,
   });
-  const prefillStatus: PrefillStatus = underEmbargo ? "idle" : prefill.status;
+  const reading: Prefill = underEmbargo ? { ...prefill, status: "idle" } : prefill;
 
-  /**
-   * Fill a field from its suggestion, and put the author in it. The chip goes
-   * for good: editing the filled text afterwards is the author's own change,
-   * not a reason to offer the suggestion back.
-   */
-  function acceptSuggestion(field: PrefillField, text: string) {
-    form.setValue(field, text, { shouldDirty: true, shouldValidate: true });
-    setDismissed((prev) => new Set(prev).add(field));
+  /** Put a value in a field as the dialog, not the author. */
+  function systemSet(field: AutofillField, value: FormValue) {
+    systemValues.current[field] = value;
+    form.setValue(field, value as never, { shouldDirty: true, shouldValidate: true });
+  }
+
+  // Fill in what the PDF supplies, where the author has not had their say.
+  // Re-running is harmless: a filled field is `automatic` for this revision.
+  useEffect(() => {
+    if (reading.status !== "ready") return;
+    const fills = planAutofill(reading.fields, reading.revision, decisions, form.getValues());
+    if (fills.length === 0) return;
+    for (const fill of fills) systemSet(fill.field, fill.value);
+    setDecisions((prev) => ({ ...prev, ...Object.fromEntries(fills.map((fill) => [fill.field, fill.decision])) }));
+    // `systemSet` and `form` are stable for this flow's life.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reading.status, reading.fields, reading.revision, decisions]);
+
+  // Any change to a field that the dialog did not make is the author's, and
+  // from then on no reading may replace it.
+  useEffect(() => {
+    const subscription = form.watch((all, { name }) => {
+      if (!name || !(AUTOFILL_FIELDS as readonly string[]).includes(name)) return;
+      const field = name as AutofillField;
+      if (field in systemValues.current && sameValue(all[field], systemValues.current[field])) return;
+      delete systemValues.current[field];
+      // Editing a value the PDF supplied keeps which file it came from, so
+      // that file's value is not offered back.
+      setDecisions((prev) => {
+        const before = prev[field];
+        if (before?.state === "authored") return prev;
+        const from = before?.state === "automatic" || before?.state === "accepted" ? before.source_revision : undefined;
+        return { ...prev, [field]: from ? { state: "authored", source_revision: from } : { state: "authored" } };
+      });
+    });
+    return () => subscription.unsubscribe();
+  }, [form]);
+
+  /** Fill a field from the PDF at the author's word, and put them in it. */
+  function acceptSuggestion(field: AutofillField, value: FormValue) {
+    systemSet(field, value);
+    setDecisions((prev) => ({ ...prev, [field]: { state: "accepted", source_revision: reading.revision } }));
     form.setFocus(field);
   }
 
-  function dismissSuggestion(field: PrefillField) {
-    setDismissed((prev) => new Set(prev).add(field));
+  function dismissSuggestion(field: AutofillField) {
+    setDecisions((prev) => ({ ...prev, [field]: { state: "dismissed", source_revision: reading.revision } }));
     form.setFocus(field);
+  }
+
+  /** Put back what the field held before the PDF filled it in. */
+  function undoAutofill(field: AutofillField) {
+    systemSet(field, (decisions[field]?.previous ?? "") as FormValue);
+    setDecisions((prev) => ({ ...prev, [field]: { state: "dismissed", source_revision: reading.revision } }));
+    form.setFocus(field);
+  }
+
+  async function retryReading() {
+    const id = draftIdRef.current;
+    if (id == null) return;
+    setRetryingRead(true);
+    try {
+      await recordsApi.retryExtraction(id, reading.revision);
+    } catch {
+      // A 409 means the manuscript changed, a 400 that it is no longer failed:
+      // either way, asking again shows where it stands now.
+    } finally {
+      setRetryingRead(false);
+      reading.checkAgain();
+    }
   }
 
   /* ── Step 3: submit, then re-read who holds it ───────────────────────── */
@@ -618,18 +746,28 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   }
 
   /* ── What the steps show ─────────────────────────────────────────────── */
-  const values = form.watch();
-  const prefillNotes = prefillFieldNotes(prefillStatus, (field) => {
-    const text = prefill.suggestions[field];
-    const current = values[field] ?? "";
-    if (text == null || dismissed.has(field) || current === text) return null;
-    const replaces = current.trim() !== "" && !(field === "title" && current === provisionalTitleRef.current);
+  const values = watched;
+  const offers = Object.fromEntries(
+    AUTOFILL_FIELDS.map((field) => [
+      field,
+      reading.status === "ready" ? offerFor(field, reading.fields, reading.revision, decisions[field], values[field]) : null,
+    ]),
+  ) as Record<AutofillField, FieldOffer>;
+  const prefillNotes = prefillFieldNotes(reading, (field) => {
+    const offer = offers[field];
+    if (offer == null) return null;
+    const name = FIELD_NAMES[field];
+    if (offer.kind === "filled") return <AutofilledNote field={name} page={offer.page} entry={offer.entry} onUndo={() => undoAutofill(field)} />;
+    if (offer.kind === "stale") return <AutofilledNote field={name} page={null} stale />;
     return (
       <PrefillChip
-        field={field}
-        suggestion={text}
-        replaces={replaces}
-        onUse={() => acceptSuggestion(field, text)}
+        field={name}
+        suggestion={Array.isArray(offer.value) ? offer.value.join(", ") : String(offer.value)}
+        replaces={offer.replaces}
+        page={offer.entry.page}
+        tooLong={offer.entry.exceeds_limit}
+        entry={offer.entry}
+        onUse={() => acceptSuggestion(field, offer.value)}
         onDismiss={() => dismissSuggestion(field)}
       />
     );
@@ -663,7 +801,12 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
     footer = (
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-small text-stone-600">
-          {draftId != null ? "Saved as a draft. You can close this and finish later." : " "}
+          {draftId == null ? " " : step === 2 ? SAVE_STATUS[autosave.status] : "Saved as a draft. You can close this and finish later."}
+          {step === 2 && autosave.status === "failed" && (
+            <button type="button" onClick={() => void autosave.saveNow()} className={cn("ml-2 rounded-full font-medium text-stone-800 underline underline-offset-2", FOCUS_RING)}>
+              Try again
+            </button>
+          )}
         </p>
         <div className="ml-auto flex gap-2">
           {step > 0 && (
@@ -860,14 +1003,21 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           {step === 2 && draftId != null && (
             <PublishDetailsPreview recordId={draftId} sourceKey={uploadGeneration}>
               <FormProvider {...form}>
-                {/* One announcement for the prefill, where the visible lines sit
-                    under both fields and would be read twice. */}
-                <span role="status" className="sr-only">
-                  {prefillAnnouncement(prefillStatus, prefillNotes)}
-                </span>
-                {(prefillStatus === "failed" || prefillStatus === "unsupported") && (
-                  <p className="mb-section-sm text-small text-stone-600">{NEUTRAL_PREFILL}</p>
+                {autosave.status === "conflict" && (
+                  <div role="alert" className={cn(LOAD_ERROR, "mb-section flex-wrap")}>
+                    <i className="fas fa-circle-exclamation mt-0.5 shrink-0" aria-hidden />
+                    <span className="flex-1">{STALE_DRAFT}</span>
+                    <button type="button" onClick={reloadDraft} className={cn(PILL_SECONDARY, FOCUS_RING, "min-h-9 px-4")}>
+                      Reload draft
+                    </button>
+                  </div>
                 )}
+                {/* One announcement for the prefill, where the visible lines sit
+                    under several fields and would be read more than once. */}
+                <span role="status" className="sr-only">
+                  {prefillAnnouncement(reading, offers)}
+                </span>
+                <PrefillLine reading={reading} retrying={retryingRead} onRetry={() => void retryReading()} />
                 <form
                   noValidate
                   onSubmit={(e) => {
@@ -924,36 +1074,101 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   );
 }
 
-/**
- * What sits under the title and abstract: "Reading your PDF…" while Docling
- * runs (the fields stay editable), then each field's chip, if it has one.
- */
-function prefillFieldNotes(
-  status: PrefillStatus,
-  chipFor: (field: PrefillField) => ReactNode,
-): Partial<Record<PrefillField, ReactNode>> {
-  if (status === "pending") {
-    // A still icon: this can sit on screen for a minute and a half, and a
-    // spinner that long is motion the reduced-motion rule (spec §7) forbids.
-    const reading = (
-      <p className="mt-1 flex items-center gap-1.5 text-small text-stone-600" aria-hidden>
-        <i className="fas fa-file-lines text-label" aria-hidden />
-        Reading your PDF…
-      </p>
-    );
-    return { title: reading, abstract: reading };
-  }
-  if (status !== "ready") return {};
-  return Object.fromEntries(PREFILL_FIELDS.map((f) => [f, chipFor(f)]).filter(([, chip]) => chip != null));
+/** Continue saves these, autosave does not: an owner list typed half-way is not one. */
+const UNSAVED_UNTIL_CONTINUE = new Set(["owner_emails"]);
+
+/** Everything Details saves: its values, and the author's decision about each prefilled field. */
+function completeBody(
+  values: MetadataValues,
+  decisions: MetadataSources,
+  unloaded: { classification?: boolean; psced?: boolean },
+): Partial<RecordFormData> {
+  return { ...metadataPayload(values, unloaded), metadata_sources: decisions };
 }
 
-/** What the prefill's live region says; the chips themselves carry the detail. */
-function prefillAnnouncement(status: PrefillStatus, notes: Partial<Record<PrefillField, ReactNode>>): string {
+/** Said in the footer while Details is shown. Not announced: a conflict has its own alert. */
+const SAVE_STATUS: Record<SaveStatus, string> = {
+  idle: "Saved as a draft. You can close this and finish later.",
+  saving: "Saving…",
+  saved: "All changes saved.",
+  unsaved: "Some changes aren't saved yet. Continue saves them.",
+  failed: "Your latest changes couldn't be saved.",
+  conflict: "Your latest changes weren't saved.",
+};
+
+/** What reading the PDF is doing, as the line under each field says it. */
+function readingText(reading: Prefill): string {
+  if (reading.phase === "queued") return "Waiting to read your PDF…";
+  if (reading.phase === "retrying") return "Reading your PDF didn't work the first time. Trying again…";
+  return "Reading your PDF…";
+}
+
+/**
+ * What sits under each prefillable field: a still line while the PDF is read
+ * (the fields stay editable), then each field's note or chip, if it has one.
+ */
+function prefillFieldNotes(
+  reading: Prefill,
+  noteFor: (field: AutofillField) => ReactNode,
+): Partial<Record<AutofillField, ReactNode>> {
+  if (reading.status === "pending") {
+    // A still icon: this can sit on screen for minutes, and a spinner that
+    // long is motion the reduced-motion rule (spec §7) forbids.
+    const line = (
+      <p className="mt-1 flex items-center gap-1.5 text-small text-stone-600" aria-hidden>
+        <i className="fas fa-file-lines text-label" aria-hidden />
+        {readingText(reading)}
+      </p>
+    );
+    return { title: line, abstract: line };
+  }
+  if (reading.status !== "ready") return {};
+  return Object.fromEntries(AUTOFILL_FIELDS.map((f) => [f, noteFor(f)]).filter(([, note]) => note != null));
+}
+
+/** The line above Details when reading has stopped, or found nothing. */
+function PrefillLine({ reading, retrying, onRetry }: { reading: Prefill; retrying: boolean; onRetry: () => void }) {
+  const action = (label: string, onClick: () => void, disabled = false) => (
+    <button type="button" onClick={onClick} disabled={disabled} className={cn(PILL_SECONDARY, FOCUS_RING, "ml-2 min-h-9 px-4")}>
+      {label}
+    </button>
+  );
+  if (reading.status === "stalled") {
+    return (
+      <p className="mb-section-sm flex flex-wrap items-center gap-y-2 text-small text-stone-600">
+        Still processing your PDF. Keep filling in details, and check again for suggestions.
+        {action("Check again", reading.checkAgain)}
+      </p>
+    );
+  }
+  if (reading.status === "failed" || reading.status === "unsupported") {
+    return (
+      <p className="mb-section-sm flex flex-wrap items-center gap-y-2 text-small text-stone-600">
+        {NEUTRAL_PREFILL}
+        {reading.status === "failed" && reading.retryable && action("Retry extraction", onRetry, retrying)}
+      </p>
+    );
+  }
+  if (reading.status === "ready" && AUTOFILL_FIELDS.every((field) => reading.fields[field] == null)) {
+    return <p className="mb-section-sm text-small text-stone-600">{NOTHING_FOUND}</p>;
+  }
+  return null;
+}
+
+/** What the prefill's live region says; the notes themselves carry the detail. */
+function prefillAnnouncement(reading: Prefill, offers: Record<AutofillField, FieldOffer>): string {
   // The neutral line is not repeated here: it is ordinary text above the form,
   // read in order, and a failure to prefill needs no interruption.
-  if (status === "pending") return "Reading your PDF…";
-  const found = PREFILL_FIELDS.filter((f) => notes[f] != null);
-  return found.length > 0 ? `Found a ${found.join(" and ")} in your PDF. Suggestions are shown under each field.` : "";
+  if (reading.status === "pending") return readingText(reading);
+  if (reading.status === "stalled") return "Still processing your PDF.";
+  const names = (kind: string) => AUTOFILL_FIELDS.filter((f) => offers[f]?.kind === kind).map((f) => FIELD_NAMES[f]);
+  const list = (items: string[]) => (items.length > 1 ? `${items.slice(0, -1).join(", ")} and ${items[items.length - 1]}` : items[0]);
+  const filled = names("filled");
+  const offered = names("offer");
+  return [
+    filled.length > 0 && `Filled in the ${list(filled)} from your PDF. You can undo this under each field.`,
+    offered.length > 0 && `Suggestions for the ${list(offered)} are shown under each field.`,
+  ].filter(Boolean).join(" ");
 }
 
 /** Where the author is: done steps say so in words, the current one is marked. */

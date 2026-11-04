@@ -2,7 +2,7 @@ import { lazy } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
-import { rolesFor } from "@/lib/access";
+import { pathFor, rolesFor } from "@/lib/access";
 import { redirectRoutes } from "./redirects";
 
 // Auth pages
@@ -126,35 +126,55 @@ export const routes: RouteObject[] = [{
           {
             // RDCO coordination. `Import Records` is the "file on behalf of"
             // path -- which is why RDCO does not also get the submission wizard.
-            element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
+            element: <ProtectedRoute allowedRoles={rolesFor("importRecords")} />,
             children: [
               {
-                path: "records/import",
+                path: pathFor("importRecords"),
                 element: <DeferredPage name="Import Records"><ImportRecordsPage /></DeferredPage>,
                 handle: { crumb: "Import Records" },
               },
               {
-                path: "admin/users",
-                element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
-                handle: { crumb: "Users", width: "full" },
-              },
-              {
-                path: "admin/role-requests",
+                path: pathFor("roleRequests"),
                 element: <DeferredPage name="Role Requests"><RoleRequestsPage /></DeferredPage>,
                 handle: { crumb: "Role Requests", width: "full" },
               },
               {
-                path: "admin/download-requests",
+                path: pathFor("downloadRequests"),
                 element: <DeferredPage name="Download Requests"><DownloadRequestsPage /></DeferredPage>,
                 handle: { crumb: "Download Requests", width: "full" },
               },
               {
-                path: "admin/delete-requests",
+                path: pathFor("deleteRequests"),
                 element: <DeferredPage name="Delete Requests"><DeleteRequestsPage /></DeferredPage>,
                 handle: { crumb: "Delete Requests", width: "full" },
               },
+            ],
+          },
+          {
+            // RDCO gives Student and Adviser at its own Users address.
+            element: <ProtectedRoute allowedRoles={rolesFor("users")} />,
+            children: [
               {
-                path: "admin/audit",
+                path: pathFor("users"),
+                element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
+                handle: { crumb: "Users", width: "full" },
+              },
+            ],
+          },
+          {
+            element: <ProtectedRoute allowedRoles={rolesFor("adminUsers")} />,
+            children: [{
+              path: pathFor("adminUsers"),
+              element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
+              handle: { crumb: "Users", width: "full" },
+            }],
+          },
+          {
+            // The System Admin alone (ADR-051 §3).
+            element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
+            children: [
+              {
+                path: pathFor("audit"),
                 element: <DeferredPage name="Audit Log"><AuditLogPage /></DeferredPage>,
                 handle: { crumb: "Audit Log", width: "full" },
               },

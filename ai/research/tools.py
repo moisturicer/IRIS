@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 
 import asyncpg
 
+from ai.research import metadata
 from ai.runs.store import RunStore
 
 APP_NAME = "iris-ai-research"
@@ -26,6 +27,10 @@ OUTLINE_CHUNKS = 2000
 RECALL_LIMIT = 50
 
 OK, NO_MATCH, PARTIAL, UNAVAILABLE = "ok", "no_match", "partial", "unavailable"
+#: A reference fits several papers; the reader is asked, never answered for (IR-750).
+AMBIGUOUS = "ambiguous"
+#: A paper that can be named but has no Manuscript read: nothing to read, not nothing found (IR-731).
+NO_MANUSCRIPT = "no_manuscript"
 
 
 @dataclass(frozen=True)
@@ -46,7 +51,8 @@ class RecordRef:
     handle: str
     record_id: int
     title: str
-    source: Source
+    #: None for a paper with no Manuscript read yet: it can be named, not read (IR-750).
+    source: Source | None
 
 
 @dataclass(frozen=True)
@@ -79,10 +85,59 @@ class Coverage:
 
 
 @dataclass(frozen=True)
+class Match:
+    """One reference a reader used and the papers it names (IR-750)."""
+
+    #: 1-based position among the call's references, names first, then ids.
+    reference: int
+    #: "title" or "record_id".
+    kind: str
+    #: exact_title, short_title, title_phrase, record_id, ambiguous or none.
+    match: str
+    records: tuple[RecordRef, ...] = ()
+    #: The title tier an ambiguous reference matched at.
+    basis: str | None = None
+
+
+@dataclass(frozen=True)
+class Count:
+    """An exact metadata count over the reader's readable Records (IR-750).
+
+    A total of the catalogue as this reader may see it, never a topic estimate.
+    """
+
+    total: int
+    #: (name, value) pairs as applied, taxonomy names as the catalogue spells them.
+    filters: tuple[tuple[str, object], ...] = ()
+    group_by: str | None = None
+    #: (value, count) per group, in value order.
+    groups: tuple[tuple[object, int], ...] = ()
+    #: Counted Records with no value for `group_by`.
+    ungrouped: int = 0
+    #: The Paper Chat Record the count was confined to, if any.
+    scope_record_id: int | None = None
+    #: The Records counted: provenance for rechecks, never shown to a model or reader.
+    population: frozenset[int] = frozenset()
+    relative_to: str = metadata.RELATIVE_TO
+
+    @property
+    def figures(self) -> set[int]:
+        """Every number this count computed."""
+        return {self.total, self.ungrouped, *(n for _, n in self.groups)}
+
+    @property
+    def stated(self) -> set[int]:
+        """Numbers that, stated in an answer, report this count: its total or a group's size."""
+        return {self.total, *(n for _, n in self.groups)}
+
+
+@dataclass(frozen=True)
 class ToolResult:
     status: str
     reason: str | None = None
     records: tuple[RecordRef, ...] = ()
+    matches: tuple[Match, ...] = ()
+    count: Count | None = None
     passages: tuple[PassageRef, ...] = ()
     sections: tuple[Section, ...] = ()
     coverage: Coverage = field(default_factory=Coverage)
@@ -117,12 +172,14 @@ class _Refused(Exception):
 
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
-                 scope_record_id: int | None = None):
+                 scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None):
         self.dsn = dsn
         self.grant = grant
         self.run_id = run_id
         self.fence = fence
         self.scope = scope_record_id
+        self.embedding_provider = embedding_provider
+        self.embedding_ledger = embedding_ledger
 
     @asynccontextmanager
     async def _session(self):
@@ -176,7 +233,10 @@ class ResearchTools:
         return handles
 
     async def _resolve(self, conn, handle, kind: str):
-        """(title, Source, chunk id) for a live handle of this run, or raise _Refused."""
+        """(title, Source or None, chunk id) for a live handle of this run, or raise _Refused.
+
+        The Source is None for a paper with no Manuscript read, which has nothing to read.
+        """
         if not isinstance(handle, str) or not handle.startswith(kind):
             raise _Refused("unknown_handle")
         bound = await conn.fetchrow(
@@ -189,7 +249,7 @@ class ResearchTools:
         current = await conn.fetchrow(
             """SELECT r.title, cs.id AS chunk_set_id, cs.extraction_hash
                  FROM public.records_record r
-                 LEFT JOIN public.ai_chunkset cs ON cs.record_id = r.id AND cs.is_active
+                 LEFT JOIN iris_ai.research_chunksets() cs ON cs.record_id = r.id AND cs.is_active
                 WHERE r.id = $1 AND ($2::bigint IS NULL OR r.id = $2)""",
             bound["record_id"], self.scope,
         )
@@ -198,6 +258,8 @@ class ResearchTools:
             raise _Refused("unknown_handle")
         if current["chunk_set_id"] != bound["chunk_set_id"]:
             raise _Refused("source_replaced")
+        if current["chunk_set_id"] is None:
+            return current["title"], None, None
         source = Source(bound["record_id"], current["chunk_set_id"], current["extraction_hash"])
         return current["title"], source, bound["chunk_id"]
 
@@ -220,7 +282,7 @@ class ResearchTools:
 
         async def body(conn):
             inspected = await conn.fetchval(
-                """SELECT count(DISTINCT cs.record_id) FROM public.ai_chunkset cs
+                """SELECT count(DISTINCT cs.record_id) FROM iris_ai.research_chunksets() cs
                      JOIN public.records_record r ON r.id = cs.record_id
                     WHERE cs.is_active AND ($1::bigint IS NULL OR cs.record_id = $1)""",
                 self.scope,
@@ -234,8 +296,8 @@ class ResearchTools:
                     hits AS (
                         SELECT c.id, c.record_id, c.chunk_set_id, cs.extraction_hash, c.source_page,
                                c.content, c.context_path, r.title, ts_rank(c.search_vector, q.q) AS rank
-                          FROM q, public.ai_documentchunk c
-                          JOIN public.ai_chunkset cs ON cs.id = c.chunk_set_id AND cs.is_active
+                          FROM q, iris_ai.research_chunks() c
+                          JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active
                           JOIN public.records_record r ON r.id = c.record_id
                          WHERE c.deleted_at IS NULL AND c.search_vector @@ q.q
                            AND ($2::bigint IS NULL OR c.record_id = $2))
@@ -269,7 +331,7 @@ class ResearchTools:
         async def body(conn):
             title, source, chunk_id = await self._resolve(conn, handle, "P")
             row = await conn.fetchrow(
-                """SELECT record_id, source_page, content, context_path FROM public.ai_documentchunk
+                """SELECT record_id, source_page, content, context_path FROM iris_ai.research_chunks()
                     WHERE id = $1 AND chunk_set_id = $2 AND deleted_at IS NULL""",
                 chunk_id, source.chunk_set_id,
             )
@@ -287,10 +349,13 @@ class ResearchTools:
 
         async def body(conn):
             title, source, _ = await self._resolve(conn, record_handle, "R")
+            # Named but never read: absent, not a page with no match (IR-731).
+            if source is None:
+                return ToolResult(NO_MATCH, NO_MANUSCRIPT, coverage=Coverage(total=0))
             rows = await conn.fetch(
                 """SELECT id, record_id, source_page, content, context_path,
                           count(*) OVER () AS total
-                     FROM public.ai_documentchunk
+                     FROM iris_ai.research_chunks()
                     WHERE chunk_set_id = $1 AND source_page = $2 AND deleted_at IS NULL
                     ORDER BY sequence LIMIT $3""",
                 source.chunk_set_id, page, PAGE_PASSAGES,
@@ -313,8 +378,10 @@ class ResearchTools:
     async def outline(self, record_handle: str) -> ToolResult:
         async def body(conn):
             title, source, _ = await self._resolve(conn, record_handle, "R")
+            if source is None:
+                return ToolResult(NO_MATCH, NO_MANUSCRIPT)
             rows = await conn.fetch(
-                """SELECT source_page, context_path FROM public.ai_documentchunk
+                """SELECT source_page, context_path FROM iris_ai.research_chunks()
                     WHERE chunk_set_id = $1 AND deleted_at IS NULL ORDER BY sequence LIMIT $2""",
                 source.chunk_set_id, OUTLINE_CHUNKS + 1,
             )
@@ -336,6 +403,136 @@ class ResearchTools:
 
         return await self._call_on_handle("outline", body)
 
+    async def resolve(self, references=(), record_ids=()) -> ToolResult:
+        """Papers the reader named, by title or Record id, as fresh paper handles (IR-750).
+
+        Several title matches are an ambiguity, never a silent choice. A Record the
+        reader may not read is the same `none` as one that does not exist.
+        """
+        if (not isinstance(references, (list, tuple)) or not isinstance(record_ids, (list, tuple))
+                or not all(isinstance(r, str) for r in references)
+                or not all(_is_int(i) for i in record_ids)
+                or not 0 < len(references) + len(record_ids) <= metadata.MAX_REFERENCES):
+            return ToolResult.unavailable("invalid_argument")
+
+        async def body(conn):
+            rows = await conn.fetch(
+                """SELECT r.id AS record_id, r.title, cs.id AS chunk_set_id, cs.extraction_hash
+                     FROM public.records_record r
+                     LEFT JOIN iris_ai.research_chunksets() cs ON cs.record_id = r.id AND cs.is_active
+                    WHERE ($1::bigint IS NULL OR r.id = $1)
+                    ORDER BY r.title, r.id""",
+                self.scope,
+            )
+            by_id = {row["record_id"]: row for row in rows}
+            found: list[tuple[str, str, list, str | None]] = []
+            truncated = False
+            for reference in references:
+                basis, named = metadata.title_matches(rows, reference)
+                truncated = truncated or len(named) > metadata.MAX_CANDIDATES
+                if len(named) > 1:
+                    found.append(("title", "ambiguous", named[:metadata.MAX_CANDIDATES], basis))
+                else:
+                    found.append(("title", basis, named, None))
+            for record_id in record_ids:
+                row = by_id.get(record_id)
+                found.append(("record_id", "record_id", [row], None) if row
+                             else ("record_id", "none", [], None))
+            named = list({row["record_id"]: row for *_, chosen, _ in found for row in chosen}.values())
+            handles = dict(zip(
+                (row["record_id"] for row in named),
+                await self._handles(conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in named]),
+            ))
+            refs = {
+                row["record_id"]: RecordRef(
+                    handles[row["record_id"]], row["record_id"], row["title"],
+                    Source(row["record_id"], row["chunk_set_id"], row["extraction_hash"])
+                    if row["chunk_set_id"] is not None else None)
+                for row in named
+            }
+            matches = tuple(
+                Match(n, kind, match, tuple(refs[row["record_id"]] for row in chosen), basis)
+                for n, (kind, match, chosen, basis) in enumerate(found, start=1)
+            )
+            resolved = sum(1 for m in matches if m.match not in ("ambiguous", "none"))
+            if any(m.match == "ambiguous" for m in matches):
+                status = AMBIGUOUS
+            elif resolved == len(matches):
+                status = OK
+            else:
+                status = PARTIAL if resolved else NO_MATCH
+            return ToolResult(
+                status, records=tuple(refs.values()), matches=matches,
+                coverage=Coverage(resolved, len(matches), truncated),
+                dependencies=frozenset(r.source for r in refs.values() if r.source is not None),
+            )
+
+        return await self._call("resolve", body)
+
+    async def count(self, filters: dict, group_by: str | None = None) -> ToolResult:
+        """Exactly how many readable Records match metadata filters, optionally grouped (IR-750).
+
+        Computed afresh on every call under the run's grant, so a paper the reader
+        lost access to is never counted. There is no topic filter: a topic total
+        is a screened subset, never a count.
+        """
+        if (not isinstance(filters, dict) or set(filters) - set(metadata.FILTERS)
+                or (group_by is not None and group_by not in metadata.GROUPS)
+                or not all(isinstance(filters[n], str) and filters[n].strip()
+                           for n in metadata.TAXONOMIES if n in filters)
+                or not all(_is_int(filters[n]) and metadata.YEAR_RANGE[0] <= filters[n] <= metadata.YEAR_RANGE[1]
+                           for n in ("year_from", "year_to") if n in filters)
+                or ("is_ip" in filters and type(filters["is_ip"]) is not bool)):
+            return ToolResult.unavailable("invalid_argument")
+
+        async def body(conn):
+            applied, ids = [], {}
+            for name, (table, _) in metadata.TAXONOMIES.items():
+                if name not in filters:
+                    continue
+                rows = await conn.fetch(
+                    f"SELECT id, name FROM public.{table} WHERE lower(name) = lower($1)",
+                    filters[name].strip())
+                if not rows:
+                    return ToolResult.unavailable("unknown_filter_value")
+                # Entries differing only by case are never chosen between.
+                if len(rows) > 1:
+                    return ToolResult.unavailable("ambiguous_filter_value")
+                ids[name] = rows[0]["id"]
+                applied.append((name, rows[0]["name"]))
+            applied += [(n, filters[n]) for n in ("year_from", "year_to", "is_ip") if n in filters]
+            rows = await conn.fetch(
+                """SELECT r.id, c.name AS classification, p.name AS psced, t.name AS record_type,
+                          r.year_completed AS year
+                     FROM public.records_record r
+                     LEFT JOIN public.records_classification c ON c.id = r.classification_id
+                     LEFT JOIN public.records_pscedclassification p ON p.id = r.psced_id
+                     LEFT JOIN public.records_recordtype t ON t.id = r.record_type_id
+                    WHERE ($1::bigint IS NULL OR r.id = $1)
+                      AND ($2::bigint IS NULL OR r.classification_id = $2)
+                      AND ($3::bigint IS NULL OR r.psced_id = $3)
+                      AND ($4::bigint IS NULL OR r.record_type_id = $4)
+                      AND ($5::int IS NULL OR r.year_completed >= $5)
+                      AND ($6::int IS NULL OR r.year_completed <= $6)
+                      AND ($7::boolean IS NULL OR r.is_ip = $7)""",
+                self.scope, ids.get("classification"), ids.get("psced"), ids.get("record_type"),
+                filters.get("year_from"), filters.get("year_to"), filters.get("is_ip"),
+            )
+            groups: dict = {}
+            for row in rows:
+                if group_by is not None:
+                    groups[row[group_by]] = groups.get(row[group_by], 0) + 1
+            fact = Count(
+                total=len(rows), filters=tuple(sorted(applied)), group_by=group_by,
+                groups=tuple(sorted((v, n) for v, n in groups.items() if v is not None)),
+                ungrouped=groups.get(None, 0), scope_record_id=self.scope,
+                population=frozenset(row["id"] for row in rows),
+            )
+            return ToolResult(OK if rows else NO_MATCH, count=fact,
+                              coverage=Coverage(len(rows), len(rows)))
+
+        return await self._call("count", body)
+
     async def recall(self, record_ids) -> ToolResult:
         """Fresh paper handles for Records a Conversation showed, still readable now (IR-728).
 
@@ -347,7 +544,7 @@ class ResearchTools:
             rows = await conn.fetch(
                 """SELECT r.id AS record_id, r.title, cs.id AS chunk_set_id, cs.extraction_hash
                      FROM public.records_record r
-                     JOIN public.ai_chunkset cs ON cs.record_id = r.id AND cs.is_active
+                     JOIN iris_ai.research_chunksets() cs ON cs.record_id = r.id AND cs.is_active
                     WHERE r.id = ANY($1::bigint[]) AND ($2::bigint IS NULL OR r.id = $2)""",
                 ids, self.scope,
             )
@@ -367,6 +564,36 @@ class ResearchTools:
 
         return await self._call("recall", body)
 
+    async def reauthorize(self, handles, counted=()) -> str | None:
+        """None when every recovered handle still reads its own source now (IR-724).
+
+        A replacement worker's restored evidence confers nothing: each handle
+        must resolve under the run's grant, scope and fence to the source it
+        was issued on, each passage must still exist, and every Record an
+        exact count counted must still be readable. "stale" otherwise, or the
+        reason the run cannot continue. Journals nothing.
+        """
+        try:
+            async with self._session() as conn:
+                for handle in handles:
+                    try:
+                        async with conn.transaction():
+                            _, source, chunk_id = await self._resolve(conn, handle, str(handle)[:1])
+                            if chunk_id is not None and not await conn.fetchval(
+                                    """SELECT EXISTS (SELECT 1 FROM iris_ai.research_chunks()
+                                        WHERE id = $1 AND chunk_set_id = $2 AND deleted_at IS NULL)""",
+                                    chunk_id, source.chunk_set_id):
+                                return "stale"
+                    except _Refused:
+                        return "stale"
+                ids = sorted({i for i in counted if _is_int(i)})
+                if ids and await conn.fetchval(
+                        "SELECT count(*) FROM public.records_record WHERE id = ANY($1::bigint[])", ids) != len(ids):
+                    return "stale"
+        except _Refused as refused:
+            return refused.reason
+        return None
+
     async def journal(self, name: str, data: dict) -> bool:
         """Append a run event under the grant; False once the run has ended (IR-728)."""
         try:
@@ -377,11 +604,64 @@ class ResearchTools:
             return False
 
     async def semantic_search(self, query: str) -> ToolResult:
-        """Declared, never run: needs embedding and reranking."""
-        async def body(conn):
-            return ToolResult.unavailable(
-                "provider_gated", provider_operations=("embed_query", "rerank"))
+        """One admitted query embedding, pinned to the current document space."""
+        if self.embedding_provider is None or self.embedding_ledger is None:
+            async def gated(conn):
+                return ToolResult.unavailable("provider_gated", provider_operations=("embed_query", "rerank"))
+            return await self._call("semantic_search", gated)
+        if not isinstance(query, str) or not query.strip():
+            return ToolResult.unavailable("invalid_argument")
+        import asyncio
+        from types import SimpleNamespace
+        from ai.admission.errors import AdmissionDenied
+        from ai.admission.guard import SendGuard
+        from ai.admission.ledger import Request, Usage, estimate_tokens
+        from ai.admission.scope import RunBinding
+        from ai.ingestion.indexing import checked_vectors, space
+        provider = self.embedding_provider
+        binding = RunBinding(self.run_id, self.fence)
+        try:
+            async with self._session() as conn:
+                pinned = await space(conn, provider)
+            ticket = await self.embedding_ledger.admit(Request(
+                operation="embed", purpose="query", purpose_version="query-1", lane="research",
+                account=provider.account, models=(provider.model,), input_tokens=estimate_tokens(query),
+                output_tokens=0), binding)
+            usage = Usage()
+            try:
+                await SendGuard(self.dsn).check(binding, SimpleNamespace(data_policy=provider.data_policy))
+                usage.sent = True
+                response = await asyncio.wait_for(provider.embed([query], input_type="query"), ticket.timeout_seconds)
+                vector = checked_vectors(response.vectors, 1, provider.dimensions)[0]
+                usage.input_tokens, usage.output_tokens, usage.model = response.input_tokens, 0, provider.model
+            finally:
+                await ticket.settle(usage)
+        except AdmissionDenied as refused:
+            return ToolResult.unavailable(refused.reason)
+        except _Refused as refused:
+            return ToolResult.unavailable(refused.reason)
 
+        async def body(conn):
+            current = await space(conn, provider)
+            if current["id"] != pinned["id"]:
+                return ToolResult.unavailable("embedding_space_changed")
+            rows = await conn.fetch(
+                "WITH candidates AS (SELECT rv.record_id FROM iris_ai.research_record_vectors($1) rv"
+                " WHERE ($2::bigint IS NULL OR rv.record_id=$2)"
+                " ORDER BY rv.embedding OPERATOR(public.<=>) $3::public.vector LIMIT 20)"
+                " SELECT c.*,r.title,cs.extraction_hash FROM iris_ai.research_chunks() c"
+                " JOIN iris_ai.research_chunksets() cs ON cs.id=c.chunk_set_id AND cs.is_active"
+                " JOIN public.records_record r ON r.id=c.record_id"
+                " JOIN iris_ai.research_vectors($1) v ON v.chunk_id=c.id"
+                " JOIN candidates cr ON cr.record_id=c.record_id"
+                " WHERE c.deleted_at IS NULL AND ($2::bigint IS NULL OR c.record_id=$2)"
+                " ORDER BY v.embedding OPERATOR(public.<=>) $3::public.vector,c.id LIMIT $4",
+                pinned["id"], self.scope, json.dumps(vector), SEARCH_LIMIT)
+            handles = await self._handles(conn, [("P",r["record_id"],r["chunk_set_id"],r["id"]) for r in rows])
+            passages = self._passages(None, rows, handles)
+            return ToolResult(OK if passages else NO_MATCH, passages=passages,
+                coverage=Coverage(len(passages),None, len(passages)==SEARCH_LIMIT),
+                dependencies=frozenset(p.source for p in passages))
         return await self._call("semantic_search", body)
 
     async def _call_on_handle(self, name: str, body) -> ToolResult:

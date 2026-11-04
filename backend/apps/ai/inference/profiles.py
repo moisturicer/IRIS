@@ -74,6 +74,12 @@ class DataPolicy(Enum):
     """
 
     NO_TRAINING = "no_training"
+    #: Nothing retained either: a paper's Figures leave IRIS only so (IR-852).
+    ZERO_RETENTION = "zero_retention"
+
+
+#: Tasks whose vendor may keep nothing they are sent.
+_ZERO_RETENTION_TASKS = frozenset({InferenceTask.DESCRIBE_FIGURE})
 
 
 @dataclass(frozen=True)
@@ -188,7 +194,7 @@ def _model_context_windows(prefix: str) -> tuple[tuple[str, int], ...]:
 #: with no new configuration, but borrowing the *answer* model would send
 #: every follow-up rewrite to the expensive one. Its own model ships as a
 #: default instead. `summary` and `describe_figure` inherit nothing and are
-#: off until configured.
+#: off until configured; `describe_figure` is zero-retention (IR-852).
 _INHERITED_KEYS = {
     InferenceTask.ANSWER: ("LLM_BASE_URL", "LLM_API_KEY", "LLM_MODEL"),
     InferenceTask.RESOLVE: ("LLM_BASE_URL", "LLM_API_KEY", ""),
@@ -342,4 +348,5 @@ def profile_for(task: Union[InferenceTask, str]) -> Profile:
         provider_only=_listed(f"{prefix}_PROVIDER_ONLY"),
         model_provider_pins=_model_provider_pins(prefix),
         model_context_windows=_model_context_windows(prefix),
+        data_policy=DataPolicy.ZERO_RETENTION if task in _ZERO_RETENTION_TASKS else DataPolicy.NO_TRAINING,
     )

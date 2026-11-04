@@ -5,12 +5,12 @@ from django.core.exceptions import ImproperlyConfigured
 
 from apps.ai.chunking.document import PARAGRAPH, DocumentElement, NormalizedDocument
 from apps.ai.extraction import (
-    DoclingExtractor,
     InMemoryExtractor,
     current_extractor,
     use_extractor,
     verify_extraction_configuration,
 )
+from apps.ai.extraction.selection import UnconfiguredExtractor
 
 pytestmark = [pytest.mark.django_required]
 
@@ -21,52 +21,73 @@ DOCUMENT = NormalizedDocument(
 )
 
 
-def test_docling_is_the_configured_backend_until_ir_842(settings):
-    settings.EXTRACTION_BACKEND = "docling"
-
-    assert isinstance(current_extractor(), DoclingExtractor)
-
-
-def test_the_docling_adapter_is_built_from_the_docling_settings(settings):
-    settings.EXTRACTION_BACKEND = "docling"
-    settings.DOCLING_API_URL = "http://docling.test:5001/"
-
-    assert current_extractor()._base_url == "http://docling.test:5001"
-
-
 def test_an_unknown_backend_refuses_to_start(settings):
-    settings.EXTRACTION_BACKEND = "pymupdf"
+    settings.EXTRACTION_BACKEND = "docling"
 
     with pytest.raises(ImproperlyConfigured, match="EXTRACTION_BACKEND"):
         verify_extraction_configuration()
 
 
-def test_a_known_backend_starts(settings):
-    settings.EXTRACTION_BACKEND = "docling"
+def test_llamaparse_is_the_only_backend():
+    from apps.ai.extraction.selection import BACKENDS
+
+    assert set(BACKENDS) == {"llamaparse"}
+
+
+def test_development_starts_without_a_llamaparse_key(settings):
+    settings.EXTRACTION_BACKEND = "llamaparse"
+    settings.LLAMAPARSE_API_KEY = ""
+    settings.DEBUG = True
 
     verify_extraction_configuration()
 
 
-def test_use_extractor_replaces_the_extractor_inside_the_block_only():
+def test_production_refuses_to_start_without_a_llamaparse_key(settings):
+    settings.EXTRACTION_BACKEND = "llamaparse"
+    settings.LLAMAPARSE_API_KEY = ""
+    settings.DEBUG = False
+
+    with pytest.raises(ImproperlyConfigured, match="LLAMAPARSE_API_KEY"):
+        verify_extraction_configuration()
+
+
+def test_an_unconfigured_extractor_fails_the_read_as_unavailable(settings):
+    from apps.ai.extraction import ExtractorUnavailable
+
+    settings.EXTRACTION_BACKEND = "llamaparse"
+    settings.LLAMAPARSE_API_KEY = ""
+
+    extractor = current_extractor()
+
+    assert isinstance(extractor, UnconfiguredExtractor)
+    assert extractor.timeout_seconds > 0
+    with pytest.raises(ExtractorUnavailable, match="LLAMAPARSE_API_KEY"):
+        extractor.extract(b"%PDF-1.7", filename="paper.pdf")
+
+
+def test_use_extractor_replaces_the_extractor_inside_the_block_only(settings):
+    settings.LLAMAPARSE_API_KEY = ""
     adapter = InMemoryExtractor(DOCUMENT)
 
     with use_extractor(adapter):
         assert current_extractor() is adapter
-    assert isinstance(current_extractor(), DoclingExtractor)
+    assert isinstance(current_extractor(), UnconfiguredExtractor)
 
 
-def test_an_error_inside_the_block_cannot_leave_the_override_installed():
+def test_an_error_inside_the_block_cannot_leave_the_override_installed(settings):
+    settings.LLAMAPARSE_API_KEY = ""
+    adapter = InMemoryExtractor(DOCUMENT)
     with pytest.raises(RuntimeError):
-        with use_extractor(InMemoryExtractor(DOCUMENT)):
+        with use_extractor(adapter):
             raise RuntimeError("boom")
 
-    assert isinstance(current_extractor(), DoclingExtractor)
+    assert isinstance(current_extractor(), UnconfiguredExtractor)
 
 
 def test_startup_refuses_an_unknown_backend(settings):
     from django.apps import apps
 
-    settings.EXTRACTION_BACKEND = "pymupdf"
+    settings.EXTRACTION_BACKEND = "docling"
 
     with pytest.raises(ImproperlyConfigured, match="EXTRACTION_BACKEND"):
         apps.get_app_config("ai").ready()
@@ -78,7 +99,7 @@ def test_extraction_settings_are_read_only_inside_the_extraction_module():
 
     backend = Path(__file__).resolve().parents[4]
     package = backend / "apps" / "ai" / "extraction"
-    reader = re.compile(r"""settings\.(DOCLING_|LLAMAPARSE_|EXTRACTION_BACKEND)|getattr\(\s*settings,\s*["'](DOCLING_|LLAMAPARSE_|EXTRACTION_BACKEND)""")
+    reader = re.compile(r"""settings\.(LLAMAPARSE_|EXTRACTION_BACKEND)|getattr\(\s*settings,\s*["'](LLAMAPARSE_|EXTRACTION_BACKEND)""")
     readers = [
         str(path.relative_to(backend))
         for path in (backend / "apps").rglob("*.py")
@@ -177,3 +198,42 @@ def test_the_llamaparse_adapter_is_built_from_the_llamaparse_settings(settings, 
     assert adapter._base_url == "https://api.cloud.eu.llamaindex.ai"
     assert adapter._options["tier"] == "agentic"
     assert adapter._options["version"] == "2026-09-28"
+
+
+# ── LlamaExtract (IR-846) ─────────────────────────────────────────────────
+
+
+def _llamaextract(settings, **overrides):
+    _llamaparse(settings, LLAMAPARSE_BASE_URL="https://api.cloud.llamaindex.ai", DEBUG=True)
+    settings.LLAMAEXTRACT_TIER = "agentic"
+    settings.LLAMAEXTRACT_VERSION = "2.5"
+    for name, value in overrides.items():
+        setattr(settings, name, value)
+
+
+@pytest.mark.parametrize("missing", ["LLAMAPARSE_API_KEY", "LLAMAEXTRACT_TIER"])
+def test_llamaextract_refuses_to_start_without_its_key_or_tier(settings, missing):
+    _llamaextract(settings, **{missing: ""})
+
+    with pytest.raises(ImproperlyConfigured, match=missing):
+        verify_extraction_configuration()
+
+
+def test_llamaextract_refuses_latest_outside_development(settings):
+    _llamaextract(settings, LLAMAEXTRACT_VERSION="latest", DEBUG=False)
+
+    with pytest.raises(ImproperlyConfigured, match="LLAMAEXTRACT_VERSION=latest"):
+        verify_extraction_configuration()
+
+
+def test_llamaextract_refuses_a_region_it_does_not_know(settings):
+    _llamaextract(settings, LLAMAPARSE_BASE_URL="https://llamaparse.example.com")
+
+    with pytest.raises(ImproperlyConfigured, match="LLAMAPARSE_BASE_URL"):
+        verify_extraction_configuration()
+
+
+def test_unset_llamaextract_checks_nothing(settings):
+    _llamaextract(settings, LLAMAEXTRACT_VERSION="", LLAMAPARSE_API_KEY="")
+
+    verify_extraction_configuration()

@@ -154,8 +154,9 @@ interface SidebarProps {
 /**
  * The app's navigation (IR-413, spec §4.1).
  *
- * One short list every role shares, RDCO's Administration group, the bell at
- * the top (IR-519) and the account menu at the bottom. Below `md` it is a
+ * Discover and research links, RDCO's coordination group, and the System
+ * Admin's Administration group. The bell is at the top (IR-519) and the
+ * account menu at the bottom. Below `md` it is a
  * drawer `AppShell` opens and closes; from `md` up it is always on screen, at
  * full width or as an icon rail the user chooses (stored per browser).
  */
@@ -186,14 +187,16 @@ export const Sidebar = forwardRef<HTMLElement, SidebarProps>(function Sidebar({ 
   // the address changes, query string included -- Paper View's sections are
   // `?section=` -- so answering the request clears it without a reload.
   // A failed read shows no dot rather than a stale one.
+  const showsLibrary = nav.some((entry) => entry.key === "library");
   useEffect(() => {
+    if (!showsLibrary) { setNeedsAction(false); return; }
     let live = true;
     dashboardApi
       .stats()
       .then(({ data }) => { if (live) setNeedsAction((data.needs_action_mine ?? 0) > 0); })
       .catch(() => { if (live) setNeedsAction(false); });
     return () => { live = false; };
-  }, [pathname, search]);
+  }, [pathname, search, showsLibrary]);
 
   // Badges are the only per-item state the map does not carry: the map answers
   // "may this role open it", never "how many are waiting". Role requests are

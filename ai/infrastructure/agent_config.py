@@ -1,0 +1,88 @@
+"""The configured chat-completions AGENT provider, read fail-closed (IR-860).
+
+Every `AGENT_LLM_*` name is required and nothing defaults. Capacity is
+declared per model; a listed model with no declaration stays unknown, and
+IR-732 refuses it. Nothing here is inferred from a model name or a vendor.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import dataclass, fields
+from typing import Mapping
+
+from ai.admission.limits import NotConfigured
+from ai.agent.context import Capacity
+
+REQUIRED = (
+    "AGENT_LLM_ENDPOINT",
+    "AGENT_LLM_API_KEY",
+    "AGENT_LLM_MODELS",
+    "AGENT_LLM_CAPABILITIES",
+    "AGENT_LLM_DATA_POLICY",
+    "AGENT_LLM_CAPACITIES",
+)
+#: Every `Capacity` field must be stated; `max_reasoning_tokens` may be null.
+CAPACITY_FIELDS = tuple(f.name for f in fields(Capacity))
+
+
+@dataclass(frozen=True)
+class AgentProviderConfig:
+    endpoint: str
+    #: Never logged or repeated in a message.
+    api_key: str
+    models: frozenset[str]
+    capabilities: frozenset[str]
+    data_policy: str
+    capacities: Mapping[str, Capacity]
+
+    def __repr__(self) -> str:
+        return f"AgentProviderConfig(endpoint={self.endpoint!r}, models={sorted(self.models)!r})"
+
+
+def _raw(values, name) -> str:
+    value = getattr(values, name, None)
+    return "" if value is None else str(value).strip()
+
+
+def _names(values, name) -> frozenset[str]:
+    return frozenset(part.strip() for part in _raw(values, name).split(",") if part.strip())
+
+
+def _capacity(model: str, entry) -> Capacity:
+    if not isinstance(entry, dict) or set(entry) != set(CAPACITY_FIELDS):
+        raise NotConfigured(f"AGENT_LLM_CAPACITIES[{model!r}] must state exactly {', '.join(CAPACITY_FIELDS)}")
+    try:
+        return Capacity(**entry)
+    except (TypeError, ValueError):
+        raise NotConfigured(f"AGENT_LLM_CAPACITIES[{model!r}] is malformed") from None
+
+
+def read(values) -> AgentProviderConfig:
+    """The provider's declaration, or `NotConfigured` naming what is wrong."""
+    missing = [name for name in REQUIRED if not _raw(values, name)]
+    if missing:
+        raise NotConfigured(", ".join(missing))
+    endpoint = _raw(values, "AGENT_LLM_ENDPOINT").rstrip("/")
+    if not endpoint.startswith(("https://", "http://")):
+        raise NotConfigured("AGENT_LLM_ENDPOINT must be an http(s) URL")
+    models = _names(values, "AGENT_LLM_MODELS")
+    if not models:
+        raise NotConfigured("AGENT_LLM_MODELS")
+    try:
+        declared = json.loads(_raw(values, "AGENT_LLM_CAPACITIES"))
+    except ValueError:
+        raise NotConfigured("AGENT_LLM_CAPACITIES must be a JSON object") from None
+    if not isinstance(declared, dict):
+        raise NotConfigured("AGENT_LLM_CAPACITIES must be a JSON object")
+    unlisted = sorted(set(declared) - models)
+    if unlisted:
+        raise NotConfigured(f"AGENT_LLM_CAPACITIES names models not in AGENT_LLM_MODELS: {', '.join(unlisted)}")
+    return AgentProviderConfig(
+        endpoint=endpoint,
+        api_key=_raw(values, "AGENT_LLM_API_KEY"),
+        models=models,
+        capabilities=_names(values, "AGENT_LLM_CAPABILITIES"),
+        data_policy=_raw(values, "AGENT_LLM_DATA_POLICY"),
+        capacities={model: _capacity(model, entry) for model, entry in declared.items()},
+    )

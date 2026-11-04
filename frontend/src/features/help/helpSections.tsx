@@ -219,19 +219,34 @@ export const HELP_SECTIONS: HelpSection[] = [
     ),
   },
   {
-    id: "administration",
-    title: "Administration",
-    shownTo: (r) => canAccess(r.role, "audit"),
+    id: "rdco",
+    title: "RDCO",
+    shownTo: (r) => canAccess(r.role, "users"),
     body: (
       <>
-        <p>The Administration part of the sidebar is RDCO&rsquo;s:</p>
+        <p>The RDCO part of the sidebar holds the research office&rsquo;s coordination tools:</p>
         <ul>
-          <li><strong>Role Requests</strong>: approve or decline the role someone asked for when they registered.</li>
-          <li><strong>Users</strong>: change a role, lock or unlock an account, and name office coordinators.</li>
-          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong>: decide what readers and owners have asked for.</li>
+          <li><strong>Users</strong>: give Student or Adviser roles and lock or unlock accounts. Office roles and coordinator assignments belong to the System Admin.</li>
+          <li><strong>Role Requests</strong>: approve or decline the Student or Adviser role someone requested at registration.</li>
+          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong>: decide requests to download or delete a paper.</li>
           <li><strong>Import Records</strong>: file research on someone&rsquo;s behalf.</li>
-          <li><strong>Audit Log</strong>: the record of workflow acts.</li>
         </ul>
+        <p>The System Admin alone reads the Audit Log. RDCO cannot change a System Admin account.</p>
+      </>
+    ),
+  },
+  {
+    id: "administration",
+    title: "Administration",
+    shownTo: (r) => canAccess(r.role, "adminUsers"),
+    body: (
+      <>
+        <p>The Administration part of the sidebar belongs to the System Admin:</p>
+        <ul>
+          <li><strong>Users</strong>: give office roles (RDCO, ITSO, IERC and KTTO) and name office coordinators. RDCO approves Student and Adviser roles and handles role requests.</li>
+          <li><strong>Audit Log</strong>: read and export the record of workflow acts.</li>
+        </ul>
+        <p>The System Admin has no review or clearance duties. RDCO handles research coordination, paper download requests and paper deletion requests.</p>
       </>
     ),
   },
