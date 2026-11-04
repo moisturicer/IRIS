@@ -1,0 +1,26 @@
+{
+  "date": "2026-11-01",
+  "childBodiesVerified": 32,
+  "parentIssuesVerifiedUnchanged": 5,
+  "acceptanceChecksVerified": 167,
+  "userStoriesMapped": 110,
+  "blockingLinks": 52,
+  "relatedLinks": [
+    "IR-703<->IR-728",
+    "IR-605<->IR-740"
+  ],
+  "missingLinks": [],
+  "extraLinks": [],
+  "obsoleteLinksRemaining": 0,
+  "newChildren": {
+    "draft-metadata-tools": "IR-750",
+    "draft-index-publication": "IR-751",
+    "draft-pending-space": "IR-752",
+    "draft-evaluation-casepack": "IR-753",
+    "draft-manual-compact": "IR-754",
+    "draft-release-campaign": "IR-755"
+  },
+  "allChildrenToDo": true,
+  "existingAssignmentsPreserved": true,
+  "errors": []
+}
