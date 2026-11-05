@@ -1,5 +1,5 @@
 /**
- * The one Conversation client on Ask IRIS (IR-562).
+ * The one Conversation client: Ask IRIS and Paper Chat (IR-562, IR-571).
  *
  * It owns what each Conversation the reader has opened is showing: its
  * transcript, its unsent draft, the answer whose sources are selected, and
@@ -54,6 +54,17 @@ interface Answering {
 }
 
 const EMPTY_THREAD: Thread = { messages: [], draft: "", selectedId: null, record: null, comparisonRecords: [] };
+
+/** What one question may carry beyond its text. */
+export interface SendOptions {
+  /** Paper Chat's "All papers": search past the Conversation's own Record (IR-298). */
+  widen?: boolean;
+  /**
+   * The Conversation to ask in, when it is not the one on screen: Paper Chat
+   * started it for a paper the reader has since moved away from.
+   */
+  conversationId?: number;
+}
 
 export interface ConversationClientEvents {
   /** An answer arrived for `conversationId`; `onScreen` when the reader is looking at it. */
@@ -125,6 +136,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
       question: string,
       open: (signal: AbortSignal) => AsyncGenerator<SSEEvent>,
       knownRunId: string | null = null,
+      widen?: boolean,
     ) => {
       // One answer per Conversation: a new request supersedes the last one.
       flights.current.get(conversationId)?.controller.abort();
@@ -140,7 +152,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
 
       setAnswering((all) => ({ ...all, [conversationId]: { requestId, runId: knownRunId, streaming: null } }));
       try {
-        const { message } = await streamAnswer(question, { conversationId }, open, {
+        const { message } = await streamAnswer(question, { conversationId, widen }, open, {
           signal: controller.signal,
           knownRunId,
           onState: (next) =>
@@ -217,6 +229,18 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
   /** Whether Conversation `id` is the one on screen, as of now rather than the last render. */
   const isOnScreen = useCallback((id: number) => activeRef.current === id, []);
 
+  /**
+   * Shows no Conversation at all: Paper Chat on a paper that has none yet,
+   * whose first question starts one. An answer still arriving for the one
+   * left behind stays with it.
+   */
+  const showEmpty = useCallback(() => {
+    opening.current += 1;
+    activeRef.current = null;
+    setActiveId(null);
+    setUnavailable(false);
+  }, []);
+
   /** Missing, deleted, malformed or someone else's: one state for all. */
   const showUnavailable = useCallback(() => {
     opening.current += 1;
@@ -246,10 +270,29 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
     [show, showUnavailable],
   );
 
+  /**
+   * Finds a Conversation through `find` and shows it, or shows none when there
+   * is none. Dropped the same ways `open` is: the reader asked for another
+   * since, or an answer landed in the one found while it was being looked up.
+   * A failure rejects, for the caller to say so.
+   */
+  const openFound = useCallback(
+    async (find: () => Promise<ConversationDetail | null>) => {
+      const request = ++opening.current;
+      // The id is unknown until the lookup returns, so every count is kept.
+      const landedBefore = new Map(landed.current);
+      const found = await find();
+      if (opening.current !== request) return;
+      if (found === null) showEmpty();
+      else show(found, landedBefore.get(found.id) ?? 0);
+    },
+    [show, showEmpty],
+  );
+
   /** Asks `question` in the Conversation on screen, unless it is still answering. */
   const send = useCallback(
-    (question: string) => {
-      const id = activeRef.current;
+    (question: string, { widen, conversationId }: SendOptions = {}) => {
+      const id = conversationId ?? activeRef.current;
       if (id === null || flights.current.has(id)) return;
       const thread = threads[id] ?? EMPTY_THREAD;
       const records = thread.comparisonRecords;
@@ -261,7 +304,8 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
         draft: "",
         messages: [...thread.messages, newChatMessage("user", question)],
       }));
-      return answer(id, question, (signal) => aiApi.askStream(question, { conversationId: id, ...comparison }, signal));
+      const asked = { conversationId: id, requestId: crypto.randomUUID(), widen, ...comparison };
+      return answer(id, question, (signal) => aiApi.askStream(question, asked, signal), null, widen);
     },
     [answer, comparisonLimit, threads, updateThread],
   );
@@ -304,6 +348,15 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
       // Already over: its own terminal event is on its way.
     }
   }, [answering]);
+
+  /**
+   * Adds `message` to Conversation `id`'s transcript, wherever the reader is
+   * now: a failure notice belongs with the question that failed.
+   */
+  const note = useCallback(
+    (id: number, message: ChatMessage) => updateThread(id, (thread) => ({ ...thread, messages: [...thread.messages, message] })),
+    [updateThread],
+  );
 
   /** The unsent draft of Conversation `id`; nothing is sent until Send. */
   const setDraftFor = useCallback(
@@ -370,8 +423,11 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
     streaming:   live?.streaming ?? null,
     isOnScreen,
     open,
+    openFound,
     show,
+    showEmpty,
     showUnavailable,
+    note,
     send,
     retry,
     stop,
