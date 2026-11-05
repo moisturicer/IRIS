@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 and §3 are not built.
+**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 is amended 2026-11-05 (IR-871): a Version's text for review is read on campus without AI, apart from the LlamaParse Extraction. §1 and §3 are not built.
 
 **Amends:**
 
@@ -36,6 +36,36 @@ So "what exactly did the reviewers see at v2?" has no answer today. That is the 
 - **Withdrawing a revision deletes no Version's text.** `restore_submitted_manuscript` may still delete an *unsubmitted* upload's extraction, which belongs to no Version, and nothing else.
 - **Versions from before this change aren't reconstructed.** Their text was overwritten, so they read *"vN's text was not kept"*, and comparing with them is unavailable. Nothing is guessed.
 - **Scanned or failed extractions say so.** A Version with no usable text shows *"No text for vN, so it can't be compared"*, never an empty comparison.
+
+**Amendment, 2026-11-05 (IR-871; decided by Hermoine Zozobrado, Accepted). Review text is read on campus, without AI.**
+
+§1 assumed a Version's text was its LlamaParse Extraction. Since IR-882 (ADR-052 as amended 2026-11-04), every paper starts embargoed and LlamaParse waits until the Adviser or RDCO releases it, so a paper under review has no Extraction at all. IR-882's build notes in ADR-052 left this open for this ADR. It is settled here:
+
+1. **Review text is not the Extraction.** Each Version that changes the manuscript gets its own **review text**: its sections (heading and page) and passages (text, page and regions in ADR-031's shape). It is read from that Version's own manuscript PDF with pdfplumber and plain rules. This replaces §1's "the extraction belongs to the Version it was made from". Everything else §1 says about a Version's text applies to the review text: a metadata-only Version shares the previous one's, it is kept for the Record's life, withdrawing a revision deletes no Version's, and a scanned or unreadable PDF reads *"No text for vN"*.
+2. **It is read at submission, whatever the embargo or AI consent says.** Nothing leaves the server and no model is called, so neither ADR-052's gate nor ADR-054's consent concerns it. The extraction gate already applies only to Extractors that leave campus. It runs in the same bounded worker sandbox as upload checks (IR-830), never in a web worker.
+3. **The Extraction and the AI path don't change.** `PdfExtraction` stays one per Record. LlamaParse reads the latest submitted Version once it is released, and only that is chunked, embedded and retrieved (ADR-013, ADR-056). Review text is never chunked, embedded or retrieved, and it is served only under `may_read_review` (§4). Review never reads the Extraction, and the AI never reads review text.
+4. **Versions from before this change are read from their own files.** This supersedes §1's "Versions from before this change aren't reconstructed" and the Consequence "Earlier Versions on existing data can't be compared". Each existing Version still has its manuscript file (ADR-032 §5), and no file a Version names can be deleted (§2's amendment, point 3). A one-time command reads them as if they had been read at submission. That re-reads the file the reviewers saw, so nothing is guessed. The reason for "not reconstructed" was a paid, off-campus Extractor, and it no longer applies. A Version whose file is missing still reads *"vN's text was not kept"*.
+5. **The reader is recorded.** Each review text names the reader's version. Text already stored is never re-read in place, so a Thread's anchor keeps resolving against the text it was checked against. Re-reading with a newer reader is a deliberate command.
+
+**Evidence.** A throwaway prototype (`prototype/pdf-version-comparison`, `backend/apps/reviews/prototype_pdf_comparison/`, 2026-11-05) wrote two Versions of a seeded paper with seven known edits: a changed figure, an added section, a removed paragraph, swapped sections, a renamed section, a corrected table value and an added sentence. It produced them twice, once drawn by a script and once built in Microsoft Word and exported by Word, and it ran the repo's two-column and multi-page table fixtures as well. All 59 checks passed:
+- running heads and page numbers removed
+- every word and sentence whole
+- every sentence's page matching Word's own pagination
+- every section's change found, sections pushed onto a later page still unchanged
+- Threads found again, or Outdated where their words changed
+
+It was **not** run on a real CIT-U thesis, and it didn't test figures, equations, footnotes, citations, tables without borders, headings that aren't bold or PDFs from other programs. IR-871 runs it on two Versions of a real thesis before merging.
+
+**Alternatives considered:**
+
+- **Upload `.docx` instead of PDF, and make a PDF at the final Decision.** A Word file gives cleaner text and real headings. Rejected:
+  - Before conversion there are no pages, so ADR-031's regions, page citations, ADR-048's watermark and §3's "found on p. N" all break.
+  - It needs a document converter service.
+  - Signed and scanned forms have no Word file.
+  - Existing PDFs would need a second path anyway.
+  - The prototype found a PDF's text enough on a thesis-shaped paper.
+- **Let LlamaParse read Versions under review.** Rejected: it sends an embargoed paper off campus, which ADR-052 forbids until release.
+- **Compare in the browser from the PDF viewer's text layer.** It needs no server reading. Rejected: Outdated threads and the suggested-wording check (§3) must run when a Version is submitted, not only when someone opens it.
 
 ### 2. A Version names its documents
 
@@ -92,7 +122,8 @@ A Version is meant to be the snapshot a review was made against. A snapshot that
 
 - Storage grows by one extraction for each manuscript-changing Version.
 - A migration: the extraction's link moves from Record to Version, and the new link table needs a reconstruction pass over existing Versions.
-- **Earlier Versions on existing data can't be compared.** Only Versions submitted after this change have text.
+- ~~**Earlier Versions on existing data can't be compared.** Only Versions submitted after this change have text.~~ Superseded by §1's 2026-11-05 amendment, point 4: earlier Versions are read from their own files, and only a Version whose file is missing can't be compared.
+- **Two texts per paper** (§1's 2026-11-05 amendment): review text for every Version, read on campus, and the LlamaParse Extraction for the latest released one. They can disagree about the same page, because they come from two readers.
 - Comparison of two typesettings of the same text produces noise. Normalisation reduces it and doesn't remove it.
 
 ## MVP Impact
@@ -121,4 +152,4 @@ None by `FR-` label.
 
 ## Related Tasks
 
-IR-868 (records this decision). Implementation needs its own issues.
+IR-868 (records this decision). IR-872 builds §2. IR-871 builds §1 as amended 2026-11-05 (review text, read on campus). IR-873 builds §3.
