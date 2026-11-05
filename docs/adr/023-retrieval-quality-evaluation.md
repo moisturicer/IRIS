@@ -105,6 +105,25 @@ show a healthy number for a configuration that sends the model nothing useful.
 **Recall@10 stays the retrieval figure** this ADR already chose; the second
 measure is reported next to it, never instead of it.
 
+### A third measure, correct refusal — 2026-11-05 (IR-454)
+
+Both measures above are recall measures, and a precision technique (ADR-033 §3's
+cut-off, §4's cap and budget) can only remove passages, so on recall alone a
+run shows what a floor costs and never what it buys. A run therefore also
+reports:
+
+| Measure | Over what | What it catches |
+|---|---|---|
+| **Correct refusal** | Questions the corpus cannot answer (`evidence_required` `corpus`, `expected_outcome` `decline-no-evidence`) | The share for which the model would be given no passage |
+| **False refusals** | Answerable questions | Each one for which the model would be given no passage, **named by id** |
+
+Unanswerable questions are kept in their own list, so neither recall average
+can include them and the three numbers are never blended into one (ADR-027 §2).
+A set with no unanswerable question reports correct refusal as **n/a**, not 0.
+"Given no passage" is read off the final set, because that empty set is what
+ADR-034's no-sources path branches on. General-knowledge and
+`decline-restricted` questions are not scored by any of the three.
+
 ### Comparison is one change at a time against a fixed baseline
 
 A run compares **exactly one** changed setting against a baseline whose
@@ -172,4 +191,4 @@ FR-M4, NFR-P2 — stable labels only, per the frozen-SRS rule.
 
 ## Related Tasks
 
-IR-133 (splits), IR-116 (unblocked by corpus acquisition), IR-89. **IR-391** (this amendment), IR-394 (the harness measures what the model received, with labels that survive re-chunking).
+IR-133 (splits), IR-116 (unblocked by corpus acquisition), IR-89. **IR-391** (this amendment), IR-394 (the harness measures what the model received, with labels that survive re-chunking). IR-454 (the correct-refusal measure and the false-refusal guard).

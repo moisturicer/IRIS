@@ -12,6 +12,23 @@ question with four labels does not outvote three questions with one. Micro
 (labels found over labels total) is reported beside it because the two
 diverging is informative.
 
+**A third measure, correct refusal, beside them and never blended in (IR-454).**
+Both recall measures can only fall when a precision technique (ADR-033 §3's
+relevance cut-off, §4's cap and budget) removes a passage, so on recall alone a
+floor shows what it costs and never what it buys. Correct refusal is computed
+over the questions the corpus cannot answer: the share where the model was
+given no passage. Those questions sit in their own `refusals` list, so they
+cannot enter a recall average, and ADR-027 §2's rule against combining two
+signals into one score holds by construction.
+
+**The false-refusal guard** is the dangerous direction: an answerable question
+for which the model was given nothing. ADR-033 §3 never shows a reader the
+score, so a floor set too high fails silently. The report names every one by
+question id, not just a count.
+
+"Given nothing" is read off the final set, the passages the model receives:
+that empty set is what ADR-034's no-sources path branches on.
+
 A report is a value that serializes. The management command prints it and
 writes it; nothing here does I/O.
 """
@@ -85,6 +102,14 @@ class QuestionOutcome:
     #: Found, but on a different page than the label claims. Never scored —
     #: a signal that a label needs its page corrected.
     page_mismatches: tuple[str, ...] = ()
+    #: The corpus cannot answer this question, so the right result is an empty
+    #: final set (IR-454). Such an outcome is scored by correct refusal only.
+    expects_refusal: bool = False
+
+    @property
+    def given_nothing(self) -> bool:
+        """The model would receive no passage for this question."""
+        return self.final_count == 0
 
     @property
     def retrieval_recall(self) -> float:
@@ -95,6 +120,8 @@ class QuestionOutcome:
         return self.final_hits / self.expected if self.expected else 0.0
 
     def as_dict(self) -> dict[str, Any]:
+        if self.expects_refusal:
+            return {**asdict(self), "refused": self.given_nothing}
         return {
             **asdict(self),
             "retrieval_recall": round(self.retrieval_recall, 4),
@@ -110,8 +137,11 @@ def _mean(values: Sequence[float]) -> float:
 class EvalReport:
     question_set: QuestionSet
     config: RunConfig
+    #: The answerable questions; every recall measure averages these only.
     outcomes: tuple[QuestionOutcome, ...]
     provenance: dict[str, Any] = field(default_factory=dict)
+    #: The unanswerable questions; correct refusal reads these only (IR-454).
+    refusals: tuple[QuestionOutcome, ...] = ()
 
     # -- the numbers --------------------------------------------------------
 
@@ -134,8 +164,27 @@ class EvalReport:
         return sum(o.final_hits for o in self.outcomes) / expected if expected else 0.0
 
     @property
+    def correct_refusal(self) -> Optional[float]:
+        """Share of unanswerable questions for which the model got nothing.
+        None, not 0.0, when the set holds no such question: nothing was
+        measured, and a zero would read as "refused nothing"."""
+        if not self.refusals:
+            return None
+        return sum(1 for o in self.refusals if o.given_nothing) / len(self.refusals)
+
+    @property
+    def unanswered_refusals(self) -> tuple[str, ...]:
+        """Unanswerable questions for which the model was still given passages."""
+        return tuple(o.question_id for o in self.refusals if not o.given_nothing)
+
+    @property
+    def false_refusals(self) -> tuple[str, ...]:
+        """Answerable questions for which the model was given nothing, by id."""
+        return tuple(o.question_id for o in self.outcomes if o.given_nothing)
+
+    @property
     def degraded_questions(self) -> int:
-        return sum(1 for o in self.outcomes if o.degraded)
+        return sum(1 for o in (*self.outcomes, *self.refusals) if o.degraded)
 
     @property
     def k(self) -> int:
@@ -152,10 +201,18 @@ class EvalReport:
                 "final_set_recall": round(self.final_set_recall, 4),
                 f"micro_recall@{self.k}": round(self.micro_retrieval_recall, 4),
                 "micro_final_set_recall": round(self.micro_final_set_recall, 4),
+                "correct_refusal": (
+                    None
+                    if self.correct_refusal is None
+                    else round(self.correct_refusal, 4)
+                ),
+                "unanswerable_questions": len(self.refusals),
+                "false_refusals": list(self.false_refusals),
                 "degraded_questions": self.degraded_questions,
             },
             "provenance": self.provenance,
             "questions": [o.as_dict() for o in self.outcomes],
+            "refusals": [o.as_dict() for o in self.refusals],
         }
 
     # -- the operator's view ------------------------------------------------
@@ -190,8 +247,23 @@ class EvalReport:
             f"   (micro {self.micro_retrieval_recall:.3f})",
             f"  final-set recall   {self.final_set_recall:.3f}"
             f"   (micro {self.micro_final_set_recall:.3f})",
+            self._refusal_line(),
             "",
         ]
+        if self.false_refusals:
+            lines.append(
+                f"  ! False refusals ({len(self.false_refusals)}) — answerable, "
+                f"but the model would be given no passage:"
+            )
+            lines.extend(f"    {qid}" for qid in self.false_refusals)
+            lines.append("")
+        if self.unanswered_refusals:
+            lines.append(
+                f"  Unanswerable but given passages "
+                f"({len(self.unanswered_refusals)}):"
+            )
+            lines.extend(f"    {qid}" for qid in self.unanswered_refusals)
+            lines.append("")
         if self.degraded_questions:
             lines.append(
                 f"  ! {self.degraded_questions} question(s) ran degraded "
@@ -218,6 +290,19 @@ class EvalReport:
             lines.append("")
         return "\n".join(lines)
 
+    def _refusal_line(self) -> str:
+        if self.correct_refusal is None:
+            return (
+                "  correct refusal    n/a     (the set holds no unanswerable "
+                "question)"
+            )
+        refused = len(self.refusals) - len(self.unanswered_refusals)
+        return (
+            f"  correct refusal    {self.correct_refusal:.3f}"
+            f"   ({refused} of {len(self.refusals)} unanswerable questions "
+            f"given no passage; reported apart from recall)"
+        )
+
 
 def compare(reports: Sequence[EvalReport]) -> str:
     """Side-by-side numbers, and the delta against the first report.
@@ -231,16 +316,19 @@ def compare(reports: Sequence[EvalReport]) -> str:
     baseline = reports[0]
     lines = [
         f"{'configuration':<16} {'recall@' + str(baseline.k):>10} "
-        f"{'Δ':>8} {'final-set':>10} {'Δ':>8}",
-        "-" * 56,
+        f"{'Δ':>8} {'final-set':>10} {'Δ':>8} {'refusal':>8} {'false-ref':>10}",
+        "-" * 76,
     ]
     for report in reports:
         d_retrieval = report.retrieval_recall - baseline.retrieval_recall
         d_final = report.final_set_recall - baseline.final_set_recall
+        refusal = (
+            "n/a" if report.correct_refusal is None else f"{report.correct_refusal:.3f}"
+        )
         lines.append(
             f"{report.config.label:<16} {report.retrieval_recall:>10.3f} "
             f"{d_retrieval:>+8.3f} {report.final_set_recall:>10.3f} "
-            f"{d_final:>+8.3f}"
+            f"{d_final:>+8.3f} {refusal:>8} {len(report.false_refusals):>10}"
         )
     lines.append("")
     lines.append(
@@ -248,5 +336,10 @@ def compare(reports: Sequence[EvalReport]) -> str:
         f"{len(baseline.question_set)} questions: one question is "
         f"{1 / len(baseline.question_set):.3f} of the score, so a delta "
         f"smaller than that moved nothing."
+    )
+    lines.append(
+        "Refusal is the share of unanswerable questions given no passage; "
+        "false-ref counts answerable questions given none, named in each "
+        "configuration's report. Neither enters a recall figure."
     )
     return "\n".join(lines)

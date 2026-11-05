@@ -386,6 +386,11 @@ python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (
                                    # recall@10 over what retrieval returned, and recall over the final
                                    # set the model was given. Runs with and without reranking by
                                    # default and prints the delta; --reranking on|off picks one.
+                                   # Plus correct refusal (IR-454): the share of unanswerable
+                                   # questions (corpus + decline-no-evidence) given no passage, kept
+                                   # apart from recall, and every answerable question given none
+                                   # named by id as a false refusal. Reads 0 until IR-396's cut-off
+                                   # exists; n/a for a set with no unanswerable question.
                                    # --drop-incomplete measures a partly-labelled set and names what
                                    # it skipped. Writes docs/evaluation/runs/<stamp>-<set>.json.
                                    # MANUAL ONLY, never CI — a real run spends Voyage credits.

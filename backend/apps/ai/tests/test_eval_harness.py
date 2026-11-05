@@ -139,6 +139,98 @@ def test_the_disclosure_gate_shows_up_in_the_final_set_measure(corpus, reader, e
     assert report.final_set_recall == 0.0
 
 
+# -- correct refusal and the false-refusal guard (IR-454) ---------------------
+
+
+def _with_unanswerable():
+    """The committed synthetic set, plus one question the corpus cannot answer."""
+    data = json.loads(SYNTHETIC_SET.read_text(encoding="utf-8"))
+    data["questions"].append(
+        {
+            "id": "off-corpus",
+            "question": "what did the 2021 trial of intermittent fasting conclude?",
+            "evidence_required": "corpus",
+            "expected_outcome": "decline-no-evidence",
+            "expected": [],
+        }
+    )
+    return data
+
+
+def test_an_unanswerable_question_is_retrieved_for_and_kept_out_of_recall(
+    corpus, reader, embedder
+):
+    """With no floor in the stack, an off-corpus question still gets the nearest
+    passages. That is the gap a cut-off exists to close, and the run says so."""
+    report = run(
+        _root(embedder), parse_question_set(_with_unanswerable()), RunConfig(), user=reader
+    )
+    assert [o.question_id for o in report.outcomes] == ["flood", "ponds"]
+    assert report.retrieval_recall == 1.0
+    assert report.final_set_recall == 1.0
+    assert report.correct_refusal == 0.0
+    assert report.unanswered_refusals == ("off-corpus",)
+    assert report.false_refusals == ()
+
+
+def test_a_floor_that_empties_every_final_set_refuses_and_names_each_false_refusal(
+    corpus, reader, embedder
+):
+    """The trade-off in one run: every off-corpus question refused, and every
+    answerable question lost with it, each named by id."""
+    report = run(
+        _root(embedder, permits=lambda record: False),
+        parse_question_set(_with_unanswerable()),
+        RunConfig(),
+        user=reader,
+    )
+    assert report.correct_refusal == 1.0
+    assert report.false_refusals == ("flood", "ponds")
+    assert report.final_set_recall == 0.0
+
+
+def test_the_committed_synthetic_set_reports_refusal_as_unmeasured(corpus, reader, embedder):
+    report = run(_root(embedder), load_question_set(SYNTHETIC_SET), RunConfig(), user=reader)
+    assert report.correct_refusal is None
+    assert report.false_refusals == ()
+
+
+def test_dry_run_validates_a_set_with_unanswerable_questions_and_counts_them(
+    corpus, tmp_path, capsys
+):
+    path = tmp_path / "mixed.json"
+    path.write_text(json.dumps(_with_unanswerable()), encoding="utf-8")
+
+    call_command("eval_retrieval", questions=str(path), dry_run=True)
+
+    out = capsys.readouterr().out
+    assert "Every label resolves" in out
+    assert "1 unanswerable question" in out
+
+
+def test_the_results_file_carries_the_refusal_measure_beside_recall(
+    corpus, reader, embedder, tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        "apps.ai.management.commands.eval_retrieval.composition_root",
+        lambda: _root(embedder),
+    )
+    path = tmp_path / "mixed.json"
+    path.write_text(json.dumps(_with_unanswerable()), encoding="utf-8")
+    out_dir = tmp_path / "runs"
+
+    call_command(
+        "eval_retrieval", questions=str(path), user=reader.email, out=str(out_dir)
+    )
+
+    written = json.loads(next(out_dir.glob("*.json")).read_text(encoding="utf-8"))
+    for run_data in written["runs"]:
+        assert run_data["measures"]["recall@10"] == 1.0
+        assert run_data["measures"]["correct_refusal"] == 0.0
+        assert run_data["measures"]["false_refusals"] == []
+        assert [q["question_id"] for q in run_data["refusals"]] == ["off-corpus"]
+
+
 def test_k_bounds_the_retrieval_measure(corpus, reader, embedder):
     """recall@1 over a two-record corpus cannot exceed what one passage can
     hold, so a question expecting both passages scores a half."""
