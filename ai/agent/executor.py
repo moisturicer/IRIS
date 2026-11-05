@@ -199,7 +199,7 @@ class _Run:
             # Persisted legacy Turns have no source manifest. They cannot be
             # certified for a paid resend, even if their citations were removed.
             history += [User(turn.question), ModelTurn(items=(Text(answer),), stop=StopReason.END,
-                                                       dependencies=frozenset({"unverified_prior"}))]
+                                                       unverified_provenance=True)]
         shown = await self.investigation.recall(self.context.state or {})
         if shown:
             history.append(User("[IRIS conversation state] " + json.dumps(shown, ensure_ascii=False),

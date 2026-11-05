@@ -63,6 +63,8 @@ class ModelTurn:
     output_tokens: int | None = None
     #: Sources carried by text or opaque state derived from earlier evidence.
     dependencies: frozenset = frozenset()
+    #: A persisted turn whose source manifest does not exist cannot be resent.
+    unverified_provenance: bool = False
 
     @property
     def text(self) -> str:
@@ -81,6 +83,7 @@ class ToolResult:
     call_id: str
     content: str
     #: Original source revisions, kept outside the provider wire payload.
+    #: Empty is not proof that arbitrary content is safe to send.
     dependencies: frozenset = frozenset()
 
 
