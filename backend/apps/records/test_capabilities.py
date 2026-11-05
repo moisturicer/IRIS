@@ -247,6 +247,16 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             ),
             "release_embargo": lambda r, u, d: self._call(u, "post", url("record-embargo-release", r)),
             "release_ip": lambda r, u, d: self._call(u, "post", url("record-ip-release", r)),
+            # RDCO's three acts on a paper in review (IR-797).
+            "replace_adviser": lambda r, u, d: self._call(
+                u, "post", url("record-replace-adviser", r), {"adviser": self.other_adviser.pk},
+            ),
+            "add_owner": lambda r, u, d: self._call(
+                u, "post", url("record-add-owner", r), {"email": self.reader.email},
+            ),
+            "withdraw_paper": lambda r, u, d: self._call(
+                u, "post", url("record-withdraw", r), {"reason": "Withdrawn by RDCO."},
+            ),
             "delete_record": delete_as("delete_record"),
             "withdraw_submission": delete_as("withdraw_submission"),
             "request_deletion": delete_as("request_deletion"),
@@ -282,9 +292,13 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     }
     # An owner is offered the one delete its record's status names (IR-508).
     OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review", "set_embargo"}
+    # IR-797: RDCO may add an owner to, or withdraw, any paper in review, and
+    # replace the Adviser while the Adviser's review is still open.
+    RDCO_ACTS = {"add_owner", "withdraw_paper"}
+    RDCO_ADVISER_OPEN = RDCO_ACTS | {"replace_adviser"}
     RDCO_SEATED = {"cite", "tag_ip", "attach_file", "request_document", "open_review",
                    "add_reviewer", "route", "comment_review", "request_revision",
-                   "accept_publish", "keep_unlisted", "reject"}
+                   "accept_publish", "keep_unlisted", "reject"} | RDCO_ACTS
     EXPECTED = {
         "draft": {
             "owner": {"cite", "continue_draft", "edit_details", "delete_record"}, "adviser": {"cite"},
@@ -292,11 +306,11 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         "with_adviser_unopened": {
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | RDCO_ADVISER_OPEN, "stranger": None,
         },
         "with_adviser_open": {
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | RDCO_ADVISER_OPEN, "stranger": None,
         },
         # ITSO's pool: any ITSO member may file and ask for documents, but
         # opens, clears and routes only once seated.
@@ -323,7 +337,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 "cite", "tag_ip", "attach_file", "request_document", "open_review",
                 "add_reviewer", "route", "request_revision",
                 "accept_publish", "keep_unlisted", "reject", "comment_review",
-            },
+            } | RDCO_ACTS,
             "stranger": None,
         },
         "published": {
@@ -346,7 +360,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 "cite", "open_review", "accept_proposal", "reject",
                 "request_document", "request_revision", "comment_review", "set_embargo",
             },
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | RDCO_ADVISER_OPEN, "stranger": None,
         },
         # An accepted Proposal's owner may continue it once (ADR-032 §6, IR-417).
         "accepted_proposal": {

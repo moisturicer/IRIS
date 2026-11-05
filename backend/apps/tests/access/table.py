@@ -151,6 +151,12 @@ RECORDS: dict[str, Entry | Shadowed] = {
     )}),
     "record-embargo-release": Entry({"POST": _case(RELEASES_EMBARGO, kwargs=RECORD)}),
     "record-ip-release": Entry({"POST": _case(RELEASES_IP, kwargs=RECORD)}),
+    # ADR-051 §10 (IR-797): RDCO alone replaces an Adviser, adds an owner to,
+    # or withdraws a paper in review. A role gate before the lookup; an empty
+    # body is refused with a 400 for RDCO, so the call changes nothing.
+    "record-replace-adviser": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
+    "record-add-owner": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
+    "record-withdraw": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),

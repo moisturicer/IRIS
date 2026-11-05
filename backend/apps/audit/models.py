@@ -56,6 +56,9 @@ class AuditEvent(models.Model):
     REVIEWER_ADDED             = "REVIEWER_ADDED"
     SEAT_OPENED                = "SEAT_OPENED"
     RECORD_WITHDRAWN           = "RECORD_WITHDRAWN"
+    # RDCO's two other acts on a paper in review (ADR-051 §10, IR-797).
+    ADVISER_REPLACED           = "ADVISER_REPLACED"
+    OWNER_ADDED                = "OWNER_ADDED"
     DOCUMENT_REQUESTED         = "DOCUMENT_REQUESTED"
     DOCUMENT_REQUEST_FULFILLED = "DOCUMENT_REQUEST_FULFILLED"
     DOCUMENT_REQUEST_ACCEPTED  = "DOCUMENT_REQUEST_ACCEPTED"
@@ -121,6 +124,8 @@ class AuditEvent(models.Model):
         (REVIEWER_ADDED,             "Reviewer Added"),
         (SEAT_OPENED,                "Seat Opened"),
         (RECORD_WITHDRAWN,           "Record Withdrawn"),
+        (ADVISER_REPLACED,           "Adviser Replaced"),
+        (OWNER_ADDED,                "Owner Added"),
         (EMBARGO_ANSWERED,           "Embargo Question Answered"),
         (EMBARGO_SET,                "Embargo Set"),
         (EMBARGO_EXTENDED,           "Embargo Date Moved"),

@@ -285,7 +285,7 @@ def require_edge(record, event: WorkflowEvent) -> Edge:
 # ---------------------------------------------------------------------------
 
 @transaction.atomic
-def apply(record, event: WorkflowEvent, actor=None, *, restore_to=None) -> str:
+def apply(record, event: WorkflowEvent, actor=None, *, restore_to=None, reason=None) -> str:
     """
     Resolve and persist the record's next `pipeline_status`. Returns it.
 
@@ -294,6 +294,9 @@ def apply(record, event: WorkflowEvent, actor=None, *, restore_to=None) -> str:
     transaction (`reviews.withdrawal`). Nobody finished, so nothing is closed
     as *completed*. The legacy `shadow.sync()` did this as a side effect of
     reconciling from the old stage; IR-274 states it as its own rule.
+
+    `reason` is RDCO's, for a soft delete that is RDCO withdrawing a paper
+    (IR-797); it reaches the withdrawal's audit event and nothing else.
 
     Raises `InvalidPipelineTransition` when the table declares no such edge.
     That is a **legality** verdict, not an authorization one -- callers check
@@ -318,5 +321,5 @@ def apply(record, event: WorkflowEvent, actor=None, *, restore_to=None) -> str:
     if event is WorkflowEvent.SOFT_DELETE:
         from apps.reviews.withdrawal import withdraw_review
 
-        withdraw_review(record, actor)
+        withdraw_review(record, actor, reason=reason)
     return destination
