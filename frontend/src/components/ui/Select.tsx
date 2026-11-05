@@ -7,19 +7,18 @@ import { FieldLabel, type FieldMarker } from "./FieldLabel";
 // clsx has no tailwind-merge, so a caller's padding would not replace these.
 // `pr-10` leaves room for the chevron at both steps. "sm" (IR-585) is the
 // 36px toolbar step -- Sort and Folder in the library -- where a select sits in
-// a row of controls rather than in a form, so it has no Input beside it.
+// a row of controls rather than in a form, so it has no Input beside it. It is
+// below 12-accessibility.md section 4's 44px target: the toolbar's own controls
+// are 36px and the old selects were too, so this keeps the row even and leaves
+// the gap visible in one place for the toolbar to close.
 type Size = "sm" | "md" | "lg";
 
-const SIZE_CLASSES: Record<Size, string> = {
-  sm: "min-h-9 pl-2 pr-8 py-1 text-small",
-  md: "pl-3 pr-10 py-2 text-[14px]",
-  lg: "min-h-11 pl-4 pr-10 py-3 text-base",
-};
-
-const CHEVRON_PADDING: Record<Size, string> = {
-  sm: "pr-2.5",
-  md: "pr-4",
-  lg: "pr-4",
+// `chevron` is the drawn arrow's right padding, kept beside the control's own
+// so a new step is added in one place.
+const SIZES: Record<Size, { control: string; chevron: string }> = {
+  sm: { control: "min-h-9 pl-2 pr-8 py-1 text-small",  chevron: "pr-2.5" },
+  md: { control: "pl-3 pr-10 py-2 text-[14px]",        chevron: "pr-4" },
+  lg: { control: "min-h-11 pl-4 pr-10 py-3 text-base", chevron: "pr-4" },
 };
 
 // `size` is omitted from the native attributes for Input's reason: HTML's own
@@ -94,7 +93,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
               aria-required={required || undefined}
               className={`w-full appearance-none border rounded-lg bg-surface outline-none transition-colors
                 text-stone-900 cursor-pointer
-                ${SIZE_CLASSES[size]}
+                ${SIZES[size].control}
                 ${invalid
                   ? "border-brand focus:border-brand focus:ring-2 focus:ring-brand"
                   : "border-stone-300 focus:border-brand focus:ring-1 focus:ring-brand"
@@ -109,7 +108,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
                 is decoration: the combobox role already says it opens. */}
             <span
               aria-hidden
-              className={`pointer-events-none absolute inset-y-0 right-0 flex items-center ${CHEVRON_PADDING[size]} text-xs text-stone-500`}
+              className={`pointer-events-none absolute inset-y-0 right-0 flex items-center ${SIZES[size].chevron} text-xs text-stone-500`}
             >
               <i className="fas fa-chevron-down" />
             </span>
