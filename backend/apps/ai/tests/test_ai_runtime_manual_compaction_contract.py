@@ -8,20 +8,37 @@ deterministic provider proves the contract, never a vendor's summary quality.
 PostgreSQL, fencing and the run's admission are `test_ai_runtime_manual_compaction_db.py`'s.
 """
 
+import dataclasses
 import json
 
 import pytest
 
-from .test_ai_runtime_agent_loop_contract import ALLOWANCE, Corpus, agent, context, models, run
+from .test_ai_runtime_agent_loop_contract import (
+    ALLOWANCE, FLOOD, PIN, PROFILES, Corpus, agent, call, context, handle, models, run, tools,
+)
+from .test_ai_runtime_context_contract import RESERVES
 from .test_ai_runtime_compaction_contract import (
     EAGER, PRIOR, STATE, SUMMARY, Handoffs, reply, windowed,
 )
 from ai.agent.compaction import NOTE
-from ai.agent.executor import COMPACT_REQUEST
+from ai.agent.context import Capacity
+from ai.agent.executor import COMPACT_REQUEST, AgentExecutor
+from ai.research.tools import RecoveredTurn
 from ai.runs.executor import Compacted, PriorTurn, Unavailable
 
 #: A threshold no history reaches: manual compaction does not wait for one.
 LATE = EAGER.__class__(threshold_tokens=7_000, summary_tokens=400, keep_exchanges=1, max_attempts=2)
+
+
+#: research-4 offers every tool, which the small fixture window above cannot hold beside a summary.
+ROOMY = Capacity(context_tokens=60_000, max_output_tokens=2_000, max_reasoning_tokens=None,
+                 max_request_bytes=512_000, min_bytes_per_token=1.0, framing_tokens_per_message=4)
+
+
+def roomy(*responses):
+    provider = windowed(*responses)
+    provider.capacities = {"scripted-model": ROOMY}
+    return provider
 
 
 def compact(provider, handoffs, *, compaction=LATE, prior=PRIOR, **kw):
@@ -185,3 +202,50 @@ def test_a_paid_provider_that_is_not_admitted_is_never_reached():
     with pytest.raises(Unavailable) as refused:
         compact(provider, Handoffs())
     assert refused.value.code == "not_admitted" and provider.requests == []
+
+
+# --- Compact, then ask for an exact earlier detail -----------------------------
+
+def test_after_a_manual_compaction_an_exact_detail_is_recovered_from_the_original_not_the_summary():
+    pin = dataclasses.replace(PIN, prompt_version="agent-research-4", tool_version="research-4")
+    original = handle("P", 1)
+    prior = (
+        PriorTurn("How many floods did the network predict?", f"It predicted 87 floods [{original}].", "answer",
+                  ordinal=1),
+        PriorTurn("Which papers study water?", "Two papers.", "answer", ordinal=2),
+        PriorTurn("What does the pond paper sample?", "Brackish ponds, weekly.", "answer", ordinal=3),
+    )
+    state = {"shown": [1, 2], "selected": [], "excluded": []}
+    # A summary that states a wrong number: it is never evidence for one.
+    summary = {"goal": "Understand the water papers.", "preferences": [], "limitations": [],
+               "findings": [{"text": "The network predicted 90 floods.", "turns": [1]}]}
+
+    handoffs = Handoffs()
+    compacting = AgentExecutor(roomy(reply(json.dumps(summary))), pin, RESERVES, profiles=PROFILES,
+                               compaction=LATE)
+    done = run(compacting.compact(Corpus(), context(prior=prior, state=state, commit_handoff=handoffs)))
+    [committed] = handoffs.committed
+    assert done.revision == 1 and committed.turns == (1, 2)
+
+    # The next run opens with the handoff and only Turn 3; the original Turn 1 is recoverable, not carried.
+    corpus = Corpus()
+    corpus.turns[1] = (RecoveredTurn(1, prior[0].question, prior[0].answer, "answer"),
+                       [corpus.papers[1][2]])
+    provider = roomy(tools(call("r1", "recover_turn", turn=1)),
+                     reply(f"Earlier it predicted 87 floods [{original}]."))
+    asking = AgentExecutor(provider, pin, RESERVES, profiles=PROFILES)
+    result = run(asking.answer("Exactly how many floods was it?", corpus, context(
+        prior=prior[2:], state=state,
+        handoff={"revision": 1, "through_ordinal": committed.through_ordinal, "body": committed.body})))
+
+    first, second = provider.requests
+    opening = json.dumps(first["messages"])
+    assert "[IRIS compacted context]" in opening and "predicted 90 floods" in opening
+    assert prior[0].answer not in opening and prior[0].question not in opening
+    # The original comes back from the store, with a fresh handle for the passage it cited.
+    [body] = [json.loads(m["content"]) for m in second["messages"] if m["role"] == "tool"]
+    assert body["turn"]["answer"] == prior[0].answer and body["passages"][0]["text"] == FLOOD
+    assert ("recover_turn", 1) in corpus.calls
+    # The answer cites the stored passage and its number is the original's, not the summary's.
+    assert [(c.record_id, c.quote) for c in result.citations] == [(1, FLOOD)]
+    assert "87" in result.answer and "90" not in result.answer
