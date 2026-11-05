@@ -1,0 +1,190 @@
+﻿[
+    {
+        "text":  "Metro Cebu generates about 1,200 tonnes of municipal solid waste every day, and most of it ends up in the Inayawan and Binaliw landfills.",
+        "page":  2
+    },
+    {
+        "text":  "Both sites have repeatedly exceeded their designed capacity since 2019.",
+        "page":  2
+    },
+    {
+        "text":  "Local governments have considered waste-to-energy facilities as a way to reduce landfill dependence while producing electricity for the regional grid.",
+        "page":  2
+    },
+    {
+        "text":  "However, the feasibility of such facilities depends on the composition, moisture content and calorific value of the waste stream, which no recent study has measured across the metropolitan area.",
+        "page":  2
+    },
+    {
+        "text":  "Earlier assessments relied on national averages published by the Environmental Management Bureau.",
+        "page":  2
+    },
+    {
+        "text":  "These averages understate the share of organic and food waste produced by dense urban barangays, and they say nothing about seasonal variation during the wet months.",
+        "page":  2
+    },
+    {
+        "text":  "A facility designed on those figures risks operating well below its rated output for a large part of the year.",
+        "page":  2
+    },
+    {
+        "text":  "This study asks whether a community-scale waste-to-energy facility is technically and financially feasible for Metro Cebu.",
+        "page":  2
+    },
+    {
+        "text":  "Specifically, it seeks to determine the composition and calorific value of the waste stream, the conversion technology best suited to that stream, and the capital and operating costs of a small-scale plant.",
+        "page":  2
+    },
+    {
+        "text":  "It also asks how sensitive the financial outcome is to the tipping fee charged to local governments.",
+        "page":  2
+    },
+    {
+        "text":  "The findings give local government units a measured basis for procurement decisions that are currently made on borrowed assumptions.",
+        "page":  3
+    },
+    {
+        "text":  "They also give the university\u0027s engineering programmes a dataset that later capstone projects can extend.",
+        "page":  3
+    },
+    {
+        "text":  "Communities near the landfills benefit indirectly, since any reduction in landfilled volume shortens the time those sites remain open.",
+        "page":  3
+    },
+    {
+        "text":  "Studies of waste generation in the Visayas report per-capita rates between 0.5 and 0.7 kilograms per day.",
+        "page":  4
+    },
+    {
+        "text":  "Urban centres sit at the upper end of that range, and Cebu City has been measured at 0.69 kilograms per person per day.",
+        "page":  4
+    },
+    {
+        "text":  "Organic waste makes up roughly half of the total by weight, followed by plastics, paper and residual waste.",
+        "page":  4
+    },
+    {
+        "text":  "Seasonal studies are scarce.",
+        "page":  4
+    },
+    {
+        "text":  "The few that exist show the moisture content of mixed waste rising by as much as twelve percentage points during the rainy season, which lowers its heating value considerably.",
+        "page":  4
+    },
+    {
+        "text":  "Three families of technology dominate the literature: mass-burn incineration, anaerobic digestion and gasification.",
+        "page":  4
+    },
+    {
+        "text":  "Mass-burn incineration handles mixed waste with little preparation but requires a high calorific value and costly emission controls.",
+        "page":  4
+    },
+    {
+        "text":  "Anaerobic digestion suits wet organic waste and produces biogas at a smaller scale, though it leaves a digestate that must itself be managed.",
+        "page":  4
+    },
+    {
+        "text":  "Gasification converts waste into a synthesis gas that can drive an engine or turbine.",
+        "page":  4
+    },
+    {
+        "text":  "Pilot plants in Southeast Asia report frequent shutdowns caused by tar formation when the feedstock is not dried and sorted beforehand.",
+        "page":  4
+    },
+    {
+        "text":  "For that reason most reviews treat gasification as unsuited to unsorted municipal waste in humid climates.",
+        "page":  4
+    },
+    {
+        "text":  "Hybrid configurations, in which digestion handles the organic fraction and a small incinerator handles the residual fraction, have been proposed for mid-sized cities.",
+        "page":  4
+    },
+    {
+        "text":  "Their economics depend heavily on how reliably the waste can be separated at source.",
+        "page":  4
+    },
+    {
+        "text":  "The study uses a descriptive and evaluative design.",
+        "page":  6
+    },
+    {
+        "text":  "Waste characterization establishes the properties of the stream, and a techno-economic model evaluates each candidate technology against those properties.",
+        "page":  6
+    },
+    {
+        "text":  "The model is deterministic, and its sensitivity analysis varies one input at a time.",
+        "page":  6
+    },
+    {
+        "text":  "Waste samples were collected from transfer stations serving four cities over eight weeks, covering both the dry and the wet season.",
+        "page":  6
+    },
+    {
+        "text":  "Each sample was sorted by hand into eight categories, weighed, and dried to determine its moisture content.",
+        "page":  6
+    },
+    {
+        "text":  "Table 1 summarizes the daily tonnage reported by each city\u0027s environment office during the sampling period.",
+        "page":  6
+    },
+    {
+        "text":  "Calorific value was measured with a bomb calorimeter at the university\u0027s chemical engineering laboratory.",
+        "page":  6
+    },
+    {
+        "text":  "Three replicates were run for every composite sample, and the mean of the three is reported.",
+        "page":  6
+    },
+    {
+        "text":  "Capital and operating costs were estimated from published vendor quotations, adjusted to 2024 prices.",
+        "page":  6
+    },
+    {
+        "text":  "Net present value and the levelized cost of electricity were computed over a twenty-year horizon at a discount rate of ten percent.",
+        "page":  6
+    },
+    {
+        "text":  "A plant was judged feasible when its net present value was positive at the median tipping fee charged in the region.",
+        "page":  6
+    },
+    {
+        "text":  "Organic waste made up 52 percent of the sampled stream by weight in the dry season and 57 percent in the wet season.",
+        "page":  8
+    },
+    {
+        "text":  "Mean moisture content rose from 48 percent to 61 percent between the two seasons.",
+        "page":  8
+    },
+    {
+        "text":  "The mean lower heating value of the mixed stream fell below the threshold usually required for self-sustaining combustion during the wet months.",
+        "page":  8
+    },
+    {
+        "text":  "Mass-burn incineration returned a negative net present value at every tipping fee tested, because supplementary fuel was needed for much of the year.",
+        "page":  8
+    },
+    {
+        "text":  "Anaerobic digestion of the separated organic fraction returned a positive net present value at the median tipping fee.",
+        "page":  8
+    },
+    {
+        "text":  "The hybrid configuration performed best when source separation exceeded 70 percent, and worst of all when it fell below 40 percent.",
+        "page":  8
+    },
+    {
+        "text":  "A community-scale anaerobic digestion facility is feasible for Metro Cebu if the organic fraction is separated at source.",
+        "page":  9
+    },
+    {
+        "text":  "Mass-burn incineration is not feasible given the moisture content measured during the wet season.",
+        "page":  9
+    },
+    {
+        "text":  "Local governments should strengthen barangay-level source separation before procuring any waste-to-energy facility.",
+        "page":  9
+    },
+    {
+        "text":  "Further work should measure the waste stream over a full year and test digestate disposal options.",
+        "page":  9
+    }
+]
