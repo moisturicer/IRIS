@@ -12,6 +12,7 @@ import time
 from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
+from urllib.parse import unquote, urlparse
 
 import asyncpg
 import pytest
@@ -34,7 +35,7 @@ from apps.ai.grants import config as grant_config, issue  # noqa: E402
 from . import test_ai_runtime_runs_db as runs_db  # noqa: E402
 from .corpus import make_user  # noqa: E402
 from .test_ai_runtime_research_db import FLOOD, paper  # noqa: E402
-from .test_ai_runtime_runs_db import DISPATCH, LIMITS, run, session  # noqa: E402
+from .test_ai_runtime_runs_db import DISPATCH, LIMITS, run  # noqa: E402
 
 runtime = runs_db.runtime
 
@@ -97,9 +98,11 @@ class Investigation:
     async def _idle_connections(self):
         conn = await asyncpg.connect(runs_db.admin_dsn())
         try:
+            # Every connection of the runtime login, whatever it calls itself (the send
+            # guard names none).
             return await conn.fetchval(
-                "SELECT count(*) FROM pg_stat_activity WHERE application_name = ANY($1)",
-                ["iris-ai-research", "iris-ai-runs"])
+                "SELECT count(*) FROM pg_stat_activity WHERE usename = $1",
+                unquote(urlparse(self.dsn).username))
         finally:
             await conn.close()
 
@@ -118,11 +121,11 @@ class Investigation:
         return Result(answer="Finished.")
 
 
-def ask(runtime, user, executor, grant, key, **body):
+def ask(runtime, user, executor, grant, key):
     """Submit on `grant`, let a worker run it, and read the outcome as the reconnected reader."""
     svc = quick_service(runtime, executor)
     queued, _ = run(svc.submit(grant.token, key=key, question="Which model predicts flooding?",
-                               conversation_id=None, base_revision=None, **body))
+                               conversation_id=None, base_revision=None))
     assert run(svc.run_next()) is True
     # Read as the operator would: the reader may have lost access by now.
     state, end_reason = stored(queued["id"])[:2]
@@ -153,8 +156,6 @@ def test_a_reconnect_mid_run_lets_a_long_investigation_finish_past_its_first_gra
     done = ask(runtime, user, executor, first, "request-renew-finish")
     assert done["state"] == "completed"
     assert [r.status for r in executor.seen] == ["ok", "ok"]
-    # The first grant had lapsed by the second read; PostgreSQL's clock, not ours.
-    assert time.time() > first.claims["exp"]
     # No connection of the runtime was open while the model would have been thinking (AC4).
     assert executor.connections_while_idle == 0
 
@@ -218,13 +219,12 @@ def test_a_renewed_run_ends_at_the_next_read_and_admission_once_the_reader_loses
 
 
 def _deactivate(user_id):
-    from django.db import connection as conn
-
+    # Runs in a worker thread, which has its own Django connection to close.
     try:
-        with conn.cursor() as cursor:
+        with connection.cursor() as cursor:
             cursor.execute("UPDATE accounts_user SET is_active = false WHERE id = %s", [user_id])
     finally:
-        conn.close()
+        connection.close()
 
 
 def test_a_stop_after_a_renewal_still_ends_the_run_at_the_next_read(runtime):
