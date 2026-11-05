@@ -298,7 +298,7 @@ Sign in, register, email verification and the pending and declined screens share
 Replaced the split screen with its "shelf of bound work" brand panel (IR-535, IR-586), deleted in IR-711.
 
 ### Identity (IR-744)
-**Folio Ribbon.** The mark is a serif I standing in the gutter of an open folio: four maroon pieces (two leaves, two ribbons), with the I as the white space between them. `IrisMark`, `IrisWordmark`, `IrisLoader`, `SearchGlyph` and `AskIrisGlyph` (`frontend/src/components/brand/IrisBrand.tsx`) fill with `currentColor`: maroon on white, white only on maroon. The loader replays the concept's storyboard (one leaf, its partner, the ribbons, then the I) on a 2 s loop; Ask IRIS answering writes its three lines in turn. Both fade instead under reduced motion. Assets and their build: `docs/brand/folio-ribbon/final/`.
+**Folio Ribbon.** The mark is a serif I standing in the gutter of an open folio: four maroon pieces (two leaves, two ribbons), with the I as the white space between them. `IrisMark`, `IrisWordmark`, `IrisLoader`, `SearchGlyph` and `AskIrisGlyph` (`frontend/src/components/brand/IrisBrand.tsx`) fill with `currentColor`: maroon on white, white only on maroon. The loader replays the concept's storyboard (one leaf, its partner, the ribbons, then the I) on a 2 s loop; Ask IRIS is a speech bubble with the mark's serif I cut out of it; answering sets that I in type (top serif, stem, bottom serif). Both fade instead under reduced motion. Assets and their build: `docs/brand/folio-ribbon/final/`.
 
 ## Do's and Don'ts
 
