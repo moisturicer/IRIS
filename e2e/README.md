@@ -52,7 +52,9 @@ Both run inside the backend container (`support/stack.ts`).
   through one full run. No acceptance criterion measures them. The lockout
   under test is axes', left at its default of three failures.
 - **Ask IRIS** is not driven here. IR-631 reuses IR-630 and IR-605/IR-608
-  evidence from the same SHA, and until IR-250 lands every question answers
-  "no readable sources" under normal settings.
+  evidence from the same SHA. IR-250 (the embargo field) is Done, but a paper
+  still reaches the AI only once someone has answered for it (ADR-052), and a
+  real answer needs an approved provider run. The Ask IRIS browser journey
+  waits on IR-903, which is a decision for Jive.
 - **Latency** is recorded, never judged: no application target is agreed
   (IR-95).
