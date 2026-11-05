@@ -70,6 +70,7 @@ __all__ = [
     "record_lock_keys",
     "record_source_hash",
     "space_readiness",
+    "stored_dimension_mismatches",
 ]
 
 STOPPED_MAX_RECORDS = "max_records"
@@ -364,10 +365,28 @@ class Readiness:
         )
 
 
+def stored_dimension_mismatches(space) -> int:
+    """Stored vectors whose width is not the space's, plus one if the space
+    itself does not match the columns. Shared with activation (IR-739)."""
+    from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
+
+    mismatches = 0
+    with connection.cursor() as cursor:
+        for table in ("ai_chunkembedding", "ai_recordspaceembedding"):
+            cursor.execute(
+                f"SELECT count(*) FROM {table} WHERE space_id = %s AND vector_dims(embedding) <> %s",
+                [space.pk, space.dimensions],
+            )
+            mismatches += cursor.fetchone()[0]
+    if space.dimensions != VECTOR_COLUMN_DIMENSIONS:
+        mismatches += 1
+    return mismatches
+
+
 def space_readiness(space_id: int) -> Readiness:
     from django.db.models import Q
 
-    from apps.ai.models import VECTOR_COLUMN_DIMENSIONS, EmbeddingSpace
+    from apps.ai.models import EmbeddingSpace
     from apps.ai.models.chunk import ChunkEmbedding, DocumentChunk
     from apps.ai.models.embedding import RecordSpaceEmbedding
     from apps.ai.promotion import records_missing_vectors
@@ -401,16 +420,7 @@ def space_readiness(space_id: int) -> Readiness:
         space_id=space_id, chunk__chunk_set__is_active=True, chunk__deleted_at__isnull=True
     ).count()
 
-    mismatches = 0
-    with connection.cursor() as cursor:
-        for table in ("ai_chunkembedding", "ai_recordspaceembedding"):
-            cursor.execute(
-                f"SELECT count(*) FROM {table} WHERE space_id = %s AND vector_dims(embedding) <> %s",
-                [space_id, space.dimensions],
-            )
-            mismatches += cursor.fetchone()[0]
-    if space.dimensions != VECTOR_COLUMN_DIMENSIONS:
-        mismatches += 1
+    mismatches = stored_dimension_mismatches(space)
 
     return Readiness(
         space_id=space.pk,

@@ -17,7 +17,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from django.db import transaction
 
 
 class PromotionRefused(Exception):
@@ -82,54 +81,26 @@ def records_missing_vectors(space_id: int, *, limit: int = 0) -> list[Shortfall]
     return shortfalls[:limit] if limit else shortfalls
 
 
-def promote(space) -> None:
+def promote(space, *, actor: str = "", provider_factory=None, verify_index: bool = True) -> None:
     """Make ``space`` the active one, retiring whichever space held that.
 
-    One transaction, and the retire lands before the promote: the partial
-    unique index ``one_active_embedding_space`` is checked per statement, so
-    the other order fails on a database that is behaving correctly.
+    Delegates to ``apps.ai.space_activation`` (IR-739), which verifies the
+    whole Record-and-Passage pair -- coverage, widths, query/document
+    semantics, current revisions and index health -- and then flips both
+    levels in one transaction, retiring the previous space rather than
+    deleting it (IR-280: vectors point at a space with ``on_delete=CASCADE``,
+    so a deleted space would take its vectors, and a rollback's target, with
+    it). Raises ``PromotionRefused`` naming every reason, changing nothing.
 
-    Retired rather than deleted, for the reason IR-280 recorded — vectors
-    point at a space with ``on_delete=CASCADE``, so deleting one takes its
-    vectors with it, and a rollback would then have nothing to roll back to.
+    A pending space that is the recorded rollback target is activated as a
+    rollback; anything else is a promotion.
     """
-    from apps.ai.models import (
-        VECTOR_COLUMN_DIMENSIONS,
-        EmbeddingSpace,
-        EmbeddingSpaceState,
+    from apps.ai.space_activation import activate_space, rollback_target
+
+    target = rollback_target()
+    kind = "rollback" if target is not None and target.pk == space.pk else "promote"
+    activate_space(
+        space.pk, kind=kind, actor=actor,
+        provider_factory=provider_factory, verify_index=verify_index,
     )
-
-    # Completeness is not the only thing that makes a space unfit to be
-    # live. A retired space is one the project has already decided against,
-    # and `indexing._checked_space` refuses to *write* to one — the two
-    # would otherwise disagree about the same row. A space whose width does
-    # not match the vector columns cannot hold a readable vector at all.
-    if space.state == EmbeddingSpaceState.RETIRED:
-        raise PromotionRefused(
-            f"Space {space.pk} is retired. Promoting one the project has "
-            f"already retired makes live what it decided against; create a "
-            f"new space instead."
-        )
-    if space.dimensions != VECTOR_COLUMN_DIMENSIONS:
-        raise PromotionRefused(
-            f"Space {space.pk} is {space.dimensions} dimensions but the "
-            f"vector columns hold {VECTOR_COLUMN_DIMENSIONS}. Queries against "
-            f"it would compare vectors of different widths."
-        )
-
-    shortfalls = records_missing_vectors(space.id)
-    if shortfalls:
-        raise PromotionRefused(
-            f"{len(shortfalls)} record(s) have active chunks with no vector in "
-            f"space {space.id} ({space.model_id}). A space promoted half-indexed "
-            f"answers confidently from the half it holds."
-        )
-
-    with transaction.atomic():
-        EmbeddingSpace.objects.filter(
-            state=EmbeddingSpaceState.ACTIVE
-        ).exclude(pk=space.pk).update(state=EmbeddingSpaceState.RETIRED)
-        EmbeddingSpace.objects.filter(pk=space.pk).update(
-            state=EmbeddingSpaceState.ACTIVE
-        )
     space.refresh_from_db()

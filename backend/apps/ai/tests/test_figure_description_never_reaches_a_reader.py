@@ -12,7 +12,8 @@ from django.core.files.base import ContentFile
 from django.urls import reverse
 
 from apps.ai.composition import use_composition_root
-from apps.ai.models import ChunkEmbedding, ChunkSet, DocumentChunk, RecordEmbedding
+from apps.ai.models import ChunkEmbedding, ChunkSet, DocumentChunk
+from apps.ai.tests.corpus import seed_record_vector
 from apps.ai.overview import PROMPT_VERSION, overview_for
 from apps.ai.overview.service import generate_overview
 from apps.ai.providers.fakes import ScriptedLLM
@@ -43,7 +44,7 @@ def figure_paper(embedder, space, owner):
         pipeline_status=PipelineStatus.PUBLISHED, manuscript_revision=revision,
     )
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
-    RecordEmbedding.objects.create(
+    seed_record_vector(
         record=record, embedding=embedder.embed_documents([f"{record.title}. {QUESTION}"])[0],
         model_name="fake-test",
     )
