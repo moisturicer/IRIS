@@ -87,7 +87,8 @@ class Corpus:
             return ToolResult(NO_MATCH, coverage=Coverage(total=0))
         return ToolResult(OK, records=tuple(self.record(r) for r in hits),
                           passages=tuple(self.papers[r][2] for r in hits),
-                          coverage=Coverage(len(hits), len(hits), False, 2))
+                          coverage=Coverage(len(hits), len(hits), False, 2),
+                          dependencies=frozenset(self.papers[r][1] for r in hits))
 
     async def open_passage(self, passage):
         self.calls.append(("open_passage", passage))
@@ -95,7 +96,8 @@ class Corpus:
             if p.handle == passage:
                 if rid in self.replaced:
                     return ToolResult.unavailable("source_replaced")
-                return ToolResult(OK, passages=(p,), coverage=Coverage(1, 1))
+                return ToolResult(OK, passages=(p,), coverage=Coverage(1, 1),
+                                  dependencies=frozenset({source}))
         return ToolResult.unavailable("unknown_handle")
 
     async def read_page(self, paper, page):
@@ -108,7 +110,9 @@ class Corpus:
 
     async def recall(self, record_ids):
         self.calls.append(("recall", tuple(record_ids)))
-        return ToolResult(OK, records=tuple(self.record(r) for r in record_ids if r in self.papers))
+        found = [r for r in record_ids if r in self.papers]
+        return ToolResult(OK, records=tuple(self.record(r) for r in found),
+                          dependencies=frozenset(self.papers[r][1] for r in found))
 
     async def recover_turn(self, ordinal):
         self.calls.append(("recover_turn", ordinal))

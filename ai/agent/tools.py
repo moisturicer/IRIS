@@ -124,6 +124,7 @@ class Outcome:
     #: Whether the call returned evidence this run had not seen.
     progress: bool = False
     clarification: Optional[str] = None
+    dependencies: frozenset = frozenset()
 
 
 def _str(value) -> bool:
@@ -249,6 +250,7 @@ class Investigation:
     unpacked: dict[str, tuple[str, tuple[int, ...]]] = field(default_factory=dict)
     #: Tools that failed during the run, in order of first failure (IR-731).
     outages: list[str] = field(default_factory=list)
+    recalled_sources: frozenset = frozenset()
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
@@ -277,6 +279,7 @@ class Investigation:
             return {}
         found = await self.research.recall(list(dict.fromkeys(ids)))
         self._ended(found)
+        self.recalled_sources = found.dependencies
         for record in found.records:
             self.papers[record.record_id] = (record.handle, record.title)
 
@@ -438,7 +441,8 @@ class Investigation:
         body["coverage"] = {"returned": coverage.returned, "total": coverage.total,
                             "truncated": coverage.truncated}
         self.figures.update(str(n) for n in (coverage.returned, coverage.total) if n is not None)
-        return Outcome(json.dumps(body, ensure_ascii=False), progress=new)
+        return Outcome(json.dumps(body, ensure_ascii=False), progress=new,
+                       dependencies=result.dependencies)
 
     def _read_into(self, result: Evidence, call_id: Optional[str], body: dict) -> bool:
         """Fold one manuscript read into the run's coverage and say it to the model (IR-733)."""

@@ -79,7 +79,10 @@ class AdmittedAgentProvider(LLMProvider):
         usage = Usage()
         try:
             # Tool results carry Record content: the guard must authorize them.
-            evidence = [e for e in request.history if isinstance(e, ToolResult)]
+            evidence = [e for e in request.history if isinstance(e, ToolResult)
+                        or getattr(e, "dependencies", frozenset())]
+            # A previous model turn may carry derived text or opaque state even
+            # when the original tool result has left the fitted context.
             await self.guard.check(binding, request.pin, evidence)
             # From here the vendor may bill it, whatever happens next.
             usage.sent = True
@@ -87,6 +90,7 @@ class AdmittedAgentProvider(LLMProvider):
                 turn = await asyncio.wait_for(self.provider.converse(request), ticket.timeout_seconds)
             usage.input_tokens, usage.output_tokens = turn.input_tokens, turn.output_tokens
             usage.model = request.pin.model
-            return turn
+            sources = frozenset().union(*(e.dependencies for e in evidence)) if evidence else frozenset()
+            return replace(turn, dependencies=sources) if sources else turn
         finally:
             await ticket.settle(usage)
