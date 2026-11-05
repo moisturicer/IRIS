@@ -81,6 +81,10 @@ class AuditEvent(models.Model):
     PASSWORD_RESET_COMPLETED     = "PASSWORD_RESET_COMPLETED"
     EMAIL_VERIFICATION_COMPLETED = "EMAIL_VERIFICATION_COMPLETED"
 
+    # A person downloaded their own data (ADR-051 decision 13, IR-786). Metadata
+    # is `sections` and `format` only: never a byte of what was downloaded.
+    PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
+
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
         (LOGOUT,           "Logout"),
@@ -138,6 +142,7 @@ class AuditEvent(models.Model):
         (RECOVERY_EMAIL_FAILED,        "Recovery Email Failed"),
         (PASSWORD_RESET_COMPLETED,     "Password Reset Completed"),
         (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
+        (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

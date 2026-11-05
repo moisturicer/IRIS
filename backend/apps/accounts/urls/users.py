@@ -5,6 +5,7 @@ urlpatterns = [
     path("",              views.UserListView.as_view(),        name="user-list"),
     path("advisers/",     views.AdviserListView.as_view(),     name="user-advisers"),
     path("me/",           views.MeView.as_view(),              name="user-me"),
+    path("me/data/",      views.PersonalDataExportView.as_view(), name="user-me-data"),
     path("<int:pk>/",     views.UserDetailView.as_view(),      name="user-detail"),
     path("<int:pk>/role/",   views.ChangeUserRoleView.as_view(),  name="user-change-role"),
     path("<int:pk>/coordinator/", views.OfficeCoordinatorView.as_view(), name="user-coordinator"),
