@@ -12,6 +12,7 @@
     "awaiting_reader": false,
     "created_at": "2026-11-04T00:00:00+00:00",
     "finished_at": "2026-11-04T00:00:00+00:00",
+    "kind": "ask",
     "plan": {
       "revision": 1,
       "steps": [
@@ -27,6 +28,10 @@
       "used_tokens": 4000,
       "capacity_tokens": 1000000
     },
+    "compaction": null,
+    "cursor": 6,
+    "retry_of": null,
+    "retried_by": null,
     "sources_available": true,
     "capabilities": {
       "manual_compaction": false
@@ -50,6 +55,7 @@
         "awaiting_reader": false,
         "created_at": "2026-11-04T00:00:00+00:00",
         "finished_at": "2026-11-04T00:00:00+00:00",
+        "kind": "ask",
         "plan": {
           "revision": 1,
           "steps": [
@@ -65,6 +71,10 @@
           "used_tokens": 4000,
           "capacity_tokens": 1000000
         },
+        "compaction": null,
+        "cursor": 6,
+        "retry_of": null,
+        "retried_by": null,
         "sources_available": true,
         "capabilities": {
           "manual_compaction": false

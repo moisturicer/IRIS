@@ -81,11 +81,28 @@ no expected passage, and it must be *answered*, not refused.
   is never skipped.
 - A contradiction is refused: `evidence_required: none` or
   `decline-no-evidence` with expected passages, or `corpus` + `answer` with none.
-- A question with no expected passage has nothing to recall, so the retrieval
-  harness does not run it and it does not enter either recall average; the run
-  reports how many it left out (`without_passages`). Scoring a refusal is
-  IR-454's measure, and the model-facing command is IR-464's. **This harness
+- A question with no expected passage has nothing to recall, so it never
+  enters either recall average; the run reports how many there are
+  (`without_passages`). The model-facing command is IR-464's. **This harness
   still calls no model.**
+- **An unanswerable question is retrieved for and scored by correct refusal
+  (IR-454).** That is a `corpus` or `corpus_multi` question whose
+  `expected_outcome` is `decline-no-evidence`. It goes through the same
+  retriever and selection as the answerable ones, and **correct refusal** is the
+  share of them whose final set (what the model would be given) is empty. It is
+  reported beside recall, never averaged into it, and is `n/a` for a set with
+  none. Any answerable question whose final set is empty is a **false refusal**
+  and is named by id: that is the floor-set-too-high failure a reader never
+  sees. General-knowledge and `decline-restricted` questions are not run.
+  `proxy_starter.json` holds ten unanswerable questions (kind
+  `off-corpus-research`); their empty `expected` list is deliberate.
+  **Until a relevance cut-off is built (IR-396), retrieval returns the nearest
+  passages for every question, so correct refusal reads 0 when every paper is
+  cleared.** (A disclosure gate refusing papers also empties final sets, and
+  then shows up as false refusals too.) A real run retrieves for these
+  questions as well, so it embeds and reranks ten more questions per
+  configuration than before.
+  That is the gap the measure exists to show, not a defect in it.
 - `--dry-run` validates every field (an invalid value is refused at load), calls
   no vendor and costs nothing.
 

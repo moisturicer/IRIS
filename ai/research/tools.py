@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import secrets
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -16,7 +17,7 @@ from dataclasses import dataclass, field
 import asyncpg
 
 from ai.research import metadata
-from ai.runs.store import RunStore
+from ai.runs.store import CURRENT_HANDOFF, CURRENT_SOURCE_TURN, RunStore
 
 APP_NAME = "iris-ai-research"
 #: Mirrors Django's keyword index (`apps.ai.keyword_index.CONFIG`).
@@ -32,6 +33,11 @@ PASSAGE_FRAME_BYTES = 200
 #: Bytes a read's coverage block (spans, ranges, counts) adds, as an allowance; each listed page adds more.
 READING_FRAME_BYTES = 800
 PAGE_ENTRY_BYTES = 8
+#: Characters of one recovered Turn's question or answer returned; a longer one is cut and says so (IR-735).
+RECOVER_CHARS = 12000
+#: A delivered answer's renumbered citation marker, replaced by the passage it bound.
+MARKER = re.compile(r"\[(\d+)\]")
+PARTIAL_HANDLE = re.compile(r"\[[^\]]*$")
 #: The shortest repeat at a passage's start taken as extraction overlap rather than coincidence.
 MIN_OVERLAP_CHARS = 24
 #: Element kinds whose rendering is not interpreted: the text carries them, never what they show.
@@ -184,6 +190,23 @@ class Count:
 
 
 @dataclass(frozen=True)
+class RecoveredTurn:
+    """One original Turn of the Conversation, read again from where it is stored (IR-735).
+
+    Its citation markers are replaced by fresh handles to the passages they
+    cited, so a value quoted from it is cited from the source, never from
+    a summary.
+    """
+
+    ordinal: int
+    question: str
+    answer: str
+    kind: str
+    #: The question or answer was longer than RECOVER_CHARS.
+    truncated: bool = False
+
+
+@dataclass(frozen=True)
 class ToolResult:
     status: str
     reason: str | None = None
@@ -193,6 +216,7 @@ class ToolResult:
     passages: tuple[PassageRef, ...] = ()
     sections: tuple[Section, ...] = ()
     reading: Reading | None = None
+    turn: RecoveredTurn | None = None
     coverage: Coverage = field(default_factory=Coverage)
     dependencies: frozenset[Source] = frozenset()
     #: Provider calls the tool would make; none runs here.
@@ -263,7 +287,8 @@ class _Refused(Exception):
 
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
-                 scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None):
+                 scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None,
+                 follow_stored_grant: bool = False):
         self.dsn = dsn
         self.grant = grant
         self.run_id = run_id
@@ -271,6 +296,24 @@ class ResearchTools:
         self.scope = scope_record_id
         self.embedding_provider = embedding_provider
         self.embedding_ledger = embedding_ledger
+        # A worker's tools read under the grant the run holds *now*, so a reader's
+        # reconnect reaches a run already in progress (IR-880). Off, `grant` is the authority.
+        self.follow_stored_grant = follow_stored_grant
+
+    async def _grant(self, conn) -> str | None:
+        """The grant this call reads under: the run's stored one when following it (IR-880).
+
+        Read inside the call's own short transaction, so no connection is kept across
+        model inference. Only `RunStore.status` writes it, and only a grant of exactly the
+        Conversation's scope; `_session` checks that scope and the reader again.
+        """
+        if not self.follow_stored_grant:
+            return self.grant
+        run = await conn.fetchrow(
+            "SELECT state, fence, reader_grant FROM iris_ai.ask_run WHERE id = $1", self.run_id)
+        if run is None or run["state"] != "running" or run["fence"] != self.fence:
+            raise _Refused("run_ended")
+        return run["reader_grant"]
 
     @asynccontextmanager
     async def _session(self):
@@ -278,13 +321,19 @@ class ResearchTools:
         await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
         try:
             async with conn.transaction():
-                if not self.grant:
+                grant = await self._grant(conn)
+                if not grant:
                     raise _Refused("unauthorized")
                 try:
                     claims = await conn.fetchval(
-                        "SELECT iris_authz.begin_research($1, 'reader_session')", self.grant)
+                        "SELECT iris_authz.begin_research($1, 'reader_session')", grant)
                 except asyncpg.InsufficientPrivilegeError:
                     raise _Refused("unauthorized") from None
+                if self.follow_stored_grant:
+                    # A renewal never widens the run: its scope is the claim's, exactly.
+                    held = claims.get("rec")
+                    if (int(held) if held is not None else None) != self.scope:
+                        raise _Refused("unauthorized")
                 # Held to commit, so Stop or deletion cannot interleave.
                 run = await conn.fetchrow(
                     "SELECT state, fence, reader_id FROM iris_ai.ask_run WHERE id = $1 FOR SHARE",
@@ -728,17 +777,128 @@ class ResearchTools:
 
         return await self._call("recall", body)
 
-    async def reauthorize(self, handles, counted=()) -> str | None:
+    async def _recoverable_turn(self, conn, ordinal: int):
+        """The stored Turn this run's reader may recover now, or None; one predicate for recovery and resume."""
+        return await conn.fetchrow(
+            f"""SELECT t.id, t.ordinal, t.question, t.answer, t.kind
+                  FROM iris_ai.ask_run r
+                  JOIN iris_ai.conversation c ON c.id = r.conversation_id AND c.reader_id = r.reader_id
+                  JOIN iris_ai.turn t ON t.conversation_id = c.id
+                 WHERE r.id = $1 AND c.deleted_at IS NULL
+                   AND c.scope_record_id IS NOT DISTINCT FROM $3::bigint
+                   AND t.ordinal = $2 AND t.ordinal <= r.base_revision AND {CURRENT_SOURCE_TURN}""",
+            self.run_id, ordinal, self.scope,
+        )
+
+    async def _recoverable(self, conn, ordinal: int) -> bool:
+        return await self._recoverable_turn(conn, ordinal) is not None
+
+    async def recover_turn(self, ordinal: int) -> ToolResult:
+        """An original Turn of this run's Conversation, with its cited passages re-bound (IR-735, ADR-049 §19).
+
+        Only a Turn the run started from, in the reader's own live Conversation
+        and Paper Chat scope, whose sources and counted Records are all still
+        current for this reader. A Turn that is missing, deleted, another
+        reader's or no longer readable is the same refusal. A citation whose
+        passage is gone is left out; the Turn is not edited to hide it.
+        """
+        if not _is_int(ordinal) or ordinal < 1:
+            return ToolResult.unavailable("invalid_argument")
+
+        async def body(conn):
+            turn = await self._recoverable_turn(conn, ordinal)
+            # Missing, deleted and unreadable look alike.
+            if turn is None:
+                raise _Refused("unknown_turn")
+            cited = await conn.fetch(
+                "SELECT position, record_id, page, quote, revision FROM iris_ai.citation"
+                " WHERE turn_id = $1 ORDER BY position", turn["id"])
+            rows, positions = [], []
+            for c in cited:
+                chunk_set, _, extraction = (c["revision"] or "").partition(":")
+                try:
+                    chunk_set = int(chunk_set)
+                except ValueError:
+                    continue
+                row = await conn.fetchrow(
+                    """SELECT c.id, c.record_id, c.chunk_set_id, c.source_page, c.content, c.context_path,
+                              r.title, cs.extraction_hash
+                         FROM iris_ai.research_chunks() c
+                         JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active
+                         JOIN public.records_record r ON r.id = c.record_id
+                        WHERE c.chunk_set_id = $1 AND c.record_id = $2 AND c.deleted_at IS NULL
+                          AND cs.extraction_hash = $3 AND c.source_page IS NOT DISTINCT FROM $4::integer
+                          AND c.content = $5 AND ($6::bigint IS NULL OR c.record_id = $6)
+                        ORDER BY c.id LIMIT 1""",
+                    chunk_set, c["record_id"], extraction, c["page"], c["quote"], self.scope,
+                )
+                if row is not None:
+                    rows.append(row)
+                    positions.append(c["position"])
+            handles = await self._handles(
+                conn, [("P", r["record_id"], r["chunk_set_id"], r["id"]) for r in rows])
+            by_position = dict(zip(positions, handles))
+            firsts = list({r["record_id"]: r for r in rows}.values())
+            record_handles = await self._handles(
+                conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in firsts])
+            records = tuple(
+                RecordRef(h, r["record_id"], r["title"], Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]))
+                for r, h in zip(firsts, record_handles))
+            answer = MARKER.sub(
+                lambda m: f"[{by_position[int(m.group(1))]}]" if int(m.group(1)) in by_position else "",
+                turn["answer"])
+            cut = len(answer) > RECOVER_CHARS
+            # A cut never leaves half a handle behind.
+            kept = PARTIAL_HANDLE.sub("", answer[:RECOVER_CHARS]) if cut else answer
+            recovered = RecoveredTurn(
+                ordinal=turn["ordinal"], question=turn["question"][:RECOVER_CHARS], answer=kept,
+                kind=turn["kind"], truncated=cut or len(turn["question"]) > RECOVER_CHARS)
+            passages = self._passages(None, rows, handles)
+            return ToolResult(
+                OK, records=records, passages=passages, turn=recovered,
+                # A citation whose passage can no longer be found shows as a shortfall, never as full coverage.
+                coverage=Coverage(len(passages), len(cited), len(passages) < len(cited)),
+                dependencies=frozenset(p.source for p in passages))
+
+        return await self._call("recover_turn", body)
+
+    async def handoff_current(self, turns, sources) -> str | None:
+        """None while a handoff's Turns and sources are all still current for this reader (IR-735).
+
+        Checked as a claim checks it, under the run's grant, so a source revoked
+        or replaced since the run began is noticed before the next send and the
+        commit. "stale" otherwise, or the reason the run cannot continue.
+        Journals nothing.
+        """
+        try:
+            async with self._session() as conn:
+                conversation_id = await conn.fetchval(
+                    """SELECT c.id FROM iris_ai.ask_run r JOIN iris_ai.conversation c ON c.id = r.conversation_id
+                        WHERE r.id = $1 AND c.deleted_at IS NULL""", self.run_id)
+                if conversation_id is None:
+                    return "run_ended"
+                current = await conn.fetchval(
+                    f"SELECT {CURRENT_HANDOFF} FROM (SELECT $1::uuid AS conversation_id, $2::integer[] AS turns,"
+                    " $3::text[] AS sources) h", conversation_id, list(turns), list(sources))
+                return None if current else "stale"
+        except _Refused as refused:
+            return refused.reason
+
+    async def reauthorize(self, handles, counted=(), turns=()) -> str | None:
         """None when every recovered handle still reads its own source now (IR-724).
 
         A replacement worker's restored evidence confers nothing: each handle
         must resolve under the run's grant, scope and fence to the source it
         was issued on, each passage must still exist, and every Record an
         exact count counted must still be readable. "stale" otherwise, or the
-        reason the run cannot continue. Journals nothing.
+        reason the run cannot continue. Journals nothing. Each original Turn the
+        run recovered (`turns`) must still be one this reader may recover (IR-735).
         """
         try:
             async with self._session() as conn:
+                for ordinal in turns:
+                    if not await self._recoverable(conn, ordinal):
+                        return "stale"
                 for handle in handles:
                     try:
                         async with conn.transaction():

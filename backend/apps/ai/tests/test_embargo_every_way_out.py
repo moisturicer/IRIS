@@ -31,7 +31,7 @@ from apps.ai.indexing import embed_active_chunk_set, embed_record_summary
 from apps.ai.memory import ConversationMemory
 from apps.ai.models import TURN_ANSWER_VECTOR, ChunkSet, Turn, TurnCitation, TurnEmbedding
 from apps.ai.models.chunk import ChunkEmbedding
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.models.embedding import RecordEmbedding, RecordSpaceEmbedding
 from apps.ai.overview.service import PROMPT_VERSION, generate_overview
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedLLM
 from apps.ai.providers.ports import RerankedCandidate, Reranker
@@ -152,6 +152,7 @@ def _unindexed(record) -> Record:
     """As it stands after chunking, with its vectors still owed."""
     ChunkEmbedding.objects.filter(chunk__record=record).delete()
     RecordEmbedding.objects.filter(record=record).delete()
+    RecordSpaceEmbedding.objects.filter(record=record).delete()
     return record
 
 

@@ -15,6 +15,7 @@ from typing import Mapping, Optional
 from ai.admission.guard import NO_TRAINING
 from ai.admission.limits import Limits, NotConfigured, read as read_limits
 from ai.agent.budget import Bounds, profiles as checked_profiles
+from ai.agent.compaction import Compaction
 from ai.agent.context import Reserves
 from ai.agent.protocol import Pin
 from ai.infrastructure import agent_config
@@ -30,6 +31,8 @@ class AgentProfile:
     reserves: Reserves
     provider: agent_config.AgentProviderConfig
     limits: Limits
+    #: None never compacts (IR-734).
+    compaction: Optional[Compaction] = None
 
 
 def _json(values, name, shape: str):
@@ -59,7 +62,7 @@ def _bounds(values) -> dict[str, Bounds]:
 
 def read(values) -> AgentProfile:
     """The whole profile, or `NotConfigured` naming the first problem."""
-    from ai.agent.executor import MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION
+    from ai.agent.executor import RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION
     from ai.admission.transport import RESEARCH_LANE
     from ai.infrastructure.openai_adapter import OpenAICompatibleAgentProvider
 
@@ -82,13 +85,21 @@ def read(values) -> AgentProfile:
     bounds = _bounds(values)
     reserves = _record(Reserves, "RUNS_AGENT_RESERVES",
                        _json(values, "RUNS_AGENT_RESERVES", "a JSON object"))
+    compaction = None
+    if str(getattr(values, "RUNS_AGENT_COMPACTION", "") or "").strip():
+        compaction = _record(Compaction, "RUNS_AGENT_COMPACTION",
+                             _json(values, "RUNS_AGENT_COMPACTION", "a JSON object"))
+        if not compaction.fits(provider.capacities[model], reserves):
+            raise NotConfigured("RUNS_AGENT_COMPACTION leaves no room to summarize or finish"
+                                " under RUNS_AGENT_MODEL's capacity")
     pin = Pin(
         model=model, endpoint=provider.endpoint, adapter=OpenAICompatibleAgentProvider.adapter,
-        dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=MANUSCRIPT_PROMPT_VERSION,
-        tool_version=MANUSCRIPT_TOOL_VERSION, public_version=runs_config.PROTOCOL,
+        dialect=OpenAICompatibleAgentProvider.dialect.name, prompt_version=RECOVERY_PROMPT_VERSION,
+        tool_version=RECOVERY_TOOL_VERSION, public_version=runs_config.PROTOCOL,
         state_version=runs_config.SCHEMA, data_policy=provider.data_policy,
     )
-    return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits)
+    return AgentProfile(pin=pin, bounds=bounds, reserves=reserves, provider=provider, limits=limits,
+                        compaction=compaction)
 
 
 def executor(profile: AgentProfile, dsn: str, *, provider=None):
@@ -104,7 +115,7 @@ def executor(profile: AgentProfile, dsn: str, *, provider=None):
     inner = provider if provider is not None else OpenAICompatibleAgentProvider(profile.provider)
     admitted = AdmittedAgentProvider(inner, Ledger(dsn, profile.limits), purpose=PURPOSE)
     return AgentExecutor(admitted, profile.pin, profile.reserves, profiles=profile.bounds,
-                         price=profile.limits.prices[profile.pin.model])
+                         price=profile.limits.prices[profile.pin.model], compaction=profile.compaction)
 
 
 def selected(values) -> Optional[AgentProfile]:

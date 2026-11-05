@@ -21,7 +21,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.tests.corpus import seed_record_vector
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.similarity import similar_records
@@ -73,7 +73,7 @@ def make_record(*, title, abstract, embedder, status=PipelineStatus.PUBLISHED,
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     if embedded:
-        RecordEmbedding.objects.create(
+        seed_record_vector(
             record=record,
             embedding=embedder.embed_documents([f"{title}. {abstract}"])[0],
             model_name="fake-test",
@@ -169,10 +169,11 @@ class SimilarRecordsTests:
             embedder=embedder,
             embedded=False,
         )
-        RecordEmbedding.objects.create(
+        seed_record_vector(
             record=other,
             embedding=embedder.embed_documents(["rainfall catchment"])[0],
             model_name="some-older-model",
+            keyed=False,
         )
 
         assert similar_records(seed, reader) == []

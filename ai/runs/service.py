@@ -18,7 +18,7 @@ from ai.agent.budget import Bounds
 from ai.research.tools import ResearchTools
 from ai.runs import config as runs_config
 from ai.runs.dispatch import Notifier, PollingNotifier
-from ai.runs.executor import Executor, RunContext, Unavailable
+from ai.runs.executor import Compacted, Executor, RunContext, Unavailable
 from ai.runs.store import Claim, Fenced, RunStore
 
 log = logging.getLogger(__name__)
@@ -90,16 +90,64 @@ class RunService:
         except TypeError:
             raise ValueError("bounds") from None
 
+    @property
+    def can_compact(self) -> bool:
+        """Whether a reader may ask to condense a Conversation (IR-754).
+
+        Only an AGENT that new runs are pinned to and that has a compaction
+        rule: the same mechanism and the same admission as automatic
+        compaction, never a second summarizer.
+        """
+        return (getattr(self.executor, "compaction", None) is not None
+                and callable(getattr(self.executor, "compact", None)))
+
     async def submit(self, grant, *, key, question, conversation_id, base_revision,
                      depth=runs_config.DEFAULT_DEPTH):
         """The run's projection, and whether this submission admitted it."""
+        return await self._enqueue(grant, key=key, question=question, conversation_id=conversation_id,
+                                   base_revision=base_revision, depth=depth, pinned=self.pinned(depth))
+
+    async def submit_compaction(self, grant, *, key, conversation_id, base_revision):
+        """The run that condenses the Conversation, and whether this request admitted it (IR-754).
+
+        A run of its own: it has its own identity, deadline and allowance,
+        asks nothing and writes no Turn. It is admitted only where an Ask
+        would be -- no active run in the Conversation, the revision the reader
+        saw -- so it never shares or extends an investigation's budget.
+        """
+        depth = "ordinary"
+        return await self._enqueue(grant, key=key, question=None, conversation_id=conversation_id,
+                                   base_revision=base_revision, depth=depth, compaction=True,
+                                   pinned={**self.pinned(depth), "kind": runs_config.KIND_COMPACT})
+
+    async def _enqueue(self, grant, *, key, question, conversation_id, base_revision, depth, pinned,
+                       compaction=False):
         dispatch = self.cfg.dispatch
         row, created = await self.store.admit(
             grant, key=key, question=question, conversation_id=conversation_id,
             base_revision=base_revision, deadline_seconds=self.cfg.limits.deadline_for(depth),
-            allowance=self.cfg.limits.allowance(), pinned=self.pinned(depth), depth=depth,
+            allowance=self.cfg.limits.allowance(), pinned=pinned, depth=depth,
+            max_queued=dispatch.max_queued, max_active_per_reader=dispatch.max_active_per_reader,
+            compaction=compaction,
+        )
+        return await self._queued(grant, row, created)
+
+    async def retry(self, grant, run_id, *, key):
+        """The new run that retries an ended one, and whether this request admitted it (IR-726).
+
+        A separate AskRun linked to the first and admitted with the original
+        limits of the configured profile: it never inherits, resets or extends
+        the first run's allowance, and it is queued like any submission.
+        """
+        dispatch = self.cfg.dispatch
+        row, created = await self.store.retry(
+            grant, run_id, key=key,
+            plan=lambda depth: (self.cfg.limits.deadline_for(depth), self.cfg.limits.allowance(), self.pinned(depth)),
             max_queued=dispatch.max_queued, max_active_per_reader=dispatch.max_active_per_reader,
         )
+        return await self._queued(grant, row, created)
+
+    async def _queued(self, grant, row, created):
         if created:
             try:
                 await self.notifier.notify()
@@ -132,6 +180,20 @@ class RunService:
             return False
         return True
 
+    async def _commit_handoff(self, claim: Claim, handoff) -> tuple:
+        """Commit a compact handoff under the claim's fence (IR-734)."""
+        return await self.store.commit_handoff(claim.run_id, claim.fence, handoff)
+
+    def _context(self, claim: Claim, bounds) -> RunContext:
+        return RunContext(
+            allowance=claim.allowance, remaining_seconds=claim.remaining_seconds,
+            depth=claim.depth, prior=claim.prior, state=claim.state or {},
+            bounds=bounds, checkpoint=claim.checkpoint, spent=claim.spent or {},
+            save=lambda step, body: self._save(claim, step, body),
+            handoff=claim.handoff, compactions=claim.compactions, committed=claim.committed,
+            commit_handoff=lambda handoff: self._commit_handoff(claim, handoff),
+        )
+
     async def execute(self, claim: Claim) -> None:
         """The run's tools read under the reader's stored grant (IR-719)."""
         run_id = claim.run_id
@@ -147,18 +209,21 @@ class RunService:
             log.info("run %s unavailable: bounds_unpinned", run_id)
             await self.store.fail(run_id, claim.fence, "unavailable")
             return
+        compacting = (claim.pinned or {}).get("kind") == runs_config.KIND_COMPACT
+        if compacting and not callable(getattr(executor, "compact", None)):
+            log.info("run %s unavailable: cannot_compact", run_id)
+            await self.store.fail(run_id, claim.fence, "unavailable")
+            return
         try:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id,
-                                  embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger)
+                                  embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger,
+                                  follow_stored_grant=True)
             # Every provider attempt inside is admitted against this run (IR-725).
             with admission.bound(admission.RunBinding(run_id, claim.fence)):
-                if getattr(executor, "takes_context", False):
-                    result = await executor.answer(claim.question, tools, context=RunContext(
-                        allowance=claim.allowance, remaining_seconds=claim.remaining_seconds,
-                        depth=claim.depth, prior=claim.prior, state=claim.state or {},
-                        bounds=bounds, checkpoint=claim.checkpoint, spent=claim.spent or {},
-                        save=lambda step, body: self._save(claim, step, body),
-                    ))
+                if compacting:
+                    result = await executor.compact(tools, self._context(claim, bounds))
+                elif getattr(executor, "takes_context", False):
+                    result = await executor.answer(claim.question, tools, context=self._context(claim, bounds))
                 else:
                     result = await executor.answer(claim.question, tools)
         except Unavailable as refused:
@@ -170,7 +235,10 @@ class RunService:
             await self.store.fail(run_id, claim.fence, "executor_failed")
             return
         try:
-            await self.store.commit_final(run_id, claim.fence, result)
+            if isinstance(result, Compacted):
+                await self.store.commit_compaction(run_id, claim.fence, result)
+            else:
+                await self.store.commit_final(run_id, claim.fence, result)
         except Fenced:
             return
         except (asyncpg.PostgresError, asyncpg.InterfaceError, OSError):

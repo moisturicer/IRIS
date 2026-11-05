@@ -162,6 +162,7 @@ DEPENDENT_READS = {
     "ai_chunkembedding": "SELECT c.record_id FROM ai_chunkembedding e "
                          "JOIN ai_documentchunk c ON c.id = e.chunk_id",
     "ai_recordembedding": "SELECT record_id FROM ai_recordembedding",
+    "ai_recordspaceembedding": "SELECT record_id FROM ai_recordspaceembedding",
 }
 
 

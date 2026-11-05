@@ -2,6 +2,8 @@
 
 **Status: APPROVED for development only, by Jive Tyler I. Revalde, 2026-11-04.** An AI agent entered the values, the approver, the date and the signature on Jive Tyler I. Revalde's explicit instruction in chat. The decision is that person's, and the entry is not an independent signature or a code review. A later change needs its own approval by a named person.
 
+**AI-runtime model amendment, 2026-11-05 (IR-889): use `openai/gpt-6-luna:floor`, not the OSS model in the original tables below.** The original OSS price and question-count estimates are historical; do not copy them into a Luna deployment. The $30 campaign and other numeric caps remain. [The amendment](runtime-paid-research-approval.md) names the new model and its conditions. A Luna price/capacity declaration and bounded OpenRouter routing still have to be completed before paid sends.
+
 Authority: [ADR-041](../../adr/041-shared-provider-admission.md) (shared provider admission) and ADR-049 (AI-owned runs). Gates this record answers: [pilot README §6](README.md#6-pilot-metrics-and-gates-ac-7) — per-stage/per-run values, queue sizing and shared quotas. The proposed campaign in [§7](README.md#7-campaign-budget-and-deferred-scope-ac-8) is a starting point only.
 
 ## Scope
@@ -82,7 +84,7 @@ Every one is required; while any is unset, every run submission is refused.
 | `RUNS_WORKER_CONCURRENCY` | **Concurrency**: run slots per worker process | `4` | positive integer |
 | `RUNS_DEEP_CONCURRENCY` | Deep runs at once; **must be below** `RUNS_WORKER_CONCURRENCY` | `2` | positive integer |
 | `RUNS_POLL_SECONDS` | How often an idle worker checks the queue. Not a spend limit | `2` | positive number |
-| `AI_RESEARCH_GRANT_TTL_SECONDS` | How long a reader's grant lasts. Set in `backend/.env`. A run stops when its grant expires until IR-880 renews it mid-run, so this must outlast the deep deadline. A grant more than 5 minutes old at submission can still end a deep run early | `900` | integer, 30-900 |
+| `AI_RESEARCH_GRANT_TTL_SECONDS` | How long a reader's grant lasts. Set in `backend/.env`. A running run reads under its stored grant, which a reader's reconnect renews (IR-880), so a deep run outlasts this only while the reader keeps polling; a reader who stops ends it at its next read. A grant more than 5 minutes old at submission can still leave a queued run waiting for its reader | `900` | integer, 30-900 |
 
 ## 6. AGENT runs (only with `RUNS_EXECUTOR=agent`, `ai/runs/agent_profile.py`)
 
@@ -124,7 +126,7 @@ Decision (2026-11-04): a US$30 ceiling, with each value that changed for deep-by
 - Set the key's credit limit to the approved amount, so OpenRouter stops spending if the estimates are wrong.
 - `AI_ADMISSION_PRICES` holds the AGENT model and Voyage only. With `AI_PROVIDER_ADMISSION=enforce`, any other chat model a deployment configures is refused until it is priced in a new approval.
 
-**This approval does not enable paid research.** `ai/admission/guard.py` still refuses Record evidence until the disclosure decision in ADR-049 is made.
+**This approval alone does not enable paid research.** [IR-889's development decision](runtime-paid-research-approval.md) selects `openai/gpt-6-luna:floor` for the AI runtime on 2026-11-05, superseding the OSS model, price row and estimates above for that runtime. The $30 campaign and other numeric caps remain unchanged. The literal suffixed model needs a declared capacity and price before admission; the price must bound every eligible routed endpoint, including long-prompt price overrides. `:floor` sorts by price but does not impose a maximum. Reprice the pilot from a paid Luna smoke; the OSS estimates of roughly 286 questions and US$59 for 756 turns do not apply to Luna. `ai/admission/guard.py` still refuses Record evidence until IR-889's source-aware guard and the decision's OpenRouter and per-Record conditions are met.
 
 ## Not decided here
 

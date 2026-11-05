@@ -30,11 +30,14 @@ from typing import Mapping
 import asyncpg
 
 from ai.admission.scope import run_key
-from ai.runs.executor import PriorTurn, Result
+from ai.runs.config import KIND_COMPACT
+from ai.runs.executor import Compacted, PriorTurn, Result
 
 APP_NAME = "iris-ai-runs"
 ACTIVE = ("queued", "running")
 TERMINAL = ("completed", "cancelled", "conflict", "expired", "failed", "deleted")
+#: A reader may retry a run that ended without an answer and left the Conversation as it was (IR-726).
+RETRYABLE = ("cancelled", "expired", "failed")
 
 # An exact count stands only while the reader may still read every Record it
 # counted; the row policy decides (IR-750). Correlated on Turn `t`.
@@ -62,6 +65,18 @@ CURRENT_SOURCE_TURN = """NOT EXISTS (
   AND NOT """ + COUNTED_UNREADABLE
 
 
+# A handoff stands only while every Turn it compacts would still be carried and
+# every source its findings name is still current; correlated on handoff `h` (IR-734).
+CURRENT_HANDOFF = """NOT EXISTS (
+    SELECT 1 FROM iris_ai.turn t
+     WHERE t.conversation_id=h.conversation_id AND t.ordinal = ANY(h.turns)
+       AND NOT (""" + CURRENT_SOURCE_TURN + """))
+  AND NOT EXISTS (
+    SELECT 1 FROM unnest(h.sources) dependency(revision) WHERE NOT EXISTS (
+      SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.is_active
+        AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))"""
+
+
 def shown_facts(facts) -> list[dict]:
     """A Turn's facts as a reader sees them: allowlisted keys, never the counted Records (IR-750)."""
     shown = []
@@ -79,13 +94,14 @@ def shown_facts(facts) -> list[dict]:
                 **{k: fact.get(k) for k in ("kind", "title", "passages", "read", "complete", "pages",
                                             "pages_no_passage_starts_on", "formula_passages", "caption_passages")},
                 "visual_interpretation": False, "exhaustive": False,
+                **({"not_in_context": fact["not_in_context"]} if "not_in_context" in fact else {}),
             })
     return shown
 
 RUN_COLUMNS = (
     "id, reader_id, conversation_id, request_hash, question, base_revision, state, end_reason,"
     " deadline_at, allowance, pinned, fence, version, turn_id, created_at, finished_at,"
-    " depth, started_at"
+    " depth, started_at, retry_of"
 )
 
 #: Earlier Turns a claim carries, newest kept (IR-728).
@@ -152,14 +168,20 @@ class Claim:
     #: Tokens the shared ledger has charged this run over every fence, open
     #: and uncertain attempts at their reservation (IR-724).
     spent: dict | None = None
+    #: The Conversation's latest handoff still valid now; `prior` then starts after it (IR-734).
+    handoff: dict | None = None
+    #: Summary attempts journalled for this run over every fence.
+    compactions: int = 0
+    #: Handoff revisions this run committed.
+    committed: frozenset = frozenset()
 
 
-def request_hash(question: str, conversation_id, base_revision) -> str:
-    body = json.dumps(
-        {"q": question, "c": str(conversation_id) if conversation_id else None, "r": base_revision},
-        sort_keys=True,
-    )
-    return hashlib.sha256(body.encode()).hexdigest()
+def request_hash(question: str | None, conversation_id, base_revision, *, compaction: bool = False) -> str:
+    body = {"q": question, "c": str(conversation_id) if conversation_id else None, "r": base_revision}
+    if compaction:
+        # An Ask's identity is unchanged; a compaction can never replay as one under the same key (IR-754).
+        body["k"] = "compact"
+    return hashlib.sha256(json.dumps(body, sort_keys=True).encode()).hexdigest()
 
 
 class RunStore:
@@ -220,16 +242,22 @@ class RunStore:
         if not alive:
             raise NotFound
 
-    async def admit(self, grant, *, key: str, question: str, conversation_id, base_revision,
+    async def admit(self, grant, *, key: str, question: str | None, conversation_id, base_revision,
                     deadline_seconds: int, allowance: dict, pinned: dict, depth: str = "ordinary",
                     max_queued: int | None = None,
-                    max_active_per_reader: int | None = None) -> tuple[dict, bool]:
+                    max_active_per_reader: int | None = None,
+                    compaction: bool = False) -> tuple[dict, bool]:
         """The run for this request identity, and whether it is new.
 
         The queued run is committed before this returns; a caller notifies
         workers only afterwards. Raises Busy when a population is full.
+
+        `compaction` admits the reader's request to condense an existing
+        Conversation (IR-754): a run of its own, with no question and no Turn,
+        under the same rules as an Ask -- one active run per Conversation, the
+        revision the reader saw, the population bounds -- and its own allowance.
         """
-        digest = request_hash(question, conversation_id, base_revision)
+        digest = request_hash(question, conversation_id, base_revision, compaction=compaction)
         bounds = (max_queued, max_active_per_reader)
         async with self._connect() as conn:
             for _ in range(2):
@@ -237,7 +265,7 @@ class RunStore:
                     async with conn.transaction():
                         return await self._admit(
                             conn, grant, key, question, conversation_id, base_revision,
-                            digest, deadline_seconds, allowance, pinned, depth, bounds,
+                            digest, deadline_seconds, allowance, pinned, depth, bounds, compaction,
                         )
                 except _Raced:
                     continue
@@ -260,7 +288,7 @@ class RunStore:
             raise Busy("queue_full")
 
     async def _admit(self, conn, grant, key, question, conversation_id, base_revision,
-                     digest, deadline_seconds, allowance, pinned, depth, bounds):
+                     digest, deadline_seconds, allowance, pinned, depth, bounds, compaction=False):
         claims = await self._verify(conn, grant)
         reader, scope = self._reader(claims)
         existing = await conn.fetchrow(
@@ -278,6 +306,9 @@ class RunStore:
                 raise Conflict("request_mismatch")
             return dict(existing), False
         if conversation_id is None:
+            if compaction:
+                # There is nothing to condense in a Conversation that does not exist.
+                raise NotFound
             conversation_id = uuid.uuid4()
             await conn.execute(
                 "INSERT INTO iris_ai.conversation (id, reader_id, scope_record_id) VALUES ($1, $2, $3)",
@@ -320,6 +351,87 @@ class RunStore:
         )
         if row is None:
             # A concurrent submission with this identity won; read it instead.
+            raise _Raced
+        await self._journal(conn, row["id"], "admitted", {})
+        return dict(row), True
+
+    async def retry(self, grant, run_id, *, key: str, plan, max_queued: int | None = None,
+                    max_active_per_reader: int | None = None) -> tuple[dict, bool]:
+        """The new run that retries `run_id`, and whether this request admitted it (IR-726).
+
+        Only the reader's own run that ended `cancelled`, `expired` or `failed`
+        with its Conversation unmoved and no other run active in it. The new run
+        is a separate AskRun, linked by `retry_of`, admitted like any submission:
+        `plan(depth)` gives its deadline, allowance and pin, so it starts from
+        the configured limits and the first run's allowance and charges stay as
+        they were. Asking again -- by key or not -- finds the first retry.
+        Raises Conflict("not_retryable") for any other run.
+        """
+        bounds = (max_queued, max_active_per_reader)
+        async with self._connect() as conn:
+            for _ in range(2):
+                try:
+                    async with conn.transaction():
+                        return await self._retry(conn, grant, run_id, key, plan, bounds)
+                except _Raced:
+                    continue
+        raise Conflict("request_in_flight")
+
+    async def _retry(self, conn, grant, run_id, key, plan, bounds):
+        claims = await self._verify(conn, grant)
+        reader, scope = self._reader(claims)
+        await self._owned_run(conn, reader, scope, run_id)
+        original = await conn.fetchrow(
+            f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE id = $1 FOR UPDATE", run_id,
+        )
+        conversation = await conn.fetchrow(
+            "SELECT revision, scope_record_id FROM iris_ai.conversation WHERE id = $1",
+            original["conversation_id"],
+        )
+        # Paper Chat stays on its Record; the retry reads under this grant, so it must match.
+        if conversation["scope_record_id"] != scope:
+            raise Conflict("scope_mismatch")
+        existing = await conn.fetchrow(
+            f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE reader_id = $1 AND request_key = $2",
+            reader, key,
+        )
+        if existing is not None:
+            if existing["retry_of"] != run_id:
+                raise Conflict("request_mismatch")
+            return dict(existing), False
+        first = await conn.fetchrow(
+            f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE retry_of = $1", run_id,
+        )
+        if first is not None:
+            return dict(first), False
+        if (original["state"] not in RETRYABLE or original["question"] is None
+                or (original["pinned"] or {}).get("kind") == KIND_COMPACT):
+            raise Conflict("not_retryable")
+        if conversation["revision"] != original["base_revision"]:
+            raise Conflict("revision_conflict", revision=conversation["revision"])
+        await self._expire_overdue(conn, original["conversation_id"])
+        active = await conn.fetchval(
+            "SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1 AND state = ANY($2)",
+            original["conversation_id"], list(ACTIVE),
+        )
+        if active is not None:
+            raise Conflict("run_in_progress", run_id=str(active))
+        await self._bound_population(conn, reader, bounds)
+        deadline_seconds, allowance, pinned = plan(original["depth"])
+        row = await conn.fetchrow(
+            f"""INSERT INTO iris_ai.ask_run
+                    (id, reader_id, conversation_id, request_key, request_hash, question,
+                     base_revision, deadline_at, allowance, pinned, depth,
+                     reader_grant, grant_expires_at, retry_of)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(secs => $8), $9, $10,
+                        $11, $12, to_timestamp($13), $14)
+                ON CONFLICT (reader_id, request_key) DO NOTHING
+                RETURNING {RUN_COLUMNS}""",
+            uuid.uuid4(), reader, original["conversation_id"], key, original["request_hash"],
+            original["question"], original["base_revision"], float(deadline_seconds), allowance, pinned,
+            original["depth"], grant, claims["exp"], run_id,
+        )
+        if row is None:
             raise _Raced
         await self._journal(conn, row["id"], "admitted", {})
         return dict(row), True
@@ -394,10 +506,27 @@ class RunStore:
             run_id, row["fence"], executor, reserved_units,
         )
         await self._journal(conn, run_id, "started", {"attempt": used + 1})
+        # Only a handoff a completed run left opens later runs; a failed run's never does (IR-734).
+        handoff = await conn.fetchrow(
+            f"""SELECT h.revision, h.through_ordinal, h.body FROM iris_ai.conversation_handoff h
+                  JOIN iris_ai.ask_run hr ON hr.id = h.run_id
+                 WHERE h.conversation_id = $1 AND hr.state = 'completed' AND h.through_ordinal >= 1
+                   AND {CURRENT_HANDOFF}
+                 ORDER BY h.revision DESC LIMIT 1""",
+            row["conversation_id"],
+        )
         prior = await conn.fetch(
-            f"""SELECT question, answer, kind FROM iris_ai.turn t
-                WHERE conversation_id = $1 AND {CURRENT_SOURCE_TURN} ORDER BY ordinal DESC LIMIT $2""",
-            row["conversation_id"], PRIOR_TURNS,
+            f"""SELECT question, answer, kind, ordinal FROM iris_ai.turn t
+                WHERE conversation_id = $1 AND ordinal > $3 AND {CURRENT_SOURCE_TURN}
+                ORDER BY ordinal DESC LIMIT $2""",
+            row["conversation_id"], PRIOR_TURNS, handoff["through_ordinal"] if handoff else 0,
+        )
+        compactions = await conn.fetchval(
+            """SELECT count(*) FROM iris_ai.run_event
+                WHERE run_id = $1 AND name = 'model' AND data->>'phase' = 'compact'""", run_id,
+        )
+        committed = await conn.fetch(
+            "SELECT revision FROM iris_ai.conversation_handoff WHERE run_id = $1", run_id,
         )
         checkpoint = await conn.fetchrow(
             "SELECT step, body FROM iris_ai.run_checkpoint WHERE run_id = $1", run_id,
@@ -414,9 +543,12 @@ class RunStore:
                      scope_record_id=row["scope_record_id"], run_id=run_id,
                      grant=row["reader_grant"], depth=row["depth"], allowance=row["allowance"],
                      remaining_seconds=float(row["remaining"]),
-                     prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"]) for t in reversed(prior)),
+                     prior=tuple(PriorTurn(t["question"], t["answer"], t["kind"], t["ordinal"])
+                                 for t in reversed(prior)),
                      state=row["state"], checkpoint=dict(checkpoint) if checkpoint else None,
-                     spent={k: int(v) for k, v in spent.items()})
+                     spent={k: int(v) for k, v in spent.items()},
+                     handoff=dict(handoff) if handoff else None, compactions=int(compactions),
+                     committed=frozenset(r["revision"] for r in committed))
 
     async def claim_next(self, *, worker: str, lease_seconds: int, executor: str | None,
                          reserved_units: int | Mapping[str, int], deep_concurrency: int,
@@ -531,6 +663,102 @@ class RunStore:
                 if saved is None:
                     raise Fenced
 
+    async def commit_handoff(self, run_id, fence: int, handoff) -> tuple[str, int | None]:
+        """Commit a compact handoff for the run's Conversation (IR-734).
+
+        ("committed", revision) only while the run holds its current fence
+        before its deadline, the Conversation is undeleted at the revision the
+        run started from, and every Turn and source it depends on is still
+        current; otherwise ("stale", None), or ("fenced", None) for a
+        superseded attempt. Nothing is written unless it commits.
+        """
+        async with self._connect() as conn:
+            async with conn.transaction():
+                conversation_id = await conn.fetchval(
+                    "SELECT conversation_id FROM iris_ai.ask_run WHERE id = $1", run_id,
+                )
+                if conversation_id is None:
+                    return "fenced", None
+                conversation = await conn.fetchrow(
+                    "SELECT revision, deleted_at FROM iris_ai.conversation WHERE id = $1 FOR UPDATE",
+                    conversation_id,
+                )
+                run = await conn.fetchrow(
+                    """SELECT r.state, r.fence, r.base_revision, r.deadline_at <= now() AS overdue,
+                              r.reader_grant, r.reader_id, c.scope_record_id
+                         FROM iris_ai.ask_run r JOIN iris_ai.conversation c ON c.id = r.conversation_id
+                        WHERE r.id = $1 FOR UPDATE OF r""", run_id,
+                )
+                if run["state"] != "running" or run["fence"] != fence or run["overdue"]:
+                    return "fenced", None
+                if conversation["deleted_at"] is not None or conversation["revision"] != run["base_revision"]:
+                    # A Turn committed meanwhile: what this summarizes is no longer the whole history.
+                    return "stale", None
+                # Its dependencies are checked as the reader reads them now, as a claim's are.
+                try:
+                    async with conn.transaction():
+                        reader, scope = await self._principal(conn, run["reader_grant"])
+                except Unauthorized:
+                    return "stale", None
+                if reader != run["reader_id"] or scope != run["scope_record_id"]:
+                    return "stale", None
+                revision = await conn.fetchval(
+                    "SELECT coalesce(max(revision), 0) + 1 FROM iris_ai.conversation_handoff"
+                    " WHERE conversation_id = $1", conversation_id,
+                )
+                inserted = await conn.fetchval(
+                    f"""INSERT INTO iris_ai.conversation_handoff
+                           (conversation_id, revision, run_id, fence, base_revision, through_ordinal,
+                            turns, sources, format, binding, usage, body)
+                        SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12
+                          FROM (SELECT $1::uuid AS conversation_id, $7::integer[] AS turns,
+                                       $8::text[] AS sources) h
+                         WHERE {CURRENT_HANDOFF}
+                     RETURNING revision""",
+                    conversation_id, revision, run_id, fence, run["base_revision"], handoff.through_ordinal,
+                    list(handoff.turns), list(handoff.sources), handoff.body.get("format", ""),
+                    list(handoff.binding), handoff.usage, handoff.body,
+                )
+                if inserted is None:
+                    return "stale", None
+                return "committed", inserted
+
+    async def _finishing(self, conn, run_id, fence: int):
+        """Lock the Conversation and run to finish the run; `(run, conversation, ended)`.
+
+        `ended` is the terminal state when nothing may be written: the run had
+        already ended, or this call ended it because the Conversation, reader
+        or deadline no longer allows its result. A superseded fence raises
+        Fenced. Otherwise `ended` is None and the result may be committed.
+        """
+        conversation_id = await conn.fetchval(
+            "SELECT conversation_id FROM iris_ai.ask_run WHERE id = $1", run_id,
+        )
+        if conversation_id is None:
+            raise NotFound
+        conversation = await conn.fetchrow(
+            "SELECT revision, deleted_at FROM iris_ai.conversation WHERE id = $1 FOR UPDATE",
+            conversation_id,
+        )
+        run = await conn.fetchrow(
+            f"SELECT {RUN_COLUMNS}, now() AS now FROM iris_ai.ask_run WHERE id = $1 FOR UPDATE",
+            run_id,
+        )
+        if run["state"] in TERMINAL:
+            return run, conversation, run["state"]
+        if run["fence"] != fence:
+            raise Fenced
+        if conversation["deleted_at"] is not None:
+            return run, conversation, await self._end(conn, run_id, "deleted", "conversation_deleted")
+        reader = await conn.fetchval("SELECT iris_authz.reader_status($1)", run["reader_id"])
+        if reader != "active":
+            return run, conversation, await self._end(conn, run_id, "cancelled", "reader_departed")
+        if run["deadline_at"] <= run["now"]:
+            return run, conversation, await self._end(conn, run_id, "expired", "deadline")
+        if conversation["revision"] != run["base_revision"]:
+            return run, conversation, await self._end(conn, run_id, "conflict", "revision_moved")
+        return run, conversation, None
+
     async def commit_final(self, run_id, fence: int, result: Result) -> str:
         """Turn, citations, Conversation revision and terminal journal, atomically.
 
@@ -539,32 +767,10 @@ class RunStore:
         """
         async with self._connect() as conn:
             async with conn.transaction():
-                conversation_id = await conn.fetchval(
-                    "SELECT conversation_id FROM iris_ai.ask_run WHERE id = $1", run_id,
-                )
-                if conversation_id is None:
-                    raise NotFound
-                conversation = await conn.fetchrow(
-                    "SELECT revision, deleted_at FROM iris_ai.conversation WHERE id = $1 FOR UPDATE",
-                    conversation_id,
-                )
-                run = await conn.fetchrow(
-                    f"SELECT {RUN_COLUMNS}, now() AS now FROM iris_ai.ask_run WHERE id = $1 FOR UPDATE",
-                    run_id,
-                )
-                if run["state"] in TERMINAL:
-                    return run["state"]
-                if run["fence"] != fence:
-                    raise Fenced
-                if conversation["deleted_at"] is not None:
-                    return await self._end(conn, run_id, "deleted", "conversation_deleted")
-                reader = await conn.fetchval("SELECT iris_authz.reader_status($1)", run["reader_id"])
-                if reader != "active":
-                    return await self._end(conn, run_id, "cancelled", "reader_departed")
-                if run["deadline_at"] <= run["now"]:
-                    return await self._end(conn, run_id, "expired", "deadline")
-                if conversation["revision"] != run["base_revision"]:
-                    return await self._end(conn, run_id, "conflict", "revision_moved")
+                run, conversation, ended = await self._finishing(conn, run_id, fence)
+                if ended is not None:
+                    return ended
+                conversation_id = run["conversation_id"]
 
                 turn_id = uuid.uuid4()
                 ordinal = conversation["revision"] + 1
@@ -590,6 +796,26 @@ class RunStore:
                 )
                 return await self._end(
                     conn, run_id, "completed", "answered", reported_units=result.reported_units,
+                )
+
+    async def commit_compaction(self, run_id, fence: int, result: Compacted) -> str:
+        """End a manual compaction run (IR-754): `completed`, with no Turn and no new revision.
+
+        Its handoff, if any, was committed by `commit_handoff` under this fence,
+        and a later run opens with it only now that this run has completed.
+        The gates are `commit_final`'s: a Stop, deletion, departed reader,
+        deadline or moved revision ends it as that, and a handoff of a run
+        that did not complete is never used. Fenced like a commit.
+        """
+        async with self._connect() as conn:
+            async with conn.transaction():
+                _, _, ended = await self._finishing(conn, run_id, fence)
+                if ended is not None:
+                    return ended
+                return await self._end(
+                    conn, run_id, "completed",
+                    "compacted" if result.revision is not None else "nothing_to_compact",
+                    reported_units=result.reported_units,
                 )
 
     async def fail(self, run_id, fence: int, reason: str) -> None:
@@ -650,6 +876,7 @@ class RunStore:
             "SELECT sequence, name, data FROM iris_ai.run_event WHERE run_id = $1 ORDER BY sequence",
             run_id,
         )
+        retried_by = await conn.fetchval("SELECT id FROM iris_ai.ask_run WHERE retry_of = $1", run_id)
         evidence = {}
         if reader:
             # Recheck every evidence dependency under begin_research's live RLS,
@@ -693,6 +920,8 @@ class RunStore:
             "created_at": run["created_at"].isoformat(),
             "finished_at": run["finished_at"].isoformat() if run["finished_at"] else None,
             "depth": run["depth"],
+            "retry_of": str(run["retry_of"]) if run["retry_of"] else None,
+            "retried_by": str(retried_by) if retried_by else None,
             # Queued on a lapsed grant: it starts once the reader reconnects.
             "awaiting_reader": bool(run["awaiting_reader"]),
             "started_at": run["started_at"].isoformat() if run["started_at"] else None,
@@ -792,6 +1021,8 @@ class RunStore:
                 WHERE run_id IN (SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1)""",
             conversation_id,
         )
+        # Derived context goes with what it was derived from (IR-734).
+        await conn.execute("DELETE FROM iris_ai.conversation_handoff WHERE conversation_id = $1", conversation_id)
         await conn.execute(
             """DELETE FROM iris_ai.citation
                 WHERE turn_id IN (SELECT id FROM iris_ai.turn WHERE conversation_id = $1)""",

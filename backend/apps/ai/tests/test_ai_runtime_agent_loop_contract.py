@@ -69,6 +69,11 @@ class Corpus:
         self.events = []
         self.ended = False
         self.replaced = set()
+        # Original Turns this reader may recover: ordinal -> (RecoveredTurn, cited passages) (IR-735).
+        self.turns = {}
+        # What the handoff recheck answers (a value, or a function of the check number); None while it stands.
+        self.handoff_reason = None
+        self.handoff_checks = []
 
     def record(self, rid):
         title, source, _ = self.papers[rid]
@@ -104,6 +109,21 @@ class Corpus:
     async def recall(self, record_ids):
         self.calls.append(("recall", tuple(record_ids)))
         return ToolResult(OK, records=tuple(self.record(r) for r in record_ids if r in self.papers))
+
+    async def recover_turn(self, ordinal):
+        self.calls.append(("recover_turn", ordinal))
+        if ordinal not in self.turns:
+            return ToolResult.unavailable("unknown_turn")
+        turn, passages = self.turns[ordinal]
+        records = tuple({p.record_id: self.record(p.record_id) for p in passages}.values())
+        return ToolResult(OK, records=records, passages=tuple(passages), turn=turn,
+                          coverage=Coverage(len(passages), len(passages)))
+
+    async def handoff_current(self, turns, sources):
+        self.handoff_checks.append((tuple(turns), tuple(sources)))
+        if callable(self.handoff_reason):
+            return self.handoff_reason(len(self.handoff_checks))
+        return self.handoff_reason
 
     async def journal(self, name, data):
         if self.ended:

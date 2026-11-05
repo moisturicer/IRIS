@@ -17,7 +17,7 @@ from django.utils import timezone
 
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.tests.corpus import seed_record_vector
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedReranker
 from apps.ai.providers.noop import NoOpReranker
@@ -82,7 +82,7 @@ def make_record(title, owner, embedder, space, texts, *, is_ip=False, consented=
         dpa_accepted_at=timezone.now() if consented else None,
     )
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
-    RecordEmbedding.objects.create(
+    seed_record_vector(
         record=record,
         embedding=embedder.embed_documents([title])[0],
         model_name="fake-test",

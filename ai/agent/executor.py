@@ -23,8 +23,9 @@ from typing import Mapping, Optional
 
 from ai.admission.errors import AdmissionDenied
 from ai.admission.limits import Price
-from ai.agent import assurance, checkpoint
+from ai.agent import assurance, checkpoint, compaction as compacting
 from ai.agent.budget import Bounds, Budget, profiles as checked_profiles
+from ai.agent.compaction import STATE_PREFIX, Compaction, Handoff
 from ai.agent.context import (
     CONTEXT_EXHAUSTED, REQUEST_BYTES_EXCEEDED, FittedAgentProvider, OverCapacity, Reserves, measure, output_cap,
 )
@@ -35,7 +36,7 @@ from ai.agent.tools import ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE,
 from ai.domain.ports import LLMProvider, ProviderRejected, TransientProviderError, UnsupportedCapability
 from ai.research.tools import OK
 from ai.runs import config as runs_config
-from ai.runs.executor import Result, RunContext, Unavailable
+from ai.runs.executor import Compacted, Result, RunContext, Unavailable
 
 log = logging.getLogger(__name__)
 
@@ -49,6 +50,9 @@ METADATA_TOOL_VERSION = "research-2"
 #: research-2 plus whole-Manuscript reading (IR-733).
 MANUSCRIPT_PROMPT_VERSION = "agent-research-3"
 MANUSCRIPT_TOOL_VERSION = "research-3"
+#: research-3 plus recovery of original Turns after compaction (IR-735).
+RECOVERY_PROMPT_VERSION = "agent-research-4"
+RECOVERY_TOOL_VERSION = "research-4"
 #: The one purpose every attempt of this responsibility records.
 PURPOSE = "agent"
 
@@ -82,6 +86,21 @@ MANUSCRIPT_INSTRUCTIONS = METADATA_INSTRUCTIONS + (
     "which parts you did not read, that figures and formulas were not interpreted, and that reading "
     "one paper is not a search of the repository."
 )
+RECOVERY_INSTRUCTIONS = MANUSCRIPT_INSTRUCTIONS + (
+    " Earlier Turns of a long conversation may arrive as a derived summary. A summary is not evidence and "
+    "never a source for an exact value, quotation, page or number. When the reader asks for an exact "
+    "detail from an earlier Turn, reread that Turn with recover_turn by its number, or read the paper "
+    "again, and cite the passage handles it returns. If recovery is unavailable, say that you cannot "
+    "confirm the detail."
+)
+#: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
+COMPACT_REQUEST = (
+    "The reader asked to condense this conversation now. This is not a question and not the reader's "
+    "goal: there is nothing new to answer. Take the goal, preferences and findings from the earlier "
+    "exchanges only."
+)
+#: `_Run.outcome` when the history held nothing older than the exchanges kept.
+NOTHING_TO_COMPACT = "nothing_to_compact"
 FINAL_NOTE = (
     "Research is now closed. Answer the original question from what you have read, citing passages "
     "by handle, and say plainly what you could not find or read."
@@ -93,8 +112,10 @@ PROMPTS = {
     (RESEARCH_PROMPT_VERSION, RESEARCH_TOOL_VERSION): RESEARCH_INSTRUCTIONS,
     (METADATA_PROMPT_VERSION, METADATA_TOOL_VERSION): METADATA_INSTRUCTIONS,
     (MANUSCRIPT_PROMPT_VERSION, MANUSCRIPT_TOOL_VERSION): MANUSCRIPT_INSTRUCTIONS,
+    (RECOVERY_PROMPT_VERSION, RECOVERY_TOOL_VERSION): RECOVERY_INSTRUCTIONS,
 }
-RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION)
+RESEARCH_TOOL_VERSIONS = (RESEARCH_TOOL_VERSION, METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION,
+                          RECOVERY_TOOL_VERSION)
 #: Of the bytes a read may fill, the share kept for JSON escaping of its text.
 ESCAPE_SHARE = 0.9
 #: Over-capacity codes that close research rather than end the run; the final answer must still fit.
@@ -113,10 +134,14 @@ class AgentExecutor:
     takes_context = True
 
     def __init__(self, provider: LLMProvider, pin: Pin, reserves: Reserves, *,
-                 profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None):
+                 profiles: Optional[Mapping[str, Bounds]] = None, price: Optional[Price] = None,
+                 compaction: Optional[Compaction] = None):
         self.provider = provider
         self.pin = pin
         self.reserves = reserves
+        #: None never compacts: a full window then closes research, as before (IR-734).
+        self.compaction = compaction
+        self.summarizer = FittedAgentProvider(provider, compaction.summary_reserves(reserves)) if compaction else None
         #: Research needs configured bounds per depth; none are defaulted.
         self.profiles = checked_profiles(profiles) if profiles is not None else None
         #: The pinned model's price; a paid provider without one cannot bound cost.
@@ -138,6 +163,8 @@ class AgentExecutor:
             return False
         if self.researches and self.profiles is None:
             return False
+        if self.compaction and not self.compaction.fits(self.sender.capacity(self.pin), self.reserves):
+            return False
         return (all(getattr(self.pin, k) == v for k, v in SUPPORTED.items())
                 and self.provider.accepts(self.pin))
 
@@ -158,6 +185,26 @@ class AgentExecutor:
             raise Unavailable("price_unknown")
         try:
             return await _Run(self, question, tools, context).run()
+        except RunEnded as ended:
+            raise Unavailable(ended.reason) from None
+
+    async def compact(self, tools, context: RunContext) -> Compacted:
+        """Condense the Conversation on the reader's request: IR-734's summary and handoff, no answer (IR-754).
+
+        The same checks as `answer`, because the same AGENT and admission pay
+        for it, and one summary attempt at most. Anything short of a committed
+        handoff is `unavailable` and leaves the preceding context as it was.
+        """
+        if not self.supported() or self.compaction is None or context.commit_handoff is None:
+            raise Unavailable("unsupported_pin")
+        if not self.admitted():
+            raise Unavailable("not_admitted")
+        if not self.researches:
+            raise Unavailable("unsupported_pin")
+        if self.price is None and getattr(self.provider, "paid", True):
+            raise Unavailable("price_unknown")
+        try:
+            return await _Run(self, COMPACT_REQUEST, tools, context).compact()
         except RunEnded as ended:
             raise Unavailable(ended.reason) from None
 
@@ -197,9 +244,24 @@ class AgentExecutor:
         room = min(low * capacity.min_bytes_per_token, capacity.max_request_bytes - status.request_bytes)
         return max(0, int(room * ESCAPE_SHARE))
 
-    async def send(self, request: AgentRequest) -> ModelTurn:
+    def occupancy(self, request: AgentRequest) -> Optional[int]:
+        """The estimated occupancy of `request` whether or not it fits; None with capacity unknown."""
+        capacity = self.sender.capacity(request.pin)
+        if capacity is None:
+            return None
+        sized = replace(request, max_output_tokens=output_cap(capacity, self.reserves))
+        return measure(sized, self.sender.dialect, capacity, self.reserves).occupancy_tokens
+
+    def estimate_summary(self, request: AgentRequest):
+        return _fitted(self.summarizer.estimate, request)
+
+    async def summarize(self, request: AgentRequest) -> ModelTurn:
+        """A compaction summary: the same AGENT and admission, its own completion cap (IR-734)."""
+        return await self.send(request, sender=self.summarizer)
+
+    async def send(self, request: AgentRequest, *, sender=None) -> ModelTurn:
         try:
-            return await self.sender.converse(request)
+            return await (sender or self.sender).converse(request)
         except OverCapacity as refused:
             # The status, numbers only, is logged by the sender.
             raise Unavailable(refused.code) from None
@@ -246,15 +308,29 @@ class _Run:
         version = agent.pin.tool_version
         self.investigation = Investigation(
             tools, clarify=not asked,
-            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION),
-            manuscripts=version == MANUSCRIPT_TOOL_VERSION)
+            metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION),
+            manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION),
+            recovery=version == RECOVERY_TOOL_VERSION)
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         # Whatever an earlier fence spent stays spent, the attempt it left uncertain included (IR-724).
         spent = context.spent or {}
         self.budget.restore(spent.get("input_tokens", 0), spent.get("output_tokens", 0),
                             attempts=spent.get("attempts", 0))
-        self.task = checkpoint.task_key(question, context.prior, context.state or {})
+        self.task = checkpoint.task_key(question, context.prior, context.state or {},
+                                        handoff=(context.handoff or {}).get("revision"))
+        # The compact handoff the history now opens with, and the original Turns still carried whole (IR-734).
+        self.handoff = (context.handoff or {}).get("body")
+        self.handoff_revision = (context.handoff or {}).get("revision")
+        self.handoff_through = int((context.handoff or {}).get("through_ordinal") or 0)
+        self.carried = [t.ordinal for t in self.prior]
+        # Every summary attempt counts, those of earlier fences included.
+        self.compactions = context.compactions
+        self.compact_failed_at: Optional[int] = None
+        #: How the last compaction attempt ended: "compacted", `NOTHING_TO_COMPACT`, or the reason it was kept.
+        self.outcome: Optional[str] = None
+        self.revision: Optional[int] = None
+        self.condensed = 0
 
     def request(self, history, *, closed=False) -> AgentRequest:
         pin = self.agent.pin
@@ -266,6 +342,7 @@ class _Run:
         resumed = await self._resume()
         history, stale = resumed if resumed is not None else (await self._open(), 0)
         while self._may_gather(stale):
+            history = await self._compacted(history)
             try:
                 request, status = self.agent.estimate(self.request(history))
             except Unavailable as full:
@@ -304,6 +381,7 @@ class _Run:
             stale = 0 if progressed else stale + 1
             await self._save(history, stale)
 
+        history = await self._compacted(history)
         if self.steps:
             history.append(User(FINAL_NOTE))
         request, status = self.agent.estimate(self.request(history, closed=True))
@@ -325,14 +403,24 @@ class _Run:
 
     async def _open(self) -> list:
         history: list = []
+        state = self.context.state or {}
+        handoff = self.handoff
+        if handoff and self.context.state is not None:
+            # What is shown, selected and excluded now, not when the handoff was written.
+            handoff = {**handoff, **{k: list(state.get(k, ())) for k in ("shown", "selected", "excluded")}}
+        # One read gives the handoff's papers the same handles the state message uses.
+        also = [*handoff["shown"], *handoff["selected"], *handoff["excluded"]] if handoff else ()
+        shown = await self.investigation.recall(state, also=also)
+        if handoff:
+            # Earlier Turns arrive compacted (IR-734).
+            history.append(compacting.render(handoff, self.investigation.papers, passages=False))
         for turn in self.prior:
             answer = DELIVERED_MARKER.sub("", turn.answer)
-            history += [User(turn.question), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
-        shown = await self.investigation.recall(self.context.state or {})
+            history += [User(compacting.reader(turn.question)), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
         if shown:
-            history.append(User("[IRIS conversation state] " + json.dumps(shown, ensure_ascii=False)))
-        # The reader's words, unchanged, whatever queries the agent forms.
-        history.append(User(self.question))
+            history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False)))
+        # The reader's words, unchanged unless they would pass for derived context.
+        history.append(User(compacting.reader(self.question)))
         return history
 
     async def _resume(self) -> Optional[tuple[list, int]]:
@@ -348,27 +436,151 @@ class _Run:
             return None
         self.steps = max(self.steps, int(saved.get("step") or 0))
         restored = checkpoint.load(saved.get("body"), pin=self.agent.pin, bounds=self.bounds, task=self.task)
+        # Opaque state may depend on the exact prefix and tool schemas, not only on the pin (ADR-049 §20).
+        if restored is not None and restored.prefix != self._prefix():
+            restored = None
+        if restored is not None and not self._resumable(restored.compaction):
+            restored = None
         reason = "incompatible" if restored is None else await self.tools.reauthorize(
-            restored.handles(), restored.counted())
+            restored.handles(), restored.counted(), turns=restored.turns())
         if reason in ENDS_RUN:
             raise Unavailable(reason)
         if reason is not None:
             await self._journal("recovery", {"outcome": "rebuilt", "reason": reason, "step": self.steps})
             return None
         restored.apply(self.investigation)
+        if restored.compaction:
+            state = restored.compaction
+            self.handoff, self.handoff_revision = state["body"], state["revision"]
+            self.handoff_through, self.carried = int(state["through"]), list(state["carried"])
         self.steps = max(self.steps, restored.steps)
         spent = restored.budget
         self.budget.restore(spent["input"], spent["output"], spent["reported"], spent["attempts"])
         await self._journal("recovery", {"outcome": "resumed", "step": self.steps})
         return restored.history, restored.stale
 
+    async def compact(self) -> Compacted:
+        """A manual compaction: one summary attempt over this run's own allowance (IR-754)."""
+        if self.context.committed:
+            # An earlier fence committed it; finish rather than summarize, and spend, again.
+            revision = max(self.context.committed)
+            await self._journal("compaction", {"outcome": "compacted", "revision": revision,
+                                               "turns": 0, "exchanges": 0})
+            return Compacted(revision, 0, self.budget.reported)
+        if self.compactions:
+            # A summary was sent and nothing committed; it is not retried by another worker.
+            raise Unavailable("attempts_exhausted")
+        await self._compacted(await self._open(), forced=True)
+        if self.outcome == "compacted":
+            return Compacted(self.revision, self.condensed, self.budget.reported)
+        if self.outcome == NOTHING_TO_COMPACT:
+            await self._journal("compaction", {"outcome": "kept", "reason": NOTHING_TO_COMPACT})
+            return Compacted(None, 0, self.budget.reported)
+        raise Unavailable(self.outcome or "unavailable")
+
+    async def _compacted(self, history: list, *, forced: bool = False) -> list:
+        """`history` with its older exchanges compacted once it reaches the threshold (IR-734).
+
+        Anything short of a complete, committed handoff -- a refused, empty or
+        malformed summary, or a Conversation that moved -- leaves `history` as
+        it was. Every attempt counts against the run's own bound, allowance
+        and deadline; a failed one is not retried until the history grows.
+
+        `forced` is the reader's request (IR-754): no threshold applies, and
+        only the summary must be affordable, since no answer follows it.
+        """
+        rule = self.agent.compaction
+        if rule is None or self.context.commit_handoff is None:
+            return history
+        if not forced and (self.compactions >= rule.max_attempts or self.compact_failed_at == len(history)):
+            return history
+        occupancy = self.agent.occupancy(self.request(history))
+        if occupancy is None:
+            return await self._compaction_failed(history, "capacity_unknown") if forced else history
+        if not forced and occupancy < rule.threshold_tokens:
+            return history
+        cut = compacting.split(history, rule.keep_exchanges)
+        if cut is None:
+            self.outcome = NOTHING_TO_COMPACT
+            return history
+        try:
+            request, status = self.agent.estimate_summary(self.request(cut.summary(), closed=True))
+        except Unavailable:
+            return await self._compaction_failed(history, "summary_exceeds_context")
+        planned = [(status.occupancy_tokens, request.max_output_tokens)]
+        if not forced:
+            # The summary must leave the final answer and its repair affordable at today's size.
+            cap = output_cap(self.agent.sender.capacity(request.pin), self.agent.reserves)
+            planned += [(occupancy, cap), (occupancy + cap + self.agent.reserves.repair_tokens, cap)]
+        if not self.budget.fits(planned):
+            return await self._compaction_failed(history, "allowance")
+        self.compactions += 1
+        turn = await self._attempt(request, status, "compact")
+        try:
+            summary = compacting.parse(final_answer(turn))
+        except NotFinal:
+            summary = None
+        if summary is None:
+            return await self._compaction_failed(history, "invalid_summary")
+        compacted = [o for o in self.carried[:len(cut.gone_turns)] if o is not None]
+        state = self.context.state or {}
+        body = compacting.build(
+            summary, previous=self.handoff, compacted=compacted, passages=self.investigation.passages,
+            plan=self.investigation.plan,
+            state={"shown": state.get("shown", ()), "selected": self._focus("selected"),
+                   "excluded": self._focus("excluded")})
+        through = max([self.handoff_through, *compacted])
+        outcome, revision = await self.context.commit_handoff(Handoff(
+            body=body, through_ordinal=through, turns=tuple(body["turns"]), sources=tuple(body["sources"]),
+            binding=self.agent.pin.binding(),
+            usage={"input_tokens": turn.input_tokens, "output_tokens": turn.output_tokens}))
+        if outcome == "fenced":
+            raise Unavailable("run_ended")
+        if outcome != "committed":
+            return await self._compaction_failed(history, outcome)
+        self.handoff, self.handoff_revision = body, revision
+        self.handoff_through = through
+        self.carried = self.carried[len(cut.gone_turns):]
+        self.outcome, self.revision, self.condensed = "compacted", revision, len(cut.gone_turns)
+        await self._journal("compaction", {"outcome": "compacted", "revision": revision,
+                                           "turns": len(cut.gone_turns), "exchanges": len(cut.gone_exchanges)})
+        rebuilt = cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True))
+        # What the compacted exchanges showed is no longer in front of the model (IR-736).
+        self.investigation.reshown(e.content for e in rebuilt if isinstance(e, ToolResult))
+        return rebuilt
+
+    async def _compaction_failed(self, history: list, reason: str) -> list:
+        self.compact_failed_at = len(history)
+        self.outcome = reason
+        await self._journal("compaction", {"outcome": "kept", "reason": reason})
+        return history
+
+    def _resumable(self, compaction: Optional[dict]) -> bool:
+        """A saved history opens only with a handoff that is committed and still this run's to use (IR-734)."""
+        if not compaction:
+            return self.handoff_revision is None
+        if not (isinstance(compaction, dict) and compacting.well_formed(compaction.get("body"))
+                and type(compaction.get("through")) is int and isinstance(compaction.get("carried"), list)):
+            return False
+        revision = compaction.get("revision")
+        return revision in self.context.committed or revision == self.handoff_revision
+
+    def _prefix(self) -> str:
+        """The digest of the instructions and tool schemas every request of this run is sent under."""
+        request = self.request(())
+        return checkpoint.prefix_digest(request.instructions, request.tools)
+
     async def _save(self, history: list, stale: int) -> None:
         """Keep this completed step for a worker that takes the run over (IR-724)."""
         if self.context.save is None:
             return
+        compaction = None if self.handoff is None else {
+            "revision": self.handoff_revision, "through": self.handoff_through, "carried": self.carried,
+            "body": self.handoff,
+        }
         body = checkpoint.dump(pin=self.agent.pin, bounds=self.bounds, task=self.task, history=history,
                                investigation=self.investigation, budget=self.budget,
-                               steps=self.steps, stale=stale)
+                               steps=self.steps, stale=stale, compaction=compaction, prefix=self._prefix())
         if not await self.context.save(self.steps, body):
             raise Unavailable("run_ended")
 
@@ -382,7 +594,23 @@ class _Run:
                 and stale < self.bounds.max_no_progress
                 and self.deadline - time.monotonic() > self.bounds.final_seconds)
 
+    async def _handoff_current(self) -> None:
+        """A handoff in the history stands only while its Turns and sources are readable now (IR-735).
+
+        Checked before every send and the commit, so revoked or replaced
+        material cannot reach the model or the reader through a summary. The run
+        stops safely rather than keep context it can no longer vouch for.
+        """
+        if self.handoff is None:
+            return
+        reason = await self.tools.handoff_current(self.handoff["turns"], self.handoff["sources"])
+        if reason in ENDS_RUN:
+            raise Unavailable(reason)
+        if reason is not None:
+            raise Unavailable("source_changed")
+
     async def _attempt(self, request: AgentRequest, status, phase: str) -> ModelTurn:
+        await self._handoff_current()
         if not await self.tools.journal("context", {
             "used_tokens": status.occupancy_tokens, "capacity_tokens": status.context_tokens,
         }):
@@ -390,9 +618,10 @@ class _Run:
         # Recorded before sending; a stopped run admits no further attempt.
         if not await self.tools.journal("model", {"purpose": PURPOSE, "phase": phase, "step": self.steps + 1}):
             raise Unavailable("run_ended")
+        send = self.agent.summarize if phase == "compact" else self.agent.send
         try:
             # The run's deadline bounds every send, admitted or not.
-            turn = await asyncio.wait_for(self.agent.send(request), max(0.0, self.deadline - time.monotonic()))
+            turn = await asyncio.wait_for(send(request), max(0.0, self.deadline - time.monotonic()))
         except asyncio.TimeoutError:
             raise Unavailable("deadline") from None
         self.steps += phase == "gather"
@@ -448,6 +677,7 @@ class _Run:
 
     async def _recheck(self, text: str) -> None:
         try:
+            await self._handoff_current()
             await self._recheck_sources(text)
         except OUTAGES as failure:
             # A source that cannot be reached cannot be vouched for; nothing is delivered (IR-731).

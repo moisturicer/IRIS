@@ -31,7 +31,9 @@ import { recordsApi } from "@/api/records";
 import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
 import { ChatInput } from "./components/ChatInput";
+import { CHAT_OPENING } from "./components/answerLayout";
 import { ComparisonPicker } from "./components/ComparisonPicker";
+import { ModelPill } from "./components/ModelPill";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
@@ -112,6 +114,11 @@ function RuntimeAskPage() {
       onConversation={id => { if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true }); }} />
   </div>;
 }
+
+// The server picks the model; a reader has no choice to make (ADR-036).
+const ANSWER_MODEL = [
+  { value: "auto", short: "Auto", label: "Auto", description: "IRIS chooses the model for each answer", icon: "far fa-lightbulb" },
+] as const;
 
 function LegacyRAGChatPage() {
   const [searchParams] = useSearchParams();
@@ -408,6 +415,8 @@ function LegacyRAGChatPage() {
     }
   };
 
+  const centered = !unavailable && !loading && !client.streaming && messages.length === 0;
+
   return (
     // `dvh`, not `vh`: the page is the height of what a phone shows, so the
     // composer stays above the software keyboard rather than under it (IR-570).
@@ -474,6 +483,7 @@ function LegacyRAGChatPage() {
             </div>
           )}
 
+          <div className={`flex min-h-0 flex-1 flex-col ${centered ? CHAT_OPENING : ""}`}>
           {unavailable ? (
             <div role="status" className="flex-1 flex items-center justify-center p-8 text-center">
               <div className={`max-w-md rounded-xl px-6 py-5 ${TONES.attention}`}>
@@ -510,6 +520,7 @@ function LegacyRAGChatPage() {
             />
           )}
           <ChatInput
+            centered={centered}
             onSend={client.send}
             draft={client.draft}
             onDraftChange={client.setDraft}
@@ -521,7 +532,9 @@ function LegacyRAGChatPage() {
           >
             <ComparisonPicker key={activeId} selected={client.comparisonRecords} onChange={client.setComparisonRecords}
               limit={comparisonLimit} scoped={client.record !== null} disabled={loading || !activeId} />
+            <ModelPill name="Model" value="auto" options={ANSWER_MODEL} />
           </ChatInput>
+          </div>
         </div>
 
         {!panelsAsDrawers && (

@@ -1,6 +1,7 @@
 """Two-stage retrieval: candidate records, then chunks within them (IR-129).
 
-Stage 1 ranks *records* on the summary-level `RecordEmbedding`; stage 2 ranks
+Stage 1 ranks *records* on the summary-level vectors of the active Embedding
+Space (`RecordSpaceEmbedding`, IR-739); stage 2 ranks
 *chunks* belonging only to the records stage 1 kept. That is what makes chunk
 search affordable -- a few dozen records is roughly a thousand chunks rather
 than the whole corpus.
@@ -22,13 +23,14 @@ the permission layer.
 
 from __future__ import annotations
 
+import logging
 from typing import AbstractSet, Optional
 
 from pgvector.django import CosineDistance
 
 from apps.ai.models.chunk import ChunkEmbedding
-from apps.ai.models.embedding import RecordEmbedding
 from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
+from apps.ai.record_vectors import record_vectors
 from apps.ai.providers.ports import EmbeddingProvider
 from apps.ai.regions import normalized_regions
 from apps.records.models import Record
@@ -36,6 +38,8 @@ from apps.records.models import Record
 from .ports import VECTOR, RetrievalResult, RetrievedChunk, Retriever
 from .scan_depth import scan_depth
 from apps.ai.grants.reads import research_records
+
+logger = logging.getLogger(__name__)
 
 #: Stage 1 keeps this many records. ADR-013's sizing: a few dozen records is
 #: roughly a thousand chunks, which is a cheap stage-2 search.
@@ -87,6 +91,20 @@ class TwoStageRetriever(Retriever):
             # spaces returns rows, ranked plausibly, and wrong.
             return RetrievalResult(mode=VECTOR)
 
+        # The query must be embedded by the model this space was built with
+        # (ADR-015 rule 3, ADR-049 §23). A provider that names a different
+        # model would return a vector of the right width in the wrong space,
+        # ranked plausibly and wrong, so it finds nothing instead. A provider
+        # that names no model (a fake) cannot be shown to differ and is let by.
+        pinned_model = self._embedder.model_id
+        if pinned_model is not None and pinned_model != space.model_id:
+            logger.error(
+                "Query embedder is %r but the active embedding space %s is %r; "
+                "retrieval refused rather than mix vector spaces.",
+                pinned_model, space.pk, space.model_id,
+            )
+            return RetrievalResult(mode=VECTOR)
+
         query_vector = self._embedder.embed_query(question)
 
         # Both stages and their row reads share one scan depth (IR-440).
@@ -102,8 +120,10 @@ class TwoStageRetriever(Retriever):
             if self._records is not None:
                 visible_records = visible_records.filter(pk__in=self._records)
             visible_records = visible_records.values("pk")
+            # Stage 1 reads the summary vectors of the SAME space stage 2 reads
+            # (IR-739): the pair is one identity, never two chosen separately.
             candidate_ids = list(
-                RecordEmbedding.objects.filter(record__in=visible_records)
+                record_vectors(space).filter(record__in=visible_records)
                 .order_by(CosineDistance("embedding", query_vector))
                 .values_list("record_id", flat=True)[: self._record_candidates]
             )

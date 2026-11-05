@@ -148,7 +148,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **ADR-035 §2 · §3 · §8 (Jev Noul mode)** | The Evidence route can be asked as a probability — no FR- id; ADR-035, ADR-036 §Amendment 2026-10-08. IR-482 under IR-480 | [details](traceability/ADR-035-2-3-8-Jev-Noul-mode.md) | Not Done |
 | **ADR-035 §2 · §3 · §10 (chained decision evaluation)** | The proposed decision chain can be scored offline — no FR- id; ADR-035 as amended by IR-487 (pending approval). IR-486 under IR-484 | [details](traceability/ADR-035-2-3-10-chained-decision-evaluation.md) | **BUILT, offline, exploratory** |
 | **ADR-038 (proposed)** | Ask IRIS gains a bounded research lane — no FR- id; ADR-038 (Proposed 2026-10-11, IR-499; awaiting a named approver) is the requirement … | [details](traceability/ADR-038-proposed.md) | **PROPOSED; TOOL LAYER BUILT ON A BRANCH** |
-| **ADR-023** | Retrieval quality is measured — no FR- id; ADR-023 (Accepted 2026-09-17, amended 2026-09-28 by IR-391) is the requirement: recall@10 over a … | [details](traceability/ADR-023.md) | **HARNESS IMPLEMENTED, PROXY BASELINE RECORDED (2026-09-30)** |
+| **ADR-023** | Retrieval quality is measured — no FR- id; ADR-023 (Accepted 2026-09-17, amended 2026-09-28 by IR-391) is the requirement: recall@10 over a … | [details](traceability/ADR-023.md) | **HARNESS IMPLEMENTED, PROXY BASELINE RECORDED (2026-09-30)**; correct-refusal measure added by [IR-454](traceability/IR-454.md), not yet run on the proxy set |
 | **IR-423** | A paper longer than voyage-context-4's 32k-token window can be indexed — extends FR-M3-02 (stable label only) | [details](traceability/IR-423.md) | **IMPLEMENTED** |
 | **IR-424** | Answer presentation: Markdown structure, delimited formulas and no invented images — no FR- id; changes answer-path behaviour (IR-426 … | [details](traceability/IR-424.md) | **IMPLEMENTED** |
 | **IR-440** | Retrieval looks past 40 candidates — no FR- id; a bug fix, not a technique | [details](traceability/IR-440.md) | **IMPLEMENTED** |
@@ -161,6 +161,14 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-885** | A runtime question runs at deep depth unless the reader chooses ordinary | [details](traceability/IR-885.md) | **PARTIAL** |
 | **IR-884** | ADR-049 and the AI runtime spec are on `main`; IR-714's resume, export and review questions have owners | [details](traceability/IR-884.md) | **PARTIAL** |
 | **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
+| **IR-754** | A reader deliberately compacts an owned Conversation from Ask IRIS or Paper Chat as a run of its own, through IR-734's mechanism, and sees what happened — under IR-715, ADR-049 §19; no FR- id | [details](traceability/IR-754.md) | **PARTIAL** |
+| **IR-736** | A long-paper investigation continues across repeated compactions and safely rebuilds when native continuation state is incompatible — under IR-715, ADR-049 §19–20; no FR- id | [details](traceability/IR-736.md) | **PARTIAL** |
+| **IR-784** | RDCO is told once, in the app, of a Student or Adviser role request when the person verifies their email; an unverified or repeated link alerts nobody — under IR-779, ADR-051 decision 20; no FR- id | [details](traceability/IR-784.md) | **PARTIAL** |
+| **IR-880** | A running AI-runtime investigation keeps reading under its reader's renewed grant, never widens scope, and still ends at the next read or admission once the reader stops reconnecting or loses access — under IR-713, ADR-049 §6, §9; no FR- id | [details](traceability/IR-880.md) | **PARTIAL** |
+| **IR-726** | A reader stops, reconnects with a journal cursor, or explicitly retries one AI-runtime investigation across worker races without duplicate delivery, continued admissions or a renewed allowance — under IR-713, ADR-049 §11; no FR- id | [details](traceability/IR-726.md) | **PARTIAL** |
+| **IR-752** | An operator builds a pending Embedding Space beside the active one, with space-keyed Record and Passage vectors, while readers keep searching the active space — under IR-716, ADR-049 §23; additive expand only, no activation (IR-739); no FR- id | [details](traceability/IR-752.md) | **PARTIAL** |
+| **IR-739** | An operator verifies and atomically promotes a complete Embedding Space pair (Record and Passage vectors), or rolls back to the previous revision, with readers and the `ai/` runtime moved onto space-keyed Record vectors and no revoked source resurrected — under IR-716, ADR-049 §23; no live provider, no production upgrade; no FR- id | [details](traceability/IR-739.md) | **PARTIAL** |
+| **IR-740** | IR-605 collects the dedicated runtime through its real authenticated routes under an explicit engine identity, and rescores old baselines with effective-condition preflight and a separate capability report — under IR-716, ADR-049 §24; no FR- id | [details](traceability/IR-740.md) | **PARTIAL** |
 | **IR-882** | Every paper starts embargoed; Publish asks no embargo question; only the Adviser or RDCO date or release one, and RDCO publishes only a released paper — extends FR-M3-02 (stable label only); ADR-052 IR-879 amendment | [details](traceability/IR-882.md) | **IMPLEMENTED** |
 
 ### Non-functional
@@ -269,7 +277,7 @@ See [verification, public recording and screenshot](evidence/IR-730/README.md).
 
 **Limits:** disabled by default (since IR-863 by the server's `AI_RUNTIME_READER`, not a build flag); the reader refuses the operator echo executor until
 an AGENT service is composed. No paid enablement or cutover. Manual compaction is
-IR-754. Clean-install verification resolves the earlier frontend/typechecking failures;
+IR-754, which is implemented and reported as `capabilities.manual_compaction`. Clean-install verification resolves the earlier frontend/typechecking failures;
 publication evidence records 5,696 passing backend tests, 1,706 passing frontend
 tests and the isolated CI-equivalent setup. Automated standards/spec reviews were performed and
 their material findings addressed; independent human approval and CI remain required.

@@ -6,6 +6,9 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
 import { Select } from "@/components/ui/Select";
+import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
+import { cn } from "@/lib/utils";
+import { CHAT_COMPOSER_ICON } from "./answerLayout";
 import type { Classification, ComparisonRecord } from "@/types/records";
 
 const ORIGINS = {
@@ -93,18 +96,23 @@ export function ComparisonPicker({ selected, onChange, limit, disabled, scoped }
       `${selected.length} of ${limit} papers selected.`;
 
   return (
-    <div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <Button type="button" variant="outline" className="min-h-11" size="sm" disabled={!available}
-          aria-haspopup="dialog" onClick={() => { setResults(null); setOpen(true); }}>
-          <i className="fas fa-columns mr-2" aria-hidden />Compare papers
-        </Button>
-        <p className="text-xs text-stone-600" aria-live="polite">
-          {scoped ? "This chat is about one paper. Start a new chat to compare papers." : count}
+    // `contents`: these sit directly in the composer's control row.
+    <div className="contents">
+      <div className="contents">
+        <button type="button" disabled={!available} aria-label="Compare papers" title="Compare papers"
+          aria-haspopup="dialog" onClick={() => { setResults(null); setOpen(true); }}
+          className={cn(CHAT_COMPOSER_ICON, COLOUR_TRANSITION, FOCUS_RING,
+            selected.length > 0 ? "border border-brand-200 bg-brand-50 text-brand" : "border border-stone-300 text-stone-700 hover:border-brand/40 hover:text-brand",
+            "disabled:border-stone-200 disabled:bg-transparent disabled:text-stone-400 disabled:cursor-not-allowed")}>
+          <i className="fas fa-columns text-sm" aria-hidden />
+        </button>
+        <p className="order-1 text-xs text-stone-600" aria-live="polite">
+          {/* Nothing to report until a paper is chosen; the dialog states the limit. */}
+          {scoped ? "This chat is about one paper. Start a new chat to compare papers." : selected.length > 0 || limit === undefined ? count : null}
         </p>
       </div>
       {selected.length > 0 && (
-        <ul aria-label="Papers to compare" tabIndex={0} className="mt-2 flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand">
+        <ul aria-label="Papers to compare" tabIndex={0} className="order-2 flex max-h-40 basis-full flex-wrap gap-2 overflow-y-auto rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand">
           {selected.map((paper) => (
             <li key={paper.id} className="inline-flex max-w-full items-center rounded-lg border border-stone-300 text-sm text-stone-800">
               <span className="min-w-0 break-words py-1.5 pl-3">{paper.title}</span>
