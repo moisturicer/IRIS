@@ -366,7 +366,8 @@ class _Run:
             for n, call in enumerate(calls):
                 if self.investigation.tool_calls >= self.bounds.max_tool_calls:
                     # The exchange stays whole; the call is answered, not run.
-                    results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"})))
+                    results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"}),
+                                              control_only=True))
                     continue
                 room = self._room(history, results, calls[n:]) if call.name == READ_MANUSCRIPT.name else 0
                 outcome = await self.investigation.execute(call, room=room)
@@ -374,7 +375,8 @@ class _Run:
                     self._checked(outcome.clarification, clarification=True)
                     return self._result(outcome.clarification, (), kind="clarification")
                 progressed = progressed or outcome.progress
-                results.append(ToolResult(call.id, outcome.content, outcome.dependencies))
+                results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
+                                          outcome.control_only))
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
             self.investigation.packed(history[len(history) - len(results):])

@@ -85,6 +85,8 @@ class ToolResult:
     #: Original source revisions, kept outside the provider wire payload.
     #: Empty is not proof that arbitrary content is safe to send.
     dependencies: frozenset = frozenset()
+    #: Set only by local tool/control paths that emit no Record content.
+    control_only: bool = False
 
 
 Entry = Union[User, ModelTurn, ToolResult]

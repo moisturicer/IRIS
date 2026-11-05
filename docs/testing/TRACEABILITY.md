@@ -280,21 +280,40 @@ IR-754, which is implemented and reported as `capabilities.manual_compaction`. C
 publication evidence records 5,696 passing backend tests, 1,706 passing frontend
 tests and the isolated CI-equivalent setup. Automated standards/spec reviews were performed and
 their material findings addressed; independent human approval and CI remain required.
-### IR-889 — AI-runtime paid research disclosure (partial)
+
+### IR-889 — AI-runtime paid research disclosure (development proxy only)
 
 Research tool outcomes now retain their source revisions outside the provider
 payload. Tool messages, recalled Conversation state and subsequent model turns
 carry those dependencies through the agent loop. Persisted earlier answers with
 no source manifest are explicitly unverified and refused by the paid transport.
-The send guard still refuses all Record evidence; this commit grants no paid
-real-paper research. Draft PR #534 records the development decision, while
+The send guard now admits explicitly listed source revisions from public
+proxy or synthetic Records in an expiring IR-889 development manifest **through
+the recording provider**. Real vendor adapters remain closed until IR-827's
+account-specific no-training and retention evidence is recorded. Each
+physical attempt rechecks the running fence, reader grant, row-security read,
+Paper Chat scope, active chunk revision, non-IP origin and answered embargo.
+The exact model, endpoint, account digest and campaign must match the manifest;
+production and unconfigured deployments refuse. Changed, revoked, withheld,
+untagged and unverifiable prior content sends nothing. Capacity-withheld tool
+results become a fixed neutral marker with no source-dependent byte length;
+only trusted local control results may use an empty dependency set. Real institutional
+Records remain refused. Merged PR #534 records the development decision, while
 IR-791's canonical Contact-person answer and IR-827's OpenRouter account and
 eligible-endpoint policy evidence remain prerequisites. The exact Luna model
 also needs a verified capacity and conservative price before a smoke run.
 
-**Evidence (2026-11-05):** two pure source-provenance tests passed. Changed
-Python files compiled and passed the repository's flake8 configuration. The
-new database refusal test and full AI suite could not complete locally because
-Python's event loop hangs in this Windows environment, including for a minimal
-`asyncio.run(asyncio.sleep(0))`. No provider call, cost, or quality result is
-claimed. IR-889 remains blocked before its allowed-paper and live-pilot criteria.
+**Evidence (2026-11-05):** seventeen pure source-provenance and recording-provider
+tests passed, covering an allowed proxy payload, withheld/revoked/changed
+sources, retry rechecks, missing approval and production refusal. Changed
+Python files compiled and passed the repository's flake8 configuration.
+The AI runtime suite passed 59 tests; affected backend context and agent-loop
+contract tests passed 64 tests. Eight focused real-PostgreSQL tests then passed
+under the restricted runtime login: one approved source, five changed/withheld
+facts, one expired approval, and one search → read → final-answer run. A full
+backend run stopped on unrelated
+pre-existing local configuration (`AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT` in
+production-settings test); with it disabled, the next failure was in the
+already-dirty `apps.ai.tasks` chunking callback signature.
+No live vendor call, cost, or quality result is claimed. IR-889 remains
+blocked before real-paper and live-pilot criteria.

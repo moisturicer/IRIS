@@ -23,7 +23,7 @@ from . import test_ai_runtime_runs_db as runs_db
 from .test_ai_runtime_runs_db import service, session
 from ai.admission import limits as ai_limits  # noqa: E402
 from ai.admission.errors import AdmissionDenied  # noqa: E402
-from ai.admission.guard import SendGuard  # noqa: E402
+from ai.admission.guard import ProxyApproval, SendGuard  # noqa: E402
 from ai.admission.ledger import Ledger, Request  # noqa: E402
 from ai.admission.report import run_report  # noqa: E402
 from ai.admission.scope import RunBinding, bound  # noqa: E402
@@ -38,8 +38,11 @@ from ai.infrastructure.recording_adapter import HANG, RecordingAgentProvider  # 
 from ai.runs import config as runs_config  # noqa: E402
 from ai.runs.store import RunStore, Unauthorized  # noqa: E402
 from ai.research.tools import Source  # noqa: E402
+from apps.ai.models.chunk import ChunkSet  # noqa: E402
 from apps.ai.models.admission import ProviderCampaign, ProviderReservation
+from apps.records.models import Record  # noqa: E402
 from .corpus import make_user  # noqa: E402
+from .test_ai_runtime_research_db import paper, write_source  # noqa: E402
 from .test_ai_runtime_context_contract import MILLION  # noqa: E402
 from ai.agent.context import Capacity, FITS, Reserves  # noqa: E402
 
@@ -332,6 +335,82 @@ def test_derived_text_is_withheld_after_its_tool_result_left_context(runtime):
     assert denied.value.reason == "source_unavailable"
     assert provider.requests == []
     assert ProviderReservation.objects.get().state == "released"
+
+
+def proxy_source():
+    record = paper("Public proxy", {4: [("Methods", "Public passage about water.")]})
+    Record.objects.filter(pk=record.pk).update(
+        origin=Record.Origin.IMPORTED_REFERENCE, embargo_answered_at=timezone.now())
+    chunk_set = ChunkSet.objects.get(record=record, is_active=True)
+    return record, Source(record.pk, chunk_set.pk, chunk_set.extraction_hash)
+
+
+def proxy_approval(provider, source):
+    return ProxyApproval(
+        "IR-889", PIN.model, PIN.endpoint, provider.account, ADMISSION["AI_ADMISSION_CAMPAIGN"],
+        timezone.now() + timedelta(hours=1), frozenset({source}))
+
+
+def sourced_request(source):
+    return AgentRequest(pin=PIN, instructions="I", history=(
+        User("Q?"), ModelTurn(items=(ToolGroup((ToolCall("c1", "search"),)),),
+                              stop=StopReason.TOOLS),
+        ToolResult("c1", '{"status":"ok","passages":[{"text":"Public passage"}]}',
+                   frozenset({source})),
+    ))
+
+
+def test_approved_proxy_source_reaches_the_recording_provider(runtime):
+    _, source = proxy_source()
+    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
+    guard = SendGuard(runtime, proxy_approval(provider, source), stage="development")
+    transport = AdmittedAgentProvider(provider, Ledger(runtime, limits()), guard=guard)
+    binding = claimed(runtime, "admit-proxy@cit.edu", "admit-proxy")
+    with bound(binding):
+        turn = run(transport.converse(sourced_request(source)))
+    assert turn.text == "An answer."
+    assert turn.dependencies == {source}
+    assert len(provider.requests) == 1
+    assert ProviderReservation.objects.get().sent
+
+
+@pytest.mark.parametrize("change", ["withdraw", "replace", "embargo", "unknown", "ip"])
+def test_changed_or_withheld_proxy_never_reaches_the_provider(runtime, change):
+    record, source = proxy_source()
+    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
+    guard = SendGuard(runtime, proxy_approval(provider, source), stage="development")
+    transport = AdmittedAgentProvider(provider, Ledger(runtime, limits()), guard=guard)
+    binding = claimed(runtime, f"admit-{change}@cit.edu", f"admit-{change}")
+    if change == "withdraw":
+        Record.objects.filter(pk=record.pk).update(pipeline_status="draft")
+    elif change == "replace":
+        write_source(record, {4: [("Methods", "Replaced passage.")]}, "2")
+    elif change == "embargo":
+        Record.objects.filter(pk=record.pk).update(embargoed_until=timezone.now().date())
+    elif change == "unknown":
+        Record.objects.filter(pk=record.pk).update(embargo_answered_at=None)
+    else:
+        Record.objects.filter(pk=record.pk).update(is_ip=True)
+    with bound(binding), pytest.raises(AdmissionDenied) as denied:
+        run(transport.converse(sourced_request(source)))
+    assert denied.value.reason == "source_unavailable"
+    assert provider.requests == []
+    assert not ProviderReservation.objects.get().sent
+
+
+def test_expired_proxy_approval_never_sends(runtime):
+    _, source = proxy_source()
+    provider = RecordingAgentProvider(responses=[reply()], capacities=CAPACITIES)
+    approval = proxy_approval(provider, source)
+    expired = ProxyApproval(approval.approval_id, approval.model, approval.endpoint,
+                            approval.account, approval.campaign, timezone.now() - timedelta(seconds=1),
+                            approval.sources)
+    transport = AdmittedAgentProvider(provider, Ledger(runtime, limits()),
+                                      guard=SendGuard(runtime, expired, stage="development"))
+    binding = claimed(runtime, "admit-expired@cit.edu", "admit-expired")
+    with bound(binding), pytest.raises(AdmissionDenied):
+        run(transport.converse(sourced_request(source)))
+    assert provider.requests == []
 
 
 def test_redelivery_never_renews_the_run_allowance(runtime):

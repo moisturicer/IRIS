@@ -125,6 +125,7 @@ class Outcome:
     progress: bool = False
     clarification: Optional[str] = None
     dependencies: frozenset = frozenset()
+    control_only: bool = False
 
 
 def _str(value) -> bool:
@@ -295,7 +296,7 @@ class Investigation:
         self.tool_calls += 1
         spec = next((s for s in self.specs() if s.name == call.name), None)
         if spec is None:
-            return Outcome(json.dumps({"error": "unknown_tool"}))
+            return Outcome(json.dumps({"error": "unknown_tool"}), control_only=True)
         try:
             args = _arguments(call, spec)
             if spec is UPDATE_PLAN:
@@ -318,7 +319,7 @@ class Investigation:
                 return self._evidence(await self.research.recover_turn(args["turn"]))
             return self._evidence(await self._research(spec, args))
         except InvalidArguments:
-            return Outcome(json.dumps({"error": "invalid_arguments"}))
+            return Outcome(json.dumps({"error": "invalid_arguments"}), control_only=True)
         except asyncpg.InsufficientPrivilegeError:
             # A policy refusal is not an outage: the reader may no longer read.
             raise RunEnded("unauthorized") from None
@@ -327,7 +328,7 @@ class Investigation:
             log.warning("agent tool %s failed: %s", spec.name, type(failure).__name__)
             if spec.name not in self.outages:
                 self.outages.append(spec.name)
-            return Outcome(json.dumps({"status": UNAVAILABLE, "reason": TOOL_UNAVAILABLE}))
+            return Outcome(json.dumps({"status": UNAVAILABLE, "reason": TOOL_UNAVAILABLE}), control_only=True)
 
     async def _research(self, spec: ToolSpec, args: dict) -> Evidence:
         if spec is SEARCH:
@@ -442,7 +443,9 @@ class Investigation:
                             "truncated": coverage.truncated}
         self.figures.update(str(n) for n in (coverage.returned, coverage.total) if n is not None)
         return Outcome(json.dumps(body, ensure_ascii=False), progress=new,
-                       dependencies=result.dependencies)
+                       dependencies=result.dependencies,
+                       control_only=not (result.dependencies or result.records
+                                         or result.passages or result.sections))
 
     def _read_into(self, result: Evidence, call_id: Optional[str], body: dict) -> bool:
         """Fold one manuscript read into the run's coverage and say it to the model (IR-733)."""
@@ -532,7 +535,8 @@ class Investigation:
             "executed": {"tool_calls": self.tool_calls - 1, "evidence_reads": self.reads},
         }):
             raise RunEnded("run_ended")
-        return Outcome(json.dumps({"status": "ok", "revision": self.plan_revision}))
+        return Outcome(json.dumps({"status": "ok", "revision": self.plan_revision}),
+                       control_only=True)
 
     def _focus(self, args: dict) -> Outcome:
         chosen = {}
@@ -550,4 +554,4 @@ class Investigation:
             self.selected = chosen["selected"]
         if "excluded" in chosen:
             self.excluded = chosen["excluded"]
-        return Outcome(json.dumps({"status": "ok"}))
+        return Outcome(json.dumps({"status": "ok"}), control_only=True)

@@ -15,10 +15,11 @@ from typing import Optional
 from ai.agent.dialect import serialize
 from ai.agent.protocol import ToolResult
 from ai.domain.ports import LLMProvider, TransientProviderError, UnsupportedCapability
+from ai.infrastructure.settings import settings
 
 from . import errors, scope
 from .errors import AdmissionDenied
-from .guard import SendGuard
+from .guard import ProxyApproval, SendGuard
 from .ledger import Ledger, Request, Usage, estimate_tokens
 
 RESEARCH_LANE = "research"
@@ -33,7 +34,9 @@ class AdmittedAgentProvider(LLMProvider):
                  lane: str = RESEARCH_LANE, purpose: str = "answer"):
         self.provider = provider
         self.ledger = ledger
-        self.guard = guard or SendGuard(ledger.dsn)
+        self.guard = guard or SendGuard(
+            ledger.dsn, ProxyApproval.from_json(settings.RUNS_PROXY_SEND_APPROVAL),
+            stage=settings.RUNS_DEPLOYMENT_STAGE)
         self.retries = retries
         self.timeout_seconds = timeout_seconds
         self.lane = lane
@@ -84,7 +87,9 @@ class AdmittedAgentProvider(LLMProvider):
                         or getattr(e, "unverified_provenance", False)]
             # A previous model turn may carry derived text or opaque state even
             # when the original tool result has left the fitted context.
-            await self.guard.check(binding, request.pin, evidence)
+            await self.guard.check(binding, request.pin, evidence,
+                                   account=self.provider.account,
+                                   campaign=self.ledger.limits.campaign_key if self.ledger.limits else None)
             # From here the vendor may bill it, whatever happens next.
             usage.sent = True
             with scope.admitted_send():
