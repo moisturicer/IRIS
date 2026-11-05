@@ -468,6 +468,14 @@ class RecordVersion(models.Model):
     #: times rather than recorded at submission (ADR-058 §2, IR-872): every
     #: version written before IR-872. Shown, so a guess is never read as a record.
     documents_reconstructed = models.BooleanField(default=False)
+    #: The text reviewers compare and anchor threads to (ADR-058 §1 as
+    #: amended, IR-871). A Version that changes the manuscript gets its own;
+    #: a metadata-only one points at the one before it. Null where there is no
+    #: manuscript, or for a Version from before IR-871 that `read_review_texts`
+    #: hasn't reached yet. `RESTRICT`: no code deletes a text a Version names.
+    review_text = models.ForeignKey(
+        "ReviewText", on_delete=models.RESTRICT, null=True, blank=True, related_name="versions",
+    )
 
     class Meta:
         ordering = ["record", "number"]
@@ -507,6 +515,93 @@ class RecordVersionDocument(models.Model):
 
     def __str__(self):
         return f"{self.version} · upload {self.upload_id}"
+
+
+class ReviewTextState(models.TextChoices):
+    PENDING     = "pending", "Being read"
+    READ        = "read", "Read"
+    #: A scan, an unreadable or encrypted file, or one over the limits: never empty text.
+    NO_TEXT     = "no_text", "No text"
+    #: The sandbox couldn't run (limits unset, not Linux). `read_review_texts` retries it.
+    UNAVAILABLE = "unavailable", "Not read yet"
+    #: A Version from before IR-871 whose manuscript file is gone.
+    NOT_KEPT    = "not_kept", "Text not kept"
+
+
+class ReviewText(models.Model):
+    """
+    One manuscript file's text for review, read on campus with no AI (ADR-058
+    §1 as amended 2026-11-05, IR-871). It is not the LlamaParse Extraction:
+    it is read at submission whatever the embargo or AI consent says, and it
+    is never chunked, embedded or retrieved. Served only under
+    `may_read_review`.
+
+    **Never re-read in place.** Once a reading is stored it stays what it
+    was, so a Thread's anchor keeps resolving against the text it was checked
+    against; `reader` names the reader that produced it. Only `pending` and
+    `unavailable` texts are ever read (`store.read_text`).
+    """
+
+    record = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="review_texts")
+    #: The manuscript file it reads, as the Version names it.
+    source_file = models.CharField(max_length=255)
+    manuscript_sha256 = models.CharField(max_length=64, blank=True)
+    state = models.CharField(max_length=16, choices=ReviewTextState.choices,
+                             default=ReviewTextState.PENDING)
+    #: Why there is no text: a `sandbox` reason code. Blank when read.
+    reason = models.CharField(max_length=32, blank=True)
+    reader = models.CharField(max_length=64, blank=True)
+    page_count = models.PositiveIntegerField(null=True, blank=True)
+    #: What may be wrong with the sections found (`reader._finish`), e.g. no headings.
+    warnings = models.JSONField(default=list, blank=True)
+    #: Read later by `read_review_texts` from the Version's own file, not at submission.
+    read_after_submission = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["record", "created_at", "pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(state="read") | (
+                    ~models.Q(reader="") & models.Q(read_at__isnull=False)
+                ),
+                name="review_text_read_names_its_reader",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.record_id} · {self.source_file} · {self.state}"
+
+
+class ReviewTextSection(models.Model):
+    """
+    One section of a review text: its heading, the page it starts on, and its
+    passages (IR-871). A passage is a sentence or a ruled table's row, stored
+    as JSON `{text, page, paragraph, kind, regions}`, with `regions` in
+    ADR-031's page-fraction shape. `key` is the heading without its numbering,
+    with `#2` and on for a repeated heading, or `front-matter`; `text_hash`
+    hashes the normalised passages, so a later reading can tell an unchanged
+    section from a changed one exactly.
+    """
+
+    text = models.ForeignKey(ReviewText, on_delete=models.CASCADE, related_name="sections")
+    ordinal = models.PositiveIntegerField()
+    key = models.CharField(max_length=255)
+    heading = models.TextField(blank=True)
+    page = models.PositiveIntegerField()
+    text_hash = models.CharField(max_length=64)
+    passages = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ["text", "ordinal"]
+        constraints = [
+            models.UniqueConstraint(fields=["text", "ordinal"], name="review_section_ordinal_unique"),
+            models.UniqueConstraint(fields=["text", "key"], name="review_section_key_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.text_id} §{self.ordinal} {self.key[:40]}"
 
 
 class EmbargoReminder(models.Model):

@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 is amended 2026-11-05 (IR-871): a Version's text for review is read on campus without AI, apart from the LlamaParse Extraction. §1 and §3 are not built.
+**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 is amended 2026-11-05 (IR-871): a Version's text for review is read on campus without AI, apart from the LlamaParse Extraction. §1 as amended is built by IR-871, and the build notes under it record the decisions made while building it. §3 is not built.
 
 **Amends:**
 
@@ -66,6 +66,16 @@ It was **not** run on a real CIT-U thesis, and it didn't test figures, equations
   - The prototype found a PDF's text enough on a thesis-shaped paper.
 - **Let LlamaParse read Versions under review.** Rejected: it sends an embargoed paper off campus, which ADR-052 forbids until release.
 - **Compare in the browser from the PDF viewer's text layer.** It needs no server reading. Rejected: Outdated threads and the suggested-wording check (§3) must run when a Version is submitted, not only when someone opens it.
+
+**Build notes, 2026-11-05 (IR-871; decided by Hermoine Zozobrado while building it, Accepted).** Seven points the amendment left open:
+
+1. **A passage is one sentence**, or one row of a ruled table, with its page, its paragraph number and one region per line. This is the shape the prototype checked, and §3 and ADR-032 §7's anchors work sentence by sentence. *Rejected:* a paragraph with every word's box (about 1 MB per thesis, and §3 rebuilds sentences on every comparison), and a paragraph with line boxes only (a sentence starting mid-line would be highlighted from the line's start). A later change to the sentence rules is a new reader, under point 5 above.
+2. **Stored as section rows with their sentences as JSON.** `ReviewText` holds one manuscript file's reading: its state, reason, reader, page count and warnings. `ReviewTextSection` holds one row per section: heading, page, `key` and `text_hash`, with the passages as JSON. No card under IR-870 queries a passage in SQL, while a Viewed mark (IR-877) needs a section the database checks. Each `key` is the heading without numbering (`#2` and on for a repeat, `front-matter` before the first heading). Each `text_hash` hashes the normalised passages, so a later reading can match an unchanged section exactly.
+3. **A Version points at its text** (`RecordVersion.review_text`, `RESTRICT`). A metadata-only Version points at the previous Version's, so nothing walks back through Versions and nothing is copied. A Version with no manuscript has none.
+4. **Headings are found by numbering and capitals as well as bold**, because headings that aren't bold were never tested. Table-of-contents lines (dot leaders, a trailing page number) and captions are never headings, and a numbered line or a change of case starts a new heading rather than continuing one.
+5. **Each text records warnings** about its sections: no headings found, a section over 15 pages, pages with no text. IR-873 can then say a comparison is unreliable instead of showing a misleading one.
+6. **The sandbox has its own limits**, `REVIEW_TEXT_WALL_SECONDS`, `_MEMORY_MIB` and `_MAX_PAGES`, because a layout read does more work than the upload check. Like IR-830's, they are required: with any unset, nothing is read and the text waits as *not read yet*, for `read_review_texts` to retry. `GET /records/<id>/versions/<n>/text/` serves a text under `may_read_review` and is audited as the Version's manuscript is. `versions_payload` carries each Version's text state.
+7. **The reader's text is the one sandbox output that crosses back**, against IR-830's "only fixed exit codes cross back" (`docs/engineering/PDF_INTAKE.md`). It has to: the text is the result. To narrow the risk that a parser taken over by a crafted PDF copies something into it, the child opens its input and output first and then caps its own open-file limit, so it can open nothing else: not the worker's environment, not another paper. The parent checks that the bytes it read are the Version's recorded SHA-256 before storing anything. The child still runs as the worker's OS user; a separate unprivileged user would close the rest and is a deployment change left for later.
 
 ### 2. A Version names its documents
 
