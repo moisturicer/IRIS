@@ -89,6 +89,18 @@ it("shows the log without type options, and says so, when the types cannot be lo
   expect(screen.getByRole("button", { name: "Filter" })).toBeEnabled();
 });
 
+it("treats a types response that is not a list like a failed request, and still shows the log", async () => {
+  // The shape of an answer is the server's to keep, and the page must not crash on a
+  // wrong one: the router tests answer every GET with a paginated object (IR-913 CI).
+  vi.mocked(auditApi.eventTypes).mockResolvedValue({ data: { count: 0, results: [] } } as unknown as Awaited<ReturnType<typeof auditApi.eventTypes>>);
+  renderScreen(<AuditLogPage />);
+
+  expect(await screen.findByText("Lee Cruz")).toBeInTheDocument();
+  expect(await screen.findByText(/event types could not be loaded/i)).toBeInTheDocument();
+  const select = screen.getByRole("combobox", { name: "Event type" });
+  expect(within(select).getAllByRole("option").map((o) => o.textContent)).toEqual(["All events"]);
+});
+
 it("names an event it has no label for by the server's label, not the raw code", async () => {
   respondWithTypes([...serverTypes, { type: "A_BRAND_NEW_EVENT", label: "A Brand New Event" }]);
   vi.mocked(auditApi.list).mockResolvedValue({ data: { count: 1, results: [{

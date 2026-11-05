@@ -67,7 +67,11 @@ export default function AuditLogPage() {
   useEffect(() => {
     let active = true;
     auditApi.eventTypes().then(({ data }) => {
-      if (active) { setTypeOptions(data); setTypesFailed(false); }
+      if (!active) return;
+      // An answer that is not a list is a failed request, not a reason to crash the
+      // page: the shape is the server's to keep, and the log works without it.
+      if (Array.isArray(data)) { setTypeOptions(data); setTypesFailed(false); }
+      else { setTypeOptions([]); setTypesFailed(true); }
     }).catch(() => {
       if (active) { setTypeOptions([]); setTypesFailed(true); }
     });
