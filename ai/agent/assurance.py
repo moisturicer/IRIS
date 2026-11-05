@@ -254,6 +254,8 @@ def reading_coverage(citations, investigation: Investigation) -> list[dict]:
         "pages_no_passage_starts_on": len(read.reading.pages_no_passage_starts_on),
         "formula_passages": read.reading.formulas, "caption_passages": read.reading.captions,
         "visual_interpretation": False, "exhaustive": False,
+        # Read, but condensed or withheld before the answer: said only when it happened (IR-736).
+        **({"not_in_context": len(read.recoverable)} if read.recoverable else {}),
     } for revision, read in investigation.readings.items() if revision in cited_revisions]
 
 

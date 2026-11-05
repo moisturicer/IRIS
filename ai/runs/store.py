@@ -91,6 +91,7 @@ def shown_facts(facts) -> list[dict]:
                 **{k: fact.get(k) for k in ("kind", "title", "passages", "read", "complete", "pages",
                                             "pages_no_passage_starts_on", "formula_passages", "caption_passages")},
                 "visual_interpretation": False, "exhaustive": False,
+                **({"not_in_context": fact["not_in_context"]} if "not_in_context" in fact else {}),
             })
     return shown
 

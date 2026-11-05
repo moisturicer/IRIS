@@ -436,6 +436,9 @@ class _Run:
             return None
         self.steps = max(self.steps, int(saved.get("step") or 0))
         restored = checkpoint.load(saved.get("body"), pin=self.agent.pin, bounds=self.bounds, task=self.task)
+        # Opaque state may depend on the exact prefix and tool schemas, not only on the pin (ADR-049 §20).
+        if restored is not None and restored.prefix != self._prefix():
+            restored = None
         if restored is not None and not self._resumable(restored.compaction):
             restored = None
         reason = "incompatible" if restored is None else await self.tools.reauthorize(
@@ -541,7 +544,10 @@ class _Run:
         self.outcome, self.revision, self.condensed = "compacted", revision, len(cut.gone_turns)
         await self._journal("compaction", {"outcome": "compacted", "revision": revision,
                                            "turns": len(cut.gone_turns), "exchanges": len(cut.gone_exchanges)})
-        return cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True))
+        rebuilt = cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True))
+        # What the compacted exchanges showed is no longer in front of the model (IR-736).
+        self.investigation.reshown(e.content for e in rebuilt if isinstance(e, ToolResult))
+        return rebuilt
 
     async def _compaction_failed(self, history: list, reason: str) -> list:
         self.compact_failed_at = len(history)
@@ -559,6 +565,11 @@ class _Run:
         revision = compaction.get("revision")
         return revision in self.context.committed or revision == self.handoff_revision
 
+    def _prefix(self) -> str:
+        """The digest of the instructions and tool schemas every request of this run is sent under."""
+        request = self.request(())
+        return checkpoint.prefix_digest(request.instructions, request.tools)
+
     async def _save(self, history: list, stale: int) -> None:
         """Keep this completed step for a worker that takes the run over (IR-724)."""
         if self.context.save is None:
@@ -569,7 +580,7 @@ class _Run:
         }
         body = checkpoint.dump(pin=self.agent.pin, bounds=self.bounds, task=self.task, history=history,
                                investigation=self.investigation, budget=self.budget,
-                               steps=self.steps, stale=stale, compaction=compaction)
+                               steps=self.steps, stale=stale, compaction=compaction, prefix=self._prefix())
         if not await self.context.save(self.steps, body):
             raise Unavailable("run_ended")
 

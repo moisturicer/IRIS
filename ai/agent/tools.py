@@ -369,6 +369,16 @@ class Investigation:
                 revision, positions = pending
                 self.readings[revision].visible.update(positions)
 
+    def reshown(self, contents) -> None:
+        """Keep as shown only the Manuscript passages whose handle is still in a result the model has (IR-736).
+
+        Compaction takes whole exchanges out of the history; what they showed
+        is then inspected and recoverable by its handles, not shown.
+        """
+        contents = list(contents)
+        for read in self.readings.values():
+            read.visible = {n for n, handle in read.handles.items() if any(handle in c for c in contents)}
+
     def _ended(self, result: Evidence) -> None:
         if result.reason in ENDS_RUN:
             raise RunEnded(result.reason)
