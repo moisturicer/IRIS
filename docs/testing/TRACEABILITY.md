@@ -280,3 +280,21 @@ IR-754, which is implemented and reported as `capabilities.manual_compaction`. C
 publication evidence records 5,696 passing backend tests, 1,706 passing frontend
 tests and the isolated CI-equivalent setup. Automated standards/spec reviews were performed and
 their material findings addressed; independent human approval and CI remain required.
+### IR-889 — AI-runtime paid research disclosure (partial)
+
+Research tool outcomes now retain their source revisions outside the provider
+payload. Tool messages, recalled Conversation state and subsequent model turns
+carry those dependencies through the agent loop. Persisted earlier answers with
+no source manifest are explicitly unverified and refused by the paid transport.
+The send guard still refuses all Record evidence; this commit grants no paid
+real-paper research. Draft PR #534 records the development decision, while
+IR-791's canonical Contact-person answer and IR-827's OpenRouter account and
+eligible-endpoint policy evidence remain prerequisites. The exact Luna model
+also needs a verified capacity and conservative price before a smoke run.
+
+**Evidence (2026-11-05):** two pure source-provenance tests passed. Changed
+Python files compiled and passed the repository's flake8 configuration. The
+new database refusal test and full AI suite could not complete locally because
+Python's event loop hangs in this Windows environment, including for a minimal
+`asyncio.run(asyncio.sleep(0))`. No provider call, cost, or quality result is
+claimed. IR-889 remains blocked before its allowed-paper and live-pilot criteria.

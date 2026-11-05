@@ -37,3 +37,10 @@ def test_derived_turn_keeps_source_when_original_tool_result_is_gone():
     request = AgentRequest(pin, "instruction", (derived,))
     assert request.history[0].dependencies == frozenset({SOURCE})
     assert "revision-a" not in json.dumps(ChatCompletions.encode(request))
+
+
+def test_unverified_prior_turn_is_marked_without_a_fake_source():
+    prior = ModelTurn((Text("An earlier answer"),), StopReason.END,
+                      unverified_provenance=True)
+    assert prior.unverified_provenance
+    assert prior.dependencies == frozenset()

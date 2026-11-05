@@ -418,7 +418,7 @@ class _Run:
             answer = DELIVERED_MARKER.sub("", turn.answer)
             history += [User(compacting.reader(turn.question)),
                         ModelTurn(items=(Text(answer),), stop=StopReason.END,
-                                  dependencies=frozenset({"unverified_prior"}))]
+                                  unverified_provenance=True)]
         if shown:
             history.append(User(STATE_PREFIX + json.dumps(shown, ensure_ascii=False),
                                 self.investigation.recalled_sources))

@@ -80,7 +80,8 @@ class AdmittedAgentProvider(LLMProvider):
         try:
             # Tool results carry Record content: the guard must authorize them.
             evidence = [e for e in request.history if isinstance(e, ToolResult)
-                        or getattr(e, "dependencies", frozenset())]
+                        or getattr(e, "dependencies", frozenset())
+                        or getattr(e, "unverified_provenance", False)]
             # A previous model turn may carry derived text or opaque state even
             # when the original tool result has left the fitted context.
             await self.guard.check(binding, request.pin, evidence)
