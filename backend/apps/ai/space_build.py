@@ -27,7 +27,8 @@ recomputed from the database on every call: a summary with no current vector,
 and active chunks with no vector in the space. A crash, a stop or a duplicate
 delivery therefore resumes where it stopped; vectors already stored -- and paid
 for -- are kept, and a finished build costs queries and no vendor call. A
-session advisory lock per ``(space, record)`` makes a duplicate delivery skip a
+session advisory lock per ``(space, record)`` (it needs a direct or
+session-pooled connection, not a transaction-pooling proxy) makes a duplicate delivery skip a
 record another worker is embedding instead of paying for it twice. This is not
 exactly-once billing: a send that is lost between the vendor and the commit is
 paid for and sent again, under a new admission.
@@ -73,6 +74,8 @@ __all__ = [
 
 STOPPED_MAX_RECORDS = "max_records"
 STOPPED_TOKEN_BUDGET = "token_budget"
+#: The space left the pending state while the build ran.
+STOPPED_NOT_PENDING = "space_not_pending"
 #: ``admission:<reason>`` when the shared ledger refused an attempt.
 STOPPED_ADMISSION = "admission:"
 
@@ -182,20 +185,18 @@ def _claim(space_id: int, record_id: int):
                 cursor.execute("SELECT pg_advisory_unlock(%s, %s)", keys)
 
 
+def _still_pending(space_id: int) -> bool:
+    from apps.ai.models import EmbeddingSpace, EmbeddingSpaceState
+
+    return EmbeddingSpace.objects.filter(
+        pk=space_id, state=EmbeddingSpaceState.PENDING
+    ).exists()
+
+
 def _active_chunk_set(record_id: int):
     from apps.ai.models.chunk import ChunkSet
 
     return ChunkSet.objects.filter(record_id=record_id, is_active=True).first()
-
-
-def _current_summary_hashes(space_id: int, record_ids: Sequence[int]) -> dict:
-    from apps.ai.models.embedding import RecordSpaceEmbedding
-
-    return dict(
-        RecordSpaceEmbedding.objects.filter(
-            space_id=space_id, record_id__in=list(record_ids)
-        ).values_list("record_id", "source_hash")
-    )
 
 
 def _owed(record, space_id: int):
@@ -228,15 +229,26 @@ def build_pending_space(
 ) -> BuildReport:
     """Embed what ``space_id`` still owes, up to the bounds, and report.
 
-    ``max_records`` counts records that owed work and were attempted;
-    ``token_budget`` is an upper-bound estimate (the batching rule's own) and
-    stops the run *before* the record that would exceed it. ``0`` means no
-    bound. A record with no active chunks is not part of the corpus and is
+    ``max_records`` counts records that owed work and were attempted (one
+    another worker holds is skipped and not counted); ``token_budget`` is an
+    upper-bound estimate (the batching rule's own) and stops the run *before*
+    the record that would exceed it, though a slice always takes its first
+    record so an oversized one cannot stall the build. ``0`` means no bound. A record with no active chunks is not part of the corpus and is
     left alone, the same rule promotion uses.
     """
     from apps.ai.backfill import records_to_consider
 
-    provider = provider or indexing.build_embedding_provider()
+    if provider is None:
+        from apps.ai.models import EmbeddingSpace
+
+        model = EmbeddingSpace.objects.filter(pk=space_id).values_list(
+            "model_id", flat=True
+        ).first()
+        if model is None:
+            raise BuildRefused(f"No EmbeddingSpace with id {space_id}.")
+        # The space's own model, not the configured one: the live setting is
+        # what readers embed queries with and must not move for a build.
+        provider = indexing.build_embedding_provider(model=model)
     space = pinned_space(space_id, provider)
     report = BuildReport(space_id=space.pk)
     attempted = 0
@@ -254,15 +266,25 @@ def build_pending_space(
             report.stopped = STOPPED_MAX_RECORDS
             break
         estimate = _estimate(record, needs_summary, chunks)
-        if token_budget and report.estimated_tokens + estimate > token_budget:
+        # A slice always takes its first record, even one larger than the
+        # budget: otherwise that record would stop every later slice too and
+        # the build could never move past it.
+        if (token_budget and report.estimated_tokens
+                and report.estimated_tokens + estimate > token_budget):
             report.stopped = STOPPED_TOKEN_BUDGET
             break
 
-        attempted += 1
+        # A promotion (IR-739) or any other change of state ends the build:
+        # from then on a write would mutate the live index in place.
+        if not _still_pending(space.pk):
+            report.stopped = STOPPED_NOT_PENDING
+            break
+
         with _claim(space.pk, record.pk) as claimed:
             if not claimed:
                 report.busy.append(record.pk)
                 continue
+            attempted += 1
             # Owed work is read again under the lock: the worker that held it
             # may have finished the record while this one waited its turn.
             needs_summary, chunks = _owed(record, space.pk)

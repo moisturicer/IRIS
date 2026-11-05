@@ -165,8 +165,12 @@ def plan_records(
     it can, and a stored vector whose text hash no longer matches the record is
     owed again. Without it the legacy rule above applies unchanged.
     """
-    from apps.ai.indexing import active_chunks, estimate_pending_tokens, pending_chunks
-    from apps.ai.indexing import record_source_hash
+    from apps.ai.indexing import (
+        active_chunks,
+        estimate_pending_tokens,
+        pending_chunks,
+        record_source_hash,
+    )
     from apps.ai.models import RecordEmbedding, RecordSpaceEmbedding
 
     plans: list[RecordPlan] = []

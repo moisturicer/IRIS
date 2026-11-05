@@ -514,9 +514,78 @@ class TheOperatorCommandTests:
     def test_backfill_into_a_pending_space_builds_summaries_too(self, active, pending, monkeypatch):
         record = _record()
         monkeypatch.setattr(
-            "apps.ai.indexing.build_embedding_provider", lambda: Embedder(NEW))
+            "apps.ai.indexing.build_embedding_provider", lambda model=None: Embedder(NEW))
 
         call_command("backfill_embeddings", "--space", str(pending.id))
 
         assert RecordSpaceEmbedding.objects.filter(record=record, space=pending).exists()
         assert not RecordEmbedding.objects.filter(model_name=NEW).exists()
+
+    def test_the_default_provider_is_built_for_the_spaces_model_not_the_configured_one(
+        self, active, pending, monkeypatch
+    ):
+        _record()
+        asked = []
+
+        def build(model=None):
+            asked.append(model)
+            return Embedder(model)
+
+        monkeypatch.setattr("apps.ai.indexing.build_embedding_provider", build)
+
+        report = build_pending_space(pending.id)
+
+        assert asked == [NEW] and report.records_built == 1
+
+
+class BoundsAndStateTests:
+    def _hold(self, space, record):
+        import psycopg2
+        from apps.ai.space_build import record_lock_keys
+
+        settings_dict = connection.settings_dict
+        other = psycopg2.connect(
+            dbname=settings_dict["NAME"], user=settings_dict["USER"],
+            password=settings_dict["PASSWORD"], host=settings_dict["HOST"],
+            port=settings_dict["PORT"])
+        other.autocommit = True
+        with other.cursor() as cursor:
+            cursor.execute("SELECT pg_advisory_lock(%s, %s)", record_lock_keys(space.id, record.id))
+        return other
+
+    def test_a_record_held_by_another_worker_does_not_use_up_the_record_bound(self, active, pending):
+        held = _record("Held", chunks=("h",))
+        free = _record("Free", chunks=("f",))
+        other = self._hold(pending, held)
+        try:
+            report = build_pending_space(pending.id, provider=Embedder(NEW), max_records=1)
+        finally:
+            other.close()
+
+        assert report.busy == [held.id]
+        assert report.records_built == 1
+        assert RecordSpaceEmbedding.objects.filter(record=free, space=pending).exists()
+
+    def test_a_record_larger_than_the_budget_is_still_built_so_the_build_can_progress(self, active, pending):
+        _record("Large", chunks=("word " * 50,))
+
+        report = build_pending_space(pending.id, provider=Embedder(NEW), token_budget=1)
+
+        assert report.records_built == 1 and report.stopped == ""
+
+    def test_a_space_that_stops_being_pending_mid_run_is_not_written_further(self, active, pending):
+        _record("First", chunks=("a",))
+        second = _record("Second", chunks=("b",))
+        provider = Embedder(NEW)
+
+        def promote_elsewhere():
+            EmbeddingSpace.objects.filter(pk=active.pk).update(state=EmbeddingSpaceState.RETIRED)
+            EmbeddingSpace.objects.filter(pk=pending.pk).update(state=EmbeddingSpaceState.ACTIVE)
+            provider.hook = None
+
+        provider.hook = promote_elsewhere
+
+        report = build_pending_space(pending.id, provider=provider)
+
+        assert report.stopped == "space_not_pending"
+        assert not RecordSpaceEmbedding.objects.filter(record=second, space=pending).exists()

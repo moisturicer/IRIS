@@ -32,6 +32,7 @@ what IR-282's backfill needs.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 from typing import Optional, Sequence
 
@@ -106,8 +107,12 @@ class EmbeddingOutcome:
         }
 
 
-def build_embedding_provider() -> EmbeddingProvider:
+def build_embedding_provider(model: Optional[str] = None) -> EmbeddingProvider:
     """The adapter the indexing path uses.
+
+    ``model`` names the embedding model to ask for; unset, the configured one.
+    Only a pending-space build passes it (IR-752), so the second identity can
+    be built while the setting readers embed their queries with stays put.
 
     A function rather than a module-level instance so a test can monkeypatch
     one place, and so nothing is constructed at import time — ``VoyageEmbedding
@@ -120,7 +125,7 @@ def build_embedding_provider() -> EmbeddingProvider:
     """
     from apps.ai.providers.voyage import VoyageEmbeddingProvider
 
-    return VoyageEmbeddingProvider()
+    return VoyageEmbeddingProvider(model=model)
 
 
 def _checked_space(provider: EmbeddingProvider, space_id: Optional[int] = None):
@@ -222,8 +227,6 @@ def record_source_hash(record) -> str:
     A summary vector whose stored hash differs from this one was computed from
     a title or abstract that has since changed (IR-752).
     """
-    import hashlib
-
     return hashlib.sha256(summary_text(record).encode("utf-8")).hexdigest()
 
 
