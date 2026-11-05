@@ -28,10 +28,11 @@ PROTOCOLS = {"controller": "public-1", "runtime": "runs-reader-1"}
 COMMITS = {"controller": "ctl1", "runtime": "rt1"}
 SCENARIOS_PASSED = {
     "access_and_recovery": {"kind": "deterministic_provider_contract", "status": "measured",
-                            "passed": True, "tests": 40, "failed": 0, "errors": 0, "skipped": 0},
+                            "passed": True, "tests": 40, "failed": 0, "errors": 0, "skipped": 0,
+                            "git_commit": "rt1"},
     "durability": {"kind": "postgres_independent_processes_scripted_provider",
                    "status": "measured", "passed": True, "tests": 12, "failed": 0, "errors": 0,
-                   "skipped": 0},
+                   "skipped": 0, "git_commit": "rt1"},
     "browser": {"kind": "manual_browser", "status": "measured", "passed": True,
                 "operator": "Operator One", "git_commit": "rt1",
                 "checks": {name: {"status": "measured", "passed": True,

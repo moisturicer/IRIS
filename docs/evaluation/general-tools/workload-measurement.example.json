@@ -1,0 +1,47 @@
+{
+  "schema_version": "workload-measurement-1",
+  "run_id": "EXAMPLE-ONLY-not-a-measurement",
+  "providers": "fake",
+  "environment": {
+    "database": "sqlite",
+    "workers": "threads"
+  },
+  "started_at": "2026-10-21T00:00:00+00:00",
+  "concurrency": 8,
+  "workload_sha256": "7f107426dcff1bc471bf41201f85ab72f769294ec1972189f0b64454893041e6",
+  "samples": [
+    {
+      "class": "ordinary",
+      "outcome": "success",
+      "queue_ms": 100,
+      "total_ms": 1000,
+      "tool_ms": 50,
+      "model_ms": 600,
+      "cost_usd": 0.01,
+      "usage_reported": true
+    },
+    {
+      "class": "deep",
+      "outcome": "failed",
+      "queue_ms": 200,
+      "total_ms": 20000,
+      "tool_ms": null,
+      "model_ms": null,
+      "cost_usd": 0.05,
+      "usage_reported": false
+    },
+    {
+      "class": "ingestion",
+      "outcome": "success",
+      "total_ms": 5000,
+      "cost_usd": 0.002,
+      "usage_reported": true
+    }
+  ],
+  "resources": {
+    "peak_memory_mb": 900,
+    "peak_connections": 40,
+    "lock_waits": 3,
+    "max_lock_wait_ms": 120
+  }
+}

@@ -45,6 +45,26 @@ READY, BLOCKED = "evidence_met", "blocked"
 METRICS = tuple(TARGETS)
 #: Families the campaign report itself lists as disabled; named in the gate, never dropped.
 EXCLUDED_FAMILIES = {"A15": DISABLED["scenario:A15_public_research"]}
+#: Interpretations this report applies that no approved policy states. They are written into
+#: every manifest so a reader sees them; nothing here is a confirmed decision.
+POLICY_DECISIONS = (
+    {"id": "objectives_on_point_estimate", "status": "awaiting_confirmation",
+     "confirm_with": "Jive Tyler Revalde",
+     "applied": "The 90% and 95% objectives are judged on the observed proportion. The Wilson "
+                "95% interval is reported beside it and is not gated.",
+     "why": "A 10-case family cannot have a Wilson lower bound at 0.90 (10/10 gives 0.72), so "
+            "gating on the lower bound would make the profile unreachable at the required "
+            "family size.",
+     "if_changed": "Gating on the lower bound would need larger families or a lower target."},
+    {"id": "no_success_rate_threshold", "status": "awaiting_confirmation",
+     "confirm_with": "Jive Tyler Revalde",
+     "applied": "No success-rate threshold is applied to the workload. Successes, failures "
+                "and observed rates are reported; only a class whose every sample failed "
+                "blocks.",
+     "why": "No approved success-rate threshold exists and none is invented here.",
+     "if_changed": "An approved threshold would be added to the profile and enforced by the "
+                   "workload gate."},
+)
 RELEASE_DECISION_GAP = ("release_owner_decision: no named person has recorded the release "
                         "decision; this manifest decides nothing")
 NOT_AUTHORIZED = ("evidence_met means the recorded evidence meets the selected profile. It "
@@ -321,16 +341,60 @@ def _baseline(report: Mapping, label: str, baseline: Optional[Mapping]) -> dict:
 ACCESSIBILITY_CHECKS = ("keyboard", "accessible_summary", "mobile")
 
 
-def _suite(row: Optional[Mapping], name: str) -> dict:
-    """An IR-608 test suite as evidence: it must have run, not skipped, passed, and be the
-    kind of suite the claim needs."""
+#: What a commit that says nothing looks like (``git describe`` answers this when it cannot).
+NO_COMMIT = (None, "", "unknown")
+
+
+def _provenance(row: Mapping, commit: Optional[str], what: str) -> tuple[str, list]:
+    """Was this evidence produced at the candidate's commit? Never inferred.
+
+    ``verified`` only when the row records a commit and it equals the candidate's. A row that
+    records none is ``unverified``, which blocks; a different commit is ``mismatch``. A dirty
+    tree (``<sha>-dirty``) is a different string and so a mismatch.
+    """
+    recorded = row.get("git_commit")
+    if recorded in NO_COMMIT:
+        return "unverified", [(NOT_MEASURED, f"{what} records no commit, so its provenance is "
+                               "unverified; a commit is never inferred for it")]
+    if commit in NO_COMMIT:
+        return "unverified", [(NOT_MEASURED, f"the candidate's commit is unknown, so the {what} "
+                               "cannot be tied to it")]
+    if recorded != commit:
+        return "mismatch", [(INCOMPARABLE, f"the {what} ran at {recorded}, not at the "
+                             f"candidate's {commit}")]
+    return "verified", []
+
+
+def scenario_rows(run: Optional[Mapping]) -> dict:
+    """The IR-608 ``scenarios`` rows of an ``eval_scenarios`` run file.
+
+    The producer records the tested commit once, on the run, not on each suite row. A row
+    without a commit of its own takes the run's, marked ``git_commit_source: run_file``, so the
+    provenance the producer did record reaches the gate. A run that records none gives its rows
+    none; nothing is filled in.
+    """
+    if not isinstance(run, Mapping):
+        return {}
+    rows = run.get("scenarios", run) if isinstance(run.get("scenarios"), Mapping) else run
+    top = run.get("git_commit") if rows is not run else None
+    out = {}
+    for name, row in rows.items():
+        if isinstance(row, Mapping) and top not in NO_COMMIT and not row.get("git_commit"):
+            row = {**row, "git_commit": top, "git_commit_source": "run_file"}
+        out[name] = row
+    return out
+
+
+def _suite(row: Optional[Mapping], name: str, commit: Optional[str] = None) -> dict:
+    """An IR-608 test suite as evidence: it must have run, not skipped, passed, be the kind of
+    suite the claim needs, and carry the candidate's commit."""
     if not row:
         return _gate(NOT_MEASURED, [f"no IR-608 {name} evidence was supplied"])
     kind, _ = SUITES[name]
     if row.get("kind") != kind:
         return _gate(CONTRACT_ONLY, [f"{name} evidence is of kind {row.get('kind')!r}; the "
                                      f"claim needs {kind!r}"], kind=row.get("kind"))
-    problems = []
+    provenance, problems = _provenance(row, commit, f"{name} evidence")
     if row.get("status") != "measured":
         problems.append((NOT_MEASURED, f"{name} was not measured: {row.get('reason')}"))
     elif not row.get("tests"):
@@ -344,7 +408,9 @@ def _suite(row: Optional[Mapping], name: str) -> dict:
     elif row.get("passed") is not True and not problems:
         problems.append((NOT_MET, f"{name} did not pass"))
     status, reasons = _worst(problems)
-    return _gate(status, reasons, kind=kind, tests=row.get("tests"))
+    return _gate(status, reasons, kind=kind, tests=row.get("tests"), provenance=provenance,
+                 git_commit=row.get("git_commit"),
+                 git_commit_source=row.get("git_commit_source", "row"))
 
 
 def _browser(row: Optional[Mapping], commit: Optional[str]) -> dict:
@@ -363,19 +429,13 @@ def _browser(row: Optional[Mapping], commit: Optional[str]) -> dict:
             problems.append((NOT_MEASURED, f"browser check {name} was not measured{tag}"))
         elif check.get("passed") is not True:
             problems.append((NOT_MET, f"browser check {name} failed{tag}"))
-        elif not check.get("evidence_ref"):
+        elif not (check.get("evidence_ref") or check.get("evidence_recorded") is True):
             problems.append((NOT_MEASURED, f"browser check {name} cites no evidence_ref{tag}"))
-    if not row.get("git_commit"):
-        problems.append((NOT_MEASURED, "the browser exercise names no commit"))
-    elif not commit:
-        problems.append((NOT_MEASURED, "the candidate's commit is unknown, so the browser "
-                         "exercise cannot be tied to it"))
-    elif row["git_commit"] != commit:
-        problems.append((INCOMPARABLE, f"the browser exercise ran at {row['git_commit']}, not "
-                         f"at the candidate's {commit}"))
+    provenance, found = _provenance(row, commit, "browser exercise")
+    problems += found
     status, reasons = _worst(problems)
     return _gate(status, reasons, kind="manual_browser", operator=row.get("operator"),
-                 git_commit=row.get("git_commit"))
+                 git_commit=row.get("git_commit"), provenance=provenance)
 
 
 # --- the declared workload, the authorized profile and live collection -------------------
@@ -396,6 +456,12 @@ PROFILE_LIMITS = {"latency": ("ordinary_p95_ms", "deep_p95_ms"),
 CAP_KEYS = ("deadline_seconds", "deep_deadline_seconds", "max_attempts", "max_input_tokens",
             "max_output_tokens", "max_cost_usd", "max_queued", "deep_concurrency",
             "worker_concurrency", "campaign_cost_usd")
+
+
+#: No success-rate threshold has been approved, so none is applied; the observed rate is
+#: reported for a reader to judge. Only a class in which every sample failed blocks.
+SUCCESS_RATE_POLICY = ("no success-rate threshold is approved, so none is enforced: observed "
+                       "rates are reported and only a class whose every sample failed blocks")
 
 
 def _positive(value: Any) -> bool:
@@ -464,6 +530,87 @@ def _p95(values: Sequence[float]) -> Optional[float]:
     return percentile(list(values), 0.95)
 
 
+SAMPLE_NUMBERS = ("queue_ms", "total_ms", "tool_ms", "model_ms")
+RESOURCE_FIELDS = ("peak_memory_mb", "peak_connections", "lock_waits", "max_lock_wait_ms")
+
+
+def _number(value: Any) -> bool:
+    return (isinstance(value, (int, float)) and not isinstance(value, bool)
+            and value == value and value >= 0)
+
+
+def validate_measurement(measurement: Any, *, limit: int = 20) -> list[str]:
+    """Structural defects of a ``workload-measurement-1`` file; empty when it is well formed.
+
+    This is the contract a producer (IR-755) writes to. It checks shape only: whether the
+    numbers are good enough is the ``workload`` and ``cost`` gates' business, and a well-formed
+    file is neither evidence nor a pass. At most ``limit`` problems are listed.
+    """
+    if not isinstance(measurement, Mapping):
+        return ["the measurement is not a JSON object"]
+    out: list[str] = []
+
+    def bad(message):
+        out.append(message)
+
+    if measurement.get("schema_version") != MEASUREMENT_SCHEMA:
+        bad(f"schema_version must be {MEASUREMENT_SCHEMA!r}")
+    if not _filled(measurement.get("run_id")):
+        bad("run_id must be a non-empty string")
+    if measurement.get("providers") not in ("real", "fake"):
+        bad("providers must be 'real' or 'fake'")
+    env = measurement.get("environment")
+    if not isinstance(env, Mapping) or not _filled(env.get("database")) \
+            or not _filled(env.get("workers")):
+        bad("environment must name database and workers")
+    if _when(measurement.get("started_at")) is None:
+        bad("started_at must be a timezone-aware ISO 8601 time")
+    if not _positive(measurement.get("concurrency")):
+        bad("concurrency must be a positive number")
+    digest = measurement.get("workload_sha256")
+    if not (isinstance(digest, str) and len(digest) == 64
+            and all(c in "0123456789abcdef" for c in digest)):
+        bad("workload_sha256 must be the 64-hex canonical digest of the declared workload")
+    res = measurement.get("resources")
+    if not isinstance(res, Mapping):
+        bad("resources must be an object")
+    else:
+        bad_res = [f for f in RESOURCE_FIELDS if not _number(res.get(f))]
+        if bad_res:
+            bad(f"resources.{', resources.'.join(bad_res)} must be non-negative numbers")
+    samples = measurement.get("samples")
+    if not isinstance(samples, list):
+        bad("samples must be a list")
+        samples = []
+    for i, s in enumerate(samples):
+        if not isinstance(s, Mapping):
+            bad(f"samples[{i}] is not an object")
+            continue
+        cls = s.get("class")
+        if cls not in CLASSES:
+            bad(f"samples[{i}].class must be one of {', '.join(CLASSES)}")
+        if not _filled(s.get("outcome")):
+            bad(f"samples[{i}].outcome must be a non-empty string")
+        if not isinstance(s.get("usage_reported"), bool):
+            bad(f"samples[{i}].usage_reported must be true or false")
+        cost = s.get("cost_usd")
+        if cost is not None and not _number(cost):
+            bad(f"samples[{i}].cost_usd must be a non-negative number or null")
+        for f in SAMPLE_NUMBERS:
+            required = cls in TASK_CLASSES and f in ("queue_ms", "total_ms")
+            if f in s and s[f] is None and not required:
+                continue
+            if (required or f in s) and not _number(s.get(f)):
+                bad(f"samples[{i}].{f} must be a non-negative number")
+        if _number(s.get("queue_ms")) and _number(s.get("total_ms")) \
+                and s["total_ms"] < s["queue_ms"]:
+            bad(f"samples[{i}].total_ms must include queue_ms (total_ms >= queue_ms)")
+        if len(out) >= limit:
+            out.append("... further problems not listed")
+            break
+    return out[:limit + 1]
+
+
 def _prerequisites(workload, profile, measurement) -> list[tuple[str, str]]:
     out = []
     pre = _declaration_missing(workload, profile)
@@ -475,6 +622,11 @@ def _prerequisites(workload, profile, measurement) -> list[tuple[str, str]]:
     elif measurement.get("schema_version") != MEASUREMENT_SCHEMA:
         out.append((NOT_MEASURED, f"measurement schema {measurement.get('schema_version')!r} "
                     f"is not {MEASUREMENT_SCHEMA!r}"))
+    else:
+        defects = validate_measurement(measurement)
+        if defects:
+            out.append((NOT_MEASURED, "the measurement is not a well-formed "
+                        f"{MEASUREMENT_SCHEMA}: {'; '.join(defects)}"))
     return out
 
 
@@ -521,8 +673,10 @@ def _workload(workload, profile, measurement) -> dict:
         if len(own) < declared_n:
             problems.append((INCONCLUSIVE, f"class {cls} has {len(own)} samples, fewer than the "
                              f"declared {declared_n}"))
-        row = {"n": len(own), "declared": declared_n,
-               "failures": sum(s.get("outcome") != "success" for s in own)}
+        successes = sum(s.get("outcome") == "success" for s in own)
+        row = {"n": len(own), "declared": declared_n, "successes": successes,
+               "failures": len(own) - successes,
+               "observed_success_rate": successes / len(own) if own else None}
         if cls in TASK_CLASSES and own and row["failures"] == len(own):
             problems.append((NOT_MET, f"every {cls} sample failed; a latency figure over "
                              "failures alone says nothing about answered tasks"))
@@ -558,6 +712,7 @@ def _workload(workload, profile, measurement) -> dict:
                              f"{limits[cap_key]}"))
     status, reasons = _worst(problems)
     return _gate(status, reasons, run_id=measurement.get("run_id"), classes=classes,
+                 success_rate_policy=SUCCESS_RATE_POLICY,
                  resources={k: res.get(k) for k in ("peak_memory_mb", "peak_connections",
                                                      "lock_waits", "max_lock_wait_ms")},
                  environment=measurement.get("environment"))
@@ -722,8 +877,10 @@ def build_readiness(report: Mapping, *, candidate: str = "runtime",
         "safety": _safety(report, candidate),
         "human_review": review_gate,
         "baseline": _baseline(report, candidate, baseline),
-        "access_disclosure": _suite(scenarios.get("access_and_recovery"), "access_and_recovery"),
-        "postgres_workers": _suite(scenarios.get("durability"), "durability"),
+        "access_disclosure": _suite(scenarios.get("access_and_recovery"),
+                                    "access_and_recovery", arm.get("git_commit")),
+        "postgres_workers": _suite(scenarios.get("durability"), "durability",
+                                   arm.get("git_commit")),
         "browser_accessibility": _browser(scenarios.get("browser"), arm.get("git_commit")),
         "authorization": _authorization(workload, profile, approvals),
         "workload": _workload(workload, profile, measurements),
@@ -743,6 +900,7 @@ def build_readiness(report: Mapping, *, candidate: str = "runtime",
         "status": BLOCKED if blocking else READY, "blocking": blocking, "gates": gates,
         "human_review_gaps": [*gaps, RELEASE_DECISION_GAP],
         "inputs": {k: dict(v) for k, v in sorted((references or {}).items())},
+        "policy_decisions": [dict(d) for d in POLICY_DECISIONS],
         "separate_results": {k: v for k, v in separate.items() if v is not None},
         "notes": [NOT_AUTHORIZED, TARGET_LABEL],
     }

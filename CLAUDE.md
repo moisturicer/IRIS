@@ -353,7 +353,8 @@ python manage.py eval_readiness --build --report <campaign.json> --candidate run
                                    # IR-741: release-readiness manifest over an eval_campaign report.
                                    # Eleven gates, only `met` clears one; missing, fake, incomparable or
                                    # breached evidence blocks. --preflight names every missing cap/approval;
-                                   # --verify [--assert-ready] is what IR-742 reads. Free: no DB, no vendor.
+                                   # --verify [--check-files] [--assert-ready] is what IR-742 reads;
+                                   # --validate-measurement checks a workload-measurement-1 file. Free: no DB, no vendor.
                                    # Authorizes nothing. Verified locally on synthetic fixtures only (no
                                    # real campaign, load run or human review exists). docs/evaluation/
                                    # general-tools/readiness.md

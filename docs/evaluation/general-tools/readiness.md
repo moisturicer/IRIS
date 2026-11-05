@@ -65,3 +65,74 @@ Fake providers, in-process or non-PostgreSQL runs, jsdom results and the synthet
 `evaluation/tests/readiness_fixtures.py` are contract checks. A fixture that declares itself
 `real` exists only to exercise the gate logic. No production campaign, load measurement,
 browser exercise or human review has been collected for this manifest.
+
+## Provenance of IR-608 evidence
+
+`eval_scenarios` records the commit it ran at **once, on the run file** (`git_commit`), not on
+each suite row, and `eval_campaign --scenarios` reads only the rows. So that the recorded
+provenance reaches the gate, `eval_readiness` copies the run-level commit onto a row that has
+none, marking it `git_commit_source: "run_file"`. Nothing is inferred:
+
+| What the evidence records | Gate result | `provenance` |
+|---|---|---|
+| the candidate's commit | may be `met` | `verified` |
+| no commit, or `unknown` (`git describe` could not say) | `not_measured` | `unverified` |
+| the candidate's commit unknown | `not_measured` | `unverified` |
+| another commit, or `<sha>-dirty` | `incomparable` | `mismatch` |
+
+This applies to `access_disclosure`, `postgres_workers` and the browser exercise alike. The
+browser producer keeps no private reference; it now records `evidence_recorded: true` per
+measured check, and readiness accepts that or an `evidence_ref`.
+
+## Success rates
+
+The `workload` gate reports, per class, `successes`, `failures` and `observed_success_rate`.
+**No success-rate threshold is approved, so none is enforced**; only a class in which every
+sample failed blocks. A run with a 5% success rate and a fast p95 therefore still passes this
+gate. That is a limitation of the policy, stated in the gate (`success_rate_policy`) and in
+every manifest (`policy_decisions`), not a judgement that such a rate is acceptable.
+
+## `workload-measurement-1`
+
+The file an operator or IR-755's collector writes after running the declared workload. Shape is
+checked by `validate_measurement` (`eval_readiness --validate-measurement FILE`); a well-formed
+file is **not** evidence and the `workload` and `cost` gates still judge the numbers. A
+malformed file makes both gates `not_measured` rather than crashing them. A committed example,
+marked fake, is `workload-measurement.example.json`.
+
+| Field | Required | Meaning |
+|---|---|---|
+| `schema_version` | yes | exactly `workload-measurement-1` |
+| `run_id` | yes | non-empty string naming the load run |
+| `providers` | yes | `real` or `fake`; `fake` can only reach `contract_only` |
+| `environment` | yes | `{database, workers}`; only `{postgresql, independent_processes}` counts as real |
+| `started_at` | yes | timezone-aware ISO 8601; must be at or after the workload's `declared_at` |
+| `concurrency` | yes | positive number actually run; below the declared concurrency is `incomparable` |
+| `workload_sha256` | yes | 64 lowercase hex: SHA-256 of the declared workload as canonical JSON (sorted keys, separators `,` and `:`, `ensure_ascii=False`); a different digest is `incomparable` |
+| `resources` | yes | non-negative numbers `peak_memory_mb`, `peak_connections`, `lock_waits`, `max_lock_wait_ms` |
+| `samples[]` | yes | one per request; see below |
+
+Sample fields: `class` (`ordinary`, `deep` or `ingestion`); `outcome` (non-empty; `success`, or
+anything else, which counts as a failure); `usage_reported` (boolean); `cost_usd` (non-negative
+number, or `null` meaning no usage and no reservation, which makes cost unbounded); `queue_ms`
+and `total_ms` (non-negative; **required for `ordinary` and `deep`**, with `total_ms` >=
+`queue_ms` so latency is queue-inclusive); `tool_ms` and `model_ms` (optional, non-negative or
+`null`). The declared `mix` is the minimum samples per class. Latency percentiles and the cost
+per successful task include failed requests.
+
+## IR-755 integration contract
+
+IR-741 does not collect. A collector can be written against this alone:
+
+1. Declare the workload, the authorized profile (including every operational cap) and the
+   approvals **before** collecting; `eval_readiness --preflight` must report `allowed`.
+2. Run the declared workload against real PostgreSQL with independent workers and write a
+   `workload-measurement-1` file; check it with `--validate-measurement`.
+3. Run `eval_scenarios --workers` (and attach the named manual browser exercise) at the
+   candidate's commit; keep the run file.
+4. Produce a counted `eval_campaign` report: three or more real-provider repetitions of the
+   candidate, two human reviews per case, and a frozen baseline report whose SHA-256 is
+   recorded.
+5. Run `eval_readiness --build`, then `--verify --assert-ready --expect-commit <sha>`.
+
+Until those exist the manifest is `blocked`, correctly.

@@ -5,13 +5,15 @@ manifest here proves the command's plumbing, never that any runtime is ready.
 """
 
 import json
+from pathlib import Path
 
 import httpx
 import pytest
 from django.core.management import call_command
 from django.core.management.base import CommandError
 
-from apps.ai.evaluation.readiness import SCHEMA_VERSION, canonical_digest, verify_manifest
+from apps.ai.evaluation.readiness import (SCHEMA_VERSION, canonical_digest, validate_measurement,
+                                          verify_manifest)
 
 from .readiness_fixtures import (PROFILE, SCENARIOS_PASSED, WORKLOAD, campaign_report,
                                  measurements)
@@ -182,3 +184,53 @@ def test_malformed_inputs_are_command_errors_not_tracebacks(tmp_path):
     opts["scenarios"] = str(tmp_path / "list.json")
     with pytest.raises(CommandError, match="--scenarios"):
         call_command("eval_readiness", build=True, **opts)
+
+
+def test_validate_measurement_accepts_a_well_formed_file_and_says_it_is_not_evidence(
+        tmp_path, capsys):
+    call_command("eval_readiness", validate_measurement=_write(tmp_path / "m.json",
+                                                              measurements()))
+    assert "not evidence" in capsys.readouterr().out
+
+
+def test_validate_measurement_names_each_defect(tmp_path, capsys):
+    bad = measurements(concurrency=0, providers="mock")
+    with pytest.raises(CommandError, match="2 defect"):
+        call_command("eval_readiness", validate_measurement=_write(tmp_path / "m.json", bad))
+    out = capsys.readouterr().out
+    assert "DEFECT concurrency" in out and "DEFECT providers" in out
+
+
+def test_the_committed_example_measurement_satisfies_the_contract_and_is_marked_fake():
+    path = (Path(__file__).resolve().parents[5] / "docs" / "evaluation" / "general-tools"
+            / "workload-measurement.example.json")
+    if not path.exists():
+        pytest.skip("docs/ is not part of this checkout (backend-only image)")
+    example = json.loads(path.read_text(encoding="utf-8"))
+    assert example["providers"] == "fake" and example["run_id"].startswith("EXAMPLE-ONLY")
+    assert validate_measurement(example) == []
+
+
+def test_an_eval_scenarios_run_file_carries_its_commit_into_the_gates(tmp_path):
+    rows = {k: {x: y for x, y in v.items() if x != "git_commit"}
+            for k, v in SCENARIOS_PASSED.items() if k != "browser"}
+    run = {"schema_version": 1, "issue": "IR-608", "git_commit": "rt1", "providers": "fake",
+           "scenarios": {**rows, "browser": SCENARIOS_PASSED["browser"]}}
+    opts = _inputs(tmp_path)
+    opts["scenarios"] = _write(tmp_path / "scenarios.json", run)
+    call_command("eval_readiness", build=True, **opts)
+    manifest = _manifest(tmp_path)
+    assert manifest["gates"]["postgres_workers"]["status"] == "met"
+    assert manifest["gates"]["postgres_workers"]["git_commit_source"] == "run_file"
+    run["git_commit"] = "unknown"
+    opts["scenarios"] = _write(tmp_path / "scenarios.json", run)
+    next((tmp_path / "out").glob("*.json")).unlink()
+    call_command("eval_readiness", build=True, **opts)
+    assert _manifest(tmp_path)["gates"]["postgres_workers"]["provenance"] == "unverified"
+
+
+def test_build_prints_the_interpretations_that_await_confirmation(tmp_path, capsys):
+    call_command("eval_readiness", build=True, **_inputs(tmp_path))
+    out = capsys.readouterr().out
+    assert "CONFIRM objectives_on_point_estimate" in out
+    assert "CONFIRM no_success_rate_threshold" in out

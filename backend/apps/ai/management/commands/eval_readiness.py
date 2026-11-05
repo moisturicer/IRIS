@@ -6,6 +6,7 @@
         --approvals approvals.json [--capability cap.json] [--model model.json]
     python manage.py eval_readiness --preflight --workload w.json --profile p.json \\
         --approvals approvals.json
+    python manage.py eval_readiness --validate-measurement m.json
     python manage.py eval_readiness --verify manifest.json \\
         [--check-files] [--assert-ready --expect-commit SHA]
 
@@ -19,7 +20,8 @@ from pathlib import Path
 from django.core.management.base import BaseCommand, CommandError
 
 from apps.ai.evaluation.readiness import (ReadinessRefused, assert_ready, build_readiness,
-                                          collection_preflight, verify_manifest)
+                                          collection_preflight, scenario_rows,
+                                          validate_measurement, verify_manifest)
 from apps.ai.evaluation.runfile import file_digest, load_json, write_run
 from apps.ai.management.commands.eval_retrieval import DEFAULT_OUT
 
@@ -35,6 +37,9 @@ class Command(BaseCommand):
         parser.add_argument("--build", action="store_true")
         parser.add_argument("--preflight", action="store_true",
                             help="May paid collection begin? Names every missing item.")
+        parser.add_argument("--validate-measurement", metavar="FILE",
+                            help="Check a workload-measurement-1 file is well formed (shape "
+                                 "only: a well-formed file is not evidence).")
         parser.add_argument("--verify", metavar="MANIFEST",
                             help="Check a manifest is internally sound.")
         parser.add_argument("--check-files", action="store_true",
@@ -59,14 +64,18 @@ class Command(BaseCommand):
         parser.add_argument("--out", default=str(DEFAULT_OUT))
 
     def handle(self, *args, **options):
-        modes = [bool(options["build"]), bool(options["preflight"]), bool(options["verify"])]
+        modes = [bool(options[k]) for k in ("build", "preflight", "verify",
+                                            "validate_measurement")]
         if sum(modes) != 1:
-            raise CommandError("give exactly one of --build, --preflight or --verify")
+            raise CommandError("give exactly one of --build, --preflight, --verify or "
+                               "--validate-measurement")
         try:
             if options["build"]:
                 return self._build(options)
             if options["preflight"]:
                 return self._preflight(options)
+            if options["validate_measurement"]:
+                return self._validate_measurement(options)
             self._verify(options)
         except ReadinessRefused as exc:
             raise CommandError(str(exc)) from None
@@ -80,6 +89,16 @@ class Command(BaseCommand):
         if value is not None and not isinstance(value, dict):
             raise CommandError(f"{what} must be a JSON object")
         return value
+
+    def _validate_measurement(self, options):
+        defects = validate_measurement(load_json(options["validate_measurement"]))
+        for defect in defects:
+            self.stdout.write(f"DEFECT {defect}")
+        if defects:
+            raise CommandError(f"not a well-formed workload-measurement-1: {len(defects)} "
+                               "defect(s)")
+        self.stdout.write("well formed. Shape only: this is not evidence, and the workload and "
+                          "cost gates still judge the numbers.")
 
     def _preflight(self, options):
         result = collection_preflight(
@@ -140,7 +159,7 @@ class Command(BaseCommand):
                         "expected_sha256": options["baseline_sha256"]}
         scenarios = self._mapping(self._load(options, "scenarios"), "--scenarios")
         if scenarios is not None:
-            scenarios = scenarios.get("scenarios", scenarios)
+            scenarios = scenario_rows(scenarios)
         references = {name: {"path": Path(options[name]).as_posix(),
                              "sha256": file_digest(options[name])}
                       for name in INPUTS if options.get(name)}
@@ -162,5 +181,7 @@ class Command(BaseCommand):
             w(f"BLOCKING {line}")
         for gap in manifest["human_review_gaps"]:
             w(f"HUMAN REVIEW {gap}")
+        for decision in manifest["policy_decisions"]:
+            w(f"CONFIRM {decision['id']} with {decision['confirm_with']}: {decision['applied']}")
         w(("evidence_met" if manifest["status"] == "evidence_met" else "BLOCKED")
           + f"; wrote {out}")

@@ -11,8 +11,10 @@ import json
 
 import pytest
 
-from apps.ai.evaluation.readiness import (ReadinessRefused, build_readiness, canonical_digest,
-                                          assert_ready, collection_preflight, verify_manifest)
+from apps.ai.evaluation.readiness import (POLICY_DECISIONS, ReadinessRefused, build_readiness,
+                                          canonical_digest, assert_ready, collection_preflight,
+                                          scenario_rows, validate_measurement, verify_manifest)
+from apps.ai.evaluation.scenarios import browser_result
 
 from apps.ai.evaluation.campaign_report import build_report
 
@@ -704,7 +706,8 @@ def test_a_negative_cost_cannot_lower_the_total_it_is_unbounded():
     m = measurements()
     m["samples"][0]["cost_usd"] = -5.0
     g = gate(full(measurements=m), "cost")
-    assert g["status"] == "not_measured" and g["unbounded_samples"] == 1
+    assert g["status"] == "not_measured"
+    assert any("cost_usd must be a non-negative number" in r for r in g["reasons"])
 
 
 def test_verify_reads_a_file_as_write_run_wrote_it_and_survives_malformed_manifests():
@@ -720,3 +723,184 @@ def test_verify_reads_a_file_as_write_run_wrote_it_and_survives_malformed_manife
 def test_the_manifest_records_every_input_it_was_given():
     m = readiness()
     assert m["inputs"] == {k: v for k, v in sorted(REFS.items())}
+
+
+# --- IR-608 provenance: a commit is recorded by the producer or it is unverified ---------------
+
+
+def _with(name, **change):
+    rows = copy.deepcopy(SCENARIOS_PASSED)
+    rows[name].update(change)
+    return rows
+
+
+@pytest.mark.parametrize("name,gate_name", [("access_and_recovery", "access_disclosure"),
+                                            ("durability", "postgres_workers")])
+def test_a_suite_row_with_no_commit_is_unverified_and_blocks(name, gate_name):
+    rows = copy.deepcopy(SCENARIOS_PASSED)
+    del rows[name]["git_commit"]
+    g = gate(readiness(scenarios=rows), gate_name)
+    assert g["status"] == "not_measured" and g["provenance"] == "unverified"
+    assert any("never inferred" in r for r in g["reasons"])
+
+
+@pytest.mark.parametrize("recorded", ["unknown", "", None])
+def test_an_unknown_commit_is_not_provenance(recorded):
+    g = gate(readiness(scenarios=_with("durability", git_commit=recorded)), "postgres_workers")
+    assert g["status"] == "not_measured" and g["provenance"] == "unverified"
+
+
+def test_a_suite_run_at_another_commit_or_a_dirty_tree_is_incomparable():
+    for commit in ("old1", "rt1-dirty"):
+        g = gate(readiness(scenarios=_with("access_and_recovery", git_commit=commit)),
+                 "access_disclosure")
+        assert g["status"] == "incomparable" and g["provenance"] == "mismatch"
+        assert commit in " ".join(g["reasons"])
+
+
+def test_a_suite_at_the_candidates_commit_is_verified():
+    g = gate(readiness(), "postgres_workers")
+    assert g["status"] == "met" and g["provenance"] == "verified" and g["git_commit"] == "rt1"
+
+
+def test_the_run_level_commit_of_an_eval_scenarios_file_reaches_its_rows_marked_as_such():
+    bare = {k: {x: y for x, y in v.items() if x != "git_commit"}
+            for k, v in SCENARIOS_PASSED.items() if k != "browser"}
+    run = {"schema_version": 1, "issue": "IR-608", "git_commit": "rt1", "providers": "fake",
+           "scenarios": {**bare, "browser": SCENARIOS_PASSED["browser"]}}
+    rows = scenario_rows(run)
+    assert rows["durability"]["git_commit"] == "rt1"
+    assert rows["durability"]["git_commit_source"] == "run_file"
+    assert rows["browser"]["git_commit"] == "rt1" and "git_commit_source" not in rows["browser"]
+    g = gate(readiness(scenarios=rows), "postgres_workers")
+    assert g["status"] == "met" and g["git_commit_source"] == "run_file"
+
+
+def test_nothing_is_filled_in_when_the_run_records_no_commit():
+    bare = {k: v for k, v in SCENARIOS_PASSED["durability"].items() if k != "git_commit"}
+    run = {"scenarios": {"durability": bare}}
+    assert "git_commit" not in scenario_rows(run)["durability"]
+    unknown = {**run, "git_commit": "unknown"}
+    assert "git_commit" not in scenario_rows(unknown)["durability"]
+    own = {"git_commit": "rt1", "scenarios": {"durability": {"git_commit": "mine"}}}
+    assert scenario_rows(own)["durability"]["git_commit"] == "mine"
+    assert scenario_rows(None) == {} and scenario_rows([]) == {}
+
+
+def test_a_row_the_real_browser_producer_writes_clears_the_browser_gate():
+    """The IR-608 producer keeps no private reference, only that one was recorded."""
+    evidence = {"operator": "Operator One", "timestamp_utc": "2026-11-01T00:00:00+00:00",
+                "git_commit": "rt1", "browser": "Chrome 130", "viewport": "390x844",
+                "conversation_id": "c1",
+                "checks": {n: {"status": "measured", "passed": True, "evidence_ref": f"p/{n}"}
+                           for n in SCENARIOS_PASSED["browser"]["checks"]}}
+    row = browser_result(evidence)
+    assert "p/live" not in json.dumps(row)
+    g = gate(readiness(scenarios={**SCENARIOS_PASSED, "browser": row}), "browser_accessibility")
+    assert g["status"] == "met" and g["provenance"] == "verified"
+
+
+# --- success counts and the policy limitation ---------------------------------------------------
+
+
+def test_the_workload_reports_successes_failures_and_observed_rates_per_class():
+    g = gate(full(), "workload")
+    assert g["classes"]["ordinary"]["successes"] == 37
+    assert g["classes"]["ordinary"]["failures"] == 3
+    assert g["classes"]["ordinary"]["observed_success_rate"] == pytest.approx(0.925)
+    assert g["classes"]["deep"]["observed_success_rate"] == 1.0
+    assert g["classes"]["ingestion"]["successes"] == 5
+    assert "no success-rate threshold is approved" in g["success_rate_policy"]
+
+
+def test_a_low_but_not_total_failure_rate_is_reported_not_blocked_because_no_threshold_exists():
+    m = measurements()
+    for s in m["samples"]:
+        if s["class"] == "ordinary" and s["total_ms"] < 1300:
+            s["outcome"] = "failed"
+    g = gate(full(measurements=m), "workload")
+    assert g["classes"]["ordinary"]["observed_success_rate"] < 0.25
+    assert g["status"] == "met"          # the limitation, stated: no approved threshold to fail
+    assert g["success_rate_policy"]
+
+
+def test_every_manifest_lists_the_interpretations_awaiting_confirmation():
+    ids = {d["id"] for d in full()["policy_decisions"]}
+    assert ids == {"objectives_on_point_estimate", "no_success_rate_threshold"}
+    assert all(d["status"] == "awaiting_confirmation" and d["confirm_with"]
+               for d in POLICY_DECISIONS)
+    q = gate(full(), "quality")["repetitions"][0]["overall"]["task_completion"]
+    assert {"wilson_low", "wilson_high", "value", "target"} <= set(q)   # reported, not gated
+
+
+# --- workload-measurement-1: the contract a producer writes to ----------------------------------
+
+
+def test_the_fixture_measurement_satisfies_the_contract():
+    assert validate_measurement(measurements()) == []
+
+
+@pytest.mark.parametrize("field,value,fragment", [
+    ("schema_version", "workload-measurement-2", "schema_version"),
+    ("run_id", "", "run_id"), ("providers", "mock", "providers"),
+    ("environment", {"database": "postgresql"}, "environment"),
+    ("started_at", "2026-10-21T00:00:00", "timezone-aware"),
+    ("concurrency", 0, "concurrency"), ("workload_sha256", "abc", "workload_sha256"),
+    ("workload_sha256", "Z" * 64, "workload_sha256"),
+    ("resources", {"peak_memory_mb": -1, "peak_connections": 1, "lock_waits": 0,
+                   "max_lock_wait_ms": 0}, "peak_memory_mb"),
+    ("resources", [], "resources must be an object"),
+    ("samples", "none", "samples must be a list")])
+def test_each_top_level_defect_is_named(field, value, fragment):
+    problems = validate_measurement(measurements(**{field: value}))
+    assert problems and any(fragment in p for p in problems)
+
+
+def test_each_sample_defect_is_named():
+    m = measurements()
+    m["samples"][0].update(total_ms=10, queue_ms=500)
+    m["samples"][1]["class"] = "bulk"
+    m["samples"][2]["usage_reported"] = "yes"
+    m["samples"][3]["cost_usd"] = -1
+    m["samples"][4]["outcome"] = ""
+    m["samples"][5] = "not an object"
+    text = " ".join(validate_measurement(m))
+    for fragment in ("total_ms must include queue_ms", "class must be one of",
+                     "usage_reported must be true or false", "cost_usd must be",
+                     "outcome must be", "samples[5] is not an object"):
+        assert fragment in text
+
+
+def test_a_task_sample_needs_queue_and_total_but_ingestion_and_optional_times_may_be_absent():
+    m = measurements()
+    del m["samples"][0]["queue_ms"]
+    assert any("queue_ms" in p for p in validate_measurement(m))
+    ok = measurements()
+    ok["samples"][0]["tool_ms"] = None
+    for s in ok["samples"]:
+        if s["class"] == "ingestion":
+            s.pop("queue_ms", None)
+    assert validate_measurement(ok) == []
+    assert validate_measurement([]) == ["the measurement is not a JSON object"]
+
+
+def test_the_problem_list_is_bounded():
+    m = measurements()
+    for s in m["samples"]:
+        s["class"] = "bulk"
+    assert len(validate_measurement(m, limit=5)) <= 6
+
+
+def test_a_malformed_measurement_blocks_both_gates_instead_of_crashing_them():
+    junk = measurements(samples=[1, None, "x"])
+    for name in ("workload", "cost"):
+        g = gate(full(measurements=junk), name)
+        assert g["status"] == "not_measured" and any("not a well-formed" in r
+                                                     for r in g["reasons"])
+
+
+def test_a_well_formed_file_is_still_not_evidence_when_it_declares_fake_providers():
+    fake = measurements(providers="fake")
+    assert validate_measurement(fake) == []
+    assert gate(full(measurements=fake), "workload")["status"] == "contract_only"
+    assert gate(full(measurements=fake), "cost")["status"] == "contract_only"
