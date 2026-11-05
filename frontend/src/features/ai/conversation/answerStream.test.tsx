@@ -1,15 +1,24 @@
 /**
- * The streaming state machine driving Ask IRIS's live progress (IR-329,
- * reworked to the public `activity` frames by IR-596).
+ * The streaming state machine behind every live answer, Ask IRIS's and Paper
+ * Chat's alike (IR-329, reworked to the public `activity` frames by IR-596).
  *
  * `aiApi.askStream` is mocked as an async generator yielding the same
- * `{event, data}` shape `readSSE` produces -- the seam this hook actually
- * calls, so a test here does not need a real fetch or a real SSE body.
+ * `{event, data}` shape `readSSE` produces -- the seam `streamAnswer` is
+ * handed, so a test here does not need a real fetch or a real SSE body.
+ *
+ * It was `useAskStream.test.tsx`, which drove `streamAnswer` through Paper
+ * Chat's own hook. IR-571 deleted that hook; the harness below is the part of
+ * it a test needs -- one answer's state and its signal -- so the event handling
+ * keeps every assertion it had. What the hook added on top (`cancel`, `detach`)
+ * now lives in the Conversation client and is tested there.
  */
+import { useCallback, useRef, useState } from "react";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { describe, expect, it, vi } from "vitest";
 
-import { StreamDetached, useAskStream } from "./useAskStream";
+import { aiApi } from "@/api/ai";
+import type { SSEEvent } from "@/lib/sse";
+import { StreamDetached, streamAnswer, type AskStreamOptions, type StreamingState } from "./answerStream";
 
 const askStream = vi.fn();
 const resumeAskRun = vi.fn();
@@ -22,6 +31,27 @@ vi.mock("@/api/ai", () => ({
     cancelRun: (...args: unknown[]) => cancelRun(...args),
   },
 }));
+
+/** One followed answer at a time: its live state and the signal that detaches it. */
+function useAskStream() {
+  const [streaming, setStreaming] = useState<StreamingState | null>(null);
+  const controller = useRef<AbortController | null>(null);
+  const drive = useCallback((
+    question: string, options: AskStreamOptions,
+    open: (signal: AbortSignal) => AsyncGenerator<SSEEvent>, knownRunId: string | null = null,
+  ) => {
+    controller.current?.abort();
+    const abort = new AbortController();
+    controller.current = abort;
+    return streamAnswer(question, options, open, { signal: abort.signal, onState: setStreaming, knownRunId });
+  }, []);
+  const ask = useCallback((question: string, options: AskStreamOptions = {}) =>
+    drive(question, options, (signal) => aiApi.askStream(question, options, signal)), [drive]);
+  const follow = useCallback((runId: string, question: string, options: AskStreamOptions = {}) =>
+    drive(question, options, (signal) => aiApi.resumeAskRun(runId, 0, signal), runId), [drive]);
+  const detach = useCallback(() => controller.current?.abort(), []);
+  return { streaming, ask, follow, detach };
+}
 
 async function* eventsOf(...events: { event: string; data: unknown; id?: string }[]) {
   for (const event of events) yield event;
@@ -535,10 +565,9 @@ describe("an owned run, opened, cancelled and retried (IR-548)", () => {
     expect(outcome.message.question).toBe("What predicts flooding?");
   });
 
-  it("names the run it is following, so it can be stopped", async () => {
+  it("names the run it is following, and ends a confirmed stop as the reader's own", async () => {
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => { release = resolve; });
-    cancelRun.mockResolvedValue({ data: { run_id: "r-8", state: "cancelled" } });
     askStream.mockReturnValue(
       (async function* () {
         yield { event: "run_queued", id: "1", data: { run_id: "r-8", state: "queued" } };
@@ -552,9 +581,6 @@ describe("an owned run, opened, cancelled and retried (IR-548)", () => {
     act(() => { pending = result.current.ask("q", { conversationId: 9 }); });
 
     await waitFor(() => expect(result.current.streaming?.runId).toBe("r-8"));
-    await act(() => result.current.cancel());
-    expect(cancelRun).toHaveBeenCalledWith("r-8");
-
     release();
     const outcome = await pending;
     expect(outcome.message.content).toMatch(/you stopped this question/i);
@@ -563,7 +589,7 @@ describe("an owned run, opened, cancelled and retried (IR-548)", () => {
     await waitFor(() => expect(result.current.streaming).toBeNull());
   });
 
-  it("stops following when detached, leaving the run to finish on the server", async () => {
+  it("stops following when its signal aborts, leaving the run to finish on the server", async () => {
     askStream.mockImplementation((_q: string, _o: unknown, signal: AbortSignal) =>
       (async function* () {
         yield { event: "run_queued", id: "1", data: { run_id: "r-9", state: "queued" } };
@@ -578,8 +604,8 @@ describe("an owned run, opened, cancelled and retried (IR-548)", () => {
 
     act(() => result.current.detach());
 
+    // Whoever aborted has already cleared the screen; the stream touches nothing.
     await expect(pending).rejects.toBeInstanceOf(StreamDetached);
-    expect(result.current.streaming).toBeNull();
     expect(resumeAskRun).not.toHaveBeenCalledWith("r-9", expect.anything(), expect.anything());
     expect(cancelRun).not.toHaveBeenCalledWith("r-9");
   });

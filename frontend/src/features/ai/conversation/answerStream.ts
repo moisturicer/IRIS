@@ -3,8 +3,8 @@
  *
  * A plain function rather than a hook, so a caller can follow several answers
  * at once -- one per Conversation -- each bound to its own signal and its own
- * state. `useAskStream` (Paper Chat) and the Conversation client (Ask IRIS)
- * both drive answers through it, so the two cannot read an event differently.
+ * state. The Conversation client drives every answer through it -- Ask IRIS's
+ * and Paper Chat's (IR-571) -- so the two cannot read an event differently.
  */
 import type { Dispatch, SetStateAction } from "react";
 import { aiApi } from "@/api/ai";
@@ -62,8 +62,8 @@ export const ENDED_RUN_TEXT: Record<EndedRunState, string> = {
 };
 
 /**
- * Raised when the caller aborted its signal and stopped following -- Paper
- * Chat's `detach`, or the page going away. The run itself carries on
+ * Raised when the caller aborted its signal and stopped following -- the
+ * client's `forget`, a superseding request, or the page going away. The run itself carries on
  * server-side.
  */
 export class StreamDetached extends Error {
