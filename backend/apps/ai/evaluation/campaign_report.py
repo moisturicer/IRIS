@@ -127,6 +127,12 @@ def _check_arms(campaign, mode: str) -> None:
             if len(set(models)) != len(models):
                 raise CampaignRefused("a model comparison needs different model_ids per label")
         else:
+            code = {(r["manifest"]["engine_version"], r["manifest"]["git_commit"],
+                     r["manifest"].get("implementation_ref"), str(r["manifest"].get("identity")))
+                    for _, r in _runs(campaign)}
+            if len(code) != 1:
+                raise CampaignRefused("a capability report holds the code fixed: every label "
+                                      "needs the same engine, commit and release")
             limits = [str(sorted(effective_limits(runs[0]["manifest"].get("limits")).items()))
                       for runs in campaign.values()]
             if len(set(limits)) != len(limits):

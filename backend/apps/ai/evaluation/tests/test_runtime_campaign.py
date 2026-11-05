@@ -88,6 +88,12 @@ def test_a_larger_allowance_is_a_capability_report_never_an_architecture_compari
         prefix="x", limits={"case_cost_usd": 5.0}, model_ids={"agent": "m2"})}, mode="capability")
 
 
+def test_a_capability_report_holds_the_code_fixed():
+    other_code = {"base": rt_runs(prefix="base"),
+                  "larger": rt_runs(prefix="big", limits={"case_cost_usd": 5.0}, git_commit="rt2")}
+    assert "same engine, commit and release" in refused(other_code, mode="capability")
+
+
 def reviews_for(campaign):
     out = []
     for label, runs in campaign.items():

@@ -93,3 +93,18 @@ def test_missing_cache_state_in_every_manifest_is_the_old_artifact_shape_and_sti
     old = [("a", {k: v for k, v in manifest().items() if k != "cache_state"}),
            ("b", {k: v for k, v in manifest().items() if k != "cache_state"})]
     assert mismatches(old, "architecture") == []
+
+
+def test_repetitions_under_one_capability_label_share_an_allowance():
+    base, bigger = manifest(), manifest(limits={"case_cost_usd": 5.0})
+    drift = mismatches([("larger", bigger), ("larger", manifest(limits={"case_cost_usd": 9.0})),
+                        ("base", base)], "capability")
+    assert drift == ["larger: repetitions ran different allowances (limits)"]
+
+
+def test_repetitions_may_mix_cold_and_warm_but_every_label_must_run_the_same_states():
+    cold, warm = manifest(), manifest(cache_state="warm")
+    mixed = [("a", cold), ("a", warm), ("b", warm), ("b", cold)]
+    assert mismatches(mixed, "architecture") == []
+    lopsided = mismatches([("a", cold), ("a", warm), ("b", cold)], "architecture")
+    assert lopsided == ["b: cache_state differs from a; conditions are not equal"]

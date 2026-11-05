@@ -50,21 +50,26 @@ def effective_limits(limits: Mapping | None) -> dict:
     return {k: v for k, v in (limits or {}).items() if k not in IDENTITY_LIMIT_KEYS}
 
 
-def _shared(manifest: Mapping, key: str):
-    return manifest.get(key)
-
-
 def mismatches(labelled: Sequence[tuple[str, Mapping]], mode: str) -> list[str]:
     """Why these manifests are not comparable under ``mode``; empty when they are.
 
     ``architecture``: everything equal. ``model``: only the models differ.
-    ``capability``: only the allowance differs, and it must.
+    ``capability``: only the allowance differs between labels, and it must; repetitions
+    under one label share theirs. Repetitions may mix cold and warm runs, but every
+    label must have run the same cache states.
     """
     first_label, first = labelled[0]
     problems = []
+    cache: dict[str, set] = {}
+    allowance: dict[str, dict] = {}
+    for label, manifest in labelled:
+        cache.setdefault(label, set()).add(manifest.get("cache_state"))
+        own = allowance.setdefault(label, effective_limits(manifest.get("limits")))
+        if mode == "capability" and effective_limits(manifest.get("limits")) != own:
+            problems.append(f"{label}: repetitions ran different allowances (limits)")
     for label, manifest in labelled[1:]:
         for key in SHARED_KEYS:
-            if _shared(manifest, key) != _shared(first, key):
+            if key != "cache_state" and manifest.get(key) != first.get(key):
                 problems.append(f"{label}: {key} differs from {first_label}; "
                                 "conditions are not equal")
         if mode != "model" and effective_models(manifest) != effective_models(first):
@@ -75,9 +80,12 @@ def mismatches(labelled: Sequence[tuple[str, Mapping]], mode: str) -> list[str]:
                                      != effective_limits(first.get("limits"))):
             problems.append(f"{label}: limits differ from {first_label}; "
                             "conditions are not equal")
-    if mode == "capability" and not problems and all(
-            effective_limits(m.get("limits")) == effective_limits(first.get("limits"))
-            for _, m in labelled[1:]):
+    for label, states in cache.items():
+        if states != cache[first_label]:
+            problems.append(f"{label}: cache_state differs from {first_label}; "
+                            "conditions are not equal")
+    if mode == "capability" and not problems and len(
+            {str(sorted(v.items())) for v in allowance.values()}) == 1:
         problems.append("equal allowances (limits) make this an architecture comparison, "
                         "not a capability report")
     return problems

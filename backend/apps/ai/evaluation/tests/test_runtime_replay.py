@@ -155,6 +155,14 @@ def test_busy_cancelled_failed_and_overdue_runs_are_retained_not_dropped():
         assert row["turns"][0]["usage_status"] == "missing"
 
 
+def test_a_status_poll_that_fails_cancels_the_run_it_can_no_longer_follow():
+    seam = Seam()
+    seam.status = lambda rid: (seam.calls.append(("status", rid)) or Response(500))
+    row = collect(seam)
+    assert row["turns"][0]["outcome"] == "failure"
+    assert ("cancel", seam.issued[0]) in seam.calls
+
+
 def test_unauthorized_or_unavailable_submit_is_a_failure_and_a_missing_reopen_is_an_error():
     assert collect(Seam(submit=Response(401, {"status": "unauthorized"})))["turns"][0][
         "outcome"] == "failure"

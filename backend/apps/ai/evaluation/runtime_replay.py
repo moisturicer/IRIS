@@ -92,6 +92,7 @@ def _follow(seam, run: dict, *, clock, sleep, deadline_seconds, poll_seconds):
             return seen, "timeout"
         polled = seam.status(run["id"])
         if polled.status_code != 200:
+            seam.cancel(run["id"])  # a run we can no longer follow must not keep spending
             return seen, "failure"
         run = _body(polled)
         seen.append(run)
