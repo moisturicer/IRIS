@@ -11,6 +11,8 @@ import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessag
 import { AskIrisNotice } from "@/features/ai/components/AskIrisNotice";
 import { useConversationClient } from "@/features/ai/conversation/useConversationClient";
 import { Button } from "@/components/ui";
+import type { ConversationSummary } from "@/types/ai";
+import { RecentChats } from "./RecentChats";
 import { CHAT_COMPOSER_FIELD, CHAT_COMPOSER_SURFACE, CHAT_OPENING } from "@/features/ai/components/answerLayout";
 import { StarterQuestions } from "@/features/ai/components/StarterQuestions";
 import { cn } from "@/lib/utils";
@@ -153,7 +155,11 @@ interface PaperChatPanelProps {
  * The paper a Paper Chat conversation is about, and, when the reader came
  * back to one by its address, which of the paper's Conversations (IR-578).
  */
-type ChatSubject = Pick<RecordDetail, "id" | "title"> & { conversationId?: number };
+type ChatSubject = Pick<RecordDetail, "id" | "title"> & {
+  conversationId?: number;
+  /** The reader chose New chat: no Conversation until the first question (IR-584). */
+  fresh?: boolean;
+};
 
 function subjectOf(record: RecordDetail): ChatSubject {
   return { id: record.id, title: record.title };
@@ -235,8 +241,8 @@ function LegacyPaperChatPanel({
   const headingId = useId();
   const addToast = useUIStore((s) => s.addToast);
   const [ownInput, setOwnInput] = useState("");
-  const input = draft ?? ownInput;
-  const setInput = onDraftChange ?? setOwnInput;
+  const pageDraft = draft ?? ownInput;
+  const setPageDraft = onDraftChange ?? setOwnInput;
   const [widen, setWiden] = useState(false);
   const [ready, setReady] = useState(false);
   // The paper whose Conversation a first question is starting, from Send until
@@ -255,6 +261,16 @@ function LegacyPaperChatPanel({
       client.note(id, newChatMessage("assistant", errorDetail(error, "IRIS could not answer right now."))),
   });
   const { messages, streaming, isAnswering } = client;
+  // Each Conversation keeps its own unsent draft (IR-584); the page's copy is
+  // the one a close keeps, and the one a chat that does not exist yet types into.
+  const input = client.activeId !== null ? client.draft : pageDraft;
+  const setInput = (value: string) => {
+    if (client.activeId !== null) client.setDraft(value);
+    setPageDraft(value);
+  };
+  const [recent, setRecent] = useState<ConversationSummary[]>([]);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const seeded = useRef(false);
   const [subject, setSubject] = useState<ChatSubject>(() => subjectOf(record));
   const pinned = subject.id !== record.id;
   const busy = isAnswering || startingFor === subject.id;
@@ -293,7 +309,7 @@ function LegacyPaperChatPanel({
     (async () => {
       try {
         await client.openFound(async () =>
-          subject.conversationId
+          subject.fresh ? null : subject.conversationId
             ? (await aiApi.conversations.get(subject.conversationId)).data
             : await aiApi.conversations.findForRecord(subject.id));
       } catch {
@@ -306,7 +322,32 @@ function LegacyPaperChatPanel({
     return () => { cancelled = true; };
     // The client's callbacks are stable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subject.id, subject.conversationId]);
+  }, [subject.id, subject.conversationId, subject.fresh]);
+
+  // The draft the page kept through a close goes to the Conversation it was
+  // typed for, once; after that each Conversation's draft is its own.
+  useEffect(() => {
+    if (client.activeId === null || seeded.current) return;
+    seeded.current = true;
+    if (pageDraft && !client.draft) client.setDraft(pageDraft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.activeId]);
+
+  // The reader's own chats about the page's paper. A refusal or failure shows
+  // none, and says nothing about whether the paper has any (IR-584).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await aiApi.conversations.list({ record: record.id });
+        if (!cancelled) setRecent(Array.isArray(data) ? data.filter((c) => c.record === record.id) : []);
+      } catch {
+        if (!cancelled) setRecent([]);
+      }
+    })();
+    return () => { cancelled = true; };
+    // Re-read when a chat is started or opened, so the list keeps up.
+  }, [record.id, client.activeId]);
 
   // Back to an answer (IR-578). The one on screen scrolls to it; another is
   // opened first, about the paper it belongs to, which may not be this one.
@@ -376,7 +417,10 @@ function LegacyPaperChatPanel({
       if (target === undefined || target === null) {
         // The first question starts the paper's Conversation, or finds the one
         // another tab already started (IR-561, IR-569).
-        const { data } = await aiApi.conversations.create({ record: askedAbout, reuse_default: true });
+        // New chat is a distinct Conversation; anything else reuses the default.
+        const { data } = await aiApi.conversations.create(
+          subject.fresh ? { record: askedAbout } : { record: askedAbout, reuse_default: true });
+        setSubject((now) => (now.id === askedAbout && now.fresh ? { ...now, fresh: false } : now));
         target = data.id;
         // Shown only if its paper is still the one on screen (IR-355); asked
         // in either way, and the answer stays with it.
@@ -392,6 +436,18 @@ function LegacyPaperChatPanel({
       if (starting.current === askedAbout) starting.current = null;
       setStartingFor((now) => (now === askedAbout ? null : now));
     }
+  };
+
+  const newChat = () => {
+    setRecentOpen(false);
+    setInput("");
+    setSubject({ ...subjectOf(record), fresh: true });
+  };
+
+  const chooseRecent = (chat: ConversationSummary) => {
+    setRecentOpen(false);
+    if (chat.id === conversationId) return;
+    setSubject({ id: record.id, title: record.title, conversationId: chat.id });
   };
 
   const chooseStarter = (question: string) => {
@@ -481,6 +537,31 @@ function LegacyPaperChatPanel({
             Chat about this paper instead
           </button>
         )}
+
+        {/* One chat to continue, or a new one (IR-584). */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setRecentOpen((v) => !v)}
+            aria-expanded={recentOpen}
+            disabled={recent.length === 0}
+            className={cn("px-3", CONTROL_BASE, CONTROL_ON)}
+          >
+            Recent chats{recent.length > 0 ? ` (${recent.length})` : ""}
+          </button>
+          <button type="button" onClick={newChat} className={cn("px-3", CONTROL_BASE, CONTROL_ON)}>
+            <i className="fas fa-plus text-2xs" aria-hidden />
+            New chat
+          </button>
+        </div>
+        {recentOpen && (
+          <RecentChats
+            className="mt-2 max-h-48 overflow-y-auto"
+            chats={recent}
+            activeId={conversationId}
+            onChoose={chooseRecent}
+          />
+        )}
       </div>
 
       <div className={cn("min-h-0 flex-1 flex-col", minimized ? "hidden" : "flex", ready && !busy && messages.length === 0 && CHAT_OPENING)}>
@@ -504,6 +585,12 @@ function LegacyPaperChatPanel({
                 : "Answers come from this paper’s own text, with citations that open the passage."}
             </p>
             <StarterQuestions className="mt-4" questions={STARTER_QUESTIONS} onChoose={chooseStarter} />
+            {!recentOpen && recent.length > 0 && (
+              <div className="mt-5">
+                <h3 className="text-2xs font-semibold uppercase tracking-wider text-stone-600">Recent chats</h3>
+                <RecentChats className="mt-1" chats={recent} activeId={conversationId} onChoose={chooseRecent} />
+              </div>
+            )}
           </div>
         )}
 
