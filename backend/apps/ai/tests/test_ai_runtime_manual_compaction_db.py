@@ -39,11 +39,11 @@ SUMMARY = {"goal": "Understand the water-quality papers.", "preferences": [],
 def asked(dsn, grant, key, turns):
     """A Conversation with `turns` completed Turns; its id."""
     svc = service(dsn, ScriptedExecutor(Result(answer="Answered.")))
-    first, _ = run(svc.submit(grant, key=f"{key}-0", question="First?", conversation_id=None,
+    first, _ = run(svc.submit(grant, key=f"{key}-ask-0", question="First?", conversation_id=None,
                               base_revision=None))
     conversation = uuid.UUID(first["conversation_id"])
     for n in range(1, turns):
-        run(svc.submit(grant, key=f"{key}-{n}", question=f"Question {n + 1}?", conversation_id=conversation,
+        run(svc.submit(grant, key=f"{key}-ask-{n}", question=f"Question {n + 1}?", conversation_id=conversation,
                        base_revision=n))
     return conversation
 
@@ -205,8 +205,10 @@ def test_a_failed_summary_ends_unavailable_and_changes_nothing(runtime):
     assert done["state"] == "failed" and stored(conversation) == []
     assert turn_count(conversation) == 3 and revision_of(conversation) == 3
     # A failed run's handoff never opens a later run, and the Conversation carries on whole.
-    _, later = follow_up(runtime, grant, "failed-next", conversation, 3)
+    live, later = follow_up(runtime, grant, "failed-next", conversation, 3)
     assert later.handoff is None and [t.ordinal for t in later.prior] == [1, 2, 3]
+    # That Ask is only a probe of what a claim carries; it must not hold the Conversation.
+    run(svc.store.cancel(grant, live["id"]))
     # The reader can try again: the failure is not remembered against them.
     svc = compacting(runtime, reply(json.dumps(SUMMARY)))
     retry, created = run(svc.submit_compaction(grant, key="compact-0011", conversation_id=conversation,
