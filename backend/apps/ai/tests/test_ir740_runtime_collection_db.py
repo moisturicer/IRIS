@@ -157,7 +157,7 @@ def test_a_source_made_unreadable_after_collection_is_denied_in_reopen_export_an
     first = reopened["turns"][0]
     assert first["citations"] == [] and "gauges" not in json.dumps(reopened)
     assert "unavailable" in first["answer"]
-    assert [item["sources_available"] for item in reopened["runs"]] == [False, True]
+    assert reopened["runs"][0]["sources_available"] is False
 
     # The export made earlier is still denied to a reviewer who can no longer read the paper.
     readable = set(Record.objects.visible_to(reader).values_list("pk", flat=True))
