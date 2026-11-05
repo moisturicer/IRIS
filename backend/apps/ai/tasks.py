@@ -130,6 +130,31 @@ def embed_chunk_set(self, record_id: int, *, force: bool = False, chunk_set_id=N
     return outcome.as_dict()
 
 
+@shared_task(bind=True, max_retries=3)
+def build_embedding_space(
+    self, space_id: int, *, max_records: int = 0, token_budget: int = 0
+):
+    """One bounded slice of a pending Embedding Space build (IR-752).
+
+    Redelivery and retry are safe by construction: the slice embeds only what
+    the space still owes, so a duplicate delivery costs queries, and a worker
+    holding a record makes the other skip it. An admission refusal or a bound
+    ends the slice normally -- the report says why -- rather than retrying into
+    the same ledger. Nothing here can activate a space.
+    """
+    from apps.ai.space_build import BuildRefused, build_pending_space
+
+    try:
+        report = build_pending_space(
+            space_id, max_records=max_records, token_budget=token_budget
+        )
+    except BuildRefused:
+        raise
+    except Exception as exc:
+        raise self.retry(exc=exc, countdown=60)
+    return report.as_dict()
+
+
 @shared_task(bind=True, max_retries=3, ignore_result=True)
 def describe_extraction_figures(self, extraction_id: int, source_revision=None):
     """Describe a read's Figures for retrieval, then re-chunk (IR-852).

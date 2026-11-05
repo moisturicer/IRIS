@@ -190,7 +190,10 @@ python manage.py backfill_embeddings --dry-run           # what indexing the cor
                                    # the estimate exceeds AI_EMBEDDING_TOKEN_CEILING (--token-ceiling
                                    # overrides; 0 disables). Resumable and idempotent: it embeds only
                                    # chunks with no vector in the space, recomputed every run.
-                                   # --space N fills a pending space (chunk vectors only).
+                                   # --space N builds a PENDING space (IR-752): summaries into the space-keyed
+                                   # table, passages into its chunk rows, the provider must be the space's pinned
+                                   # model, and no active vector is touched (apps/ai/space_build.py). Other
+                                   # states keep the older chunk-only fill. Nothing here activates a space.
                                    # Verified on the dev database 2026-09-20: 26 records, 1,236 chunks,
                                    # 381,073 estimated tokens (proxy
                                    # corpus: never a finding about CIT-U research, ADR-023)
@@ -223,6 +226,8 @@ python manage.py mark_corpus_cleared --dry-run           # answer for test paper
                                    # for the check. THE 40 PROXY PAPERS ARE NOT MARKED: that database
                                    # doesn't hold them
 python manage.py promote_embedding_space --space N --check   # is this space ready to go live? (IR-282)
+                                   # IR-752 adds summary-vector and dimension coverage to the report; promote itself
+                                   # still checks passages only (IR-739). check_vector_index --space N checks a pending space
                                    # Drop --check to promote. Refuses while any active chunk lacks a
                                    # vector in that space and names the short records. Nothing
                                    # promotes automatically
