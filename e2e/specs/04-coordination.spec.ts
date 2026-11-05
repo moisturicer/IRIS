@@ -13,13 +13,13 @@ test.describe.configure({ mode: "serial" });
 
 const a11y = new A11yLedger();
 
-let student: Client, adviser: Client, rdco: Client, itso: Client, itsoCoord: Client;
+let student: Client, adviser: Client, rdco: Client, itso: Client, itsoCoord: Client, admin: Client;
 let recordId: number, assignmentId: number;
 const title = uniqueTitle("coordination");
 
 test.beforeAll(async () => {
-  [student, adviser, rdco, itso, itsoCoord] = await Promise.all(
-    ["student", "adviser", "rdco", "itso", "itsoCoordinator"].map((w) => as(w)),
+  [student, adviser, rdco, itso, itsoCoord, admin] = await Promise.all(
+    ["student", "adviser", "rdco", "itso", "itsoCoordinator", "admin"].map((w) => as(w)),
   );
   recordId = await createDraft(student, { title, type: "Project", adviserId: adviser.userId, offices: { itso: true } });
   await submit(student, recordId);
@@ -31,15 +31,18 @@ test.beforeAll(async () => {
 
 test.afterAll(async () => {
   // The plain ITSO login is a member; leave it as seeded.
-  await rdco?.patch(`/users/${itso?.userId}/coordinator/`, { is_office_coordinator: false });
-  await Promise.all([student, adviser, rdco, itso, itsoCoord].map((c) => c?.dispose()));
+  await admin?.patch(`/users/${itso?.userId}/coordinator/`, { is_office_coordinator: false });
+  await Promise.all([student, adviser, rdco, itso, itsoCoord, admin].map((c) => c?.dispose()));
 });
 
-test("RDCO grants and removes a coordinator, and the grant is what permits assigning", async () => {
+test("the System Admin grants and removes a coordinator, and the grant is what permits assigning", async () => {
+  // The System Admin gives the coordinator flag, as it gives office roles
+  // (IR-781, ADR-051 §4 as amended). RDCO no longer can.
+  expect((await rdco.patch(`/users/${itso.userId}/coordinator/`, { is_office_coordinator: true })).status(), "RDCO may not grant").toBe(403);
   expect((await itso.get(`/assignments/${assignmentId}/assign/`)).status(), "a member may not assign").toBe(403);
-  await ok(await rdco.patch(`/users/${itso.userId}/coordinator/`, { is_office_coordinator: true }), "grant");
+  await ok(await admin.patch(`/users/${itso.userId}/coordinator/`, { is_office_coordinator: true }), "grant");
   expect((await itso.get(`/assignments/${assignmentId}/assign/`)).status(), "granted").toBe(200);
-  await ok(await rdco.patch(`/users/${itso.userId}/coordinator/`, { is_office_coordinator: false }), "remove");
+  await ok(await admin.patch(`/users/${itso.userId}/coordinator/`, { is_office_coordinator: false }), "remove");
   expect((await itso.get(`/assignments/${assignmentId}/assign/`)).status(), "removed").toBe(403);
 });
 
