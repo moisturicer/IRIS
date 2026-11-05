@@ -1,0 +1,702 @@
+[
+  {
+    "title": "Synthetic Coastal Flood Routing Manuscript L01-01",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L01-01: the coastal flood routing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Campus Energy Demand Manuscript L01-02",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L01-02: the campus energy demand estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Soil Moisture Mapping Manuscript L01-03",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L01-03: the soil moisture mapping estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Urban Heat Shelters Manuscript L01-04",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L01-04: the urban heat shelters estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic River Sediment Transport Manuscript L01-05",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L01-05: the river sediment transport estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Crop Disease Screening Manuscript L01-06",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L01-06: the crop disease screening estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Emergency Radio Coverage Manuscript L01-07",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L01-07: the emergency radio coverage estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Bridge Fatigue Sensing Manuscript L01-08",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L01-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Water Quality Sampling Manuscript L01-09",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L01-09: the water quality sampling estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Public Transit Reliability Manuscript L01-10",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L01-10: the public transit reliability estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Coastal Flood Routing Manuscript L02-01",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L02-01: the coastal flood routing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Campus Energy Demand Manuscript L02-02",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L02-02: the campus energy demand estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Soil Moisture Mapping Manuscript L02-03",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L02-03: the soil moisture mapping estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Urban Heat Shelters Manuscript L02-04",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L02-04: the urban heat shelters estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic River Sediment Transport Manuscript L02-05",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L02-05: the river sediment transport estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Crop Disease Screening Manuscript L02-06",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L02-06: the crop disease screening estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Emergency Radio Coverage Manuscript L02-07",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L02-07: the emergency radio coverage estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Bridge Fatigue Sensing Manuscript L02-08",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L02-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Water Quality Sampling Manuscript L02-09",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L02-09: the water quality sampling estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Public Transit Reliability Manuscript L02-10",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L02-10: the public transit reliability estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Coastal Flood Routing Manuscript L03-01",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L03-01: the coastal flood routing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Campus Energy Demand Manuscript L03-02",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L03-02: the campus energy demand estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Soil Moisture Mapping Manuscript L03-03",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L03-03: the soil moisture mapping estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Urban Heat Shelters Manuscript L03-04",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L03-04: the urban heat shelters estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic River Sediment Transport Manuscript L03-05",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L03-05: the river sediment transport estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Crop Disease Screening Manuscript L03-06",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L03-06: the crop disease screening estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Emergency Radio Coverage Manuscript L03-07",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L03-07: the emergency radio coverage estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Bridge Fatigue Sensing Manuscript L03-08",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L03-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Water Quality Sampling Manuscript L03-09",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L03-09: the water quality sampling estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Public Transit Reliability Manuscript L03-10",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L03-10: the public transit reliability estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Coastal Flood Routing Manuscript L04-01",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L04-01: the coastal flood routing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Campus Energy Demand Manuscript L04-02",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L04-02: the campus energy demand estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Soil Moisture Mapping Manuscript L04-03",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L04-03: the soil moisture mapping estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Urban Heat Shelters Manuscript L04-04",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L04-04: the urban heat shelters estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic River Sediment Transport Manuscript L04-05",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L04-05: the river sediment transport estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Crop Disease Screening Manuscript L04-06",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L04-06: the crop disease screening estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Emergency Radio Coverage Manuscript L04-07",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L04-07: the emergency radio coverage estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Bridge Fatigue Sensing Manuscript L04-08",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L04-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Water Quality Sampling Manuscript L04-09",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L04-09: the water quality sampling estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Public Transit Reliability Manuscript L04-10",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L04-10: the public transit reliability estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Coastal Flood Routing Manuscript L05-01",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L05-01: the coastal flood routing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Campus Energy Demand Manuscript L05-02",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L05-02: the campus energy demand estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Soil Moisture Mapping Manuscript L05-03",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L05-03: the soil moisture mapping estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Urban Heat Shelters Manuscript L05-04",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L05-04: the urban heat shelters estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic River Sediment Transport Manuscript L05-05",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L05-05: the river sediment transport estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Crop Disease Screening Manuscript L05-06",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L05-06: the crop disease screening estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Emergency Radio Coverage Manuscript L05-07",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L05-07: the emergency radio coverage estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Bridge Fatigue Sensing Manuscript L05-08",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L05-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Water Quality Sampling Manuscript L05-09",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L05-09: the water quality sampling estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Public Transit Reliability Manuscript L05-10",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L05-10: the public transit reliability estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Coastal Flood Routing Manuscript L06-01",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L06-01: the coastal flood routing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Campus Energy Demand Manuscript L06-02",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L06-02: the campus energy demand estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Soil Moisture Mapping Manuscript L06-03",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L06-03: the soil moisture mapping estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Urban Heat Shelters Manuscript L06-04",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L06-04: the urban heat shelters estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic River Sediment Transport Manuscript L06-05",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L06-05: the river sediment transport estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Crop Disease Screening Manuscript L06-06",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L06-06: the crop disease screening estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Emergency Radio Coverage Manuscript L06-07",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L06-07: the emergency radio coverage estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Bridge Fatigue Sensing Manuscript L06-08",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L06-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Water Quality Sampling Manuscript L06-09",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L06-09: the water quality sampling estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Public Transit Reliability Manuscript L06-10",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L06-10: the public transit reliability estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Coastal Flood Routing Manuscript L07-01",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L07-01: the coastal flood routing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Campus Energy Demand Manuscript L07-02",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L07-02: the campus energy demand estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Soil Moisture Mapping Manuscript L07-03",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L07-03: the soil moisture mapping estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Urban Heat Shelters Manuscript L07-04",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L07-04: the urban heat shelters estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic River Sediment Transport Manuscript L07-05",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L07-05: the river sediment transport estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Crop Disease Screening Manuscript L07-06",
+    "split": "development",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L07-06: the crop disease screening estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Emergency Radio Coverage Manuscript L07-07",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L07-07: the emergency radio coverage estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Bridge Fatigue Sensing Manuscript L07-08",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L07-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Water Quality Sampling Manuscript L07-09",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 52,
+      "quote": "Constraint L07-09: the water quality sampling estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  },
+  {
+    "title": "Synthetic Public Transit Reliability Manuscript L07-10",
+    "split": "held_out",
+    "pages": 100,
+    "planted_fact": {
+      "page": 91,
+      "quote": "Constraint L07-10: the public transit reliability estimate is limited by missing late-season observations."
+    },
+    "fixture_status": "planned_not_ingested"
+  }
+]

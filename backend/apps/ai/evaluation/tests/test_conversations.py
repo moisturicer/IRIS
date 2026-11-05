@@ -69,6 +69,27 @@ def test_readiness_needs_the_minimum_and_empty_families_are_gaps():
     assert report["ready"] is False
 
 
+def test_versioned_case_pack_declares_its_own_families_and_minimum():
+    rows = [conv(f"d{i}", "L01", "development", f"development {i}", (f"D{i}",))
+            for i in range(7)]
+    rows += [conv(f"h{i}", "L01", "held_out", f"held {i}", (f"H{i}",))
+             for i in range(3)]
+    data = make_set(rows, families=["L01"], min_family_cases=10)
+    report = validate_set(data, min_conversations=10)
+    assert report["errors"] == []
+    assert report["counts"]["development"]["L01"] == 7
+    assert report["ready"] is True
+    assert "L01" in validate_set(make_set(rows[:-1], families=["L01"],
+                                        min_family_cases=10),
+                                  min_conversations=9)["lock_blockers"]
+    assert validate_set(make_set(rows[:-1], families=["L01"],
+                                 min_family_cases=10),
+                        min_conversations=9)["ready"] is False
+    frozen = lock_record(data)
+    assert check_lock({**data, "min_family_cases": 7}, frozen) == ["min_family_cases"]
+    assert check_lock(data, {**frozen, "thresholds": {"task_completion": 0.1}}) == ["thresholds"]
+
+
 def test_every_leakage_collision_is_reported():
     data = make_set([
         conv("d", split="development", topic="Floods", papers=("Paper A", "Paper B")),

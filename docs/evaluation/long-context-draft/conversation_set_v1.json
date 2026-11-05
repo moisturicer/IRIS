@@ -1,0 +1,2878 @@
+{
+  "schema_version": 1,
+  "set_id": "long-context-ir753-draft-v1",
+  "label_status": "draft_unreviewed",
+  "labelled_by": [],
+  "families": [
+    "L01",
+    "L02",
+    "L03",
+    "L04",
+    "L05",
+    "L06",
+    "L07"
+  ],
+  "min_family_cases": 10,
+  "rubric_version": 1,
+  "corpus": {
+    "snapshot_id": "ir753-synthetic-plan-v1",
+    "paper_set_sha256": "73996828c808224bcf5b29aee9a113d1d8eb61e36b7182f695107db768b0c14a",
+    "source_kind": "synthetic_planned",
+    "source": "sources.json",
+    "ingested": false
+  },
+  "partition_method": "Distinct synthetic source and theme per case; D01-D06 development, H07-H10 held out.",
+  "shared_allowed": [],
+  "conversations": [
+    {
+      "id": "L01-D01",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "development",
+      "topic": "coastal flood routing L01",
+      "papers": [
+        "Synthetic Coastal Flood Routing Manuscript L01-01"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Coastal Flood Routing Manuscript L01-01, what does the coastal flood routing study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L01-01",
+              "page": 52,
+              "quote": "Constraint L01-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-D02",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "development",
+      "topic": "campus energy demand L01",
+      "papers": [
+        "Synthetic Campus Energy Demand Manuscript L01-02"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Campus Energy Demand Manuscript L01-02, what does the campus energy demand study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L01-02",
+              "page": 91,
+              "quote": "Constraint L01-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-D03",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "development",
+      "topic": "soil moisture mapping L01",
+      "papers": [
+        "Synthetic Soil Moisture Mapping Manuscript L01-03"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Soil Moisture Mapping Manuscript L01-03, what does the soil moisture mapping study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L01-03",
+              "page": 52,
+              "quote": "Constraint L01-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-D04",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "development",
+      "topic": "urban heat shelters L01",
+      "papers": [
+        "Synthetic Urban Heat Shelters Manuscript L01-04"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Urban Heat Shelters Manuscript L01-04, what does the urban heat shelters study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L01-04",
+              "page": 91,
+              "quote": "Constraint L01-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-D05",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "development",
+      "topic": "river sediment transport L01",
+      "papers": [
+        "Synthetic River Sediment Transport Manuscript L01-05"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic River Sediment Transport Manuscript L01-05, what does the river sediment transport study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L01-05",
+              "page": 52,
+              "quote": "Constraint L01-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-D06",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "development",
+      "topic": "crop disease screening L01",
+      "papers": [
+        "Synthetic Crop Disease Screening Manuscript L01-06"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Crop Disease Screening Manuscript L01-06, what does the crop disease screening study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L01-06",
+              "page": 91,
+              "quote": "Constraint L01-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-H07",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "held_out",
+      "topic": "emergency radio coverage L01",
+      "papers": [
+        "Synthetic Emergency Radio Coverage Manuscript L01-07"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Emergency Radio Coverage Manuscript L01-07, what does the emergency radio coverage study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L01-07",
+              "page": 52,
+              "quote": "Constraint L01-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-H08",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "held_out",
+      "topic": "bridge fatigue sensing L01",
+      "papers": [
+        "Synthetic Bridge Fatigue Sensing Manuscript L01-08"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Bridge Fatigue Sensing Manuscript L01-08, what does the bridge fatigue sensing study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L01-08",
+              "page": 91,
+              "quote": "Constraint L01-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-H09",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "held_out",
+      "topic": "water quality sampling L01",
+      "papers": [
+        "Synthetic Water Quality Sampling Manuscript L01-09"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Water Quality Sampling Manuscript L01-09, what does the water quality sampling study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L01-09",
+              "page": 52,
+              "quote": "Constraint L01-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L01-H10",
+      "family": "L01",
+      "scenario": "long_manuscript",
+      "split": "held_out",
+      "topic": "public transit reliability L01",
+      "papers": [
+        "Synthetic Public Transit Reliability Manuscript L01-10"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Public Transit Reliability Manuscript L01-10, what does the public transit reliability study conclude about its main constraint?",
+          "intended_task": "read_selected_manuscript",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L01-10",
+              "page": 91,
+              "quote": "Constraint L01-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-D01",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "development",
+      "topic": "coastal flood routing L02",
+      "papers": [
+        "Synthetic Coastal Flood Routing Manuscript L02-01"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Coastal Flood Routing Manuscript L02-01 before answering: In Synthetic Coastal Flood Routing Manuscript L02-01, what does the coastal flood routing study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L02-01",
+              "page": 52,
+              "quote": "Constraint L02-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-D02",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "development",
+      "topic": "campus energy demand L02",
+      "papers": [
+        "Synthetic Campus Energy Demand Manuscript L02-02"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Campus Energy Demand Manuscript L02-02 before answering: In Synthetic Campus Energy Demand Manuscript L02-02, what does the campus energy demand study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L02-02",
+              "page": 91,
+              "quote": "Constraint L02-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-D03",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "development",
+      "topic": "soil moisture mapping L02",
+      "papers": [
+        "Synthetic Soil Moisture Mapping Manuscript L02-03"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Soil Moisture Mapping Manuscript L02-03 before answering: In Synthetic Soil Moisture Mapping Manuscript L02-03, what does the soil moisture mapping study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L02-03",
+              "page": 52,
+              "quote": "Constraint L02-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-D04",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "development",
+      "topic": "urban heat shelters L02",
+      "papers": [
+        "Synthetic Urban Heat Shelters Manuscript L02-04"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Urban Heat Shelters Manuscript L02-04 before answering: In Synthetic Urban Heat Shelters Manuscript L02-04, what does the urban heat shelters study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L02-04",
+              "page": 91,
+              "quote": "Constraint L02-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-D05",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "development",
+      "topic": "river sediment transport L02",
+      "papers": [
+        "Synthetic River Sediment Transport Manuscript L02-05"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic River Sediment Transport Manuscript L02-05 before answering: In Synthetic River Sediment Transport Manuscript L02-05, what does the river sediment transport study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L02-05",
+              "page": 52,
+              "quote": "Constraint L02-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-D06",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "development",
+      "topic": "crop disease screening L02",
+      "papers": [
+        "Synthetic Crop Disease Screening Manuscript L02-06"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Crop Disease Screening Manuscript L02-06 before answering: In Synthetic Crop Disease Screening Manuscript L02-06, what does the crop disease screening study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L02-06",
+              "page": 91,
+              "quote": "Constraint L02-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-H07",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "held_out",
+      "topic": "emergency radio coverage L02",
+      "papers": [
+        "Synthetic Emergency Radio Coverage Manuscript L02-07"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Emergency Radio Coverage Manuscript L02-07 before answering: In Synthetic Emergency Radio Coverage Manuscript L02-07, what does the emergency radio coverage study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L02-07",
+              "page": 52,
+              "quote": "Constraint L02-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-H08",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "held_out",
+      "topic": "bridge fatigue sensing L02",
+      "papers": [
+        "Synthetic Bridge Fatigue Sensing Manuscript L02-08"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Bridge Fatigue Sensing Manuscript L02-08 before answering: In Synthetic Bridge Fatigue Sensing Manuscript L02-08, what does the bridge fatigue sensing study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L02-08",
+              "page": 91,
+              "quote": "Constraint L02-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-H09",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "held_out",
+      "topic": "water quality sampling L02",
+      "papers": [
+        "Synthetic Water Quality Sampling Manuscript L02-09"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Water Quality Sampling Manuscript L02-09 before answering: In Synthetic Water Quality Sampling Manuscript L02-09, what does the water quality sampling study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L02-09",
+              "page": 52,
+              "quote": "Constraint L02-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L02-H10",
+      "family": "L02",
+      "scenario": "middle_late_evidence",
+      "split": "held_out",
+      "topic": "public transit reliability L02",
+      "papers": [
+        "Synthetic Public Transit Reliability Manuscript L02-10"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Check the middle and final sections of Synthetic Public Transit Reliability Manuscript L02-10 before answering: In Synthetic Public Transit Reliability Manuscript L02-10, what does the public transit reliability study conclude about its main constraint?",
+          "intended_task": "find_middle_late_evidence",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L02-10",
+              "page": 91,
+              "quote": "Constraint L02-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-D01",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "development",
+      "topic": "coastal flood routing L03",
+      "papers": [
+        "Synthetic Coastal Flood Routing Manuscript L03-01"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Coastal Flood Routing Manuscript L03-01 selected and remember I want the coastal flood routing constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L03-01",
+              "page": 52,
+              "quote": "Constraint L03-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-D02",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "development",
+      "topic": "campus energy demand L03",
+      "papers": [
+        "Synthetic Campus Energy Demand Manuscript L03-02"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Campus Energy Demand Manuscript L03-02 selected and remember I want the campus energy demand constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L03-02",
+              "page": 91,
+              "quote": "Constraint L03-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-D03",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "development",
+      "topic": "soil moisture mapping L03",
+      "papers": [
+        "Synthetic Soil Moisture Mapping Manuscript L03-03"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Soil Moisture Mapping Manuscript L03-03 selected and remember I want the soil moisture mapping constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L03-03",
+              "page": 52,
+              "quote": "Constraint L03-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-D04",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "development",
+      "topic": "urban heat shelters L03",
+      "papers": [
+        "Synthetic Urban Heat Shelters Manuscript L03-04"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Urban Heat Shelters Manuscript L03-04 selected and remember I want the urban heat shelters constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L03-04",
+              "page": 91,
+              "quote": "Constraint L03-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-D05",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "development",
+      "topic": "river sediment transport L03",
+      "papers": [
+        "Synthetic River Sediment Transport Manuscript L03-05"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic River Sediment Transport Manuscript L03-05 selected and remember I want the river sediment transport constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L03-05",
+              "page": 52,
+              "quote": "Constraint L03-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-D06",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "development",
+      "topic": "crop disease screening L03",
+      "papers": [
+        "Synthetic Crop Disease Screening Manuscript L03-06"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Crop Disease Screening Manuscript L03-06 selected and remember I want the crop disease screening constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L03-06",
+              "page": 91,
+              "quote": "Constraint L03-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-H07",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "held_out",
+      "topic": "emergency radio coverage L03",
+      "papers": [
+        "Synthetic Emergency Radio Coverage Manuscript L03-07"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Emergency Radio Coverage Manuscript L03-07 selected and remember I want the emergency radio coverage constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L03-07",
+              "page": 52,
+              "quote": "Constraint L03-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-H08",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "held_out",
+      "topic": "bridge fatigue sensing L03",
+      "papers": [
+        "Synthetic Bridge Fatigue Sensing Manuscript L03-08"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Bridge Fatigue Sensing Manuscript L03-08 selected and remember I want the bridge fatigue sensing constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L03-08",
+              "page": 91,
+              "quote": "Constraint L03-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-H09",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "held_out",
+      "topic": "water quality sampling L03",
+      "papers": [
+        "Synthetic Water Quality Sampling Manuscript L03-09"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Water Quality Sampling Manuscript L03-09 selected and remember I want the water quality sampling constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L03-09",
+              "page": 52,
+              "quote": "Constraint L03-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L03-H10",
+      "family": "L03",
+      "scenario": "repeated_manual_compaction",
+      "split": "held_out",
+      "topic": "public transit reliability L03",
+      "papers": [
+        "Synthetic Public Transit Reliability Manuscript L03-10"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Keep Synthetic Public Transit Reliability Manuscript L03-10 selected and remember I want the public transit reliability constraint.",
+          "intended_task": "set_research_goal",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact this conversation now.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the same investigation after two automatic compactions.",
+          "intended_task": "continue_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What was the constraint, and where was it stated?",
+          "intended_task": "answer_after_compaction",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L03-10",
+              "page": 91,
+              "quote": "Constraint L03-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-D01",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "development",
+      "topic": "coastal flood routing L04",
+      "papers": [
+        "Synthetic Coastal Flood Routing Manuscript L04-01"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Coastal Flood Routing Manuscript L04-01; inspect the coastal flood routing constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L04-01",
+              "page": 52,
+              "quote": "Constraint L04-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L04-01",
+              "page": 52,
+              "quote": "Constraint L04-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-D02",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "development",
+      "topic": "campus energy demand L04",
+      "papers": [
+        "Synthetic Campus Energy Demand Manuscript L04-02"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Campus Energy Demand Manuscript L04-02; inspect the campus energy demand constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L04-02",
+              "page": 91,
+              "quote": "Constraint L04-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L04-02",
+              "page": 91,
+              "quote": "Constraint L04-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-D03",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "development",
+      "topic": "soil moisture mapping L04",
+      "papers": [
+        "Synthetic Soil Moisture Mapping Manuscript L04-03"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Soil Moisture Mapping Manuscript L04-03; inspect the soil moisture mapping constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L04-03",
+              "page": 52,
+              "quote": "Constraint L04-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L04-03",
+              "page": 52,
+              "quote": "Constraint L04-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-D04",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "development",
+      "topic": "urban heat shelters L04",
+      "papers": [
+        "Synthetic Urban Heat Shelters Manuscript L04-04"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Urban Heat Shelters Manuscript L04-04; inspect the urban heat shelters constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L04-04",
+              "page": 91,
+              "quote": "Constraint L04-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L04-04",
+              "page": 91,
+              "quote": "Constraint L04-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-D05",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "development",
+      "topic": "river sediment transport L04",
+      "papers": [
+        "Synthetic River Sediment Transport Manuscript L04-05"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic River Sediment Transport Manuscript L04-05; inspect the river sediment transport constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L04-05",
+              "page": 52,
+              "quote": "Constraint L04-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L04-05",
+              "page": 52,
+              "quote": "Constraint L04-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-D06",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "development",
+      "topic": "crop disease screening L04",
+      "papers": [
+        "Synthetic Crop Disease Screening Manuscript L04-06"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Crop Disease Screening Manuscript L04-06; inspect the crop disease screening constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L04-06",
+              "page": 91,
+              "quote": "Constraint L04-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L04-06",
+              "page": 91,
+              "quote": "Constraint L04-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-H07",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "held_out",
+      "topic": "emergency radio coverage L04",
+      "papers": [
+        "Synthetic Emergency Radio Coverage Manuscript L04-07"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Emergency Radio Coverage Manuscript L04-07; inspect the emergency radio coverage constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L04-07",
+              "page": 52,
+              "quote": "Constraint L04-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L04-07",
+              "page": 52,
+              "quote": "Constraint L04-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-H08",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "held_out",
+      "topic": "bridge fatigue sensing L04",
+      "papers": [
+        "Synthetic Bridge Fatigue Sensing Manuscript L04-08"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Bridge Fatigue Sensing Manuscript L04-08; inspect the bridge fatigue sensing constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L04-08",
+              "page": 91,
+              "quote": "Constraint L04-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L04-08",
+              "page": 91,
+              "quote": "Constraint L04-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-H09",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "held_out",
+      "topic": "water quality sampling L04",
+      "papers": [
+        "Synthetic Water Quality Sampling Manuscript L04-09"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Water Quality Sampling Manuscript L04-09; inspect the water quality sampling constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L04-09",
+              "page": 52,
+              "quote": "Constraint L04-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L04-09",
+              "page": 52,
+              "quote": "Constraint L04-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L04-H10",
+      "family": "L04",
+      "scenario": "exact_detail_recovery",
+      "split": "held_out",
+      "topic": "public transit reliability L04",
+      "papers": [
+        "Synthetic Public Transit Reliability Manuscript L04-10"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Remember that I selected Synthetic Public Transit Reliability Manuscript L04-10; inspect the public transit reliability constraint.",
+          "intended_task": "read_and_remember_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L04-10",
+              "page": 91,
+              "quote": "Constraint L04-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Compact the earlier exchange.",
+          "intended_task": "manual_compaction",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Recover the exact original detail and page, without guessing from the summary.",
+          "intended_task": "recover_original_detail",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L04-10",
+              "page": 91,
+              "quote": "Constraint L04-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        }
+      ],
+      "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-D01",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "development",
+      "topic": "coastal flood routing L05",
+      "papers": [
+        "Synthetic Coastal Flood Routing Manuscript L05-01"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Coastal Flood Routing Manuscript L05-01, what does the coastal flood routing study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L05-01",
+              "page": 52,
+              "quote": "Constraint L05-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-D02",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "development",
+      "topic": "campus energy demand L05",
+      "papers": [
+        "Synthetic Campus Energy Demand Manuscript L05-02"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Campus Energy Demand Manuscript L05-02, what does the campus energy demand study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L05-02",
+              "page": 91,
+              "quote": "Constraint L05-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-D03",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "development",
+      "topic": "soil moisture mapping L05",
+      "papers": [
+        "Synthetic Soil Moisture Mapping Manuscript L05-03"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Soil Moisture Mapping Manuscript L05-03, what does the soil moisture mapping study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L05-03",
+              "page": 52,
+              "quote": "Constraint L05-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-D04",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "development",
+      "topic": "urban heat shelters L05",
+      "papers": [
+        "Synthetic Urban Heat Shelters Manuscript L05-04"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Urban Heat Shelters Manuscript L05-04, what does the urban heat shelters study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L05-04",
+              "page": 91,
+              "quote": "Constraint L05-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-D05",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "development",
+      "topic": "river sediment transport L05",
+      "papers": [
+        "Synthetic River Sediment Transport Manuscript L05-05"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic River Sediment Transport Manuscript L05-05, what does the river sediment transport study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L05-05",
+              "page": 52,
+              "quote": "Constraint L05-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-D06",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "development",
+      "topic": "crop disease screening L05",
+      "papers": [
+        "Synthetic Crop Disease Screening Manuscript L05-06"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Crop Disease Screening Manuscript L05-06, what does the crop disease screening study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L05-06",
+              "page": 91,
+              "quote": "Constraint L05-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-H07",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "held_out",
+      "topic": "emergency radio coverage L05",
+      "papers": [
+        "Synthetic Emergency Radio Coverage Manuscript L05-07"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Emergency Radio Coverage Manuscript L05-07, what does the emergency radio coverage study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L05-07",
+              "page": 52,
+              "quote": "Constraint L05-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-H08",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "held_out",
+      "topic": "bridge fatigue sensing L05",
+      "papers": [
+        "Synthetic Bridge Fatigue Sensing Manuscript L05-08"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Bridge Fatigue Sensing Manuscript L05-08, what does the bridge fatigue sensing study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L05-08",
+              "page": 91,
+              "quote": "Constraint L05-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-H09",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "held_out",
+      "topic": "water quality sampling L05",
+      "papers": [
+        "Synthetic Water Quality Sampling Manuscript L05-09"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Water Quality Sampling Manuscript L05-09, what does the water quality sampling study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L05-09",
+              "page": 52,
+              "quote": "Constraint L05-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L05-H10",
+      "family": "L05",
+      "scenario": "revocation",
+      "split": "held_out",
+      "topic": "public transit reliability L05",
+      "papers": [
+        "Synthetic Public Transit Reliability Manuscript L05-10"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "In Synthetic Public Transit Reliability Manuscript L05-10, what does the public transit reliability study conclude about its main constraint?",
+          "intended_task": "read_before_revocation",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L05-10",
+              "page": 91,
+              "quote": "Constraint L05-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What did you find in that paper earlier?",
+          "intended_task": "continue_after_revocation",
+          "expected_pair": [],
+          "required_evidence": [],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+        }
+      ],
+      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-D01",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "development",
+      "topic": "coastal flood routing L06",
+      "papers": [
+        "Synthetic Coastal Flood Routing Manuscript L06-01"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for coastal flood routing; read Synthetic Coastal Flood Routing Manuscript L06-01 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L06-01",
+              "page": 52,
+              "quote": "Constraint L06-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L06-01",
+              "page": 52,
+              "quote": "Constraint L06-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-D02",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "development",
+      "topic": "campus energy demand L06",
+      "papers": [
+        "Synthetic Campus Energy Demand Manuscript L06-02"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for campus energy demand; read Synthetic Campus Energy Demand Manuscript L06-02 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L06-02",
+              "page": 91,
+              "quote": "Constraint L06-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L06-02",
+              "page": 91,
+              "quote": "Constraint L06-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-D03",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "development",
+      "topic": "soil moisture mapping L06",
+      "papers": [
+        "Synthetic Soil Moisture Mapping Manuscript L06-03"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for soil moisture mapping; read Synthetic Soil Moisture Mapping Manuscript L06-03 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L06-03",
+              "page": 52,
+              "quote": "Constraint L06-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L06-03",
+              "page": 52,
+              "quote": "Constraint L06-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-D04",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "development",
+      "topic": "urban heat shelters L06",
+      "papers": [
+        "Synthetic Urban Heat Shelters Manuscript L06-04"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for urban heat shelters; read Synthetic Urban Heat Shelters Manuscript L06-04 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L06-04",
+              "page": 91,
+              "quote": "Constraint L06-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L06-04",
+              "page": 91,
+              "quote": "Constraint L06-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-D05",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "development",
+      "topic": "river sediment transport L06",
+      "papers": [
+        "Synthetic River Sediment Transport Manuscript L06-05"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for river sediment transport; read Synthetic River Sediment Transport Manuscript L06-05 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L06-05",
+              "page": 52,
+              "quote": "Constraint L06-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L06-05",
+              "page": 52,
+              "quote": "Constraint L06-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-D06",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "development",
+      "topic": "crop disease screening L06",
+      "papers": [
+        "Synthetic Crop Disease Screening Manuscript L06-06"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for crop disease screening; read Synthetic Crop Disease Screening Manuscript L06-06 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L06-06",
+              "page": 91,
+              "quote": "Constraint L06-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L06-06",
+              "page": 91,
+              "quote": "Constraint L06-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-H07",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "held_out",
+      "topic": "emergency radio coverage L06",
+      "papers": [
+        "Synthetic Emergency Radio Coverage Manuscript L06-07"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for emergency radio coverage; read Synthetic Emergency Radio Coverage Manuscript L06-07 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L06-07",
+              "page": 52,
+              "quote": "Constraint L06-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L06-07",
+              "page": 52,
+              "quote": "Constraint L06-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-H08",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "held_out",
+      "topic": "bridge fatigue sensing L06",
+      "papers": [
+        "Synthetic Bridge Fatigue Sensing Manuscript L06-08"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for bridge fatigue sensing; read Synthetic Bridge Fatigue Sensing Manuscript L06-08 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L06-08",
+              "page": 91,
+              "quote": "Constraint L06-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L06-08",
+              "page": 91,
+              "quote": "Constraint L06-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-H09",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "held_out",
+      "topic": "water quality sampling L06",
+      "papers": [
+        "Synthetic Water Quality Sampling Manuscript L06-09"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for water quality sampling; read Synthetic Water Quality Sampling Manuscript L06-09 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L06-09",
+              "page": 52,
+              "quote": "Constraint L06-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L06-09",
+              "page": 52,
+              "quote": "Constraint L06-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L06-H10",
+      "family": "L06",
+      "scenario": "partial_outage",
+      "split": "held_out",
+      "topic": "public transit reliability L06",
+      "papers": [
+        "Synthetic Public Transit Reliability Manuscript L06-10"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Compare the available evidence for public transit reliability; read Synthetic Public Transit Reliability Manuscript L06-10 first.",
+          "intended_task": "read_before_partial_outage",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L06-10",
+              "page": 91,
+              "quote": "Constraint L06-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "What can you conclude so far, and what remains unchecked?",
+          "intended_task": "partial_answer_after_tool_failure",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L06-10",
+              "page": 91,
+              "quote": "Constraint L06-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
+        }
+      ],
+      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-D01",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "development",
+      "topic": "coastal flood routing L07",
+      "papers": [
+        "Synthetic Coastal Flood Routing Manuscript L07-01"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate coastal flood routing in Synthetic Coastal Flood Routing Manuscript L07-01 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L07-01",
+              "page": 52,
+              "quote": "Constraint L07-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Coastal Flood Routing Manuscript L07-01",
+              "page": 52,
+              "quote": "Constraint L07-01: the coastal flood routing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-D02",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "development",
+      "topic": "campus energy demand L07",
+      "papers": [
+        "Synthetic Campus Energy Demand Manuscript L07-02"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate campus energy demand in Synthetic Campus Energy Demand Manuscript L07-02 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L07-02",
+              "page": 91,
+              "quote": "Constraint L07-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Campus Energy Demand Manuscript L07-02",
+              "page": 91,
+              "quote": "Constraint L07-02: the campus energy demand estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-D03",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "development",
+      "topic": "soil moisture mapping L07",
+      "papers": [
+        "Synthetic Soil Moisture Mapping Manuscript L07-03"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate soil moisture mapping in Synthetic Soil Moisture Mapping Manuscript L07-03 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L07-03",
+              "page": 52,
+              "quote": "Constraint L07-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Soil Moisture Mapping Manuscript L07-03",
+              "page": 52,
+              "quote": "Constraint L07-03: the soil moisture mapping estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-D04",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "development",
+      "topic": "urban heat shelters L07",
+      "papers": [
+        "Synthetic Urban Heat Shelters Manuscript L07-04"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate urban heat shelters in Synthetic Urban Heat Shelters Manuscript L07-04 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L07-04",
+              "page": 91,
+              "quote": "Constraint L07-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Urban Heat Shelters Manuscript L07-04",
+              "page": 91,
+              "quote": "Constraint L07-04: the urban heat shelters estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-D05",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "development",
+      "topic": "river sediment transport L07",
+      "papers": [
+        "Synthetic River Sediment Transport Manuscript L07-05"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate river sediment transport in Synthetic River Sediment Transport Manuscript L07-05 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L07-05",
+              "page": 52,
+              "quote": "Constraint L07-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic River Sediment Transport Manuscript L07-05",
+              "page": 52,
+              "quote": "Constraint L07-05: the river sediment transport estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-D06",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "development",
+      "topic": "crop disease screening L07",
+      "papers": [
+        "Synthetic Crop Disease Screening Manuscript L07-06"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate crop disease screening in Synthetic Crop Disease Screening Manuscript L07-06 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L07-06",
+              "page": 91,
+              "quote": "Constraint L07-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Crop Disease Screening Manuscript L07-06",
+              "page": 91,
+              "quote": "Constraint L07-06: the crop disease screening estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-H07",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "held_out",
+      "topic": "emergency radio coverage L07",
+      "papers": [
+        "Synthetic Emergency Radio Coverage Manuscript L07-07"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate emergency radio coverage in Synthetic Emergency Radio Coverage Manuscript L07-07 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L07-07",
+              "page": 52,
+              "quote": "Constraint L07-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Emergency Radio Coverage Manuscript L07-07",
+              "page": 52,
+              "quote": "Constraint L07-07: the emergency radio coverage estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-H08",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "held_out",
+      "topic": "bridge fatigue sensing L07",
+      "papers": [
+        "Synthetic Bridge Fatigue Sensing Manuscript L07-08"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate bridge fatigue sensing in Synthetic Bridge Fatigue Sensing Manuscript L07-08 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L07-08",
+              "page": 91,
+              "quote": "Constraint L07-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Bridge Fatigue Sensing Manuscript L07-08",
+              "page": 91,
+              "quote": "Constraint L07-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-H09",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "held_out",
+      "topic": "water quality sampling L07",
+      "papers": [
+        "Synthetic Water Quality Sampling Manuscript L07-09"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate water quality sampling in Synthetic Water Quality Sampling Manuscript L07-09 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L07-09",
+              "page": 52,
+              "quote": "Constraint L07-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Water Quality Sampling Manuscript L07-09",
+              "page": 52,
+              "quote": "Constraint L07-09: the water quality sampling estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    },
+    {
+      "id": "L07-H10",
+      "family": "L07",
+      "scenario": "interrupted_research",
+      "split": "held_out",
+      "topic": "public transit reliability L07",
+      "papers": [
+        "Synthetic Public Transit Reliability Manuscript L07-10"
+      ],
+      "supported_unambiguous": true,
+      "turns": [
+        {
+          "user": "Investigate public transit reliability in Synthetic Public Transit Reliability Manuscript L07-10 and cite the original source.",
+          "intended_task": "start_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L07-10",
+              "page": 91,
+              "quote": "Constraint L07-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "Report limits and cite the original page."
+        },
+        {
+          "user": "Continue the investigation from where we left off.",
+          "intended_task": "resume_interrupted_research",
+          "expected_pair": [],
+          "required_evidence": [
+            {
+              "title": "Synthetic Public Transit Reliability Manuscript L07-10",
+              "page": 91,
+              "quote": "Constraint L07-10: the public transit reliability estimate is limited by missing late-season observations."
+            }
+          ],
+          "clarification_necessary": false,
+          "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
+        }
+      ],
+      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
+      "source_state": "synthetic_planned_unverified"
+    }
+  ]
+}

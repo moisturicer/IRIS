@@ -52,10 +52,16 @@ def split_digests(data: Mapping[str, Any]) -> dict[str, str]:
 
 def lock_record(data: Mapping[str, Any]) -> dict[str, Any]:
     digests = split_digests(data)
-    return {"set_id": data.get("set_id"), "development": digests["development"],
+    record = {"set_id": data.get("set_id"), "development": digests["development"],
             "held_out": digests["held_out"], "corpus": _digest(data.get("corpus")),
             "rubric_version": data.get("rubric_version", RUBRIC_VERSION),
             "thresholds": dict(TARGETS)}
+    if "families" in data:
+        record["families"] = list(data["families"])
+        record["label_status"] = data.get("label_status")
+    if "min_family_cases" in data:
+        record["min_family_cases"] = data["min_family_cases"]
+    return record
 
 
 LOCK_KEYS = ("set_id", "development", "held_out", "corpus", "rubric_version")
@@ -67,7 +73,12 @@ def check_lock(data: Mapping[str, Any], lock: Mapping[str, Any]) -> list[str]:
     A lock written before IR-607 pinned no corpus or rubric, so it is stale.
     """
     current = lock_record(data)
-    return [key for key in LOCK_KEYS if current[key] != lock.get(key)]
+    keys = [*LOCK_KEYS]
+    keys += [key for key in ("families", "min_family_cases", "label_status")
+             if key in current or key in lock]
+    if "families" in current or "families" in lock:
+        keys.append("thresholds")
+    return [key for key in keys if current.get(key) != lock.get(key)]
 
 
 def postdates_lock(stamp: Any, lock: Mapping[str, Any]) -> bool:
@@ -190,6 +201,16 @@ def _leakage(conversations, allowed):
 def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MIN_CONVERSATIONS) -> dict:
     errors: list[str] = []
     conversations = list(data.get("conversations", ()))
+    families = data.get("families", FAMILIES)
+    if (not isinstance(families, list | tuple) or not families
+            or any(not isinstance(f, str) or not f.strip() for f in families)
+            or len(set(families)) != len(families)):
+        errors.append("families must be a nonempty list of distinct names")
+        families = FAMILIES
+    minimum = data.get("min_family_cases", 0)
+    if type(minimum) is not int or minimum < 0:
+        errors.append("min_family_cases must be a nonnegative integer")
+        minimum = 0
     if data.get("schema_version") != SCHEMA_VERSION:
         errors.append(f"schema_version must be {SCHEMA_VERSION}")
     if not data.get("set_id"):
@@ -214,16 +235,16 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
     for cid, n in ids.items():
         if n > 1:
             errors.append(f"duplicate id {cid}")
-    counts = {split: {f: 0 for f in FAMILIES} for split in SPLITS}
+    counts = {split: {f: 0 for f in families} for split in SPLITS}
     for c in conversations:
         for field in CONVERSATION_FIELDS:
             if field not in c:
                 errors.append(f"{c.get('id')}: missing {field}")
-        if c.get("family") not in FAMILIES:
+        if c.get("family") not in families:
             errors.append(f"{c.get('id')}: unknown family {c.get('family')}")
         if c.get("split") not in SPLITS:
             errors.append(f"{c.get('id')}: unknown split {c.get('split')!r}")
-        if c.get("family") in FAMILIES and c.get("split") in SPLITS:
+        if c.get("family") in families and c.get("split") in SPLITS:
             counts[c["split"]][c["family"]] += 1
         _check_turns(c, errors)
         if "a09_case" in c and c["a09_case"] not in A09_CASES:
@@ -235,9 +256,11 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
     leaks, shared = _leakage(conversations, allowed)
     for leak in leaks:
         errors.append(f"leakage: {leak['kind']} {leak['value']!r} in both splits")
-    gaps = [f for f in FAMILIES
+    gaps = [f for f in families
             if not any(counts[s][f] for s in SPLITS)]
-    held_gaps = [f for f in FAMILIES if not counts["held_out"][f]]
+    held_gaps = [f for f in families if not counts["held_out"][f]]
+    lock_blockers += [f for f in families
+                      if sum(counts[s][f] for s in SPLITS) < minimum]
     if len(conversations) < min_conversations:
         errors.append(f"fewer than {min_conversations} conversations ({len(conversations)})")
     return {
@@ -249,6 +272,6 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
         "coverage_gaps": gaps, "held_out_coverage_gaps": held_gaps,
         "digests": split_digests(data), "errors": errors, "lock_blockers": lock_blockers,
         "warnings": [{"kind": "topic_overlap", **o} for o in _topic_overlaps(conversations)],
-        "ready": not errors and not gaps,
+        "ready": not errors and not gaps and not lock_blockers,
         "ok": not errors,
     }

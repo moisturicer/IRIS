@@ -118,6 +118,12 @@ class Command(BaseCommand):
         if options["write_lock"]:
             if report["lock_blockers"]:
                 raise CommandError("not locked: " + "; ".join(report["lock_blockers"]))
+            if "families" in data:
+                if data["label_status"] != "human_reviewed" or label is None or label.get("fixture"):
+                    raise CommandError("not locked: custom family packs require human-reviewed labels "
+                                       "and a named, non-fixture label review")
+                if (data.get("corpus") or {}).get("ingested") is False:
+                    raise CommandError("not locked: planned sources must be ingested and verified")
             lock = {**lock_record(data), "locked_at": datetime.now(timezone.utc).isoformat()}
             if label is not None:
                 lock["label_review"] = {"reviewer": label["reviewer"],
