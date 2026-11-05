@@ -274,7 +274,7 @@ The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone
 In the AI Overview a citation is the page it cites: "p8", 12 px semibold maroon on a Maroon Wash, at the baseline of the text, linking to that page. Chat citations stay small numbered markers: 12 px semibold maroon on a Maroon Wash square, and the same numbers appear on the answer's sources button.
 
 ### Inputs / Fields
-A white field with a Rule Stone outline and the control radius. Focus darkens the outline to maroon with a soft maroon ring. A disabled field sits on Endpaper with a not-allowed cursor and says why beside it. The Ask IRIS composer holds the scope chip and Send inside its field, grows with the question up to a cap, and its Send is Bar Stone until there is something to send.
+A white field with a Rule Stone outline and the control radius. Focus darkens the outline to maroon with a soft maroon ring. A disabled field sits on Endpaper with a not-allowed cursor and says why beside it. Paper Chat's composer holds the scope chip and Send inside its field. The Ask IRIS page's composer is one line that grows with the question up to a cap, over a row of round icon controls (attach, closed until uploads exist; compare) and a Bar Stone settings pill whose menu offers only what the server supports. Send is Bar Stone until there is something to send.
 
 ### Navigation
 - **Record bar:** 56 px, Bar Stone, a Desk Stone hairline under it. Back (always labelled), a hairline divider, the paper's title on Paper, then the section tabs.

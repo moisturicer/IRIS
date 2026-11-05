@@ -33,6 +33,7 @@ import { ChatMessageList } from "./components/ChatMessageList";
 import { ChatInput } from "./components/ChatInput";
 import { CHAT_OPENING } from "./components/answerLayout";
 import { ComparisonPicker } from "./components/ComparisonPicker";
+import { ModelPill } from "./components/ModelPill";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
@@ -113,6 +114,11 @@ function RuntimeAskPage() {
       onConversation={id => { if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true }); }} />
   </div>;
 }
+
+// The server picks the model; a reader has no choice to make (ADR-036).
+const ANSWER_MODEL = [
+  { value: "auto", short: "Auto", label: "Auto", description: "IRIS chooses the model for each answer", icon: "far fa-lightbulb" },
+] as const;
 
 function LegacyRAGChatPage() {
   const [searchParams] = useSearchParams();
@@ -526,6 +532,7 @@ function LegacyRAGChatPage() {
           >
             <ComparisonPicker key={activeId} selected={client.comparisonRecords} onChange={client.setComparisonRecords}
               limit={comparisonLimit} scoped={client.record !== null} disabled={loading || !activeId} />
+            <ModelPill name="Model" value="auto" options={ANSWER_MODEL} />
           </ChatInput>
           </div>
         </div>

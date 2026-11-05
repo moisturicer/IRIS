@@ -59,7 +59,14 @@ export const CHAT_COMPOSER_SURFACE =
 
 // Grows with the question up to a cap; browsers without field-sizing keep `rows`.
 export const CHAT_COMPOSER_FIELD =
-  "resize-none caret-brand [field-sizing:content] min-h-14 max-h-40 overflow-y-auto scrollbar-thin";
+  "resize-none caret-brand [field-sizing:content] max-h-40 overflow-y-auto scrollbar-thin";
+
+// The opening's text, starter questions and composer share this width.
+export const CHAT_OPENING_COLUMN = "mx-auto w-full max-w-3xl";
+
+// A round composer control: 44 px on touch, 36 px beside a pointer.
+export const CHAT_COMPOSER_ICON =
+  "inline-flex size-11 shrink-0 items-center justify-center rounded-full [@media(pointer:fine)]:size-9";
 
 // Defined in index.css: it has to reach the end of a list as well as a paragraph.
 export const CHAT_STREAM_CARET = "answer-caret";

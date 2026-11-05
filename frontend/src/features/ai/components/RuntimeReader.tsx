@@ -4,6 +4,12 @@ import { isAxiosError } from "axios";
 import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import { ChatInput } from "./ChatInput";
 import { CHAT_OPENING } from "./answerLayout";
+import { ModelPill, type ModelPillOption } from "./ModelPill";
+
+const DEPTHS: readonly ModelPillOption<Depth>[] = [
+  { value: "deep", short: "Thorough", label: "Thorough research", description: "Searches and reads more before answering", icon: "fas fa-book-open-reader" },
+  { value: "ordinary", short: "Standard", label: "Standard", description: "A shorter search for a quicker answer", icon: "far fa-lightbulb" },
+];
 
 const STATES: Record<ReaderRun["state"], string> = {
   queued: "Queued", running: "Research in progress", completed: "Answer ready", cancelled: "Stopped",
@@ -345,14 +351,8 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
       maxLength={4000}
       placeholder={recordId ? "Ask about this paper…" : "Ask about the research corpus…"}
       disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"}>
-      <label className="inline-flex cursor-pointer">
-        <input type="checkbox" checked={depth === "deep"} onChange={e => setDepth(e.target.checked ? "deep" : "ordinary")}
-          className="peer sr-only" />
-        <span className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-small font-semibold transition-colors duration-150 motion-reduce:transition-none peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2 ${depth === "deep" ? "border-brand-200 bg-brand-50 text-brand" : "border-stone-300 text-stone-700 hover:border-brand/40 hover:text-brand"}`}>
-          <i className={`fas ${depth === "deep" ? "fa-check" : "fa-plus"} text-xs`} aria-hidden />
-          Thorough research
-        </span>
-      </label>
+      <ModelPill name="Research depth" value={depth} options={DEPTHS} onChange={setDepth}
+        note="IRIS chooses the model for each answer." />
     </ChatInput>
   </div>;
 }

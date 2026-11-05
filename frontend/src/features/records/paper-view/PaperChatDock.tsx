@@ -534,7 +534,7 @@ function LegacyPaperChatPanel({
             // a screen reader on Y must not hear "this paper" and mean X.
             aria-label={pinned ? `Ask about ${subject.title}` : "Ask about this paper"}
             placeholder="Ask about methodology, findings, datasets…"
-            className={cn("block w-full bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 outline-none", CHAT_COMPOSER_FIELD)}
+            className={cn("block w-full bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 outline-none min-h-14", CHAT_COMPOSER_FIELD)}
           />
           <div className="flex items-center justify-between gap-2 px-2 pb-2">
             {/* The scope control (IR-298, ADR-026 section 9): visible, and the

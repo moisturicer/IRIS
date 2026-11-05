@@ -4,7 +4,7 @@ import type { StreamingState } from "../conversation/answerStream";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AssistantMessageSkeleton } from "./AssistantMessageSkeleton";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
-import { CHAT_COLUMN } from "./answerLayout";
+import { CHAT_COLUMN, CHAT_OPENING_COLUMN } from "./answerLayout";
 import { AskIrisEmblem } from "./AskIrisIcons";
 import { StarterQuestions } from "./StarterQuestions";
 
@@ -70,10 +70,10 @@ export function ChatMessageList({
   if (messages.length === 0 && !isLoading) {
     return (
       <div className="shrink-0 px-4 pb-1 pt-6 text-center sm:px-6">
-        <div className="mx-auto w-full max-w-xl animate-fade-in-up motion-reduce:animate-none">
+        <div className={`${CHAT_OPENING_COLUMN} animate-fade-in-up motion-reduce:animate-none`}>
           <AskIrisEmblem className="w-16 h-16 mx-auto mb-5" />
           <h2 className="text-[26px] font-bold text-stone-900 mb-2">What do you want to ask?</h2>
-          <p className="text-[15px] text-stone-500 leading-relaxed">
+          <p className="mx-auto max-w-xl text-[15px] text-stone-500 leading-relaxed">
             Every answer is grounded in published CIT-U records
             {indexedRecords != null && (
               <> — <strong className="text-stone-700">{indexedRecords}</strong> currently searchable</>

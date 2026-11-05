@@ -1,6 +1,6 @@
 import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { CHAT_COLUMN, CHAT_COMPOSER_FIELD, CHAT_COMPOSER_SURFACE } from "./answerLayout";
+import { CHAT_COLUMN, CHAT_COMPOSER_FIELD, CHAT_COMPOSER_ICON, CHAT_COMPOSER_SURFACE, CHAT_OPENING_COLUMN } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
 
 interface ChatInputProps {
@@ -21,6 +21,8 @@ interface ChatInputProps {
   draft?: string;
   onDraftChange?: (text: string) => void;
 }
+
+const ATTACH_CLOSED = "Attaching files is not available yet";
 
 export function ChatInput({ onSend, disabled, sendDisabled, children, placeholder, label, draft, onDraftChange, maxLength, centered = false }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
@@ -49,32 +51,44 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
   return (
     <form
       onSubmit={handleSubmit}
-      className={`shrink-0 px-4 py-4 sm:px-6 ${centered ? "" : "border-t border-stone-200/80"}`}
+      className={`shrink-0 px-4 py-3 sm:px-6 ${centered ? "" : "border-t border-stone-200/80"}`}
     >
-      <div className={`grid grid-cols-[minmax(0,1fr)_auto] items-end gap-x-2 p-2 ${centered ? "mx-auto w-full max-w-xl" : CHAT_COLUMN} ${CHAT_COMPOSER_SURFACE}`}>
+      <div className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 p-1.5 ${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} ${CHAT_COMPOSER_SURFACE}`}>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={handleKeyDown}
           disabled={disabled}
-          rows={2}
+          rows={1}
           maxLength={maxLength}
           aria-label={label ?? placeholder ?? "Ask about the research corpus…"}
           placeholder={placeholder ?? "Ask about the research corpus…"}
-          className={`col-span-2 min-w-0 bg-transparent px-3 py-2 text-[15px]
+          className={`col-span-2 min-h-9 min-w-0 bg-transparent px-2.5 py-1.5 text-[15px]
             outline-none text-stone-900 placeholder:text-stone-500 disabled:opacity-50 ${CHAT_COMPOSER_FIELD}`}
         />
-        {children && <div className="col-start-1 row-start-2 min-w-0 self-start">{children}</div>}
+        <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-1.5">
+          {/* Visibly closed until uploads to a question exist. */}
+          <button
+            type="button"
+            disabled
+            title={ATTACH_CLOSED}
+            aria-label={ATTACH_CLOSED}
+            className={`${CHAT_COMPOSER_ICON} border border-stone-200 text-stone-400 cursor-not-allowed`}
+          >
+            <i className="fas fa-plus text-sm" aria-hidden />
+          </button>
+          {children}
+        </div>
         <button
           type="submit"
           disabled={disabled || sendDisabled || !text.trim()}
-          className={`col-start-2 row-start-2 self-start size-11 rounded-lg bg-brand text-white flex items-center justify-center
+          className={`${CHAT_COMPOSER_ICON} col-start-2 row-start-2 self-start bg-brand text-white
             hover:bg-brand-light disabled:bg-stone-100 disabled:text-stone-500 disabled:cursor-not-allowed
             active:scale-95 disabled:active:scale-100 motion-reduce:active:scale-100
             transition-[background-color,color,transform] duration-150 motion-reduce:transition-none ${FOCUS_RING}`}
           aria-label="Send message"
         >
-          <i className="fas fa-arrow-up text-[15px]" aria-hidden />
+          <i className="fas fa-arrow-up text-sm" aria-hidden />
         </button>
       </div>
       <AskIrisNotice className={`text-center mt-1.5 ${CHAT_COLUMN}`} />
