@@ -4,7 +4,7 @@
   "status": "deterministic_contract_not_quality_evidence",
   "source": "docs/superpowers/specs/2026-10-31-ai-runtime/04-context.md",
   "provider": "deterministic_script_only_no_vendor_calls",
-  "notes": "Contract evidence for cross-compaction continuity and provider-compatibility. Shaped like general_tools_contract_v1.json so IR-605 tooling can read it. Each case names the executable tests that prove it; none measures summary quality, paid capacity or long-context answer quality, which stay human-reviewed (IR-755).",
+  "notes": "Contract evidence for cross-compaction continuity and provider-compatibility. Shaped like general_tools_contract_v1.json so IR-605 tooling can read it. Each case names the executable tests that prove it; none measures summary quality, paid capacity or long-context answer quality, which stay human-reviewed (IR-755). A case's checks map each of request_fit, original_allowance, atomic_revision and citations to the one test that asserts it; a check no test asserts for that case is left out, never claimed.",
   "paper_set": [
     {
       "key": "monsoon",
@@ -93,15 +93,13 @@
         "originals_retained": 3,
         "reopened_with_handoff_and_later_turns_only": true,
         "checks": {
-          "request_fit": true,
-          "original_allowance": true,
-          "atomic_revision": true,
-          "citations": true
+          "request_fit": "test_every_request_across_the_compactions_fit_the_verified_capacity",
+          "citations": "test_two_automatic_compactions_and_a_manual_one_keep_the_task_the_order_and_the_exclusion"
         }
       },
       "proved_by": [
-        "test_two_automatic_compactions_and_a_manual_one_keep_the_task_the_order_and_the_exclusion",
-        "test_every_request_across_the_compactions_fit_the_verified_capacity"
+        "test_every_request_across_the_compactions_fit_the_verified_capacity",
+        "test_two_automatic_compactions_and_a_manual_one_keep_the_task_the_order_and_the_exclusion"
       ]
     },
     {
@@ -122,10 +120,7 @@
         "not_in_context": 30,
         "citation_binds_canonical_passage": "monsoon:p5",
         "checks": {
-          "request_fit": true,
-          "original_allowance": true,
-          "atomic_revision": true,
-          "citations": true
+          "citations": "test_passages_read_before_a_compaction_are_reported_as_no_longer_in_the_models_context"
         }
       },
       "proved_by": [
@@ -153,17 +148,14 @@
         ],
         "steps_not_renewed": true,
         "checks": {
-          "request_fit": true,
-          "original_allowance": true,
-          "atomic_revision": true,
-          "citations": true
+          "citations": "test_a_takeover_under_a_changed_prefix_or_schema_continues_portably_from_the_handoff"
         }
       },
       "proved_by": [
+        "test_a_changed_tool_schema_under_the_same_pin_rebuilds_without_the_saved_artifact",
         "test_a_takeover_after_a_manual_compaction_resumes_the_saved_step_with_its_artifact",
         "test_a_takeover_under_a_changed_prefix_or_schema_continues_portably_from_the_handoff",
-        "test_changed_instructions_under_the_same_pin_rebuild_without_the_saved_artifact",
-        "test_a_changed_tool_schema_under_the_same_pin_rebuilds_without_the_saved_artifact"
+        "test_changed_instructions_under_the_same_pin_rebuild_without_the_saved_artifact"
       ]
     },
     {
@@ -180,12 +172,7 @@
       "expected": {
         "withdrawn_capability": "unavailable_nothing_sent",
         "absent_native_support": "portable_path_completes",
-        "checks": {
-          "request_fit": true,
-          "original_allowance": true,
-          "atomic_revision": true,
-          "citations": true
-        }
+        "checks": {}
       },
       "proved_by": [
         "test_a_withdrawn_capability_stops_before_anything_is_sent",
@@ -210,10 +197,7 @@
         "verified_capacity": "continues_after_handoff_reauthorized",
         "in_flight_run_substituted": false,
         "checks": {
-          "request_fit": true,
-          "original_allowance": true,
-          "atomic_revision": true,
-          "citations": true
+          "request_fit": "test_a_model_whose_window_cannot_hold_the_conversation_refuses_before_sending"
         }
       },
       "proved_by": [
@@ -240,10 +224,8 @@
         "context_unchanged": true,
         "summary_beyond_allowance_sent": false,
         "checks": {
-          "request_fit": true,
-          "original_allowance": true,
-          "atomic_revision": true,
-          "citations": true
+          "atomic_revision": "test_a_handoff_the_store_refuses_leaves_the_text_in_front_of_the_model_and_the_next_run_whole",
+          "original_allowance": "test_compaction_inside_a_tight_allowance_is_skipped_never_given_a_new_one"
         }
       },
       "proved_by": [

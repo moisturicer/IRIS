@@ -33,14 +33,17 @@ def test_the_pack_is_labelled_contract_evidence_with_a_matching_snapshot():
     assert pack["snapshot"]["source_kind"] == "synthetic"
 
 
-def test_every_case_is_shaped_like_the_general_tools_pack_and_checks_the_four_contracts():
+def test_every_case_is_shaped_like_the_general_tools_pack_and_the_four_checks_are_each_proved():
     cases = _pack()["cases"]
     assert [case["id"] for case in cases] == [f"L0{n}" for n in range(1, 7)]
     for case in cases:
         assert case["family"] and case["turns"] and case["script"] and case["expected"]
-        # Request fit, the original allowance, atomic revision and citations are asserted in every case.
-        assert set(case["expected"]["checks"]) == CHECKS
-        assert all(case["expected"]["checks"].values())
+        # A check is listed only with the test that asserts it, and that test is one the case names.
+        checks = case["expected"]["checks"]
+        assert set(checks) <= CHECKS
+        assert set(checks.values()) <= set(case["proved_by"])
+    # Request fit, the original allowance, atomic revision and citations are each asserted somewhere.
+    assert {name for case in cases for name in case["expected"]["checks"]} == CHECKS
 
 
 def test_every_case_names_contract_tests_that_exist():

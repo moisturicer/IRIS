@@ -4,8 +4,9 @@ Cross-feature integration over the executor with the recording provider and
 the in-memory research stand-ins of IR-728, IR-733 and IR-735. The feature
 tests are IR-732 to IR-735's; this proves they hold together. A deterministic
 provider proves contracts, never a vendor's summary quality or paid capacity.
-PostgreSQL, fencing and the restricted runtime role are
-`test_ai_runtime_long_context_db.py`'s.
+Nothing here claims a database permission, lease or race: handoff storage,
+recovery and manual compaction against PostgreSQL belong to the IR-734,
+IR-735 and IR-754 DB suites.
 """
 
 import dataclasses
@@ -110,12 +111,12 @@ def test_passages_read_before_a_compaction_are_reported_as_no_longer_in_the_mode
         reply(f"Soil moisture first rose by 42 percent [{at(15)}]. Only a summary of the paper remained in "
               f"context when this was written, so I cannot confirm the corrected figure."),
     )
-    result, _ = investigate(provider, handoffs)
+    result, corpus = investigate(provider, handoffs)
 
     # The exchange that held the paper's text is gone from the final request.
     final = provider.requests[-1]
     assert MIDDLE not in json.dumps(final["messages"])
-    assert [m["phase"] for m in models(_)] == ["gather", "gather", "compact", "gather"]
+    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "compact", "gather"]
     # It was read whole, but nothing of it is claimed to be shown any more.
     assert coverage(result)["read"] == 30 and coverage(result)["complete"] is True
     assert coverage(result)["not_in_context"] == 30
