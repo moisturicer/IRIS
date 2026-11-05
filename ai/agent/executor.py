@@ -223,14 +223,16 @@ class _Run:
             for call in calls:
                 if self.investigation.tool_calls >= self.bounds.max_tool_calls:
                     # The exchange stays whole; the call is answered, not run.
-                    results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"})))
+                    results.append(ToolResult(call.id, json.dumps({"error": "tool_limit"}),
+                                              control_only=True))
                     continue
                 outcome = await self.investigation.execute(call)
                 if outcome.clarification is not None:
                     self._checked(outcome.clarification)
                     return self._result(outcome.clarification, (), kind="clarification")
                 progressed = progressed or outcome.progress
-                results.append(ToolResult(call.id, outcome.content, outcome.dependencies))
+                results.append(ToolResult(call.id, outcome.content, outcome.dependencies,
+                                          outcome.control_only))
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
             stale = 0 if progressed else stale + 1

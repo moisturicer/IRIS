@@ -203,8 +203,8 @@ def pack(request: AgentRequest, results, dialect, capacity: Optional[Capacity], 
 
 def _withheld(result: ToolResult) -> ToolResult:
     return ToolResult(result.call_id, json.dumps({
-        "withheld": "exceeds_context", "bytes": len(result.content.encode("utf-8")), "coverage": "none",
-    }))
+        "withheld": "exceeds_context", "coverage": "none",
+    }), control_only=True)
 
 
 def _pending_calls(request: AgentRequest) -> list[str]:
