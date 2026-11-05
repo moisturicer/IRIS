@@ -199,6 +199,10 @@ ALLOWED = {
     # "open" is a provider reservation awaiting settlement. Neither is a
     # document-request item or request state.
     "ai/evaluation/replay.py",
+    # (IR-740) The same labels for the dedicated runtime's rows, plus that
+    # service's own run states ("completed", "cancelled"), which Django cannot
+    # import from the `ai` package. A runtime run is not a request's state.
+    "ai/evaluation/runtime_replay.py",
     # "missing" reads that report key from milestone.py to print it.
     "ai/management/commands/eval_pilot_milestone.py",
     # (IR-500) A research tool call's outcome: "rejected" means a malformed

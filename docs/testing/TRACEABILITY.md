@@ -164,6 +164,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-754** | A reader deliberately compacts an owned Conversation from Ask IRIS or Paper Chat as a run of its own, through IR-734's mechanism, and sees what happened — under IR-715, ADR-049 §19; no FR- id | [details](traceability/IR-754.md) | **PARTIAL** |
 | **IR-736** | A long-paper investigation continues across repeated compactions and safely rebuilds when native continuation state is incompatible — under IR-715, ADR-049 §19–20; no FR- id | [details](traceability/IR-736.md) | **PARTIAL** |
 | **IR-726** | A reader stops, reconnects with a journal cursor, or explicitly retries one AI-runtime investigation across worker races without duplicate delivery, continued admissions or a renewed allowance — under IR-713, ADR-049 §11; no FR- id | [details](traceability/IR-726.md) | **PARTIAL** |
+| **IR-740** | IR-605 collects the dedicated runtime through its real authenticated routes under an explicit engine identity, and rescores old baselines with effective-condition preflight and a separate capability report — under IR-716, ADR-049 §24; no FR- id | [details](traceability/IR-740.md) | **PARTIAL** |
 
 ### Non-functional
 
