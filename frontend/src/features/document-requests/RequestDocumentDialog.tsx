@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { recordsApi } from "@/api/records";
+import { FieldLabel } from "@/components/ui/FieldLabel";
+import { Input } from "@/components/ui/Input";
+import { Select } from "@/components/ui/Select";
 import { useDialogFocus } from "@/hooks/useDialogFocus";
 import type { DocumentRequestItemInput, DocumentRequestSlot, Party } from "@/types/records";
 
@@ -127,26 +130,18 @@ export function RequestDocumentDialog({
           </div>
 
           {parties.length > 1 && (
-            <div>
-              <label
-                htmlFor={`${ids}-party`}
-                className="block text-xs font-semibold text-stone-700 mb-1"
-              >
-                Asking as
-              </label>
-              <select
-                id={`${ids}-party`}
-                value={party}
-                onChange={(e) => setParty(e.target.value as Party)}
-                className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
-              >
-                {parties.map((p) => (
-                  <option key={p} value={p}>
-                    {partyLabels[p] ?? p}
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              id={`${ids}-party`}
+              label="Asking as"
+              value={party}
+              onChange={(e) => setParty(e.target.value as Party)}
+            >
+              {parties.map((p) => (
+                <option key={p} value={p}>
+                  {partyLabels[p] ?? p}
+                </option>
+              ))}
+            </Select>
           )}
 
           <fieldset>
@@ -182,35 +177,28 @@ export function RequestDocumentDialog({
                 ))}
               </ul>
             )}
-            <label
-              htmlFor={`${ids}-other`}
-              className="block text-xs font-semibold text-stone-700 mt-3 mb-1"
-            >
-              Other document <span className="font-normal text-stone-500">(optional)</span>
-            </label>
-            <input
-              id={`${ids}-other`}
-              type="text"
-              value={other}
-              maxLength={200}
-              onChange={(e) => setOther(e.target.value)}
-              placeholder="e.g. Rescanned consent form"
-              className="w-full border border-stone-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-brand"
-            />
+            <div className="mt-3">
+              <Input
+                id={`${ids}-other`}
+                label="Other document"
+                optional
+                type="text"
+                value={other}
+                maxLength={200}
+                onChange={(e) => setOther(e.target.value)}
+                placeholder="e.g. Rescanned consent form"
+              />
+            </div>
           </fieldset>
 
-          <div>
-            <label
-              htmlFor={`${ids}-message`}
-              className="block text-xs font-semibold text-stone-700 mb-1"
-            >
-              Message to the owner <span className="font-normal text-brand">(required)</span>
-            </label>
+          <div className="flex flex-col gap-1">
+            <FieldLabel htmlFor={`${ids}-message`} label="Message to the owner" />
             <textarea
               id={`${ids}-message`}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               rows={3}
+              aria-required
               placeholder="Why you need these, and anything they should check first."
               className="w-full border border-stone-200 rounded-lg p-3 text-sm resize-y focus:outline-none focus:border-brand"
             />

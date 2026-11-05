@@ -1,30 +1,42 @@
 import { forwardRef, useId, type ReactNode, type SelectHTMLAttributes } from "react";
 
-import { FieldLabel } from "./FieldLabel";
+import { FieldLabel, type FieldMarker } from "./FieldLabel";
 
 // The same steps as Input's, so a select beside a text field is the same
 // height and type size (IR-539). They live on the primitive for Input's reason:
 // clsx has no tailwind-merge, so a caller's padding would not replace these.
-// `pr-10` leaves room for the chevron at both steps.
-type Size = "md" | "lg";
+// `pr-10` leaves room for the chevron at both steps. "sm" (IR-585) is the
+// 36px toolbar step -- Sort and Folder in the library -- where a select sits in
+// a row of controls rather than in a form, so it has no Input beside it.
+type Size = "sm" | "md" | "lg";
 
 const SIZE_CLASSES: Record<Size, string> = {
+  sm: "min-h-9 pl-2 pr-8 py-1 text-small",
   md: "pl-3 pr-10 py-2 text-[14px]",
   lg: "min-h-11 pl-4 pr-10 py-3 text-base",
 };
 
+const CHEVRON_PADDING: Record<Size, string> = {
+  sm: "pr-2.5",
+  md: "pr-4",
+  lg: "pr-4",
+};
+
 // `size` is omitted from the native attributes for Input's reason: HTML's own
 // `size` on a select is a visible-row count, not a size step.
-interface SelectProps extends Omit<SelectHTMLAttributes<HTMLSelectElement>, "size"> {
+type SelectProps = Omit<SelectHTMLAttributes<HTMLSelectElement>, "size" | "required"> & FieldMarker & {
   label?:    string;
   error?:    string;
   hint?:     ReactNode;
   size?:     Size;
-  /** As on Input: "(required)" beside the label, and `aria-required`. */
-  required?: boolean;
+  /**
+   * Puts the label beside the control instead of above it, for a toolbar
+   * (IR-585). The error and hint still sit underneath.
+   */
+  inline?:   boolean;
   /** The `<option>`s and `<optgroup>`s. */
   children:  ReactNode;
-}
+};
 
 /**
  * A native `<select>` with Input's contract (IR-539): a label tied to it by a
@@ -40,7 +52,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
       error,
       hint,
       size = "md",
+      inline = false,
       required,
+      optional,
       className = "",
       id,
       children,
@@ -69,35 +83,37 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(
 
     return (
       <div className="flex flex-col gap-1">
-        {label && <FieldLabel htmlFor={selectId} label={label} required={required} />}
-        <div className="relative">
-          <select
-            ref={ref}
-            id={selectId}
-            aria-invalid={invalid ? true : undefined}
-            aria-describedby={describedByIds || undefined}
-            aria-required={required || undefined}
-            className={`w-full appearance-none border rounded-lg bg-surface outline-none transition-colors
-              text-stone-900 cursor-pointer
-              ${SIZE_CLASSES[size]}
-              ${invalid
-                ? "border-brand focus:border-brand focus:ring-2 focus:ring-brand"
-                : "border-stone-300 focus:border-brand focus:ring-1 focus:ring-brand"
-              }
-              disabled:cursor-not-allowed disabled:bg-stone-50 disabled:text-stone-500
-              ${className}`}
-            {...rest}
-          >
-            {children}
-          </select>
-          {/* `appearance-none` removes the platform arrow, so one is drawn. It
-              is decoration: the combobox role already says it opens. */}
-          <span
-            aria-hidden
-            className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-4 text-xs text-stone-500"
-          >
-            <i className="fas fa-chevron-down" />
-          </span>
+        <div className={inline ? "flex items-center gap-2" : "flex flex-col gap-1"}>
+          {label && <FieldLabel htmlFor={selectId} label={label} optional={optional} />}
+          <div className="relative">
+            <select
+              ref={ref}
+              id={selectId}
+              aria-invalid={invalid ? true : undefined}
+              aria-describedby={describedByIds || undefined}
+              aria-required={required || undefined}
+              className={`w-full appearance-none border rounded-lg bg-surface outline-none transition-colors
+                text-stone-900 cursor-pointer
+                ${SIZE_CLASSES[size]}
+                ${invalid
+                  ? "border-brand focus:border-brand focus:ring-2 focus:ring-brand"
+                  : "border-stone-300 focus:border-brand focus:ring-1 focus:ring-brand"
+                }
+                disabled:cursor-not-allowed disabled:bg-stone-50 disabled:text-stone-500
+                ${className}`}
+              {...rest}
+            >
+              {children}
+            </select>
+            {/* `appearance-none` removes the platform arrow, so one is drawn. It
+                is decoration: the combobox role already says it opens. */}
+            <span
+              aria-hidden
+              className={`pointer-events-none absolute inset-y-0 right-0 flex items-center ${CHEVRON_PADDING[size]} text-xs text-stone-500`}
+            >
+              <i className="fas fa-chevron-down" />
+            </span>
+          </div>
         </div>
         {error && (
           <p id={errorId} className="flex items-start gap-1.5 text-[13px] text-brand">
