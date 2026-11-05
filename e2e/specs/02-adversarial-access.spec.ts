@@ -10,17 +10,17 @@ import { anonymous, as, ok, signInBrowser, type Client } from "../support/api";
 import { uniqueTitle } from "../support/accounts";
 import { manuscriptPdf } from "../support/pdf";
 import { NEW_PASSWORD, newStudent } from "../support/people";
-import { claimAndOpen, createDraft, reviewRow, submit, acceptAndRoute } from "../support/workflow";
+import { claimAndOpen, createDraft, reviewRow, submit, throughRdco } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
 
 const MISSING = 2_000_000_000;
 const title = uniqueTitle("access");
-let owner: Client, adviser: Client, stranger: Client, itso: Client, ierc: Client;
+let owner: Client, adviser: Client, stranger: Client, itso: Client, ierc: Client, rdco: Client;
 let draftId: number, uploadId: number;
 
 test.beforeAll(async () => {
-  [owner, adviser, itso, ierc] = await Promise.all(["student", "adviser", "itso", "ierc"].map((w) => as(w)));
+  [owner, adviser, itso, ierc, rdco] = await Promise.all(["student", "adviser", "itso", "ierc", "rdco"].map((w) => as(w)));
   stranger = await newStudent("stranger");
   draftId = await createDraft(owner, { title, type: "Thesis / Research", adviserId: adviser.userId });
   // The manuscript sits on the Record itself, so give the draft a slot upload
@@ -36,7 +36,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await Promise.all([owner, adviser, stranger, itso, ierc].map((c) => c?.dispose()));
+  await Promise.all([owner, adviser, stranger, itso, ierc, rdco].map((c) => c?.dispose()));
 });
 
 /** Status and body of a request, for comparing a hidden id against a missing one. */
@@ -95,7 +95,8 @@ test("guessed file ids: a hidden Record's upload answers as a missing one", asyn
 test("cross-office: ITSO cannot act on IERC's turn", async () => {
   await submit(owner, draftId);
   await claimAndOpen(adviser, draftId, "adviser");
-  await acceptAndRoute(adviser, draftId, [{ party: "ierc", nominee: ierc.userId }], "Ethics review only (IR-631 access journey).");
+  // ADR-047: the Adviser sends to RDCO, and RDCO requests IERC.
+  await throughRdco(adviser, rdco, draftId, [{ party: "ierc", nominees: [ierc.userId] }], "Ethics review only (IR-631 access journey).");
   const res = await itso.post(`/records/${draftId}/office-review/`, { outcome: "cleared", comment: "Not my office." });
   expect([403, 404]).toContain(res.status());
   const t = await ierc.json(`/records/${draftId}/tracker/`);

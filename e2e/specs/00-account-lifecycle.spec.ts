@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 import { as, login } from "../support/api";
 import { A11yLedger } from "../support/a11y";
 import { linkPath, waitForMail } from "../support/mailpit";
-import { NEW_PASSWORD, approveRole, freshEmail } from "../support/people";
+import { NEW_PASSWORD, approveRole, freshEmail, letters } from "../support/people";
 import { manage } from "../support/stack";
 
 test.describe.configure({ mode: "serial" });
@@ -15,7 +15,9 @@ test.describe.configure({ mode: "serial" });
 const a11y = new A11yLedger();
 
 const email = freshEmail("lifecycle");
-const last = `Lifecycle${Math.random().toString(36).slice(2, 7)}`;
+// Letters only: registration refuses a name with digits, so a random base-36
+// suffix failed whenever it drew one.
+const last = `Lifecycle${letters(5)}`;
 const RECOVERED = "Recovered-Pass-2026!";
 /** A session opened before the reset; the reset must end it. */
 let earlierRefresh = "";

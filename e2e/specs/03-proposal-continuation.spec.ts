@@ -6,7 +6,7 @@ import { as, ok, signInBrowser, type Client } from "../support/api";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
 import { A11yLedger } from "../support/a11y";
 import { manuscriptPdf } from "../support/pdf";
-import { claimAndOpen, createDraft, decide, recordTypeId, submit, tracker, party } from "../support/workflow";
+import { acknowledgeLikelyMatches, claimAndOpen, createDraft, decide, recordTypeId, submit, tracker, party } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
 
@@ -63,6 +63,12 @@ test("the Continuation cannot be submitted without its own manuscript", async ()
   await ok(await student.multipart("patch", `/records/${childId}/`, {
     abstract_file: { name: "manuscript.pdf", mimeType: "application/pdf", buffer: manuscriptPdf(`${title} — full manuscript`) },
   }), "upload the Continuation's manuscript");
+  // A Continuation keeps its Proposal's title, so IR-832's duplicate guard can
+  // show the parent as a likely match. Publish asks the owner to acknowledge
+  // what it shows before submitting; this does the same and asserts nothing
+  // about which papers it lists.
+  const acknowledged = await acknowledgeLikelyMatches(student, childId);
+  test.info().annotations.push({ type: "likely matches acknowledged", description: acknowledged.join(", ") || "none" });
   await submit(student, childId);
   expect(party(await tracker(student, childId), "adviser").state).toBe("active");
 });
