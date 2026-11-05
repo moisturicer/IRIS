@@ -29,20 +29,20 @@ V1_SECTIONS = [
     {
         "title": "Interim notice",
         "body": (
-            "The university's Terms of Service and Data Privacy Policy will replace "
-            "this notice."
+            "Interim notice. The university's Terms of Service and Data Privacy Policy will "
+            "replace it."
         ),
         "list": [
-            "What IRIS keeps when you register: your name, your CIT-U email, your college, "
-            "your program or department, the role you ask for, and your password, which is "
-            "stored only as a hash.",
-            "Why: to create your account, to email you a verification link, and to send your "
+            "What IRIS keeps when you register: Your name, your CIT-U email, your college, your "
+            "program or department, the role you ask for, and your password, which is stored "
+            "only as a hash.",
+            "Why: To create your account, to email you a verification link, and to send your "
             "role request to RDCO.",
             "Who sees your registration: RDCO staff, who approve or decline role requests, and "
             "IRIS's system administrators. If you are approved as an Adviser, anyone signed in "
             "to IRIS can see your name, email, college and department, so students can name "
             "you as their adviser.",
-            "Research you submit later: visible according to its review and publication state.",
+            "Research you submit later: Visible according to its review and publication state.",
         ],
     },
     {

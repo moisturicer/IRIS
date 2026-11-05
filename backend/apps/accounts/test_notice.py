@@ -54,6 +54,13 @@ class TheNoticeLivesInTheDatabaseTests(TestCase):
         self.assertIn("4. Your rights under RA 10173", titles)
         # DataNotice.tsx, the interim registration notice, is carried too.
         self.assertIn("Interim notice", titles)
+        self.assertEqual(titles, [
+            "Interim notice", "Notice review status",
+            "Republic Act No. 10173 (Data Privacy Act of 2012) Terms", "1. What we collect",
+            "2. How your submission is used", "3. External AI processing",
+            "4. Your rights under RA 10173", "Consent Confirmation",
+        ])
+        self.assertEqual(first.subtitle, "Cebu Institute of Technology - University Technology Transfer Office")
         self.assertEqual(DataNotice.current().number, DataNotice.objects.order_by("-number").first().number)
 
     def test_the_current_notice_is_the_highest_number(self):
@@ -298,6 +305,8 @@ class NobodyUsesIrisWithoutAnsweringTests(APITestCase):
             "adviser": self.account("blocked-adviser@cit.edu", RoleName.ADVISER),
             "rdco": self.account("blocked-rdco@cit.edu", RoleName.RDCO),
             "itso": self.account("blocked-itso@cit.edu", RoleName.ITSO),
+            "ierc": self.account("blocked-ierc@cit.edu", RoleName.IERC),
+            "ktto": self.account("blocked-ktto@cit.edu", RoleName.KTTO),
             "sysadmin": self.account("blocked-sysadmin@cit.edu", RoleName.SYSTEM_ADMIN),
             "superuser": admin,
         }
