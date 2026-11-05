@@ -439,15 +439,15 @@ class IPType(models.TextChoices):
 
 class EmbargoState(models.TextChoices):
     """
-    Where a paper's embargo stands (ADR-052 §3). `Record.embargo_state`.
+    Where a paper's embargo stands (ADR-052 §3, amended for IR-882).
+    `Record.embargo_state`.
 
-    Derived from the answer stored on the record, never stored itself, and read
-    by the disclosure gate. Only `NONE` and `RELEASED` let text reach an AI
-    company. A date never moves a paper out of `ACTIVE`: a person does (§9).
+    Derived from `Record.is_embargoed`, never stored itself, and read by the
+    disclosure gate. Every paper starts `ACTIVE`, and only `RELEASED` lets text
+    reach an AI company or the paper be published. A date never moves a paper
+    out of `ACTIVE`: the Adviser or RDCO does (§6, §9).
     """
 
-    UNKNOWN = "unknown", "Not answered"
-    NONE = "none", "No embargo"
     ACTIVE = "active", "Under embargo"
     RELEASED = "released", "Embargo released"
 

@@ -1,6 +1,6 @@
 import { apiClient } from "./client";
 import type {
-  RecordListItem, RecordDetail, RecordFormData, MyResearchItem, EmbargoAnswer, RecordEmbargo,
+  RecordListItem, RecordDetail, RecordFormData, MyResearchItem, RecordEmbargo,
   IpReleaseResult,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
@@ -206,10 +206,8 @@ export const recordsApi = {
     apiClient.get<{ exact: ManuscriptMatch[]; likely: ManuscriptMatch[]; acknowledged: boolean }>(`/records/${id}/duplicate-matches/`),
   acknowledgeDuplicates: (id: number, candidateIds: number[]) =>
     apiClient.post<{ acknowledged: boolean; matches: ManuscriptMatch[] }>(`/records/${id}/acknowledge-duplicates/`, { candidate_ids: candidateIds }),
-  // Publish's first question, saved before the file is sent (ADR-052 §2).
-  answerEmbargo:  (id: number, answer: EmbargoAnswer) =>
-    apiClient.post<RecordEmbargo>(`/records/${id}/embargo-answer/`, answer),
-  // After submission an embargo changes by its own acts (ADR-052 §5, §6, §11).
+  // Every paper starts embargoed; after submission the Adviser or RDCO date or
+  // release it, and KTTO releases an IP mark (ADR-052 §5, §6, §11, IR-882).
   setEmbargo:     (id: number, until: string) =>
     apiClient.post<RecordEmbargo>(`/records/${id}/embargo-set/`, { embargoed_until: until }),
   releaseEmbargo: (id: number) => apiClient.post<RecordEmbargo>(`/records/${id}/embargo-release/`),

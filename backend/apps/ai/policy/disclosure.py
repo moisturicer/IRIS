@@ -86,9 +86,9 @@ class Decision:
 
 
 def _embargo_reason(embargo: EmbargoState) -> Reason | None:
-    """ADR-052 §3. Only the two named states allow, so anything unrecognised
-    refuses as unknown rather than reading as permission."""
-    if embargo in (EmbargoState.NONE, EmbargoState.RELEASED):
+    """ADR-052 §3 as amended for IR-882. Only a release allows, so anything
+    unrecognised refuses as unknown rather than reading as permission."""
+    if embargo == EmbargoState.RELEASED:
         return None
     if embargo == EmbargoState.ACTIVE:
         return Reason.EMBARGOED

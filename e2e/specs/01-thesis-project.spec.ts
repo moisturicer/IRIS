@@ -14,7 +14,7 @@ import { manuscriptPdf } from "../support/pdf";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
 import { A11yLedger } from "../support/a11y";
 import {
-  acceptAndRoute, claimAndOpen, clear, createDraft, decide, newVersion, party,
+  acceptAndRoute, claimAndOpen, clear, createDraft, decide, newVersion, party, releaseEmbargo,
   requestRevision, reviewRow, reviseAbstract, submit, tracker,
 } from "../support/workflow";
 
@@ -136,6 +136,8 @@ test("IERC clears, the record is handed back to RDCO, and RDCO decides", async (
   expect(party(t, "rdco").state, "RDCO's pool opens on the Hand-back").toBe("active");
 
   await claimAndOpen(rdco, recordId, "rdco");
+  // Every paper starts embargoed and an embargoed paper is never published.
+  await releaseEmbargo(rdco, recordId);
   await decide(rdco, recordId, "publish");
 
   t = await tracker(student, recordId);

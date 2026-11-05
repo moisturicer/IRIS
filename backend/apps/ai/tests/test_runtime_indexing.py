@@ -72,7 +72,7 @@ def permitted():
         abstract="Ponds sampled weekly",
         abstract_file="manuscripts/pond.pdf",
         dpa_accepted_at=timezone.now(),
-        embargo_answered_at=timezone.now(),
+        is_embargoed=False, embargo_released_at=timezone.now(),
     )
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     work = ManuscriptWork.objects.get(record=record, revoked_at=None)

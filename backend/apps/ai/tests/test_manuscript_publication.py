@@ -251,7 +251,7 @@ def test_authenticated_manuscript_upload_publishes_work(tmp_path, settings, monk
     settings.MEDIA_ROOT = str(tmp_path)
     owner = make_user("publication-upload@cit.edu")
     record = Record.objects.create(title="Upload", added_by=owner,
-        embargo_answered_at=timezone.now(), embargo_answered_by=owner,
+        is_embargoed=False, embargo_released_at=timezone.now(), embargo_released_by=owner,
         record_type=RecordType.objects.get_or_create(name="Thesis / Research")[0])
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     # The existing extraction queue is external to this publication seam.
@@ -277,7 +277,7 @@ def test_authenticated_submission_keeps_current_work_recoverable(grant_db, monke
     adviser = make_user("publication-adviser@cit.edu", "Adviser")
     record = Record.objects.create(title="A complete research paper", abstract="Research abstract " * 5,
         added_by=owner, adviser=adviser, abstract_file="manuscripts/submit.pdf",
-        embargo_answered_at=timezone.now(), embargo_answered_by=owner,
+        is_embargoed=False, embargo_released_at=timezone.now(), embargo_released_by=owner,
         record_type=RecordType.objects.get_or_create(name="Thesis / Research")[0])
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     work = ManuscriptWork.objects.get(record=record, revoked_at=None)
@@ -297,12 +297,12 @@ def test_authenticated_submission_keeps_current_work_recoverable(grant_db, monke
         "runtime_processing"] == {"state": "pending_processing", "revision": str(work.revision)}
 
 
-def test_canonical_embargo_answer_invalidates_old_processing_grant(grant_db):
+def test_canonical_embargo_change_invalidates_old_processing_grant(grant_db):
     from datetime import timedelta
     from django.utils import timezone
     from apps.ai.grants.database import verify
     from apps.publication.models import ManuscriptWork
-    from apps.records.embargo import EmbargoAnswer, record_answer
+    from apps.records.embargo import set_embargo
 
     owner = make_user("publication-embargo@cit.edu")
     record = Record.objects.create(title="Embargo", abstract_file="manuscripts/embargo.pdf")
@@ -311,7 +311,7 @@ def test_canonical_embargo_answer_invalidates_old_processing_grant(grant_db):
     assert verify(old.grant_token, "ingestion") is not None
     with transaction.atomic():
         locked = Record.objects.select_for_update().get(pk=record.pk)
-        record_answer(locked, EmbargoAnswer(until=timezone.localdate() + timedelta(days=30)), actor=owner)
+        set_embargo(locked, timezone.localdate() + timedelta(days=30), actor=owner)
     assert verify(old.grant_token, "ingestion") is None
     current = ManuscriptWork.objects.get(record=record, revoked_at=None)
     assert current.pk == old.pk

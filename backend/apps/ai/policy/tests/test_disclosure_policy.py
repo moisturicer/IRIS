@@ -17,34 +17,27 @@ from core.enums import EmbargoState
 
 def _inputs(**overrides) -> DisclosureInputs:
     """A record that is allowed to leave, unless a test says otherwise."""
-    base = dict(is_ip=False, embargo=EmbargoState.NONE, consent_given=True)
+    base = dict(is_ip=False, embargo=EmbargoState.RELEASED, consent_given=True)
     base.update(overrides)
     return DisclosureInputs(**base)
 
 
 class EmbargoStateTests:
-    """ADR-052 §3's table: two states allow and two refuse."""
+    """ADR-052 §3's table as amended for IR-882: a release allows, nothing else does."""
 
-    @pytest.mark.parametrize("state", [EmbargoState.NONE, EmbargoState.RELEASED])
-    def test_an_answered_no_or_a_release_allows(self, state):
-        assert may_disclose(_inputs(embargo=state)).allowed is True
+    def test_a_release_allows(self):
+        assert may_disclose(_inputs(embargo=EmbargoState.RELEASED)).allowed is True
 
     def test_an_active_embargo_is_refused_even_with_consent(self):
         decision = may_disclose(_inputs(embargo=EmbargoState.ACTIVE, consent_given=True))
         assert decision.allowed is False
         assert decision.reasons == (Reason.EMBARGOED,)
 
-    def test_an_unanswered_paper_is_refused_when_everything_else_passes(self):
-        decision = may_disclose(
-            _inputs(embargo=EmbargoState.UNKNOWN, is_ip=False, consent_given=True)
-        )
-        assert decision.allowed is False
-        assert decision.reasons == (Reason.EMBARGO_UNKNOWN,)
-
-    @pytest.mark.parametrize("value", ["", "expired", None])
+    @pytest.mark.parametrize("value", ["", "expired", "none", "unknown", None])
     def test_a_state_the_policy_does_not_know_refuses(self, value):
-        """Fails closed. ADR-052 replaced the "expired" state, and a value that
-        reaches this gate by mistake must never read as permission."""
+        """Fails closed. ADR-052 replaced "expired", IR-882 removed "none" and
+        "unknown", and a value that reaches this gate by mistake must never read
+        as permission."""
         decision = may_disclose(_inputs(embargo=value))
         assert decision.allowed is False
         assert decision.reasons == (Reason.EMBARGO_UNKNOWN,)
@@ -52,7 +45,7 @@ class EmbargoStateTests:
 
 class RefusingTests:
     def test_a_record_without_consent_is_refused_even_when_unembargoed(self):
-        decision = may_disclose(_inputs(consent_given=False, embargo=EmbargoState.NONE))
+        decision = may_disclose(_inputs(consent_given=False, embargo=EmbargoState.RELEASED))
         assert decision.allowed is False
         assert Reason.NO_CONSENT in decision.reasons
 
@@ -65,7 +58,7 @@ class RefusingTests:
 
     def test_an_ip_mark_is_unreleased_unless_said_otherwise(self):
         assert DisclosureInputs(
-            is_ip=True, embargo=EmbargoState.NONE, consent_given=True,
+            is_ip=True, embargo=EmbargoState.RELEASED, consent_given=True,
         ).ip_released is False
 
 
@@ -78,9 +71,8 @@ class IpReleaseTests:
     def test_a_release_without_a_mark_changes_nothing(self):
         assert may_disclose(_inputs(is_ip=False, ip_released=True)).allowed is True
 
-    @pytest.mark.parametrize("state", [EmbargoState.ACTIVE, EmbargoState.UNKNOWN])
-    def test_a_released_mark_does_not_release_an_embargo(self, state):
-        decision = may_disclose(_inputs(is_ip=True, ip_released=True, embargo=state))
+    def test_a_released_mark_does_not_release_an_embargo(self):
+        decision = may_disclose(_inputs(is_ip=True, ip_released=True, embargo=EmbargoState.ACTIVE))
         assert decision.allowed is False
         assert Reason.UNRELEASED_IP not in decision.reasons
 

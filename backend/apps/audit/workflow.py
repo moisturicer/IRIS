@@ -281,13 +281,6 @@ def _iso(day):
     return day.isoformat() if day is not None else None
 
 
-def embargo_answered(record, actor, *, until) -> None:
-    _write(
-        AuditEvent.EMBARGO_ANSWERED, actor, record,
-        embargoed=until is not None, until=_iso(until),
-    )
-
-
 def embargo_set(record, actor, *, until, previous_state) -> None:
     _write(
         AuditEvent.EMBARGO_SET, actor, record,
