@@ -108,3 +108,7 @@ e2e/.env.e2e.local
 e2e/test-results/
 e2e/playwright-report/
 e2e/.auth/
+
+# IR-871: real papers for testing the review text reader. Never committed:
+# they are other people's work, read only on this machine.
+/samples/
