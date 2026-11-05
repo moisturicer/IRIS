@@ -27,10 +27,10 @@ from datetime import datetime
 from typing import Any, Mapping, Optional, Sequence
 
 from .campaign_report import CAPABILITY_NOTE, DISABLED, MIN_REPETITIONS, approvals_status
-from .pilot_report import percentile
 from .conversation_scoring import (DEFAULT_MIN_EXAMPLES, TARGET_LABEL, TARGETS,
                                    ZERO_BREACH_NOTE, _frac)
 from .engines import mismatches
+from .pilot_report import percentile
 from .scenarios import BROWSER_CHECKS, SUITES
 
 SCHEMA_VERSION = "release-readiness-1"
@@ -137,6 +137,10 @@ def _quality(report: Mapping, label: str) -> dict:
                          f"the scorer's {DEFAULT_MIN_EXAMPLES}; a lowered minimum cannot pass"))
 
     excluded = dict(EXCLUDED_FAMILIES)
+    if not report.get("set_families"):
+        problems.append((NOT_MEASURED, "the report does not list the set's families "
+                         "(set_families), so no family can be required; a report built "
+                         "before IR-741 cannot gate readiness"))
     required = [f for f in (report.get("set_families") or ()) if f not in EXCLUDED_FAMILIES]
     cases = arm.get("family_cases") or {}
     missing_families = [f for f in required if f not in cases]
@@ -172,9 +176,17 @@ def _quality(report: Mapping, label: str) -> dict:
             own.append((INCONCLUSIVE, f"family {family} was scored in {len(ran)} repetitions, "
                         f"fewer than the required {MIN_REPETITIONS}"))
         for rep in ran:
+            entry = rep["families"][family]
+            if entry["reviewed"] < DEFAULT_MIN_EXAMPLES:
+                own.append((INCONCLUSIVE, f"{rep['run_id']}: family {family} has "
+                            f"{entry['reviewed']} reviewed cases, fewer than the required "
+                            f"{DEFAULT_MIN_EXAMPLES}"))
             for m in METRICS:
-                frac = rep["families"][family][m]
-                if frac["denominator"] and frac["value"] < TARGETS[m]:
+                frac = entry[m]
+                if not frac["denominator"]:
+                    own.append((INCONCLUSIVE, f"{rep['run_id']}: family {family} {m} has no "
+                                "denominator"))
+                elif frac["value"] < TARGETS[m]:
                     own.append((NOT_MET, f"{rep['run_id']}: family {family} {m} {_fmt(frac)} "
                                 f"is below {TARGETS[m]:g}"))
         status, reasons = _worst(own)
@@ -268,14 +280,28 @@ def _baseline(report: Mapping, label: str, baseline: Optional[Mapping]) -> dict:
     if "conditions" not in barm or "conditions" not in carm:
         return _gate(INCOMPARABLE, ["a report that does not record its conditions cannot be "
                                     "matched"], **own)
+    weak = []
+    for who, conditions in (("baseline", barm["conditions"]), (label, carm["conditions"])):
+        weak += [f"{who} records no {k}; two unrecorded conditions are not equal conditions"
+                 for k in ("corpus_snapshot_digest", "set_digests", "data_policy", "limits")
+                 if not conditions.get(k)]
+    fake = [r["run_id"] for r in barm["repetitions"] if r.get("providers") != "real"]
+    if fake:
+        weak.append(f"baseline repetitions {', '.join(fake)} used fake providers: a contract "
+                    "check is not a baseline")
+    if len(barm["repetitions"]) < MIN_REPETITIONS:
+        weak.append(f"the baseline has {len(barm['repetitions'])} repetitions, fewer than the "
+                    f"required {MIN_REPETITIONS}")
+    if weak:
+        return _gate(INCOMPARABLE, weak, **own)
     problems = mismatches([("baseline", _as_manifest(barm["conditions"])),
                            (label, _as_manifest(carm["conditions"]))], "architecture")
     if problems:
         return _gate(INCOMPARABLE, problems, **own)
-    candidate, frozen_ = _pooled(carm), _pooled(barm)
+    candidate, frozen_base = _pooled(carm), _pooled(barm)
     metrics, problems = {}, []
     for m in METRICS:
-        c, b = candidate[m], frozen_[m]
+        c, b = candidate[m], frozen_base[m]
         regressed = c["value"] is not None and b["value"] is not None and c["value"] < b["value"]
         metrics[m] = {"candidate": c, "baseline": b, "regressed": regressed}
         if c["value"] is None or b["value"] is None:
@@ -337,9 +363,14 @@ def _browser(row: Optional[Mapping], commit: Optional[str]) -> dict:
             problems.append((NOT_MEASURED, f"browser check {name} was not measured{tag}"))
         elif check.get("passed") is not True:
             problems.append((NOT_MET, f"browser check {name} failed{tag}"))
+        elif not check.get("evidence_ref"):
+            problems.append((NOT_MEASURED, f"browser check {name} cites no evidence_ref{tag}"))
     if not row.get("git_commit"):
         problems.append((NOT_MEASURED, "the browser exercise names no commit"))
-    elif commit and row["git_commit"] != commit:
+    elif not commit:
+        problems.append((NOT_MEASURED, "the candidate's commit is unknown, so the browser "
+                         "exercise cannot be tied to it"))
+    elif row["git_commit"] != commit:
         problems.append((INCOMPARABLE, f"the browser exercise ran at {row['git_commit']}, not "
                          f"at the candidate's {commit}"))
     status, reasons = _worst(problems)
@@ -421,10 +452,12 @@ def _authorization(workload, profile, approvals) -> dict:
 
 
 def _when(text: Any) -> Optional[datetime]:
+    """A timezone-aware instant, or None: a naive time cannot be ordered against one."""
     try:
-        return datetime.fromisoformat(str(text))
+        value = datetime.fromisoformat(str(text))
     except ValueError:
         return None
+    return value if value.tzinfo is not None else None
 
 
 def _p95(values: Sequence[float]) -> Optional[float]:
@@ -466,10 +499,20 @@ def _workload(workload, profile, measurement) -> dict:
                          "declared one (digest differs)"))
     declared, started = _when(workload["declared_at"]), _when(measurement.get("started_at"))
     if started is None:
-        problems.append((NOT_MEASURED, "the measurement records no valid start time"))
-    elif declared is None or started < declared:
+        problems.append((NOT_MEASURED, "the measurement records no valid timezone-aware "
+                         "start time"))
+    elif declared is None:
+        problems.append((NOT_MEASURED, "the workload's declared_at is not a timezone-aware "
+                         "time"))
+    elif started < declared:
         problems.append((NOT_MET, "the measurement started before the workload was declared; "
                          "a workload is declared before collection, not after"))
+    ran_at = measurement.get("concurrency")
+    if not _positive(ran_at):
+        problems.append((NOT_MEASURED, "the measurement records no concurrency it ran at"))
+    elif ran_at < workload["concurrency"]:
+        problems.append((INCOMPARABLE, f"the measurement ran at concurrency {ran_at}, below "
+                         f"the declared {workload['concurrency']}"))
     samples = measurement.get("samples") or []
     classes = {}
     for cls in CLASSES:
@@ -480,6 +523,9 @@ def _workload(workload, profile, measurement) -> dict:
                              f"declared {declared_n}"))
         row = {"n": len(own), "declared": declared_n,
                "failures": sum(s.get("outcome") != "success" for s in own)}
+        if cls in TASK_CLASSES and own and row["failures"] == len(own):
+            problems.append((NOT_MET, f"every {cls} sample failed; a latency figure over "
+                             "failures alone says nothing about answered tasks"))
         if cls in TASK_CLASSES:
             bad = [s for s in own if not (isinstance(s.get("queue_ms"), (int, float))
                                           and isinstance(s.get("total_ms"), (int, float))
@@ -541,7 +587,7 @@ def _campaign_cost(arm: Mapping, cap: float, problems: list) -> dict:
     return out
 
 
-def _cost(report: Mapping, label: str, profile, measurement) -> dict:
+def _cost(report: Mapping, label: str, workload, profile, measurement) -> dict:
     cap = ((profile or {}).get("cost") or {}).get("cost_per_successful_task_usd")
     if not measurement:
         return _gate(NOT_MEASURED, ["no workload measurement was supplied"],
@@ -549,18 +595,23 @@ def _cost(report: Mapping, label: str, profile, measurement) -> dict:
     if not _positive(cap):
         return _gate(NOT_MEASURED, ["no authorized cost-per-successful-task cap in the profile"],
                      cost_per_successful_task=None)
-    problems = []
-    if measurement.get("providers") != "real":
-        problems.append((CONTRACT_ONLY, f"providers were {measurement.get('providers')!r}: "
-                         "cost from a contract check is never measured spend"))
+    problems = _prerequisites(workload, profile, measurement)
+    if problems:
+        return _gate(*_worst(problems), cost_per_successful_task=None)
+    problems = _real(measurement)
+    if measurement.get("workload_sha256") != canonical_digest(workload):
+        problems.append((INCOMPARABLE, "the measurement is of a workload other than the "
+                         "declared one (digest differs)"))
     tasks = [s for s in measurement.get("samples") or () if s.get("class") in TASK_CLASSES]
     ingestion = [s for s in measurement.get("samples") or () if s.get("class") == "ingestion"]
     total, unknown, unbounded = 0.0, 0, 0
     for s in tasks:
-        if s.get("cost_usd") is None:
+        cost = s.get("cost_usd")
+        if (not isinstance(cost, (int, float)) or isinstance(cost, bool) or cost < 0
+                or cost != cost):
             unbounded += 1
             continue
-        total += s["cost_usd"]
+        total += cost
         unknown += s.get("usage_reported") is not True
     successes = sum(s.get("outcome") == "success" for s in tasks)
     if unbounded:
@@ -646,7 +697,6 @@ def _attach_references(gates: dict, references: Optional[Mapping]) -> None:
                      reasons=[f"no evidence reference recorded for {', '.join(missing)}"])
 
 
-
 def _blocking(gates: Mapping[str, Mapping]) -> list[str]:
     out = []
     for name, g in gates.items():
@@ -677,7 +727,7 @@ def build_readiness(report: Mapping, *, candidate: str = "runtime",
         "browser_accessibility": _browser(scenarios.get("browser"), arm.get("git_commit")),
         "authorization": _authorization(workload, profile, approvals),
         "workload": _workload(workload, profile, measurements),
-        "cost": _cost(report, candidate, profile, measurements),
+        "cost": _cost(report, candidate, workload, profile, measurements),
     }
     separate = {"capability": _separate(capability, "capability"),
                 "model": _separate(model, "model")}
@@ -692,6 +742,7 @@ def build_readiness(report: Mapping, *, candidate: str = "runtime",
         "live_collection": collection_preflight(workload, profile, approvals),
         "status": BLOCKED if blocking else READY, "blocking": blocking, "gates": gates,
         "human_review_gaps": [*gaps, RELEASE_DECISION_GAP],
+        "inputs": {k: dict(v) for k, v in sorted((references or {}).items())},
         "separate_results": {k: v for k, v in separate.items() if v is not None},
         "notes": [NOT_AUTHORIZED, TARGET_LABEL],
     }
@@ -701,8 +752,10 @@ def build_readiness(report: Mapping, *, candidate: str = "runtime",
 
 # --- what cutover preflight (IR-742) reads ---------------------------------------------
 
-GATES = ("comparison", "quality", "safety", "human_review", "baseline", "access_disclosure",
-         "postgres_workers", "browser_accessibility", "authorization", "workload", "cost")
+GATES = tuple(GATE_SOURCES)
+#: Keys outside the sealed manifest: the digest itself, and the commit ``write_run`` stamps on
+#: the file it writes (provenance of the file, not part of what the digest covers).
+UNSEALED = ("manifest_sha256", "commit")
 
 
 def verify_manifest(manifest: Mapping) -> list[str]:
@@ -711,15 +764,19 @@ def verify_manifest(manifest: Mapping) -> list[str]:
     Sound is not ready: a blocked manifest is sound. The digest catches an edit; the
     consistency checks catch an edit that was resealed.
     """
+    if not isinstance(manifest, Mapping):
+        return ["the manifest is not a JSON object"]
     problems = []
     if manifest.get("schema_version") != SCHEMA_VERSION:
         problems.append(f"unknown schema_version {manifest.get('schema_version')!r}; this "
                         f"reader understands {SCHEMA_VERSION!r}")
-    body = {k: v for k, v in manifest.items() if k != "manifest_sha256"}
+    body = {k: v for k, v in manifest.items() if k not in UNSEALED}
     if manifest.get("manifest_sha256") != canonical_digest(body):
         problems.append("the manifest digest (manifest_sha256) does not match the manifest: it "
                         "was edited after it was written")
-    gates = manifest.get("gates") or {}
+    gates = manifest.get("gates")
+    if not isinstance(gates, Mapping):
+        return problems + ["the manifest has no gates object"]
     missing = [g for g in GATES if g not in gates]
     if missing:
         problems.append(f"gates missing from the manifest: {', '.join(missing)}")
@@ -727,6 +784,9 @@ def verify_manifest(manifest: Mapping) -> list[str]:
     for name in GATES:
         g = gates.get(name)
         if g is None:
+            continue
+        if not isinstance(g, Mapping):
+            problems.append(f"gate {name} is not an object")
             continue
         if g.get("status") not in STATUSES:
             problems.append(f"gate {name} has unknown status {g.get('status')!r}")

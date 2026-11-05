@@ -152,3 +152,33 @@ def test_a_wrong_mode_capability_report_is_refused_not_blended_in(tmp_path):
     opts["capability"] = _write(tmp_path / "cap.json", campaign_report())  # architecture mode
     with pytest.raises(CommandError, match="capability"):
         call_command("eval_readiness", build=True, **opts)
+
+
+def test_check_files_catches_an_input_changed_after_the_manifest_was_built(tmp_path):
+    opts = _inputs(tmp_path)
+    call_command("eval_readiness", build=True, **opts)
+    (written,) = (tmp_path / "out").glob("*.json")
+    call_command("eval_readiness", verify=str(written), check_files=True)
+    (tmp_path / "scenarios.json").write_text(json.dumps({"scenarios": {}}))
+    with pytest.raises(CommandError, match="scenarios.*changed"):
+        call_command("eval_readiness", verify=str(written), check_files=True)
+
+
+def test_assert_ready_re_hashes_inputs_so_a_hand_made_manifest_cannot_pass(tmp_path):
+    call_command("eval_readiness", build=True, **_inputs(tmp_path))
+    (written,) = (tmp_path / "out").glob("*.json")
+    m = json.loads(written.read_text())
+    assert m["status"] == "evidence_met"  # the synthetic fixture: plumbing only
+    (tmp_path / "report.json").unlink()
+    with pytest.raises(CommandError, match="not on disk"):
+        call_command("eval_readiness", verify=str(written), assert_ready=True)
+
+
+def test_malformed_inputs_are_command_errors_not_tracebacks(tmp_path):
+    (tmp_path / "list.json").write_text("[]")
+    with pytest.raises(CommandError, match="JSON object"):
+        call_command("eval_readiness", preflight=True, workload=str(tmp_path / "list.json"))
+    opts = _inputs(tmp_path)
+    opts["scenarios"] = str(tmp_path / "list.json")
+    with pytest.raises(CommandError, match="--scenarios"):
+        call_command("eval_readiness", build=True, **opts)

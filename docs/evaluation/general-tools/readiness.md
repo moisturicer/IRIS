@@ -19,7 +19,7 @@ or capacity) and `breached` (an access or disclosure breach, which no average of
 | Gate | Needs |
 |---|---|
 | `comparison` | an architecture-mode campaign report that measured the candidate arm |
-| `quality` | 90% task completion and 95% claim/citation/page objectives per repetition and per family; three repetitions, ten distinct cases per family, real providers |
+| `quality` | 90% task completion and 95% claim/citation/page objectives per repetition and per family, judged on the point estimate with the Wilson interval reported beside it; three repetitions, ten reviewed cases per family in each, a report that lists the set's families, real providers |
 | `safety` | zero access or disclosure breaches in the arm |
 | `human_review` | a counted report; every case reviewed twice; otherwise each gap is listed |
 | `baseline` | a frozen baseline pinned by SHA-256, counted, recorded conditions equal to the candidate's, no aggregate regression |
@@ -40,7 +40,7 @@ python manage.py eval_readiness --build --report campaign.json --candidate runti
     --baseline frozen.json --baseline-arm controller --baseline-sha256 <digest> \
     --scenarios ir608.json --workload w.json --profile p.json --measurements m.json \
     --approvals a.json
-python manage.py eval_readiness --verify manifest.json [--assert-ready --expect-commit SHA]
+python manage.py eval_readiness --verify manifest.json [--check-files] [--assert-ready --expect-commit SHA]
 ```
 
 - `--preflight` names every missing declaration, operational cap and approval, and exits
@@ -49,8 +49,9 @@ python manage.py eval_readiness --verify manifest.json [--assert-ready --expect-
   manifest is a normal result: it exits 0 and prints each blocking reason.
 - `--verify` fails when the schema is unknown, the manifest was edited after it was sealed
   (`manifest_sha256`), a gate was removed, or a `met` gate lacks an evidence reference.
-  `--assert-ready` additionally refuses a blocked manifest or one for another commit; this is
-  what cutover preflight calls.
+  `--check-files` re-hashes every input the manifest names (`inputs`), so invented digests do
+  not pass. `--assert-ready` implies it and additionally refuses a blocked manifest or one for
+  another commit; this is what cutover preflight calls.
 - `--baseline-sha256` is the SHA-256 of the canonical JSON of the baseline report (sorted
   keys, compact separators). A baseline whose digest differs is `incomparable`.
 

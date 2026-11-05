@@ -630,3 +630,93 @@ def test_a_met_gate_without_an_evidence_reference_is_a_problem():
     gates["quality"]["evidence"] = []
     problems = verify_manifest(sealed({**ready, "gates": gates}))
     assert any("quality" in p and "reference" in p for p in problems)
+
+
+# --- review hardening: ways a gate must not be met -------------------------------------------
+
+
+def test_a_report_that_lists_no_set_families_cannot_gate_quality():
+    old = campaign_report()
+    del old["set_families"]
+    g = gate(readiness(old), "quality")
+    assert g["status"] == "not_measured" and any("set_families" in r for r in g["reasons"])
+
+
+def test_a_repetition_that_reviewed_fewer_than_ten_cases_of_a_family_is_inconclusive():
+    skip = {("runtime", 1, f"A01-{i}") for i in range(4)}
+    g = gate(readiness(campaign_report(revs=reviews(skip=skip), counted=False)), "quality")
+    assert g["status"] != "met"
+    assert any("runtime-1" in r and "A01" in r and "reviewed cases" in r for r in g["reasons"])
+
+
+def test_a_baseline_with_unrecorded_conditions_or_fake_providers_is_not_a_baseline():
+    fake = campaign_report(runs=campaign(providers="fake"), counted=False)
+    assert gate(readiness(baseline=pinned(fake)), "baseline")["status"] != "met"
+    hollow = campaign_report()
+    hollow["arms"]["controller"]["conditions"]["corpus_snapshot_digest"] = None
+    g = gate(readiness(baseline=pinned(hollow)), "baseline")
+    assert g["status"] == "incomparable" and any("corpus_snapshot_digest" in r
+                                                  for r in g["reasons"])
+
+
+def test_a_browser_check_with_no_evidence_reference_or_an_unknown_candidate_is_not_measured():
+    bare = copy.deepcopy(SCENARIOS_PASSED)
+    del bare["browser"]["checks"]["mobile"]["evidence_ref"]
+    g = gate(readiness(scenarios=bare), "browser_accessibility")
+    assert g["status"] == "not_measured" and any("mobile" in r for r in g["reasons"])
+    report_ = campaign_report()
+    report_["arms"]["runtime"]["git_commit"] = None
+    g = gate(readiness(report_), "browser_accessibility")
+    assert g["status"] == "not_measured" and any("commit is unknown" in r for r in g["reasons"])
+
+
+def test_a_naive_timestamp_is_a_clean_block_not_a_crash():
+    g = gate(full(measurements=measurements(started_at="2026-10-21T00:00:00")), "workload")
+    assert g["status"] == "not_measured" and any("timezone" in r for r in g["reasons"])
+
+
+def test_a_measurement_run_below_the_declared_concurrency_is_incomparable():
+    g = gate(full(measurements=measurements(concurrency=1)), "workload")
+    assert g["status"] == "incomparable" and any("concurrency" in r for r in g["reasons"])
+    absent = measurements()
+    del absent["concurrency"]
+    assert gate(full(measurements=absent), "workload")["status"] == "not_measured"
+
+
+def test_a_class_where_every_sample_failed_is_not_met_whatever_its_latency():
+    m = measurements()
+    for s in m["samples"]:
+        if s["class"] == "ordinary":
+            s["outcome"] = "failed"
+    g = gate(full(measurements=m), "workload")
+    assert g["status"] == "not_met" and any("every ordinary sample failed" in r
+                                            for r in g["reasons"])
+
+
+def test_cost_is_judged_only_from_a_measurement_of_the_declared_workload():
+    g = gate(full(measurements=measurements(workload_sha256="0" * 64)), "cost")
+    assert g["status"] == "incomparable"
+    in_process = measurements(environment={"database": "sqlite", "workers": "threads"})
+    assert gate(full(measurements=in_process), "cost")["status"] == "contract_only"
+
+
+def test_a_negative_cost_cannot_lower_the_total_it_is_unbounded():
+    m = measurements()
+    m["samples"][0]["cost_usd"] = -5.0
+    g = gate(full(measurements=m), "cost")
+    assert g["status"] == "not_measured" and g["unbounded_samples"] == 1
+
+
+def test_verify_reads_a_file_as_write_run_wrote_it_and_survives_malformed_manifests():
+    m = full()
+    stamped = {**m, "commit": "abc123"}
+    assert verify_manifest(stamped) == []
+    assert verify_manifest([]) == ["the manifest is not a JSON object"]
+    assert any("no gates object" in p for p in verify_manifest({**m, "gates": []}))
+    bad = {**m, "gates": {**m["gates"], "quality": "met"}}
+    assert any("gate quality is not an object" in p for p in verify_manifest(bad))
+
+
+def test_the_manifest_records_every_input_it_was_given():
+    m = readiness()
+    assert m["inputs"] == {k: v for k, v in sorted(REFS.items())}

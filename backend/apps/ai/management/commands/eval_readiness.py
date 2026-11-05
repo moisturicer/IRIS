@@ -6,7 +6,8 @@
         --approvals approvals.json [--capability cap.json] [--model model.json]
     python manage.py eval_readiness --preflight --workload w.json --profile p.json \\
         --approvals approvals.json
-    python manage.py eval_readiness --verify manifest.json [--assert-ready --expect-commit SHA]
+    python manage.py eval_readiness --verify manifest.json \\
+        [--check-files] [--assert-ready --expect-commit SHA]
 
 Reads files an operator already holds, and writes one manifest naming each input by path and
 SHA-256. A blocked manifest is a normal result and exits 0; it says what is missing. This
@@ -22,9 +23,9 @@ from apps.ai.evaluation.readiness import (ReadinessRefused, assert_ready, build_
 from apps.ai.evaluation.runfile import file_digest, load_json, write_run
 from apps.ai.management.commands.eval_retrieval import DEFAULT_OUT
 
-#: command option -> the evidence name build_readiness and the manifest use for it.
-SOURCES = {"report": "report", "scenarios": "scenarios", "workload": "workload",
-           "profile": "profile", "measurements": "measurements", "approvals": "approvals"}
+#: Every input file the manifest records by path and SHA-256, named as the manifest names it.
+INPUTS = ("report", "baseline", "scenarios", "workload", "profile", "measurements",
+          "approvals", "capability", "model")
 
 
 class Command(BaseCommand):
@@ -36,6 +37,9 @@ class Command(BaseCommand):
                             help="May paid collection begin? Names every missing item.")
         parser.add_argument("--verify", metavar="MANIFEST",
                             help="Check a manifest is internally sound.")
+        parser.add_argument("--check-files", action="store_true",
+                            help="With --verify: re-hash every input the manifest names. "
+                                 "Implied by --assert-ready.")
         parser.add_argument("--assert-ready", action="store_true",
                             help="With --verify: also refuse unless the manifest is ready.")
         parser.add_argument("--expect-commit", help="With --assert-ready: the candidate commit.")
@@ -71,10 +75,17 @@ class Command(BaseCommand):
     def _load(options, key):
         return load_json(options[key]) if options.get(key) else None
 
+    @staticmethod
+    def _mapping(value, what):
+        if value is not None and not isinstance(value, dict):
+            raise CommandError(f"{what} must be a JSON object")
+        return value
+
     def _preflight(self, options):
-        result = collection_preflight(self._load(options, "workload"),
-                                      self._load(options, "profile"),
-                                      self._load(options, "approvals"))
+        result = collection_preflight(
+            self._mapping(self._load(options, "workload"), "--workload"),
+            self._mapping(self._load(options, "profile"), "--profile"),
+            self._mapping(self._load(options, "approvals"), "--approvals"))
         w = self.stdout.write
         for item in result["missing"]:
             w(f"MISSING {item}")
@@ -85,18 +96,37 @@ class Command(BaseCommand):
           "by itself.")
 
     def _verify(self, options):
-        # write_run stamps the commit the tool ran at; that key is provenance of the file,
-        # not part of the sealed manifest, so it is set aside before the digest is checked.
-        manifest = {k: v for k, v in load_json(options["verify"]).items() if k != "commit"}
-        problems = verify_manifest(manifest)
-        if problems:
-            raise CommandError("manifest cannot be trusted: " + "; ".join(problems))
+        manifest = load_json(options["verify"])
+        if not isinstance(manifest, dict):
+            raise CommandError("manifest cannot be accepted: the file is not a JSON object")
+        problems = [] if options["assert_ready"] else verify_manifest(manifest)
+        if options["check_files"] or options["assert_ready"]:
+            problems += self._file_problems(manifest)
         if options["assert_ready"]:
-            assert_ready(manifest, expect_commit=options["expect_commit"])
+            try:
+                assert_ready(manifest, expect_commit=options["expect_commit"])
+            except ReadinessRefused as exc:
+                problems.append(str(exc))
+        if problems:
+            raise CommandError("manifest cannot be accepted: " + "; ".join(problems))
+        if options["assert_ready"]:
             self.stdout.write("ready: every gate is met. A named person's release decision is "
                               "still required.")
         else:
             self.stdout.write(f"sound; status {manifest['status']}")
+
+    @staticmethod
+    def _file_problems(manifest):
+        """Re-hash each input the manifest names: a digest in a file proves nothing alone."""
+        problems = []
+        for name, ref in (manifest.get("inputs") or {}).items():
+            path = Path(str(ref.get("path", "")))
+            if not path.is_file():
+                problems.append(f"input {name} ({ref.get('path')}) is not on disk to re-hash")
+            elif file_digest(path) != ref.get("sha256"):
+                problems.append(f"input {name} ({ref.get('path')}) has changed since the "
+                                "manifest was built")
+        return problems
 
     def _build(self, options):
         if not options["report"]:
@@ -108,22 +138,22 @@ class Command(BaseCommand):
                     raise CommandError(f"--baseline needs --{key.replace('_', '-')}")
             baseline = {"report": load_json(options["baseline"]), "arm": options["baseline_arm"],
                         "expected_sha256": options["baseline_sha256"]}
-        report = load_json(options["report"])
-        scenarios = self._load(options, "scenarios")
+        scenarios = self._mapping(self._load(options, "scenarios"), "--scenarios")
         if scenarios is not None:
             scenarios = scenarios.get("scenarios", scenarios)
-        references = {name: {"path": Path(options[key]).as_posix(),
-                             "sha256": file_digest(options[key])}
-                      for key, name in SOURCES.items() if options.get(key)}
-        if baseline:
-            references["baseline"] = {"path": Path(options["baseline"]).as_posix(),
-                                      "sha256": file_digest(options["baseline"])}
+        references = {name: {"path": Path(options[name]).as_posix(),
+                             "sha256": file_digest(options[name])}
+                      for name in INPUTS if options.get(name)}
         manifest = build_readiness(
-            report, candidate=options["candidate"], baseline=baseline, scenarios=scenarios,
-            workload=self._load(options, "workload"), profile=self._load(options, "profile"),
-            measurements=self._load(options, "measurements"),
-            approvals=self._load(options, "approvals"), references=references,
-            capability=self._load(options, "capability"), model=self._load(options, "model"))
+            self._mapping(load_json(options["report"]), "--report"),
+            candidate=options["candidate"], baseline=baseline, scenarios=scenarios,
+            workload=self._mapping(self._load(options, "workload"), "--workload"),
+            profile=self._mapping(self._load(options, "profile"), "--profile"),
+            measurements=self._mapping(self._load(options, "measurements"), "--measurements"),
+            approvals=self._mapping(self._load(options, "approvals"), "--approvals"),
+            references=references,
+            capability=self._mapping(self._load(options, "capability"), "--capability"),
+            model=self._mapping(self._load(options, "model"), "--model"))
         out = write_run(options["out"], f"IR-741-readiness-{manifest['set_id']}", manifest)
         w = self.stdout.write
         for name, gate in manifest["gates"].items():

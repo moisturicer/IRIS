@@ -34,7 +34,9 @@ SCENARIOS_PASSED = {
                    "skipped": 0},
     "browser": {"kind": "manual_browser", "status": "measured", "passed": True,
                 "operator": "Operator One", "git_commit": "rt1",
-                "checks": {name: {"status": "measured", "passed": True} for name in (
+                "checks": {name: {"status": "measured", "passed": True,
+                                  "evidence_ref": f"shot/{name}.png"}
+                           for name in (
                     "live", "reopened", "copied", "exported", "paper_chat", "mobile", "keyboard",
                     "accessible_summary", "ask_notice_before_submit",
                     "paper_notice_before_submit")}},
@@ -161,7 +163,7 @@ def measurements(workload=WORKLOAD, **over):
                + [sample("ingestion", i, cost=0.002, total_ms=5000) for i in range(5)])
     base = {"schema_version": "workload-measurement-1", "run_id": "load-1", "providers": "real",
             "environment": {"database": "postgresql", "workers": "independent_processes"},
-            "started_at": "2026-10-21T00:00:00+00:00",
+            "started_at": "2026-10-21T00:00:00+00:00", "concurrency": 8,
             "workload_sha256": canonical_digest(workload), "samples": samples,
             "resources": {"peak_memory_mb": 900, "peak_connections": 40, "lock_waits": 3,
                           "max_lock_wait_ms": 120}}
