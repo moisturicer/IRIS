@@ -38,6 +38,11 @@ needed -- chunking does not embed, and the disclosure gate refuses to embed a
 paper whose embargo hasn't been released (ADR-052), and every paper starts
 embargoed.
 
+So without ``--clear-for-ai`` a loaded paper is **published and embargoed at
+once**, and that is intended: an embargo keeps a paper from the AI and never
+unlists it. It shows in Discover and keyword search finds it, but Ask IRIS can't
+use it until it is released.
+
 ``--clear-for-ai`` releases each new paper instead (decision 16, as amended for
 IR-882), with consent. The gate then lets it through, so **after chunking the worker embeds
 its chunks and queues its AI Overview, which spends credits**. Retrieval can't find
@@ -97,7 +102,8 @@ class Command(BaseCommand):
             "--clear-for-ai", action="store_true",
             help="Release the embargo, with consent, for each new test paper. The worker "
                  "then embeds its chunks and queues its AI Overview, which spends credits. "
-                 "Without this a paper stays embargoed and the AI refuses it. Refuses with "
+                 "Without this a paper is published but stays embargoed: it shows in Discover, "
+                 "and the AI refuses it until it is released. Refuses with "
                  "DEBUG off, even with --force.",
         )
         parser.add_argument(

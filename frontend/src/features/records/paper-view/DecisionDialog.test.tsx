@@ -222,7 +222,7 @@ it("RDCO sees the revision requests and findings its executive Decision supersed
 
 // ADR-052 decision 14 as amended (IR-818, IR-882): an embargoed paper is never
 // published. The server offers no Publish for it, keeping it unlisted says why,
-// and a Publish dialog an embargo overtook can't be confirmed.
+// and a Publish dialog an embargo overtook is refused with the embargo reason.
 describe("an embargo at RDCO's Decision", () => {
   const EMBARGOED: DecisionFlags = { ...RDCO_ALONE, embargo: { state: "active", until: "2099-01-01" } };
   const warning = () => screen.queryByRole("region", { name: "Under embargo" });
@@ -257,20 +257,31 @@ describe("an embargo at RDCO's Decision", () => {
     }
   });
 
-  it("can't publish once an embargo set meanwhile makes the dialog stale", async () => {
+  // The server refuses the outcome before it checks the token, so an embargo set
+  // while the dialog was open comes back as a 400 with the embargo reason and no
+  // fresh `decision` (`decide()` in apps/reviews/decisions.py). It used to mock a
+  // 409 here, which the server never sends for this case.
+  it("shows the embargo reason when an embargo set meanwhile refuses the publish", async () => {
     decide.mockRejectedValueOnce({
       response: {
-        status: 409,
-        data: { detail: "This record changed while you were deciding.", decision: { ...EMBARGOED, token: "t2" } },
+        status: 400,
+        data: { detail: "Under embargo until 01 Jan 2099. Release the embargo, then publish." },
       },
     });
-    open("publish", RDCO_ALONE);
+    const { onDone } = open("publish", RDCO_ALONE);
     expect(warning()).not.toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: "Publish" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("This record changed while you were deciding.");
-    expect(warning()).toHaveTextContent("under embargo until Jan 1, 2099, so it can't be published");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Under embargo until 01 Jan 2099. Release the embargo, then publish. Your comment is kept.",
+    );
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("can't be confirmed when the record it opened on is already embargoed", () => {
+    open("publish", EMBARGOED);
+
     expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
   });
 });

@@ -135,8 +135,10 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
         ? "proposal"
         : "thesis";
   // An embargoed paper is never published, so `decide/` offers no publish for it
-  // (ADR-052 §14 as amended). Keeping it unlisted says why, and what to do; a
-  // Publish dialog an embargo overtook (a 409) says so and can't be confirmed.
+  // (ADR-052 §14 as amended). Keeping it unlisted says why, and what to do. A
+  // Publish dialog an embargo overtook gets a 400, not the 409 below: `decide()`
+  // refuses the outcome before it checks the token, so the reply carries the
+  // embargo reason and no fresh `decision`, and the server refuses every retry.
   const embargo = flags.embargo && flags.embargo.state !== "released" ? flags.embargo : null;
   const warnEmbargo = embargo !== null && (outcome === "keep_unlisted" || outcome === "publish");
   const ready = (!reject || text.trim() !== "") && !(outcome === "publish" && embargo !== null);
