@@ -287,7 +287,8 @@ class _Refused(Exception):
 
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
-                 scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None):
+                 scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None,
+                 follow_stored_grant: bool = False):
         self.dsn = dsn
         self.grant = grant
         self.run_id = run_id
@@ -295,6 +296,24 @@ class ResearchTools:
         self.scope = scope_record_id
         self.embedding_provider = embedding_provider
         self.embedding_ledger = embedding_ledger
+        # A worker's tools read under the grant the run holds *now*, so a reader's
+        # reconnect reaches a run already in progress (IR-880). Off, `grant` is the authority.
+        self.follow_stored_grant = follow_stored_grant
+
+    async def _grant(self, conn) -> str | None:
+        """The grant this call reads under: the run's stored one when following it (IR-880).
+
+        Read inside the call's own short transaction, so no connection is kept across
+        model inference. Only `RunStore.status` writes it, and only a grant of exactly the
+        Conversation's scope; `_session` checks that scope and the reader again.
+        """
+        if not self.follow_stored_grant:
+            return self.grant
+        run = await conn.fetchrow(
+            "SELECT state, fence, reader_grant FROM iris_ai.ask_run WHERE id = $1", self.run_id)
+        if run is None or run["state"] != "running" or run["fence"] != self.fence:
+            raise _Refused("run_ended")
+        return run["reader_grant"]
 
     @asynccontextmanager
     async def _session(self):
@@ -302,13 +321,19 @@ class ResearchTools:
         await conn.set_type_codec("jsonb", encoder=json.dumps, decoder=json.loads, schema="pg_catalog")
         try:
             async with conn.transaction():
-                if not self.grant:
+                grant = await self._grant(conn)
+                if not grant:
                     raise _Refused("unauthorized")
                 try:
                     claims = await conn.fetchval(
-                        "SELECT iris_authz.begin_research($1, 'reader_session')", self.grant)
+                        "SELECT iris_authz.begin_research($1, 'reader_session')", grant)
                 except asyncpg.InsufficientPrivilegeError:
                     raise _Refused("unauthorized") from None
+                if self.follow_stored_grant:
+                    # A renewal never widens the run: its scope is the claim's, exactly.
+                    held = claims.get("rec")
+                    if (int(held) if held is not None else None) != self.scope:
+                        raise _Refused("unauthorized")
                 # Held to commit, so Stop or deletion cannot interleave.
                 run = await conn.fetchrow(
                     "SELECT state, fence, reader_id FROM iris_ai.ask_run WHERE id = $1 FOR SHARE",

@@ -82,7 +82,7 @@ Every one is required; while any is unset, every run submission is refused.
 | `RUNS_WORKER_CONCURRENCY` | **Concurrency**: run slots per worker process | `4` | positive integer |
 | `RUNS_DEEP_CONCURRENCY` | Deep runs at once; **must be below** `RUNS_WORKER_CONCURRENCY` | `2` | positive integer |
 | `RUNS_POLL_SECONDS` | How often an idle worker checks the queue. Not a spend limit | `2` | positive number |
-| `AI_RESEARCH_GRANT_TTL_SECONDS` | How long a reader's grant lasts. Set in `backend/.env`. A run stops when its grant expires until IR-880 renews it mid-run, so this must outlast the deep deadline. A grant more than 5 minutes old at submission can still end a deep run early | `900` | integer, 30-900 |
+| `AI_RESEARCH_GRANT_TTL_SECONDS` | How long a reader's grant lasts. Set in `backend/.env`. A running run reads under its stored grant, which a reader's reconnect renews (IR-880), so a deep run outlasts this only while the reader keeps polling; a reader who stops ends it at its next read. A grant more than 5 minutes old at submission can still leave a queued run waiting for its reader | `900` | integer, 30-900 |
 
 ## 6. AGENT runs (only with `RUNS_EXECUTOR=agent`, `ai/runs/agent_profile.py`)
 
