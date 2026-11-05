@@ -100,7 +100,8 @@ export function ComparisonPicker({ selected, onChange, limit, disabled, scoped }
           <i className="fas fa-columns mr-2" aria-hidden />Compare papers
         </Button>
         <p className="text-xs text-stone-600" aria-live="polite">
-          {scoped ? "This chat is about one paper. Start a new chat to compare papers." : count}
+          {/* Nothing to report until a paper is chosen; the dialog states the limit. */}
+          {scoped ? "This chat is about one paper. Start a new chat to compare papers." : selected.length > 0 || limit === undefined ? count : null}
         </p>
       </div>
       {selected.length > 0 && (

@@ -11,7 +11,8 @@ import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessag
 import { AskIrisNotice } from "@/features/ai/components/AskIrisNotice";
 import { useAskStream } from "@/features/ai/hooks/useAskStream";
 import { Button } from "@/components/ui";
-import { CHAT_COMPOSER_SURFACE, CHAT_OPENING } from "@/features/ai/components/answerLayout";
+import { CHAT_COMPOSER_FIELD, CHAT_COMPOSER_SURFACE, CHAT_OPENING } from "@/features/ai/components/answerLayout";
+import { StarterQuestions } from "@/features/ai/components/StarterQuestions";
 import { cn } from "@/lib/utils";
 import { useReaderPath } from "@/api/runtimeReader";
 import { useAuthStore } from "@/store/auth.store";
@@ -20,7 +21,6 @@ import {
   CONTROL_BASE,
   CONTROL_FILLED,
   CONTROL_ON,
-  CONTROL_OUTLINE,
   CONTROL_SHAPE,
   CONTROL_SQUARE,
 } from "./controls";
@@ -499,19 +499,7 @@ function LegacyPaperChatPanel({
                 ? "Answers come from every paper in the repository, with citations you can open."
                 : "Answers come from this paper’s own text, with citations that open the passage."}
             </p>
-            <div role="group" aria-label="Suggested questions" className="mt-5 grid gap-2">
-              {STARTER_QUESTIONS.map((question) => (
-                <button
-                  key={question}
-                  type="button"
-                  onClick={() => chooseStarter(question)}
-                  className={cn("justify-between gap-3 px-3 text-left font-normal hover:bg-brand-50", CONTROL_BASE, CONTROL_OUTLINE)}
-                >
-                  <span>{question}</span>
-                  <i className="fas fa-arrow-right shrink-0 text-xs text-brand" aria-hidden />
-                </button>
-              ))}
-            </div>
+            <StarterQuestions className="mt-4" questions={STARTER_QUESTIONS} onChoose={chooseStarter} />
           </div>
         )}
 
@@ -546,7 +534,7 @@ function LegacyPaperChatPanel({
             // a screen reader on Y must not hear "this paper" and mean X.
             aria-label={pinned ? `Ask about ${subject.title}` : "Ask about this paper"}
             placeholder="Ask about methodology, findings, datasets…"
-            className="block w-full resize-none bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 caret-brand outline-none"
+            className={cn("block w-full bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 outline-none", CHAT_COMPOSER_FIELD)}
           />
           <div className="flex items-center justify-between gap-2 px-2 pb-2">
             {/* The scope control (IR-298, ADR-026 section 9): visible, and the

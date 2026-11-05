@@ -1,5 +1,6 @@
 import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { CHAT_COLUMN, CHAT_COMPOSER_SURFACE } from "./answerLayout";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { CHAT_COLUMN, CHAT_COMPOSER_FIELD, CHAT_COMPOSER_SURFACE } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
 
 interface ChatInputProps {
@@ -60,15 +61,17 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
           maxLength={maxLength}
           aria-label={label ?? placeholder ?? "Ask about the research corpus…"}
           placeholder={placeholder ?? "Ask about the research corpus…"}
-          className="col-span-2 min-w-0 resize-none bg-transparent px-3 py-2 text-[15px]
-            outline-none caret-brand text-stone-900 placeholder:text-stone-500 disabled:opacity-50"
+          className={`col-span-2 min-w-0 bg-transparent px-3 py-2 text-[15px]
+            outline-none text-stone-900 placeholder:text-stone-500 disabled:opacity-50 ${CHAT_COMPOSER_FIELD}`}
         />
-        {children && <div className="col-start-1 row-start-2 min-w-0 self-center px-2">{children}</div>}
+        {children && <div className="col-start-1 row-start-2 min-w-0 self-start">{children}</div>}
         <button
           type="submit"
           disabled={disabled || sendDisabled || !text.trim()}
-          className="col-start-2 row-start-2 size-11 rounded-xl bg-brand text-white flex items-center justify-center
-            hover:bg-brand-dark disabled:opacity-40 disabled:cursor-not-allowed transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand"
+          className={`col-start-2 row-start-2 self-start size-11 rounded-lg bg-brand text-white flex items-center justify-center
+            hover:bg-brand-light disabled:bg-stone-100 disabled:text-stone-500 disabled:cursor-not-allowed
+            active:scale-95 disabled:active:scale-100 motion-reduce:active:scale-100
+            transition-[background-color,color,transform] duration-150 motion-reduce:transition-none ${FOCUS_RING}`}
           aria-label="Send message"
         >
           <i className="fas fa-arrow-up text-[15px]" aria-hidden />

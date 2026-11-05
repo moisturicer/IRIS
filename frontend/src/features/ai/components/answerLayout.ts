@@ -55,7 +55,11 @@ export const ASK_PANELS_INLINE_PX = 900;
 export const CHAT_OPENING = "overflow-y-auto before:my-auto before:content-[''] after:my-auto after:content-['']";
 
 export const CHAT_COMPOSER_SURFACE =
-  "rounded-2xl border border-stone-300 bg-surface transition-colors focus-within:border-brand motion-reduce:transition-none";
+  "rounded-2xl border border-stone-300 bg-surface transition-[border-color,box-shadow] duration-150 focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 motion-reduce:transition-none";
 
-export const CHAT_STREAM_CARET =
-  "[&>p:last-child]:after:ml-1 [&>p:last-child]:after:inline-block [&>p:last-child]:after:h-[0.85em] [&>p:last-child]:after:w-0.5 [&>p:last-child]:after:bg-brand [&>p:last-child]:after:content-[''] motion-safe:[&>p:last-child]:after:animate-pulse";
+// Grows with the question up to a cap; browsers without field-sizing keep `rows`.
+export const CHAT_COMPOSER_FIELD =
+  "resize-none caret-brand [field-sizing:content] min-h-14 max-h-40 overflow-y-auto scrollbar-thin";
+
+// Defined in index.css: it has to reach the end of a list as well as a paragraph.
+export const CHAT_STREAM_CARET = "answer-caret";

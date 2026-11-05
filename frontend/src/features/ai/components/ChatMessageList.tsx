@@ -6,6 +6,7 @@ import { AssistantMessageSkeleton } from "./AssistantMessageSkeleton";
 import { StreamingMessageBubble } from "./StreamingMessageBubble";
 import { CHAT_COLUMN } from "./answerLayout";
 import { AskIrisEmblem } from "./AskIrisIcons";
+import { StarterQuestions } from "./StarterQuestions";
 
 interface ChatMessageListProps {
   messages:           ChatMessage[];
@@ -81,22 +82,7 @@ export function ChatMessageList({
           </p>
 
           {suggestions.length > 0 && (
-            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-3 text-left">
-              {suggestions.map((prompt, i) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => onSuggestion?.(prompt)}
-                  style={{ animationDelay: `${i * 60}ms` }}
-                  className="flex items-center justify-between gap-3 rounded-xl border border-stone-200 px-4 py-3 text-left text-[14px] text-stone-700
-                    hover:border-brand/40 hover:bg-brand-50 hover:text-brand transition-colors duration-200
-                    animate-fade-in-up motion-reduce:animate-none [animation-fill-mode:backwards]"
-                >
-                  <span>{prompt}</span>
-                  <i className="fas fa-arrow-right shrink-0 text-xs text-brand" aria-hidden />
-                </button>
-              ))}
-            </div>
+            <StarterQuestions className="mt-5" questions={suggestions} onChoose={(prompt) => onSuggestion?.(prompt)} />
           )}
         </div>
       </div>

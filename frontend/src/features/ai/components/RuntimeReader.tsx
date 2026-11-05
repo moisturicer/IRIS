@@ -214,9 +214,13 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
       maxLength={4000}
       placeholder={recordId ? "Ask about this paper…" : "Ask about the research corpus…"}
       disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"}>
-      <label className="inline-flex min-h-11 items-center gap-2 text-sm text-stone-700">
+      <label className="inline-flex cursor-pointer">
         <input type="checkbox" checked={depth === "deep"} onChange={e => setDepth(e.target.checked ? "deep" : "ordinary")}
-          className="h-4 w-4 accent-brand" /> Thorough research
+          className="peer sr-only" />
+        <span className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg border px-3 text-small font-semibold transition-colors duration-150 motion-reduce:transition-none peer-focus-visible:ring-2 peer-focus-visible:ring-brand peer-focus-visible:ring-offset-2 ${depth === "deep" ? "border-brand-200 bg-brand-50 text-brand" : "border-stone-300 text-stone-700 hover:border-brand/40 hover:text-brand"}`}>
+          <i className={`fas ${depth === "deep" ? "fa-check" : "fa-plus"} text-xs`} aria-hidden />
+          Thorough research
+        </span>
       </label>
     </ChatInput>
   </div>;
