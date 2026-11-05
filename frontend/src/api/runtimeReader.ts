@@ -43,6 +43,8 @@ export interface ReaderRun {
   protocol: typeof READER_PROTOCOL;
   id: string;
   conversation_id: string;
+  /** What the run is for: a question, or the reader's request to condense the conversation (IR-754). Absent from older servers. */
+  kind?: "ask" | "compact";
   state: "queued" | "running" | "completed" | "cancelled" | "conflict" | "expired" | "failed" | "deleted";
   question: string;
   base_revision: number;
@@ -66,6 +68,7 @@ export interface ReaderConversation {
 }
 
 export const activeRun = (run: ReaderRun) => run.state === "queued" || run.state === "running";
+export const compactionRun = (run: ReaderRun) => run.kind === "compact";
 
 export const RELOAD_TO_RECONNECT = "Please reload to reconnect to Ask IRIS.";
 
@@ -95,6 +98,14 @@ export function runtimeReader(recordId?: number) {
     },
     async stop(id: string) {
       const { data } = await apiClient.post<ReaderRun>(`${base}/runs/${encodeURIComponent(id)}/cancel`, {}, config);
+      return checked(data);
+    },
+    /** Condense an owned conversation as a run of its own; the key makes a repeated click one request. */
+    async compact(conversation: ReaderConversation, key: string) {
+      const { data } = await apiClient.post<ReaderRun>(
+        `${base}/conversations/${encodeURIComponent(conversation.id)}/compact`,
+        { base_revision: conversation.revision },
+        { ...config, headers: { ...config.headers, "Idempotency-Key": key } });
       return checked(data);
     },
     async reopen(id: string) {

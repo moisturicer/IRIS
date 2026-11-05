@@ -36,7 +36,7 @@ from ai.agent.tools import ENDS_RUN, OUTAGES, READ_MANUSCRIPT, TOOL_UNAVAILABLE,
 from ai.domain.ports import LLMProvider, ProviderRejected, TransientProviderError, UnsupportedCapability
 from ai.research.tools import OK
 from ai.runs import config as runs_config
-from ai.runs.executor import Result, RunContext, Unavailable
+from ai.runs.executor import Compacted, Result, RunContext, Unavailable
 
 log = logging.getLogger(__name__)
 
@@ -93,6 +93,14 @@ RECOVERY_INSTRUCTIONS = MANUSCRIPT_INSTRUCTIONS + (
     "again, and cite the passage handles it returns. If recovery is unavailable, say that you cannot "
     "confirm the detail."
 )
+#: The only task a manual compaction serves: no question is asked, and none is answered (IR-754).
+COMPACT_REQUEST = (
+    "The reader asked to condense this conversation now. This is not a question and not the reader's "
+    "goal: there is nothing new to answer. Take the goal, preferences and findings from the earlier "
+    "exchanges only."
+)
+#: `_Run.outcome` when the history held nothing older than the exchanges kept.
+NOTHING_TO_COMPACT = "nothing_to_compact"
 FINAL_NOTE = (
     "Research is now closed. Answer the original question from what you have read, citing passages "
     "by handle, and say plainly what you could not find or read."
@@ -177,6 +185,26 @@ class AgentExecutor:
             raise Unavailable("price_unknown")
         try:
             return await _Run(self, question, tools, context).run()
+        except RunEnded as ended:
+            raise Unavailable(ended.reason) from None
+
+    async def compact(self, tools, context: RunContext) -> Compacted:
+        """Condense the Conversation on the reader's request: IR-734's summary and handoff, no answer (IR-754).
+
+        The same checks as `answer`, because the same AGENT and admission pay
+        for it, and one summary attempt at most. Anything short of a committed
+        handoff is `unavailable` and leaves the preceding context as it was.
+        """
+        if not self.supported() or self.compaction is None or context.commit_handoff is None:
+            raise Unavailable("unsupported_pin")
+        if not self.admitted():
+            raise Unavailable("not_admitted")
+        if not self.researches:
+            raise Unavailable("unsupported_pin")
+        if self.price is None and getattr(self.provider, "paid", True):
+            raise Unavailable("price_unknown")
+        try:
+            return await _Run(self, COMPACT_REQUEST, tools, context).compact()
         except RunEnded as ended:
             raise Unavailable(ended.reason) from None
 
@@ -299,6 +327,10 @@ class _Run:
         # Every summary attempt counts, those of earlier fences included.
         self.compactions = context.compactions
         self.compact_failed_at: Optional[int] = None
+        #: How the last compaction attempt ended: "compacted", `NOTHING_TO_COMPACT`, or the reason it was kept.
+        self.outcome: Optional[str] = None
+        self.revision: Optional[int] = None
+        self.condensed = 0
 
     def request(self, history, *, closed=False) -> AgentRequest:
         pin = self.agent.pin
@@ -427,33 +459,60 @@ class _Run:
         await self._journal("recovery", {"outcome": "resumed", "step": self.steps})
         return restored.history, restored.stale
 
-    async def _compacted(self, history: list) -> list:
+    async def compact(self) -> Compacted:
+        """A manual compaction: one summary attempt over this run's own allowance (IR-754)."""
+        if self.context.committed:
+            # An earlier fence committed it; finish rather than summarize, and spend, again.
+            revision = max(self.context.committed)
+            await self._journal("compaction", {"outcome": "compacted", "revision": revision,
+                                               "turns": 0, "exchanges": 0})
+            return Compacted(revision, 0, self.budget.reported)
+        if self.compactions:
+            # A summary was sent and nothing committed; it is not retried by another worker.
+            raise Unavailable("attempts_exhausted")
+        await self._compacted(await self._open(), forced=True)
+        if self.outcome == "compacted":
+            return Compacted(self.revision, self.condensed, self.budget.reported)
+        if self.outcome == NOTHING_TO_COMPACT:
+            await self._journal("compaction", {"outcome": "kept", "reason": NOTHING_TO_COMPACT})
+            return Compacted(None, 0, self.budget.reported)
+        raise Unavailable(self.outcome or "unavailable")
+
+    async def _compacted(self, history: list, *, forced: bool = False) -> list:
         """`history` with its older exchanges compacted once it reaches the threshold (IR-734).
 
         Anything short of a complete, committed handoff -- a refused, empty or
         malformed summary, or a Conversation that moved -- leaves `history` as
         it was. Every attempt counts against the run's own bound, allowance
         and deadline; a failed one is not retried until the history grows.
+
+        `forced` is the reader's request (IR-754): no threshold applies, and
+        only the summary must be affordable, since no answer follows it.
         """
         rule = self.agent.compaction
         if rule is None or self.context.commit_handoff is None:
             return history
-        if self.compactions >= rule.max_attempts or self.compact_failed_at == len(history):
+        if not forced and (self.compactions >= rule.max_attempts or self.compact_failed_at == len(history)):
             return history
         occupancy = self.agent.occupancy(self.request(history))
-        if occupancy is None or occupancy < rule.threshold_tokens:
+        if occupancy is None:
+            return await self._compaction_failed(history, "capacity_unknown") if forced else history
+        if not forced and occupancy < rule.threshold_tokens:
             return history
         cut = compacting.split(history, rule.keep_exchanges)
         if cut is None:
+            self.outcome = NOTHING_TO_COMPACT
             return history
         try:
             request, status = self.agent.estimate_summary(self.request(cut.summary(), closed=True))
         except Unavailable:
             return await self._compaction_failed(history, "summary_exceeds_context")
-        # The summary must leave the final answer and its repair affordable at today's size.
-        cap = output_cap(self.agent.sender.capacity(request.pin), self.agent.reserves)
-        if not self.budget.fits([(status.occupancy_tokens, request.max_output_tokens), (occupancy, cap),
-                                 (occupancy + cap + self.agent.reserves.repair_tokens, cap)]):
+        planned = [(status.occupancy_tokens, request.max_output_tokens)]
+        if not forced:
+            # The summary must leave the final answer and its repair affordable at today's size.
+            cap = output_cap(self.agent.sender.capacity(request.pin), self.agent.reserves)
+            planned += [(occupancy, cap), (occupancy + cap + self.agent.reserves.repair_tokens, cap)]
+        if not self.budget.fits(planned):
             return await self._compaction_failed(history, "allowance")
         self.compactions += 1
         turn = await self._attempt(request, status, "compact")
@@ -482,6 +541,7 @@ class _Run:
         self.handoff, self.handoff_revision = body, revision
         self.handoff_through = through
         self.carried = self.carried[len(cut.gone_turns):]
+        self.outcome, self.revision, self.condensed = "compacted", revision, len(cut.gone_turns)
         await self._journal("compaction", {"outcome": "compacted", "revision": revision,
                                            "turns": len(cut.gone_turns), "exchanges": len(cut.gone_exchanges)})
         rebuilt = cut.rebuilt(compacting.render(body, self.investigation.papers, passages=True))
@@ -491,6 +551,7 @@ class _Run:
 
     async def _compaction_failed(self, history: list, reason: str) -> list:
         self.compact_failed_at = len(history)
+        self.outcome = reason
         await self._journal("compaction", {"outcome": "kept", "reason": reason})
         return history
 

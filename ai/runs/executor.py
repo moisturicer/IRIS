@@ -38,6 +38,17 @@ class Result:
 
 
 @dataclass(frozen=True)
+class Compacted:
+    """What a manual compaction run left (IR-754): a committed handoff, or nothing older to condense."""
+
+    #: The committed handoff's revision; None when there was nothing older than the kept exchanges.
+    revision: int | None
+    #: Original Turns the handoff newly condensed.
+    turns: int = 0
+    reported_units: int = 0
+
+
+@dataclass(frozen=True)
 class PriorTurn:
     question: str
     answer: str
