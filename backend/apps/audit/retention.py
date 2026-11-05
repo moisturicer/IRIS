@@ -17,8 +17,10 @@ one, because guessing what was meant could erase data nobody approved erasing.
 type and nothing about a person.
 
 Safe to repeat and to interrupt: an eraser blanks only what is still set, so a
-second run finds nothing, and the whole run is one transaction, so an
-interrupted one erases nothing and the next run does it again.
+second run finds nothing, and the whole run is one transaction with its audit
+event, so an interrupted one erases nothing and an erasure is never unrecorded.
+The cost is that a type whose eraser keeps failing stops the others too, and the
+task fails loudly each day until it is fixed.
 """
 import logging
 from dataclasses import dataclass
@@ -29,7 +31,6 @@ from django.db import transaction
 from django.utils import timezone
 
 from .models import AuditEvent
-from .services import create_audit_event
 
 logger = logging.getLogger(__name__)
 
@@ -101,11 +102,14 @@ def run_retention(now: datetime | None = None) -> dict[str, int]:
     from apps.accounts.models import SystemSetting
 
     now = now or timezone.now()
-    periods = dict(
-        SystemSetting.objects.filter(key__in=setting_keys()).values_list("key", "value")
-    )
     counts: dict[str, int] = {}
     with transaction.atomic():
+        # Read under a row lock, as the settings PATCH does, so a period the System
+        # Admin has just blanked is never erased under its old value.
+        periods = dict(
+            SystemSetting.objects.select_for_update()
+            .filter(key__in=setting_keys()).values_list("key", "value")
+        )
         for retention_type in registered_types():
             raw = periods.get(retention_type.setting_key)
             days = parse_period(raw)
@@ -118,7 +122,9 @@ def run_retention(now: datetime | None = None) -> dict[str, int]:
                 counts[retention_type.key] = 0
                 continue
             counts[retention_type.key] = retention_type.erase(now - timedelta(days=days))
-        create_audit_event(
-            AuditEvent.RETENTION_CLEANUP_RUN, None, metadata={"counts": counts},
+        # Not `create_audit_event`, which swallows a failed write: if the event can't
+        # be written, the erasure rolls back with it rather than going unrecorded.
+        AuditEvent.objects.create(
+            event_type=AuditEvent.RETENTION_CLEANUP_RUN, user=None, metadata={"counts": counts},
         )
     return counts

@@ -10,8 +10,11 @@ notes existed ("No note recorded").
 A pending request is never touched, since someone still has to decide on it.
 Otherwise a request's age runs from the latest thing that happened to it: its
 creation, RDCO's decision, a revocation, its cancellation or the end of its
-grant. A note exactly one period old is kept; one second older is erased.
+grant. The grant's end counts only while the request is approved: a revoked
+request's grant ended at the revocation, whatever date it once carried.
+A note exactly one period old is kept; one second older is erased.
 """
+from django.db.models import Case, F, When
 from django.db.models.functions import Greatest
 
 from apps.audit.retention import RetentionType, register
@@ -30,7 +33,9 @@ def erase_download_notes(cutoff) -> int:
         .exclude(status=RequestStatus.PENDING)
         .exclude(note="", rdco_note="")
         .annotate(last_activity=Greatest(
-            "created_at", "reviewed_at", "revoked_at", "cancelled_at", "grant_expires_at",
+            "created_at", "reviewed_at", "revoked_at", "cancelled_at",
+            # GREATEST ignores NULL, so a request with no live grant drops this term.
+            Case(When(status=RequestStatus.APPROVED, then=F("grant_expires_at"))),
         ))
         .filter(last_activity__lt=cutoff)
         .update(note="", rdco_note="")

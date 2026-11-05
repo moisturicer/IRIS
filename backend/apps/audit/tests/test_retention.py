@@ -194,6 +194,11 @@ class DownloadNotesTests(RetentionTestCase):
             age=timedelta(days=400), status=RequestStatus.REVOKED,
             reviewed_at=NOW - timedelta(days=400), revoked_at=NOW - timedelta(days=2),
         )
+        revoked_with_a_grant_that_would_have_run_on = self.request(
+            age=timedelta(days=400), status=RequestStatus.REVOKED,
+            reviewed_at=NOW - timedelta(days=400), revoked_at=NOW - timedelta(days=399),
+            grant_expires_at=NOW + timedelta(days=200),
+        )
         cancelled_long_ago = self.request(
             age=timedelta(days=400), status=RequestStatus.CANCELLED,
             cancelled_at=NOW - timedelta(days=399),
@@ -201,10 +206,12 @@ class DownloadNotesTests(RetentionTestCase):
 
         counts = run_retention(NOW)
 
-        self.assertEqual(counts, {TYPE_KEY: 1})
+        self.assertEqual(counts, {TYPE_KEY: 2})
         for kept in (decided_recently, grant_still_running, revoked_recently):
             self.assertEqual(self.notes(kept), (READER_NOTE, RDCO_NOTE))
         self.assertEqual(self.notes(cancelled_long_ago), ("", ""))
+        # Its grant ended when it was revoked, not on the date it once carried.
+        self.assertEqual(self.notes(revoked_with_a_grant_that_would_have_run_on), ("", ""))
 
     def test_a_request_with_only_one_note_is_counted_once_and_a_blank_one_not_at_all(self):
         only_reader = self.request(age=timedelta(days=90), rdco_note="")
@@ -256,6 +263,18 @@ class SafeToRepeatTests(RetentionTestCase):
 
         self.assertEqual(run_retention(NOW), {TYPE_KEY: 1})
         self.assertEqual(self.notes(old), ("", ""))
+
+
+class AuditFailureTests(RetentionTestCase):
+    def test_a_run_whose_event_cannot_be_written_erases_nothing(self):
+        set_period(str(DAYS))
+        old = self.request(age=timedelta(days=90))
+
+        with mock.patch.object(AuditEvent.objects, "create", side_effect=RuntimeError("audit down")):
+            with self.assertRaises(RuntimeError):
+                run_retention(NOW)
+
+        self.assertEqual(self.notes(old), (READER_NOTE, RDCO_NOTE))
 
 
 class AuditTests(RetentionTestCase):
