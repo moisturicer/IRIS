@@ -6,54 +6,104 @@ from ai.runs.config import KIND_COMPACT
 PROTOCOL = "runs-reader-1"
 
 
-def progress(events):
-    plan = None
-    context = None
-    compaction = None
-    counted = set()
-    for event in events:
+#: Lifecycle moments a reconnecting reader is told of, by name alone. Anything
+#: else in the journal (tool calls, model attempts, recovery) is the operator's.
+LIFECYCLE = ("admitted", "started", "completed", "cancelled", "failed", "expired", "conflict", "deleted")
+
+
+class _Progress:
+    """Folds journal events into the reader's progress, and says what each shows (IR-726).
+
+    `accept` returns the allowlisted form of an event the reader may see, or
+    None when it shows nothing (unknown, invalid, or repeated).
+    """
+
+    def __init__(self):
+        self.plan = None
+        self.context = None
+        self.compaction = None
+        self.counted = set()
+
+    def accept(self, event):
         data = event["data"]
-        if event["name"] == "plan":
-            revision, steps = data.get("revision"), data.get("steps")
-            if (type(revision) is not int or revision < 1 or
-                    (plan and revision <= plan["revision"]) or
-                    not isinstance(steps, list) or len(steps) > PLAN_STEPS):
-                continue
-            clean = []
-            for step in steps:
-                if (not isinstance(step, dict) or not isinstance(step.get("id"), str) or
-                        not STEP_ID.fullmatch(step["id"]) or step.get("status") not in STEP_STATUS or
-                        not isinstance(step.get("title"), str) or not step["title"].strip() or
-                        len(step["title"]) > 160):
-                    break
-                clean.append({key: step[key] for key in ("id", "title", "status")})
-            else:
-                ids = [s["id"] for s in clean]
-                previous = {s["id"] for s in plan["steps"]} if plan else set()
-                if len(set(ids)) == len(ids) and previous <= set(ids):
-                    plan = {"revision": revision, "steps": clean}
-        elif event["name"] == "compaction":
-            # Outcome and counts only: never a reason code, summary text, revision or source.
-            turns = data.get("turns")
-            if data.get("outcome") not in ("compacted", "kept") or (
-                    data["outcome"] == "compacted" and (type(turns) is not int or turns < 0)):
-                continue
-            revision = data.get("revision")
-            if data["outcome"] == "compacted" and revision in counted:
-                # A worker that took the run over saw the commit and said so again (IR-754).
-                continue
-            compaction = compaction or {"compactions": 0, "turns_compacted": 0, "last": None}
-            compaction["last"] = data["outcome"]
-            if data["outcome"] == "compacted":
-                counted.add(revision)
-                compaction["compactions"] += 1
-                compaction["turns_compacted"] += turns
-        elif event["name"] == "context":
-            used, capacity = data.get("used_tokens"), data.get("capacity_tokens")
-            context = ({"estimated": True, "used_tokens": used, "capacity_tokens": capacity}
-                       if type(used) is int and type(capacity) is int and 0 <= used <= capacity
-                       and capacity > 0 else None)
-    return {"plan": plan, "context": context, "compaction": compaction}
+        name = event["name"]
+        if name == "plan":
+            return self._plan(data)
+        if name == "compaction":
+            return self._compaction(data)
+        if name == "context":
+            return self._context(data)
+        if name in LIFECYCLE:
+            return {"name": name}
+        return None
+
+    def _plan(self, data):
+        revision, steps = data.get("revision"), data.get("steps")
+        if (type(revision) is not int or revision < 1 or
+                (self.plan and revision <= self.plan["revision"]) or
+                not isinstance(steps, list) or len(steps) > PLAN_STEPS):
+            return None
+        clean = []
+        for step in steps:
+            if (not isinstance(step, dict) or not isinstance(step.get("id"), str) or
+                    not STEP_ID.fullmatch(step["id"]) or step.get("status") not in STEP_STATUS or
+                    not isinstance(step.get("title"), str) or not step["title"].strip() or
+                    len(step["title"]) > 160):
+                return None
+            clean.append({key: step[key] for key in ("id", "title", "status")})
+        ids = [s["id"] for s in clean]
+        previous = {s["id"] for s in self.plan["steps"]} if self.plan else set()
+        if len(set(ids)) != len(ids) or not previous <= set(ids):
+            return None
+        self.plan = {"revision": revision, "steps": clean}
+        return {"name": "plan", **self.plan}
+
+    def _compaction(self, data):
+        # Outcome and counts only: never a reason code, summary text, revision or source.
+        turns = data.get("turns")
+        if data.get("outcome") not in ("compacted", "kept") or (
+                data["outcome"] == "compacted" and (type(turns) is not int or turns < 0)):
+            return None
+        revision = data.get("revision")
+        if data["outcome"] == "compacted" and revision in self.counted:
+            # A worker that took the run over saw the commit and said so again (IR-754).
+            return None
+        self.compaction = self.compaction or {"compactions": 0, "turns_compacted": 0, "last": None}
+        self.compaction["last"] = data["outcome"]
+        if data["outcome"] == "compacted":
+            self.counted.add(revision)
+            self.compaction["compactions"] += 1
+            self.compaction["turns_compacted"] += turns
+            return {"name": "compaction", "outcome": "compacted", "turns": turns}
+        return {"name": "compaction", "outcome": "kept"}
+
+    def _context(self, data):
+        used, capacity = data.get("used_tokens"), data.get("capacity_tokens")
+        valid = type(used) is int and type(capacity) is int and 0 <= used <= capacity and capacity > 0
+        self.context = {"estimated": True, "used_tokens": used, "capacity_tokens": capacity} if valid else None
+        return {"name": "context", **self.context} if valid else None
+
+
+def progress(events):
+    folded = _Progress()
+    for event in events:
+        folded.accept(event)
+    return {"plan": folded.plan, "context": folded.context, "compaction": folded.compaction}
+
+
+def journal(events, after):
+    """The safe, ordered entries of a run's journal past `after`, each with its position (IR-726).
+
+    The whole journal is folded so a slice never contradicts the run's plan,
+    context or compaction; only entries past the cursor are returned.
+    """
+    folded = _Progress()
+    entries = []
+    for event in events:
+        shown = folded.accept(event)
+        if shown is not None and event["sequence"] > after:
+            entries.append({"sequence": event["sequence"], **shown})
+    return entries
 
 
 def kind(snapshot):
@@ -61,9 +111,11 @@ def kind(snapshot):
     return "compact" if (snapshot.get("pinned") or {}).get("kind") == KIND_COMPACT else "ask"
 
 
-def run(snapshot, *, manual_compaction=False):
+def run(snapshot, *, manual_compaction=False, after=None):
+    """The reader's view of a run. A cursor (`after`) adds the journal replay past it (IR-726)."""
     # A compaction asks nothing; it shows an empty question rather than none.
     snapshot = {**snapshot, "question": snapshot["question"] or ""}
+    visible = snapshot["events"] if snapshot.get("sources_available", True) else []
     return {
         "protocol": PROTOCOL,
         **{key: snapshot[key] for key in (
@@ -71,7 +123,12 @@ def run(snapshot, *, manual_compaction=False):
             "turn_id", "depth", "awaiting_reader", "created_at", "finished_at",
         )},
         "kind": kind(snapshot),
-        **progress(snapshot["events"] if snapshot.get("sources_available", True) else []),
+        **progress(visible),
+        # A position in the journal: where a reconnecting reader asks to continue from.
+        "cursor": max((event["sequence"] for event in snapshot["events"]), default=0),
+        **({"journal": journal(visible, after)} if after is not None else {}),
+        "retry_of": snapshot.get("retry_of"),
+        "retried_by": snapshot.get("retried_by"),
         "sources_available": snapshot.get("sources_available", True),
         "capabilities": {"manual_compaction": manual_compaction},
     }

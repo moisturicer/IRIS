@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
-import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
+import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import { ChatInput } from "./ChatInput";
 
 const STATES: Record<ReaderRun["state"], string> = {
@@ -105,6 +105,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
   const generation = useRef(0);
   const pending = useRef<{ question: string; depth: Depth; key: string; conversation?: ReaderConversation }>();
   const pendingCompact = useRef<{ key: string; conversation: ReaderConversation }>();
+  const pendingRetry = useRef<{ key: string; run: ReaderRun }>();
   const sending = useRef(false);
 
   const fail = useCallback((failure: unknown) => setError(trouble(failure)), []);
@@ -120,7 +121,7 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
   useEffect(() => {
     const version = ++generation.current;
     setConversation(undefined); setRun(undefined); setError(undefined);
-    pending.current = undefined; pendingCompact.current = undefined;
+    pending.current = undefined; pendingCompact.current = undefined; pendingRetry.current = undefined;
     if (conversationId) {
       setBusy(true);
       void reopen(conversationId, version).catch((failure) => {
@@ -224,6 +225,41 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
     }
   };
 
+  /** The reader asks the same question again: a new run linked to this one, however many times it is clicked. */
+  const retryRun = async (again = false) => {
+    if (sending.current) return;
+    const request = again ? pendingRetry.current : run && { key: crypto.randomUUID(), run };
+    if (!request) return;
+    pendingRetry.current = request;
+    sending.current = true;
+    setBusy(true); setError(undefined);
+    const version = generation.current;
+    try {
+      const next = await api.retry(request.run.id, request.key);
+      if (version !== generation.current) return;
+      pendingRetry.current = undefined;
+      setRun(next);
+      await reopen(next.conversation_id, version);
+    } catch (failure) {
+      if (version !== generation.current) return;
+      if (isAxiosError(failure) && failure.response?.status === 409) {
+        // Another run is active, or the conversation moved on: show what is true now.
+        pendingRetry.current = undefined;
+        try { await reopen(request.run.conversation_id, version); } catch (reopenFailure) { fail(reopenFailure); }
+        if (version === generation.current) {
+          setError({ message: "This conversation changed. Reconnect, then ask your question again.", retry: true });
+        }
+      } else {
+        const next = trouble(failure);
+        if (!next.retry) pendingRetry.current = undefined;
+        setError(next);
+      }
+    } finally {
+      sending.current = false;
+      if (version === generation.current) setBusy(false);
+    }
+  };
+
   const stop = async () => {
     if (!run) return;
     const version = ++generation.current;
@@ -241,12 +277,18 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
   const reconnect = async () => {
     if (pending.current) return send(pending.current.question, true);
     if (pendingCompact.current) return compact(true);
+    if (pendingRetry.current) return retryRun(true);
     const id = run?.conversation_id ?? conversationId;
     if (!id) return;
     setBusy(true);
     try { await reopen(id); } catch (failure) { fail(failure); }
     finally { setBusy(false); }
   };
+
+  // Only for the latest run, when it ended without an answer and the conversation is still as it asked.
+  const canRetry = !!conversation && !!run && !error && !busy && retryable(run)
+    && conversation.revision === run.base_revision
+    && conversation.runs[conversation.runs.length - 1]?.id === run.id;
 
   // Only where the deployment can condense, once there is something to condense, and never beside an active run.
   const canCompact = !!conversation && conversation.turns.length > 0 && !error && !!run
@@ -282,6 +324,9 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
           {error.retry && <button type="button" disabled={busy} onClick={() => void reconnect()} className="min-h-11 underline text-brand">Reconnect</button>}
           {error.missing && <Link to="/ai" className="inline-flex min-h-11 items-center underline text-brand">Start a new conversation</Link>}
         </div>}
+        {canRetry && <button type="button" onClick={() => void retryRun()}
+          className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
+          Try this question again</button>}
         {run && activeRun(run) && <button type="button" onClick={() => void stop()} disabled={busy}
           className="min-h-11 rounded-full border border-stone-300 px-5 text-sm text-stone-800 focus-visible:outline-brand">
           {compactionRun(run) ? "Stop compaction" : "Stop research"}</button>}

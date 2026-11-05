@@ -30,11 +30,14 @@ from typing import Mapping
 import asyncpg
 
 from ai.admission.scope import run_key
+from ai.runs.config import KIND_COMPACT
 from ai.runs.executor import Compacted, PriorTurn, Result
 
 APP_NAME = "iris-ai-runs"
 ACTIVE = ("queued", "running")
 TERMINAL = ("completed", "cancelled", "conflict", "expired", "failed", "deleted")
+#: A reader may retry a run that ended without an answer and left the Conversation as it was (IR-726).
+RETRYABLE = ("cancelled", "expired", "failed")
 
 # An exact count stands only while the reader may still read every Record it
 # counted; the row policy decides (IR-750). Correlated on Turn `t`.
@@ -98,7 +101,7 @@ def shown_facts(facts) -> list[dict]:
 RUN_COLUMNS = (
     "id, reader_id, conversation_id, request_hash, question, base_revision, state, end_reason,"
     " deadline_at, allowance, pinned, fence, version, turn_id, created_at, finished_at,"
-    " depth, started_at"
+    " depth, started_at, retry_of"
 )
 
 #: Earlier Turns a claim carries, newest kept (IR-728).
@@ -348,6 +351,83 @@ class RunStore:
         )
         if row is None:
             # A concurrent submission with this identity won; read it instead.
+            raise _Raced
+        await self._journal(conn, row["id"], "admitted", {})
+        return dict(row), True
+
+    async def retry(self, grant, run_id, *, key: str, plan, max_queued: int | None = None,
+                    max_active_per_reader: int | None = None) -> tuple[dict, bool]:
+        """The new run that retries `run_id`, and whether this request admitted it (IR-726).
+
+        Only the reader's own run that ended `cancelled`, `expired` or `failed`
+        with its Conversation unmoved and no other run active in it. The new run
+        is a separate AskRun, linked by `retry_of`, admitted like any submission:
+        `plan(depth)` gives its deadline, allowance and pin, so it starts from
+        the configured limits and the first run's allowance and charges stay as
+        they were. Asking again -- by key or not -- finds the first retry.
+        Raises Conflict("not_retryable") for any other run.
+        """
+        bounds = (max_queued, max_active_per_reader)
+        async with self._connect() as conn:
+            for _ in range(2):
+                try:
+                    async with conn.transaction():
+                        return await self._retry(conn, grant, run_id, key, plan, bounds)
+                except _Raced:
+                    continue
+        raise Conflict("request_in_flight")
+
+    async def _retry(self, conn, grant, run_id, key, plan, bounds):
+        claims = await self._verify(conn, grant)
+        reader, scope = self._reader(claims)
+        await self._owned_run(conn, reader, scope, run_id)
+        original = await conn.fetchrow(
+            f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE id = $1 FOR UPDATE", run_id,
+        )
+        existing = await conn.fetchrow(
+            f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE reader_id = $1 AND request_key = $2",
+            reader, key,
+        )
+        if existing is not None:
+            if existing["retry_of"] != run_id:
+                raise Conflict("request_mismatch")
+            return dict(existing), False
+        first = await conn.fetchrow(
+            f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE retry_of = $1", run_id,
+        )
+        if first is not None:
+            return dict(first), False
+        if (original["state"] not in RETRYABLE or original["question"] is None
+                or (original["pinned"] or {}).get("kind") == KIND_COMPACT):
+            raise Conflict("not_retryable")
+        revision = await conn.fetchval(
+            "SELECT revision FROM iris_ai.conversation WHERE id = $1", original["conversation_id"],
+        )
+        if revision != original["base_revision"]:
+            raise Conflict("revision_conflict", revision=revision)
+        await self._expire_overdue(conn, original["conversation_id"])
+        active = await conn.fetchval(
+            "SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1 AND state = ANY($2)",
+            original["conversation_id"], list(ACTIVE),
+        )
+        if active is not None:
+            raise Conflict("run_in_progress", run_id=str(active))
+        await self._bound_population(conn, reader, bounds)
+        deadline_seconds, allowance, pinned = plan(original["depth"])
+        row = await conn.fetchrow(
+            f"""INSERT INTO iris_ai.ask_run
+                    (id, reader_id, conversation_id, request_key, request_hash, question,
+                     base_revision, deadline_at, allowance, pinned, depth,
+                     reader_grant, grant_expires_at, retry_of)
+                VALUES ($1, $2, $3, $4, $5, $6, $7, now() + make_interval(secs => $8), $9, $10,
+                        $11, $12, to_timestamp($13), $14)
+                ON CONFLICT (reader_id, request_key) DO NOTHING
+                RETURNING {RUN_COLUMNS}""",
+            uuid.uuid4(), reader, original["conversation_id"], key, original["request_hash"],
+            original["question"], original["base_revision"], float(deadline_seconds), allowance, pinned,
+            original["depth"], grant, claims["exp"], run_id,
+        )
+        if row is None:
             raise _Raced
         await self._journal(conn, row["id"], "admitted", {})
         return dict(row), True
@@ -792,6 +872,7 @@ class RunStore:
             "SELECT sequence, name, data FROM iris_ai.run_event WHERE run_id = $1 ORDER BY sequence",
             run_id,
         )
+        retried_by = await conn.fetchval("SELECT id FROM iris_ai.ask_run WHERE retry_of = $1", run_id)
         evidence = {}
         if reader:
             # Recheck every evidence dependency under begin_research's live RLS,
@@ -835,6 +916,8 @@ class RunStore:
             "created_at": run["created_at"].isoformat(),
             "finished_at": run["finished_at"].isoformat() if run["finished_at"] else None,
             "depth": run["depth"],
+            "retry_of": str(run["retry_of"]) if run["retry_of"] else None,
+            "retried_by": str(retried_by) if retried_by else None,
             # Queued on a lapsed grant: it starts once the reader reconnects.
             "awaiting_reader": bool(run["awaiting_reader"]),
             "started_at": run["started_at"].isoformat() if run["started_at"] else None,
