@@ -207,16 +207,23 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
                 partition_method=None, retrieval=None, pricing=None,
                 arm="controller", engine_version=CONTROLLER_ENGINE,
                 diagnostics=None, clock=time.monotonic, split="development",
-                faults=None) -> dict:
-    """One scorer-readable run; only supplied, approved manifest fields enter it."""
+                faults=None, case_collector=None, protocol=PUBLIC_PROTOCOL, identity=None,
+                runtime=None) -> dict:
+    """One scorer-readable run; only supplied, approved manifest fields enter it.
+
+    ``case_collector`` replaces `collect_case` for an engine with its own seam (IR-740),
+    and ``protocol``, ``identity`` and ``runtime`` record that engine's wire protocol,
+    explicit identity and operator-declared facts. The defaults are the Django path.
+    """
+    collect = case_collector or collect_case
     run_id = str(uuid.uuid4())
     rows = []
     for case in cases:
         if case["split"] != split:
             raise ValueError(f"this collection is restricted to the {split} split")
         try:
-            row = collect_case(reader, case, attempts=attempts, limits=limits,
-                               diagnostics=diagnostics, clock=clock, faults=faults)
+            row = collect(reader, case, attempts=attempts, limits=limits,
+                          diagnostics=diagnostics, clock=clock, faults=faults)
         except (TimeoutError, httpx.TimeoutException, KeyboardInterrupt) as exc:
             row = _unfinished(case, "cancellation" if isinstance(exc, KeyboardInterrupt) else "timeout")
         except (OSError, ConnectionError, httpx.TransportError, ValueError):
@@ -244,7 +251,9 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
         "engine_version": engine_version,
         "controller_protocol_version": (PROTOCOL_VERSION if engine_version == CONTROLLER_ENGINE
                                         else None),
-        "protocol_version": PUBLIC_PROTOCOL,
+        "protocol_version": protocol,
+        **({"identity": dict(identity)} if identity else {}),
+        **({"runtime": dict(runtime)} if runtime else {}),
         "prompt_versions": ({"plan": PLAN_PROMPT_VERSION, "answer": ANSWER_PROMPT_VERSION}
                             if engine_version == CONTROLLER_ENGINE else {}),
         "cache_state": cache, "attempted_physical_calls": len(physical),
@@ -252,9 +261,20 @@ def collect_run(reader, cases: list[Mapping], *, set_id: str, set_digests: Mappi
         "rubric_version": 1,
         "fault_injection": faults.describe() if faults is not None else None,
     }
+    providers = "real" if attempts else "fake"
     return {"schema_version": SCHEMA_VERSION, "run_id": run_id, "arm": arm,
-            "providers": "real" if attempts else "fake", "manifest": manifest,
+            "providers": providers, "manifest": manifest, "evidence": evidence(providers),
             "conversations": rows, "capacity_fit": False}
+
+
+def evidence(providers: str) -> dict:
+    """What a collected run is evidence of: never a reviewed quality result by itself."""
+    return {"kind": "contract" if providers == "fake" else "collected_unreviewed",
+            "human_reviewed": False, "quality_evidence": False,
+            "note": ("deterministic providers: a transport and contract check, not model "
+                     "quality, capacity or cost" if providers == "fake" else
+                     "collected from real providers; quality needs independent human review "
+                     "and scoring (eval_conversations, eval_campaign)")}
 
 
 def _unfinished(case: Mapping, outcome: str) -> dict:
@@ -314,7 +334,10 @@ class CampaignAttempts:
         return self._query().aggregate(value=Max("pk"))["value"] or 0
 
     def since(self, cursor: int) -> list[dict]:
-        rows = self._query().filter(pk__gt=cursor).order_by("pk")
+        return self._rows(self._query().filter(pk__gt=cursor).order_by("pk"))
+
+    @staticmethod
+    def _rows(rows) -> list[dict]:
         return [{
             "id": row.pk, "run_key": row.run_key, "work_key": row.work_key,
             "operation": row.operation, "model": row.model, "state": row.state,
@@ -322,6 +345,21 @@ class CampaignAttempts:
             "input_tokens": row.charge_input_tokens,
             "output_tokens": row.charge_output_tokens,
             "cost_usd": row.charge_cost_micros / 1_000_000,
+            "reserved_cost_usd": row.reserved_cost_micros / 1_000_000,
+            "owner": row.owner, "purpose": row.purpose, "purpose_version": row.purpose_version,
             "price_basis": ("admission_charge_basis_not_persisted" if row.usage_reported
                             else "reservation"),
         } for row in rows if row.charge_attempts]
+
+
+class RuntimeAttempts(CampaignAttempts):
+    """The runtime's own physical attempts, found by the run that made them (IR-725).
+
+    The runtime stamps every attempt with ``airun:<run id>`` and ``owner = 'ai'``, so a
+    run's attempts are exact without a cursor; the campaign should still be dedicated.
+    """
+
+    def for_run(self, run_id) -> list[dict]:
+        key = f"airun:{uuid.UUID(str(run_id)).hex}"
+        rows = self._query().filter(owner="ai", run_key=key).order_by("pk")
+        return self._rows(rows)
