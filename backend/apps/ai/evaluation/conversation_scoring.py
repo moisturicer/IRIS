@@ -13,10 +13,12 @@ import math
 from collections import Counter
 from typing import Any, Mapping, Optional, Sequence
 
+from .engines import mismatches
 from .pilot_report import percentile
 
-ARMS = ("current", "fixed_synthesis", "controller")
-MODES = ("architecture", "model")
+ARMS = ("current", "fixed_synthesis", "controller", "runtime")
+#: `capability` compares a larger allowance on purpose and is never an architecture result (IR-740).
+MODES = ("architecture", "model", "capability")
 DEFAULT_MIN_EXAMPLES = 10
 Z = 1.96
 
@@ -272,17 +274,18 @@ def check_conditions(runs: Mapping[str, Mapping], *, mode: str,
         for label, run in runs.items():
             if label != run.get("arm"):
                 raise ScoringError(f"run label {label!r} must equal its arm {run.get('arm')!r}")
-        keys = CONDITION_KEYS
     else:
         if len(set(arms)) != 1:
-            raise ScoringError("model comparison needs the same architecture in every run")
-        keys = tuple(k for k in CONDITION_KEYS if k != "model_ids")
+            raise ScoringError(f"{mode} comparison needs the same architecture in every run")
     manifests = [r.get("manifest", {}) for r in runs.values()]
+    keys = CONDITION_KEYS if mode != "model" else tuple(
+        k for k in CONDITION_KEYS if k != "model_ids")
     for key in keys:
         if any(m.get(key) is None for m in manifests):
             raise ScoringError(f"manifest lacks {key}")
-        if any(m[key] != manifests[0][key] for m in manifests):
-            raise ScoringError(f"arms differ in {key}; conditions are not equal")
+    problems = mismatches([(label, r.get("manifest", {})) for label, r in runs.items()], mode)
+    if problems:
+        raise ScoringError(problems[0])
     if mode == "architecture" and any(not m.get("model_ids") for m in manifests):
         raise ScoringError("manifest lacks model_ids")
     if set_digests is not None and manifests[0]["set_digests"] != dict(set_digests):
