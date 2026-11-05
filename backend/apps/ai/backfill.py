@@ -145,6 +145,7 @@ def plan_records(
     space_model: str = "",
     cost_per_million: float = 0.0,
     include_summaries: bool = True,
+    summary_space_id: Optional[int] = None,
 ) -> BackfillPlan:
     """Cost every record in ``records`` against the embedding space ``space_id``.
 
@@ -158,9 +159,15 @@ def plan_records(
     that mode writes chunk vectors only — ``RecordEmbedding`` is one row per
     record with no space key, so a summary vector cannot exist in two spaces
     at once.
+
+    ``summary_space_id`` (IR-752) is how a **pending** space's summaries are
+    planned: the space-keyed table holds one vector per ``(record, space)``, so
+    it can, and a stored vector whose text hash no longer matches the record is
+    owed again. Without it the legacy rule above applies unchanged.
     """
     from apps.ai.indexing import active_chunks, estimate_pending_tokens, pending_chunks
-    from apps.ai.models import RecordEmbedding
+    from apps.ai.indexing import record_source_hash
+    from apps.ai.models import RecordEmbedding, RecordSpaceEmbedding
 
     plans: list[RecordPlan] = []
     stub_records = 0
@@ -173,8 +180,17 @@ def plan_records(
                 "record_id", flat=True
             )
         )
-        if include_summaries and space_model
+        if include_summaries and space_model and summary_space_id is None
         else set()
+    )
+    keyed = (
+        dict(
+            RecordSpaceEmbedding.objects.filter(space_id=summary_space_id).values_list(
+                "record_id", "source_hash"
+            )
+        )
+        if include_summaries and summary_space_id is not None
+        else {}
     )
 
     for record in records:
@@ -185,12 +201,19 @@ def plan_records(
         # them least of all — and owing it a summary vector would walk every
         # one of them straight back into the run this skip exists to keep
         # them out of.
-        needs_summary = (
-            include_summaries
-            and bool(space_model)
-            and total > 0
-            and record.id not in summarised
-        )
+        if summary_space_id is not None:
+            needs_summary = (
+                include_summaries
+                and total > 0
+                and keyed.get(record.id) != record_source_hash(record)
+            )
+        else:
+            needs_summary = (
+                include_summaries
+                and bool(space_model)
+                and total > 0
+                and record.id not in summarised
+            )
 
         reason = ""
         if not chunks and not needs_summary:

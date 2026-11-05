@@ -163,6 +163,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
 | **IR-754** | A reader deliberately compacts an owned Conversation from Ask IRIS or Paper Chat as a run of its own, through IR-734's mechanism, and sees what happened — under IR-715, ADR-049 §19; no FR- id | [details](traceability/IR-754.md) | **PARTIAL** |
 | **IR-736** | A long-paper investigation continues across repeated compactions and safely rebuilds when native continuation state is incompatible — under IR-715, ADR-049 §19–20; no FR- id | [details](traceability/IR-736.md) | **PARTIAL** |
+| **IR-752** | An operator builds a pending Embedding Space beside the active one, with space-keyed Record and Passage vectors, while readers keep searching the active space — under IR-716, ADR-049 §23; additive expand only, no activation (IR-739); no FR- id | [details](traceability/IR-752.md) | **PARTIAL** |
 
 ### Non-functional
 

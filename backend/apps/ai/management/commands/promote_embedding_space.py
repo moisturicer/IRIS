@@ -71,6 +71,8 @@ class Command(BaseCommand):
         else:
             self.stdout.write(self.style.SUCCESS("  every active chunk has a vector"))
 
+        self._write_readiness(space.pk)
+
         if options["check"]:
             return
 
@@ -92,4 +94,30 @@ class Command(BaseCommand):
                 f"space is retired, not deleted — its vectors point at it with "
                 f"on_delete=CASCADE."
             )
+        )
+
+    def _write_readiness(self, space_id):
+        """Summary and dimension coverage beside the passage shortfall (IR-752).
+
+        Reporting only: the passage check above is what `promote` itself
+        enforces, and this adds what a pending build now also has to hold.
+        """
+        from apps.ai.space_build import space_readiness
+
+        r = space_readiness(space_id)
+        self.stdout.write(
+            f"  summary vectors     {r.summaries_built} current of {r.records_total} "
+            f"record(s); {r.summaries_missing} missing, {r.summaries_stale} stale, "
+            f"{r.summaries_unverified} unverified"
+        )
+        self.stdout.write(
+            f"  passage vectors     {r.passages_embedded} of {r.passages_total}"
+        )
+        line = f"  dimension check     {r.dimension_mismatches} mismatch(es)"
+        self.stdout.write(
+            self.style.SUCCESS(line) if not r.dimension_mismatches else self.style.ERROR(line)
+        )
+        verdict = "complete and current" if r.ready else "not ready"
+        self.stdout.write(
+            (self.style.SUCCESS if r.ready else self.style.WARNING)(f"  coverage            {verdict}")
         )

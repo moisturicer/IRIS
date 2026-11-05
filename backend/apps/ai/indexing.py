@@ -211,34 +211,61 @@ def _require_disclosure(record) -> None:
         raise EmbeddingRefused(decision.explain())
 
 
+def summary_text(record) -> str:
+    """The exact text a Record's summary vector is computed from."""
+    return f"{record.title}. {record.abstract}"
+
+
+def record_source_hash(record) -> str:
+    """SHA-256 of ``summary_text``: the source revision a summary vector pins.
+
+    A summary vector whose stored hash differs from this one was computed from
+    a title or abstract that has since changed (IR-752).
+    """
+    import hashlib
+
+    return hashlib.sha256(summary_text(record).encode("utf-8")).hexdigest()
+
+
 @charged_to("ingestion")
 def embed_record_summary(
     record_id: int,
     *,
     provider: Optional[EmbeddingProvider] = None,
     skip_existing: bool = False,
+    space_id: Optional[int] = None,
 ) -> EmbeddingOutcome:
-    """Embed a record's title and abstract into ``RecordEmbedding``.
+    """Embed a record's title and abstract.
+
+    With no ``space_id`` this is the live path: the vector goes to
+    ``RecordEmbedding``, which every reader still uses, and is mirrored into
+    the space-keyed ``RecordSpaceEmbedding`` for the active space (IR-752).
+    With a ``space_id`` it fills **that** space only -- a pending one, through
+    ``apps.ai.space_build`` -- and never touches the legacy row, which holds
+    one vector per record and belongs to the active space.
 
     ``skip_existing`` is off by default and on for a backfill. The task path
     is queued *because* a record changed, so re-embedding is the point; a
     backfill walking thousands of records must not pay again for the ones a
     previous, interrupted run already did. The skip keys on the model id the
     existing row was written under, which is what ``RecordEmbedding`` records
-    — so a record whose title or abstract changed under an unchanged model is
+    -- so a record whose title or abstract changed under an unchanged model is
     *not* re-embedded by a backfill. Say so plainly rather than implying a
     freshness guarantee this table cannot give: re-indexing edited text is the
-    task path's job, and a text-hash column that would let a backfill notice
-    is schema IR-281 did not add.
+    task path's job. The space-keyed table does keep a text hash, which is how
+    a pending build notices an edit.
     """
+    from django.db import transaction
+
     from apps.ai.models import RecordEmbedding
+    from apps.ai.models.embedding import RecordSpaceEmbedding
     from apps.records.models import Record
 
     record = Record.objects.get(pk=record_id)
     provider = provider or build_embedding_provider()
-    space = _checked_space(provider)
+    space = _checked_space(provider, space_id)
 
-    if skip_existing and RecordEmbedding.objects.filter(
+    if space_id is None and skip_existing and RecordEmbedding.objects.filter(
         record_id=record_id, model_name=space.model_id
     ).exists():
         return EmbeddingOutcome(record_id=record_id, space_id=space.id, skipped=1)
@@ -250,17 +277,24 @@ def embed_record_summary(
             record_id=record_id, space_id=space.id, refused=True, reason=str(exc)
         )
 
-    text = f"{record.title}. {record.abstract}"
+    text = summary_text(record)
     sent = Dependency.abstract(record.pk, record.title, record.abstract)
     try:
         with OutboundGuard(principal=None, permits=default_permits).fence(lambda: {sent}):
             vector = provider.embed_documents([text])[0]
     except Withheld as refused:
         return _withheld(record_id, space, refused)
-    RecordEmbedding.objects.update_or_create(
-        record=record,
-        defaults={"embedding": vector, "model_name": space.model_id},
-    )
+    with transaction.atomic():
+        if space_id is None:
+            RecordEmbedding.objects.update_or_create(
+                record=record,
+                defaults={"embedding": vector, "model_name": space.model_id},
+            )
+        RecordSpaceEmbedding.objects.update_or_create(
+            record=record,
+            space=space,
+            defaults={"embedding": vector, "source_hash": record_source_hash(record)},
+        )
     return EmbeddingOutcome(record_id=record_id, space_id=space.id, embedded=1)
 
 
