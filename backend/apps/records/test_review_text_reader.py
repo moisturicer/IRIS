@@ -356,3 +356,85 @@ def test_a_single_letter_word_in_the_same_size_is_left_alone():
     a = {"text": "A", "x0": 72, "x1": 80, "top": 100, "bottom": 110, "size": 10.0}
     word = {"text": "STUDY", "x0": 81, "x1": 120, "top": 100, "bottom": 110, "size": 10.0}
     assert [w["text"] for w in reader._join_small_caps([a, word])] == ["A", "STUDY"]
+
+
+# --- paragraphs and lists, found on a single-column student paper (sample 6) ---
+
+def _paragraphs(reading):
+    """Each paragraph's text, joined, in order."""
+    out = {}
+    for s in reading["sections"]:
+        for p in s["passages"]:
+            out.setdefault(p["paragraph"], []).append(p["text"])
+    return [" ".join(v) for v in out.values()]
+
+
+LONG = "words that run all the way across the line to its right edge here"
+
+
+def test_each_list_item_is_its_own_passage_with_its_hanging_lines(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    reading = read(placed([[
+        (72, BOLD, 12, "Limitations"),
+        (108, BODY, 11, "The study has several limitations, listed here:"),
+        (90, BODY, 11, "●"), (108, BODY, 11, "The sample was small and " + LONG),
+        (108, BODY, 11, "and so it may not generalize."),
+        (90, BODY, 11, "●"), (108, BODY, 11, "Only some factors were studied."),
+    ]]))
+    paragraphs = _paragraphs(reading)
+    assert any(p.endswith("and so it may not generalize.") and "sample was small" in p for p in paragraphs)
+    assert any(p.endswith("Only some factors were studied.") and "sample" not in p for p in paragraphs)
+
+
+def test_headings_and_body_at_different_margins_keep_paragraphs_whole(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    reading = read(placed([[
+        (72, BOLD, 12, "3.1 Revision to Sampling"),
+        (144, BODY, 11, "Initially, the study planned to employ random"),
+        (108, BODY, 11, "sampling across the population. However, it changed"),
+        (108, BODY, 11, "near the end of the term."),
+        (144, BODY, 11, "The final study used convenience sampling."),
+    ]]))
+    assert _paragraphs(reading) == [
+        "Initially, the study planned to employ random sampling across the population. "
+        "However, it changed near the end of the term.",
+        "The final study used convenience sampling.",
+    ]
+
+
+def test_a_reference_with_a_hanging_indent_is_one_paragraph(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    reading = read(placed([[
+        (72, BOLD, 12, "References"),
+        (72, BODY, 11, "Cruz, J. (2020). A study of " + LONG),
+        (90, BODY, 11, "Journal of Cebu Studies, 3(1), 1-9."),
+        (72, BODY, 11, "Lim, A. (2021). Another study of " + LONG),
+        (90, BODY, 11, "Philippine Review, 4(2), 10-20."),
+    ]]))
+    paragraphs = _paragraphs(reading)
+    assert len(paragraphs) == 2
+    assert paragraphs[0].startswith("Cruz") and paragraphs[0].endswith("3(1), 1-9.")
+
+
+def test_an_indented_paragraph_opening_a_page_is_not_glued_to_the_last(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    first = [(72, BOLD, 12, "Findings"), (108, BODY, 11, "The first paragraph opens here and"),
+             (72, BODY, 11, "ends on this page.")]
+    # A page set mostly at the indent, as a list-heavy page is.
+    second = [(108, BODY, 11, "The second paragraph opens the page"), (72, BODY, 11, "and ends here."),
+              (108, BODY, 11, "A third one, indented."), (108, BODY, 11, "A fourth one, indented.")]
+    paragraphs = _paragraphs(read(placed([first, second])))
+    assert paragraphs[:2] == ["The first paragraph opens here and ends on this page.",
+                              "The second paragraph opens the page and ends here."]
+
+
+def test_a_bold_word_in_mid_sentence_alone_on_its_line_is_not_a_heading(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    reading = read(placed([[(72, BOLD, 12, "Consent"), (72, BODY, 11, "Participation is"),
+                            (72, BOLD, 11, "completely"), (72, BODY, 11, "voluntary.")]]))
+    assert [s["heading"] for s in reading["sections"]] == ["Consent"]

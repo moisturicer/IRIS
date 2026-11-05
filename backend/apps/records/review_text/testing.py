@@ -196,3 +196,19 @@ def headings(lines) -> bytes:
     c.showPage()
     c.save()
     return out.getvalue()
+
+
+def placed(pages, size=letter) -> bytes:
+    """Pages of ``(x, font, size, text)`` lines, 16 pt apart, at exact
+    positions, for paragraph and list rules."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    for lines in pages:
+        y = size[1] - 100
+        for x, font, font_size, text in lines:
+            c.setFont(font, font_size)
+            c.drawString(x, y, text)
+            y -= 16
+        c.showPage()
+    c.save()
+    return out.getvalue()
