@@ -117,6 +117,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-382** | Groq dialect: the vendor's request shape behind the adapter, with citation-marker normalisation — no FR- id; part H of IR-375's spec, and … | [details](traceability/IR-382.md) | **IMPLEMENTED** |
 | **IR-852** | Figures are described for retrieval only, never shown to readers — no FR- id; part of IR-848 (ADR-056 §10) | [details](traceability/IR-852.md) | **IMPLEMENTED** |
 | **IR-647** | The API enforces the configured password policy — no FR- id; subtask 4 of IR-644 (account-security findings, 2026-10-30) | [details](traceability/IR-647.md) | **VERIFIED** |
+| **IR-829** | The ASVS items marked "Needs manual check" are run: 16 of 21 have a result, every fail ticketed (IR-923–IR-926, IR-928); four wait for IR-806's server and one for the DPO — no FR- id; from IR-617, covers NFR-S1…S6 | [details](traceability/IR-829.md) | **PARTIAL** |
 | **IR-645** | A refused session's 401 says why it ended — no FR- id; subtask 1 of IR-644 (account-security findings, 2026-10-30), extends NFR-S2 (IR-166) | [details](traceability/IR-645.md) | **IMPLEMENTED** |
 | **FR-M5-01** | Hierarchical submission workflow | [details](traceability/FR-M5-01.md) | **VERIFIED** |
 | FR-M5-03 | Explicit document requests, distinct from resubmission | [details](traceability/FR-M5-03.md) | **IMPLEMENTED** |
