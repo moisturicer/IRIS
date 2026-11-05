@@ -68,10 +68,14 @@ ABBREVIATIONS = (
     "et al.", "e.g.", "i.e.", "Fig.", "Figs.", "No.", "Nos.", "vs.", "Dr.", "Mr.", "Ms.",
     "Mrs.", "Prof.", "Engr.", "St.", "Jr.", "Sr.", "pp.", "p.", "Vol.", "cf.", "Eq.",
 )
-NUMBERING = re.compile(r"^(chapter\s+([0-9]+|[ivxlc]+)\b[\s.:-]*|\d+(\.\d+)*\.?\s+)", re.I)
+#: A heading's numbering, dropped from its key so a renumbered section is the
+#: same section: "CHAPTER 2", "2.1", and roman "II." or lettered "A." too.
+NUMBERING = re.compile(
+    r"^(chapter\s+([0-9]+|[ivxlc]+)\b[\s.:-]*|\d+(\.\d+)*\.?\s+|[ivxlc]+\.\s+|[a-z]\.\s+)", re.I)
 CHAPTER = re.compile(r"chapter\s+([0-9]+|[IVXLC]+)\.?", re.I)
-MULTI_LEVEL = re.compile(r"^\d+(\.\d+)+\.?\s+\S")
-SINGLE_LEVEL = re.compile(r"^\d+\.?\s+(\S.*)$")
+# Section numbers run to two digits; a year or a DOI ("10.2190/...") is no numbering.
+MULTI_LEVEL = re.compile(r"^\d{1,2}(\.\d{1,2})+\.?\s+\S")
+SINGLE_LEVEL = re.compile(r"^\d{1,2}\.?\s+(\S.*)$")
 CAPTION = re.compile(r"^(table|figure|fig\.|plate|appendix)\s*[0-9A-Z]", re.I)
 DOT_LEADER = re.compile(r"(\.\s?){4,}|…{2,}")
 TRAILING_PAGE = re.compile(r"\s\d{1,3}$")
@@ -156,6 +160,25 @@ def read(path, max_pages: int | None = None) -> dict:
     }
 
 
+def _join_small_caps(words):
+    """Rejoin a small-capitals word split after its larger first letter, as
+    "I NTRODUCTION": a single capital, then capitals in a smaller size, less
+    than 3 pt apart or touching (pdfplumber splits a word where its size
+    changes), on the same line."""
+    out = []
+    for w in (w for line in _lines(words) for w in line):   # a smaller size sits lower
+        prev = out[-1] if out else None
+        if (prev and len(prev["text"]) == 1 and prev["text"].isupper()
+                and abs(prev["top"] - w["top"]) < 3 and -1 <= w["x0"] - prev["x1"] < 3
+                and w["text"][:1].isupper() and w["text"].replace("-", "").isalpha()
+                and w["text"].isupper() and float(prev.get("size") or 0) > float(w.get("size") or 0) + 0.5):
+            prev = dict(prev, text=prev["text"] + w["text"], x1=w["x1"], bottom=max(prev["bottom"], w["bottom"]))
+            out[-1] = prev
+            continue
+        out.append(w)
+    return out
+
+
 def _unmapped_share(sections) -> float:
     """The share of words the PDF gives no character for, as a font with no
     Unicode map does. pypdf reads the same marks: nothing can be recovered."""
@@ -170,7 +193,7 @@ def _read_page(page) -> dict:
     for w in words:
         w["text"] = _clean(w["text"])
         w["page"] = number
-    words = [w for w in words if w["text"].strip()]
+    words = _join_small_caps([w for w in words if w["text"].strip()])
     tables = page.find_tables()
     boxes = [t.bbox for t in tables]
 
@@ -290,10 +313,26 @@ def _stream(pages):
     return stream
 
 
+def _wordy(text) -> bool:
+    """Is ``text`` made of words, as a heading is? Not an identifier
+    ("ICCOINS.2016.7783277", "QUADCOPTER_CONTROL"), a DOI, a year range or a
+    bare number, which references and charts are full of: at least four
+    letters, no underscore or slash, and at least half its tokens words."""
+    tokens = NUMBERING.sub("", text).split()
+    if not tokens or any("_" in t or "/" in t for t in tokens):
+        return False
+    words = [t for t in tokens if sum(c.isalpha() for c in t) >= 2 and not any(c.isdigit() for c in t)]
+    return sum(c.isalpha() for c in text) >= 4 and len(words) * 2 >= len(tokens)
+
+
 def _is_heading(line):
     """Bold, or numbered, or in capitals, and shaped like a heading."""
     text = _line_text(line).strip()
     if not text or len(text) > 100 or text.endswith((".", ",", ";", ":", "?", "!")):
+        return False
+    if CHAPTER.fullmatch(text):
+        return True   # all numbering, which `_wordy` would strip to nothing
+    if not _wordy(text):
         return False
     if DOT_LEADER.search(text) or CAPTION.match(text):
         return False   # a table-of-contents line, or a caption

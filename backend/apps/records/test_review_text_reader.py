@@ -308,3 +308,51 @@ def test_a_chapter_opening_each_page_is_never_a_running_head(read):
              for n, title in enumerate(titles, start=1)]
     headings_found = [s["heading"] for s in read(pdf(pages, running_head=None))["sections"]]
     assert headings_found == [f"CHAPTER {n} {title}" for n, title in enumerate(titles, start=1)]
+
+
+# --- found on papers from other fields (samples 2-5, 2026-11-06) ---
+
+@pytest.mark.parametrize("line", [
+    "ICCOINS.2016.7783277", "10.2190/4YNU-4TMB-22DJ-AN4W", "QUADCOPTER_CONTROL_WITH_A_PHONE",
+    "2020-2021", "5", "JET",
+])
+def test_identifiers_years_and_numbers_are_never_headings(line):
+    assert reader._wordy(line) is False
+
+
+@pytest.mark.parametrize("line", [
+    "II. REVIEW OF RELATED LITERATURE", "S.Y. 2018-2019 Decision Tree Result", "2.1 Literature profiling",
+])
+def test_headings_with_some_numbers_are_still_headings(line):
+    assert reader._wordy(line) is True
+
+
+def test_a_year_or_doi_is_not_section_numbering():
+    assert not reader.SINGLE_LEVEL.match("2020 IEEE International Conference on Safety")
+    assert not reader.MULTI_LEVEL.match("10.2190 Journal of College Retention")
+    assert reader.MULTI_LEVEL.match("3.2 Synthesis results")
+
+
+@pytest.mark.parametrize("heading, key", [
+    ("II. REVIEW OF RELATED LITERATURE", "review of related literature"),
+    ("A. Decision Tree Result", "decision tree result"),
+    ("CHAPTER 2 METHODOLOGY", "methodology"),
+])
+def test_roman_and_lettered_numbering_leaves_the_key(heading, key):
+    passages = [{"text": "Text.", "page": 1, "paragraph": 1, "kind": "sentence", "regions": []}]
+    sections, _ = reader._finish([{"heading": heading, "page": 1, "passages": passages}],
+                                 [{"number": 1, "has_words": True}])
+    assert sections[0]["key"] == key
+
+
+def test_a_small_capitals_word_split_after_its_first_letter_is_rejoined():
+    first = {"text": "I", "x0": 132.1, "x1": 135.9, "top": 550.1, "bottom": 560.1, "size": 10.0}
+    rest = {"text": "NTRODUCTION", "x0": 135.8, "x1": 197.0, "top": 551.6, "bottom": 559.6, "size": 8.0}
+    other = {"text": "Next", "x0": 205.0, "x1": 230.0, "top": 550.1, "bottom": 560.1, "size": 10.0}
+    assert [w["text"] for w in reader._join_small_caps([first, rest, other])] == ["INTRODUCTION", "Next"]
+
+
+def test_a_single_letter_word_in_the_same_size_is_left_alone():
+    a = {"text": "A", "x0": 72, "x1": 80, "top": 100, "bottom": 110, "size": 10.0}
+    word = {"text": "STUDY", "x0": 81, "x1": 120, "top": 100, "bottom": 110, "size": 10.0}
+    assert [w["text"] for w in reader._join_small_caps([a, word])] == ["A", "STUDY"]
