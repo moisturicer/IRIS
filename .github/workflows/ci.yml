@@ -434,7 +434,9 @@ jobs:
       # SPA route, an asset, a 404 and the legacy activation path. A stand-in
       # index.html replaces the build; `backend` resolves to the runner so the
       # proxy locations load, and nothing here is proxied. `nginx -t` first, so
-      # a config error fails with nginx's own message.
+      # a config error fails with nginx's own message. No `ai-gateway` host on
+      # purpose (IR-892): nginx must start without the gateway, as the Core
+      # journeys stack runs it.
       - name: nginx sends the browser security headers
         run: |
           mkdir -p "$RUNNER_TEMP/html/assets"
@@ -447,8 +449,8 @@ jobs:
                   -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
                   -v $PWD/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro
                   -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"
-          docker run --rm --add-host backend:127.0.0.1 --add-host ai-gateway:127.0.0.1 $mounts "$image" nginx -t
-          docker run -d --name iris-nginx --add-host backend:127.0.0.1 --add-host ai-gateway:127.0.0.1 -p 8080:8080 $mounts "$image"
+          docker run --rm --add-host backend:127.0.0.1 $mounts "$image" nginx -t
+          docker run -d --name iris-nginx --add-host backend:127.0.0.1 -p 8080:8080 $mounts "$image"
           trap 'docker logs iris-nginx; docker rm -f iris-nginx' EXIT
           ready=
           for i in $(seq 1 20); do curl -s -o /dev/null localhost:8080/ && { ready=1; break; }; sleep 1; done
