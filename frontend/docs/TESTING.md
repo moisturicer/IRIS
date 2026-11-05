@@ -59,9 +59,11 @@ Mock at the boundary the code under test owns, and nothing nearer:
 
 CI's `frontend` job runs `vitest run --coverage` (v8 provider), writes totals to the job summary on every PR run and uploads the full HTML report as the `frontend-coverage` artifact.
 
-**There is no threshold.** The report is information only and cannot fail a build; do not add `coverage.thresholds` without a ticket the team has approved.
+**There is a floor, and it fails the build.** `coverage.thresholds` in `vitest.config.ts` is 80% for lines, statements and functions. A run under any of the three exits non-zero, so the `frontend` job fails on the `Test` step. Branches are reported with no floor.
 
-**Decision (2026-11-06, proposed on IR-912):** report only for now. The proposed floor, not enforced, is 80% for lines, statements and functions; branches are reported but not floored. At 2026-11-05 the suite measured lines 89.75%, statements 87.38%, branches 83.83%, functions 83.21%. Enforcing it is a separate ticket. Coverage measures lines executed, not behaviour asserted, so a number is not a substitute for the accessible-name tests above.
+**Source:** the team's decision on IR-912 (2026-11-06), enforced by IR-932. At 2026-11-05 the suite measured lines 89.75%, statements 87.38%, branches 83.83%, functions 83.21%.
+
+**A low run is fixed by a ticket, never by lowering the number.** If a PR drops under the floor, add the tests it needs, or open a ticket for the gap. Do not edit the thresholds to make a run pass, and do not rerun a red coverage job hoping it clears (see the flake policy below). Raising the floor is a ticket the team approves. Coverage measures lines executed, not behaviour asserted, so a number is not a substitute for the accessible-name tests above.
 
 ## Flaky-test policy
 
