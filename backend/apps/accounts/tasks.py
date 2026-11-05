@@ -20,18 +20,3 @@ def send_email_task(self, subject: str, message: str, recipient_list: list):
         )
     except Exception as exc:
         raise self.retry(exc=exc)
-
-
-@shared_task(bind=True, max_retries=3)
-def send_verification_email_task(self, user_id: int):
-    """
-    TODO: move send_verification_email() logic here so the registration
-    endpoint never blocks on email delivery.
-    """
-    pass
-
-
-@shared_task(bind=True, max_retries=3)
-def send_role_request_email_task(self, user_id: int, role_name: str):
-    """TODO: notify KTTO/RDCO by email when a new role request comes in."""
-    pass
