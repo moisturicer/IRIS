@@ -7,7 +7,7 @@ import { as, ok, signInBrowser, type Client } from "../support/api";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
 import { A11yLedger } from "../support/a11y";
 import { manage } from "../support/stack";
-import { acceptAndRoute, claimAndOpen, createDraft, party, reviewRow, submit, tracker } from "../support/workflow";
+import { claimAndOpen, createDraft, party, reviewRow, submit, throughRdco, tracker } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
 
@@ -24,7 +24,8 @@ test.beforeAll(async () => {
   recordId = await createDraft(student, { title, type: "Project", adviserId: adviser.userId, offices: { itso: true } });
   await submit(student, recordId);
   await claimAndOpen(adviser, recordId, "adviser");
-  await acceptAndRoute(adviser, recordId, [{ party: "itso" }], "Prior-art review (IR-631 coordination journey).");
+  // ADR-047: the Adviser sends to RDCO, and RDCO requests ITSO.
+  await throughRdco(adviser, rdco, recordId, [{ party: "itso" }], "Prior-art review (IR-631 coordination journey).");
   assignmentId = (await reviewRow(itsoCoord, recordId, "itso")).assignment!;
 });
 

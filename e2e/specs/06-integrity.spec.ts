@@ -8,19 +8,19 @@ import { as, type Client } from "../support/api";
 import { uniqueTitle } from "../support/accounts";
 import { manage } from "../support/stack";
 import {
-  acceptAndRoute, claimAndOpen, createDraft, party, requestRevision,
-  reviewRow, reviseAbstract, submit, tracker,
+  claimAndOpen, createDraft, party, requestRevision,
+  reviewRow, reviseAbstract, submit, throughRdco, tracker,
 } from "../support/workflow";
 
-let student: Client, adviser: Client, itso: Client, itsoCoord: Client, rdco: Client;
+let student: Client, adviser: Client, itso: Client, itsoCoord: Client, rdco: Client, admin: Client;
 
 test.beforeAll(async () => {
-  [student, adviser, itso, itsoCoord, rdco] = await Promise.all(
-    ["student", "adviser", "itso", "itsoCoordinator", "rdco"].map((w) => as(w)),
+  [student, adviser, itso, itsoCoord, rdco, admin] = await Promise.all(
+    ["student", "adviser", "itso", "itsoCoordinator", "rdco", "admin"].map((w) => as(w)),
   );
 });
 test.afterAll(async () => {
-  await Promise.all([student, adviser, itso, itsoCoord, rdco].map((c) => c?.dispose()));
+  await Promise.all([student, adviser, itso, itsoCoord, rdco, admin].map((c) => c?.dispose()));
 });
 
 async function timed<T>(label: string, run: () => Promise<T>): Promise<T> {
@@ -30,8 +30,9 @@ async function timed<T>(label: string, run: () => Promise<T>): Promise<T> {
   return out;
 }
 
+// The System Admin alone reads the Audit Log (IR-781).
 async function auditCount(recordId: number, eventType: string): Promise<number> {
-  const body = await rdco.json("/audit/", { record: recordId, event_type: eventType });
+  const body = await admin.json("/audit/", { record: recordId, event_type: eventType });
   return Array.isArray(body) ? body.length : body.count;
 }
 
@@ -52,8 +53,10 @@ test("simultaneous claims of one pool make one Seat per reviewer", async () => {
   const id = await createDraft(student, { title: uniqueTitle("claims"), type: "Project", adviserId: adviser.userId, offices: { itso: true } });
   await submit(student, id);
   await claimAndOpen(adviser, id, "adviser");
-  await acceptAndRoute(adviser, id, [{ party: "itso" }], "Integrity: concurrent claims.");
+  await throughRdco(adviser, rdco, id, [{ party: "itso" }], "Integrity: concurrent claims.");
   const pool = await reviewRow(itso, id, "itso");
+  // RDCO's own claim (ADR-047) is a SEAT_CLAIMED on this record too.
+  const claimedBefore = await auditCount(id, "SEAT_CLAIMED");
 
   const results = await timed("4x claim", () => Promise.all([
     itso.post(`/assignments/${pool.assignment}/claim/`),
@@ -66,7 +69,7 @@ test("simultaneous claims of one pool make one Seat per reviewer", async () => {
   const perReviewer = new Map<number, number>();
   for (const s of seats) perReviewer.set(s.reviewer, (perReviewer.get(s.reviewer) ?? 0) + 1);
   for (const [reviewer, n] of perReviewer) expect(n, `seats held by user ${reviewer}`).toBe(1);
-  expect(await auditCount(id, "SEAT_CLAIMED")).toBe(seats.length);
+  expect(await auditCount(id, "SEAT_CLAIMED") - claimedBefore, "one SEAT_CLAIMED per ITSO seat").toBe(seats.length);
 });
 
 test("a stale decision form is refused and changes nothing", async () => {
@@ -104,7 +107,7 @@ test("a retried reminder job sends each notification once", async () => {
   const id = await createDraft(student, { title, type: "Project", adviserId: adviser.userId, offices: { itso: true } });
   await submit(student, id);
   await claimAndOpen(adviser, id, "adviser");
-  await acceptAndRoute(adviser, id, [{ party: "itso" }], "Integrity: retried job.");
+  await throughRdco(adviser, rdco, id, [{ party: "itso" }], "Integrity: retried job.");
   manage("review_clock_for_testing", "--force", "--record", String(id), "--party", "itso", "--due-in-working-days", "-2");
 
   const mentions = async () => ((await itsoCoord.json("/notifications/")).results ?? (await itsoCoord.json("/notifications/")))

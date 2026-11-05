@@ -1,9 +1,10 @@
 // AC2 · Thesis/Project: the thesis contribution, end to end on one build.
 //
-// Adviser-first review, parallel office pools, claim and coordinator
-// assignment, a document request and its fulfilment, a Revision request from
-// one office, a new Version that resets only that office's Clearance while
-// the others are preserved, the Hand-back to RDCO and RDCO's Decision.
+// Adviser-first review, the Adviser's send to RDCO and RDCO's routing to
+// parallel office pools (ADR-047), claim and coordinator assignment, a
+// document request and its fulfilment, a Revision request from one office, a
+// new Version that resets only that office's Clearance while the others are
+// preserved, and RDCO's Decision once every office has finished.
 //
 // Workflow acts go through the API the review screens call; what a reader of
 // the record is shown about them is checked in the browser.
@@ -14,8 +15,8 @@ import { manuscriptPdf } from "../support/pdf";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
 import { A11yLedger } from "../support/a11y";
 import {
-  acceptAndRoute, claimAndOpen, clear, createDraft, decide, newVersion, party,
-  requestRevision, reviewRow, reviseAbstract, submit, tracker,
+  claimAndOpen, clear, createDraft, decide, newVersion, party,
+  requestRevision, reviewRow, reviseAbstract, route, sendToRdco, submit, tracker,
 } from "../support/workflow";
 
 test.describe.configure({ mode: "serial" });
@@ -75,16 +76,26 @@ test("the Adviser requests a document and the owner fulfils it", async () => {
   expect(party(t, "adviser").awaiting_document).toBe(false);
 });
 
-test("the Adviser accepts and routes to three offices in parallel pools", async () => {
-  await acceptAndRoute(adviser, recordId, [
+test("the Adviser sends to RDCO, and RDCO routes to three offices in parallel pools", async () => {
+  // ADR-047 §1-2: the Adviser's only accept is the send to RDCO, which opens no
+  // office. Only RDCO requests ITSO, IERC or KTTO.
+  await sendToRdco(adviser, recordId, "Ready for the offices (IR-631 journey).");
+  let t = await tracker(student, recordId);
+  expect(party(t, "adviser").state, "the Adviser's turn completes on the send").toBe("completed");
+  expect(party(t, "rdco").state, "RDCO's pool opens on the send").toBe("active");
+  for (const office of ["itso", "ierc", "ktto"]) expect(party(t, office).state, `${office} not yet requested`).not.toBe("active");
+
+  await claimAndOpen(rdco, recordId, "rdco");
+  await route(rdco, recordId, [
     { party: "itso" },                               // pool: a member claims it
-    { party: "ierc", nominee: ierc.userId },          // nominated reviewer
+    { party: "ierc", nominees: [ierc.userId] },      // nominated reviewer
     { party: "ktto" },                               // pool: the coordinator assigns it
   ], "Prior-art, ethics and commercialisation review (IR-631 journey).");
 
-  const t = await tracker(student, recordId);
+  t = await tracker(student, recordId);
   for (const office of ["itso", "ierc", "ktto"]) expect(party(t, office).state, office).toBe("active");
   expect(party(t, "itso").in_pool).toBe(true);
+  expect(party(t, "rdco").state, "routing keeps RDCO's own turn active").toBe("active");
 });
 
 test("a member claims from the pool and a coordinator assigns a seat", async () => {
@@ -128,12 +139,15 @@ test("a new Version resets only IERC; ITSO and KTTO are preserved", async ({ pag
   await a11y.reflow360(page, "paper-view-after-new-version");
 });
 
-test("IERC clears, the record is handed back to RDCO, and RDCO decides", async () => {
+test("IERC clears, RDCO still holds the record, and RDCO decides", async () => {
   await claimAndOpen(ierc, recordId, "ierc");
   await clear(ierc, recordId, "Consent form received.");
 
+  // ADR-047 §4: RDCO holds the record from the Adviser's send onward. An office
+  // finishing notifies RDCO and opens nothing, so there is no Hand-back.
   let t = await tracker(student, recordId);
-  expect(party(t, "rdco").state, "RDCO's pool opens on the Hand-back").toBe("active");
+  expect(party(t, "rdco").state, "RDCO's turn is still active").toBe("active");
+  for (const office of ["itso", "ierc", "ktto"]) expect(party(t, office).outcome, office).toBe("cleared");
 
   await claimAndOpen(rdco, recordId, "rdco");
   await decide(rdco, recordId, "publish");
