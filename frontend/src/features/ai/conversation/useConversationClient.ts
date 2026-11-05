@@ -59,6 +59,11 @@ const EMPTY_THREAD: Thread = { messages: [], draft: "", selectedId: null, record
 export interface SendOptions {
   /** Paper Chat's "All papers": search past the Conversation's own Record (IR-298). */
   widen?: boolean;
+  /**
+   * The Conversation to ask in, when it is not the one on screen: Paper Chat
+   * started it for a paper the reader has since moved away from.
+   */
+  conversationId?: number;
 }
 
 export interface ConversationClientEvents {
@@ -286,8 +291,8 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
 
   /** Asks `question` in the Conversation on screen, unless it is still answering. */
   const send = useCallback(
-    (question: string, { widen }: SendOptions = {}) => {
-      const id = activeRef.current;
+    (question: string, { widen, conversationId }: SendOptions = {}) => {
+      const id = conversationId ?? activeRef.current;
       if (id === null || flights.current.has(id)) return;
       const thread = threads[id] ?? EMPTY_THREAD;
       const records = thread.comparisonRecords;

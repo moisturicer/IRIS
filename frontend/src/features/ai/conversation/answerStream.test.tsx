@@ -6,7 +6,7 @@
  * `{event, data}` shape `readSSE` produces -- the seam `streamAnswer` is
  * handed, so a test here does not need a real fetch or a real SSE body.
  *
- * It was `useAskStream.test.tsx`, which drove `streamAnswer` through Paper
+ * It was `useOneAnswer.test.tsx`, which drove `streamAnswer` through Paper
  * Chat's own hook. IR-571 deleted that hook; the harness below is the part of
  * it a test needs -- one answer's state and its signal -- so the event handling
  * keeps every assertion it had. What the hook added on top (`cancel`, `detach`)
@@ -33,7 +33,7 @@ vi.mock("@/api/ai", () => ({
 }));
 
 /** One followed answer at a time: its live state and the signal that detaches it. */
-function useAskStream() {
+function useOneAnswer() {
   const [streaming, setStreaming] = useState<StreamingState | null>(null);
   const controller = useRef<AbortController | null>(null);
   const drive = useCallback((
@@ -61,7 +61,7 @@ it("keeps the checked comparison on the finished answer and forwards explicit pa
   const comparison = { records: [{ record_id: 7, title: "Flood Prediction" }], rows: [],
     coverage: [{ record_id: 7, state: "read_fully" }], removed_claims: 0 };
   askStream.mockReturnValue(eventsOf({ event: "done", data: { answer: "Compared papers.", comparison } }));
-  const { result } = renderHook(() => useAskStream());
+  const { result } = renderHook(() => useOneAnswer());
   const outcome = await act(() => result.current.ask("Compare", { comparisonRecordIds: [7, 9] }));
   expect(outcome.message.comparison).toEqual(comparison);
   expect(askStream).toHaveBeenCalledWith("Compare", { comparisonRecordIds: [7, 9] }, expect.any(AbortSignal));
@@ -91,7 +91,7 @@ describe("a complete stream", () => {
       })(),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     let pending!: Promise<unknown>;
     act(() => {
@@ -126,7 +126,7 @@ describe("a complete stream", () => {
       ),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("anything"));
 
@@ -158,7 +158,7 @@ describe("activity and the reasoning summary (IR-596)", () => {
         yield finished();
       })(),
     );
-    const { result } = renderHook(() => { const hook = useAskStream(); seen.push(hook.streaming); return hook; });
+    const { result } = renderHook(() => { const hook = useOneAnswer(); seen.push(hook.streaming); return hook; });
     let pending!: Promise<unknown>;
     act(() => { pending = result.current.ask("q"); });
     await waitFor(() => expect(result.current.streaming?.activity).toBe("thinking"));
@@ -171,7 +171,7 @@ describe("activity and the reasoning summary (IR-596)", () => {
 
   it("puts a non-empty reasoning summary on the finished message", async () => {
     askStream.mockReturnValue(eventsOf(finished({ reasoning_summary: "  The papers differ in setting.  " })));
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("q"));
 
@@ -180,7 +180,7 @@ describe("activity and the reasoning summary (IR-596)", () => {
 
   it.each([undefined, "", "   ", null])("carries no summary when the server sends %j", async (summary) => {
     askStream.mockReturnValue(eventsOf(finished(summary === undefined ? {} : { reasoning_summary: summary })));
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("q"));
 
@@ -194,7 +194,7 @@ describe("activity and the reasoning summary (IR-596)", () => {
       { event: "agent_step", data: { position: 0, tool: "search_passages", status: "running" } },
       finished({ reasoning: "secret working", routing: { lane: "listing" } }),
     ));
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("q"));
 
@@ -211,7 +211,7 @@ describe("activity and the reasoning summary (IR-596)", () => {
       { event: "text_delta", id: "1", data: { text: "stale " } },
       { event: "run_failed", id: "3", data: { run_id: "r-1", state: "failed" } },
     ));
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
 
@@ -232,7 +232,7 @@ describe("activity and the reasoning summary (IR-596)", () => {
     );
     resumeAskRun.mockReturnValueOnce(eventsOf(...batch("2", "Rainfall "), ...batch("3", "gauges.")));
     resumeAskRun.mockImplementation(() => eventsOf());
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
 
@@ -254,7 +254,7 @@ describe("activity and the reasoning summary (IR-596)", () => {
       { event: "done", id: "4", data: { answer: null, message: null, turn_id: 5, conversation_id: 9, mode: "generative" } },
       { event: "done", id: "4", data: { answer: null, message: null, turn_id: 5, conversation_id: 9, mode: "generative" } },
     ));
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
 
@@ -275,7 +275,7 @@ describe("an interrupted stream (IR-328)", () => {
       })(),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("What predicts flooding?", { conversationId: 4 }));
 
@@ -292,7 +292,7 @@ describe("an interrupted stream (IR-328)", () => {
       ),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("anything"));
 
@@ -308,7 +308,7 @@ describe("an interrupted stream (IR-328)", () => {
       })(),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     const outcome = await act(() => result.current.ask("anything"));
 
@@ -328,7 +328,7 @@ describe("a request that never starts streaming", () => {
       })(),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
 
     await expect(act(() => result.current.ask(""))).rejects.toThrow("question is required.");
     expect(result.current.streaming).toBeNull();
@@ -338,7 +338,7 @@ describe("a request that never starts streaming", () => {
 it("carries terminal listing rows into the answer and sends no lane override", async () => {
   const listing = { completeness: "matches_found", wording: "Matches found", records: [{ record_id: 7, title: "Flood Prediction" }] };
   askStream.mockReturnValue(eventsOf({ event: "done", data: { answer: "Found papers", turn_id: 5, listing } }));
-  const { result } = renderHook(() => useAskStream());
+  const { result } = renderHook(() => useOneAnswer());
   const outcome = await act(() => result.current.ask("Find flooding papers", { conversationId: 9 }));
   expect(outcome.message.listing).toEqual(listing);
   expect(outcome.message.question).toBe("Find flooding papers");
@@ -359,7 +359,7 @@ describe("unknown events", () => {
         },
       ),
     );
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     const outcome = await act(() => result.current.ask("q"));
     expect(outcome.message.content).toBe("Fine.");
     expect(outcome.message.partial).toBeUndefined();
@@ -398,7 +398,7 @@ describe("a listing's candidates (IR-546)", () => {
           listing } };
       })(),
     );
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     let pending!: Promise<unknown>;
     act(() => { pending = result.current.ask("Which papers are about flooding?"); });
 
@@ -426,7 +426,7 @@ describe("a listing's candidates (IR-546)", () => {
         yield { event: "run_failed", id: "4", data: { run_id: "r-9", state: "failed" } };
       })(),
     );
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     let pending!: Promise<unknown>;
     act(() => { pending = result.current.ask("q"); });
     await waitFor(() => expect(result.current.streaming?.candidates).toBeUndefined());
@@ -460,7 +460,7 @@ describe("a queued run (IR-544)", () => {
       ),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     const outcome = await act(() => result.current.ask("What predicts flooding?", { conversationId: 9 }));
 
     expect(resumeAskRun).toHaveBeenCalledWith("r-1", 2, expect.any(AbortSignal));
@@ -487,7 +487,7 @@ describe("a queued run (IR-544)", () => {
       })(),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     let pending!: Promise<unknown>;
     act(() => { pending = result.current.ask("q", { conversationId: 9 }); });
 
@@ -508,7 +508,7 @@ describe("a queued run (IR-544)", () => {
       ),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
 
     expect(outcome.message.content).toMatch(/ran out of time/);
@@ -520,7 +520,7 @@ describe("a queued run (IR-544)", () => {
     askStream.mockReturnValue(eventsOf({ event: "run_queued", id: "1", data: { run_id: "r-4" } }));
     resumeAskRun.mockImplementation(() => eventsOf());
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     const outcome = await act(() => result.current.ask("q", { conversationId: 9 }));
 
     expect(resumeAskRun).toHaveBeenCalledTimes(3);
@@ -530,7 +530,7 @@ describe("a queued run (IR-544)", () => {
   it("ignores an event name it does not know", async () => {
     askStream.mockReturnValue(eventsOf({ event: "something_new", data: { x: 1 } }, done));
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     const outcome = await act(() => result.current.ask("q"));
 
     expect(outcome.message.content).toBe("Rainfall gauges feed the model.");
@@ -556,7 +556,7 @@ describe("an owned run, opened, cancelled and retried (IR-548)", () => {
       ),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     const outcome = await act(() => result.current.follow("r-7", "What predicts flooding?"));
 
     expect(resumeAskRun).toHaveBeenCalledWith("r-7", 0, expect.any(AbortSignal));
@@ -576,7 +576,7 @@ describe("an owned run, opened, cancelled and retried (IR-548)", () => {
       })(),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     let pending!: Promise<{ message: { content: string; partial?: boolean; endedRun?: unknown } }>;
     act(() => { pending = result.current.ask("q", { conversationId: 9 }); });
 
@@ -597,7 +597,7 @@ describe("an owned run, opened, cancelled and retried (IR-548)", () => {
       })(),
     );
 
-    const { result } = renderHook(() => useAskStream());
+    const { result } = renderHook(() => useOneAnswer());
     let pending!: Promise<unknown>;
     act(() => { pending = result.current.ask("q", { conversationId: 9 }); });
     await waitFor(() => expect(result.current.streaming?.runId).toBe("r-9"));

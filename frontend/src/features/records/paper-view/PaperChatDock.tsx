@@ -239,10 +239,11 @@ function LegacyPaperChatPanel({
   const setInput = onDraftChange ?? setOwnInput;
   const [widen, setWiden] = useState(false);
   const [ready, setReady] = useState(false);
-  // Held from Send until the Conversation exists and the client has the
-  // question: a second Send in that gap would start a second Conversation.
-  const [starting, setStarting] = useState(false);
-  const sending = useRef(false);
+  // The paper whose Conversation a first question is starting, from Send until
+  // the client has the question: a second Send for it in that gap would start
+  // a second Conversation. Another paper is free meanwhile.
+  const [startingFor, setStartingFor] = useState<number | null>(null);
+  const starting = useRef<number | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const transcriptScrollTop = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -254,9 +255,13 @@ function LegacyPaperChatPanel({
       client.note(id, newChatMessage("assistant", errorDetail(error, "IRIS could not answer right now."))),
   });
   const { messages, streaming, isAnswering } = client;
-  const busy = isAnswering || starting;
   const [subject, setSubject] = useState<ChatSubject>(() => subjectOf(record));
   const pinned = subject.id !== record.id;
+  const busy = isAnswering || startingFor === subject.id;
+  // Read after the Conversation is created: the reader may have moved to
+  // another paper meanwhile, and the question belongs to the one it was asked in.
+  const subjectId = useRef(subject.id);
+  subjectId.current = subject.id;
   /** The Conversation on screen, once there is one; its citations name it (IR-578). */
   const conversationId = client.activeId;
   /** The Turn to show once the transcript has it (IR-578). */
@@ -361,27 +366,31 @@ function LegacyPaperChatPanel({
 
   const send = async () => {
     const question = input.trim();
-    if (!question || busy || !ready || sending.current) return;
-    sending.current = true;
+    if (!question || busy || !ready || starting.current === subject.id) return;
+    const askedAbout = subject.id;
+    starting.current = askedAbout;
     setInput("");
-    setStarting(true);
+    setStartingFor(askedAbout);
     try {
-      // The first question starts the paper's Conversation, or finds the one
-      // another tab already started (IR-561, IR-569).
-      if (client.activeId === null) {
-        const { data } = await aiApi.conversations.create({ record: subject.id, reuse_default: true });
-        client.show(data);
+      let target = client.activeId ?? subject.conversationId;
+      if (target === undefined || target === null) {
+        // The first question starts the paper's Conversation, or finds the one
+        // another tab already started (IR-561, IR-569).
+        const { data } = await aiApi.conversations.create({ record: askedAbout, reuse_default: true });
+        target = data.id;
+        // Shown only if its paper is still the one on screen (IR-355); asked
+        // in either way, and the answer stays with it.
+        if (subjectId.current === askedAbout) client.show(data);
       }
       // Not awaited: the answer is the client's to follow, and the reader may
       // ask about another paper while it comes.
-      void client.send(question, { widen });
+      void client.send(question, { widen, conversationId: target });
     } catch (error) {
-      // No Conversation to hold the failure: say so where the reader looks.
       setInput(question);
       addToast({ type: "error", message: errorDetail(error, "IRIS could not answer right now.") });
     } finally {
-      sending.current = false;
-      setStarting(false);
+      if (starting.current === askedAbout) starting.current = null;
+      setStartingFor((now) => (now === askedAbout ? null : now));
     }
   };
 

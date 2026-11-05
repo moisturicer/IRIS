@@ -538,6 +538,43 @@ describe("Paper Chat on the shared Conversation client (IR-571)", () => {
     expect(await screen.findByText("Answer about the first paper.")).toBeInTheDocument();
   });
 
+  it("asks a first question in the paper it was typed for, even if the reader moves on while it starts", async () => {
+    let created: (value: unknown) => void = () => {};
+    findForRecord.mockImplementation(async (id: number) =>
+      id === record.id ? null : conversation({ id: 50, record: other.id, record_title: other.title }));
+    create.mockImplementation(() => new Promise((resolve) => { created = resolve; }));
+    askStream.mockImplementation(() => doneStreamOf({ answer: "Answer about the first paper." }));
+    renderScreen(<Moving />);
+
+    await ask("What datasets were used?");
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ record: record.id, reuse_default: true }));
+    await userEvent.click(screen.getByRole("button", { name: "go to other paper" }));
+    await waitFor(() => expect(findForRecord).toHaveBeenCalledWith(other.id));
+    // The other paper's composer is not held by the first paper's start.
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /ask about this paper/i })).toBeEnabled());
+
+    created({ data: conversation({ id: 43 }) });
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    expect(askStream.mock.calls[0][1]).toMatchObject({ conversationId: 43 });
+    expect(screen.queryByText("Answer about the first paper.")).toBeNull();
+    expect(screen.queryByText("What datasets were used?")).toBeNull();
+  });
+
+  it("asks in a citation's own Conversation when it could not be reloaded, never in the paper's default", async () => {
+    // The return address finds it once, which pins the panel to it; loading it
+    // again for the panel then fails.
+    get.mockResolvedValueOnce({ data: conversation({ id: 77 }) }).mockRejectedValue(new Error("down"));
+    findForRecord.mockResolvedValue(null);
+    renderScreen(<PaperChatPanel record={record} onClose={noop} returnTo={{ conversationId: 77, turnId: 5, key: 1 }} />);
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+
+    await ask("What datasets were used?");
+
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    expect(askStream.mock.calls[0][1]).toMatchObject({ conversationId: 77 });
+    expect(create).not.toHaveBeenCalled();
+  });
+
   it("offers Stop for a queued run, and shows a confirmed stop as the reader's own, not a cut-off", async () => {
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => { release = resolve; });

@@ -63,7 +63,8 @@ export const ENDED_RUN_TEXT: Record<EndedRunState, string> = {
 
 /**
  * Raised when the caller aborted its signal and stopped following -- the
- * client's `forget`, a superseding request, or the page going away. The run itself carries on
+ * client's `forget`, a superseding request, or the page going away. The run
+ * itself carries on
  * server-side.
  */
 export class StreamDetached extends Error {
