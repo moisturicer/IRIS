@@ -561,6 +561,7 @@ TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "audit": {
         "audit-list": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
         "audit-export": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
+        "audit-event-types": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
     },
     "opportunities": OPPORTUNITIES,
     "library": LIBRARY,
