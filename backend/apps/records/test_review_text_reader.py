@@ -183,3 +183,60 @@ def test_a_heading_past_the_column_width_keeps_its_repeat_suffix():
     sections, _ = reader._finish([dict(long), dict(long)], [{"number": 1, "has_words": True}])
     assert [len(s["key"]) <= 255 for s in sections] == [True, True]
     assert sections[0]["key"] != sections[1]["key"] and sections[1]["key"].endswith("#2")
+
+
+# --- found on the first real paper (a two-column journal article, 2026-11-06) ---
+
+def test_a_footer_across_both_columns_is_dropped_however_low_it_sits(read):
+    from apps.records.review_text.testing import journal
+
+    body = " ".join(texts(read(journal())))
+    assert "JOURNAL" not in body and "Volume 7" not in body
+
+
+def test_a_title_across_the_page_does_not_stop_two_columns_being_split(read):
+    from apps.records.review_text.testing import journal
+
+    reading = read(journal(pages=1))
+    body = " ".join(texts(reading))
+    assert body.index("P1L2 line 4") < body.index("P1R0 line 0")
+
+
+def test_paragraphs_in_a_right_hand_column_are_paragraphs_not_lines(read):
+    from apps.records.review_text.testing import journal
+
+    passages = [p for s in read(journal(pages=1))["sections"] for p in s["passages"]]
+    right = [p for p in passages if p["text"].startswith("P1R")]
+    # Five lines a paragraph, five sentences: one paragraph number each, three in all.
+    assert len({p["paragraph"] for p in right}) == 3
+
+
+def test_a_heading_wraps_only_in_its_own_font_and_size(read):
+    from apps.records.review_text.testing import BOLD, headings
+
+    reading = read(headings([(BOLD, 12, "Materials and Methods"), ("Times-BoldItalic", 11, "Review Design")]))
+    assert [s["heading"] for s in reading["sections"]] == ["Materials and Methods", "Review Design"]
+
+
+def test_a_hyphen_at_a_heading_line_end_is_rejoined(read):
+    from apps.records.review_text.testing import BOLD, headings
+
+    reading = read(headings([(BOLD, 11, "Conceptual Foundations of Accom-"), (BOLD, 11, "modation")]))
+    assert reading["sections"][0]["heading"] == "Conceptual Foundations of Accommodation"
+
+
+def test_a_few_stray_mid_line_hyphens_do_not_decide_every_break():
+    from collections import Counter
+
+    known = Counter({"ad-justment": 2, "adjustment": 9, "small-scale": 3})
+    assert reader._keeps_hyphen("ad", "justment", known) is False
+    assert reader._keeps_hyphen("small", "scale", known) is True
+    assert reader._keeps_hyphen("govern", "ment", Counter()) is False
+
+
+def test_a_chapter_opening_each_page_is_never_a_running_head(read):
+    titles = ["INTRODUCTION", "METHODOLOGY", "RESULTS", "CONCLUSION"]
+    pages = [[("plain", f"CHAPTER {n}"), ("plain", title), ("para", [f"Text {n}."])]
+             for n, title in enumerate(titles, start=1)]
+    headings_found = [s["heading"] for s in read(pdf(pages, running_head=None))["sections"]]
+    assert headings_found == [f"CHAPTER {n} {title}" for n, title in enumerate(titles, start=1)]

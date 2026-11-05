@@ -38,10 +38,18 @@ RULES_VERSION = 1
 #: pdfplumber's default word gap (3 pt) is a 12 pt Times space, so a line that
 #: isn't justified came back as one word. Below a space's width (prototype finding 1).
 X_TOLERANCE = 1.5
-#: The top and bottom bands where running heads and page numbers live.
+#: The top and bottom bands a column split leaves whole.
 MARGIN_FRACTION = 0.08
+#: The top and bottom bands searched for running heads, footers and page
+#: numbers. Wider than the margin: a journal footer sat at 91.6% of the page.
+RUNNING_BAND = 0.12
 #: A section longer than this many pages may be two sections whose heading was missed.
 LONG_SECTION_PAGES = 15
+#: The fewest lines a two-column band can be.
+MIN_COLUMN_LINES = 5
+#: How far right of its column's left edge a line starts to be a first-line
+#: indent. A journal's 17 pt indent was missed at the prototype's 20.
+INDENT = 10
 FRONT_MATTER_KEY = "front-matter"
 
 SENTENCE_END = re.compile(r'(?<=[.!?])["”)]?\s+(?=[A-Z(“"])')
@@ -56,6 +64,7 @@ SINGLE_LEVEL = re.compile(r"^\d+\.?\s+(\S.*)$")
 CAPTION = re.compile(r"^(table|figure|fig\.|plate|appendix)\s*[0-9A-Z]", re.I)
 DOT_LEADER = re.compile(r"(\.\s?){4,}|…{2,}")
 TRAILING_PAGE = re.compile(r"\s\d{1,3}$")
+PAGE_NUMBER = re.compile(r"[-–—\s]*\d{1,4}[-–—\s]*")
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -107,6 +116,9 @@ def read(path, max_pages: int | None = None) -> dict:
                 raise OverBudget
             for page in pdf.pages:
                 pages.append(_read_page(page))
+            _drop_running(pages)
+            for p in pages:
+                p["columns"] = _columns(p.pop("words"), p["width"], p["height"], p["margin"])
     except (PDFPasswordIncorrect, PDFEncryptionError) as exc:
         raise Encrypted from exc
     except (OverBudget, MemoryError, RecursionError):
@@ -146,10 +158,38 @@ def _read_page(page) -> dict:
             text = _clean(" | ".join((c or "").replace("\n", " ") for c in cells)).strip(" |")
             if text:
                 rows.append({"text": text, "top": row.bbox[1], "bbox": row.bbox})
-    margin = height * MARGIN_FRACTION
-    columns = _columns([w for w in words if not inside(w)], width, height, margin)
-    return {"number": number, "width": width, "height": height, "margin": margin,
-            "columns": columns, "rows": rows, "has_words": bool(words)}
+    return {"number": number, "width": width, "height": height,
+            "margin": height * MARGIN_FRACTION, "words": [w for w in words if not inside(w)],
+            "rows": rows, "has_words": bool(words)}
+
+
+def _drop_running(pages):
+    """Drop running heads, footers and page numbers from every page.
+
+    A line in the top or bottom band, read across the page's whole width
+    before any column split (a footer can span both columns), that repeats on
+    most pages (at least three) once digits are ignored, or is a bare page
+    number. A "CHAPTER N" line is never one, though each chapter opens at
+    the top of a page.
+    """
+    def band_lines(p):
+        band = p["height"] * RUNNING_BAND
+        return [line for line in _lines(p["words"])
+                if line[0]["top"] < band or line[0]["top"] > p["height"] - band]
+
+    def signature(line):
+        return re.sub(r"\d+", "#", _line_text(line))
+
+    counts = Counter()
+    for p in pages:
+        counts.update({signature(line) for line in band_lines(p)})
+    repeated = {t for t, n in counts.items() if n >= max(3, len(pages) // 2)}
+    for p in pages:
+        drop = {id(w) for line in band_lines(p)
+                if not CHAPTER.fullmatch(_line_text(line).strip())
+                and (signature(line) in repeated or PAGE_NUMBER.fullmatch(_line_text(line)))
+                for w in line}
+        p["words"] = [w for w in p["words"] if id(w) not in drop]
 
 
 def _lines(words):
@@ -163,19 +203,45 @@ def _lines(words):
 
 
 def _columns(words, width, height, margin):
-    """Split a page into columns at a vertical gutter no body word crosses."""
+    """Split a page into columns at a vertical gutter.
+
+    A gutter is an x no body word crosses, except on lines that span the
+    page: any number above or below the columns, such as a journal's title
+    and authors over a two-column abstract, and at most 10% of the lines
+    between them, which must be at least `MIN_COLUMN_LINES` lines tall, so
+    two lines of prose that happen to share a gap are never columns. Spanning lines are read whole, with the left column; the
+    rest split at the gutter. With none, the page is one column.
+    """
     body = [w for w in words if margin < w["top"] < height - margin]
     if len(body) < 20:
         return [words]
-    for x in range(int(width * 0.3), int(width * 0.7)):
-        if all(not (w["x0"] - 2 < x < w["x1"] + 2) for w in body):
-            left = [w for w in body if w["x1"] <= x]
-            right = [w for w in body if w["x0"] >= x]
-            if len(left) > 10 and len(right) > 10:
-                in_body = lambda w: margin < w["top"] < height - margin  # noqa: E731
-                return [[w for w in words if w["x1"] <= x or not in_body(w)],
-                        [w for w in words if w["x0"] >= x and in_body(w)]]
-    return [words]
+    lines = _lines(body)
+    best = None
+    # 20-80%: a journal's narrow side column (article history, e-mail) sits
+    # outside a 30-70% search and was read into the abstract.
+    for x in range(int(width * 0.2), int(width * 0.8)):
+        crossing = [line for line in lines if any(w["x0"] - 2 < x < w["x1"] + 2 for w in line)]
+        span = {id(w) for line in crossing for w in line}
+        right_tops = [w["top"] for w in body if id(w) not in span and w["x0"] >= x]
+        if not right_tops:
+            continue
+        # Only spanning lines inside the columns' height interrupt them.
+        band = [line for line in lines if min(right_tops) <= line[0]["top"] <= max(right_tops)]
+        inside = sum(1 for line in crossing if min(right_tops) <= line[0]["top"] <= max(right_tops))
+        if (len(band) < MIN_COLUMN_LINES or inside > 0.1 * len(band)
+                or (best and inside >= best[0])):
+            continue
+        left = sum(1 for w in body if id(w) not in span and w["x1"] <= x)
+        if left > 10 and len(right_tops) > 10:
+            best = (inside, x, span)
+            if not inside:
+                break
+    if best is None:
+        return [words]
+    _, x, span = best
+    in_body = lambda w: margin < w["top"] < height - margin  # noqa: E731
+    return [[w for w in words if id(w) in span or not in_body(w) or w["x1"] <= x],
+            [w for w in words if id(w) not in span and in_body(w) and w["x0"] >= x]]
 
 
 def _line_text(line):
@@ -183,31 +249,17 @@ def _line_text(line):
 
 
 def _stream(pages):
-    """Every body line and table row in reading order, running heads dropped."""
-    # Running heads and page numbers: margin lines that repeat on most pages
-    # once digits are ignored, or a bare number in a margin.
-    margin_text = Counter()
-    for p in pages:
-        for col in p["columns"]:
-            for line in _lines(col):
-                if line[0]["top"] < p["margin"] or line[0]["top"] > p["height"] - p["margin"]:
-                    margin_text[re.sub(r"\d+", "#", _line_text(line))] += 1
-    repeated = {t for t, n in margin_text.items() if n >= max(2, len(pages) // 2)}
-
+    """Every body line and table row in reading order (running heads are
+    already gone, `_drop_running`)."""
     stream = []
     for p in pages:
         for ci, col in enumerate(p["columns"]):
-            items = []
-            for line in _lines(col):
-                text = _line_text(line)
-                top = line[0]["top"]
-                in_margin = top < p["margin"] or top > p["height"] - p["margin"]
-                if in_margin and (re.sub(r"\d+", "#", text) in repeated
-                                  or re.fullmatch(r"[-–—\s]*\d{1,4}[-–—\s]*", text)):
-                    continue
-                items.append(("line", p["number"], line, top))
+            lines = _lines(col)
+            # The column's own left edge, which a first-line indent is measured from.
+            left = Counter(round(line[0]["x0"]) for line in lines).most_common(1)[0][0] if lines else 0
+            items = [("line", p["number"], line, line[0]["top"], left) for line in lines]
             if ci == 0:
-                items += [("row", p["number"], r, r["top"]) for r in p["rows"]]
+                items += [("row", p["number"], r, r["top"], None) for r in p["rows"]]
             stream += sorted(items, key=lambda it: it[3])
     return stream
 
@@ -238,11 +290,45 @@ def _caps(text):
     return bool(letters) and all(c.isupper() for c in letters)
 
 
-def _continues(heading, line):
-    """Is ``line`` the second line of ``heading``, not a subheading under it?
-    A numbered line starts its own heading, and so does a change of case, as
+def _font(line):
+    return (line[0].get("fontname") or "", round(float(line[0].get("size") or 0), 1))
+
+
+def _continues(section, line):
+    """Is ``line`` the second line of ``section``'s heading, not a subheading
+    under it? Only in the same font and size: "Materials and Methods" (12 pt
+    bold) over "Review Design" (11 pt bold italic) is two headings. A numbered
+    line starts its own heading, and so does a change of case, as
     "INTRODUCTION" followed by "Background of the Study"."""
-    return not NUMBERING.match(line.strip()) and _caps(heading) == _caps(line)
+    text = _line_text(line)
+    return (section.get("font") == _font(line) and not NUMBERING.match(text.strip())
+            and _caps(section["heading"]) == _caps(text))
+
+
+def _word(text):
+    return re.sub(r"[^\w-]", "", text).lower()
+
+
+def _keeps_hyphen(head, tail, known):
+    """Is "head-" at a line end, followed by "tail", a compound's own hyphen?
+
+    Decided by how the paper itself spells the word elsewhere (prototype
+    finding 3), counting both spellings: "small-scale" seen whole, and
+    "smallscale" never, keeps it; "adjustment" seen more often than
+    "ad-justment" drops it. A handful of stray mid-line hyphens, as text pasted
+    from a PDF leaves, no longer decides every other break of the word.
+    """
+    if "-" in head or tail[:1].isupper():
+        return True
+    return known[_word(head + "-" + tail)] > known[_word(head + tail)]
+
+
+def _join_heading(heading, text, known):
+    """A wrapped heading's two lines, a line-end hyphen decided as in body text."""
+    if heading.endswith("-") and text[:1].islower():
+        head = heading[:-1].split()[-1]
+        return (heading if _keeps_hyphen(head, text.split()[0], known) else heading[:-1]) + text
+    return f"{heading} {text}"
 
 
 def _structure(pages):
@@ -251,18 +337,13 @@ def _structure(pages):
     tops = [it[3] for it in lines]
     gaps = Counter(round(b - a) for a, b in zip(tops, tops[1:]) if 0 < b - a < 40)
     line_gap = gaps.most_common(1)[0][0] if gaps else 14
-    body_x = Counter(round(it[2][0]["x0"]) for it in lines)
-    left_margins = sorted(x for x, n in body_x.items() if n >= 3)
-    # Every whole word on any page, to decide whether a line-end hyphen is a
-    # compound's own (prototype finding 3).
-    known = {re.sub(r"[^\w-]", "", w["text"]).lower() for it in lines for w in it[2]}
+    # How often the paper spells each word, to decide whether a line-end
+    # hyphen is a compound's own (`_keeps_hyphen`).
+    known = Counter(_word(w["text"]) for it in lines for w in it[2])
 
     sections = [{"heading": "", "page": 1, "passages": []}]
     para, paragraph = [], [0]
     last_top, pending_chapter, prev_heading = None, None, None
-
-    def margin_of(x):
-        return max([m for m in left_margins if m <= x + 1] or [x])
 
     def flush():
         if para:
@@ -280,7 +361,7 @@ def _structure(pages):
                 "regions": _normalize([(it[1], *row["bbox"])], pages),
             })
             continue
-        _, page, line, top = it
+        _, page, line, top, column_left = it
         text = _line_text(line)
         if _is_heading(line):
             flush()
@@ -291,11 +372,12 @@ def _structure(pages):
                 text, page = f"{pending_chapter[0]} {text}", pending_chapter[1]
                 pending_chapter = None
             elif (prev_heading and prev_heading[0] == page and top - prev_heading[1] < 30
-                  and not sections[-1]["passages"] and _continues(sections[-1]["heading"], text)):
-                sections[-1]["heading"] += " " + text   # a heading that wraps onto a second line
+                  and not sections[-1]["passages"] and _continues(sections[-1], line)):
+                # A heading that wraps onto a second line.
+                sections[-1]["heading"] = _join_heading(sections[-1]["heading"], text, known)
                 prev_heading = (page, top)
                 continue
-            sections.append({"heading": text, "page": page, "passages": []})
+            sections.append({"heading": text, "page": page, "passages": [], "font": _font(line)})
             prev_heading = (page, top)
             last_top = top
             continue
@@ -303,8 +385,10 @@ def _structure(pages):
             # "CHAPTER 2" with no title line after it is a heading on its own.
             sections.append({"heading": pending_chapter[0], "page": pending_chapter[1], "passages": []})
             pending_chapter = None
-        indented = line[0]["x0"] > margin_of(line[0]["x0"]) + 20 or (
-            line[0]["x0"] - min(left_margins or [line[0]["x0"]]) > 20)
+        # A first-line indent, from this column's own left edge: measured from
+        # the page's leftmost text, every line of a right-hand column read as
+        # indented and became a paragraph of its own.
+        indented = line[0]["x0"] > column_left + INDENT
         gap = bool(para) and last_top is not None and page == para[-1][1] and top - last_top > line_gap * 1.6
         if para and (indented or gap):
             flush()
@@ -360,8 +444,7 @@ def _sentences(para, known, paragraph, pages):
         nxt = para[i + 2] if i + 2 < len(para) and para[i + 1][0] == "\n" else None
         if t.endswith("-") and len(t) > 1 and nxt and nxt[0][:1].isalpha():
             head, tail = t[:-1], nxt[0]
-            compound = re.sub(r"[^\w-]", "", head + "-" + tail).lower()
-            if "-" in head or tail[:1].isupper() or compound in known:
+            if _keeps_hyphen(head, tail, known):
                 joined = head + "-" + tail       # a compound broken at its own hyphen
             else:
                 joined = head + tail             # a word hyphenated to fit the line

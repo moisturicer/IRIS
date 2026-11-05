@@ -148,3 +148,51 @@ def in_process_sandbox(source):
     outcome = sandbox.outcome_of(reading)
     outcome.sha256 = sha256
     return outcome
+
+
+def journal(pages=3, size=letter) -> bytes:
+    """A journal-style article, as the first real paper read with IR-871 was
+    laid out: a title across the page over two columns, 17 pt first-line
+    indents, and a footer across both columns at 91.6% of the page height,
+    inside the old 8% margin's reach but not its band."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    width, height = size
+    gutter = width / 2 + 10
+    for number in range(1, pages + 1):
+        y = height - 90
+        if number == 1:
+            c.setFont(BOLD, 14)
+            c.drawString(LEFT, y, "A Theory of Bounded Change Across Institutions and People")
+            y -= 30
+        c.setFont(BODY, 10)
+        for column_x in (LEFT, gutter):
+            line_y = y
+            for paragraph in range(3):
+                for i in range(5):
+                    indent = 17 if i == 0 else 0
+                    c.drawString(column_x + indent, line_y,
+                                 f"P{number}{'LR'[column_x > LEFT]}{paragraph} line {i} reads on here.")
+                    line_y -= 12
+        c.setFont(BODY, 8)
+        c.drawString(LEFT, height * (1 - 0.916), f"JOURNAL {4454 + number}")
+        c.drawString(gutter, height * (1 - 0.916), "Volume 7 | Number 10 | October | 2026")
+        c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def headings(lines) -> bytes:
+    """One page of ``(font, size, text)`` lines 13 pt apart, then a sentence."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=letter)
+    y = letter[1] - 120
+    for font, size, text in lines:
+        c.setFont(font, size)
+        c.drawString(LEFT, y, text)
+        y -= 13
+    c.setFont(BODY, 11)
+    c.drawString(LEFT, y - 10, "The body starts here.")
+    c.showPage()
+    c.save()
+    return out.getvalue()
