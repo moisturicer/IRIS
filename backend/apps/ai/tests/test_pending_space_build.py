@@ -318,14 +318,18 @@ class ReadersStayOnTheActiveSpaceTests:
         assert client.get("/api/v1/ai/status/").json() == before
 
     def test_only_the_build_and_indexing_modules_name_the_space_keyed_table(self):
-        """A reader of `RecordSpaceEmbedding` must name its space. Until IR-739
-        moves the readers, the table has exactly these callers."""
+        """A reader of `RecordSpaceEmbedding` must name its space. IR-739 moved
+        the readers onto it, through `record_vectors` (which takes the space) and
+        `similarity` (which seeds from it); activation counts it. Any other
+        module naming the table is a reader that has not shown it names a space,
+        and must be added here deliberately."""
         import ast
         from testing.source_files import python_sources
 
         apps_ai = pathlib.Path(__file__).resolve().parents[1]
         allowed = {"space_build.py", "indexing.py", "embedding.py", "__init__.py",
-                   "backfill.py", "check_vector_index.py"}
+                   "backfill.py", "check_vector_index.py",
+                   "record_vectors.py", "similarity.py", "space_activation.py"}
         named = []
         for path in python_sources(apps_ai):
             if "tests" in path.parts or "migrations" in path.parts:

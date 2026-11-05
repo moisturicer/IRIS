@@ -225,12 +225,26 @@ python manage.py mark_corpus_cleared --dry-run           # answer for test paper
                                    # corpus. Verified 2026-11-02 on that same copy, on papers loaded
                                    # for the check. THE 40 PROXY PAPERS ARE NOT MARKED: that database
                                    # doesn't hold them
-python manage.py promote_embedding_space --space N --check   # is this space ready to go live? (IR-282)
-                                   # IR-752 adds summary-vector and dimension coverage to the report; promote itself
-                                   # still checks passages only (IR-739). check_vector_index --space N checks a pending space
-                                   # Drop --check to promote. Refuses while any active chunk lacks a
-                                   # vector in that space and names the short records. Nothing
-                                   # promotes automatically
+python manage.py promote_embedding_space --space N --check   # is this space ready to go live? (IR-282, IR-739)
+                                   # --dry-run runs the full verification (exits non-zero if it would be
+                                   # refused); without either it verifies, then retires the active space and
+                                   # activates N in ONE transaction (Record and Passage vectors move together,
+                                   # no vector is written). Refuses, naming every reason: incomplete or stale
+                                   # summary/passage coverage, wrong width or metric, a query provider that
+                                   # does not name the space's model, a chunk set that is not the Record's
+                                   # current Manuscript revision, or a vector index that misses what an exact
+                                   # scan finds. Records the disclosure gate refuses are not owed a vector.
+                                   # --rollback returns to the space the last promotion replaced (same
+                                   # verification against today's corpus); --reopen-rollback-target makes a
+                                   # behind target pending so `backfill_embeddings --space N` can catch it up;
+                                   # --probe-user EMAIL searches before and after and checks every cited
+                                   # passage is a current one that user may read (stored vectors as queries,
+                                   # no vendor); --json, --actor, --skip-index-check. Nothing promotes
+                                   # automatically and this does not authorize a production upgrade.
+                                   # Verified 2026-11-05 on a copy of the dev database (21 Records, no chunks):
+                                   # --dry-run of the retired 1536-d space refused with three coded reasons;
+                                   # --rollback said there was no recorded previous revision.
+                                   # check_vector_index --space N checks a pending space
 python manage.py eval_pilot_milestone --set <labels.json> --tier proxy --base-url <url> --providers fake
                                    # IR-550: score the first fixed-workflow milestone (metadata
                                    # count, topic count, listing) against pinned labels, each

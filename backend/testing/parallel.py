@@ -27,6 +27,7 @@ ROLE_MODULES = frozenset({
     "test_ai_runtime_lifecycle_db.py",
     "test_ai_runtime_grant_renewal_db.py",
     "test_ir740_runtime_collection_db.py",
+    "test_ir739_runtime_record_vectors_db.py",
 })
 
 

@@ -32,7 +32,8 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from pgvector.django import CosineDistance
 
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.models.embedding import RecordSpaceEmbedding
+from apps.ai.record_vectors import active_space, record_vectors
 from apps.ai.retrieval.scan_depth import scan_depth
 from apps.records.models import Record
 from core.enums import PUBLICLY_VISIBLE_STATUSES, RecordTypeName
@@ -132,12 +133,18 @@ def verify_novelty_configuration() -> None:
         )
 
 
-def _seed(record: Record) -> Optional[RecordEmbedding]:
-    return RecordEmbedding.objects.filter(record=record).first()
+def _seed(record: Record) -> Optional[RecordSpaceEmbedding]:
+    """``record``'s summary vector under the active space (IR-739).
+
+    Its space is the seed's space: ``_nearest`` compares only against vectors
+    of that same space, so a promotion between the two reads cannot compare
+    across spaces.
+    """
+    return record_vectors(active_space()).filter(record=record).first()
 
 
 def _nearest(
-    seed: RecordEmbedding,
+    seed: RecordSpaceEmbedding,
     candidates,
     *,
     limit: int,
@@ -149,16 +156,15 @@ def _nearest(
     visibility predicate. The one query both related-works paths run, so a fix
     to it reaches both.
     """
-    # Only vectors written by the **same model** are comparable. `RecordEmbedding`
-    # records the model on the row rather than pointing at an `EmbeddingSpace`,
-    # so this is the scoping the chunk path gets from `space=space`. Without it,
-    # a half-finished re-index compares a `voyage-context-4` vector against
+    # Only vectors of the **same Embedding Space** are comparable (ADR-049 §23).
+    # The seed names its space, and the candidates are read from that space and
+    # no other -- the scoping the chunk path gets from `space=space`. Without
+    # it, a half-finished re-index compares one model's vector against
     # whatever preceded it and returns rankings that look ordinary and mean
-    # nothing — the failure mode the Embedding Space exists to prevent, arriving
-    # by a different door.
+    # nothing: the failure the Embedding Space exists to prevent.
     rows = (
-        RecordEmbedding.objects.filter(
-            record__in=candidates.values("pk"), model_name=seed.model_name
+        RecordSpaceEmbedding.objects.filter(
+            record__in=candidates.values("pk"), space_id=seed.space_id
         )
         .exclude(record_id=seed.record_id)
         .select_related("record", "record__classification")
