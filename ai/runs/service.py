@@ -216,7 +216,8 @@ class RunService:
             return
         try:
             tools = ResearchTools(self.store.dsn, claim.grant, run_id, claim.fence, claim.scope_record_id,
-                                  embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger)
+                                  embedding_provider=self.embedding_provider, embedding_ledger=self.embedding_ledger,
+                                  follow_stored_grant=True)
             # Every provider attempt inside is admitted against this run (IR-725).
             with admission.bound(admission.RunBinding(run_id, claim.fence)):
                 if compacting:
