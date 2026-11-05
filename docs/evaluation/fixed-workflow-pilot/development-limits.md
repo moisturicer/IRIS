@@ -2,6 +2,8 @@
 
 **Status: APPROVED for development only, by Jive Tyler I. Revalde, 2026-11-04.** An AI agent entered the values, the approver, the date and the signature on Jive Tyler I. Revalde's explicit instruction in chat. The decision is that person's, and the entry is not an independent signature or a code review. A later change needs its own approval by a named person.
 
+**AI-runtime model amendment, 2026-11-05 (IR-889): use `openai/gpt-6-luna:floor`, not the OSS model in the original tables below.** The original OSS price and question-count estimates are historical; do not copy them into a Luna deployment. The $30 campaign and other numeric caps remain. [The amendment](runtime-paid-research-approval.md) names the new model and its conditions. A Luna price/capacity declaration and bounded OpenRouter routing still have to be completed before paid sends.
+
 Authority: [ADR-041](../../adr/041-shared-provider-admission.md) (shared provider admission) and ADR-049 (AI-owned runs). Gates this record answers: [pilot README §6](README.md#6-pilot-metrics-and-gates-ac-7) — per-stage/per-run values, queue sizing and shared quotas. The proposed campaign in [§7](README.md#7-campaign-budget-and-deferred-scope-ac-8) is a starting point only.
 
 ## Scope
