@@ -65,7 +65,7 @@ export async function approveRole(fullName: string) {
 
 /** Register, verify and approve: a signed-in Client for a brand-new student. */
 /** Eight random lowercase letters: registration refuses a name with digits in it. */
-function letters(n = 8): string {
+export function letters(n = 8): string {
   return Array.from({ length: n }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join("");
 }
 
