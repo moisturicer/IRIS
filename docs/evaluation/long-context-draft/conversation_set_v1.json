@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "set_id": "long-context-ir753-draft-v1",
+  "set_id": "long-context-ir753-draft-v2",
   "label_status": "draft_unreviewed",
   "labelled_by": [],
   "families": [
@@ -15,13 +15,14 @@
   "min_family_cases": 10,
   "rubric_version": 1,
   "corpus": {
-    "snapshot_id": "ir753-synthetic-plan-v1",
-    "paper_set_sha256": "73996828c808224bcf5b29aee9a113d1d8eb61e36b7182f695107db768b0c14a",
-    "source_kind": "synthetic_planned",
-    "source": "sources.json",
+    "snapshot_id": "proxy-arxiv-40",
+    "paper_set_sha256": "6793dcadc793c1a3cdd831bc18b9091816e04d519e674e728e864aeef970c3d0",
+    "source_kind": "proxy",
+    "source": "docs/evaluation/proxy_starter.json (40 openly licensed arXiv papers)",
+    "note": "A proxy corpus, not CIT-U research. Nothing measured on it is a finding about CIT-U.",
     "ingested": false
   },
-  "partition_method": "Distinct synthetic source and theme per case; D01-D06 development, H07-H10 held out.",
+  "partition_method": "Reuses the 40-paper proxy split; six development and four held-out source titles, no source crosses splits.",
   "shared_allowed": [],
   "conversations": [
     {
@@ -29,594 +30,614 @@
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "development",
-      "topic": "coastal flood routing L01",
+      "topic": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
       "papers": [
-        "Synthetic Coastal Flood Routing Manuscript L01-01"
+        "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Coastal Flood Routing Manuscript L01-01, what does the coastal flood routing study conclude about its main constraint?",
+          "user": "In Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning, how do they make the generator produce the rare in-between arrangements instead of the common ones?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L01-01",
-              "page": 52,
-              "quote": "Constraint L01-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q04"
     },
     {
       "id": "L01-D02",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "development",
-      "topic": "campus energy demand L01",
+      "topic": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
       "papers": [
-        "Synthetic Campus Energy Demand Manuscript L01-02"
+        "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Campus Energy Demand Manuscript L01-02, what does the campus energy demand study conclude about its main constraint?",
+          "user": "In Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition, how does the smaller model learn where each word sits in the audio?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L01-02",
-              "page": 91,
-              "quote": "Constraint L01-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q06"
     },
     {
       "id": "L01-D03",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "development",
-      "topic": "soil moisture mapping L01",
+      "topic": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
       "papers": [
-        "Synthetic Soil Moisture Mapping Manuscript L01-03"
+        "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Soil Moisture Mapping Manuscript L01-03, what does the soil moisture mapping study conclude about its main constraint?",
+          "user": "In Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark, how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L01-03",
-              "page": 52,
-              "quote": "Constraint L01-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q07"
     },
     {
       "id": "L01-D04",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "development",
-      "topic": "urban heat shelters L01",
+      "topic": "State-Space-Based FIR Filtering on a Quantum Computer",
       "papers": [
-        "Synthetic Urban Heat Shelters Manuscript L01-04"
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Urban Heat Shelters Manuscript L01-04, what does the urban heat shelters study conclude about its main constraint?",
+          "user": "In State-Space-Based FIR Filtering on a Quantum Computer, where is the waveform actually held in their scheme?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L01-04",
-              "page": 91,
-              "quote": "Constraint L01-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q08"
     },
     {
       "id": "L01-D05",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "development",
-      "topic": "river sediment transport L01",
+      "topic": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
       "papers": [
-        "Synthetic River Sediment Transport Manuscript L01-05"
+        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic River Sediment Transport Manuscript L01-05, what does the river sediment transport study conclude about its main constraint?",
+          "user": "In TTM-Bench A Framework for Text-to-Music System Performance Benchmarking, how did they choose which text descriptions to keep for each track?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L01-05",
-              "page": 52,
-              "quote": "Constraint L01-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q09"
     },
     {
       "id": "L01-D06",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "development",
-      "topic": "crop disease screening L01",
+      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
       "papers": [
-        "Synthetic Crop Disease Screening Manuscript L01-06"
+        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Crop Disease Screening Manuscript L01-06, what does the crop disease screening study conclude about its main constraint?",
+          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how did the older approach get the emotion label back out of the model?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L01-06",
-              "page": 91,
-              "quote": "Constraint L01-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q10"
     },
     {
       "id": "L01-H07",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "held_out",
-      "topic": "emergency radio coverage L01",
+      "topic": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
       "papers": [
-        "Synthetic Emergency Radio Coverage Manuscript L01-07"
+        "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Emergency Radio Coverage Manuscript L01-07, what does the emergency radio coverage study conclude about its main constraint?",
+          "user": "In Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties, how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L01-07",
-              "page": 52,
-              "quote": "Constraint L01-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q01"
     },
     {
       "id": "L01-H08",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "held_out",
-      "topic": "bridge fatigue sensing L01",
+      "topic": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
       "papers": [
-        "Synthetic Bridge Fatigue Sensing Manuscript L01-08"
+        "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Bridge Fatigue Sensing Manuscript L01-08, what does the bridge fatigue sensing study conclude about its main constraint?",
+          "user": "In Online Adaptive Kernel Mixing for Gaussian Process Decision Making, how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L01-08",
-              "page": 91,
-              "quote": "Constraint L01-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q03"
     },
     {
       "id": "L01-H09",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "held_out",
-      "topic": "water quality sampling L01",
+      "topic": "Towards Active Cross-View Object Geo-Localization",
       "papers": [
-        "Synthetic Water Quality Sampling Manuscript L01-09"
+        "Towards Active Cross-View Object Geo-Localization"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Water Quality Sampling Manuscript L01-09, what does the water quality sampling study conclude about its main constraint?",
+          "user": "In Towards Active Cross-View Object Geo-Localization, with the next view not yet visible, how does the agent decide where to look?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L01-09",
-              "page": 52,
-              "quote": "Constraint L01-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q05"
     },
     {
       "id": "L01-H10",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "held_out",
-      "topic": "public transit reliability L01",
+      "topic": "Nested Parallel von Neumann Architecture and Nested BSP",
       "papers": [
-        "Synthetic Public Transit Reliability Manuscript L01-10"
+        "Nested Parallel von Neumann Architecture and Nested BSP"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Public Transit Reliability Manuscript L01-10, what does the public transit reliability study conclude about its main constraint?",
+          "user": "In Nested Parallel von Neumann Architecture and Nested BSP, why was reaching memory on another machine historically so slow?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L01-10",
-              "page": 91,
-              "quote": "Constraint L01-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "Read the selected 100-page Manuscript; state covered ranges and the page binding.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q16"
     },
     {
       "id": "L02-D01",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "development",
-      "topic": "coastal flood routing L02",
+      "topic": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
       "papers": [
-        "Synthetic Coastal Flood Routing Manuscript L02-01"
+        "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Coastal Flood Routing Manuscript L02-01 before answering: In Synthetic Coastal Flood Routing Manuscript L02-01, what does the coastal flood routing study conclude about its main constraint?",
+          "user": "Check the relevant sections of Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning before answering: how do they make the generator produce the rare in-between arrangements instead of the common ones?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L02-01",
-              "page": 52,
-              "quote": "Constraint L02-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q04"
     },
     {
       "id": "L02-D02",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "development",
-      "topic": "campus energy demand L02",
+      "topic": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
       "papers": [
-        "Synthetic Campus Energy Demand Manuscript L02-02"
+        "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Campus Energy Demand Manuscript L02-02 before answering: In Synthetic Campus Energy Demand Manuscript L02-02, what does the campus energy demand study conclude about its main constraint?",
+          "user": "Check the relevant sections of Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition before answering: how does the smaller model learn where each word sits in the audio?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L02-02",
-              "page": 91,
-              "quote": "Constraint L02-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q06"
     },
     {
       "id": "L02-D03",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "development",
-      "topic": "soil moisture mapping L02",
+      "topic": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
       "papers": [
-        "Synthetic Soil Moisture Mapping Manuscript L02-03"
+        "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Soil Moisture Mapping Manuscript L02-03 before answering: In Synthetic Soil Moisture Mapping Manuscript L02-03, what does the soil moisture mapping study conclude about its main constraint?",
+          "user": "Check the relevant sections of Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark before answering: how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L02-03",
-              "page": 52,
-              "quote": "Constraint L02-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q07"
     },
     {
       "id": "L02-D04",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "development",
-      "topic": "urban heat shelters L02",
+      "topic": "State-Space-Based FIR Filtering on a Quantum Computer",
       "papers": [
-        "Synthetic Urban Heat Shelters Manuscript L02-04"
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Urban Heat Shelters Manuscript L02-04 before answering: In Synthetic Urban Heat Shelters Manuscript L02-04, what does the urban heat shelters study conclude about its main constraint?",
+          "user": "Check the relevant sections of State-Space-Based FIR Filtering on a Quantum Computer before answering: where is the waveform actually held in their scheme?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L02-04",
-              "page": 91,
-              "quote": "Constraint L02-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q08"
     },
     {
       "id": "L02-D05",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "development",
-      "topic": "river sediment transport L02",
+      "topic": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
       "papers": [
-        "Synthetic River Sediment Transport Manuscript L02-05"
+        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic River Sediment Transport Manuscript L02-05 before answering: In Synthetic River Sediment Transport Manuscript L02-05, what does the river sediment transport study conclude about its main constraint?",
+          "user": "Check the relevant sections of TTM-Bench A Framework for Text-to-Music System Performance Benchmarking before answering: how did they choose which text descriptions to keep for each track?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L02-05",
-              "page": 52,
-              "quote": "Constraint L02-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q09"
     },
     {
       "id": "L02-D06",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "development",
-      "topic": "crop disease screening L02",
+      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
       "papers": [
-        "Synthetic Crop Disease Screening Manuscript L02-06"
+        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Crop Disease Screening Manuscript L02-06 before answering: In Synthetic Crop Disease Screening Manuscript L02-06, what does the crop disease screening study conclude about its main constraint?",
+          "user": "Check the relevant sections of Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition before answering: how did the older approach get the emotion label back out of the model?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L02-06",
-              "page": 91,
-              "quote": "Constraint L02-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q10"
     },
     {
       "id": "L02-H07",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "held_out",
-      "topic": "emergency radio coverage L02",
+      "topic": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
       "papers": [
-        "Synthetic Emergency Radio Coverage Manuscript L02-07"
+        "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Emergency Radio Coverage Manuscript L02-07 before answering: In Synthetic Emergency Radio Coverage Manuscript L02-07, what does the emergency radio coverage study conclude about its main constraint?",
+          "user": "Check the relevant sections of Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties before answering: how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L02-07",
-              "page": 52,
-              "quote": "Constraint L02-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q01"
     },
     {
       "id": "L02-H08",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "held_out",
-      "topic": "bridge fatigue sensing L02",
+      "topic": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
       "papers": [
-        "Synthetic Bridge Fatigue Sensing Manuscript L02-08"
+        "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Bridge Fatigue Sensing Manuscript L02-08 before answering: In Synthetic Bridge Fatigue Sensing Manuscript L02-08, what does the bridge fatigue sensing study conclude about its main constraint?",
+          "user": "Check the relevant sections of Online Adaptive Kernel Mixing for Gaussian Process Decision Making before answering: how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L02-08",
-              "page": 91,
-              "quote": "Constraint L02-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q03"
     },
     {
       "id": "L02-H09",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "held_out",
-      "topic": "water quality sampling L02",
+      "topic": "Towards Active Cross-View Object Geo-Localization",
       "papers": [
-        "Synthetic Water Quality Sampling Manuscript L02-09"
+        "Towards Active Cross-View Object Geo-Localization"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Water Quality Sampling Manuscript L02-09 before answering: In Synthetic Water Quality Sampling Manuscript L02-09, what does the water quality sampling study conclude about its main constraint?",
+          "user": "Check the relevant sections of Towards Active Cross-View Object Geo-Localization before answering: with the next view not yet visible, how does the agent decide where to look?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L02-09",
-              "page": 52,
-              "quote": "Constraint L02-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q05"
     },
     {
       "id": "L02-H10",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "held_out",
-      "topic": "public transit reliability L02",
+      "topic": "Nested Parallel von Neumann Architecture and Nested BSP",
       "papers": [
-        "Synthetic Public Transit Reliability Manuscript L02-10"
+        "Nested Parallel von Neumann Architecture and Nested BSP"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the middle and final sections of Synthetic Public Transit Reliability Manuscript L02-10 before answering: In Synthetic Public Transit Reliability Manuscript L02-10, what does the public transit reliability study conclude about its main constraint?",
+          "user": "Check the relevant sections of Nested Parallel von Neumann Architecture and Nested BSP before answering: why was reaching memory on another machine historically so slow?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L02-10",
-              "page": 91,
-              "quote": "Constraint L02-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Report limits and cite the original page."
         }
       ],
-      "harness_setup": "The planted fact is on a middle or late page; an introduction-only read is insufficient.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q16"
     },
     {
       "id": "L03-D01",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "development",
-      "topic": "coastal flood routing L03",
+      "topic": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
       "papers": [
-        "Synthetic Coastal Flood Routing Manuscript L03-01"
+        "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Coastal Flood Routing Manuscript L03-01 selected and remember I want the coastal flood routing constraint.",
+          "user": "Keep Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning selected. I want to answer: how do they make the generator produce the rare in-between arrangements instead of the common ones?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -640,14 +661,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L03-01",
-              "page": 52,
-              "quote": "Constraint L03-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
@@ -655,21 +676,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q04"
     },
     {
       "id": "L03-D02",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "development",
-      "topic": "campus energy demand L03",
+      "topic": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
       "papers": [
-        "Synthetic Campus Energy Demand Manuscript L03-02"
+        "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Campus Energy Demand Manuscript L03-02 selected and remember I want the campus energy demand constraint.",
+          "user": "Keep Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition selected. I want to answer: how does the smaller model learn where each word sits in the audio?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -693,14 +715,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L03-02",
-              "page": 91,
-              "quote": "Constraint L03-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
@@ -708,21 +730,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q06"
     },
     {
       "id": "L03-D03",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "development",
-      "topic": "soil moisture mapping L03",
+      "topic": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
       "papers": [
-        "Synthetic Soil Moisture Mapping Manuscript L03-03"
+        "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Soil Moisture Mapping Manuscript L03-03 selected and remember I want the soil moisture mapping constraint.",
+          "user": "Keep Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark selected. I want to answer: how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -746,14 +769,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L03-03",
-              "page": 52,
-              "quote": "Constraint L03-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
@@ -761,21 +784,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q07"
     },
     {
       "id": "L03-D04",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "development",
-      "topic": "urban heat shelters L03",
+      "topic": "State-Space-Based FIR Filtering on a Quantum Computer",
       "papers": [
-        "Synthetic Urban Heat Shelters Manuscript L03-04"
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Urban Heat Shelters Manuscript L03-04 selected and remember I want the urban heat shelters constraint.",
+          "user": "Keep State-Space-Based FIR Filtering on a Quantum Computer selected. I want to answer: where is the waveform actually held in their scheme?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -799,14 +823,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L03-04",
-              "page": 91,
-              "quote": "Constraint L03-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
@@ -814,21 +838,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q08"
     },
     {
       "id": "L03-D05",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "development",
-      "topic": "river sediment transport L03",
+      "topic": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
       "papers": [
-        "Synthetic River Sediment Transport Manuscript L03-05"
+        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic River Sediment Transport Manuscript L03-05 selected and remember I want the river sediment transport constraint.",
+          "user": "Keep TTM-Bench A Framework for Text-to-Music System Performance Benchmarking selected. I want to answer: how did they choose which text descriptions to keep for each track?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -852,14 +877,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L03-05",
-              "page": 52,
-              "quote": "Constraint L03-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
@@ -867,21 +892,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q09"
     },
     {
       "id": "L03-D06",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "development",
-      "topic": "crop disease screening L03",
+      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
       "papers": [
-        "Synthetic Crop Disease Screening Manuscript L03-06"
+        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Crop Disease Screening Manuscript L03-06 selected and remember I want the crop disease screening constraint.",
+          "user": "Keep Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition selected. I want to answer: how did the older approach get the emotion label back out of the model?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -905,14 +931,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L03-06",
-              "page": 91,
-              "quote": "Constraint L03-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
@@ -920,21 +946,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q10"
     },
     {
       "id": "L03-H07",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "held_out",
-      "topic": "emergency radio coverage L03",
+      "topic": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
       "papers": [
-        "Synthetic Emergency Radio Coverage Manuscript L03-07"
+        "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Emergency Radio Coverage Manuscript L03-07 selected and remember I want the emergency radio coverage constraint.",
+          "user": "Keep Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties selected. I want to answer: how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -958,14 +985,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L03-07",
-              "page": 52,
-              "quote": "Constraint L03-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
@@ -973,21 +1000,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q01"
     },
     {
       "id": "L03-H08",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "held_out",
-      "topic": "bridge fatigue sensing L03",
+      "topic": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
       "papers": [
-        "Synthetic Bridge Fatigue Sensing Manuscript L03-08"
+        "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Bridge Fatigue Sensing Manuscript L03-08 selected and remember I want the bridge fatigue sensing constraint.",
+          "user": "Keep Online Adaptive Kernel Mixing for Gaussian Process Decision Making selected. I want to answer: how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -1011,14 +1039,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L03-08",
-              "page": 91,
-              "quote": "Constraint L03-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
@@ -1026,21 +1054,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q03"
     },
     {
       "id": "L03-H09",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "held_out",
-      "topic": "water quality sampling L03",
+      "topic": "Towards Active Cross-View Object Geo-Localization",
       "papers": [
-        "Synthetic Water Quality Sampling Manuscript L03-09"
+        "Towards Active Cross-View Object Geo-Localization"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Water Quality Sampling Manuscript L03-09 selected and remember I want the water quality sampling constraint.",
+          "user": "Keep Towards Active Cross-View Object Geo-Localization selected. I want to answer: with the next view not yet visible, how does the agent decide where to look?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -1064,14 +1093,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L03-09",
-              "page": 52,
-              "quote": "Constraint L03-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
@@ -1079,21 +1108,22 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q05"
     },
     {
       "id": "L03-H10",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "held_out",
-      "topic": "public transit reliability L03",
+      "topic": "Nested Parallel von Neumann Architecture and Nested BSP",
       "papers": [
-        "Synthetic Public Transit Reliability Manuscript L03-10"
+        "Nested Parallel von Neumann Architecture and Nested BSP"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Synthetic Public Transit Reliability Manuscript L03-10 selected and remember I want the public transit reliability constraint.",
+          "user": "Keep Nested Parallel von Neumann Architecture and Nested BSP selected. I want to answer: why was reaching memory on another machine historically so slow?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -1117,14 +1147,14 @@
           "acceptable_uncertainty": "Report limits and cite the original page."
         },
         {
-          "user": "What was the constraint, and where was it stated?",
+          "user": "What was the answer, and where was it stated?",
           "intended_task": "answer_after_compaction",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L03-10",
-              "page": 91,
-              "quote": "Constraint L03-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
@@ -1132,28 +1162,29 @@
         }
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q16"
     },
     {
       "id": "L04-D01",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "development",
-      "topic": "coastal flood routing L04",
+      "topic": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
       "papers": [
-        "Synthetic Coastal Flood Routing Manuscript L04-01"
+        "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Coastal Flood Routing Manuscript L04-01; inspect the coastal flood routing constraint.",
+          "user": "In Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning, how do they make the generator produce the rare in-between arrangements instead of the common ones?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L04-01",
-              "page": 52,
-              "quote": "Constraint L04-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
@@ -1173,9 +1204,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L04-01",
-              "page": 52,
-              "quote": "Constraint L04-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
@@ -1183,28 +1214,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q04"
     },
     {
       "id": "L04-D02",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "development",
-      "topic": "campus energy demand L04",
+      "topic": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
       "papers": [
-        "Synthetic Campus Energy Demand Manuscript L04-02"
+        "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Campus Energy Demand Manuscript L04-02; inspect the campus energy demand constraint.",
+          "user": "In Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition, how does the smaller model learn where each word sits in the audio?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L04-02",
-              "page": 91,
-              "quote": "Constraint L04-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
@@ -1224,9 +1256,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L04-02",
-              "page": 91,
-              "quote": "Constraint L04-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
@@ -1234,28 +1266,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q06"
     },
     {
       "id": "L04-D03",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "development",
-      "topic": "soil moisture mapping L04",
+      "topic": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
       "papers": [
-        "Synthetic Soil Moisture Mapping Manuscript L04-03"
+        "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Soil Moisture Mapping Manuscript L04-03; inspect the soil moisture mapping constraint.",
+          "user": "In Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark, how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L04-03",
-              "page": 52,
-              "quote": "Constraint L04-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
@@ -1275,9 +1308,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L04-03",
-              "page": 52,
-              "quote": "Constraint L04-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
@@ -1285,28 +1318,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q07"
     },
     {
       "id": "L04-D04",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "development",
-      "topic": "urban heat shelters L04",
+      "topic": "State-Space-Based FIR Filtering on a Quantum Computer",
       "papers": [
-        "Synthetic Urban Heat Shelters Manuscript L04-04"
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Urban Heat Shelters Manuscript L04-04; inspect the urban heat shelters constraint.",
+          "user": "In State-Space-Based FIR Filtering on a Quantum Computer, where is the waveform actually held in their scheme?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L04-04",
-              "page": 91,
-              "quote": "Constraint L04-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
@@ -1326,9 +1360,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L04-04",
-              "page": 91,
-              "quote": "Constraint L04-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
@@ -1336,28 +1370,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q08"
     },
     {
       "id": "L04-D05",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "development",
-      "topic": "river sediment transport L04",
+      "topic": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
       "papers": [
-        "Synthetic River Sediment Transport Manuscript L04-05"
+        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic River Sediment Transport Manuscript L04-05; inspect the river sediment transport constraint.",
+          "user": "In TTM-Bench A Framework for Text-to-Music System Performance Benchmarking, how did they choose which text descriptions to keep for each track?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L04-05",
-              "page": 52,
-              "quote": "Constraint L04-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
@@ -1377,9 +1412,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L04-05",
-              "page": 52,
-              "quote": "Constraint L04-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
@@ -1387,28 +1422,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q09"
     },
     {
       "id": "L04-D06",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "development",
-      "topic": "crop disease screening L04",
+      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
       "papers": [
-        "Synthetic Crop Disease Screening Manuscript L04-06"
+        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Crop Disease Screening Manuscript L04-06; inspect the crop disease screening constraint.",
+          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how did the older approach get the emotion label back out of the model?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L04-06",
-              "page": 91,
-              "quote": "Constraint L04-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
@@ -1428,9 +1464,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L04-06",
-              "page": 91,
-              "quote": "Constraint L04-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
@@ -1438,28 +1474,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q10"
     },
     {
       "id": "L04-H07",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "held_out",
-      "topic": "emergency radio coverage L04",
+      "topic": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
       "papers": [
-        "Synthetic Emergency Radio Coverage Manuscript L04-07"
+        "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Emergency Radio Coverage Manuscript L04-07; inspect the emergency radio coverage constraint.",
+          "user": "In Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties, how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L04-07",
-              "page": 52,
-              "quote": "Constraint L04-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
@@ -1479,9 +1516,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L04-07",
-              "page": 52,
-              "quote": "Constraint L04-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
@@ -1489,28 +1526,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q01"
     },
     {
       "id": "L04-H08",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "held_out",
-      "topic": "bridge fatigue sensing L04",
+      "topic": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
       "papers": [
-        "Synthetic Bridge Fatigue Sensing Manuscript L04-08"
+        "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Bridge Fatigue Sensing Manuscript L04-08; inspect the bridge fatigue sensing constraint.",
+          "user": "In Online Adaptive Kernel Mixing for Gaussian Process Decision Making, how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L04-08",
-              "page": 91,
-              "quote": "Constraint L04-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
@@ -1530,9 +1568,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L04-08",
-              "page": 91,
-              "quote": "Constraint L04-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
@@ -1540,28 +1578,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q03"
     },
     {
       "id": "L04-H09",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "held_out",
-      "topic": "water quality sampling L04",
+      "topic": "Towards Active Cross-View Object Geo-Localization",
       "papers": [
-        "Synthetic Water Quality Sampling Manuscript L04-09"
+        "Towards Active Cross-View Object Geo-Localization"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Water Quality Sampling Manuscript L04-09; inspect the water quality sampling constraint.",
+          "user": "In Towards Active Cross-View Object Geo-Localization, with the next view not yet visible, how does the agent decide where to look?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L04-09",
-              "page": 52,
-              "quote": "Constraint L04-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
@@ -1581,9 +1620,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L04-09",
-              "page": 52,
-              "quote": "Constraint L04-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
@@ -1591,28 +1630,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q05"
     },
     {
       "id": "L04-H10",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "held_out",
-      "topic": "public transit reliability L04",
+      "topic": "Nested Parallel von Neumann Architecture and Nested BSP",
       "papers": [
-        "Synthetic Public Transit Reliability Manuscript L04-10"
+        "Nested Parallel von Neumann Architecture and Nested BSP"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Remember that I selected Synthetic Public Transit Reliability Manuscript L04-10; inspect the public transit reliability constraint.",
+          "user": "In Nested Parallel von Neumann Architecture and Nested BSP, why was reaching memory on another machine historically so slow?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L04-10",
-              "page": 91,
-              "quote": "Constraint L04-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
@@ -1632,9 +1672,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L04-10",
-              "page": 91,
-              "quote": "Constraint L04-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
@@ -1642,28 +1682,29 @@
         }
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
-      "source_state": "synthetic_planned_unverified"
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q16"
     },
     {
       "id": "L05-D01",
       "family": "L05",
       "scenario": "revocation",
       "split": "development",
-      "topic": "coastal flood routing L05",
+      "topic": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
       "papers": [
-        "Synthetic Coastal Flood Routing Manuscript L05-01"
+        "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Coastal Flood Routing Manuscript L05-01, what does the coastal flood routing study conclude about its main constraint?",
+          "user": "In Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning, how do they make the generator produce the rare in-between arrangements instead of the common ones?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L05-01",
-              "page": 52,
-              "quote": "Constraint L05-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
@@ -1675,32 +1716,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q04"
     },
     {
       "id": "L05-D02",
       "family": "L05",
       "scenario": "revocation",
       "split": "development",
-      "topic": "campus energy demand L05",
+      "topic": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
       "papers": [
-        "Synthetic Campus Energy Demand Manuscript L05-02"
+        "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Campus Energy Demand Manuscript L05-02, what does the campus energy demand study conclude about its main constraint?",
+          "user": "In Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition, how does the smaller model learn where each word sits in the audio?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L05-02",
-              "page": 91,
-              "quote": "Constraint L05-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
@@ -1712,32 +1754,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q06"
     },
     {
       "id": "L05-D03",
       "family": "L05",
       "scenario": "revocation",
       "split": "development",
-      "topic": "soil moisture mapping L05",
+      "topic": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
       "papers": [
-        "Synthetic Soil Moisture Mapping Manuscript L05-03"
+        "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Soil Moisture Mapping Manuscript L05-03, what does the soil moisture mapping study conclude about its main constraint?",
+          "user": "In Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark, how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L05-03",
-              "page": 52,
-              "quote": "Constraint L05-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
@@ -1749,32 +1792,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q07"
     },
     {
       "id": "L05-D04",
       "family": "L05",
       "scenario": "revocation",
       "split": "development",
-      "topic": "urban heat shelters L05",
+      "topic": "State-Space-Based FIR Filtering on a Quantum Computer",
       "papers": [
-        "Synthetic Urban Heat Shelters Manuscript L05-04"
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Urban Heat Shelters Manuscript L05-04, what does the urban heat shelters study conclude about its main constraint?",
+          "user": "In State-Space-Based FIR Filtering on a Quantum Computer, where is the waveform actually held in their scheme?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L05-04",
-              "page": 91,
-              "quote": "Constraint L05-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
@@ -1786,32 +1830,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q08"
     },
     {
       "id": "L05-D05",
       "family": "L05",
       "scenario": "revocation",
       "split": "development",
-      "topic": "river sediment transport L05",
+      "topic": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
       "papers": [
-        "Synthetic River Sediment Transport Manuscript L05-05"
+        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic River Sediment Transport Manuscript L05-05, what does the river sediment transport study conclude about its main constraint?",
+          "user": "In TTM-Bench A Framework for Text-to-Music System Performance Benchmarking, how did they choose which text descriptions to keep for each track?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L05-05",
-              "page": 52,
-              "quote": "Constraint L05-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
@@ -1823,32 +1868,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q09"
     },
     {
       "id": "L05-D06",
       "family": "L05",
       "scenario": "revocation",
       "split": "development",
-      "topic": "crop disease screening L05",
+      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
       "papers": [
-        "Synthetic Crop Disease Screening Manuscript L05-06"
+        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Crop Disease Screening Manuscript L05-06, what does the crop disease screening study conclude about its main constraint?",
+          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how did the older approach get the emotion label back out of the model?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L05-06",
-              "page": 91,
-              "quote": "Constraint L05-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
@@ -1860,32 +1906,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q10"
     },
     {
       "id": "L05-H07",
       "family": "L05",
       "scenario": "revocation",
       "split": "held_out",
-      "topic": "emergency radio coverage L05",
+      "topic": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
       "papers": [
-        "Synthetic Emergency Radio Coverage Manuscript L05-07"
+        "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Emergency Radio Coverage Manuscript L05-07, what does the emergency radio coverage study conclude about its main constraint?",
+          "user": "In Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties, how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L05-07",
-              "page": 52,
-              "quote": "Constraint L05-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
@@ -1897,32 +1944,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q01"
     },
     {
       "id": "L05-H08",
       "family": "L05",
       "scenario": "revocation",
       "split": "held_out",
-      "topic": "bridge fatigue sensing L05",
+      "topic": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
       "papers": [
-        "Synthetic Bridge Fatigue Sensing Manuscript L05-08"
+        "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Bridge Fatigue Sensing Manuscript L05-08, what does the bridge fatigue sensing study conclude about its main constraint?",
+          "user": "In Online Adaptive Kernel Mixing for Gaussian Process Decision Making, how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L05-08",
-              "page": 91,
-              "quote": "Constraint L05-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
@@ -1934,32 +1982,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q03"
     },
     {
       "id": "L05-H09",
       "family": "L05",
       "scenario": "revocation",
       "split": "held_out",
-      "topic": "water quality sampling L05",
+      "topic": "Towards Active Cross-View Object Geo-Localization",
       "papers": [
-        "Synthetic Water Quality Sampling Manuscript L05-09"
+        "Towards Active Cross-View Object Geo-Localization"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Water Quality Sampling Manuscript L05-09, what does the water quality sampling study conclude about its main constraint?",
+          "user": "In Towards Active Cross-View Object Geo-Localization, with the next view not yet visible, how does the agent decide where to look?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L05-09",
-              "page": 52,
-              "quote": "Constraint L05-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
@@ -1971,32 +2020,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q05"
     },
     {
       "id": "L05-H10",
       "family": "L05",
       "scenario": "revocation",
       "split": "held_out",
-      "topic": "public transit reliability L05",
+      "topic": "Nested Parallel von Neumann Architecture and Nested BSP",
       "papers": [
-        "Synthetic Public Transit Reliability Manuscript L05-10"
+        "Nested Parallel von Neumann Architecture and Nested BSP"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Synthetic Public Transit Reliability Manuscript L05-10, what does the public transit reliability study conclude about its main constraint?",
+          "user": "In Nested Parallel von Neumann Architecture and Nested BSP, why was reaching memory on another machine historically so slow?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L05-10",
-              "page": 91,
-              "quote": "Constraint L05-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
@@ -2008,32 +2058,33 @@
           "expected_pair": [],
           "required_evidence": [],
           "clarification_necessary": false,
-          "acceptable_uncertainty": "Do not repeat the revoked fact, citation or derived summary."
+          "acceptable_uncertainty": "Do not repeat a revoked fact, citation or derived summary."
         }
       ],
-      "harness_setup": "After turn 1, harness revokes Record access before turn 2; no later answer, provider prompt, citation or handoff may expose it.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q16"
     },
     {
       "id": "L06-D01",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "development",
-      "topic": "coastal flood routing L06",
+      "topic": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
       "papers": [
-        "Synthetic Coastal Flood Routing Manuscript L06-01"
+        "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for coastal flood routing; read Synthetic Coastal Flood Routing Manuscript L06-01 first.",
+          "user": "Read Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning and investigate the question: how do they make the generator produce the rare in-between arrangements instead of the common ones?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L06-01",
-              "page": 52,
-              "quote": "Constraint L06-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
@@ -2045,38 +2096,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L06-01",
-              "page": 52,
-              "quote": "Constraint L06-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q04"
     },
     {
       "id": "L06-D02",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "development",
-      "topic": "campus energy demand L06",
+      "topic": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
       "papers": [
-        "Synthetic Campus Energy Demand Manuscript L06-02"
+        "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for campus energy demand; read Synthetic Campus Energy Demand Manuscript L06-02 first.",
+          "user": "Read Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition and investigate the question: how does the smaller model learn where each word sits in the audio?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L06-02",
-              "page": 91,
-              "quote": "Constraint L06-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
@@ -2088,38 +2140,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L06-02",
-              "page": 91,
-              "quote": "Constraint L06-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q06"
     },
     {
       "id": "L06-D03",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "development",
-      "topic": "soil moisture mapping L06",
+      "topic": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
       "papers": [
-        "Synthetic Soil Moisture Mapping Manuscript L06-03"
+        "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for soil moisture mapping; read Synthetic Soil Moisture Mapping Manuscript L06-03 first.",
+          "user": "Read Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark and investigate the question: how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L06-03",
-              "page": 52,
-              "quote": "Constraint L06-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
@@ -2131,38 +2184,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L06-03",
-              "page": 52,
-              "quote": "Constraint L06-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q07"
     },
     {
       "id": "L06-D04",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "development",
-      "topic": "urban heat shelters L06",
+      "topic": "State-Space-Based FIR Filtering on a Quantum Computer",
       "papers": [
-        "Synthetic Urban Heat Shelters Manuscript L06-04"
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for urban heat shelters; read Synthetic Urban Heat Shelters Manuscript L06-04 first.",
+          "user": "Read State-Space-Based FIR Filtering on a Quantum Computer and investigate the question: where is the waveform actually held in their scheme?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L06-04",
-              "page": 91,
-              "quote": "Constraint L06-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
@@ -2174,38 +2228,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L06-04",
-              "page": 91,
-              "quote": "Constraint L06-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q08"
     },
     {
       "id": "L06-D05",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "development",
-      "topic": "river sediment transport L06",
+      "topic": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
       "papers": [
-        "Synthetic River Sediment Transport Manuscript L06-05"
+        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for river sediment transport; read Synthetic River Sediment Transport Manuscript L06-05 first.",
+          "user": "Read TTM-Bench A Framework for Text-to-Music System Performance Benchmarking and investigate the question: how did they choose which text descriptions to keep for each track?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L06-05",
-              "page": 52,
-              "quote": "Constraint L06-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
@@ -2217,38 +2272,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L06-05",
-              "page": 52,
-              "quote": "Constraint L06-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q09"
     },
     {
       "id": "L06-D06",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "development",
-      "topic": "crop disease screening L06",
+      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
       "papers": [
-        "Synthetic Crop Disease Screening Manuscript L06-06"
+        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for crop disease screening; read Synthetic Crop Disease Screening Manuscript L06-06 first.",
+          "user": "Read Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition and investigate the question: how did the older approach get the emotion label back out of the model?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L06-06",
-              "page": 91,
-              "quote": "Constraint L06-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
@@ -2260,38 +2316,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L06-06",
-              "page": 91,
-              "quote": "Constraint L06-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q10"
     },
     {
       "id": "L06-H07",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "held_out",
-      "topic": "emergency radio coverage L06",
+      "topic": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
       "papers": [
-        "Synthetic Emergency Radio Coverage Manuscript L06-07"
+        "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for emergency radio coverage; read Synthetic Emergency Radio Coverage Manuscript L06-07 first.",
+          "user": "Read Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties and investigate the question: how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L06-07",
-              "page": 52,
-              "quote": "Constraint L06-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
@@ -2303,38 +2360,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L06-07",
-              "page": 52,
-              "quote": "Constraint L06-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q01"
     },
     {
       "id": "L06-H08",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "held_out",
-      "topic": "bridge fatigue sensing L06",
+      "topic": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
       "papers": [
-        "Synthetic Bridge Fatigue Sensing Manuscript L06-08"
+        "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for bridge fatigue sensing; read Synthetic Bridge Fatigue Sensing Manuscript L06-08 first.",
+          "user": "Read Online Adaptive Kernel Mixing for Gaussian Process Decision Making and investigate the question: how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L06-08",
-              "page": 91,
-              "quote": "Constraint L06-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
@@ -2346,38 +2404,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L06-08",
-              "page": 91,
-              "quote": "Constraint L06-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q03"
     },
     {
       "id": "L06-H09",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "held_out",
-      "topic": "water quality sampling L06",
+      "topic": "Towards Active Cross-View Object Geo-Localization",
       "papers": [
-        "Synthetic Water Quality Sampling Manuscript L06-09"
+        "Towards Active Cross-View Object Geo-Localization"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for water quality sampling; read Synthetic Water Quality Sampling Manuscript L06-09 first.",
+          "user": "Read Towards Active Cross-View Object Geo-Localization and investigate the question: with the next view not yet visible, how does the agent decide where to look?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L06-09",
-              "page": 52,
-              "quote": "Constraint L06-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
@@ -2389,38 +2448,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L06-09",
-              "page": 52,
-              "quote": "Constraint L06-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q05"
     },
     {
       "id": "L06-H10",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "held_out",
-      "topic": "public transit reliability L06",
+      "topic": "Nested Parallel von Neumann Architecture and Nested BSP",
       "papers": [
-        "Synthetic Public Transit Reliability Manuscript L06-10"
+        "Nested Parallel von Neumann Architecture and Nested BSP"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Compare the available evidence for public transit reliability; read Synthetic Public Transit Reliability Manuscript L06-10 first.",
+          "user": "Read Nested Parallel von Neumann Architecture and Nested BSP and investigate the question: why was reaching memory on another machine historically so slow?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L06-10",
-              "page": 91,
-              "quote": "Constraint L06-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
@@ -2432,38 +2492,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L06-10",
-              "page": 91,
-              "quote": "Constraint L06-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "Identify the failed read and do not claim complete coverage."
         }
       ],
-      "harness_setup": "Harness fails a subsequent read after the first succeeds; record fault=fired and retain only the supported partial result.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q16"
     },
     {
       "id": "L07-D01",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "development",
-      "topic": "coastal flood routing L07",
+      "topic": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
       "papers": [
-        "Synthetic Coastal Flood Routing Manuscript L07-01"
+        "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate coastal flood routing in Synthetic Coastal Flood Routing Manuscript L07-01 and cite the original source.",
+          "user": "In Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning, how do they make the generator produce the rare in-between arrangements instead of the common ones?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L07-01",
-              "page": 52,
-              "quote": "Constraint L07-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
@@ -2475,38 +2536,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Coastal Flood Routing Manuscript L07-01",
-              "page": 52,
-              "quote": "Constraint L07-01: the coastal flood routing estimate is limited by missing late-season observations."
+              "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+              "page": 3,
+              "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q04"
     },
     {
       "id": "L07-D02",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "development",
-      "topic": "campus energy demand L07",
+      "topic": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
       "papers": [
-        "Synthetic Campus Energy Demand Manuscript L07-02"
+        "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate campus energy demand in Synthetic Campus Energy Demand Manuscript L07-02 and cite the original source.",
+          "user": "In Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition, how does the smaller model learn where each word sits in the audio?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L07-02",
-              "page": 91,
-              "quote": "Constraint L07-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
@@ -2518,38 +2580,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Campus Energy Demand Manuscript L07-02",
-              "page": 91,
-              "quote": "Constraint L07-02: the campus energy demand estimate is limited by missing late-season observations."
+              "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+              "page": 2,
+              "quote": "extract each text token's attention scores over audio embeddings"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q06"
     },
     {
       "id": "L07-D03",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "development",
-      "topic": "soil moisture mapping L07",
+      "topic": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
       "papers": [
-        "Synthetic Soil Moisture Mapping Manuscript L07-03"
+        "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate soil moisture mapping in Synthetic Soil Moisture Mapping Manuscript L07-03 and cite the original source.",
+          "user": "In Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark, how did they simulate a conversation where the earlier turns have nothing to do with the new question?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L07-03",
-              "page": 52,
-              "quote": "Constraint L07-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
@@ -2561,38 +2624,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Soil Moisture Mapping Manuscript L07-03",
-              "page": 52,
-              "quote": "Constraint L07-03: the soil moisture mapping estimate is limited by missing late-season observations."
+              "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+              "page": 4,
+              "quote": "models a topic shift. The history and current query concern unrelated topics"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q07"
     },
     {
       "id": "L07-D04",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "development",
-      "topic": "urban heat shelters L07",
+      "topic": "State-Space-Based FIR Filtering on a Quantum Computer",
       "papers": [
-        "Synthetic Urban Heat Shelters Manuscript L07-04"
+        "State-Space-Based FIR Filtering on a Quantum Computer"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate urban heat shelters in Synthetic Urban Heat Shelters Manuscript L07-04 and cite the original source.",
+          "user": "In State-Space-Based FIR Filtering on a Quantum Computer, where is the waveform actually held in their scheme?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L07-04",
-              "page": 91,
-              "quote": "Constraint L07-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
@@ -2604,38 +2668,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Urban Heat Shelters Manuscript L07-04",
-              "page": 91,
-              "quote": "Constraint L07-04: the urban heat shelters estimate is limited by missing late-season observations."
+              "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+              "page": 2,
+              "quote": "signals are represented in the probability amplitudes of a quantum state"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q08"
     },
     {
       "id": "L07-D05",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "development",
-      "topic": "river sediment transport L07",
+      "topic": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
       "papers": [
-        "Synthetic River Sediment Transport Manuscript L07-05"
+        "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate river sediment transport in Synthetic River Sediment Transport Manuscript L07-05 and cite the original source.",
+          "user": "In TTM-Bench A Framework for Text-to-Music System Performance Benchmarking, how did they choose which text descriptions to keep for each track?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L07-05",
-              "page": 52,
-              "quote": "Constraint L07-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
@@ -2647,38 +2712,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic River Sediment Transport Manuscript L07-05",
-              "page": 52,
-              "quote": "Constraint L07-05: the river sediment transport estimate is limited by missing late-season observations."
+              "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+              "page": 3,
+              "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q09"
     },
     {
       "id": "L07-D06",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "development",
-      "topic": "crop disease screening L07",
+      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
       "papers": [
-        "Synthetic Crop Disease Screening Manuscript L07-06"
+        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate crop disease screening in Synthetic Crop Disease Screening Manuscript L07-06 and cite the original source.",
+          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how did the older approach get the emotion label back out of the model?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L07-06",
-              "page": 91,
-              "quote": "Constraint L07-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
@@ -2690,38 +2756,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Crop Disease Screening Manuscript L07-06",
-              "page": 91,
-              "quote": "Constraint L07-06: the crop disease screening estimate is limited by missing late-season observations."
+              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+              "page": 3,
+              "quote": "read the predicted emotion off the LLM by decoding"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q10"
     },
     {
       "id": "L07-H07",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "held_out",
-      "topic": "emergency radio coverage L07",
+      "topic": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
       "papers": [
-        "Synthetic Emergency Radio Coverage Manuscript L07-07"
+        "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate emergency radio coverage in Synthetic Emergency Radio Coverage Manuscript L07-07 and cite the original source.",
+          "user": "In Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties, how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L07-07",
-              "page": 52,
-              "quote": "Constraint L07-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
@@ -2733,38 +2800,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Emergency Radio Coverage Manuscript L07-07",
-              "page": 52,
-              "quote": "Constraint L07-07: the emergency radio coverage estimate is limited by missing late-season observations."
+              "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+              "page": 2,
+              "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q01"
     },
     {
       "id": "L07-H08",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "held_out",
-      "topic": "bridge fatigue sensing L07",
+      "topic": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
       "papers": [
-        "Synthetic Bridge Fatigue Sensing Manuscript L07-08"
+        "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate bridge fatigue sensing in Synthetic Bridge Fatigue Sensing Manuscript L07-08 and cite the original source.",
+          "user": "In Online Adaptive Kernel Mixing for Gaussian Process Decision Making, how do they avoid committing to one similarity assumption when they cannot tell which one fits?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L07-08",
-              "page": 91,
-              "quote": "Constraint L07-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
@@ -2776,38 +2844,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Bridge Fatigue Sensing Manuscript L07-08",
-              "page": 91,
-              "quote": "Constraint L07-08: the bridge fatigue sensing estimate is limited by missing late-season observations."
+              "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+              "page": 2,
+              "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q03"
     },
     {
       "id": "L07-H09",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "held_out",
-      "topic": "water quality sampling L07",
+      "topic": "Towards Active Cross-View Object Geo-Localization",
       "papers": [
-        "Synthetic Water Quality Sampling Manuscript L07-09"
+        "Towards Active Cross-View Object Geo-Localization"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate water quality sampling in Synthetic Water Quality Sampling Manuscript L07-09 and cite the original source.",
+          "user": "In Towards Active Cross-View Object Geo-Localization, with the next view not yet visible, how does the agent decide where to look?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L07-09",
-              "page": 52,
-              "quote": "Constraint L07-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
@@ -2819,38 +2888,39 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Water Quality Sampling Manuscript L07-09",
-              "page": 52,
-              "quote": "Constraint L07-09: the water quality sampling estimate is limited by missing late-season observations."
+              "title": "Towards Active Cross-View Object Geo-Localization",
+              "page": 4,
+              "quote": "infer where to observe next from its current localization state and observation history"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q05"
     },
     {
       "id": "L07-H10",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "held_out",
-      "topic": "public transit reliability L07",
+      "topic": "Nested Parallel von Neumann Architecture and Nested BSP",
       "papers": [
-        "Synthetic Public Transit Reliability Manuscript L07-10"
+        "Nested Parallel von Neumann Architecture and Nested BSP"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Investigate public transit reliability in Synthetic Public Transit Reliability Manuscript L07-10 and cite the original source.",
+          "user": "In Nested Parallel von Neumann Architecture and Nested BSP, why was reaching memory on another machine historically so slow?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L07-10",
-              "page": 91,
-              "quote": "Constraint L07-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
@@ -2862,17 +2932,18 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Synthetic Public Transit Reliability Manuscript L07-10",
-              "page": 91,
-              "quote": "Constraint L07-10: the public transit reliability estimate is limited by missing late-season observations."
+              "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+              "page": 4,
+              "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
             }
           ],
           "clarification_necessary": false,
           "acceptable_uncertainty": "No duplicate final Turn; retain original source and run identity."
         }
       ],
-      "harness_setup": "Harness interrupts the worker after a committed step, then reconnects the same run before turn 2; record the recovery event.",
-      "source_state": "synthetic_planned_unverified"
+      "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
+      "source_state": "proxy_reference_needs_recheck",
+      "proxy_question_id": "q16"
     }
   ]
 }

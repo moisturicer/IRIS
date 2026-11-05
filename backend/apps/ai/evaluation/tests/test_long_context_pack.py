@@ -1,6 +1,5 @@
 """IR-753: inspect the draft pack without model output or a provider."""
 
-import hashlib
 import json
 from collections import Counter
 from pathlib import Path
@@ -24,9 +23,10 @@ def test_draft_has_ten_distinct_cases_per_family_and_bound_sources():
     data = load(PACK / "conversation_set_v1.json")
     source_rows = load(PACK / "sources.json")
     sources = {s["title"]: s for s in source_rows}
-    assert data["corpus"]["paper_set_sha256"] == hashlib.sha256(
-        json.dumps(source_rows, sort_keys=True, ensure_ascii=False).encode()
-    ).hexdigest()
+    baseline = load(BASELINE / "conversation_set_v1.json")
+    proxy = {q["id"]: q for q in load(PACK.parent / "proxy_starter.json")["questions"]}
+    assert data["corpus"]["paper_set_sha256"] == baseline["corpus"]["paper_set_sha256"]
+    assert data["corpus"]["snapshot_id"] == baseline["corpus"]["snapshot_id"]
     report = validate_set(data, min_conversations=70)
     assert report["errors"] == []
     assert report["lock_blockers"] == []
@@ -36,14 +36,17 @@ def test_draft_has_ten_distinct_cases_per_family_and_bound_sources():
         family: 10 for family in data["families"]
     }
     for case in data["conversations"]:
-        assert case["source_state"] == "synthetic_planned_unverified"
+        assert case["source_state"] == "proxy_reference_needs_recheck"
         for turn in case["turns"]:
             for evidence in turn["required_evidence"]:
                 source = sources[evidence["title"]]
                 assert source["split"] == case["split"]
-                assert source["planted_fact"] == {
-                    "page": evidence["page"], "quote": evidence["quote"]
-                }
+                assert source["page"] == evidence["page"]
+                assert source["quote"] == evidence["quote"]
+                assert any(expected == {"record": evidence["title"],
+                                        "page": evidence["page"],
+                                        "quote": evidence["quote"]}
+                           for expected in proxy[source["question_id"]]["expected"])
 
 
 def test_seven_case_family_cannot_be_frozen_and_baseline_lock_still_matches():
