@@ -161,6 +161,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-885** | A runtime question runs at deep depth unless the reader chooses ordinary | [details](traceability/IR-885.md) | **PARTIAL** |
 | **IR-884** | ADR-049 and the AI runtime spec are on `main`; IR-714's resume, export and review questions have owners | [details](traceability/IR-884.md) | **PARTIAL** |
 | **IR-863** | Ask IRIS opens AI-runtime runs only when the deployment's `AI_RUNTIME_READER` switch says so; the browser reads it and cannot choose — under IR-714, ADR-049; no FR- id | [details](traceability/IR-863.md) | **PARTIAL** |
+| **IR-754** | A reader deliberately compacts an owned Conversation from Ask IRIS or Paper Chat as a run of its own, through IR-734's mechanism, and sees what happened — under IR-715, ADR-049 §19; no FR- id | [details](traceability/IR-754.md) | **PARTIAL** |
 
 ### Non-functional
 
@@ -268,7 +269,7 @@ See [verification, public recording and screenshot](evidence/IR-730/README.md).
 
 **Limits:** disabled by default (since IR-863 by the server's `AI_RUNTIME_READER`, not a build flag); the reader refuses the operator echo executor until
 an AGENT service is composed. No paid enablement or cutover. Manual compaction is
-IR-754. Clean-install verification resolves the earlier frontend/typechecking failures;
+IR-754, which is implemented and reported as `capabilities.manual_compaction`. Clean-install verification resolves the earlier frontend/typechecking failures;
 publication evidence records 5,696 passing backend tests, 1,706 passing frontend
 tests and the isolated CI-equivalent setup. Automated standards/spec reviews were performed and
 their material findings addressed; independent human approval and CI remain required.

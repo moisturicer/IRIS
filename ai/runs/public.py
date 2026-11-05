@@ -1,6 +1,7 @@
 """Allowlisted reader state shared by live, reopened and exported runs (IR-730)."""
 
 from ai.agent.tools import PLAN_STEPS, STEP_ID, STEP_STATUS
+from ai.runs.config import KIND_COMPACT
 
 PROTOCOL = "runs-reader-1"
 
@@ -9,6 +10,7 @@ def progress(events):
     plan = None
     context = None
     compaction = None
+    counted = set()
     for event in events:
         data = event["data"]
         if event["name"] == "plan":
@@ -36,9 +38,14 @@ def progress(events):
             if data.get("outcome") not in ("compacted", "kept") or (
                     data["outcome"] == "compacted" and (type(turns) is not int or turns < 0)):
                 continue
+            revision = data.get("revision")
+            if data["outcome"] == "compacted" and revision in counted:
+                # A worker that took the run over saw the commit and said so again (IR-754).
+                continue
             compaction = compaction or {"compactions": 0, "turns_compacted": 0, "last": None}
             compaction["last"] = data["outcome"]
             if data["outcome"] == "compacted":
+                counted.add(revision)
                 compaction["compactions"] += 1
                 compaction["turns_compacted"] += turns
         elif event["name"] == "context":
@@ -49,24 +56,32 @@ def progress(events):
     return {"plan": plan, "context": context, "compaction": compaction}
 
 
-def run(snapshot):
+def kind(snapshot):
+    """What the run was for: "compact" for a manual compaction, else an Ask. Nothing else is published."""
+    return "compact" if (snapshot.get("pinned") or {}).get("kind") == KIND_COMPACT else "ask"
+
+
+def run(snapshot, *, manual_compaction=False):
+    # A compaction asks nothing; it shows an empty question rather than none.
+    snapshot = {**snapshot, "question": snapshot["question"] or ""}
     return {
         "protocol": PROTOCOL,
         **{key: snapshot[key] for key in (
             "id", "conversation_id", "state", "question", "base_revision", "version",
             "turn_id", "depth", "awaiting_reader", "created_at", "finished_at",
         )},
+        "kind": kind(snapshot),
         **progress(snapshot["events"] if snapshot.get("sources_available", True) else []),
         "sources_available": snapshot.get("sources_available", True),
-        "capabilities": {"manual_compaction": False},
+        "capabilities": {"manual_compaction": manual_compaction},
     }
 
 
-def conversation(snapshot):
+def conversation(snapshot, *, manual_compaction=False):
     available = {item["id"]: item.get("sources_available", True) for item in snapshot["runs"]}
     return {
         "protocol": PROTOCOL, "id": snapshot["id"], "revision": snapshot["revision"],
-        "runs": [run(item) for item in snapshot["runs"]],
+        "runs": [run(item, manual_compaction=manual_compaction) for item in snapshot["runs"]],
         "turns": [{**{key: turn[key] for key in (
             "id", "run_id", "ordinal", "question", "answer", "kind", "created_at", "citations",
         )}, "facts": turn.get("facts", []),
