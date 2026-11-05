@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint src",
     "test": "vitest run",
+    "test:changed": "vitest run --changed origin/main",
     "test:watch": "vitest"
   },
   "dependencies": {
