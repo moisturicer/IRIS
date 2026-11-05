@@ -18,6 +18,7 @@ from core.enums import (  # noqa: F401
     IPType,
     PipelineStatus,
     RequestStatus,
+    ReviewTextState,
     VersionCause,
 )
 
@@ -517,17 +518,6 @@ class RecordVersionDocument(models.Model):
         return f"{self.version} · upload {self.upload_id}"
 
 
-class ReviewTextState(models.TextChoices):
-    PENDING     = "pending", "Being read"
-    READ        = "read", "Read"
-    #: A scan, an unreadable or encrypted file, or one over the limits: never empty text.
-    NO_TEXT     = "no_text", "No text"
-    #: The sandbox couldn't run (limits unset, not Linux). `read_review_texts` retries it.
-    UNAVAILABLE = "unavailable", "Not read yet"
-    #: A Version from before IR-871 whose manuscript file is gone.
-    NOT_KEPT    = "not_kept", "Text not kept"
-
-
 class ReviewText(models.Model):
     """
     One manuscript file's text for review, read on campus with no AI (ADR-058
@@ -563,7 +553,7 @@ class ReviewText(models.Model):
         ordering = ["record", "created_at", "pk"]
         constraints = [
             models.CheckConstraint(
-                condition=~models.Q(state="read") | (
+                condition=~models.Q(state=ReviewTextState.READ) | (
                     ~models.Q(reader="") & models.Q(read_at__isnull=False)
                 ),
                 name="review_text_read_names_its_reader",
