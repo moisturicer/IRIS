@@ -31,12 +31,13 @@ from ai.admission.transport import AdmittedAgentProvider  # noqa: E402
 from ai.agent.dialect import ChatCompletions  # noqa: E402
 from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.agent.protocol import (  # noqa: E402
-    AgentRequest, ModelTurn, Pin, StopReason, ToolCall, ToolGroup, ToolResult, User,
+    AgentRequest, ModelTurn, Pin, StopReason, Text, ToolCall, ToolGroup, ToolResult, User,
 )
 from ai.domain.ports import TransientProviderError  # noqa: E402
 from ai.infrastructure.recording_adapter import HANG, RecordingAgentProvider  # noqa: E402
 from ai.runs import config as runs_config  # noqa: E402
 from ai.runs.store import RunStore, Unauthorized  # noqa: E402
+from ai.research.tools import Source  # noqa: E402
 from apps.ai.models.admission import ProviderCampaign, ProviderReservation
 from .corpus import make_user  # noqa: E402
 from .test_ai_runtime_context_contract import MILLION  # noqa: E402
@@ -310,6 +311,21 @@ def test_tool_results_in_the_request_are_withheld_by_the_transport(runtime):
     request = AgentRequest(pin=PIN, instructions="I", history=(
         User("Q?"), ModelTurn(items=(ToolGroup((ToolCall("c1", "search"),)),), stop=StopReason.TOOLS),
         ToolResult("c1", "a passage"),
+    ))
+    with bound(binding), pytest.raises(AdmissionDenied) as denied:
+        run(transport.converse(request))
+    assert denied.value.reason == "source_unavailable"
+    assert provider.requests == []
+    assert ProviderReservation.objects.get().state == "released"
+
+
+def test_derived_text_is_withheld_after_its_tool_result_left_context(runtime):
+    provider, transport = admitted(runtime, reply())
+    binding = claimed(runtime, "admit-derived@cit.edu", "admit-derived")
+    source = Source(1, 8, "old-revision")
+    request = AgentRequest(pin=PIN, instructions="I", history=(
+        User("Q?"), ModelTurn(items=(Text("A passage summary"),), stop=StopReason.END,
+                              dependencies=frozenset({source})),
     ))
     with bound(binding), pytest.raises(AdmissionDenied) as denied:
         run(transport.converse(request))

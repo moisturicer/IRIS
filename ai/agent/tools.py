@@ -75,6 +75,7 @@ class Outcome:
     #: Whether the call returned evidence this run had not seen.
     progress: bool = False
     clarification: Optional[str] = None
+    dependencies: frozenset = frozenset()
 
 
 def _str(value) -> bool:
@@ -121,6 +122,7 @@ class Investigation:
     excluded: Optional[tuple[int, ...]] = None
     seen: set = field(default_factory=set)
     tool_calls: int = 0
+    recalled_sources: frozenset = frozenset()
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
@@ -143,6 +145,7 @@ class Investigation:
             return {}
         found = await self.research.recall(list(dict.fromkeys(ids)))
         self._ended(found)
+        self.recalled_sources = found.dependencies
         for record in found.records:
             self.papers[record.record_id] = (record.handle, record.title)
 
@@ -227,7 +230,8 @@ class Investigation:
         body["coverage"] = {"returned": coverage.returned, "total": coverage.total,
                             "truncated": coverage.truncated}
         self.figures.update(str(n) for n in (coverage.returned, coverage.total) if n is not None)
-        return Outcome(json.dumps(body, ensure_ascii=False), progress=new)
+        return Outcome(json.dumps(body, ensure_ascii=False), progress=new,
+                       dependencies=result.dependencies)
 
     async def _plan(self, steps) -> Outcome:
         if not isinstance(steps, list) or len(steps) > PLAN_STEPS:

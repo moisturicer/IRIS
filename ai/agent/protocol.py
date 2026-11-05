@@ -61,6 +61,8 @@ class ModelTurn:
     reasoned: bool = False
     input_tokens: int | None = None
     output_tokens: int | None = None
+    #: Sources carried by text or opaque state derived from earlier evidence.
+    dependencies: frozenset = frozenset()
 
     @property
     def text(self) -> str:
@@ -70,12 +72,16 @@ class ModelTurn:
 @dataclass(frozen=True)
 class User:
     text: str
+    #: Sources in application-supplied context, not the reader's own words.
+    dependencies: frozenset = frozenset()
 
 
 @dataclass(frozen=True)
 class ToolResult:
     call_id: str
     content: str
+    #: Original source revisions, kept outside the provider wire payload.
+    dependencies: frozenset = frozenset()
 
 
 Entry = Union[User, ModelTurn, ToolResult]

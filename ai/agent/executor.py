@@ -196,10 +196,14 @@ class _Run:
         history: list = []
         for turn in self.prior:
             answer = DELIVERED_MARKER.sub("", turn.answer)
-            history += [User(turn.question), ModelTurn(items=(Text(answer),), stop=StopReason.END)]
+            # Persisted legacy Turns have no source manifest. They cannot be
+            # certified for a paid resend, even if their citations were removed.
+            history += [User(turn.question), ModelTurn(items=(Text(answer),), stop=StopReason.END,
+                                                       dependencies=frozenset({"unverified_prior"}))]
         shown = await self.investigation.recall(self.context.state or {})
         if shown:
-            history.append(User("[IRIS conversation state] " + json.dumps(shown, ensure_ascii=False)))
+            history.append(User("[IRIS conversation state] " + json.dumps(shown, ensure_ascii=False),
+                                self.investigation.recalled_sources))
         # The reader's words, unchanged, whatever queries the agent forms.
         history.append(User(self.question))
 
@@ -226,7 +230,7 @@ class _Run:
                     self._checked(outcome.clarification)
                     return self._result(outcome.clarification, (), kind="clarification")
                 progressed = progressed or outcome.progress
-                results.append(ToolResult(call.id, outcome.content))
+                results.append(ToolResult(call.id, outcome.content, outcome.dependencies))
             packed, _ = self.agent.pack(self.request(history), results)
             history = list(packed.history)
             stale = 0 if progressed else stale + 1
