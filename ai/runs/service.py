@@ -130,6 +130,24 @@ class RunService:
             max_queued=dispatch.max_queued, max_active_per_reader=dispatch.max_active_per_reader,
             compaction=compaction,
         )
+        return await self._queued(grant, row, created)
+
+    async def retry(self, grant, run_id, *, key):
+        """The new run that retries an ended one, and whether this request admitted it (IR-726).
+
+        A separate AskRun linked to the first and admitted with the original
+        limits of the configured profile: it never inherits, resets or extends
+        the first run's allowance, and it is queued like any submission.
+        """
+        dispatch = self.cfg.dispatch
+        row, created = await self.store.retry(
+            grant, run_id, key=key,
+            plan=lambda depth: (self.cfg.limits.deadline_for(depth), self.cfg.limits.allowance(), self.pinned(depth)),
+            max_queued=dispatch.max_queued, max_active_per_reader=dispatch.max_active_per_reader,
+        )
+        return await self._queued(grant, row, created)
+
+    async def _queued(self, grant, row, created):
         if created:
             try:
                 await self.notifier.notify()

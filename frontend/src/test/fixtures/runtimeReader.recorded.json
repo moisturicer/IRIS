@@ -29,6 +29,9 @@
       "capacity_tokens": 1000000
     },
     "compaction": null,
+    "cursor": 6,
+    "retry_of": null,
+    "retried_by": null,
     "sources_available": true,
     "capabilities": {
       "manual_compaction": false
@@ -69,6 +72,9 @@
           "capacity_tokens": 1000000
         },
         "compaction": null,
+        "cursor": 6,
+        "retry_of": null,
+        "retried_by": null,
         "sources_available": true,
         "capabilities": {
           "manual_compaction": false
