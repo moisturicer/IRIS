@@ -3,6 +3,13 @@ import { Link } from "react-router-dom";
 import { isAxiosError } from "axios";
 import { activeRun, compactionRun, ProtocolMismatch, RELOAD_TO_RECONNECT, retryable, runtimeReader, type Depth, type ReaderConversation, type ReaderRun } from "@/api/runtimeReader";
 import { ChatInput } from "./ChatInput";
+import { CHAT_OPENING } from "./answerLayout";
+import { ModelPill, type ModelPillOption } from "./ModelPill";
+
+const DEPTHS: readonly ModelPillOption<Depth>[] = [
+  { value: "deep", short: "Thorough", label: "Thorough research", description: "Searches and reads more before answering", icon: "fas fa-book-open-reader" },
+  { value: "ordinary", short: "Standard", label: "Standard", description: "A shorter search for a quicker answer", icon: "far fa-lightbulb" },
+];
 
 const STATES: Record<ReaderRun["state"], string> = {
   queued: "Queued", running: "Research in progress", completed: "Answer ready", cancelled: "Stopped",
@@ -294,10 +301,12 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
   const canCompact = !!conversation && conversation.turns.length > 0 && !error && !!run
     && !activeRun(run) && run.capabilities?.manual_compaction === true;
 
-  return <div className="flex h-full min-h-0 min-w-0 flex-col bg-canvas">
-    <div className="flex-1 min-h-0 overflow-y-auto px-4 py-6 sm:px-6">
+  const centered = !conversation?.runs.length && !run && !busy && !error;
+
+  return <div className={`flex h-full min-h-0 min-w-0 flex-col bg-canvas ${centered ? CHAT_OPENING : ""}`}>
+    <div className={`px-4 py-6 sm:px-6 ${centered ? "shrink-0 pb-1 text-center" : "flex-1 min-h-0 overflow-y-auto"}`}>
       <div className="mx-auto max-w-3xl space-y-6">
-        {!conversation && !run && !busy && !error && <p className="font-display text-2xl text-stone-900">What would you like to investigate?</p>}
+        {centered && <p className="font-display text-2xl text-stone-900">What would you like to investigate?</p>}
         {conversation?.runs.map(item => {
           const turn = conversation.turns.find(t => t.run_id === item.id);
           const current = item.id === run?.id ? run : item;
@@ -338,13 +347,12 @@ export function RuntimeReader({ recordId, conversationId, onConversation }: Prop
         Compact conversation</button>
       <p id="compact-help" className="min-w-0 flex-1 basis-56 text-xs text-stone-600">{COMPACTION_HELP}</p>
     </div>}
-    <label className="mx-auto flex w-full max-w-3xl items-center gap-3 px-4 py-2 text-sm text-stone-700">
-      <input type="checkbox" checked={depth === "deep"} onChange={e => setDepth(e.target.checked ? "deep" : "ordinary")}
-        className="h-4 w-4 accent-brand" /> Thorough research
-    </label>
-    <ChatInput onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
+    <ChatInput centered={centered} onSend={text => void send(text)} draft={draft} onDraftChange={setDraft}
       maxLength={4000}
       placeholder={recordId ? "Ask about this paper…" : "Ask about the research corpus…"}
-      disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"} />
+      disabled={busy || !!error || !!(run && activeRun(run))} label={recordId ? "Ask about this paper" : "Ask about the research corpus"}>
+      <ModelPill name="Research depth" value={depth} options={DEPTHS} onChange={setDepth}
+        note="IRIS chooses the model for each answer." />
+    </ChatInput>
   </div>;
 }

@@ -292,8 +292,8 @@ function LoadingSkeleton() {
 }
 
 /** An outlined fact about the record: its type, classification, programme flags. */
-const META_CHIP =
-  "px-2.5 py-1 rounded-full ring-1 ring-stone-300 text-xs font-semibold text-stone-700";
+const META_PILL = "inline-flex min-h-5 items-center rounded-full px-2.5 text-2xs font-semibold leading-4";
+const META_CHIP = cn(META_PILL, "ring-1 ring-inset ring-stone-300 text-stone-700");
 
 /** Initials for the byline's mark. */
 function initials(name: string): string {
@@ -949,7 +949,7 @@ export default function PaperViewPage() {
                   "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   railHidden
                     ? "gap-y-0 overview-wide:grid-cols-[minmax(0,1fr)_0rem] overview-wide:gap-x-0"
-                    : "overview-wide:grid-cols-[minmax(0,1fr)_22rem] overview-wide:gap-x-12",
+                    : "overview-wide:grid-cols-[minmax(0,1fr)_clamp(17rem,25cqw,22rem)] overview-wide:gap-x-8",
                 ),
             )}
           >
@@ -987,11 +987,11 @@ export default function PaperViewPage() {
               </h1>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
+                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />
                 {record.record_type_name && <span className={META_CHIP}>{record.record_type_name}</span>}
                 {record.classification_name && <span className={META_CHIP}>{record.classification_name}</span>}
                 {record.is_ip && (
-                  <span className="px-2.5 py-1 rounded-full bg-brand-50 text-brand ring-1 ring-brand-200 text-xs font-semibold inline-flex items-center gap-1.5">
+                  <span className={cn(META_PILL, "gap-1.5 bg-brand-50 text-brand ring-1 ring-inset ring-brand-200")}>
                     <i className="fas fa-shield-halved text-2xs" aria-hidden />
                     Intellectual Property
                   </span>
@@ -1203,14 +1203,13 @@ export default function PaperViewPage() {
                   </div>
                 )}
 
-                {/* The reading sections, each under a hairline (IR-569). */}
-                <div className="border-t border-stone-200 divide-y divide-stone-200 [&>*]:py-8 [&>:last-child]:pb-0">
-                {/* Abstract, as a reading column: a measure of ~65 characters
-                    and relaxed leading, not justified text (IR-356). */}
+                {/* Reading sections are separated by space. */}
+                <div className="space-y-8">
+                {/* The abstract shares the reading column with its heading and actions. */}
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
-                    <p className="max-w-[68ch] text-lg text-stone-700 leading-7">
+                    <p className="text-lg text-stone-700 leading-7">
                       {record.abstract}
                     </p>
                   ) : (
@@ -1299,7 +1298,7 @@ export default function PaperViewPage() {
             >
               <aside
                 aria-labelledby={`${tabsId}-details`}
-                className="min-h-0 space-y-4 overflow-hidden border-t border-stone-200 pt-8 overview-wide:w-[22rem] overview-wide:overflow-visible overview-wide:border-t-0 overview-wide:pt-0"
+                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible"
               >
                 <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
                   Record details

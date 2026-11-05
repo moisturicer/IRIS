@@ -31,4 +31,4 @@ export const CONTROL_OUTLINE = "border border-stone-300 text-stone-700 hover:bor
 export const CONTROL_ON = "bg-brand-50 border border-brand-200 text-brand hover:border-brand/50";
 
 /** The one filled control (Send). */
-export const CONTROL_FILLED = "bg-brand border border-brand text-white hover:bg-brand-light disabled:opacity-30";
+export const CONTROL_FILLED = "bg-brand border border-brand text-white hover:bg-brand-light disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-500 disabled:cursor-not-allowed";
