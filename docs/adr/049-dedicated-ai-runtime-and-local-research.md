@@ -95,3 +95,7 @@ Current code retains its existing behavior until implementation and controlled c
    - IR-740 also carries what remains of IR-731's AC 3 and AC 4: A01–A15 through the runtime, and the replayed and exported projections.
    - **Gain:** one evaluation format and one owner. **Cost:** IR-714's privacy criterion covers live and reopened answers until IR-740 lands.
 4. **Jive Tyler I. Revalde owns the disclosure decision that would let the AI runtime send Record evidence to a paid provider.** This names the owner only; the decision is not made. No Record evidence may be sent on the strength of this amendment, and `ai/admission/guard.py` keeps refusing it (§8). IR-827 (vendor no-training evidence) and IR-791 (the disclosure check reads the Contact person's answer) are preconditions, not the decision.
+
+## Amendment — 2026-11-05 (IR-889): development paid-research decision
+
+**Status: Accepted for development only. Decider: Jive Tyler I. Revalde.** The owner instructed an AI assistant in chat to record him as approver and implement the paid-research approval. The scoped decision and sequence are in [the development record](../evaluation/fixed-workflow-pilot/runtime-paid-research-approval.md). This answers the ownership question in the 2026-11-04 amendment; it does not assert that IR-791, IR-827 or the runtime's source-aware send guard have landed. Until those conditions are satisfied, Record evidence remains withheld. Production, a reader cutover and a larger campaign need separate approval.
