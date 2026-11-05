@@ -92,18 +92,23 @@ def progress(events):
 
 
 def journal(events, after):
-    """The safe, ordered entries of a run's journal past `after`, each with its position (IR-726).
+    """The reader's journal past position `after`, and its length (IR-726).
 
-    The whole journal is folded so a slice never contradicts the run's plan,
-    context or compaction; only entries past the cursor are returned.
+    Only what the reader may see is counted, so a position says nothing of how
+    many tool calls, model attempts or recoveries the operator's journal holds.
+    The whole journal is folded, so a slice never contradicts the run's plan,
+    context or compaction; entries are returned only past the cursor.
     """
     folded = _Progress()
-    entries = []
+    entries, position = [], 0
     for event in events:
         shown = folded.accept(event)
-        if shown is not None and event["sequence"] > after:
-            entries.append({"sequence": event["sequence"], **shown})
-    return entries
+        if shown is None:
+            continue
+        position += 1
+        if position > after:
+            entries.append({"position": position, **shown})
+    return entries, position
 
 
 def kind(snapshot):
@@ -116,6 +121,7 @@ def run(snapshot, *, manual_compaction=False, after=None):
     # A compaction asks nothing; it shows an empty question rather than none.
     snapshot = {**snapshot, "question": snapshot["question"] or ""}
     visible = snapshot["events"] if snapshot.get("sources_available", True) else []
+    replay, cursor = journal(visible, after or 0)
     return {
         "protocol": PROTOCOL,
         **{key: snapshot[key] for key in (
@@ -124,9 +130,9 @@ def run(snapshot, *, manual_compaction=False, after=None):
         )},
         "kind": kind(snapshot),
         **progress(visible),
-        # A position in the journal: where a reconnecting reader asks to continue from.
-        "cursor": max((event["sequence"] for event in snapshot["events"]), default=0),
-        **({"journal": journal(visible, after)} if after is not None else {}),
+        # The end of what the reader may see: where a reconnecting reader asks to continue from.
+        "cursor": cursor,
+        **({"journal": replay} if after is not None else {}),
         "retry_of": snapshot.get("retry_of"),
         "retried_by": snapshot.get("retried_by"),
         "sources_available": snapshot.get("sources_available", True),

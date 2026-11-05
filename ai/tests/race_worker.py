@@ -14,6 +14,7 @@ import sys
 
 import asyncpg
 
+from ai.runs.config import RunLimits
 from ai.runs.executor import Result
 from ai.runs.store import Fenced, RunStore
 
@@ -42,11 +43,11 @@ async def main(dsn, action, run_id, *rest):
         claim = await store.claim(run_id, worker="takeover", lease_seconds=30, executor="x", reserved_units=1)
         return "none" if claim is None else str(claim.fence)
     if action == "retry":
-        from ai.runs.config import RunLimits
         limits = RunLimits(deadline_seconds=120, deep_deadline_seconds=600, lease_seconds=30, max_attempts=2,
                            max_input_tokens=1000, max_output_tokens=500, max_cost_usd=0.5)
         row, created = await store.retry(rest[0], run_id, key=rest[1],
-                                         plan=lambda depth: (120, limits.allowance(), {}))
+                                         plan=lambda depth: (120, limits.allowance(), {}),
+                                         max_queued=50, max_active_per_reader=10)
         return f"{row['id']} {created}"
     return (await store.cancel(rest[0], run_id))["state"]
 

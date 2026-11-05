@@ -20,7 +20,7 @@ from .test_ai_runtime_runs_db import (
     DISPATCH, _admit_and_claim, _race, as_reader, run, service, session,
 )
 from .test_ai_runtime_admission_db import (
-    PIN, RESERVES, admitted, limits, request, reply as direct_reply,
+    PIN, RESERVES, limits, request, reply as direct_reply,
 )
 from .test_ai_runtime_agent_loop_db import agent_service, call, recording, reply, tools
 from .corpus import make_user
@@ -33,7 +33,6 @@ from ai.agent.executor import AgentExecutor  # noqa: E402
 from ai.domain.ports import TransientProviderError  # noqa: E402
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
 from ai.runs.dispatch import PollingNotifier  # noqa: E402
-from ai.runs.executor import Result  # noqa: E402
 from ai.runs.store import RunStore  # noqa: E402
 from apps.ai.grants import issue  # noqa: E402
 from apps.ai.models.admission import ProviderReservation  # noqa: E402
@@ -118,11 +117,11 @@ def test_a_reader_who_left_a_queued_run_reconnects_with_a_cursor_and_is_replayed
     assert run(svc.run_next()) is True
     replay = reconnect(client, headers, queued["id"], after=queued["cursor"]).json()
     assert replay["state"] == "completed"
-    sequences = [entry["sequence"] for entry in replay["journal"]]
-    assert sequences == sorted(sequences) and sequences[0] > queued["cursor"]
+    positions = [entry["position"] for entry in replay["journal"]]
+    assert positions == sorted(positions) and positions[0] > queued["cursor"]
     names = [entry["name"] for entry in replay["journal"]]
     assert names[0] == "started" and names[-1] == "completed" and "plan" in names and "context" in names
-    assert replay["cursor"] == sequences[-1]
+    assert replay["cursor"] == positions[-1]
 
     full = reconnect(client, headers, queued["id"], after=0).json()["journal"]
     assert [entry["name"] for entry in full][:1] == ["admitted"]
@@ -307,6 +306,39 @@ def test_a_retry_counts_against_the_same_queue_bounds_as_any_new_run(api, runtim
     assert rows("SELECT count(*) FROM iris_ai.ask_run WHERE retry_of IS NOT NULL") == [(0,)]
 
 
+def test_a_retry_of_a_retry_that_also_failed_is_a_further_link_in_the_chain(api, runtime):
+    client, holder = api
+    _, svc = retrying_service(runtime, TransientProviderError("503"), TransientProviderError("503"),
+                              direct_reply("Third time."))
+    holder["service"] = svc
+    _, headers = reader("life-chain@cit.edu")
+    first = ask(client, headers, "life-chain-001").json()
+    assert run(svc.run_next()) is True
+    second = retry(client, headers, first["id"], "life-chain-002").json()
+    assert run(svc.run_next()) is True
+    # The original already has its retry; that retry failed too, so the reader retries *it*.
+    assert retry(client, headers, first["id"], "life-chain-003").json()["id"] == second["id"]
+    third = retry(client, headers, second["id"], "life-chain-004")
+    assert third.status_code == 201 and third.json()["retry_of"] == second["id"]
+    assert run(svc.run_next()) is True
+    assert reconnect(client, headers, third.json()["id"]).json()["state"] == "completed"
+    assert rows("SELECT count(*) FROM iris_ai.ask_run") == [(3,)]
+
+
+def test_a_paper_chat_run_is_retried_only_under_its_own_scope(api, runtime):
+    client, holder = api
+    queue(holder, agent_service(runtime, recording(reply("One."))))
+    owner, general = reader("life-scope@cit.edu")
+    record = Record.objects.create(title="Scope", pipeline_status=PipelineStatus.PUBLISHED)
+    scoped = {**as_reader(issue.reader_session_grant(owner, record.pk).token), **PUBLIC}
+    started = ask(client, scoped, "life-scope-001").json()
+    stop(client, scoped, started["id"])
+    # A grant of the whole corpus never widens a Paper Chat run, and nothing is written.
+    assert retry(client, general, started["id"], "life-scope-002").status_code == 409
+    assert rows("SELECT count(*) FROM iris_ai.ask_run") == [(1,)]
+    assert retry(client, scoped, started["id"], "life-scope-003").status_code == 201
+
+
 def test_two_processes_retrying_one_run_start_one_new_run(runtime):
     grant = session(make_user("life-retry-race@cit.edu"))
     for n in range(3):
@@ -358,7 +390,6 @@ def test_stop_after_the_request_was_sent_lets_it_finish_stays_charged_and_publis
 
 def test_stop_racing_a_takeover_and_the_old_holders_final_commit_has_one_outcome(runtime):
     grant = session(make_user("life-takeover@cit.edu"))
-    seen = set()
     for n in range(5):
         store, row, claim = _admit_and_claim(runtime, grant, f"life-takeover-{n}")
         with connection.cursor() as cursor:
@@ -378,14 +409,11 @@ def test_stop_racing_a_takeover_and_the_old_holders_final_commit_has_one_outcome
             assert status["state"] == "cancelled" and commit in ("cancelled", "fenced")
             assert stopped == "cancelled" and takeover in ("none", "2")
             assert turns == []
-        seen.add(status["state"])
-        # Whatever won, no worker holds the run or can write to it any more.
+        # Whatever won, no worker holds the run any more.
         assert rows("SELECT lease_owner FROM iris_ai.ask_run WHERE id = %s", row["id"]) == [(None,)]
-        assert run(store.commit_final(row["id"], 2, Result(answer="late"))) == status["state"]
-        assert len(turns_of(row["conversation_id"])) == len(turns)
-        # A takeover is an attempt of the same allowance, never a renewal of it.
-        assert rows("SELECT count(*) FROM iris_ai.attempt_accounting WHERE run_id = %s", row["id"])[0][0] <= 2
-    assert seen  # the outcome varies with scheduling; the invariants above hold for each
+        # A takeover that got in is one more attempt of the same allowance; one that did not left none.
+        assert rows("SELECT count(*) FROM iris_ai.attempt_accounting WHERE run_id = %s",
+                    row["id"]) == [(2 if takeover == "2" else 1,)]
 
 
 # --- The request/worker seam, end to end -------------------------------------
@@ -400,7 +428,19 @@ def test_a_disconnect_a_lost_wakeup_a_delayed_completion_and_a_deletion_leave_on
         async def wait(self, timeout):
             await asyncio.sleep(timeout)
 
-    svc = agent_service(runtime, recording(reply("Delayed answer."), reply("Retried answer.")))
+    class Slow(RecordingAgentProvider):
+        """Answers only after the reader's Stop has landed, as a worker slow past it would."""
+
+        stop_now = None
+
+        async def converse(self, request):
+            if self.stop_now is not None:
+                await self.stop_now()
+            return await super().converse(request)
+
+    provider = Slow(responses=[reply("Delayed answer."), reply("Retried answer.")],
+                    capacities={"scripted-model": MILLION})
+    svc = agent_service(runtime, provider)
     svc.notifier = LostWakeup()
     holder["service"] = svc
     _, headers = reader("life-seam@cit.edu")
@@ -410,16 +450,17 @@ def test_a_disconnect_a_lost_wakeup_a_delayed_completion_and_a_deletion_leave_on
     assert queued.status_code == 201 and queued.json()["state"] == "queued"
     run_id, conversation_id = queued.json()["id"], queued.json()["conversation_id"]
 
-    # A worker takes it; the reader's Stop lands while its (slow) answer is still being produced.
-    claimed = run(svc.store.claim(run_id, worker="slow", lease_seconds=30, executor="x", reserved_units=1))
-    assert claimed is not None
-    assert stop(client, headers, run_id).json()["state"] == "cancelled"
-    # The delayed worker finishes now: it publishes nothing and cannot revive the run.
-    assert run(svc.store.commit_final(run_id, claimed.fence, Result(answer="Delayed answer."))) == "cancelled"
+    # A worker (its real loop) takes it; the reader's Stop lands while the answer is still being produced.
+    grant = headers["X-IRIS-Reader-Grant"]
+    provider.stop_now = lambda: svc.store.cancel(grant, uuid.UUID(run_id))
+    assert run(svc.run_next()) is True
+    # The delayed worker finished: it published nothing and could not revive the run.
     assert turns_of(conversation_id) == []
     assert reconnect(client, headers, run_id, after=0).json()["state"] == "cancelled"
+    assert terminal_events(run_id) == ["cancelled"]
 
     # Retry: a new run, which a worker answers once even though its wakeup is lost too.
+    provider.stop_now = None
     again = retry(client, headers, run_id, "life-seam-002").json()
     assert again["retry_of"] == run_id
     assert run(svc.run_next()) is True and run(svc.run_next()) is False

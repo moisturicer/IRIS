@@ -384,6 +384,13 @@ class RunStore:
         original = await conn.fetchrow(
             f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE id = $1 FOR UPDATE", run_id,
         )
+        conversation = await conn.fetchrow(
+            "SELECT revision, scope_record_id FROM iris_ai.conversation WHERE id = $1",
+            original["conversation_id"],
+        )
+        # Paper Chat stays on its Record; the retry reads under this grant, so it must match.
+        if conversation["scope_record_id"] != scope:
+            raise Conflict("scope_mismatch")
         existing = await conn.fetchrow(
             f"SELECT {RUN_COLUMNS} FROM iris_ai.ask_run WHERE reader_id = $1 AND request_key = $2",
             reader, key,
@@ -400,11 +407,8 @@ class RunStore:
         if (original["state"] not in RETRYABLE or original["question"] is None
                 or (original["pinned"] or {}).get("kind") == KIND_COMPACT):
             raise Conflict("not_retryable")
-        revision = await conn.fetchval(
-            "SELECT revision FROM iris_ai.conversation WHERE id = $1", original["conversation_id"],
-        )
-        if revision != original["base_revision"]:
-            raise Conflict("revision_conflict", revision=revision)
+        if conversation["revision"] != original["base_revision"]:
+            raise Conflict("revision_conflict", revision=conversation["revision"])
         await self._expire_overdue(conn, original["conversation_id"])
         active = await conn.fetchval(
             "SELECT id FROM iris_ai.ask_run WHERE conversation_id = $1 AND state = ANY($2)",
