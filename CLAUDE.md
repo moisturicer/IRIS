@@ -89,6 +89,10 @@ npm run dev          # vite
 npm run build        # tsc && vite build
 npm run lint         # eslint src --ext ts,tsx
 npm test             # vitest run — non-interactive, jsdom, axe-core (IR-210)
+npm run test:changed # vitest run --changed origin/main: every test that imports a changed
+                     # file, directly or through the route table (IR-922). Run it before
+                     # pushing; a narrow single-file run missed a router test in IR-913.
+                     # CI still runs the whole suite and is the gate.
 npm run test:watch   # vitest in watch mode
 # Queries go through the accessible tree (role + accessible name), never a class
 # or a test id. axe-core fails the build on serious/critical only, and cannot

@@ -33,7 +33,7 @@
 **Required**
 - [ ] Acceptance criteria satisfied and self-verified
 - [ ] CI passing, or the failure is explained above and understood
-- [ ] Branch is up to date with `feat/rag-service`
+- [ ] Branch is up to date with `main`
 - [ ] No secret, credential or real institutional data committed
 - [ ] No test was modified to make it pass
 
