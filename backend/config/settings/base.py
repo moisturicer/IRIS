@@ -357,6 +357,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.records.tasks.send_embargo_reminders",
         "schedule": crontab(hour=0, minute=0),
     },
+    # ADR-051 decision 19 (IR-794): erase personal data past the periods the System
+    # Admin set, daily at 03:00 Manila. Each type's period is a system setting, and
+    # a blank one erases nothing.
+    "retention-cleanup": {
+        "task": "apps.audit.tasks.erase_expired_personal_data",
+        "schedule": crontab(hour=19, minute=0),
+    },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due
     # retries, expires stale intents and purges terminal records. Its interval

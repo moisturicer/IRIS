@@ -15,6 +15,7 @@ from core.permissions import (
 )
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
+from apps.audit import retention
 from apps.audit.models import AuditEvent
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
@@ -546,6 +547,9 @@ class SystemSettingView(APIView):
         value = request.data.get("value")
         if not isinstance(value, str):
             return Response({"value": ["A text value is required."]}, status=400)
+        # A retention period is whole days, or blank to erase nothing (IR-794).
+        if key in retention.setting_keys() and (error := retention.period_error(value)):
+            return Response({"value": [error]}, status=400)
         with transaction.atomic():
             setting = SystemSetting.objects.select_for_update().filter(key=key).first()
             if not setting:

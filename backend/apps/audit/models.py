@@ -80,6 +80,10 @@ class AuditEvent(models.Model):
     RECOVERY_EMAIL_FAILED        = "RECOVERY_EMAIL_FAILED"
     PASSWORD_RESET_COMPLETED     = "PASSWORD_RESET_COMPLETED"
     EMAIL_VERIFICATION_COMPLETED = "EMAIL_VERIFICATION_COMPLETED"
+    # The daily retention cleanup (ADR-051 decision 19, IR-794). No actor and no
+    # record. Metadata: `counts`, the rows erased per data type -- never a name,
+    # an email or any erased text.
+    RETENTION_CLEANUP_RUN = "RETENTION_CLEANUP_RUN"
 
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
@@ -138,6 +142,7 @@ class AuditEvent(models.Model):
         (RECOVERY_EMAIL_FAILED,        "Recovery Email Failed"),
         (PASSWORD_RESET_COMPLETED,     "Password Reset Completed"),
         (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
+        (RETENTION_CLEANUP_RUN,        "Retention Cleanup Run"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)
