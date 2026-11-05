@@ -50,16 +50,16 @@ describe("seatsApi", () => {
 
 describe("reviewsApi.mine", () => {
   it("sends the tab and nothing else when no filter is set", async () => {
-    await reviewsApi.mine({ tab: "active" } as never);
+    await reviewsApi.mine({ tab: "to_review" });
 
-    expect(stub.only()).toMatchObject({ method: "get", url: "/reviews/mine/", params: { tab: "active" } });
+    expect(stub.only()).toMatchObject({ method: "get", url: "/reviews/mine/", params: { tab: "to_review" } });
     expect(Object.keys(stub.only().params as object)).toEqual(["tab"]);
   });
 
   it("sends every filter that is set, with overdue as the string 1", async () => {
     await reviewsApi.mine({
       tab: "done", outcome: "cleared", office: "ITSO", cursor: "c1", sort: "due", overdue: true,
-    } as never);
+    });
 
     expect(stub.only().params).toEqual({
       tab: "done", outcome: "cleared", office: "ITSO", cursor: "c1", sort: "due", overdue: "1",
@@ -68,40 +68,40 @@ describe("reviewsApi.mine", () => {
 
   it("leaves a filter off when it is empty, null or false", async () => {
     await reviewsApi.mine({
-      tab: "active", outcome: "", office: null, cursor: undefined, sort: "", overdue: false,
-    } as never);
+      tab: "to_review", outcome: null, office: null, cursor: undefined, sort: null, overdue: false,
+    });
 
-    expect(stub.only().params).toEqual({ tab: "active" });
+    expect(stub.only().params).toEqual({ tab: "to_review" });
   });
 
   it("answers with the page the server sent", async () => {
     stub.reply({ data: { counts: { active: 1 }, results: [] } });
 
-    expect((await reviewsApi.mine({ tab: "active" } as never)).data).toEqual({ counts: { active: 1 }, results: [] });
+    expect((await reviewsApi.mine({ tab: "to_review" })).data).toEqual({ counts: { active: 1 }, results: [] });
   });
 
   it("rejects with the status when a reviewer is refused", async () => {
     stub.reply({ status: 403, data: { detail: "No." } });
 
-    await expect(reviewsApi.mine({ tab: "active" } as never)).rejects.toMatchObject({ response: { status: 403 } });
+    await expect(reviewsApi.mine({ tab: "to_review" })).rejects.toMatchObject({ response: { status: 403 } });
   });
 });
 
 describe("reviewsApi.analytics", () => {
   it("sends no filter when none is set, so the server applies none", async () => {
-    await reviewsApi.analytics({ office: null, from: null, to: null } as never);
+    await reviewsApi.analytics({ office: "", from: "", to: "" });
 
     expect(stub.only()).toMatchObject({ method: "get", url: "/reviews/analytics/", params: {} });
   });
 
   it("sends the filters that are set under the names the server reads", async () => {
-    await reviewsApi.analytics({ office: "KTTO", from: "2026-01-01", to: "2026-06-30" } as never);
+    await reviewsApi.analytics({ office: "KTTO", from: "2026-01-01", to: "2026-06-30" });
 
     expect(stub.only().params).toEqual({ office: "KTTO", from: "2026-01-01", to: "2026-06-30" });
   });
 
   it("sends only a lower bound when that is all there is", async () => {
-    await reviewsApi.analytics({ from: "2026-01-01" } as never);
+    await reviewsApi.analytics({ office: "", from: "2026-01-01", to: "" });
 
     expect(stub.only().params).toEqual({ from: "2026-01-01" });
   });
@@ -109,7 +109,7 @@ describe("reviewsApi.analytics", () => {
   it("rejects with the status when the caller may not see analytics", async () => {
     stub.reply({ status: 403 });
 
-    await expect(reviewsApi.analytics({} as never)).rejects.toMatchObject({ response: { status: 403 } });
+    await expect(reviewsApi.analytics({ office: "", from: "", to: "" })).rejects.toMatchObject({ response: { status: 403 } });
   });
 });
 

@@ -29,6 +29,8 @@ export interface RecordedCall {
   headers: Record<string, unknown>;
   responseType: string | undefined;
   config: InternalAxiosRequestConfig;
+  /** Fires the call's upload-progress callback, as the browser would while the bytes go up. */
+  progress(event: { loaded: number; total?: number }): void;
 }
 
 export interface StubReply {
@@ -84,6 +86,7 @@ export function installApiStub(): ApiStub {
       headers: { ...(config.headers as unknown as Record<string, unknown>) },
       responseType: config.responseType,
       config,
+      progress: (event) => (config.onUploadProgress as (e: object) => void)(event),
     });
 
     const status = next.status ?? 200;

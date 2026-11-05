@@ -114,9 +114,8 @@ describe("uploads", () => {
     const onProgress = vi.fn();
 
     await call(new File(["0123456789"], "paper.pdf"), onProgress);
-    const report = stub.only().config.onUploadProgress as (e: object) => void;
-    report({ loaded: 5, total: 20 });
-    report({ loaded: 10 });
+    stub.only().progress({ loaded: 5, total: 20 });
+    stub.only().progress({ loaded: 10 });
 
     expect(onProgress).toHaveBeenNthCalledWith(1, 25);
     // With no total from the browser the file's own size is the denominator.
@@ -127,7 +126,7 @@ describe("uploads", () => {
     const onProgress = vi.fn();
 
     await documentsApi.upload(9, 4, new File([], "empty.pdf"), { onProgress });
-    (stub.only().config.onUploadProgress as (e: object) => void)({ loaded: 0 });
+    stub.only().progress({ loaded: 0 });
 
     expect(onProgress).not.toHaveBeenCalled();
   });
@@ -135,8 +134,7 @@ describe("uploads", () => {
   it("does not throw on progress when no one is listening", async () => {
     await documentsApi.upload(9, 4, pdf());
 
-    expect(() => (stub.only().config.onUploadProgress as (e: object) => void)({ loaded: 1, total: 2 }))
-      .not.toThrow();
+    expect(() => stub.only().progress({ loaded: 1, total: 2 })).not.toThrow();
   });
 
   it("sets a multipart content type so the browser adds the boundary", async () => {

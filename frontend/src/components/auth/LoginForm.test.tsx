@@ -89,7 +89,7 @@ describe("LoginForm", () => {
       expect(screen.queryByText("Password is required.")).not.toBeInTheDocument();
     });
 
-    it("accepts an address with surrounding spaces, as the schema trims it", async () => {
+    it("does not block an address with surrounding spaces, which the schema trims when validating", async () => {
       const { onSubmit, user, email, password, signIn } = setup();
 
       await user.type(email(), "  kay@cit.edu  ");

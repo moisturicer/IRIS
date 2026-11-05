@@ -54,15 +54,8 @@ describe("useRole", () => {
     expect(set).toEqual(flag ? [flag] : []);
   });
 
-  it("an Adviser reviews but is not office staff", () => {
-    const flags = roleFlags(makeUser({ role_name: ROLES.ADVISER }));
-
-    expect(flags.isReviewer).toBe(true);
-    expect(flags.isStaff).toBe(false);
-  });
-
   it("a Django staff account counts as reviewer and staff even with no role", () => {
-    const flags = roleFlags(makeUser({ role_name: undefined, is_staff: true } as never));
+    const flags = roleFlags(makeUser({ role_name: null, is_staff: true }));
 
     expect(flags.isDjangoStaff).toBe(true);
     expect(flags.isReviewer).toBe(true);

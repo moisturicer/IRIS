@@ -1,5 +1,5 @@
 /**
- * What is persisted on sign-in and what sign-out removes (IR-916, NFR-S2).
+ * What is persisted on sign-in and what sign-out removes (IR-916).
  *
  * The credential inventory is the point. A refresh token left behind is a live
  * session for the next person on a shared lab machine, so every key the app has
@@ -121,8 +121,16 @@ describe("sign-out clears every stored credential", () => {
     useAuthStore.getState().login(makeUser(), "access-1", "refresh-1");
 
     expect(sessionStorage.getItem(REFRESH_KEY)).toBe("refresh-1");
-    expect(JSON.stringify({ ...sessionStorage })).not.toContain("access-1");
-    expect(JSON.stringify({ ...localStorage })).not.toContain("access-1");
+    // Every stored key and value, read through the Storage API: the refresh
+    // token is there, and the access token is in none of them.
+    const stored = [sessionStorage, localStorage].flatMap((storage) =>
+      Array.from({ length: storage.length }, (_, i) => {
+        const key = storage.key(i)!;
+        return [key, storage.getItem(key)];
+      }),
+    );
+    expect(stored).toContainEqual([REFRESH_KEY, "refresh-1"]);
+    expect(stored.flat()).not.toContain("access-1");
   });
 
   it("logout leaves nothing behind", () => {

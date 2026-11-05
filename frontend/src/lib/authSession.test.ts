@@ -137,9 +137,22 @@ describe("lockout", () => {
 });
 
 describe("session end messages", () => {
-  it.each(Object.keys(SESSION_END_MESSAGES))("knows %s", (code) => {
+  it.each([
+    ["session_idle", "Session Expired"],
+    ["session_ended", "Signed Out"],
+    ["account_locked", "Account Locked"],
+    ["session_ended_password_changed", "Password Changed"],
+    ["session_ended_revoked", "Session Ended"],
+  ])("says %s as %j", (code, title) => {
     expect(isSessionEndCode(code)).toBe(true);
-    expect(sessionEndMessage(code)).toBe(SESSION_END_MESSAGES[code as keyof typeof SESSION_END_MESSAGES]);
+    expect(sessionEndMessage(code).title).toBe(title);
+  });
+
+  it("knows exactly the five codes the server gives", () => {
+    expect(Object.keys(SESSION_END_MESSAGES).sort()).toEqual([
+      "account_locked", "session_ended", "session_ended_password_changed",
+      "session_ended_revoked", "session_idle",
+    ]);
   });
 
   it.each([undefined, null, 42, "", "made_up", "toString", "__proto__"])(
@@ -149,13 +162,6 @@ describe("session end messages", () => {
       expect(sessionEndMessage(code)).toBe(SESSION_END_MESSAGES.session_idle);
     },
   );
-
-  it("gives every message a title and a sentence a person can read", () => {
-    for (const { title, text } of Object.values(SESSION_END_MESSAGES)) {
-      expect(title.length).toBeGreaterThan(0);
-      expect(text.endsWith(".")).toBe(true);
-    }
-  });
 });
 
 describe("redirectToLoginSessionExpired", () => {

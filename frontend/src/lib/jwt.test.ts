@@ -23,12 +23,11 @@ describe("decodeJwtPayload", () => {
   });
 
   it("reads base64url, which swaps + and / for - and _ and drops the padding", () => {
-    // These bytes encode to base64 containing both "+" and "/".
-    const department = "ûÿ?>>";
-    const token = makeToken({ department });
+    // "???>>>" encodes to base64 containing both "+" and "/".
+    const token = makeToken({ department: "???>>>" });
 
     expect(token.split(".")[1]).toMatch(/^[A-Za-z0-9_-]+$/);
-    expect(decodeJwtPayload(token)?.department).toBe(department);
+    expect(decodeJwtPayload(token)?.department).toBe("???>>>");
   });
 
   it.each([
@@ -49,11 +48,11 @@ describe("decodeJwtPayload", () => {
 
 describe("isJwtExpired", () => {
   it("is false while exp is in the future", () => {
-    expect(isJwtExpired(decodeJwtPayload(validToken())!)).toBe(false);
+    expect(isJwtExpired(decodeJwtPayload(validToken()) ?? {})).toBe(false);
   });
 
   it("is true once exp has passed", () => {
-    expect(isJwtExpired(decodeJwtPayload(expiredToken())!)).toBe(true);
+    expect(isJwtExpired(decodeJwtPayload(expiredToken()) ?? {})).toBe(true);
   });
 
   it("treats a token with no exp as expired, so it is never trusted", () => {

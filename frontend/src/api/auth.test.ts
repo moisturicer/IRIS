@@ -3,9 +3,11 @@
  * (IR-916). `client.test.ts` covers the refresh interceptor; this covers the
  * calls a screen makes.
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { authApi } from "./auth";
+
+vi.mock("@/lib/authSession", () => ({ redirectToLoginSessionExpired: vi.fn() }));
 import { installApiStub } from "@/test/apiAdapter";
 
 const stub = installApiStub();
@@ -109,11 +111,14 @@ describe("authApi", () => {
   });
 
   describe("a refusal", () => {
-    it("rejects with the server's status and body intact, so the screen can show its message", async () => {
-      stub.reply({ status: 400, data: { detail: "Invalid credentials." } });
+    it("rejects a wrong password, a 401 as the server sends it, with its body intact", async () => {
+      // The 401 passes through the refresh interceptor, which with no session to
+      // refresh ends it and rejects with the original error. The redirect is
+      // stubbed: on the real /login page it is a no-op.
+      stub.reply({ status: 401, data: { detail: "Invalid credentials." } });
 
       await expect(authApi.login({ email: "a@cit.edu", password: "bad" }))
-        .rejects.toMatchObject({ response: { status: 400, data: { detail: "Invalid credentials." } } });
+        .rejects.toMatchObject({ response: { status: 401, data: { detail: "Invalid credentials." } } });
     });
 
     it("keeps the lock reason a locked account is refused with", async () => {
@@ -129,7 +134,7 @@ describe("authApi", () => {
       await expect(authApi.activate("x", "y")).rejects.toMatchObject({ response: { status: 400 } });
     });
 
-    it("rejects a server error without inventing a body", async () => {
+    it("rejects a server error with its status", async () => {
       stub.reply({ status: 500 });
 
       await expect(authApi.me()).rejects.toMatchObject({ response: { status: 500 } });

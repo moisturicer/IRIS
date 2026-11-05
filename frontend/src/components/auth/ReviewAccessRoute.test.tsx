@@ -12,6 +12,7 @@ import { useAuthStore } from "@/store/auth.store";
 import { ROLES } from "@/lib/constants";
 import { pathFor } from "@/lib/access";
 import { makeUser } from "@/test/authFixtures";
+import type { User } from "@/types/auth";
 import { renderScreen, screen } from "@/test/render";
 
 function renderAt(route: string) {
@@ -28,7 +29,7 @@ function renderAt(route: string) {
 
 function signInWith(reviewAccess: unknown) {
   useAuthStore.setState({
-    user: makeUser({ role_name: ROLES.ADVISER, review_access: reviewAccess } as never),
+    user: makeUser({ role_name: ROLES.ADVISER, review_access: reviewAccess as User["review_access"] }),
     isAuthenticated: true,
   });
 }

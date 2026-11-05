@@ -6,9 +6,11 @@
  * or a renamed body key is refused there as a 405 or a 400 and reads as a
  * broken button here.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { recordsApi } from "./records";
+import { useAuthStore } from "@/store/auth.store";
+import type { RouteRequest } from "@/types/records";
 import { installApiStub } from "@/test/apiAdapter";
 
 const stub = installApiStub();
@@ -17,7 +19,7 @@ type Row = [name: string, call: () => Promise<unknown>, method: string, url: str
 
 const none = undefined;
 
-const routeBody = { offices: ["ITSO"] } as never;
+const routeBody: RouteRequest = { to: [{ party: "itso" }], reason: "Needs ITSO review" };
 
 const rows: Row[] = [
   // Discover
@@ -37,7 +39,7 @@ const rows: Row[] = [
   ["continueAs", () => recordsApi.continueAs(9, 4), "post", "/records/9/continue-as/", { record_type: 4 }],
   ["tracker", () => recordsApi.tracker(9), "get", "/records/9/tracker/"],
   ["similar", () => recordsApi.similar(9), "get", "/records/9/similar/"],
-  ["create", () => recordsApi.create({ title: "T" } as never), "post", "/records/", { title: "T" }],
+  ["create", () => recordsApi.create({ title: "T" }), "post", "/records/", { title: "T" }],
   ["update", () => recordsApi.update(9, { title: "New" }), "patch", "/records/9/", { title: "New" }],
   ["delete", () => recordsApi.delete(9), "delete", "/records/9/"],
   ["submit", () => recordsApi.submit(9, true), "post", "/records/9/submit/", { dpa_accepted: true }],
@@ -69,9 +71,9 @@ const rows: Row[] = [
   ["routeOptions", () => recordsApi.routeOptions(9), "get", "/records/9/route-options/"],
   ["acceptAndRoute", () => recordsApi.acceptAndRoute(9, routeBody), "post", "/records/9/accept-and-route/", routeBody],
   ["route", () => recordsApi.route(9, routeBody), "post", "/records/9/route/", routeBody],
-  ["officeReview clearing", () => recordsApi.officeReview(9, { outcome: "cleared" as never, comment: "" }),
+  ["officeReview clearing", () => recordsApi.officeReview(9, { outcome: "cleared", comment: "" }),
     "post", "/records/9/office-review/", { outcome: "cleared", comment: "" }],
-  ["decide", () => recordsApi.decide(9, { outcome: "reject" as never, comment: "No", token: "tok" }),
+  ["decide", () => recordsApi.decide(9, { outcome: "reject", comment: "No", token: "tok" }),
     "post", "/records/9/decide/", { outcome: "reject", comment: "No", token: "tok" }],
   ["requestRevision", () => recordsApi.requestRevision(9, { reason: "Fix section 2" }),
     "post", "/records/9/request-revision/", { reason: "Fix section 2" }],
@@ -82,10 +84,10 @@ const rows: Row[] = [
   // Document requests
   ["documentRequests", () => recordsApi.documentRequests(9), "get", "/records/9/document-requests/"],
   ["createDocumentRequest",
-    () => recordsApi.createDocumentRequest(9, { message: "Please", items: [], party: "ITSO" as never }),
-    "post", "/records/9/document-requests/", { message: "Please", items: [], party: "ITSO" }],
-  ["decideDocumentRequestItem", () => recordsApi.decideDocumentRequestItem(4, { decision: "accept" } as never),
-    "patch", "/document-request-items/4/", { decision: "accept" }],
+    () => recordsApi.createDocumentRequest(9, { message: "Please", items: [{ slot: 2 }, { label: "Other" }], party: "itso" }),
+    "post", "/records/9/document-requests/", { message: "Please", items: [{ slot: 2 }, { label: "Other" }], party: "itso" }],
+  ["decideDocumentRequestItem", () => recordsApi.decideDocumentRequestItem(4, { action: "reject", reason: "Wrong file" }),
+    "patch", "/document-request-items/4/", { action: "reject", reason: "Wrong file" }],
   ["withdrawDocumentRequest", () => recordsApi.withdrawDocumentRequest(4),
     "patch", "/document-requests/4/", { action: "withdraw" }],
   ["documentRequestSlots", () => recordsApi.documentRequestSlots(9), "get", "/records/9/document-requests/slots/"],
@@ -117,6 +119,8 @@ const rows: Row[] = [
   ["approveDeleteRequest", () => recordsApi.approveDeleteRequest(8), "post", "/records/delete-requests/8/approve/"],
   ["declineDeleteRequest", () => recordsApi.declineDeleteRequest(8), "post", "/records/delete-requests/8/decline/"],
 ];
+
+afterEach(() => useAuthStore.setState({ accessToken: null }));
 
 describe("recordsApi: every call sends the request the server expects", () => {
   it.each(rows)("%s", async (_name, call, method, url, body, params) => {
@@ -175,9 +179,8 @@ describe("recordsApi: calls with a shape of their own", () => {
       const onProgress = vi.fn();
 
       await recordsApi.uploadManuscript(9, file, { onProgress });
-      const report = stub.only().config.onUploadProgress as (e: object) => void;
-      report({ loaded: 5, total: 20 });
-      report({ loaded: 5 });
+      stub.only().progress({ loaded: 5, total: 20 });
+      stub.only().progress({ loaded: 5 });
 
       expect(onProgress).toHaveBeenNthCalledWith(1, 25);
       expect(onProgress).toHaveBeenNthCalledWith(2, 50);
@@ -187,7 +190,7 @@ describe("recordsApi: calls with a shape of their own", () => {
       const onProgress = vi.fn();
 
       await recordsApi.uploadManuscript(9, new File([], "empty.pdf"), { onProgress });
-      (stub.only().config.onUploadProgress as (e: object) => void)({ loaded: 0 });
+      stub.only().progress({ loaded: 0 });
 
       expect(onProgress).not.toHaveBeenCalled();
     });
@@ -229,13 +232,11 @@ describe("recordsApi: calls with a shape of their own", () => {
   });
 
   it("carries a bearer token from the auth store on every call", async () => {
-    const { useAuthStore } = await import("@/store/auth.store");
     useAuthStore.setState({ accessToken: "tok-1" });
 
     await recordsApi.facets();
 
     expect(stub.only().headers).toMatchObject({ Authorization: "Bearer tok-1" });
-    useAuthStore.setState({ accessToken: null });
   });
 });
 
@@ -245,7 +246,7 @@ describe("recordsApi: a refusal reaches the caller with its status and body", ()
     ["403, an act they may not do", 403, { detail: "No." }, () => recordsApi.releaseEmbargo(9)],
     ["400, an act that is not possible now", 400, { detail: "Not now." }, () => recordsApi.submit(9, true)],
     ["409, a record that changed since the decision token", 409, { decision: { token: "fresh" } },
-      () => recordsApi.decide(9, { outcome: "reject" as never, comment: "No", token: "stale" })],
+      () => recordsApi.decide(9, { outcome: "reject", comment: "No", token: "stale" })],
     ["403 with a code, a download without a grant", 403, { code: "download_grant_required" },
       () => recordsApi.downloadCopy(9)],
   ])("%s", async (_label, status, data, call) => {
