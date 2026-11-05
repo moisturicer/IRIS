@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable } from "@/components/shared/DataTable";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import type { ColumnDef } from "@tanstack/react-table";
 import { AUDIT_EVENT_LABELS, type AuditEvent } from "@/types/audit";
 import { groupAuditEventTypes, type AuditEventTypeOption } from "@/lib/auditEventGroups";
@@ -120,12 +121,10 @@ export default function AuditLogPage() {
       setPage(1);
       setFilters({ event_type: eventType || undefined, record: record ? Number(record) : undefined, user: user ? Number(user) : undefined, from: from || undefined, to: to || undefined });
     }}>
-      <label className="flex flex-col gap-1 text-sm">Event type
-        <select className="border border-stone-300 rounded-lg px-3 py-2" value={eventType} onChange={(e) => setEventType(e.target.value)} aria-describedby={typesFailed ? "audit-event-types-note" : undefined}>
-          <option value="">All events</option>
-          {typeGroups.map(({ group, types }) => <optgroup key={group} label={group}>{types.map(({ type, label: text }) => <option key={type} value={type}>{text}</option>)}</optgroup>)}
-        </select>
-      </label>
+      <Select label="Event type" value={eventType} onChange={(e) => setEventType(e.target.value)} aria-describedby={typesFailed ? "audit-event-types-note" : undefined}>
+        <option value="">All events</option>
+        {typeGroups.map(({ group, types }) => <optgroup key={group} label={group}>{types.map(({ type, label: text }) => <option key={type} value={type}>{text}</option>)}</optgroup>)}
+      </Select>
       <Input label="Record ID" type="number" min="1" step="1" value={record} onChange={(e) => setRecord(e.target.value)} />
       <Input label="Actor ID" type="number" min="1" step="1" value={user} onChange={(e) => setUser(e.target.value)} />
       <Input label="From date" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
