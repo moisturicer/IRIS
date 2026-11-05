@@ -166,6 +166,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-726** | A reader stops, reconnects with a journal cursor, or explicitly retries one AI-runtime investigation across worker races without duplicate delivery, continued admissions or a renewed allowance — under IR-713, ADR-049 §11; no FR- id | [details](traceability/IR-726.md) | **PARTIAL** |
 | **IR-752** | An operator builds a pending Embedding Space beside the active one, with space-keyed Record and Passage vectors, while readers keep searching the active space — under IR-716, ADR-049 §23; additive expand only, no activation (IR-739); no FR- id | [details](traceability/IR-752.md) | **PARTIAL** |
 | **IR-740** | IR-605 collects the dedicated runtime through its real authenticated routes under an explicit engine identity, and rescores old baselines with effective-condition preflight and a separate capability report — under IR-716, ADR-049 §24; no FR- id | [details](traceability/IR-740.md) | **PARTIAL** |
+| **IR-741** | The release-readiness manifest reports quality, safety, baseline, scenario, workload and cost evidence per gate and refuses to call missing, fake or incomparable evidence a pass — under IR-716, ADR-049 §25-§26; no FR- id | [details](traceability/IR-741.md) | **PARTIAL** |
 
 ### Non-functional
 

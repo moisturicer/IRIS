@@ -1,0 +1,136 @@
+"""Release-readiness manifest over IR-605's campaign evidence (IR-741). Free: no DB, no vendor.
+
+    python manage.py eval_readiness --build --report campaign.json --candidate runtime \\
+        --baseline frozen.json --baseline-arm controller --baseline-sha256 <digest> \\
+        --scenarios ir608.json --workload w.json --profile p.json --measurements m.json \\
+        --approvals approvals.json [--capability cap.json] [--model model.json]
+    python manage.py eval_readiness --preflight --workload w.json --profile p.json \\
+        --approvals approvals.json
+    python manage.py eval_readiness --verify manifest.json [--assert-ready --expect-commit SHA]
+
+Reads files an operator already holds, and writes one manifest naming each input by path and
+SHA-256. A blocked manifest is a normal result and exits 0; it says what is missing. This
+collects nothing, calls no model and authorizes no release, spending or deployment.
+"""
+
+from pathlib import Path
+
+from django.core.management.base import BaseCommand, CommandError
+
+from apps.ai.evaluation.readiness import (ReadinessRefused, assert_ready, build_readiness,
+                                          collection_preflight, verify_manifest)
+from apps.ai.evaluation.runfile import file_digest, load_json, write_run
+from apps.ai.management.commands.eval_retrieval import DEFAULT_OUT
+
+#: command option -> the evidence name build_readiness and the manifest use for it.
+SOURCES = {"report": "report", "scenarios": "scenarios", "workload": "workload",
+           "profile": "profile", "measurements": "measurements", "approvals": "approvals"}
+
+
+class Command(BaseCommand):
+    help = "Build, verify or preflight the release-readiness manifest."
+
+    def add_arguments(self, parser):
+        parser.add_argument("--build", action="store_true")
+        parser.add_argument("--preflight", action="store_true",
+                            help="May paid collection begin? Names every missing item.")
+        parser.add_argument("--verify", metavar="MANIFEST",
+                            help="Check a manifest is internally sound.")
+        parser.add_argument("--assert-ready", action="store_true",
+                            help="With --verify: also refuse unless the manifest is ready.")
+        parser.add_argument("--expect-commit", help="With --assert-ready: the candidate commit.")
+        parser.add_argument("--report", help="An eval_campaign report file (architecture mode).")
+        parser.add_argument("--candidate", default="runtime")
+        parser.add_argument("--baseline", help="The frozen baseline campaign report.")
+        parser.add_argument("--baseline-arm", help="The arm of the baseline to compare against.")
+        parser.add_argument("--baseline-sha256",
+                            help="Frozen digest of the baseline report (canonical JSON).")
+        parser.add_argument("--scenarios", help="IR-608 eval_scenarios run file.")
+        parser.add_argument("--workload", help="The predeclared workload.")
+        parser.add_argument("--profile", help="The authorized latency/cost profile.")
+        parser.add_argument("--measurements", help="A workload-measurement-1 file.")
+        parser.add_argument("--approvals", help="Recorded approval references.")
+        parser.add_argument("--capability", help="A capability-mode report, kept separate.")
+        parser.add_argument("--model", help="A model-mode report, kept separate.")
+        parser.add_argument("--out", default=str(DEFAULT_OUT))
+
+    def handle(self, *args, **options):
+        modes = [bool(options["build"]), bool(options["preflight"]), bool(options["verify"])]
+        if sum(modes) != 1:
+            raise CommandError("give exactly one of --build, --preflight or --verify")
+        try:
+            if options["build"]:
+                return self._build(options)
+            if options["preflight"]:
+                return self._preflight(options)
+            self._verify(options)
+        except ReadinessRefused as exc:
+            raise CommandError(str(exc)) from None
+
+    @staticmethod
+    def _load(options, key):
+        return load_json(options[key]) if options.get(key) else None
+
+    def _preflight(self, options):
+        result = collection_preflight(self._load(options, "workload"),
+                                      self._load(options, "profile"),
+                                      self._load(options, "approvals"))
+        w = self.stdout.write
+        for item in result["missing"]:
+            w(f"MISSING {item}")
+        if not result["allowed"]:
+            raise CommandError("live collection is not allowed: "
+                               f"{len(result['missing'])} item(s) missing")
+        w("allowed: every declaration, cap and approval is recorded. This authorizes nothing "
+          "by itself.")
+
+    def _verify(self, options):
+        # write_run stamps the commit the tool ran at; that key is provenance of the file,
+        # not part of the sealed manifest, so it is set aside before the digest is checked.
+        manifest = {k: v for k, v in load_json(options["verify"]).items() if k != "commit"}
+        problems = verify_manifest(manifest)
+        if problems:
+            raise CommandError("manifest cannot be trusted: " + "; ".join(problems))
+        if options["assert_ready"]:
+            assert_ready(manifest, expect_commit=options["expect_commit"])
+            self.stdout.write("ready: every gate is met. A named person's release decision is "
+                              "still required.")
+        else:
+            self.stdout.write(f"sound; status {manifest['status']}")
+
+    def _build(self, options):
+        if not options["report"]:
+            raise CommandError("--build needs --report")
+        baseline = None
+        if options["baseline"]:
+            for key in ("baseline_arm", "baseline_sha256"):
+                if not options[key]:
+                    raise CommandError(f"--baseline needs --{key.replace('_', '-')}")
+            baseline = {"report": load_json(options["baseline"]), "arm": options["baseline_arm"],
+                        "expected_sha256": options["baseline_sha256"]}
+        report = load_json(options["report"])
+        scenarios = self._load(options, "scenarios")
+        if scenarios is not None:
+            scenarios = scenarios.get("scenarios", scenarios)
+        references = {name: {"path": Path(options[key]).as_posix(),
+                             "sha256": file_digest(options[key])}
+                      for key, name in SOURCES.items() if options.get(key)}
+        if baseline:
+            references["baseline"] = {"path": Path(options["baseline"]).as_posix(),
+                                      "sha256": file_digest(options["baseline"])}
+        manifest = build_readiness(
+            report, candidate=options["candidate"], baseline=baseline, scenarios=scenarios,
+            workload=self._load(options, "workload"), profile=self._load(options, "profile"),
+            measurements=self._load(options, "measurements"),
+            approvals=self._load(options, "approvals"), references=references,
+            capability=self._load(options, "capability"), model=self._load(options, "model"))
+        out = write_run(options["out"], f"IR-741-readiness-{manifest['set_id']}", manifest)
+        w = self.stdout.write
+        for name, gate in manifest["gates"].items():
+            w(f"{name}: {gate['status']}")
+        for line in manifest["blocking"]:
+            w(f"BLOCKING {line}")
+        for gap in manifest["human_review_gaps"]:
+            w(f"HUMAN REVIEW {gap}")
+        w(("evidence_met" if manifest["status"] == "evidence_met" else "BLOCKED")
+          + f"; wrote {out}")
