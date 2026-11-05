@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils";
 import type { StreamingState } from "../conversation/answerStream";
 import { AskIrisMark } from "./AskIrisIcons";
 import { CitationText } from "./CitationText";
-import { ANSWER_MARKDOWN } from "./answerLayout";
+import { ANSWER_MARKDOWN, CHAT_STREAM_CARET } from "./answerLayout";
 import { StreamStatusRow } from "./StreamStatusRow";
 import { LiveCandidates } from "./CandidateList";
 
@@ -39,7 +39,7 @@ export function StreamingMessageBubble({
             text={state.text}
             citations={state.citations}
             streaming
-            className={ANSWER_MARKDOWN}
+            className={cn(ANSWER_MARKDOWN, CHAT_STREAM_CARET)}
           />
         )}
 

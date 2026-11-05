@@ -83,9 +83,9 @@ function CitationChip({ citation, page = false }: { citation: ChatCitation; page
           ? "inline-flex items-center px-1 mx-0.5 rounded-md text-2xs font-semibold tabular-nums " +
             "text-brand leading-5 align-baseline no-underline hover:bg-brand-50 hover:underline transition-colors duration-150"
           : // min-w: a marker can run to three digits.
-            "inline-flex items-center justify-center min-w-[15px] px-[2px] h-[15px] rounded-full " +
-            "bg-[#6B0F12]/10 text-[8px] font-bold text-[#6B0F12] align-super leading-none " +
-            "no-underline hover:bg-[#6B0F12]/20 mx-px"
+            "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mx-0.5 rounded-md " +
+            "bg-brand-50 text-2xs font-semibold tabular-nums text-brand align-text-bottom leading-none " +
+            "no-underline hover:bg-brand-100 transition-colors duration-150 motion-reduce:transition-none"
       }
     >
       {page ? `p${citation.marker}` : citation.marker}

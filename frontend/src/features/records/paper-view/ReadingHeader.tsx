@@ -115,7 +115,7 @@ export function ReadingHeader({
           aria-hidden
           className={cn(
             // One step in from the track's radius, so the two are concentric.
-            "absolute inset-y-0.5 left-0.5 rounded-md bg-brand shadow-[0_1px_2px_rgb(41_37_36/0.35),0_2px_6px_rgb(107_15_18/0.25)]",
+            "absolute inset-y-0.5 left-0.5 rounded-md bg-brand",
             "transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
           )}
           style={{

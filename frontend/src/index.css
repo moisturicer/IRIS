@@ -53,6 +53,31 @@
   .chat-markdown pre code {
     @apply bg-transparent text-inherit p-0;
   }
+
+  /* The end of an answer still arriving, in the text's own ink. It blinks in
+     hard steps like a text caret, and holds still under reduced motion. */
+  .answer-caret > p:last-child::after,
+  .answer-caret > :is(ul, ol):last-child > li:last-child::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 1.05em;
+    margin-left: 0.125rem;
+    vertical-align: -0.15em;
+    background-color: currentColor;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .answer-caret > p:last-child::after,
+    .answer-caret > :is(ul, ol):last-child > li:last-child::after {
+      animation: answer-caret 1s steps(1, end) infinite;
+    }
+  }
+
+  @keyframes answer-caret {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+  }
 }
 
 @layer utilities {

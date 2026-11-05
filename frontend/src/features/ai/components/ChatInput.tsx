@@ -1,8 +1,10 @@
 import { useState, type FormEvent, type KeyboardEvent, type ReactNode } from "react";
-import { CHAT_COLUMN } from "./answerLayout";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { CHAT_COLUMN, CHAT_COMPOSER_FIELD, CHAT_COMPOSER_ICON, CHAT_COMPOSER_SURFACE, CHAT_OPENING_COLUMN } from "./answerLayout";
 import { AskIrisNotice } from "./AskIrisNotice";
 
 interface ChatInputProps {
+  centered?: boolean;
   onSend:    (text: string) => void;
   disabled?: boolean;
   sendDisabled?: boolean;
@@ -20,7 +22,9 @@ interface ChatInputProps {
   onDraftChange?: (text: string) => void;
 }
 
-export function ChatInput({ onSend, disabled, sendDisabled, children, placeholder, label, draft, onDraftChange, maxLength }: ChatInputProps) {
+const ATTACH_CLOSED = "Attaching files is not available yet";
+
+export function ChatInput({ onSend, disabled, sendDisabled, children, placeholder, label, draft, onDraftChange, maxLength, centered = false }: ChatInputProps) {
   const [ownText, setOwnText] = useState("");
   const text = draft ?? ownText;
   const setText = (next: string) => (onDraftChange ? onDraftChange(next) : setOwnText(next));
@@ -47,10 +51,9 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
   return (
     <form
       onSubmit={handleSubmit}
-      className="shrink-0 border-t border-stone-200/80 px-4 sm:px-6 py-4"
+      className={`shrink-0 px-4 py-3 sm:px-6 ${centered ? "" : "border-t border-stone-200/80"}`}
     >
-      {children && <div className={`mb-3 ${CHAT_COLUMN}`}>{children}</div>}
-      <div className={`flex gap-2 items-end ${CHAT_COLUMN}`}>
+      <div className={`grid grid-cols-[minmax(0,1fr)_auto] gap-x-2 p-1.5 ${centered ? CHAT_OPENING_COLUMN : CHAT_COLUMN} ${CHAT_COMPOSER_SURFACE}`}>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value)}
@@ -60,18 +63,32 @@ export function ChatInput({ onSend, disabled, sendDisabled, children, placeholde
           maxLength={maxLength}
           aria-label={label ?? placeholder ?? "Ask about the research corpus…"}
           placeholder={placeholder ?? "Ask about the research corpus…"}
-          className="min-w-0 flex-1 resize-none rounded-full border border-stone-200 bg-stone-50/80 px-5 py-3 text-[15px]
-            outline-none focus:border-[#6B0F12] focus:ring-1 focus:ring-[#6B0F12] focus:bg-white
-            text-stone-900 placeholder:text-stone-400 disabled:opacity-50 min-h-[48px] max-h-[120px]"
+          className={`col-span-2 min-h-9 min-w-0 bg-transparent px-2.5 py-1.5 text-[15px]
+            outline-none text-stone-900 placeholder:text-stone-500 disabled:opacity-50 ${CHAT_COMPOSER_FIELD}`}
         />
+        <div className="col-start-1 row-start-2 flex min-w-0 flex-wrap items-center gap-1.5">
+          {/* Visibly closed until uploads to a question exist. */}
+          <button
+            type="button"
+            disabled
+            title={ATTACH_CLOSED}
+            aria-label={ATTACH_CLOSED}
+            className={`${CHAT_COMPOSER_ICON} border border-stone-200 text-stone-400 cursor-not-allowed`}
+          >
+            <i className="fas fa-plus text-sm" aria-hidden />
+          </button>
+          {children}
+        </div>
         <button
           type="submit"
           disabled={disabled || sendDisabled || !text.trim()}
-          className="shrink-0 w-12 h-12 rounded-full bg-[#6B0F12] text-white flex items-center justify-center
-            hover:bg-[#7d1215] disabled:opacity-40 disabled:cursor-not-allowed transition-colors shadow-sm"
+          className={`${CHAT_COMPOSER_ICON} col-start-2 row-start-2 self-start bg-brand text-white
+            hover:bg-brand-light disabled:bg-stone-100 disabled:text-stone-500 disabled:cursor-not-allowed
+            active:scale-95 disabled:active:scale-100 motion-reduce:active:scale-100
+            transition-[background-color,color,transform] duration-150 motion-reduce:transition-none ${FOCUS_RING}`}
           aria-label="Send message"
         >
-          <i className="fas fa-arrow-up text-[15px]" aria-hidden />
+          <i className="fas fa-arrow-up text-sm" aria-hidden />
         </button>
       </div>
       <AskIrisNotice className={`text-center mt-1.5 ${CHAT_COLUMN}`} />

@@ -30,7 +30,7 @@ test("reader sees persisted work, stops by keyboard and asks deeply unless they 
   screen.getByRole("button", { name: "Stop research" }).focus();
   await user.keyboard("{Enter}");
   expect(await screen.findByText("Stopped")).toBeInTheDocument();
-  expect(screen.getByRole("checkbox", { name: "Thorough research" })).toBeChecked();
+  expect(screen.getByRole("button", { name: "Research depth: Thorough" })).toBeInTheDocument();
   await user.type(screen.getByRole("textbox"), "Compare further");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(post).toHaveBeenCalledWith("/ai/runtime/runs", expect.objectContaining({
@@ -48,7 +48,8 @@ test("a reader can ask one question at ordinary depth", async () => {
     protocol: "runs-reader-1", id: "c", revision: 0, runs: [], turns: [],
   } });
   render(<MemoryRouter><RuntimeReader /></MemoryRouter>);
-  await user.click(screen.getByRole("checkbox", { name: "Thorough research" }));
+  await user.click(screen.getByRole("button", { name: "Research depth: Thorough" }));
+  await user.click(screen.getByRole("menuitemradio", { name: /Standard/ }));
   await user.type(screen.getByRole("textbox"), "Quick question");
   await user.click(screen.getByRole("button", { name: "Send message" }));
   await waitFor(() => expect(post).toHaveBeenCalledWith("/ai/runtime/runs",

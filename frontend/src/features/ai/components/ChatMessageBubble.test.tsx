@@ -41,6 +41,19 @@ function assistantMessage(overrides: Partial<ChatMessage> = {}): ChatMessage {
   };
 }
 
+describe("an answer's sources button", () => {
+  it("counts distinct sources and keeps its one accessible name", () => {
+    renderScreen(
+      <ChatMessageBubble
+        onSelectSources={vi.fn()}
+        message={assistantMessage({ citations: [citation, citation, { ...citation, marker: 2 }] })}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "2 sources for this answer" })).toHaveTextContent("122 sources");
+  });
+});
+
 describe("a cited answer", () => {
   it("shows the marker as a clickable chip, right where it sits in the sentence", () => {
     renderScreen(<ChatMessageBubble message={assistantMessage()} />);
