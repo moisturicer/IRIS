@@ -63,13 +63,16 @@ def enforced(settings):
     enforce(settings, **PRICES)
 
 
-def _record(*, consent=True, embargo=None, answered=True):
+def _record(*, consent=True, embargo=None, released=True):
     record = Record.objects.create(
         title="A thesis",
         record_type=RecordType.objects.get_or_create(name="Thesis")[0],
         abstract_file=SimpleUploadedFile("thesis.pdf", PDF),
-        embargo_answered_at=timezone.now() if answered else None,
+        # Embargoed by default (IR-882): released only when asked, and never with a date.
+        is_embargoed=not (released and embargo is None),
+        embargo_released_at=timezone.now() if released and embargo is None else None,
         embargoed_until=embargo,
+        embargo_date_set_at=timezone.now() if embargo is not None else None,
         dpa_accepted_at=timezone.now() if consent else None,
     )
     PdfExtraction.objects.create(
@@ -135,8 +138,9 @@ def test_a_paper_under_embargo_is_not_sent(enforced):
     assert _charged_micros() == 0
 
 
-def test_a_paper_nobody_answered_the_embargo_for_is_not_sent(enforced):
-    record = _record(answered=False)
+def test_a_paper_nobody_has_released_is_not_sent(enforced):
+    """Every paper starts embargoed (IR-882), with no date, and that holds it."""
+    record = _record(released=False)
     extractor = _offcampus()
 
     _run(extractor, record)

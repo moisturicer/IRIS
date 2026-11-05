@@ -38,7 +38,6 @@ async function auditCount(recordId: number, eventType: string): Promise<number> 
 
 test("a double submit makes one submission", async () => {
   const id = await createDraft(student, { title: uniqueTitle("double-submit"), type: "Thesis / Research", adviserId: adviser.userId });
-  await student.act(`/records/${id}/embargo-answer/`, { embargoed: false });
   const [a, b] = await timed("2x submit", () => Promise.all([
     student.post(`/records/${id}/submit/`, { dpa_accepted: true }),
     student.post(`/records/${id}/submit/`, { dpa_accepted: true }),

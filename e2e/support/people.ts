@@ -63,12 +63,12 @@ export async function approveRole(fullName: string) {
   await rdco.dispose();
 }
 
-/** Register, verify and approve: a signed-in Client for a brand-new student. */
-/** Eight random lowercase letters: registration refuses a name with digits in it. */
+/** `n` random lowercase letters, for a unique name: registration refuses a name with digits in it. */
 export function letters(n = 8): string {
   return Array.from({ length: n }, () => String.fromCharCode(97 + Math.floor(Math.random() * 26))).join("");
 }
 
+/** Register, verify and approve: a signed-in Client for a brand-new student. */
 export async function newStudent(tag: string): Promise<Client> {
   const email = freshEmail(tag);
   // Unique, so approveRole finds this request by name, and letters only, as

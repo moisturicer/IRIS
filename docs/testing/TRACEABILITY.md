@@ -169,6 +169,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-752** | An operator builds a pending Embedding Space beside the active one, with space-keyed Record and Passage vectors, while readers keep searching the active space — under IR-716, ADR-049 §23; additive expand only, no activation (IR-739); no FR- id | [details](traceability/IR-752.md) | **PARTIAL** |
 | **IR-739** | An operator verifies and atomically promotes a complete Embedding Space pair (Record and Passage vectors), or rolls back to the previous revision, with readers and the `ai/` runtime moved onto space-keyed Record vectors and no revoked source resurrected — under IR-716, ADR-049 §23; no live provider, no production upgrade; no FR- id | [details](traceability/IR-739.md) | **PARTIAL** |
 | **IR-740** | IR-605 collects the dedicated runtime through its real authenticated routes under an explicit engine identity, and rescores old baselines with effective-condition preflight and a separate capability report — under IR-716, ADR-049 §24; no FR- id | [details](traceability/IR-740.md) | **PARTIAL** |
+| **IR-882** | Every paper starts embargoed; Publish asks no embargo question; only the Adviser or RDCO date or release one, and RDCO publishes only a released paper — extends FR-M3-02 (stable label only); ADR-052 IR-879 amendment | [details](traceability/IR-882.md) | **IMPLEMENTED** |
 
 ### Non-functional
 

@@ -1,5 +1,5 @@
 /**
- * Paper View's embargo card (ADR-052 decisions 5, 6 and 11, IR-817).
+ * Paper View's embargo card (ADR-052 decisions 5, 6 and 11, IR-817, IR-882).
  *
  * Every control comes from `capabilities`: the card compares no role names.
  * Releasing asks first and says the text goes to outside AI companies for good.
@@ -36,6 +36,8 @@ function paper(
 }
 
 const ACTIVE: RecordEmbargo = { state: "active", until: "2099-01-01" };
+/** How every paper starts (IR-882). */
+const UNDATED: RecordEmbargo = { state: "active", until: null };
 
 function refusal(data: unknown, status = 400) {
   return Object.assign(new Error("refused"), { response: { status, data } });
@@ -63,18 +65,14 @@ describe("where the embargo stands", () => {
     expect(within(card).getByText(/lasts until someone releases it/)).toBeInTheDocument();
   });
 
-  it("says when nobody has answered, which keeps the paper from the AI", () => {
-    renderCard(paper({ state: "unknown", until: null }));
+  it("shows an embargo with no date, which holds until someone releases it", () => {
+    renderCard(paper(UNDATED));
 
-    expect(screen.getByText("Not answered")).toBeInTheDocument();
-    expect(screen.getByText(/stays out of the AI/)).toBeInTheDocument();
+    expect(screen.getByText("Under embargo")).toBeInTheDocument();
+    expect(screen.getByText(/No review date\. Ask IRIS won't use it and it can't be published/)).toBeInTheDocument();
   });
 
-  it("shows no embargo, and a released one with the date it held", () => {
-    const { unmount } = renderCard(paper({ state: "none", until: null }));
-    expect(screen.getByText("No embargo")).toBeInTheDocument();
-    unmount();
-
+  it("shows a released one with the date it held", () => {
     renderCard(paper({ state: "released", until: "2026-12-01" }));
     expect(screen.getByText("Released")).toBeInTheDocument();
     expect(screen.getByText(/Its review date was Dec 1, 2026/)).toBeInTheDocument();
@@ -88,7 +86,7 @@ describe("where the embargo stands", () => {
 });
 
 describe("who may act comes from capabilities alone", () => {
-  it("offers an owner Change date, no Release, and says who can release it", () => {
+  it("offers Change date without Release, and says who can release it", () => {
     renderCard(paper(ACTIVE, ["set_embargo"]));
 
     expect(screen.getByRole("button", { name: "Change date" })).toBeInTheDocument();
@@ -96,10 +94,13 @@ describe("who may act comes from capabilities alone", () => {
     expect(screen.getByText("Only the paper's Adviser or RDCO can release it.")).toBeInTheDocument();
   });
 
-  it("offers Set embargo where there is none to change", () => {
-    renderCard(paper({ state: "none", until: null }, ["set_embargo"]));
+  it("offers Add review date on an embargo with no date, and Embargo again once released", () => {
+    const { unmount } = renderCard(paper(UNDATED, ["set_embargo"]));
+    expect(screen.getByRole("button", { name: "Add review date" })).toBeInTheDocument();
+    unmount();
 
-    expect(screen.getByRole("button", { name: "Set embargo" })).toBeInTheDocument();
+    renderCard(paper({ state: "released", until: null }, ["set_embargo"]));
+    expect(screen.getByRole("button", { name: "Embargo again" })).toBeInTheDocument();
   });
 
   it("offers Release to whoever the server offers it, without the who-can line", () => {
@@ -140,11 +141,11 @@ describe("setting or moving the date", () => {
     } as never);
     renderCard(paper({ state: "released", until: "2026-12-01" }, ["set_embargo"]));
 
-    await userEvent.click(screen.getByRole("button", { name: "Set embargo" }));
-    const dialog = screen.getByRole("dialog", { name: "Set an embargo" });
+    await userEvent.click(screen.getByRole("button", { name: "Embargo again" }));
+    const dialog = screen.getByRole("dialog", { name: "Embargo this paper again" });
     expect(within(dialog).getByText(/already sent to outside AI companies can't be recalled/)).toBeInTheDocument();
     await userEvent.type(within(dialog).getByLabelText("Review date"), "2027-03-01");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Set embargo" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Embargo again" }));
 
     expect(await screen.findByRole("status")).toHaveTextContent(
       "Text already sent to outside AI companies can't be recalled.",
@@ -152,11 +153,13 @@ describe("setting or moving the date", () => {
   });
 
   it("does not warn when nothing could have gone out", async () => {
-    renderCard(paper({ state: "unknown", until: null }, ["set_embargo"]));
+    renderCard(paper(UNDATED, ["set_embargo"]));
 
-    await userEvent.click(screen.getByRole("button", { name: "Set embargo" }));
+    await userEvent.click(screen.getByRole("button", { name: "Add review date" }));
 
-    expect(within(screen.getByRole("dialog")).queryByText(/can't be recalled/)).not.toBeInTheDocument();
+    const dialog = screen.getByRole("dialog", { name: "Add a review date" });
+    expect(within(dialog).queryByText(/can't be recalled/)).not.toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Add date" })).toBeInTheDocument();
   });
 
   it("keeps the dialog open with the server's refusal of the date", async () => {
@@ -217,7 +220,7 @@ describe("releasing", () => {
 
 describe("KTTO's release of an IP mark", () => {
   const marked = (capabilities: Capability[]) =>
-    paper({ state: "none", until: null }, capabilities, {
+    paper({ state: "released", until: null }, capabilities, {
       isIp: true, ipRelease: { released: false, released_at: null },
     });
 

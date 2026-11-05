@@ -80,6 +80,7 @@ from core.enums import (
     PUBLICLY_VISIBLE_STATUSES,
     AssignmentState,
     DocumentRequestState,
+    EmbargoState,
     Party,
     PipelineStatus,
     RecordTypeName,
@@ -160,10 +161,26 @@ def _is_proposal(record) -> bool:
 
 
 def outcomes_for(record, party) -> tuple:
-    """The outcomes `party` may decide `record` with, in the bar's order."""
+    """
+    The outcomes `party` may decide `record` with, in the bar's order.
+
+    An embargoed paper is never published (ADR-052's first 2026-11-04
+    amendment, ADR-047 §10): RDCO keeps it unlisted or rejects it, and publishes
+    it once the Adviser or RDCO has released the embargo.
+    """
     if _is_proposal(record):
         return PROPOSAL_OUTCOMES if party == Party.ADVISER else ()
-    return OUTCOMES_FOR.get(str(party), ())
+    allowed = OUTCOMES_FOR.get(str(party), ())
+    if record.embargo_state != EmbargoState.RELEASED:
+        allowed = tuple(o for o in allowed if o != PUBLISH)
+    return allowed
+
+
+def embargo_refusal(record) -> str:
+    """Why an embargoed paper can't be published, as RDCO is told (ADR-047 §10)."""
+    until = record.embargoed_until
+    dated = f" until {until:%d %b %Y}" if until else ""
+    return f"Under embargo{dated}. Release the embargo, then publish."
 
 
 # --- who decides, as what ------------------------------------------------------------
@@ -302,7 +319,7 @@ def decision_token(record) -> str:
     """
     A short digest of everything a decision would act on: the latest version,
     every active assignment, every open seat and every open document request,
-    and the embargo RDCO is warned about (ADR-052 §14). Any change to any of
+    and the embargo that decides whether RDCO may publish (ADR-052 §14). Any change to any of
     them changes the token, so a dialog opened before the change is refused
     rather than deciding into it (IR-270, decision 11).
     """
@@ -340,7 +357,7 @@ def decision_flags(record, user) -> dict:
     `decision` on record detail (IR-270): the outcomes the viewer may take, why
     not yet, what deciding would close, the staleness token, and -- for the
     Adviser -- the author's hints the send-to-RDCO dialog shows; for RDCO, the
-    embargo it is warned about and may publish through (ADR-052 §14). A
+    embargo that keeps it from publishing (ADR-052 §14 as amended). A
     rendering hint; `decide/` re-checks all of it.
     """
     empty = {
@@ -404,6 +421,8 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         choices = " or ".join(OUTCOME_WORDS[o] for o in allowed)
         raise DecisionError(f"Choose to {choices}.")
     if outcome not in allowed:
+        if outcome == PUBLISH and party == Party.RDCO and not _is_proposal(record):
+            raise DecisionError(embargo_refusal(record))
         if _is_proposal(record):
             raise DecisionError(
                 "A Proposal is accepted or rejected, never published or kept unlisted "

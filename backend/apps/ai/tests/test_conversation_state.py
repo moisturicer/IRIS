@@ -42,12 +42,12 @@ pytestmark = [pytest.mark.db_required]
 
 
 def _record(title, content_hash=None):
-    # Answered and consented, because a Turn citing a paper the gate refuses stays
+    # Released and consented, because a Turn citing a paper the gate refuses stays
     # out of what goes back to a model (IR-812). A test here revokes by visibility.
     now = timezone.now()
     record = Record.objects.create(
         title=title, abstract=f"About {title}.", pipeline_status=PipelineStatus.PUBLISHED,
-        embargo_answered_at=now, dpa_accepted_at=now,
+        is_embargoed=False, embargo_released_at=now, dpa_accepted_at=now,
     )
     if content_hash:
         ChunkSet.objects.create(

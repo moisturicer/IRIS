@@ -47,7 +47,7 @@ class LlamaExtractSuggestionTests(APITestCase):
             added_by=self.owner, pipeline_status=PipelineStatus.DRAFT,
             abstract_file=SimpleUploadedFile("two_columns.pdf", b"%PDF-1.7 fake", content_type="application/pdf"),
             manuscript_revision=uuid.uuid4(),
-            embargo_answered_at=timezone.now(), dpa_accepted_at=timezone.now(),
+            is_embargoed=False, embargo_released_at=timezone.now(), dpa_accepted_at=timezone.now(),
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
         self.extraction = PdfExtraction.objects.create(

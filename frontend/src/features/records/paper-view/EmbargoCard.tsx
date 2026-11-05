@@ -1,6 +1,7 @@
 /**
  * A paper's embargo on Paper View, and the acts that change it after submission
- * (ADR-052 decisions 5, 6 and 11).
+ * (ADR-052 decisions 5, 6 and 11). Every paper starts embargoed with no date, and
+ * only the Adviser or RDCO date or release it (amended for IR-882).
  *
  * Every control comes from `capabilities`, so the card compares no role names.
  * A release sends text to outside AI companies for good, so it always asks first.
@@ -26,22 +27,16 @@ const CANNOT_BE_UNDONE = "can't be undone";
 
 function stateWording(embargo: RecordEmbargo): { label: string; detail: string | null } {
   const until = embargo.until ? formatDate(embargo.until) : null;
-  switch (embargo.state) {
-    case "active":
-      return {
-        label: "Under embargo",
-        detail: `Review by ${until}. The date is a reminder: the embargo lasts until someone releases it.`,
-      };
-    case "released":
-      return { label: "Released", detail: until ? `Its review date was ${until}.` : null };
-    case "none":
-      return { label: "No embargo", detail: null };
-    default:
-      return {
-        label: "Not answered",
-        detail: "Nobody has said whether this paper is under embargo, so it stays out of the AI.",
-      };
+  if (embargo.state === "released") {
+    return { label: "Released", detail: until ? `Its review date was ${until}.` : null };
   }
+  // Anything else is held, so an unexpected state never reads as released.
+  return {
+    label: "Under embargo",
+    detail: until
+      ? `Review by ${until}. The date is a reminder: the embargo lasts until someone releases it.`
+      : "No review date. Ask IRIS won't use it and it can't be published until it is released.",
+  };
 }
 
 interface EmbargoCardProps {
@@ -62,7 +57,7 @@ export function EmbargoCard({ record, onChanged, today = manilaToday() }: Embarg
   const offersIpRelease = record.is_ip && can.has("release_ip");
   if (!embargo && !offersIpRelease) return null;
 
-  const active = embargo?.state === "active";
+  const active = embargo != null && embargo.state !== "released";
   const done = (message: string | null = null) => {
     setDialog(null);
     setNotice(message);
@@ -97,7 +92,7 @@ export function EmbargoCard({ record, onChanged, today = manilaToday() }: Embarg
         <div className="flex flex-wrap gap-2">
           {can.has("set_embargo") && embargo && (
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setDialog("set")}>
-              {active ? "Change date" : "Set embargo"}
+              {setLabel(embargo)}
             </Button>
           )}
           {active && can.has("release_embargo") && (
@@ -149,6 +144,12 @@ export function EmbargoCard({ record, onChanged, today = manilaToday() }: Embarg
       />
     </section>
   );
+}
+
+/** What setting a date does from here: add one, move it, or hold a released paper again. */
+function setLabel(embargo: RecordEmbargo): string {
+  if (embargo.state === "released") return "Embargo again";
+  return embargo.until ? "Change date" : "Add review date";
 }
 
 interface ReleaseDialogProps {
@@ -211,13 +212,13 @@ interface SetEmbargoDialogProps {
 const STAY_OPEN = () => {};
 
 function SetEmbargoDialog({ open, recordId, embargo, today, onCancel, onSaved }: SetEmbargoDialogProps) {
-  const active = embargo.state === "active";
+  const active = embargo.state !== "released";
   const [until, setUntil] = useState(active ? (embargo.until ?? "") : "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // "No embargo" and "released" are the states in which the check may already
-  // have let text out (ADR-052 IR-812 Amendment).
-  const mayHaveGone = embargo.state === "none" || embargo.state === "released";
+  // A released paper is the one whose text the check may already have let out
+  // (ADR-052 IR-812 Amendment).
+  const mayHaveGone = embargo.state === "released";
 
   const close = () => {
     setError(null);
@@ -237,12 +238,13 @@ function SetEmbargoDialog({ open, recordId, embargo, today, onCancel, onSaved }:
     }
   };
 
-  const verb = active ? "Save date" : "Set embargo";
+  const dated = active && embargo.until != null;
+  const verb = dated ? "Save date" : active ? "Add date" : "Embargo again";
   return (
     <Modal
       open={open}
       onClose={saving ? STAY_OPEN : close}
-      title={active ? "Change the review date" : "Set an embargo"}
+      title={dated ? "Change the review date" : active ? "Add a review date" : "Embargo this paper again"}
       size="max-w-sm"
       footer={
         <div className="flex justify-end gap-2">

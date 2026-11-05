@@ -15,7 +15,7 @@ import { manuscriptPdf } from "../support/pdf";
 import { ACCOUNTS, uniqueTitle } from "../support/accounts";
 import { A11yLedger } from "../support/a11y";
 import {
-  claimAndOpen, clear, createDraft, decide, newVersion, party,
+  claimAndOpen, clear, createDraft, decide, newVersion, party, releaseEmbargo,
   requestRevision, reviewRow, reviseAbstract, route, sendToRdco, submit, tracker,
 } from "../support/workflow";
 
@@ -26,6 +26,14 @@ const a11y = new A11yLedger();
 let student: Client, adviser: Client, itso: Client, ierc: Client, ktto: Client, kttoCoordinator: Client, rdco: Client;
 let recordId: number;
 const title = uniqueTitle("thesis");
+const OFFICES = ["itso", "ierc", "ktto"] as const;
+
+/** How many of `client`'s notifications name this journey's record. */
+async function mentions(client: Client): Promise<number> {
+  const body = await client.json("/notifications/");
+  const list: unknown[] = Array.isArray(body) ? body : body.results;
+  return list.filter((n) => JSON.stringify(n).includes(title)).length;
+}
 
 test.beforeAll(async () => {
   [student, adviser, itso, ierc, ktto, kttoCoordinator, rdco] = await Promise.all(
@@ -46,7 +54,7 @@ test("draft, edit, upload and submit enter adviser-first review", async () => {
 
   const t = await tracker(student, recordId);
   expect(party(t, "adviser").state).toBe("active");
-  for (const office of ["itso", "ierc", "ktto"]) expect(party(t, office).state).not.toBe("active");
+  for (const office of OFFICES) expect(party(t, office).state).not.toBe("active");
 });
 
 test("the Adviser requests a document and the owner fulfils it", async () => {
@@ -83,7 +91,8 @@ test("the Adviser sends to RDCO, and RDCO routes to three offices in parallel po
   let t = await tracker(student, recordId);
   expect(party(t, "adviser").state, "the Adviser's turn completes on the send").toBe("completed");
   expect(party(t, "rdco").state, "RDCO's pool opens on the send").toBe("active");
-  for (const office of ["itso", "ierc", "ktto"]) expect(party(t, office).state, `${office} not yet requested`).not.toBe("active");
+  expect(party(t, "rdco").in_pool, "nobody named, so it waits in RDCO's pool").toBe(true);
+  for (const office of OFFICES) expect(party(t, office).state, `${office} not yet requested`).not.toBe("active");
 
   await claimAndOpen(rdco, recordId, "rdco");
   await route(rdco, recordId, [
@@ -93,7 +102,7 @@ test("the Adviser sends to RDCO, and RDCO routes to three offices in parallel po
   ], "Prior-art, ethics and commercialisation review (IR-631 journey).");
 
   t = await tracker(student, recordId);
-  for (const office of ["itso", "ierc", "ktto"]) expect(party(t, office).state, office).toBe("active");
+  for (const office of OFFICES) expect(party(t, office).state, office).toBe("active");
   expect(party(t, "itso").in_pool).toBe(true);
   expect(party(t, "rdco").state, "routing keeps RDCO's own turn active").toBe("active");
 });
@@ -141,15 +150,19 @@ test("a new Version resets only IERC; ITSO and KTTO are preserved", async ({ pag
 
 test("IERC clears, RDCO still holds the record, and RDCO decides", async () => {
   await claimAndOpen(ierc, recordId, "ierc");
+  const toldBefore = await mentions(rdco);
   await clear(ierc, recordId, "Consent form received.");
 
   // ADR-047 §4: RDCO holds the record from the Adviser's send onward. An office
-  // finishing notifies RDCO and opens nothing, so there is no Hand-back.
+  // finishing notifies RDCO and opens nothing, so there is no Hand-back and
+  // RDCO decides from the seat it opened when it routed.
+  await expect.poll(() => mentions(rdco), { message: "IERC finishing notifies RDCO" }).toBeGreaterThan(toldBefore);
   let t = await tracker(student, recordId);
   expect(party(t, "rdco").state, "RDCO's turn is still active").toBe("active");
-  for (const office of ["itso", "ierc", "ktto"]) expect(party(t, office).outcome, office).toBe("cleared");
+  for (const office of OFFICES) expect(party(t, office).outcome, office).toBe("cleared");
 
-  await claimAndOpen(rdco, recordId, "rdco");
+  // Every paper starts embargoed and an embargoed paper is never published.
+  await releaseEmbargo(rdco, recordId);
   await decide(rdco, recordId, "publish");
 
   t = await tracker(student, recordId);
