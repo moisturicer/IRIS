@@ -59,7 +59,9 @@ Mock at the boundary the code under test owns, and nothing nearer:
 
 CI's `frontend` job runs `vitest run --coverage` (v8 provider), writes totals to the job summary on every PR run and uploads the full HTML report as the `frontend-coverage` artifact.
 
-**There is no threshold.** The report is information only and cannot fail a build. Whether a threshold should apply, and at what level, is a team decision to be recorded in the IR-912 PR/ticket; do not add `coverage.thresholds` without that record. Coverage measures lines executed, not behaviour asserted, so a number is not a substitute for the accessible-name tests above.
+**There is no threshold.** The report is information only and cannot fail a build; do not add `coverage.thresholds` without a ticket the team has approved.
+
+**Decision (2026-11-06, proposed on IR-912):** report only for now. The proposed floor, not enforced, is 80% for lines, statements and functions; branches are reported but not floored. At 2026-11-05 the suite measured lines 89.75%, statements 87.38%, branches 83.83%, functions 83.21%. Enforcing it is a separate ticket. Coverage measures lines executed, not behaviour asserted, so a number is not a substitute for the accessible-name tests above.
 
 ## Flaky-test policy
 
@@ -69,4 +71,4 @@ A flake is a test that passes and fails on the same code. **A flake is a ticket 
 - When a test flakes, open a Jira issue naming the test and the failing run, assign an owner, and link it from the PR that hit it.
 - Find the cause (unawaited async work, real timers, leaked store or DOM state, order dependence). Fix the test or the code, and say which in the PR.
 - If it must be quarantined while the fix is pending, use `it.skip` with the ticket key in a comment, and the ticket stays open until the skip is removed.
-- Precedent: IR-541, the `PaperAiOverview` poll test, which failed in some runs and passed alone. It was tracked as a ticket rather than retried.
+- Precedent: IR-541, the `PaperAiOverview` poll test, which failed once in CI on `main` and passed on a re-run. The re-run only unblocked the merge; the cause was written up on a ticket with an owner and acceptance criteria (stable over repeated runs, no test weakened), and the ticket was closed only once that was met.
