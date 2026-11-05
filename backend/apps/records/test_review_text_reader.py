@@ -127,10 +127,78 @@ def test_table_of_contents_lines_and_captions_are_not_headings(read):
     assert keys(read(pdf(pages, running_head=None))) == ["front-matter", "methods"]
 
 
-def test_a_paper_with_no_headings_says_so(read):
+def test_a_paper_with_no_headings_is_one_document_and_says_why(read):
+    # Changed deliberately (IR-871, fail safe): no headings is one of the
+    # shapes that make sections untrustworthy, so the paper is one section.
     reading = read(pdf([[("para", ["Just one paragraph of text here."])]], running_head=None))
-    assert keys(reading) == ["front-matter"]
-    assert {"code": "no_headings"} in reading["warnings"]
+    assert keys(reading) == ["document"]
+    assert {"code": "sections_unreliable", "reasons": ["no_headings"]} in reading["warnings"]
+
+
+# --- fail safe on layouts the rules don't know (IR-871) ---
+
+def _sectioned(*sections):
+    """`_unreliable`'s input: (key, number of passages) per section."""
+    return [{"key": k, "passages": [{}] * n} for k, n in sections]
+
+
+def test_good_sections_are_trusted():
+    assert reader._unreliable(_sectioned(("front-matter", 3), ("introduction", 9), ("methods", 12))) == []
+
+
+def test_about_as_many_headings_as_sentences_is_not_trusted():
+    # Capitals in a table, or a form, read as headings.
+    many = _sectioned(*[(f"row {n}", 1) for n in range(12)])
+    assert reader._unreliable(many) == ["too_many_headings"]
+
+
+def test_one_heading_over_and_over_is_not_trusted():
+    repeated = _sectioned(("journal", 9), *[(f"journal#{n}", 9) for n in range(2, 7)], ("methods", 9))
+    assert "repeated_headings" in reader._unreliable(repeated)
+
+
+def test_headings_over_mostly_nothing_are_not_trusted():
+    hollow = _sectioned(*[(f"heading {n}", 0) for n in range(6)], ("results", 30))
+    assert reader._unreliable(hollow) == ["mostly_empty_sections"]
+
+
+def test_an_untrusted_paper_keeps_every_sentence_with_its_page(read):
+    # A form's worth of capitals lines over a few sentences: twelve headings
+    # of three lines each, guessed wrong.
+    page = [("plain", f"FIELD {chr(65 + n // 26)}{chr(65 + n % 26)} LABEL") for n in range(36)] + [
+        ("para", ["The only paragraph has two sentences. It ends here."])]
+    reading = read(pdf([page[:18], page[18:]], running_head=None, numbered=False))
+    assert keys(reading) == ["document"]
+    assert texts(reading) == ["The only paragraph has two sentences.", "It ends here."]
+    assert all(p["page"] == 2 and p["regions"] for p in reading["sections"][0]["passages"])
+    assert reading["warnings"][0]["code"] == "sections_unreliable"
+
+
+def test_a_footnote_in_a_smaller_font_is_its_own_passage(read):
+    from apps.records.review_text.testing import BODY, headings
+
+    reading = read(headings([
+        ("Times-Bold", 12, "Results"),
+        (BODY, 12, "The plant runs on about forty tonnes"),
+        (BODY, 12, "of waste each day."),
+        (BODY, 8, "1 Measured over eight weeks in 2024."),
+    ]))
+    found = texts(reading)
+    assert "The plant runs on about forty tonnes of waste each day." in found
+    assert "1 Measured over eight weeks in 2024." in found
+
+
+def test_text_with_no_characters_behind_it_is_unreadable_not_stored(tmp_path, monkeypatch):
+    path = tmp_path / "paper.pdf"
+    path.write_bytes(pdf(THESIS))
+    monkeypatch.setattr(reader, "_unmapped_share", lambda sections: 0.5)
+    with pytest.raises(reader.Unreadable):
+        reader.read(path)
+
+
+def test_a_few_unmapped_characters_are_kept_and_counted():
+    sections = [{"passages": [{"text": "a b c (cid:12) d e f g h i"}, {"text": "j k l m n o p q r �"}]}]
+    assert reader._unmapped_share(sections) == 0.1
 
 
 def test_a_scan_has_no_sections_and_names_its_pages(read):

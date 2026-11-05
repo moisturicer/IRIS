@@ -45,12 +45,23 @@ MARGIN_FRACTION = 0.08
 RUNNING_BAND = 0.12
 #: A section longer than this many pages may be two sections whose heading was missed.
 LONG_SECTION_PAGES = 15
+#: The most lines one heading wraps onto. A list of capitals lines (a form,
+#: a table without rules) is many headings, which `_unreliable` then refuses.
+HEADING_LINES = 3
 #: The fewest lines a two-column band can be.
 MIN_COLUMN_LINES = 5
 #: How far right of its column's left edge a line starts to be a first-line
 #: indent. A journal's 17 pt indent was missed at the prototype's 20.
 INDENT = 10
 FRONT_MATTER_KEY = "front-matter"
+#: The one section a paper is stored as when its sections can't be trusted.
+DOCUMENT_KEY = "document"
+#: Above this share of words with no character behind them (U+FFFD, or
+#: pdfminer's "(cid:N)"), the text is unreadable and none is stored.
+UNREADABLE_SHARE = 0.2
+#: A font size this many points off the paragraph's starts a new one: a
+#: footnote, caption or block quote is never glued into a body sentence.
+SIZE_BREAK = 1.0
 
 SENTENCE_END = re.compile(r'(?<=[.!?])["”)]?\s+(?=[A-Z(“"])')
 ABBREVIATIONS = (
@@ -66,6 +77,9 @@ DOT_LEADER = re.compile(r"(\.\s?){4,}|…{2,}")
 TRAILING_PAGE = re.compile(r"\s\d{1,3}$")
 PAGE_NUMBER = re.compile(r"[-–—\s]*\d{1,4}[-–—\s]*")
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+UNMAPPED = re.compile(r"\ufffd|\(cid:\d+\)")
 
 
 class Unreadable(Exception):
@@ -129,12 +143,24 @@ def read(path, max_pages: int | None = None) -> dict:
         raise Unreadable
 
     sections, warnings = _structure(pages)
+    share = _unmapped_share(sections)
+    if share > UNREADABLE_SHARE:
+        raise Unreadable   # stored as "No text for vN", never as nonsense
+    if share:
+        warnings.append({"code": "unmapped_characters", "share": round(share, 3)})
     return {
         "reader": reader_version(),
         "page_count": len(pages),
         "sections": sections,
         "warnings": warnings,
     }
+
+
+def _unmapped_share(sections) -> float:
+    """The share of words the PDF gives no character for, as a font with no
+    Unicode map does. pypdf reads the same marks: nothing can be recovered."""
+    words = [w for s in sections for p in s["passages"] for w in p["text"].split()]
+    return sum(1 for w in words if UNMAPPED.search(w)) / len(words) if words else 0.0
 
 
 def _read_page(page) -> dict:
@@ -342,7 +368,7 @@ def _structure(pages):
     known = Counter(_word(w["text"]) for it in lines for w in it[2])
 
     sections = [{"heading": "", "page": 1, "passages": []}]
-    para, paragraph = [], [0]
+    para, paragraph, para_size = [], [0], [None]
     last_top, pending_chapter, prev_heading = None, None, None
 
     def flush():
@@ -372,9 +398,11 @@ def _structure(pages):
                 text, page = f"{pending_chapter[0]} {text}", pending_chapter[1]
                 pending_chapter = None
             elif (prev_heading and prev_heading[0] == page and top - prev_heading[1] < 30
-                  and not sections[-1]["passages"] and _continues(sections[-1], line)):
+                  and not sections[-1]["passages"] and sections[-1].get("lines", 1) < HEADING_LINES
+                  and _continues(sections[-1], line)):
                 # A heading that wraps onto a second line.
                 sections[-1]["heading"] = _join_heading(sections[-1]["heading"], text, known)
+                sections[-1]["lines"] = sections[-1].get("lines", 1) + 1
                 prev_heading = (page, top)
                 continue
             sections.append({"heading": text, "page": page, "passages": [], "font": _font(line)})
@@ -390,8 +418,12 @@ def _structure(pages):
         # indented and became a paragraph of its own.
         indented = line[0]["x0"] > column_left + INDENT
         gap = bool(para) and last_top is not None and page == para[-1][1] and top - last_top > line_gap * 1.6
-        if para and (indented or gap):
+        size = _font(line)[1]
+        resized = bool(para) and para_size[0] is not None and abs(size - para_size[0]) > SIZE_BREAK
+        if para and (indented or gap or resized):
             flush()
+        if not para:
+            para_size[0] = size
         para.extend((w["text"], page, w) for w in line)
         para.append(("\n", page, None))
         last_top = top
@@ -420,8 +452,16 @@ def _finish(sections, pages):
                     "text_hash": digest, "passages": s["passages"]})
 
     warnings = []
-    if all(s["key"] == FRONT_MATTER_KEY for s in out):
-        warnings.append({"code": "no_headings"})
+    reasons = _unreliable(out)
+    if reasons:
+        # Fail safe: a paper whose sections can't be trusted is stored as one
+        # section, every sentence still carrying its page, so a comparison or
+        # a Thread's quote never rests on a heading that was guessed wrong.
+        passages = [p for s in out for p in s["passages"]]
+        digest = hashlib.sha256("\n".join(norm(p["text"]) for p in passages).encode()).hexdigest()
+        out = [{"key": DOCUMENT_KEY, "heading": "", "page": out[0]["page"],
+                "text_hash": digest, "passages": passages}]
+        warnings.append({"code": "sections_unreliable", "reasons": reasons})
     for s in out:
         last = max((p["page"] for p in s["passages"]), default=s["page"])
         if last - s["page"] + 1 > LONG_SECTION_PAGES:
@@ -430,6 +470,26 @@ def _finish(sections, pages):
     if blank:
         warnings.append({"code": "pages_without_text", "pages": blank[:50]})
     return out, warnings
+
+
+def _unreliable(sections) -> list:
+    """Why these sections can't be trusted, or nothing. Each reason is a shape
+    no paper's real headings take: none at all, about as many headings as
+    sentences (capitals in a table read as headings), one heading over and
+    over (a running head the reader missed), or headings over mostly nothing."""
+    headed = [s for s in sections if s["key"] != FRONT_MATTER_KEY]
+    passages = sum(len(s["passages"]) for s in sections)
+    reasons = []
+    if not headed:
+        reasons.append("no_headings")
+        return reasons
+    if len(headed) > 10 and len(headed) * 3 > passages:
+        reasons.append("too_many_headings")
+    if sum(1 for s in headed if "#" in s["key"]) > max(3, len(headed) // 5):
+        reasons.append("repeated_headings")
+    if len(headed) > 4 and sum(1 for s in headed if not s["passages"]) * 2 > len(headed):
+        reasons.append("mostly_empty_sections")
+    return reasons
 
 
 def _sentences(para, known, paragraph, pages):
