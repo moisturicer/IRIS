@@ -290,7 +290,10 @@ def _columns(words, width, height, margin):
         if (len(band) < MIN_COLUMN_LINES or inside > 0.1 * len(band)
                 or (best and inside >= best[0])):
             continue
-        left = sum(1 for w in body if id(w) not in span and w["x1"] <= x)
+        left_words = [w for w in body if id(w) not in span and w["x1"] <= x]
+        if left_words and all(LIST_NUMBER.fullmatch(w["text"]) or w["text"].isdigit() for w in left_words):
+            continue   # a strip of "[18]" labels, or section or line numbers, is no column
+        left = len(left_words)
         if left > 10 and len(right_tops) > 10:
             best = (inside, x, span)
             if not inside:
@@ -314,8 +317,9 @@ def _column_left(lines) -> float:
 BULLETS = "●•▪◦○■□➢➤✓✔◆◇►▸-–*"
 
 
-#: A numbered or lettered list item's mark: "1.", "2)", "(3)", "a.", "b)".
-LIST_NUMBER = re.compile(r"\(?(\d{1,2}|[a-z])[.)]")
+#: A numbered or lettered list item's mark: "1.", "2)", "(3)", "a.", "b)",
+#: or a numbered reference's "[18]".
+LIST_NUMBER = re.compile(r"\(?(\d{1,2}|[a-z])[.)]|\[\d{1,3}\]")
 
 
 #: Fonts whose every character is a symbol: a Word bullet set in one reads
@@ -348,6 +352,35 @@ def _bullet_text_x(line):
     return None
 
 
+URL = re.compile(r"(https?://|www\.|doi\.org/|10\.\d{4,}/)", re.I)
+
+
+def _ends_entry(word) -> bool:
+    """Can a paragraph end on ``word``? A full stop, question or exclamation
+    mark (before any closing quote or bracket), or a web address, as a
+    reference entry ends on its DOI."""
+    return bool(re.search(r"[.!?][\"”’')\]]*$", word) or URL.search(word))
+
+
+def _continues_text(word) -> bool:
+    """Does a line opening on ``word`` carry on what came before? Lower case,
+    or a web address wrapped onto its own line."""
+    return word[:1].islower() or bool(URL.match(word))
+
+
+def _began_at(first, body, page, column) -> float:
+    """Where the current paragraph began, in this column: its first line's
+    position if that is here, else this column's body margin moved by the
+    first line's distance from its body. Unknown means no limit."""
+    if first is None:
+        return float("inf")
+    if first[:2] == (page, column):
+        return first[2]
+    if first[3] is not None and body is not None:
+        return body[2] + first[3]
+    return float("inf")
+
+
 def _size(line) -> float:
     """The size most of a line is set in, so a larger bullet doesn't count."""
     return Counter(round(float(w.get("size") or 0), 1) for w in line).most_common(1)[0][0]
@@ -367,9 +400,10 @@ def _stream(pages):
             # The column's own left edge, which a first-line indent is measured from.
             left = _column_left(lines)
             right = max((line[-1]["x1"] for line in lines), default=0)
-            items = [("line", p["number"], line, line[0]["top"], left, ci, right) for line in lines]
+            leftmost = min((line[0]["x0"] for line in lines), default=0)
+            items = [("line", p["number"], line, line[0]["top"], left, ci, right, leftmost) for line in lines]
             if ci == 0:
-                items += [("row", p["number"], r, r["top"], None, ci, None) for r in p["rows"]]
+                items += [("row", p["number"], r, r["top"], None, ci, None, None) for r in p["rows"]]
             stream += sorted(items, key=lambda it: it[3])
     return stream
 
@@ -473,6 +507,7 @@ def _structure(pages):
     sections = [{"heading": "", "page": 1, "passages": []}]
     para, paragraph, para_size, hang, prev_line, body_x = [], [0], [None], [None], [None], [None]
     last_body = [None]   # the body margin of the latest paragraph, kept across columns
+    first_x = [None]     # where the current paragraph's first line began
     last_top, pending_chapter, prev_heading = None, None, None
 
     def flush():
@@ -491,7 +526,7 @@ def _structure(pages):
                 "regions": _normalize([(it[1], *row["bbox"])], pages),
             })
             continue
-        _, page, line, top, column_left, column, column_right = it
+        _, page, line, top, column_left, column, column_right, column_min = it
         text = _line_text(line)
         # The second half of a heading broken at a hyphen, as "Accom-" over
         # "modation": no heading by itself, since it starts in lower case.
@@ -528,6 +563,11 @@ def _structure(pages):
         # indented and became a paragraph of its own.
         bullet_x = _bullet_text_x(line)
         x = line[0]["x0"]
+        if (bullet_x is not None and LIST_NUMBER.fullmatch(line[0]["text"]) and prev_line[0] is not None
+                and prev_line[0][:2] == (page, column)
+                and prev_line[0][3] >= column_right - RAN_ON * (column_right - column_left)
+                and not re.search(r"[.:;!?]$", prev_line[0][4])):
+            bullet_x = None   # "34." ending a page range the line before ran on into
         # A list item's later lines hang at its text, not at the indent.
         hanging = hang[0] is not None and abs(x - hang[0]) <= 3
         # A first-line indent is local: a line starting further right than
@@ -543,21 +583,46 @@ def _structure(pages):
             # every line of a reference after its first does.
             ran_on = prev_line[0][3] >= column_right - RAN_ON * (column_right - column_left)
             indented = x > prev_line[0][2] + INDENT and not hanging and not ran_on
-            # Back out past the paragraph's own body: a list or block quote ended.
+            # Back out past the paragraph's own body, to where it began or
+            # beyond: a list, a block quote or a reference entry ended. A step
+            # back that stops short of where the paragraph began is a second
+            # indent inside it, as some reference entries have.
             outdented = (body_x[0] is not None and body_x[0][:2] == (page, column)
-                         and x < body_x[0][2] - INDENT)
+                         and x < body_x[0][2] - INDENT
+                         and x <= _began_at(first_x[0], body_x[0], page, column) + 3)
+            # A line that stopped short on a full stop or a web address ended
+            # its paragraph, whatever the next line's position: two reference
+            # entries set at the same margin, one line each. A sentence can't
+            # be cut here, since it already ended.
+            ended = (not ran_on and _ends_entry(prev_line[0][4])
+                     and not _continues_text(line[0]["text"]))
+            outdented = outdented or ended
         else:
             # Against the lower of the column's commonest start and the body
             # margin the text was just using: a page whose commonest start is
             # an indent would otherwise glue its first paragraph to the last.
-            edge = min(column_left, last_body[0][0]) if last_body[0] is not None else column_left
+            # That margin counts only if it lies in this column: a left
+            # column's margin says nothing about the right column's lines.
+            near = (last_body[0] is not None
+                    and column_left - 4 * INDENT <= last_body[0][0] <= column_right)
+            edge = min(column_left, last_body[0][0]) if near else column_left
             indented = x > edge + INDENT and not hanging
-            # Out past where the paragraph's lines sat in their own column, as
-            # a reference's next entry opening the next column or page.
-            # Measured from the same edge, since a list page's commonest start
-            # is the list's indent, not the margin.
-            outdented = (bool(para) and last_body[0] is not None
-                         and x < edge + last_body[0][1] - INDENT)
+            # A hanging paragraph (a reference entry: first line out, the rest
+            # in) carried into a new column: a line there at the column's
+            # leftmost text, not at the indent, is the next entry.
+            hang_by = first_x[0][3] if first_x[0] is not None and first_x[0][3] is not None else 0
+            outdented = bool(para) and hang_by < -INDENT and x < column_min - hang_by - INDENT / 2
+            # A paragraph that stopped short on a full stop at the foot of the
+            # last column ended there, as a single-line entry does.
+            if prev_line[0] is not None and para:
+                prev_right = prev_line[0][5]
+                prev_short = prev_line[0][3] < prev_right - RAN_ON * (prev_right - prev_line[0][6])
+                outdented = outdented or (prev_short and _ends_entry(prev_line[0][4])
+                                          and not _continues_text(line[0]["text"]))
+        # A line opening on a lower-case word or a web address carries on
+        # what came before, however far in it starts.
+        if _continues_text(line[0]["text"]):
+            indented = False
         indented = indented or outdented
         gap = bool(para) and last_top is not None and page == para[-1][1] and top - last_top > line_gap * 1.6
         size = _size(line)
@@ -567,15 +632,21 @@ def _structure(pages):
         if not para:
             para_size[0] = size
             hang[0] = bullet_x   # each list item is its own passage
+            first_x[0] = (page, column, x, None)   # where the paragraph began
             body_x[0] = None
         elif body_x[0] is None or body_x[0][:2] != (page, column):
             # The paragraph's second line, or its first in a new column or
             # page, sets its body margin there.
+            if body_x[0] is None and first_x[0] is not None and first_x[0][:2] == (page, column):
+                # How far its first line sat from its body: -24 pt for a
+                # hanging indent. Carried to other columns, where the first
+                # line's own position means nothing.
+                first_x[0] = first_x[0][:3] + (first_x[0][2] - x,)
             body_x[0] = (page, column, x)
             last_body[0] = (x, x - column_left)   # the margin, and its offset in its column
         para.extend((w["text"], page, w) for w in line)
         para.append(("\n", page, None))
-        prev_line[0] = (page, column, x, line[-1]["x1"])
+        prev_line[0] = (page, column, x, line[-1]["x1"], line[-1]["text"], column_right, column_left)
         last_top = top
     flush()
     if pending_chapter:

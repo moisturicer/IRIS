@@ -493,3 +493,69 @@ def test_a_word_bullet_in_any_of_its_fonts_is_a_list_mark(text, font):
 def test_a_single_letter_in_a_text_font_is_not_a_list_mark():
     assert not reader._is_mark({"text": "l", "fontname": "TimesNewRomanPSMT"})
     assert not reader._is_mark({"text": "A", "fontname": "Arial"})
+
+
+# --- reference lists, every style in the samples (2026-11-06) ---
+
+def test_one_line_entries_at_the_same_margin_are_separate(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    reading = read(placed([[
+        (72, BOLD, 12, "References"),
+        (72, BODY, 11, "Mohsan, S. (2023). Unmanned aerial vehicles: practical aspects and"),
+        (96, BODY, 11, "applications. Intelligent Service Robotics."),
+        (72, BODY, 11, "PID controller. (2023). https://en.wikipedia.org/wiki/PID"),
+        (72, BODY, 11, "Rovira, A. (2022). A review. Ad Hoc Networks, 130."),
+    ]]))
+    assert len(_paragraphs(reading)) == 3
+
+
+def test_a_web_address_on_its_own_line_continues_its_entry(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    reading = read(placed([[
+        (72, BOLD, 12, "References"),
+        (72, BODY, 11, "Mishkin, F. S. (2019). The economics of money and " + LONG),
+        (90, BODY, 11, "(12th ed.)."),
+        (102, BODY, 11, "https://books.google.com/books/about"),
+    ]]))
+    paragraphs = _paragraphs(reading)
+    assert len(paragraphs) == 1 and paragraphs[0].endswith("https://books.google.com/books/about")
+
+
+def test_a_page_number_that_runs_on_is_not_a_numbered_list_item(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    reading = read(placed([[
+        (72, BOLD, 12, "References"),
+        (72, BODY, 11, "Zhang, C. (2023). A fusion strategy for drones, Drones, 7(1), " + LONG),
+        (90, BODY, 11, "34."), (110, BODY, 11, "https://doi.org/10.3390/drones7010034", True),
+    ]]))
+    assert len(_paragraphs(reading)) == 1
+
+
+def test_numbered_references_keep_their_numbers(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    entries = [(f"[{n}]", f"A. Author{n}, \u201cTitle number {n},\u201d J. Studies, vol. {n}, 2020.") for n in range(1, 9)]
+    lines = [(150, BOLD, 12, "REFERENCES")]
+    for label, text in entries:
+        lines += [(120, BODY, 9, label), (150, BODY, 9, text, True)]
+    passages = [p["text"] for s in read(placed([lines]))["sections"] for p in s["passages"]]
+    assert [p.split()[0] for p in passages] == [label for label, _ in entries]
+
+
+def test_a_hanging_entry_carried_onto_the_next_page_ends_where_the_next_begins(read):
+    # The entry begins at 72 with its body at 96. On the next page its lines
+    # sit at 330, so its first line's distance (-24 pt) puts the next entry
+    # at 306, where it begins.
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    first = [(72, BOLD, 12, "References"),
+             (72, BODY, 9, "Sommer, J. (2024). Updating, evidence evaluation, and operator"),
+             (96, BODY, 9, "availability: a theoretical framework for understanding")]
+    second = [(330, BODY, 9, "belief. Psychological Review, 131(2), 373-401."),
+              (306, BODY, 9, "Zhu, P. (2024). Investor attention and consumer price"),
+              (330, BODY, 9, "index inflation rate in the United States today.")]
+    paragraphs = _paragraphs(read(placed([first, second])))
+    assert len(paragraphs) == 2 and paragraphs[1].startswith("Zhu")

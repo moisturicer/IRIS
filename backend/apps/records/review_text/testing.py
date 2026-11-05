@@ -172,7 +172,8 @@ def journal(pages=3, size=letter) -> bytes:
                 for i in range(5):
                     indent = 17 if i == 0 else 0
                     c.drawString(column_x + indent, line_y,
-                                 f"P{number}{'LR'[column_x > LEFT]}{paragraph} line {i} reads on here.")
+                                 f"P{number}{'LR'[column_x > LEFT]}{paragraph} line {i} reads on"
+                                 + (" here." if i == 4 else " and"))   # prose, ending once
                     line_y -= 12
         c.setFont(BODY, 8)
         c.drawString(LEFT, height * (1 - 0.916), f"JOURNAL {4454 + number}")
