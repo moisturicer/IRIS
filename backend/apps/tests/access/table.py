@@ -439,6 +439,11 @@ ACCOUNTS = {
     # Missing credentials are rejected for every caller, including signed-in users.
     "auth-login": Entry({"POST": _case(row(*([ANON]*10)), data={})}),
     "auth-logout": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # ADR-054 (IR-789): the notice is public (registration shows it) and answering
+    # is every signed-in account's own act, office staff and System Admin included.
+    # An empty body is refused as invalid, which is not an access denial.
+    "notice-current": Entry({"GET": _case(PUBLIC)}),
+    "notice-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),

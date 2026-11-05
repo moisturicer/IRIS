@@ -76,7 +76,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff       = models.BooleanField(default=False)
     is_active      = models.BooleanField(default=True)
     date_joined    = models.DateTimeField(auto_now_add=True)
-    consent_given  = models.BooleanField(default=False)   # FR-M6-06: Data Privacy Act (RA 10173) consent recorded at signup
+    #: Legacy (FR-M6-06): the one boolean the old signup box set. ADR-054
+    #: replaces it with a versioned answer -- see `answered_notice_version`
+    #: and `ai_consent` -- and nothing reads it for a decision. It is still set
+    #: to True whenever the person answers, so an old reader is never wrong in
+    #: the unsafe direction, and an unanswered account keeps what it had.
+    consent_given  = models.BooleanField(default=False)
+    #: ADR-054 decisions 1-4, 17 (IR-789): the person's *last* answer to the
+    #: data notice, copied here from `NoticeAnswer` so the sign-in block is one
+    #: comparison per request. `None` is unanswered, which is what every
+    #: account that existed before IR-789 starts as. Change these only through
+    #: `apps.accounts.notice.record_answer`, which writes the history row too.
+    answered_notice_version = models.PositiveIntegerField(null=True, blank=True)
+    #: The Yes or No on AI using this person's papers. `None` until they answer;
+    #: never defaulted, because a default would be an answer nobody gave.
+    ai_consent = models.BooleanField(null=True, blank=True)
+    notice_answered_at = models.DateTimeField(null=True, blank=True)
     #: ADR-032 §4: may assign, reassign and withdraw reviewer seats in the
     #: office their role staffs, and nowhere else. Granted by an administrator
     #: (`PATCH /users/<id>/coordinator/`), never by the user. Meaningless
@@ -133,6 +148,85 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.role = role
         self.is_office_coordinator = False
         self.save(update_fields=["role", "is_office_coordinator"])
+
+
+class DataNotice(models.Model):
+    """
+    One numbered version of the data notice (ADR-054 decision 1, IR-789).
+
+    There is one notice for the whole system, in the database, so IRIS never
+    runs without one: migration 0019 creates version 1 from the text the
+    frontend carried before. The wording is the data protection officer's to
+    approve (IR-123); this model is the mechanism and works for any text.
+
+    A published version is never edited -- a person's answer names the version
+    they read, so changing its text afterwards would change what they agreed
+    to. A change is a new, higher number. The **current** notice is the highest
+    number. Publishing one (IR-790) is a separate act and a separate ticket.
+    """
+
+    number       = models.PositiveIntegerField(unique=True)
+    title        = models.CharField(max_length=200)
+    subtitle     = models.CharField(max_length=300, blank=True)
+    #: The notice body: a list of ``{"title": str, "body"?: str, "list"?: [str]}``
+    #: in reading order -- the shape the frontend already renders.
+    sections     = models.JSONField()
+    published_at = models.DateTimeField(default=timezone.now)
+    published_by = models.ForeignKey(
+        "accounts.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-number"]
+
+    def __str__(self):
+        return f"Data notice v{self.number}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("A published data notice is never edited; publish a new version.")
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def current(cls) -> "DataNotice | None":
+        """The highest-numbered notice, or None before migration 0019 has run."""
+        return cls.objects.order_by("-number").first()
+
+
+class NoticeAnswer(models.Model):
+    """
+    One answer to one notice version (ADR-054 decision 3). Append-only.
+
+    The history keeps every answer, including a later one for the same version
+    (Settings can change the answer, IR-791), so what a person had said at any
+    moment can be reconstructed. `User.ai_consent` and `answered_notice_version`
+    mirror the latest row.
+    """
+
+    user         = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="notice_answers")
+    notice       = models.ForeignKey(DataNotice, on_delete=models.PROTECT, related_name="answers")
+    #: The data-privacy agreement, which having an account requires. Stored so
+    #: the row records both halves of the answer; the constraint says a stored
+    #: answer is always an agreement, because No here would be no account.
+    agreed_dpa   = models.BooleanField()
+    #: Yes or No on AI using the person's papers. No default.
+    ai_consent   = models.BooleanField()
+    answered_at  = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-answered_at", "-id"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(agreed_dpa=True), name="notice_answer_agreed_dpa"),
+        ]
+        indexes = [models.Index(fields=["user", "-answered_at"], name="notice_answer_user_at_idx")]
+
+    def __str__(self):
+        return f"{self.user_id} v{self.notice_id} ai={'yes' if self.ai_consent else 'no'}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("A notice answer is history and is never edited.")
+        return super().save(*args, **kwargs)
 
 
 class StudentProfile(models.Model):

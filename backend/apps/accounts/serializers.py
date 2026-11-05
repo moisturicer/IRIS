@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 from core.enums import RequestStatus, RoleName
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
+from .notice import answer_notice, require_current
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -179,12 +180,34 @@ class RegistrationNameField(serializers.CharField):
         return value
 
 
+class NoDefaultBoolean(serializers.BooleanField):
+    """A required Yes or No that is never filled in for the person.
+
+    DRF reads a *missing* value in form-encoded input as False, which for a
+    consent answer would turn "didn't answer" into "No". Declaring it empty
+    makes `required=True` hold for every encoding.
+    """
+
+    default_empty_html = serializers.empty
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("required", True)
+        super().__init__(**kwargs)
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     first_name = RegistrationNameField("First name")
     last_name = RegistrationNameField("Last name")
     password         = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
-    consent_given    = serializers.BooleanField(write_only=True)
+    # ADR-054 decisions 1-3 (IR-789), replacing the single `consent_given`
+    # box: agreeing to the data-privacy agreement is what having an account
+    # requires; the Yes or No on AI is its own required answer, with no default
+    # on either side (`NoDefaultBoolean`), and No still gives a normal account.
+    # `notice_version` is the version the person was shown.
+    agree_dpa        = NoDefaultBoolean(write_only=True)
+    ai_consent       = NoDefaultBoolean(write_only=True)
+    notice_version   = serializers.IntegerField(write_only=True, min_value=1)
 
     # Role-selection fields (not model fields — popped before user creation)
     role_name     = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -197,7 +220,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             "email", "first_name", "middle_initial", "last_name",
             "password", "confirm_password",
-            "consent_given",
+            "agree_dpa", "ai_consent", "notice_version",
             "role_name", "course_id", "college_id", "department_id",
         ]
 
@@ -206,9 +229,15 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("This email address is already registered.")
         return value
 
-    def validate_consent_given(self, value):
+    def validate_agree_dpa(self, value):
         if not value:
-            raise serializers.ValidationError("You must agree to the Data Privacy Notice to register.")
+            raise serializers.ValidationError("You must agree to the data-privacy agreement to register.")
+        return value
+
+    def validate_notice_version(self, value):
+        # A newer notice published since the form loaded: refuse with it (409),
+        # so the person reads it before agreeing to anything.
+        require_current(value)
         return value
 
     def validate(self, data):
@@ -248,9 +277,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         department_id = validated_data.pop("department_id", None)
 
         password = validated_data.pop("password")
-        user = User(**validated_data)   # consent_given stays in validated_data → persisted to model
+        validated_data.pop("agree_dpa")
+        ai_consent     = validated_data.pop("ai_consent")
+        notice_version = validated_data.pop("notice_version")
+        user = User(**validated_data)
         user.set_password(password)
         user.save()
+        # The first answer, in the same transaction as the account (the view's).
+        answer_notice(user, notice_version=notice_version, ai_consent=ai_consent)
 
         # Create role-specific profile rows immediately so data is not lost
         if role_name == RoleName.STUDENT and course_id:
@@ -319,3 +353,27 @@ class SystemSettingSerializer(serializers.ModelSerializer):
         model  = SystemSetting
         fields = ["key", "value", "updated_by", "updated_at"]
         read_only_fields = ["updated_by", "updated_at"]
+
+
+class NoticeAnswerSerializer(serializers.Serializer):
+    """The body of ``POST /auth/notice/answer/`` (ADR-054, IR-789).
+
+    Both answers are required with no default: agreeing to the data-privacy
+    agreement (which having an account requires, so it must be true) and a
+    Yes or No on AI. `notice_version` is the version the person was shown; a
+    stale one is refused with the current notice by `require_current`, which
+    runs again under the lock in `answer_notice`.
+    """
+
+    notice_version = serializers.IntegerField(min_value=1)
+    agree_dpa      = NoDefaultBoolean()
+    ai_consent     = NoDefaultBoolean()
+
+    def validate_agree_dpa(self, value):
+        if not value:
+            raise serializers.ValidationError("You must agree to the data-privacy agreement to use IRIS.")
+        return value
+
+    def validate_notice_version(self, value):
+        require_current(value)
+        return value

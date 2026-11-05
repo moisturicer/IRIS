@@ -27,6 +27,19 @@ def make_user(email, role_name=None, **extra):
     )
 
 
+def make_unanswered(user):
+    """Put `user` back as every real account starts: the data notice unanswered.
+
+    The suite gives a new user a Yes on the current notice (`conftest.py`), so
+    a test of the notice block starts by undoing it. Returns `user` refreshed.
+    """
+    User.objects.filter(pk=user.pk).update(
+        answered_notice_version=None, ai_consent=None, notice_answered_at=None,
+    )
+    user.refresh_from_db()
+    return user
+
+
 class SelfProfileUpdateTests(APITestCase):
     """
     MeView is a RetrieveUpdateAPIView open to any authenticated user, so what it

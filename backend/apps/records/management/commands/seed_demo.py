@@ -57,6 +57,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import College, Course, Role, StudentProfile, User
+from apps.accounts.notice import answer_notice, current_notice_number
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.records import lifecycle
 from apps.records.embargo import EmbargoAnswer, record_answer
@@ -243,6 +244,7 @@ class Command(BaseCommand):
         admin.is_active = True
         admin.set_password(self.password)
         admin.save()
+        self._answer_notice_yes(admin)
         self._report(created, f"{ADMIN_EMAIL:26} System Admin, and a Django superuser")
 
         return users
@@ -262,9 +264,21 @@ class Command(BaseCommand):
         user.consent_given = True
         user.set_password(self.password)
         user.save()
+        self._answer_notice_yes(user)
         label = f"role={role_name}" + (" coordinator" if coordinator else "")
         self._report(created, f"{email:26} {label}")
         return user
+
+    def _answer_notice_yes(self, user: User) -> None:
+        """Test data answers Yes (ADR-054 decision 18), so a demo account is never
+        blocked at the data notice. A real answer is written, history and audit
+        row included, and a re-run restores a Yes the demo changed to No.
+        """
+        number = current_notice_number()
+        if number is None:
+            return
+        if user.answered_notice_version != number or user.ai_consent is not True:
+            answer_notice(user, notice_version=number, ai_consent=True)
 
     # -- phase 2: reference data -------------------------------------------
 
@@ -289,6 +303,7 @@ class Command(BaseCommand):
         user.consent_given = True
         user.set_password(self.password)
         user.save()
+        self._answer_notice_yes(user)
 
         if course:
             StudentProfile.objects.update_or_create(user=user, defaults={"course": course})
