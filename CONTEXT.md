@@ -40,6 +40,10 @@ _Avoid_: Submission, paper, thesis (a Record's `record_type` may be a thesis, bu
 The structured document read out of one PDF (a `PdfExtraction` row): its elements in reading order with page boxes, the flattened search text derived from them, and the Provenance of the Extractor that produced it.
 _Avoid_: Parse, OCR result, the PDF text
 
+**Review text**:
+What reviewers compare and comment against: one Version's sections and passages, each with its page, read from that Version's own Manuscript on campus with no AI. Every Version that changes the Manuscript has its own. Distinct from the Extraction, which the AI reads, exists only for the latest released Version, and comes from a different reader, so the two can disagree about the same page.
+_Avoid_: Extraction (the AI's text, not the reviewers'), Version text alone (ambiguous between the two), diff text.
+
 **Extractor**:
 The adapter that turns PDF bytes into an Extraction behind the `StructuredExtractor` port. `EXTRACTION_BACKEND` chooses which one runs; every non-legacy Extractor passes the contract suite.
 _Avoid_: Parser, Docling (one legacy Extractor, not the role)

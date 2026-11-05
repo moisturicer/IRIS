@@ -174,8 +174,13 @@ def test_every_location_nginx_answers_itself_includes_the_snippet():
         assert re.search(rf"include\s+{re.escape(SNIPPET_INCLUDE_PATH)}\s*;", body), (
             f"`{line}` serves the SPA without the security headers"
         )
+    # The reader proxy is found by where it sends requests, not by one spelling of
+    # its proxy_pass: since IR-892 the upstream is a variable resolved per request.
+    # It must exist, so a rewrite can't quietly move it into the Django branch.
+    gateway = [line for line, body in blocks if "proxy_pass" in body and "ai-gateway:8001" in body]
+    assert len(gateway) == 1, f"expected one AI-runtime reader proxy, found {gateway}"
     for line, body in blocks:
-        if "proxy_pass http://ai-gateway:8001;" in body:
+        if "proxy_pass" in body and "ai-gateway:8001" in body:
             assert re.search(rf"include\s+{re.escape(SNIPPET_INCLUDE_PATH)}\s*;", body), (
                 f"`{line}` proxies the reader without the security headers"
             )
