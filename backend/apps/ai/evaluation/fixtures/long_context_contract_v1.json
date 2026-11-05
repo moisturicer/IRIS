@@ -1,0 +1,260 @@
+{
+  "schema_version": 1,
+  "ticket": "IR-736",
+  "status": "deterministic_contract_not_quality_evidence",
+  "source": "docs/superpowers/specs/2026-10-31-ai-runtime/04-context.md",
+  "provider": "deterministic_script_only_no_vendor_calls",
+  "notes": "Contract evidence for cross-compaction continuity and provider-compatibility. Shaped like general_tools_contract_v1.json so IR-605 tooling can read it. Each case names the executable tests that prove it; none measures summary quality, paid capacity or long-context answer quality, which stay human-reviewed (IR-755).",
+  "paper_set": [
+    {
+      "key": "monsoon",
+      "title": "Long monsoon study",
+      "version": "77:e7",
+      "passages": 30,
+      "pages": 10,
+      "readable": true,
+      "facts": [
+        {
+          "passage": 15,
+          "page": 5,
+          "role": "middle",
+          "text": "soil moisture rose by 42 percent after the first monsoon week"
+        },
+        {
+          "passage": 30,
+          "page": 10,
+          "role": "late_contradiction",
+          "text": "the 42 percent rise fell to 17 percent once the dry-season baseline applied"
+        }
+      ]
+    },
+    {
+      "key": "flood",
+      "title": "Flood forecasting",
+      "version": "11:e1",
+      "passages": 1,
+      "pages": [
+        4
+      ],
+      "readable": true,
+      "text": "Rainfall gauges fed a neural network that predicted 87 floods."
+    },
+    {
+      "key": "pond",
+      "title": "Pond sampling",
+      "version": "22:e2",
+      "passages": 1,
+      "pages": [
+        2
+      ],
+      "readable": true,
+      "text": "Tilapia ponds were sampled weekly in brackish water."
+    }
+  ],
+  "cases": [
+    {
+      "id": "L01",
+      "family": "repeated_compaction",
+      "turns": [
+        "What does the long monsoon study find, and which flood paper can we drop?",
+        "Thanks. In a sentence, what is a monsoon?",
+        "[manual] Compact conversation",
+        "Was the first figure you gave me final? Quote it exactly and say what the paper later says."
+      ],
+      "script": [
+        "read:monsoon_whole",
+        "search:flood+exclude:flood",
+        "compact:automatic",
+        "answer:middle_cited",
+        "answer:direct",
+        "compact:manual",
+        "recover:turn_1",
+        "open:monsoon_late",
+        "compact:automatic",
+        "answer:contradiction_cited"
+      ],
+      "expected": {
+        "compactions": [
+          "automatic",
+          "manual",
+          "automatic"
+        ],
+        "old_exact_value_recovered_from_original_turn": true,
+        "late_contradiction_cited": [
+          "monsoon:p5",
+          "monsoon:p10"
+        ],
+        "shown_order_preserved": [
+          "monsoon"
+        ],
+        "excluded_preserved": [
+          "flood"
+        ],
+        "originals_retained": 3,
+        "reopened_with_handoff_and_later_turns_only": true,
+        "checks": {
+          "request_fit": true,
+          "original_allowance": true,
+          "atomic_revision": true,
+          "citations": true
+        }
+      },
+      "proved_by": [
+        "test_two_automatic_compactions_and_a_manual_one_keep_the_task_the_order_and_the_exclusion",
+        "test_every_request_across_the_compactions_fit_the_verified_capacity"
+      ]
+    },
+    {
+      "id": "L02",
+      "family": "evicted_text_not_shown",
+      "turns": [
+        "What does the long monsoon study find?"
+      ],
+      "script": [
+        "read:monsoon_whole",
+        "search:flood",
+        "compact:automatic",
+        "answer:middle_cited"
+      ],
+      "expected": {
+        "read": 30,
+        "complete": true,
+        "not_in_context": 30,
+        "citation_binds_canonical_passage": "monsoon:p5",
+        "checks": {
+          "request_fit": true,
+          "original_allowance": true,
+          "atomic_revision": true,
+          "citations": true
+        }
+      },
+      "proved_by": [
+        "test_passages_read_before_a_compaction_are_reported_as_no_longer_in_the_models_context"
+      ]
+    },
+    {
+      "id": "L03",
+      "family": "incompatible_native_state",
+      "turns": [
+        "Was the first figure you gave me final?"
+      ],
+      "script": [
+        "recover:turn_1+signed_artifact",
+        "worker_killed",
+        "change:instructions|tool_schema|pin",
+        "takeover:rebuild_from_handoff"
+      ],
+      "expected": {
+        "artifact_forwarded": false,
+        "rebuilt_from": [
+          "handoff",
+          "later_turns",
+          "question"
+        ],
+        "steps_not_renewed": true,
+        "checks": {
+          "request_fit": true,
+          "original_allowance": true,
+          "atomic_revision": true,
+          "citations": true
+        }
+      },
+      "proved_by": [
+        "test_a_takeover_after_a_manual_compaction_resumes_the_saved_step_with_its_artifact",
+        "test_a_takeover_under_a_changed_prefix_or_schema_continues_portably_from_the_handoff",
+        "test_changed_instructions_under_the_same_pin_rebuild_without_the_saved_artifact",
+        "test_a_changed_tool_schema_under_the_same_pin_rebuilds_without_the_saved_artifact"
+      ]
+    },
+    {
+      "id": "L04",
+      "family": "capability_withdrawn_or_absent",
+      "turns": [
+        "Was the first figure you gave me final?"
+      ],
+      "script": [
+        "withdraw:continuation",
+        "answer:refused_before_send",
+        "without_native_support:compact_and_continue"
+      ],
+      "expected": {
+        "withdrawn_capability": "unavailable_nothing_sent",
+        "absent_native_support": "portable_path_completes",
+        "checks": {
+          "request_fit": true,
+          "original_allowance": true,
+          "atomic_revision": true,
+          "citations": true
+        }
+      },
+      "proved_by": [
+        "test_a_withdrawn_capability_stops_before_anything_is_sent",
+        "test_without_native_support_the_portable_path_still_compacts_and_continues"
+      ]
+    },
+    {
+      "id": "L05",
+      "family": "model_change",
+      "turns": [
+        "What did the first answer say about the middle of the paper?"
+      ],
+      "script": [
+        "model:small_window",
+        "model:unknown_capacity",
+        "model:verified_large",
+        "pin:other_worker"
+      ],
+      "expected": {
+        "smaller_window": "unavailable_nothing_sent",
+        "unknown_capacity": "unavailable_nothing_sent",
+        "verified_capacity": "continues_after_handoff_reauthorized",
+        "in_flight_run_substituted": false,
+        "checks": {
+          "request_fit": true,
+          "original_allowance": true,
+          "atomic_revision": true,
+          "citations": true
+        }
+      },
+      "proved_by": [
+        "test_a_model_whose_window_cannot_hold_the_conversation_refuses_before_sending",
+        "test_a_model_with_no_verified_capacity_is_not_used",
+        "test_a_model_with_verified_capacity_continues_from_the_handoff_after_reauthorization",
+        "test_a_run_pinned_to_one_model_is_not_answered_by_a_worker_serving_another"
+      ]
+    },
+    {
+      "id": "L06",
+      "family": "atomic_revision_and_allowance",
+      "turns": [
+        "What does the long monsoon study find?",
+        "Thanks. In a sentence, what is a monsoon?"
+      ],
+      "script": [
+        "compact:store_refuses_stale",
+        "answer:full_context",
+        "compact:allowance_too_tight"
+      ],
+      "expected": {
+        "refused_handoff_active": false,
+        "context_unchanged": true,
+        "summary_beyond_allowance_sent": false,
+        "checks": {
+          "request_fit": true,
+          "original_allowance": true,
+          "atomic_revision": true,
+          "citations": true
+        }
+      },
+      "proved_by": [
+        "test_a_handoff_the_store_refuses_leaves_the_text_in_front_of_the_model_and_the_next_run_whole",
+        "test_compaction_inside_a_tight_allowance_is_skipped_never_given_a_new_one"
+      ]
+    }
+  ],
+  "snapshot": {
+    "id": "IR-736-S0",
+    "paper_set_sha256": "1cf1ff5f4019e5a0812726d0b93e65fc430673a3b6b0a0a33e3de54108510c76",
+    "source_kind": "synthetic"
+  }
+}
