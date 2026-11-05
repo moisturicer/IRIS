@@ -169,7 +169,7 @@ def test_an_unanswerable_question_is_retrieved_for_and_kept_out_of_recall(
     assert report.retrieval_recall == 1.0
     assert report.final_set_recall == 1.0
     assert report.correct_refusal == 0.0
-    assert report.unanswered_refusals == ("off-corpus",)
+    assert report.missed_refusals == ("off-corpus",)
     assert report.false_refusals == ()
 
 

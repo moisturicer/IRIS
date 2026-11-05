@@ -114,7 +114,7 @@ reports:
 
 | Measure | Over what | What it catches |
 |---|---|---|
-| **Correct refusal** | Questions the corpus cannot answer (`evidence_required` `corpus`, `expected_outcome` `decline-no-evidence`) | The share for which the model would be given no passage |
+| **Correct refusal** | Questions the corpus cannot answer (`evidence_required` `corpus` or `corpus_multi`, `expected_outcome` `decline-no-evidence`) | The share for which the model would be given no passage |
 | **False refusals** | Answerable questions | Each one for which the model would be given no passage, **named by id** |
 
 Unanswerable questions are kept in their own list, so neither recall average

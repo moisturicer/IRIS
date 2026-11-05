@@ -126,7 +126,7 @@ def test_unanswerable_questions_given_passages_are_named():
     report = _report(
         refusals=[_unanswerable("refused", final=0), _unanswerable("leaked", final=2)]
     )
-    assert report.unanswered_refusals == ("leaked",)
+    assert report.missed_refusals == ("leaked",)
 
 
 # -- never blended -------------------------------------------------------------
@@ -222,8 +222,9 @@ def test_the_comparison_shows_recall_and_refusal_side_by_side_per_configuration(
     assert "refusal" in table
     assert "false-ref" in table
     row = next(line for line in table.splitlines() if line.startswith("with-reranking"))
-    assert "1.000" in row  # correct refusal on the floor
-    assert row.rstrip().endswith("1")  # one false refusal
+    *_, refusal, false_refusals = row.split()
+    assert refusal == "1.000"
+    assert false_refusals == "1"
 
 
 def test_the_comparison_marks_refusal_unmeasured_rather_than_zero():

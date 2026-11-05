@@ -173,8 +173,9 @@ class EvalReport:
         return sum(1 for o in self.refusals if o.given_nothing) / len(self.refusals)
 
     @property
-    def unanswered_refusals(self) -> tuple[str, ...]:
-        """Unanswerable questions for which the model was still given passages."""
+    def missed_refusals(self) -> tuple[str, ...]:
+        """Unanswerable questions the stack should have refused, but for which
+        the model was still given passages."""
         return tuple(o.question_id for o in self.refusals if not o.given_nothing)
 
     @property
@@ -184,6 +185,8 @@ class EvalReport:
 
     @property
     def degraded_questions(self) -> int:
+        """Answerable and unanswerable questions alike: a degraded refusal is
+        no more a measurement of vector retrieval than a degraded recall."""
         return sum(1 for o in (*self.outcomes, *self.refusals) if o.degraded)
 
     @property
@@ -257,12 +260,12 @@ class EvalReport:
             )
             lines.extend(f"    {qid}" for qid in self.false_refusals)
             lines.append("")
-        if self.unanswered_refusals:
+        if self.missed_refusals:
             lines.append(
                 f"  Unanswerable but given passages "
-                f"({len(self.unanswered_refusals)}):"
+                f"({len(self.missed_refusals)}):"
             )
-            lines.extend(f"    {qid}" for qid in self.unanswered_refusals)
+            lines.extend(f"    {qid}" for qid in self.missed_refusals)
             lines.append("")
         if self.degraded_questions:
             lines.append(
@@ -296,7 +299,7 @@ class EvalReport:
                 "  correct refusal    n/a     (the set holds no unanswerable "
                 "question)"
             )
-        refused = len(self.refusals) - len(self.unanswered_refusals)
+        refused = sum(1 for o in self.refusals if o.given_nothing)
         return (
             f"  correct refusal    {self.correct_refusal:.3f}"
             f"   ({refused} of {len(self.refusals)} unanswerable questions "

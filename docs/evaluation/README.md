@@ -97,7 +97,11 @@ no expected passage, and it must be *answered*, not refused.
   `proxy_starter.json` holds ten unanswerable questions (kind
   `off-corpus-research`); their empty `expected` list is deliberate.
   **Until a relevance cut-off is built (IR-396), retrieval returns the nearest
-  passages for every question, so correct refusal reads 0 on a healthy stack.**
+  passages for every question, so correct refusal reads 0 when every paper is
+  cleared.** (A disclosure gate refusing papers also empties final sets, and
+  then shows up as false refusals too.) A real run retrieves for these
+  questions as well, so it embeds and reranks ten more questions per
+  configuration than before.
   That is the gap the measure exists to show, not a defect in it.
 - `--dry-run` validates every field (an invalid value is refused at load), calls
   no vendor and costs nothing.
