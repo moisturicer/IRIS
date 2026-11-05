@@ -44,5 +44,15 @@ export default defineConfig({
     // watch; this is it. Linux CI is unaffected either way, so the pool is set
     // unconditionally rather than behind a platform check nobody would test.
     pool: "forks",
+    // Report only (IR-912). Coverage runs when asked for (`--coverage`, as CI
+    // does), never in `npm test`. No `thresholds` key on purpose: whether one
+    // applies is a team decision recorded outside this file.
+    coverage: {
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.{test,spec}.{ts,tsx}", "src/test/**", "src/**/*.d.ts"],
+      reporter: ["text-summary", "json-summary", "html"],
+      reportsDirectory: "./coverage",
+    },
   },
 });
