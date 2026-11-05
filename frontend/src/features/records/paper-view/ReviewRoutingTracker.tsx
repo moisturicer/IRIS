@@ -82,14 +82,9 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
       aria-labelledby={HEADING_ID}
       className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card"
     >
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <RailHeading id={HEADING_ID}>Review &amp; Routing</RailHeading>
-        {data && (
-          <span className="px-2 py-0.5 rounded-md bg-stone-100 text-2xs font-bold text-stone-700">
-            {data.workflow_state_label}
-          </span>
-        )}
-      </div>
+      {/* No status chip here: the title badge states where the record stands,
+          once (IR-525). This panel says who holds it and what each party did. */}
+      <RailHeading id={HEADING_ID} className="mb-3">Review &amp; Routing</RailHeading>
 
       {failed ? (
         <p role="alert" className="text-xs text-stone-600">
@@ -108,16 +103,26 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
   );
 }
 
+/**
+ * Intake is retired (ADR-032 §1, §13): stored rows that hold it are history,
+ * never a step, so it is neither a party row nor someone the record is "with"
+ * (frontend_redesign_spec §0, invariant 1). The routing history below still
+ * names it, in the server's words, as the record's past.
+ */
+const RETIRED_PARTY = "intake";
+
 function TrackerBody({ data }: { data: RecordTracker }) {
+  const holders = data.current_holders.filter((h) => h.party !== RETIRED_PARTY);
+  const parties = data.parties.filter((p) => p.party !== RETIRED_PARTY);
   return (
     <div className="space-y-4">
-      {data.current_holders.length > 0 && (
+      {holders.length > 0 && (
         <div>
           <p id="tracker-holders-label" className="text-2xs font-semibold text-stone-500 mb-1">
             Currently with
           </p>
           <ul aria-labelledby="tracker-holders-label" className="flex flex-wrap gap-1.5">
-            {data.current_holders.map((h) => (
+            {holders.map((h) => (
               <li
                 key={h.party}
                 className="px-2 py-0.5 rounded-md bg-brand-50 text-brand text-xs font-bold"
@@ -139,7 +144,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
           </tr>
         </thead>
         <tbody>
-          {data.parties.map((row) => (
+          {parties.map((row) => (
             <PartyRow key={row.party} row={row} />
           ))}
         </tbody>
@@ -329,7 +334,12 @@ function RoutingHistory({
         Routing history
       </h3>
       {groups.length === 0 ? (
-        <p className="text-xs text-stone-500">No routing recorded yet.</p>
+        // One statement: with a start date, nothing has been routed since it.
+        <p className="text-xs text-stone-500">
+          {recordedFrom
+            ? `No routing recorded since ${formatDate(recordedFrom)}.`
+            : "No routing recorded yet."}
+        </p>
       ) : (
         <ol aria-labelledby="tracker-routing-label" className="space-y-2">
           {groups.map((g) => (
@@ -351,7 +361,7 @@ function RoutingHistory({
           ))}
         </ol>
       )}
-      {recordedFrom && (
+      {groups.length > 0 && recordedFrom && (
         <p className="text-2xs text-stone-500 mt-2">
           Routing recorded from {formatDate(recordedFrom)}.
         </p>
