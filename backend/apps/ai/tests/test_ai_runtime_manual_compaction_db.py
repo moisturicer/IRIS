@@ -143,7 +143,7 @@ def test_a_compaction_never_runs_beside_an_active_run_and_neither_does_an_ask(ru
     conversation = asked(runtime, grant, "active", 3)
     svc = compacting(runtime, reply(json.dumps(SUMMARY)), queued=True)
 
-    live, _ = run(svc.submit(grant, key="active-ask", question="Still researching?", conversation_id=conversation,
+    live, _ = run(svc.submit(grant, key="live-ask-0001", question="Still researching?", conversation_id=conversation,
                              base_revision=3))
     assert live["state"] == "queued"
     with pytest.raises(Conflict) as busy:
@@ -157,7 +157,7 @@ def test_a_compaction_never_runs_beside_an_active_run_and_neither_does_an_ask(ru
                                           base_revision=3))
     assert queued["state"] == "queued"
     with pytest.raises(Conflict) as ask_busy:
-        run(svc.submit(grant, key="active-ask-2", question="Another?", conversation_id=conversation,
+        run(svc.submit(grant, key="later-ask-0002", question="Another?", conversation_id=conversation,
                        base_revision=3))
     assert ask_busy.value.code == "run_in_progress"
     # A second click with another key joins nothing and starts nothing.
