@@ -378,9 +378,9 @@ def test_each_list_item_is_its_own_passage_with_its_hanging_lines(read):
     reading = read(placed([[
         (72, BOLD, 12, "Limitations"),
         (108, BODY, 11, "The study has several limitations, listed here:"),
-        (90, BODY, 11, "●"), (108, BODY, 11, "The sample was small and " + LONG),
+        (90, BODY, 11, "•"), (108, BODY, 11, "The sample was small and " + LONG, True),
         (108, BODY, 11, "and so it may not generalize."),
-        (90, BODY, 11, "●"), (108, BODY, 11, "Only some factors were studied."),
+        (90, BODY, 11, "•"), (108, BODY, 11, "Only some factors were studied.", True),
     ]]))
     paragraphs = _paragraphs(reading)
     assert any(p.endswith("and so it may not generalize.") and "sample was small" in p for p in paragraphs)
@@ -438,3 +438,58 @@ def test_a_bold_word_in_mid_sentence_alone_on_its_line_is_not_a_heading(read):
     reading = read(placed([[(72, BOLD, 12, "Consent"), (72, BODY, 11, "Participation is"),
                             (72, BOLD, 11, "completely"), (72, BODY, 11, "voluntary.")]]))
     assert [s["heading"] for s in reading["sections"]] == ["Consent"]
+
+
+# --- back matter: forms and reference lists (sample 6, sample 1) ---
+
+def test_a_paragraph_drawn_as_one_box_per_line_reads_as_text_once(read):
+    from apps.records.review_text.testing import boxed_paragraph
+
+    reading = read(boxed_paragraph([
+        "This survey aims to gather information",
+        "related to student attendance and school",
+        "experiences. Participation is voluntary.",
+    ]))
+    assert texts(reading) == [
+        "This survey aims to gather information related to student attendance and school experiences.",
+        "Participation is voluntary.",
+    ]
+    assert all(p["kind"] == "sentence" for s in reading["sections"] for p in s["passages"])
+
+
+def test_a_numbered_list_item_is_its_own_passage_and_its_number_ends_no_sentence(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    reading = read(placed([[
+        (72, BOLD, 12, "Consent to Participate"),
+        (72, BODY, 11, "By proceeding, you confirm that:"),
+        (90, BODY, 11, "1."), (108, BODY, 11, "You understand the purpose of this research.", True),
+        (90, BODY, 11, "2."), (108, BODY, 11, "You are participating voluntarily.", True),
+    ]]))
+    assert texts(reading) == ["By proceeding, you confirm that:",
+                              "1. You understand the purpose of this research.",
+                              "2. You are participating voluntarily."]
+
+
+def test_a_reference_opening_the_next_page_is_a_new_entry(read):
+    from apps.records.review_text.testing import BODY, BOLD, placed
+
+    first = [(72, BOLD, 12, "References"),
+             (72, BODY, 11, "Bartunek, J. M. (1987). First-order change and " + LONG),
+             (90, BODY, 11, "https://doi.org/10.1177/0021886387")]
+    second = [(72, BODY, 11, "Boateng, G. O. (2018). Best practices for " + LONG),
+              (90, BODY, 11, "Frontiers in Public Health, 6, 149.")]
+    paragraphs = _paragraphs(read(placed([first, second])))
+    assert len(paragraphs) == 2 and paragraphs[1].startswith("Boateng")
+
+
+@pytest.mark.parametrize("text, font", [
+    ("•", "Times-Roman"), ("", "Symbol"), ("l", "Wingdings-Regular"), ("§", "ABCDEF+Wingdings"),
+])
+def test_a_word_bullet_in_any_of_its_fonts_is_a_list_mark(text, font):
+    assert reader._is_mark({"text": text, "fontname": font})
+
+
+def test_a_single_letter_in_a_text_font_is_not_a_list_mark():
+    assert not reader._is_mark({"text": "l", "fontname": "TimesNewRomanPSMT"})
+    assert not reader._is_mark({"text": "A", "fontname": "Arial"})

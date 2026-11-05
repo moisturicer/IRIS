@@ -200,15 +200,36 @@ def headings(lines) -> bytes:
 
 def placed(pages, size=letter) -> bytes:
     """Pages of ``(x, font, size, text)`` lines, 16 pt apart, at exact
-    positions, for paragraph and list rules."""
+    positions, for paragraph and list rules. A fifth item, ``True``, draws
+    the text on the line before, as a list item's text beside its number."""
     out = BytesIO()
     c = canvas.Canvas(out, pagesize=size)
     for lines in pages:
-        y = size[1] - 100
-        for x, font, font_size, text in lines:
+        y = size[1] - 84
+        for x, font, font_size, text, *same_line in lines:
+            if not same_line:
+                y -= 16
             c.setFont(font, font_size)
             c.drawString(x, y, text)
-            y -= 16
         c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def boxed_paragraph(lines, size=letter) -> bytes:
+    """A paragraph drawn as Word draws a bordered one: one box per line, the
+    last word of a line overhanging the box's right border by a fraction."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 120
+    c.setFont(BOLD, 12)
+    c.drawString(LEFT, y + 30, "Consent Statement")
+    c.setFont(BODY, 10)
+    for text in lines:
+        width = c.stringWidth(text, BODY, 10)
+        c.rect(LEFT - 2, y - 3, width + 1.7, 12)   # 0.3 pt short of the text
+        c.drawString(LEFT, y, text)
+        y -= 12
+    c.showPage()
     c.save()
     return out.getvalue()

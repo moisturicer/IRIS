@@ -199,12 +199,17 @@ def _read_page(page) -> dict:
         w["text"] = _clean(w["text"])
         w["page"] = number
     words = _join_small_caps([w for w in words if w["text"].strip()])
-    tables = page.find_tables()
+    # Only a grid of two columns or more is a table. A stack of one-cell boxes
+    # is a bordered or shaded paragraph (Word draws one box per line), whose
+    # text reads as ordinary lines, not as one "row" per line.
+    tables = [t for t in page.find_tables() if max((len(r) for r in t.extract()), default=0) >= 2]
     boxes = [t.bbox for t in tables]
 
     def inside(w):
-        return any(b[0] <= w["x0"] and w["x1"] <= b[2] and b[1] <= w["top"] and w["bottom"] <= b[3]
-                   for b in boxes)
+        # 2 pt of slack: a line's last word can overhang a cell's border, and
+        # was then read twice, once in the row and once as ordinary text.
+        return any(b[0] - 2 <= w["x0"] and w["x1"] <= b[2] + 2 and b[1] - 2 <= w["top"]
+                   and w["bottom"] <= b[3] + 2 for b in boxes)
 
     rows = []
     for table in tables:
@@ -309,9 +314,33 @@ def _column_left(lines) -> float:
 BULLETS = "●•▪◦○■□➢➤✓✔◆◇►▸-–*"
 
 
+#: A numbered or lettered list item's mark: "1.", "2)", "(3)", "a.", "b)".
+LIST_NUMBER = re.compile(r"\(?(\d{1,2}|[a-z])[.)]")
+
+
+#: Fonts whose every character is a symbol: a Word bullet set in one reads
+#: as a letter ("l" in Wingdings is a round bullet).
+SYMBOL_FONTS = ("wingdings", "webdings", "symbol", "zapfdingbats", "dingbats")
+
+
+def _is_mark(word) -> bool:
+    """A single list mark: a bullet character, a private-use character (Word's
+    default Symbol bullet reads as U+F0B7), any one character in a symbol font,
+    or one glyph with no character behind it ("(cid:127)")."""
+    text = word["text"]
+    if UNMAPPED.fullmatch(text):
+        return True   # a lone glyph with no character, as a bullet's font often has
+    if len(text) != 1:
+        return False
+    font = (word.get("fontname") or "").lower()
+    return text in BULLETS or 0xE000 <= ord(text) <= 0xF8FF or any(f in font for f in SYMBOL_FONTS)
+
+
 def _bullet_text_x(line):
     """Where a list item's text starts, if ``line`` opens one, else None."""
     first = line[0]["text"]
+    if (LIST_NUMBER.fullmatch(first) or _is_mark(line[0])) and len(line) > 1:
+        return line[1]["x0"]
     if first and first[0] in BULLETS and (len(first) == 1 or not first[1].isalnum() or first[0] not in "-–*"):
         if len(first) == 1:
             return line[1]["x0"] if len(line) > 1 else None
@@ -521,8 +550,14 @@ def _structure(pages):
             # Against the lower of the column's commonest start and the body
             # margin the text was just using: a page whose commonest start is
             # an indent would otherwise glue its first paragraph to the last.
-            edge = min(column_left, last_body[0]) if last_body[0] is not None else column_left
-            indented, outdented = x > edge + INDENT and not hanging, False
+            edge = min(column_left, last_body[0][0]) if last_body[0] is not None else column_left
+            indented = x > edge + INDENT and not hanging
+            # Out past where the paragraph's lines sat in their own column, as
+            # a reference's next entry opening the next column or page.
+            # Measured from the same edge, since a list page's commonest start
+            # is the list's indent, not the margin.
+            outdented = (bool(para) and last_body[0] is not None
+                         and x < edge + last_body[0][1] - INDENT)
         indented = indented or outdented
         gap = bool(para) and last_top is not None and page == para[-1][1] and top - last_top > line_gap * 1.6
         size = _size(line)
@@ -537,7 +572,7 @@ def _structure(pages):
             # The paragraph's second line, or its first in a new column or
             # page, sets its body margin there.
             body_x[0] = (page, column, x)
-            last_body[0] = x
+            last_body[0] = (x, x - column_left)   # the margin, and its offset in its column
         para.extend((w["text"], page, w) for w in line)
         para.append(("\n", page, None))
         prev_line[0] = (page, column, x, line[-1]["x1"])
@@ -638,6 +673,8 @@ def _sentences(para, known, paragraph, pages):
 
     def splits_here(m):
         before = text[:m.start()].rstrip('"”)')
+        if LIST_NUMBER.fullmatch(before.strip()):
+            return False   # "1." opening a list item ends no sentence
         if any(before.endswith(a) for a in ABBREVIATIONS):
             return False
         # An initial, as in "J. Cruz", ends no sentence.
