@@ -24,15 +24,32 @@ from ai.agent.protocol import (
 from ai.agent.tools import Investigation, ManuscriptRead
 from ai.research.tools import Count, PassageRef, Reading, Source, Span
 
-FORMAT = "agent-checkpoint-1"
+#: -2 adds the compact handoff the history opens with (IR-734); -3 adds the digest of the instructions and
+#: tool schemas the history was sent under (IR-736). An earlier body is rebuilt, never misread.
+FORMAT = "agent-checkpoint-3"
 
 
-def task_key(question: str, prior, state: dict) -> str:
-    """What the run is answering: the reader's words and the Conversation they follow."""
+def prefix_digest(instructions: str, tools) -> str:
+    """What opaque state in a history is bound to besides the pin: the exact prefix and tool schemas.
+
+    A signed artifact can depend on them, so one saved under other bytes is
+    never replayed even when the pin's version strings were not changed.
+    """
+    body = json.dumps({"instructions": instructions, "tools": [asdict(t) for t in tools]},
+                      sort_keys=True, ensure_ascii=False)
+    return hashlib.sha256(body.encode()).hexdigest()
+
+
+def task_key(question: str, prior, state: dict, *, handoff: Optional[int] = None) -> str:
+    """What the run is answering: the reader's words and the Conversation they follow.
+
+    `handoff` is the compact handoff revision the Conversation opens with (IR-734).
+    """
     body = json.dumps({
         "question": question,
         "prior": [[t.question, t.answer, t.kind] for t in prior],
         "state": state or {},
+        **({"handoff": handoff} if handoff is not None else {}),
     }, sort_keys=True, ensure_ascii=False)
     return hashlib.sha256(body.encode()).hexdigest()
 
@@ -132,6 +149,7 @@ def _investigation(found: Investigation) -> dict:
         "tool_calls": found.tool_calls, "counts": [_count(c) for c in found.counts],
         "searched": found.searched, "outages": list(found.outages),
         "readings": {revision: _reading(read) for revision, read in found.readings.items()},
+        "recovered": {str(ordinal): answer for ordinal, answer in found.recovered.items()},
     }
 
 
@@ -154,6 +172,8 @@ def _restore_investigation(found: Investigation, raw: dict) -> None:
     found.outages = [str(name) for name in raw["outages"]]
     # What the run read of each Manuscript, so a resumed answer reports the same coverage (IR-733).
     found.readings = {str(revision): _load_reading(read) for revision, read in raw.get("readings", {}).items()}
+    # Original Turns recovered before the takeover (IR-735); a body from before it has none.
+    found.recovered = {int(ordinal): str(answer) for ordinal, answer in raw.get("recovered", {}).items()}
 
 
 def _span(span: Optional[Span]) -> Optional[list]:
@@ -198,6 +218,10 @@ class Restored:
     stale: int
     budget: dict
     investigation: dict
+    #: The handoff the history opens with: `revision`, `through`, `carried` and `body`, or None (IR-734).
+    compaction: Optional[dict] = None
+    #: `prefix_digest` of what the history was sent under; empty when none was recorded.
+    prefix: str = ""
 
     def handles(self) -> list[str]:
         """Every handle the restored Investigation may cite or read again."""
@@ -207,14 +231,21 @@ class Restored:
     def counted(self) -> list[int]:
         return [i for c in self.investigation["counts"] for i in c["population"]]
 
+    def turns(self) -> list[int]:
+        """Original Turns recovered, whose text this history carries (IR-735)."""
+        return sorted(int(ordinal) for ordinal in self.investigation.get("recovered", {}))
+
     def apply(self, found: Investigation) -> None:
         _restore_investigation(found, self.investigation)
 
 
 def dump(*, pin: Pin, bounds, task: str, history, investigation: Investigation, budget,
-         steps: int, stale: int) -> dict:
+         steps: int, stale: int, compaction: Optional[dict] = None, prefix: str = "") -> dict:
     return {
+        "compaction": compaction,
         "format": FORMAT,
+        # An empty digest matches nothing, so a body without one is never resumed.
+        "prefix": prefix,
         "pin": pin.as_dict(), "bounds": asdict(bounds) if bounds is not None else None,
         "task": task, "steps": steps, "stale": stale,
         "budget": {"input": budget.input, "output": budget.output, "reported": budget.reported,
@@ -236,7 +267,8 @@ def load(body, *, pin: Pin, bounds, task: str) -> Optional[Restored]:
         history = [_load_entry(e) for e in body["history"]]
         restored = Restored(history=history, steps=int(body["steps"]), stale=int(body["stale"]),
                             budget={k: int(body["budget"][k]) for k in ("input", "output", "reported", "attempts")},
-                            investigation=body["investigation"])
+                            investigation=body["investigation"], compaction=body.get("compaction"),
+                            prefix=str(body.get("prefix") or ""))
         # Parsed in full now, so a malformed body is refused before anything is applied.
         _restore_investigation(Investigation(None), restored.investigation)
     except (KeyError, TypeError, ValueError, AttributeError):

@@ -197,6 +197,10 @@ class VoyageEmbeddingProvider(EmbeddingProvider):
     def dimensions(self) -> int:
         return self._dimensions
 
+    @property
+    def model_id(self) -> str:
+        return self._model
+
     def _embed_grouped(
         self, documents: Sequence[Sequence[str]], input_type: str
     ) -> list[list[list[float]]]:

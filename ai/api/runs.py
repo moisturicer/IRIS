@@ -14,7 +14,7 @@ import functools
 import uuid
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Header
+from fastapi import APIRouter, Depends, Header, Query
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
@@ -35,6 +35,11 @@ class SubmitRequest(BaseModel):
     base_revision: int | None = Field(default=None, ge=0)
     #: The larger configured profile unless the reader chooses "ordinary" (ADR-049 §16 as amended).
     depth: Literal["ordinary", "deep"] = runs_config.DEFAULT_DEPTH
+
+
+class CompactRequest(BaseModel):
+    #: The Conversation revision the reader saw; a Turn since then makes this a conflict.
+    base_revision: int = Field(ge=0)
 
 
 @functools.cache
@@ -94,7 +99,8 @@ async def submit_run(
         )
         if protocol:
             run = await s.store.status(grant, run["id"], reader_projection=True)
-        return JSONResponse(public.run(run) if protocol else run, status_code=201 if created else 200)
+        return JSONResponse(public.run(run, manual_compaction=s.can_compact) if protocol else run,
+                            status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
 
@@ -102,13 +108,43 @@ async def submit_run(
 @router.get("/runs/{run_id}")
 async def run_status(
     run_id: uuid.UUID,
+    #: The journal position a reconnecting reader has already seen (IR-726); reader protocol only.
+    after: int | None = Query(default=None, ge=0),
     grant: str | None = Header(default=None, alias=GRANT_HEADER),
     service: RunService | None = Depends(_service),
     protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
 ):
+    if after is not None and not protocol:
+        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
+
     async def act(s: RunService):
         snapshot = await s.store.status(grant, run_id, reader_projection=bool(protocol))
-        return JSONResponse(public.run(snapshot) if protocol else snapshot)
+        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact, after=after)
+                            if protocol else snapshot)
+
+    return await _call(service, act, protocol)
+
+
+@router.post("/runs/{run_id}/retry")
+async def retry_run(
+    run_id: uuid.UUID,
+    idempotency_key: str = Header(min_length=8, max_length=128),
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
+):
+    """Ask again, explicitly (IR-726): a new run linked to one that ended without an answer.
+
+    201 with the new run, 200 for the same request again or a retry already
+    started, 409 when the run is not retryable or its Conversation moved on.
+    The first run's allowance and charges are untouched.
+    """
+    async def act(s: RunService):
+        run, created = await s.retry(grant, run_id, key=idempotency_key)
+        if protocol:
+            run = await s.store.status(grant, run["id"], reader_projection=True)
+        return JSONResponse(public.run(run, manual_compaction=s.can_compact) if protocol else run,
+                            status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
 
@@ -122,7 +158,7 @@ async def cancel_run(
 ):
     async def act(s: RunService):
         snapshot = await s.store.cancel(grant, run_id, reader_projection=bool(protocol))
-        return JSONResponse(public.run(snapshot) if protocol else snapshot)
+        return JSONResponse(public.run(snapshot, manual_compaction=s.can_compact) if protocol else snapshot)
 
     return await _call(service, act, protocol)
 
@@ -136,7 +172,38 @@ async def reopen_conversation(
 ):
     async def act(s: RunService):
         snapshot = await s.store.reopen(grant, conversation_id, include_runs=bool(protocol))
-        return JSONResponse(public.conversation(snapshot) if protocol else snapshot)
+        return JSONResponse(public.conversation(snapshot, manual_compaction=s.can_compact) if protocol else snapshot)
+
+    return await _call(service, act, protocol)
+
+
+@router.post("/conversations/{conversation_id}/compact")
+async def compact_conversation(
+    conversation_id: uuid.UUID,
+    body: CompactRequest,
+    idempotency_key: str = Header(min_length=8, max_length=128),
+    grant: str | None = Header(default=None, alias=GRANT_HEADER),
+    service: RunService | None = Depends(_service),
+    protocol: str | None = Header(default=None, alias="X-IRIS-Protocol"),
+):
+    """Condense an owned Conversation on the reader's request (IR-754).
+
+    The same mechanism as automatic compaction, as a run of its own: 201 with
+    the run when admitted, 200 for the same request again (a double click),
+    409 while another run is active in the Conversation or when it has moved
+    past `base_revision`. Reader protocol only.
+    """
+    if protocol is None:
+        return JSONResponse({"status": "unsupported_protocol"}, status_code=406)
+
+    async def act(s: RunService):
+        if not s.can_compact:
+            return _unavailable()
+        run, created = await s.submit_compaction(
+            grant, key=idempotency_key, conversation_id=conversation_id, base_revision=body.base_revision,
+        )
+        run = await s.store.status(grant, run["id"], reader_projection=True)
+        return JSONResponse(public.run(run, manual_compaction=True), status_code=201 if created else 200)
 
     return await _call(service, act, protocol)
 

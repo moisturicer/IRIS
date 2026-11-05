@@ -92,11 +92,20 @@ READ_MANUSCRIPT = ToolSpec(
     "Pass the continue_after handle a read returned to go on where it stopped.", _object(
         {"paper": _HANDLE, "continue_after": _HANDLE}, ["paper"]))
 
+RECOVER_TURN = ToolSpec(
+    "recover_turn",
+    "Read one earlier Turn of this conversation again exactly as it was answered, by its number, with "
+    "fresh handles for the passages it cited. Use it when the reader asks for an exact detail from an "
+    "earlier Turn, such as one a compacted summary mentions.", _object({"turn": {"type": "integer", "minimum": 1}},
+                                                                       ["turn"]))
+
 RESEARCH = (SEARCH, OPEN_PASSAGE, READ_PAGE, OUTLINE)
 #: Named papers and exact counts, offered only under the research-2 tool version (IR-750).
 METADATA = (RESOLVE_PAPERS, COUNT_RECORDS)
 #: Whole-Manuscript reading, offered only under the research-3 tool version (IR-733).
 MANUSCRIPTS = (READ_MANUSCRIPT,)
+#: Original-Turn recovery, offered only under the research-4 tool version (IR-735).
+RECOVERY = (RECOVER_TURN,)
 
 
 class InvalidArguments(Exception):
@@ -209,6 +218,10 @@ class Investigation:
     metadata: bool = False
     #: Offer read_manuscript (the research-3 tool version, IR-733).
     manuscripts: bool = False
+    #: Offer recover_turn (the research-4 tool version, IR-735).
+    recovery: bool = False
+    #: Original Turns this run recovered: ordinal -> answer, whose numbers were checked when delivered.
+    recovered: dict[int, str] = field(default_factory=dict)
     #: Passage handle -> what was shown for it.
     passages: dict[str, PassageRef] = field(default_factory=dict)
     #: Record id -> (paper handle, title).
@@ -240,6 +253,7 @@ class Investigation:
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
         return (*RESEARCH, *(METADATA if self.metadata else ()), *(MANUSCRIPTS if self.manuscripts else ()),
+                *(RECOVERY if self.recovery else ()),
                 UPDATE_PLAN, UPDATE_FOCUS, *extra)
 
     @property
@@ -252,9 +266,13 @@ class Investigation:
     def paper(self, handle) -> Optional[int]:
         return next((rid for rid, (h, _) in self.papers.items() if h == handle), None)
 
-    async def recall(self, state: dict) -> dict:
-        """Fresh handles for the papers the Conversation showed, still readable now."""
-        ids = [*state.get("shown", ()), *state.get("selected", ()), *state.get("excluded", ())]
+    async def recall(self, state: dict, *, also=()) -> dict:
+        """Fresh handles for the papers the Conversation showed, still readable now.
+
+        `also` names more Records to give handles to in the same read, such as
+        a compact handoff's (IR-734); the state message describes `state` only.
+        """
+        ids = [*state.get("shown", ()), *state.get("selected", ()), *state.get("excluded", ()), *also]
         if not ids:
             return {}
         found = await self.research.recall(list(dict.fromkeys(ids)))
@@ -291,6 +309,10 @@ class Investigation:
                 return self._counted(await self.research.count(filters, args.get("group_by")))
             if spec is READ_MANUSCRIPT:
                 return self._evidence(await self._read(args, room), call.id)
+            if spec is RECOVER_TURN:
+                if not _int(args["turn"]):
+                    raise InvalidArguments
+                return self._evidence(await self.research.recover_turn(args["turn"]))
             return self._evidence(await self._research(spec, args))
         except InvalidArguments:
             return Outcome(json.dumps({"error": "invalid_arguments"}))
@@ -347,6 +369,16 @@ class Investigation:
                 revision, positions = pending
                 self.readings[revision].visible.update(positions)
 
+    def reshown(self, contents) -> None:
+        """Keep as shown only the Manuscript passages whose handle is still in a result the model has (IR-736).
+
+        Compaction takes whole exchanges out of the history; what they showed
+        is then inspected and recoverable by its handles, not shown.
+        """
+        contents = list(contents)
+        for read in self.readings.values():
+            read.visible = {n for n, handle in read.handles.items() if any(handle in c for c in contents)}
+
     def _ended(self, result: Evidence) -> None:
         if result.reason in ENDS_RUN:
             raise RunEnded(result.reason)
@@ -385,6 +417,14 @@ class Investigation:
                 "page": passage.page, "section": passage.section, "text": passage.text[passage.overlap:],
                 **({"repeats_previous_chars": passage.overlap} if passage.overlap else {}),
             })
+        if result.turn is not None:
+            turn = result.turn
+            self.recovered[turn.ordinal] = turn.answer
+            new = new or ("turn", turn.ordinal) not in self.seen
+            self.seen.add(("turn", turn.ordinal))
+            # The original words, with its citations as this run's handles: never a summary.
+            body["turn"] = {"turn": turn.ordinal, "question": turn.question, "answer": turn.answer,
+                            "kind": turn.kind, "truncated": turn.truncated}
         if result.reading is not None:
             new = self._read_into(result, call_id, body) or new
         if result.sections:

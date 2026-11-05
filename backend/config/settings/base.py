@@ -335,6 +335,8 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.embed_record": {"queue": "embedding"},
     "apps.ai.tasks.embed_chunk_set": {"queue": "embedding"},
     "apps.ai.tasks.index_record": {"queue": "embedding"},
+    # IR-752: one bounded slice of a pending Embedding Space build.
+    "apps.ai.tasks.build_embedding_space": {"queue": "embedding"},
     "apps.ai.tasks.generate_record_overview": {"queue": "embedding"},
     "apps.ai.tasks.generate_paper_brief": {"queue": "embedding"},
     # IR-466: its own concurrency-1 worker, apart from reader work.

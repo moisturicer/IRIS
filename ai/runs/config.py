@@ -12,6 +12,8 @@ EXECUTORS = ("deterministic", "agent")
 DEPTHS = ("ordinary", "deep")
 #: Owner decision, ADR-049's 2026-11-04 amendment (IR-885).
 DEFAULT_DEPTH = "deep"
+#: What a run is for, in its pin: absent means an Ask; a compaction asks nothing and writes no Turn (IR-754).
+KIND_COMPACT = "compact"
 PROTOCOL = "runs-1"
 SCHEMA = "0004_agent.sql"
 

@@ -81,10 +81,12 @@ class Command(BaseCommand):
             default=None,
             dest="space_id",
             help="Fill this EmbeddingSpace instead of the active one, so it can "
-            "be promoted once complete. **Chunk vectors only**: `RecordEmbedding` "
-            "is one row per record with no space key, so a summary vector cannot "
-            "exist in two spaces at once and writing one here would overwrite the "
-            "live space's. Summaries are left alone in this mode.",
+            "be promoted once complete. A **pending** space is built by "
+            "`apps.ai.space_build` (IR-752): summary vectors go to the "
+            "space-keyed table and passage vectors to its chunk rows, the "
+            "provider must be the space's pinned model, and the legacy "
+            "`RecordEmbedding` row of the live space is never touched. Any "
+            "other space keeps the older chunk-vectors-only fill.",
         )
         parser.add_argument(
             "--force",
@@ -96,6 +98,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from apps.ai.models import (
             VECTOR_COLUMN_DIMENSIONS,
+            EmbeddingSpaceState,
             assert_embedding_space_consistent,
             get_active_embedding_space,
         )
@@ -110,12 +113,22 @@ class Command(BaseCommand):
         if options["limit"]:
             records = records[: options["limit"]]
 
+        build_pending = (
+            options["space_id"] is not None and space.state == EmbeddingSpaceState.PENDING
+        )
+        if build_pending and options["force"]:
+            raise CommandError(
+                "--force is not available for a pending build: the build keeps "
+                "completed, paid work. Delete the pending space's rows "
+                "deliberately if a full rebuild is intended."
+            )
         plan = plan_records(
             records,
             space_id=space.id,
             space_model=space.model_id,
             cost_per_million=cost_per_million(),
-            include_summaries=options["space_id"] is None,
+            include_summaries=options["space_id"] is None or build_pending,
+            summary_space_id=space.id if build_pending else None,
         )
         self._write_plan(plan)
 
@@ -147,6 +160,10 @@ class Command(BaseCommand):
                     "writes the active space. Run a targeted fill inline."
                 )
             self._queue(plan, force=options["force"])
+            return
+
+        if build_pending:
+            self._build_pending(plan, space)
             return
 
         self._run_inline(
@@ -262,6 +279,39 @@ class Command(BaseCommand):
             report.record_outcome(outcome)
 
         self._write_report(report)
+
+    def _build_pending(self, plan, space):
+        """Hand the planned records to the pending-space build (IR-752).
+
+        The build recomputes what is owed itself, so a re-run after any stop
+        sends only the remainder; the plan above was the bill, this is the run.
+        """
+        from apps.ai.space_build import BuildRefused, build_pending_space
+
+        try:
+            report = build_pending_space(
+                space.pk, record_ids=[item.record_id for item in plan.to_embed]
+            )
+        except BuildRefused as exc:
+            raise CommandError(str(exc)) from exc
+
+        self.stdout.write(self.style.MIGRATE_HEADING("\nBuild"))
+        self.stdout.write(f"  records built        {report.records_built}")
+        self.stdout.write(f"  summaries embedded   {report.summaries_embedded}")
+        self.stdout.write(f"  passages embedded    {report.passages_embedded:,}")
+        for label, items in (("refused by policy", report.refused),
+                             ("failed", report.failed)):
+            if items:
+                self.stdout.write(self.style.WARNING(f"  {label:<20} {len(items)}"))
+                for record_id, reason in items[:10]:
+                    self.stdout.write(f"      record {record_id}: {reason}")
+        if report.busy:
+            self.stdout.write(f"  held by another worker {report.busy}")
+        if report.stopped:
+            self.stdout.write(self.style.WARNING(f"  stopped early: {report.stopped}"))
+        self.stdout.write(
+            "  Re-running continues from what is still owed; nothing was promoted."
+        )
 
     def _write_report(self, report):
         self.stdout.write(self.style.MIGRATE_HEADING("\nRun"))
