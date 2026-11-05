@@ -466,6 +466,8 @@ python -m ai.runs.purge            # remove deleted accounts' AI-owned Conversat
 
 **Plan before substantial implementation.** For anything beyond a small fix, state the approach and the files you intend to touch before writing code. Say which acceptance criteria you are working to.
 
+**Judgement-call standards.** [`docs/engineering/CODING_STANDARDS.md`](docs/engineering/CODING_STANDARDS.md) holds what a review enforces that no automated check can (IR-927). Mechanical rules belong in a lint rule or a CI job, not there.
+
 ## Definition of Done
 
 Authoritative definition: **`docs/engineering/DEFINITION_OF_DONE.md` §4.** Do not restate a different version anywhere.
