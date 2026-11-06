@@ -17,6 +17,7 @@ import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { importedReference } from "@/test/fixtures/importedReference";
 import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import { recordsApi } from "@/api/records";
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
 import { libraryApi } from "@/api/library";
 import { useLibraryStore } from "@/store/library.store";
@@ -737,6 +738,18 @@ describe("states", () => {
     expect(alert).toHaveTextContent("We couldn't load research");
 
     await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
+  });
+
+  it("shows a feed that timed out as interrupted, not as a refusal, and Retry reads again (IR-906)", async () => {
+    vi.mocked(recordsApi.list).mockImplementationOnce(() => Promise.reject(new RequestTimeoutError(30_000, "get", "/records/")));
+    renderDiscover();
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("This took too long");
+    expect(alert).not.toHaveTextContent("We couldn't load research");
+
+    await userEvent.click(within(alert).getByRole("button", { name: "Retry" }));
     expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
   });
 
