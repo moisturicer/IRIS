@@ -44,6 +44,7 @@ import type { User } from "@/types/auth";
 import type { PaperDetails, PaperPerson, Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { documentsApi } from "@/api/documents";
 import * as utils from "@/lib/utils";
 import { seatsApi } from "@/api/reviews";
@@ -2709,6 +2710,46 @@ describe("a record the viewer cannot read (IR-411)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitForRecord(record.title);
+  });
+
+  // IR-906. A refusal is a refusal whichever status carries it: a hidden Record
+  // and a missing id must not be told apart.
+  it("treats a 403 exactly like a 404", async () => {
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 403, data: { detail: "You do not have permission." } } });
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "We couldn't load this record" })).not.toBeInTheDocument();
+  });
+
+  it("shows a load that timed out as interrupted, and Retry reads again", async () => {
+    shownRecord = record;
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/records/1/"));
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Record not available" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitForRecord(record.title);
+  });
+
+  it("falls to the same not-available state when a re-read finds access gone", async () => {
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Request documents" }));
+    const dialog = screen.getByRole("dialog", { name: "Request documents" });
+    await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Ethics Clearance" }));
+    await userEvent.type(within(dialog).getByRole("textbox", { name: /Message to the owner/ }), "Please.");
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 });
 

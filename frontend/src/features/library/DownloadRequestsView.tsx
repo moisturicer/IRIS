@@ -6,6 +6,8 @@ import { DownloadRequestModal } from "@/components/records/DownloadRequestModal"
 import { useCancelDownloadRequest } from "@/components/records/useCancelDownloadRequest";
 import { useDownloadCopy } from "@/components/records/useDownloadCopy";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { isRequestTimeout } from "@/api/requestPolicy";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn, formatDate } from "@/lib/utils";
@@ -96,16 +98,19 @@ export function DownloadRequestsView() {
   const [requests, setRequests] = useState<ReaderDownloadRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [interrupted, setInterrupted] = useState(false);
   const [askingAgain, setAskingAgain] = useState<ReaderDownloadRequest | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     setFailed(false);
+    setInterrupted(false);
     try {
       const { data } = await recordsApi.myDownloadRequests();
       setRequests(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (error) {
       setFailed(true);
+      setInterrupted(isRequestTimeout(error));
     } finally {
       setLoading(false);
     }
@@ -130,13 +135,12 @@ export function DownloadRequestsView() {
 
   if (failed) {
     return (
-      <EmptyState
-        framed
-        tone="error"
-        icon="fa-plug-circle-xmark"
+      <ReadFailedState
+        interrupted={interrupted}
+        what="download requests"
         title="Could not load your download requests"
         message="Nothing was changed. Check your connection and try again."
-        action={<button type="button" onClick={reload} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>}
+        onRetry={reload}
       />
     );
   }

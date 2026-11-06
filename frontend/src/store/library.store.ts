@@ -1,5 +1,6 @@
 import { create } from "zustand";
 
+import { isRequestTimeout } from "@/api/requestPolicy";
 import { libraryApi, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
 import type { RecordListItem } from "@/types/records";
 
@@ -52,6 +53,8 @@ interface LibraryState {
   /** The epoch these items were loaded in; anything else is another session's. */
   epoch:   number;
   load:    LoadState;
+  /** `load` is `error` because the read timed out, not because it was refused (IR-906). */
+  interrupted: boolean;
   items:   Record<number, LibraryItem>;
   failure: LibraryFailure | null;
 
@@ -62,7 +65,7 @@ interface LibraryState {
   dismissFailure: () => void;
 }
 
-const empty = () => ({ load: "idle" as LoadState, items: {}, failure: null });
+const empty = () => ({ load: "idle" as LoadState, interrupted: false, items: {}, failure: null });
 
 function toItem(entry: SavedRecordEntry): LibraryItem {
   if (!entry.available) {
@@ -100,7 +103,7 @@ export const useLibraryStore = create<LibraryState>()((set, get) => ({
     if (!force && (load === "ready" || load === "loading")) return inflightLoad ?? undefined;
 
     const epoch = currentEpoch();
-    set({ load: "loading", epoch });
+    set({ load: "loading", interrupted: false, epoch });
     const request = libraryApi.saves().then(
       ({ data }) => {
         if (currentEpoch() !== epoch) return;
@@ -108,9 +111,9 @@ export const useLibraryStore = create<LibraryState>()((set, get) => ({
         for (const entry of data.results ?? []) items[entry.record_id] = toItem(entry);
         set({ items, load: "ready" });
       },
-      () => {
+      (error: unknown) => {
         if (currentEpoch() !== epoch) return;
-        set({ load: "error" });
+        set({ load: "error", interrupted: isRequestTimeout(error) });
       },
     );
     inflightLoad = request.finally(() => { inflightLoad = null; });

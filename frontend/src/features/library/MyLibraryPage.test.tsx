@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { libraryApi, type ReadingStatus, type SavedRecordEntry } from "@/api/library";
 import { recordsApi } from "@/api/records";
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
 import { useLibraryStore } from "@/store/library.store";
 import type { User } from "@/types/auth";
@@ -255,6 +256,38 @@ describe("My Library: an author's research", () => {
 
     await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
     expect(recordsApi.mine).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("My Library: interrupted reads (IR-906)", () => {
+  const timeout = () => new RequestTimeoutError(30_000, "get", "/x/");
+
+  it("shows a research list that timed out as interrupted, and Retry reads again", async () => {
+    vi.mocked(recordsApi.mine).mockRejectedValueOnce(timeout());
+    renderScreen(<MyLibraryPage />);
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Could not load your research" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(recordsApi.mine).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows download requests that timed out as interrupted", async () => {
+    vi.mocked(recordsApi.myDownloadRequests).mockRejectedValueOnce(timeout());
+    renderScreen(<MyLibraryPage />, DOWNLOADS);
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(recordsApi.myDownloadRequests).toHaveBeenCalledTimes(2);
+  });
+
+  it("shows saved papers that timed out as interrupted, and Retry reads the account's saves again", async () => {
+    vi.mocked(libraryApi.saves).mockRejectedValueOnce(timeout());
+    renderScreen(<MyLibraryPage />, { route: "/records/mine?section=saved" });
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(libraryApi.saves).toHaveBeenCalledTimes(2));
   });
 });
 
