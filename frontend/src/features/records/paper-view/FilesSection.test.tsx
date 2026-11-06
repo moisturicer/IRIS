@@ -161,18 +161,18 @@ describe("the Files section, for the owner of a record in review", () => {
     const { container } = renderFiles();
 
     const ethics = await screen.findByRole("region", { name: "Ethics Clearance" });
-    expect(within(ethics).getByRole("button", { name: "Upload Ethics Clearance" })).toBeInTheDocument();
+    expect(within(ethics).getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
     expect(within(ethics).getByText(/Requested by IERC/)).toBeInTheDocument();
     expect(within(ethics).getByText("Requested")).toBeInTheDocument();
     // Nothing asked for, nothing uploaded, and not editable: not listed at all.
     expect(screen.queryByRole("region", { name: "Patent Draft" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Upload Patent Draft" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Upload Patent Draft/ })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
 
   it("uploads into the slot through the dropzone, and the item then reads Uploaded · awaiting review", async () => {
     renderFiles();
-    const zone = await screen.findByRole("button", { name: "Upload Ethics Clearance" });
+    const zone = await screen.findByRole("button", { name: /^Upload Ethics Clearance/ });
     const file = pdf("ethics.pdf");
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
@@ -180,12 +180,12 @@ describe("the Files section, for the owner of a record in review", () => {
     await waitFor(() => expect(upload).toHaveBeenCalledWith(RECORD_ID, ETHICS, file, expect.any(Object)));
     const ethics = screen.getByRole("region", { name: "Ethics Clearance" });
     await waitFor(() => expect(within(ethics).getByText("Uploaded · awaiting review")).toBeInTheDocument());
-    expect(within(ethics).queryByRole("button", { name: "Upload Ethics Clearance" })).not.toBeInTheDocument();
+    expect(within(ethics).queryByRole("button", { name: /^Upload Ethics Clearance/ })).not.toBeInTheDocument();
   });
 
   it("answers an Other item, which has no slot, with a dropzone of its own", async () => {
     renderFiles();
-    const zone = await screen.findByRole("button", { name: "Upload Consent form" });
+    const zone = await screen.findByRole("button", { name: /^Upload Consent form/ });
     const file = pdf("consent.pdf");
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
@@ -211,7 +211,7 @@ describe("the Files section, for the owner of a record in review", () => {
     const ethics = await screen.findByRole("region", { name: "Ethics Clearance" });
     expect(await within(ethics).findByText("Replacement needed")).toBeInTheDocument();
     expect(within(ethics).getByText(/The scan is unreadable\./)).toBeInTheDocument();
-    expect(within(ethics).getByRole("button", { name: "Upload Ethics Clearance" })).toBeInTheDocument();
+    expect(within(ethics).getByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
   });
 
   it("shows the reason on an item stored as rejected, too", async () => {
@@ -228,7 +228,7 @@ describe("the Files section, for the owner of a record in review", () => {
     renderFiles();
     const file = pdf("ethics.pdf");
 
-    fireEvent.drop(await screen.findByRole("button", { name: "Upload Ethics Clearance" }), {
+    fireEvent.drop(await screen.findByRole("button", { name: /^Upload Ethics Clearance/ }), {
       dataTransfer: { files: [file] },
     });
 
@@ -245,8 +245,8 @@ describe("the Files section, for the owner of an editable record", () => {
     requests = [];
     renderFiles({ editable: true });
 
-    expect(await screen.findByRole("button", { name: "Upload Ethics Clearance" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Upload Patent Draft" })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /^Upload Ethics Clearance/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Upload Patent Draft/ })).toBeInTheDocument();
   });
 });
 
@@ -325,7 +325,7 @@ describe("the Files section, for a reviewer", () => {
 describe("supplementary attachments", () => {
   it("lets an office attach a file of any type, and remove it", async () => {
     renderFiles({ owner: false, reviewing: true, attach: true });
-    const zone = await screen.findByRole("button", { name: "Attach a supplementary file" });
+    const zone = await screen.findByRole("button", { name: /^Attach a supplementary file/ });
     const file = new File(["minutes"], "ierc-minutes.docx");
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
@@ -360,7 +360,7 @@ describe("supplementary attachments", () => {
     expect(await screen.findByText("clearance-certificate.pdf")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Download clearance-certificate.pdf" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^Remove clearance/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Attach a supplementary file" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Attach a supplementary file/ })).not.toBeInTheDocument();
   });
 });
 
@@ -382,7 +382,7 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
         onChanged={onChanged}
       />,
     );
-    const zone = await screen.findByRole("button", { name: "Upload revised manuscript" });
+    const zone = await screen.findByRole("button", { name: /^Upload revised manuscript/ });
     const file = pdf("revised.pdf");
 
     fireEvent.drop(zone, { dataTransfer: { files: [file] } });
@@ -404,8 +404,8 @@ describe("the manuscript, while a revision is asked for (IR-273)", () => {
 
   it("offers no manuscript upload without the replace_manuscript capability", async () => {
     renderFiles({ editable: true });
-    await screen.findByRole("button", { name: "Upload Ethics Clearance" });
-    expect(screen.queryByRole("button", { name: "Upload revised manuscript" })).not.toBeInTheDocument();
+    await screen.findByRole("button", { name: /^Upload Ethics Clearance/ });
+    expect(screen.queryByRole("button", { name: /^Upload revised manuscript/ })).not.toBeInTheDocument();
   });
 
 });

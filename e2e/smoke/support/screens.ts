@@ -66,6 +66,16 @@ const USERS = Array.from({ length: 6 }, (_, i) => ({
   date_joined: when("01-05"),
 }));
 
+/** One open call, so the board draws its filters as it does with data. */
+const OPPORTUNITY = {
+  id: 1, opportunity_type: "funding_window", type_display: "Funding Window",
+  title: "Internal research grant, second cycle", posting_office: "RDCO", audience: "Faculty and graduate students",
+  description: "Seed funding for projects that start in the next term.", funding_ceiling: "50000.00",
+  external_url: "https://example.edu/grants", due_date: "2026-12-15", is_featured: false, tags: ["funding"],
+  source: "internal", posted_by: 2, posted_by_name: "RDCO", created_at: when("11-01"), updated_at: when("11-01"),
+  days_left: 39, is_closed: false, can_edit: false,
+};
+
 const LONG_TITLE = "A comparative study of low-cost capacitive soil moisture sensing for upland rice in Cebu";
 
 const DOWNLOAD_REQUEST = {
@@ -185,9 +195,9 @@ export const SCREENS: Screen[] = [
   },
   {
     id: "opportunities", path: "/opportunities", route: "/opportunities", role: "Student",
-    mocks: wrap("Student", (api) => api.on("GET", "/opportunities/", { items: [], can_post: false })),
+    mocks: wrap("Student", (api) => api.on("GET", "/opportunities/", { count: 1, next: null, previous: null, results: [OPPORTUNITY], can_post: false })),
     heading: "Calls & Conferences",
-    primary: (p) => p.getByRole("button", { name: "All", exact: true }), primaryLabel: "All (filter)",
+    primary: (p) => p.getByRole("button", { name: /^All\s*\d*$/ }).first(), primaryLabel: "All (filter)",
   },
   {
     id: "notifications", path: "/notifications", route: "/notifications", role: "Student",
