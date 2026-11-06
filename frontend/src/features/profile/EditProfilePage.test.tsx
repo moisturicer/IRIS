@@ -10,7 +10,7 @@ import { fireEvent, waitFor } from "@testing-library/react";
 import { profileApi } from "@/api/profile";
 import { useAuthStore } from "@/store/auth.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useLocation } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
 import { renderScreen, screen, userEvent, within } from "@/test/render";
@@ -45,11 +45,17 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** What the Profile receives on return: the saved flag the real page shows. */
+function ProfileStandIn() {
+  const saved = (useLocation().state as { saved?: boolean } | null)?.saved;
+  return <><h1>Your profile</h1>{saved && <p role="status">Profile saved.</p>}</>;
+}
+
 /** The edit page, and a stand-in for the Profile it returns to. */
 const withProfile = () => (
   <Routes>
     <Route path="/profile/edit" element={<EditProfilePage />} />
-    <Route path="/profile" element={<h1>Your profile</h1>} />
+    <Route path="/profile" element={<ProfileStandIn />} />
   </Routes>
 );
 
@@ -133,6 +139,7 @@ describe("saving", () => {
       bio: "Floods.", research_interests: ["GIS"], orcid: "0000-0002-1825-0097",
     });
     expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
+    expect(screen.getByRole("status")).toHaveTextContent("Profile saved.");
     expect(useAuthStore.getState().user?.bio).toBe("Floods.");
   });
 

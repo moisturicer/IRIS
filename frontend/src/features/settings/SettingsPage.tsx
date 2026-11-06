@@ -188,8 +188,8 @@ function SecurityTab({ email, isVerified }: { email: string; isVerified: boolean
           <Field label="Sign-in email">
             <input className={readOnlyClass} value={email} readOnly aria-readonly />
           </Field>
-          <p className="flex items-start gap-1.5 text-[12px] text-stone-500 mt-1.5">
-            <i className="fas fa-circle-check text-stone-900 text-[12px] mt-0.5" aria-hidden />
+          <p className="flex items-start gap-1.5 text-label text-stone-500 mt-1.5">
+            <i className="fas fa-circle-check text-stone-900 text-label mt-0.5" aria-hidden />
             <span>
               {isVerified ? "Verified · " : ""}
               Managed by {INSTITUTION.name}. Your email is your sign-in identity and the name attached to

@@ -57,7 +57,7 @@ ADMINISTRATION                                     (System Admin alone)
 
 **IR-783, 2026-11-04 (ADR-051 and its IR-781 amendment).** RDCO approves Student and Adviser roles and coordinates research. The System Admin assigns office roles and coordinators and alone reads the Audit Log. Both Users addresses render the same page; the server controls the actions offered. `/admin/users` remains the System Admin's address, while RDCO now uses `/rdco/users`. The old role, download and delete request addresses under `/admin/` are removed, with no redirects.
 
-The System Admin lands on `/admin/users` after sign-in. Its sidebar shows Discover plus its Administration section, with no research-tool or workflow links. Other roles land on My Reviews when the server reports review work, otherwise Discover. Settings & Profile and Help are in the account menu; Notifications is reached through the bell. No separate Active Sessions page is routed.
+The System Admin lands on `/admin/users` after sign-in. Its sidebar shows Discover plus its Administration section, with no research-tool or workflow links. Other roles land on My Reviews when the server reports review work, otherwise Discover. Profile (`/profile`, with Edit profile at `/profile/edit`), Settings and Help are in the account menu (IR-933); Notifications is reached through the bell. No separate Active Sessions page is routed.
 
 ### Rules
 

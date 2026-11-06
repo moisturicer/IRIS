@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -20,6 +20,8 @@ import { useAuthedImage } from "./useAuthedImage";
  */
 export default function ProfilePage() {
   const { user } = useAuth();
+  // Edit profile sends the person back here after a save and says so.
+  const saved = (useLocation().state as { saved?: boolean } | null)?.saved === true;
   const photoSrc = useAuthedImage(user?.photo_url ?? null);
   if (!user) return null;
 
@@ -29,6 +31,12 @@ export default function ProfilePage() {
 
   return (
     <div className="max-w-3xl space-y-6">
+      {saved && (
+        <p role="status" className="flex items-center gap-1.5 text-small text-stone-700">
+          <i className="fas fa-check" aria-hidden />
+          Profile saved.
+        </p>
+      )}
       <p
         role="note"
         className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-100 py-2 pl-4 pr-2 text-small text-stone-700"

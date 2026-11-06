@@ -104,6 +104,15 @@ describe("editing", () => {
     expect(screen.getByRole("note")).toHaveTextContent(/how other people signed in to IRIS see you/i);
   });
 
+  it("confirms a save it was sent back from, and otherwise says nothing", () => {
+    const { unmount } = renderScreen(<ProfilePage />, { route: "/profile" });
+    expect(screen.queryByRole("status")).not.toBeInTheDocument();
+    unmount();
+
+    renderScreen(<ProfilePage />, { route: "/profile", state: { saved: true } });
+    expect(screen.getByRole("status")).toHaveTextContent("Profile saved.");
+  });
+
   it("has no blocking accessibility violations", async () => {
     signIn({ bio: "Floods.", research_interests: ["GIS"], orcid: "0000-0002-1825-0097" });
     const { container } = renderScreen(<ProfilePage />, { route: "/profile" });

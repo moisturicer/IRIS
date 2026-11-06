@@ -102,8 +102,14 @@ export const routes: RouteObject[] = [{
             ],
           },
           { path: "help",                  element: <HelpPage />,        handle: { crumb: "Help" } },
-          { path: "profile",               element: <ProfilePage />,     handle: { crumb: "Profile" } },
-          { path: "profile/edit",          element: <EditProfilePage />, handle: { crumb: "Edit profile" } },
+          {
+            // Edit profile sits under Profile, so its breadcrumb reads Profile > Edit profile.
+            path: "profile", handle: { crumb: "Profile" },
+            children: [
+              { index: true,  element: <ProfilePage /> },
+              { path: "edit", element: <EditProfilePage />, handle: { crumb: "Edit profile" } },
+            ],
+          },
           { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings" } },
 
           {

@@ -102,7 +102,7 @@ export default function EditProfilePage() {
         });
         updateUser(data);
       }
-      navigate("/profile");
+      navigate("/profile", { state: { saved: true } });
     } catch (err) {
       setError(
         fieldError(err, "bio", "research_interests", "orcid") ??
