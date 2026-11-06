@@ -24,6 +24,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.records.discovery import invalidate_feed
 from apps.records.models import Record
 from apps.records.serializers import RecordListSerializer
 from core.enums import ReadingStatus
@@ -100,9 +101,14 @@ class SavedRecordDetailView(APIView):
                 record_id=record.pk,
                 defaults={"reading_status": None if reading_status is _UNSET else reading_status},
             )
+            changed = created
             if not created and reading_status is not _UNSET and save.reading_status != reading_status:
                 save.reading_status = reading_status
                 save.save(update_fields=["reading_status", "updated_at"])
+                changed = True
+            if changed:
+                # A new save, or a status that moves it within For you (IR-575).
+                invalidate_feed(request.user)
 
         return Response(
             _entry(save, record, {"request": request}),
@@ -112,5 +118,8 @@ class SavedRecordDetailView(APIView):
     def delete(self, request, record_id):
         # No visibility check: removing your own row discloses nothing, and a
         # reader must be able to drop a save that has become unavailable.
-        SavedRecord.objects.filter(owner=request.user, record_id=record_id).delete()
+        with transaction.atomic():
+            deleted, _ = SavedRecord.objects.filter(owner=request.user, record_id=record_id).delete()
+            if deleted:
+                invalidate_feed(request.user)
         return Response(status=status.HTTP_204_NO_CONTENT)

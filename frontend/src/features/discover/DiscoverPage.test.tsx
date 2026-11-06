@@ -62,7 +62,7 @@ const approvedProposal = listItem({
 
 let listed: RecordListItem[] = [publishedThesis];
 let total: number | null = null;
-let recommended: { mode: "for_you" | "latest"; results: (RecordListItem & { reason: { kind: "selected_area" | "latest"; area?: string } })[]; next_cursor: string | null; count: number } = {
+let recommended: { mode: "for_you" | "latest"; results: (RecordListItem & { reason: { kind: "selected_area" | "saved_area" | "latest"; area?: string } })[]; next_cursor: string | null; count: number } = {
   mode: "latest", results: [{ ...publishedThesis, reason: { kind: "latest" } }], next_cursor: null, count: 1,
 };
 
@@ -305,6 +305,25 @@ describe("browsing", () => {
     expect(await screen.findByText("Because you chose Applied Research")).toBeInTheDocument();
     expect(vi.mocked(recordsApi.forYou)).toHaveBeenCalled();
 
+  });
+
+  it("says an item shares an Area with a paper the reader saved (IR-575)", async () => {
+    recommended = {
+      mode: "for_you",
+      results: [
+        { ...publishedThesis, reason: { kind: "saved_area", area: "Applied Research" } },
+        { ...publishedThesis, id: 2, title: "Chosen Area paper", reason: { kind: "selected_area", area: "Applied Research" } },
+      ],
+      next_cursor: null,
+      count: 2,
+    };
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: "For you" }));
+
+    expect(await screen.findByText("Same Area as a paper you saved")).toBeInTheDocument();
+    // The chosen-Area reason is untouched.
+    expect(screen.getByText("Because you chose Applied Research")).toBeInTheDocument();
   });
 
   it("keeps a direct For you link selected after the search debounce", async () => {

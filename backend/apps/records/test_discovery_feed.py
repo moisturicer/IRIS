@@ -1,4 +1,4 @@
-"""IR-567 and IR-576 at the authenticated records API seam."""
+"""IR-567, IR-575 and IR-576 at the authenticated records API seam."""
 
 from datetime import timedelta
 
@@ -18,6 +18,10 @@ INTERESTS = "/api/v1/records/interests/"
 
 def not_interested(record):
     return f"/api/v1/records/{record.id}/not-interested/"
+
+
+def save_url(record):
+    return f"/api/v1/library/saves/{record.id}/"
 
 
 class DiscoveryFeedTests(APITestCase):
@@ -301,3 +305,197 @@ class DiscoveryFeedTests(APITestCase):
 
         self.client.force_authenticate(self.reader)
         self.assertNotIn(shared.id, [row["id"] for row in self.client.get(FEED).data["results"]])
+
+    # ── IR-575: saved research shapes For you ───────────────────────────────
+
+    def save(self, record, reading_status=None):
+        body = {"reading_status": reading_status} if reading_status else {}
+        response = self.client.put(save_url(record), body, format="json")
+        self.assertIn(response.status_code, (200, 201))
+        return response
+
+    def ids(self, response):
+        return [row["id"] for row in response.data["results"]]
+
+    def reasons(self, response):
+        return [row["reason"] for row in response.data["results"]]
+
+    def test_a_saved_record_makes_its_area_an_interest_with_its_own_reason(self):
+        saved = self.record("Agriculture saved", classification=self.agriculture, days_old=100)
+        fresh = self.record("Agriculture new", classification=self.agriculture)
+        unmatched = self.record("Unmatched newest")
+        self.save(saved)
+
+        response = self.client.get(FEED)
+
+        self.assertEqual(response.data["mode"], "for_you")
+        # Latest alone would put the unmatched Record first.
+        self.assertEqual(self.ids(response), [fresh.id, saved.id, unmatched.id])
+        self.assertEqual(
+            self.reasons(response),
+            [
+                {"kind": "saved_area", "area": "Agriculture"},
+                {"kind": "saved_area", "area": "Agriculture"},
+                {"kind": "latest"},
+            ],
+        )
+
+    def test_saved_psced_area_counts_and_a_save_without_an_area_adds_nothing(self):
+        saved = self.record("PSCED saved", psced=self.psced, days_old=100)
+        match = self.record("PSCED match", psced=self.psced, days_old=50)
+        self.save(saved)
+        self.save(self.record("No area at all"))
+
+        response = self.client.get(FEED)
+
+        self.assertEqual(response.data["mode"], "for_you")
+        self.assertEqual(self.ids(response)[0], match.id)
+        self.assertEqual(self.reasons(response)[0], {"kind": "saved_area", "area": "Education"})
+
+        # With only the area-less save left there is no signal, so the feed says so.
+        self.client.delete(save_url(saved))
+        self.assertEqual(self.client.get(FEED).data["mode"], "latest")
+
+    def test_saved_and_chosen_areas_share_the_rotation_and_a_chosen_area_keeps_its_reason(self):
+        ag_saved = self.record("Agriculture saved", classification=self.agriculture, days_old=100)
+        ag_new = self.record("Agriculture new", classification=self.agriculture)
+        cs_new = self.record("Computing new", classification=self.computing)
+        cs_old = self.record("Computing older", classification=self.computing, days_old=4000)
+        self.client.put(
+            INTERESTS, {"classification_ids": [self.computing.id], "psced_ids": []}, format="json"
+        )
+        self.save(ag_saved)
+
+        response = self.client.get(FEED)
+
+        # Round-robin in stable Area-ID order: Agriculture was created first.
+        self.assertEqual(self.ids(response), [ag_new.id, cs_new.id, ag_saved.id, cs_old.id])
+        self.assertEqual(
+            self.reasons(response),
+            [
+                {"kind": "saved_area", "area": "Agriculture"},
+                {"kind": "selected_area", "area": "Computer Science"},
+                {"kind": "saved_area", "area": "Agriculture"},
+                {"kind": "selected_area", "area": "Computer Science"},
+            ],
+        )
+
+        # Saving a Record in an Area the reader already chose changes no reason.
+        self.save(cs_new)
+        again = self.client.get(FEED)
+        self.assertEqual(
+            {row["id"]: row["reason"] for row in again.data["results"]}[cs_new.id],
+            {"kind": "selected_area", "area": "Computer Science"},
+        )
+
+    def test_saved_and_completed_records_come_after_new_ones_in_their_area(self):
+        saved = self.record("Saved", classification=self.agriculture)
+        completed = self.record("Completed", classification=self.agriculture, days_old=10)
+        unread = self.record("Unread", classification=self.agriculture, days_old=20)
+        oldest = self.record("Unread oldest", classification=self.agriculture, days_old=5000)
+        self.client.put(
+            INTERESTS, {"classification_ids": [self.agriculture.id], "psced_ids": []},
+            format="json",
+        )
+        self.save(saved)
+        self.save(completed, "completed")
+
+        response = self.client.get(FEED)
+
+        # Older research stays eligible; only the saved ones move, keeping their own order.
+        self.assertEqual(self.ids(response), [unread.id, oldest.id, saved.id, completed.id])
+
+    def test_a_dismissed_record_still_contributes_the_area_it_was_saved_in(self):
+        saved = self.record("Saved then dismissed", classification=self.agriculture, days_old=100)
+        match = self.record("Agriculture match", classification=self.agriculture, days_old=50)
+        unmatched = self.record("Unmatched newest")
+        self.save(saved)
+        self.client.post(not_interested(saved))
+
+        response = self.client.get(FEED)
+
+        # Unsaving and Not interested are independent: the dismissal removes the
+        # item, and the save still speaks for its Area.
+        self.assertEqual(self.ids(response), [match.id, unmatched.id])
+        self.assertEqual(self.reasons(response)[0], {"kind": "saved_area", "area": "Agriculture"})
+
+    def test_a_save_the_reader_can_no_longer_read_stops_being_a_signal(self):
+        saved = self.record("Agriculture saved", classification=self.agriculture, days_old=100)
+        match = self.record("Agriculture match", classification=self.agriculture, days_old=50)
+        unmatched = self.record("Unmatched newest")
+        self.save(saved)
+        self.assertEqual(self.client.get(FEED).data["mode"], "for_you")
+
+        Record.objects.filter(pk=saved.pk).update(pipeline_status=PipelineStatus.DRAFT)
+        response = self.client.get(FEED)
+
+        self.assertEqual(response.data["mode"], "latest")
+        self.assertEqual(self.ids(response), [unmatched.id, match.id])
+        self.assertEqual(self.reasons(response), [{"kind": "latest"}, {"kind": "latest"}])
+
+    def test_a_snapshot_stops_naming_a_signal_whose_record_was_withdrawn_after_it_was_frozen(self):
+        saved = self.record("Agriculture saved", classification=self.agriculture, days_old=100)
+        for index in range(22):
+            self.record(f"Agriculture {index}", classification=self.agriculture)
+        self.save(saved)
+        first = self.client.get(FEED).data
+        self.assertEqual({row["reason"]["kind"] for row in first["results"]}, {"saved_area"})
+
+        Record.objects.filter(pk=saved.pk).update(pipeline_status=PipelineStatus.DRAFT)
+        second = self.client.get(FEED, {"cursor": first["next_cursor"]})
+
+        self.assertEqual(second.status_code, 200)
+        self.assertTrue(second.data["results"])
+        for row in second.data["results"]:
+            self.assertEqual(row["reason"], {"kind": "latest"})
+
+    def test_changing_saves_invalidates_the_snapshot_but_repeating_one_does_not(self):
+        for index in range(22):
+            self.record(f"Record {index}")
+        target = self.record("Target", classification=self.agriculture)
+        cursor = self.client.get(FEED).data["next_cursor"]
+        self.assertIsNotNone(cursor)
+
+        self.save(target)
+        self.assertEqual(self.client.get(FEED, {"cursor": cursor}).status_code, 409)
+
+        cursor = self.client.get(FEED).data["next_cursor"]
+        self.save(target)  # Already saved, nothing changed.
+        self.assertEqual(self.client.get(FEED, {"cursor": cursor}).status_code, 200)
+
+        self.save(target, "completed")  # A status moves it down, so the order may change.
+        self.assertEqual(self.client.get(FEED, {"cursor": cursor}).status_code, 409)
+
+        cursor = self.client.get(FEED).data["next_cursor"]
+        self.client.put(save_url(target), {"reading_status": None}, format="json")
+        self.assertEqual(self.client.get(FEED, {"cursor": cursor}).status_code, 409)
+
+        cursor = self.client.get(FEED).data["next_cursor"]
+        self.assertEqual(self.client.delete(save_url(target)).status_code, 204)
+        self.assertEqual(self.client.get(FEED, {"cursor": cursor}).status_code, 409)
+
+        cursor = self.client.get(FEED).data["next_cursor"]
+        self.assertEqual(self.client.delete(save_url(target)).status_code, 204)  # Nothing to remove.
+        self.assertEqual(self.client.get(FEED, {"cursor": cursor}).status_code, 200)
+
+    def test_one_readers_saves_never_shape_anothers_feed(self):
+        saved = self.record("Agriculture saved", classification=self.agriculture, days_old=100)
+        match = self.record("Agriculture match", classification=self.agriculture, days_old=50)
+        unmatched = self.record("Unmatched newest")
+        self.save(saved)
+
+        self.client.force_authenticate(self.other)
+        response = self.client.get(FEED)
+
+        self.assertEqual(response.data["mode"], "latest")
+        self.assertEqual(self.ids(response), [unmatched.id, match.id, saved.id])
+        self.assertEqual(self.reasons(response), [{"kind": "latest"}] * 3)
+
+    def test_for_you_rows_carry_what_the_discover_card_needs(self):
+        saved = self.record("Agriculture saved", classification=self.agriculture)
+        self.save(saved)
+
+        row = self.client.get(FEED).data["results"][0]
+
+        self.assertEqual(row["abstract"], "An abstract.")
+        self.assertIn("has_manuscript", row)
