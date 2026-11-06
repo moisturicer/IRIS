@@ -12,10 +12,15 @@ def send_verification_email(user: User, request):
     """
     Build and send an email verification link via Celery (send_email_async dispatches
     to the send_email_task Celery task so registration never blocks on mail delivery).
+
+    The secret rides in the URL fragment, like a reset link's (IR-928, ASVS 8.3.1):
+    the browser never sends a fragment, so the token stays out of server logs,
+    `Referer` and proxies, and the page posts it in a body. Links emailed before
+    IR-928 carry it in the path and are still honoured (`ActivateView`).
     """
     uid   = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
-    link  = f"{settings.FRONTEND_URL}/activate/{uid}/{token}"
+    link  = f"{settings.FRONTEND_URL}/activate#uid={uid}&token={token}"
 
     send_email_async(
         subject="Verify your IRIS account",

@@ -35,11 +35,11 @@ describe("authApi", () => {
     expect(stub.only()).toMatchObject({ method: "post", url: "/auth/register/", body: payload });
   });
 
-  it("activate gets the link's two parts, in order, with no body", async () => {
+  it("activate posts the link's two parts in a body, never in the URL (IR-928)", async () => {
     await authApi.activate("Mjc", "abc-123");
 
     expect(stub.only()).toMatchObject({
-      method: "get", url: "/auth/activate/Mjc/abc-123/", body: undefined,
+      method: "post", url: "/auth/activate/", body: { uid: "Mjc", token: "abc-123" },
     });
   });
 

@@ -438,6 +438,7 @@ ACCOUNTS = {
     "auth-logout": Entry({"POST": _case(SIGNED_IN, data={})}),
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
+    "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),
     "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),
     # ADR-045: both recovery endpoints are anonymous and ignore incidental
     # credentials. Confirmation checks the link, not the caller's role.
