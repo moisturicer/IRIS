@@ -1,3 +1,5 @@
+import { BREAK } from "./runLimit";
+
 /**
  * How much LaTeX the interface will typeset (IR-917).
  *
@@ -18,6 +20,19 @@ interface MdastNode {
   children?: MdastNode[];
 }
 
+interface HastNode {
+  value?: string;
+  children?: HastNode[];
+}
+
+/** Removes every {@link BREAK} from the text under `nodes`, in place. */
+function stripBreaks(nodes: HastNode[] | undefined): void {
+  nodes?.forEach((node) => {
+    if (typeof node.value === "string") node.value = node.value.split(BREAK).join("");
+    stripBreaks(node.children);
+  });
+}
+
 /**
  * A remark plugin: replaces a `math` / `inlineMath` node longer than
  * {@link MAX_FORMULA_CHARS} with code, so `rehype-katex` never sees it.
@@ -26,6 +41,14 @@ interface MdastNode {
 export function remarkLimitMath() {
   return (tree: MdastNode) => {
     const walk = (node: MdastNode) => {
+      if ((node.type === "math" || node.type === "inlineMath") && node.value?.includes(BREAK)) {
+        // `breakLongRuns` cut a long run before parsing so the autolink scan
+        // stays linear (IR-930); inside a formula the cut would be a stray
+        // character in the LaTeX, so it goes back out before anything reads it.
+        // `remark-math` keeps its own copy of the text for `rehype-katex`.
+        node.value = node.value.split(BREAK).join("");
+        stripBreaks((node.data as { hChildren?: HastNode[] } | undefined)?.hChildren);
+      }
       if ((node.type === "math" || node.type === "inlineMath") && (node.value?.length ?? 0) > MAX_FORMULA_CHARS) {
         node.type = node.type === "math" ? "code" : "inlineCode";
         // `remark-math` tags the node (`language-math`) so `rehype-katex` finds
