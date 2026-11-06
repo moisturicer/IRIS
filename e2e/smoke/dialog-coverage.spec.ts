@@ -5,6 +5,7 @@
 // The e2e suite is the one place allowed to read across stacks (CODING_STANDARDS X1).
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 import { DIALOGS, UNSCANNED } from "./support/dialogs";
 import { SCREENS } from "./support/screens";
@@ -19,7 +20,11 @@ function sources(dir: string): string[] {
   });
 }
 
-const root = decodeURIComponent(SRC.pathname).replace(/^\/([A-Za-z]:)/, "$1");
+const root = fileURLToPath(SRC);
+// A dialog is a file named *Dialog or *Modal, one that draws role="dialog" or "alertdialog"
+// (the lookbehind skips a CSS selector such as `[role="dialog"]`), or a page that mounts a
+// <Modal> or <ConfirmDialog> itself. A native <dialog> is not used in the app; if one is
+// added, extend this.
 const isDialog = (path: string) =>
   /(Dialog|Modal)\.tsx$/.test(path) ||
   /(?<!\[)\brole=(\{[^}]*"(alert)?dialog"|"(alert)?dialog")|<(Modal|ConfirmDialog)\b/.test(readFileSync(path, "utf8"));

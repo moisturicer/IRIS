@@ -8,7 +8,11 @@
 //   interrupted the read got no answer in time (ADR-061); see `timeOut`
 //   revoked     the server answered 403 or 404, which read alike (IR-153)
 // A cell the matrix marks N/A has no entry here, and neither has a state a
-// surface does not have.
+// surface does not have. Cells that exist but are NOT scanned, each because it
+// needs a fixture this tier lacks (docs/testing/traceability/IR-908.md lists them):
+// Discover's filtered-empty and timed-out "Load more", the Saved view's empty and
+// "no longer available" cells, My Reviews' per-tab empties, Ask IRIS's list-failure
+// and no-sources cells, and the review panels' empty copy.
 //
 // `shows` finds the thing that proves the screen is in the state and not in
 // the one before it; without it a scan could run on the wrong screen.
@@ -96,18 +100,16 @@ export const STATES: UiState[] = [
     revoked: "Record not available",
   }, { loading: (page) => page.locator(".animate-pulse").first() }),
 
-  // Review panels in Paper View. Both read the record's tracker, and a 403 or 404 there reads as
-  // an ordinary failure (the matrix's known gap), so the refusal cells expect the failure copy.
+  // Review panels in Paper View. Both read the record's tracker. The matrix marks their refused
+  // cell N/A (a 403 or 404 reads as an ordinary failure, a known gap), so there is no entry for it.
   ...reads("paper-view", "GET", "/records/101/tracker/", {
     error: "Could not load the review tracker.",
-    revoked: "Could not load the review tracker.",
   }, {
     variant: "review tracker", also: asParticipant, interrupted: "The review tracker took too long to load.",
     loading: (page) => page.getByRole("region", { name: /Review & Routing/ }).locator(".animate-pulse").first(),
   }),
   ...reads("paper-view", "GET", "/records/101/tracker/", {
     error: "Could not load the review timeline.",
-    revoked: "Could not load the review timeline.",
   }, {
     variant: "review timeline", path: "/records/101?section=review", also: asParticipant,
     interrupted: "The review timeline took too long to load.",
@@ -117,9 +119,11 @@ export const STATES: UiState[] = [
   // My Library's views.
   ...reads("my-library", "GET", "/records/mine/", {
     error: "Could not load your research",
+    empty: { reply: [], shows: "You haven’t published anything yet" },
   }, { variant: "overview", loading: announced("Loading your research") }),
   ...reads("my-library", "GET", "/records/mine/", {
     error: "Could not load your research",
+    empty: { reply: [], shows: "You haven’t published anything yet" },
   }, { variant: "my research", path: "/records/mine?section=research", loading: announced("Loading your research") }),
   ...reads("my-library", "GET", "/library/saves/", {
     error: /Could not load/,
@@ -138,10 +142,12 @@ export const STATES: UiState[] = [
   // Review.
   ...reads("my-reviews", "GET", "/reviews/mine/", {
     error: "Could not load My Reviews",
+    empty: { reply: { rows: [], counts: { to_review: 0, in_review: 0, done: 0 }, next: null }, shows: "Nothing to review" },
     revoked: "My Reviews isn't available to you",
   }, { loading: (page) => page.locator('[aria-busy="true"]').first() }),
   ...reads("office-console", "GET", "/reviews/office/", {
     error: "Could not load the console",
+    empty: { reply: { office: "rdco", office_label: "RDCO", rows: [], load: [] }, shows: /Nothing open at/ },
     revoked: "This console is for coordinators",
   }, { loading: (page) => page.locator('[aria-busy="true"]').first() }),
 ];

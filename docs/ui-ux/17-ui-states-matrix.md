@@ -35,7 +35,7 @@ Legend: **✓** already implemented · **●** added by IR-906 · **N/A** with t
 - **Review analytics** (`ReviewAnalyticsPage`) was not audited: it is a coordinator report rather than a work surface, and its states are a follow-up.
 - **Admin, Publish, Settings and the other surfaces.** The ticket names five. IR-895's other children own the rest.
 - **Cancellation.** These surfaces still fetch in their own `useEffect`, so a slow earlier response can still overwrite a later one there. ADR-061 plans moving them onto `useApiRead`; this ticket only makes their failures read consistently.
-- **Colour contrast** of the new states is not checked under jsdom, where axe cannot do it (see `docs/ui-ux/12-accessibility.md`). It is checked in a real browser by the smoke tier's `axe-states.spec.ts` (IR-908), once per cell, on mocked data.
+- **Colour contrast** of the new states is not checked under jsdom, where axe cannot do it (see `docs/ui-ux/12-accessibility.md`). It is checked in a real browser by the smoke tier's `axe-states.spec.ts` (IR-908), on mocked data, for the cells that tier can reach; the cells it does not scan are listed in `docs/testing/traceability/IR-908.md`.
 
 ## How it is proved
 

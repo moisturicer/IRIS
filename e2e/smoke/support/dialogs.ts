@@ -172,7 +172,8 @@ export const DIALOGS: DialogCase[] = [
       api.on("GET", "/records/classifications/", paginated([{ id: 1, name: "Agriculture" }]));
       api.on("GET", "/records/psced-classifications/", paginated([]));
     },
-    open: async () => undefined, dialog: anyDialog,
+    open: async () => undefined, // `?edit=details` opens it on load
+    dialog: anyDialog,
   },
   {
     id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
@@ -253,4 +254,3 @@ export const UNSCANNED: Record<string, string> = {
     "The review workspace's details drawer, which opens only when the workspace is too narrow for its three columns and a tracker is drawn; the Details tab is covered by the add-a-colleague and request-a-review cases, the drawer itself is not.",
 };
 
-export { paginated };

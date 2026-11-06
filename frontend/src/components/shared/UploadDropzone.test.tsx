@@ -53,6 +53,13 @@ describe("UploadDropzone", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("is named by the label first and then every word drawn on it, so a voice-control user can say what they see (WCAG 2.5.3, IR-908)", () => {
+    renderScreen(<UploadDropzone label="Upload manuscript" onFiles={vi.fn()} accept=".pdf" hint="PDF, up to 50 MB" />);
+
+    const zone = screen.getByRole("button", { name: /^Upload manuscript/ });
+    expect(zone).toHaveAccessibleName("Upload manuscript Drag and drop here, or browse PDF, up to 50 MB");
+  });
+
   it("hands a dropped file to its parent", () => {
     const onFiles = vi.fn();
     renderScreen(<UploadDropzone label="Upload manuscript" onFiles={onFiles} accept=".pdf" />);
