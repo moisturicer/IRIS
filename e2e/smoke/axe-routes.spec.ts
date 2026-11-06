@@ -29,6 +29,19 @@ for (const screen of SCREENS) {
     // An error screen can be accessible; it is not the screen under test.
     await expect(page.getByRole("heading", { name: "Something went wrong" })).toHaveCount(0);
 
+    // Contrast is read from the colours on screen at that instant, so a fade or
+    // slide still running reads as the wrong colour (IR-934 met the same with
+    // the shell's margin transition). Finite animations are awaited, for 3 s at
+    // most; an endless one (a spinner, a skeleton pulse) must not hang the scan.
+    await page.evaluate(async () => {
+      const ended = Promise.all(
+        document.getAnimations()
+          .filter((a) => a.effect?.getTiming().iterations !== Infinity)
+          .map((a) => a.finished.catch(() => undefined)),
+      );
+      await Promise.race([ended, new Promise((resolve) => setTimeout(resolve, 3000))]);
+    });
+
     const { violations, findings } = await axeScan(page, screen.id);
     await testInfo.attach(`axe-${screen.id}.json`, {
       body: JSON.stringify(violations, null, 2),
