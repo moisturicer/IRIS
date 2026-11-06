@@ -683,14 +683,15 @@ describe("the new-version control follows revision requests", () => {
 });
 
 describe("the status the paper shows", () => {
-  it("is the API's workflow_state_label, on the badge and in governance", async () => {
+  it("is the API's workflow_state_label, stated once on the badge and not again in governance (IR-525)", async () => {
     shownRecord = { ...inReview, pipeline_status: "in_review", workflow_state_label: "Final review", workflow_state: "final_review" };
     signInAs(99, "Student");
     renderPaperView();
 
     await waitForRecord(inReview.title);
-    // Once as the badge, once as the governance ledger's status row.
-    expect(screen.getAllByText("Final review")).toHaveLength(2);
+    // Once, as the badge. Governance has no "Pipeline Status" row repeating it.
+    expect(screen.getAllByText("Final review")).toHaveLength(1);
+    expect(screen.queryByText("Pipeline Status")).not.toBeInTheDocument();
     expect(screen.queryByText("RDCO Final Review")).not.toBeInTheDocument();
   });
 });
