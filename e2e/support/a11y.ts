@@ -11,6 +11,7 @@
 // one from the workflow's.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type TestInfo } from "@playwright/test";
+import { measureOverflow } from "./viewport";
 
 export class A11yLedger {
   private readonly findings: string[] = [];
@@ -40,28 +41,7 @@ export class A11yLedger {
   async reflow360(page: Page, label: string) {
     const previous = page.viewportSize();
     await page.setViewportSize({ width: 360, height: 740 });
-    const { overflow, culprits } = await page.evaluate(() => {
-      const width = document.documentElement.clientWidth;
-      const overflow = document.documentElement.scrollWidth - width;
-      // Name what sticks out: the outermost elements whose right edge passes the
-      // viewport while their parent's doesn't, widest first. A diagnosis only;
-      // the verdict is still the overflow number above.
-      const describe = (el: Element) => {
-        const id = el.id ? `#${el.id}` : "";
-        const cls = typeof el.className === "string" && el.className.trim()
-          ? "." + el.className.trim().split(/\s+/).slice(0, 4).join(".") : "";
-        return `${el.tagName.toLowerCase()}${id}${cls}`;
-      };
-      const culprits = overflow > 0
-        ? Array.from(document.body.querySelectorAll("*"))
-          .map((el) => ({ el, right: el.getBoundingClientRect().right }))
-          .filter(({ el, right }) => right > width + 1 && (el.parentElement?.getBoundingClientRect().right ?? 0) <= width + 1)
-          .sort((a, b) => b.right - a.right)
-          .slice(0, 3)
-          .map(({ el, right }) => `${describe(el)} (right edge ${Math.round(right)}px)`)
-        : [];
-      return { overflow, culprits };
-    });
+    const { overflow, culprits } = await measureOverflow(page);
     this.checked.push(`reflow ${label}`);
     if (overflow > 0) {
       const where = culprits.length ? `; widest: ${culprits.join(" | ")}` : "";

@@ -128,7 +128,7 @@ export default function DeleteRequestsPage() {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-[14px]">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">

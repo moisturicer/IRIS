@@ -24,6 +24,8 @@ export default defineConfig({
     ["list"],
     ["html", { open: "never", outputFolder: "playwright-report-smoke" }],
     ["json", { outputFile: "test-results-smoke/results.json" }],
+    // IR-910: the per-screen, per-width table of the viewport matrix.
+    ["./smoke/support/matrix-reporter.ts"],
   ],
   outputDir: "test-results-smoke",
   use: {
