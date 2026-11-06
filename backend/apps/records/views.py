@@ -786,24 +786,122 @@ class RecordViewSet(viewsets.ModelViewSet):
             lambda c: c.comment_payload(c.post_comment(
                 record, request.user,
                 body=request.data.get("body"), reply_to=request.data.get("reply_to"),
+                severity=request.data.get("severity"), anchor=request.data.get("anchor"),
             ), request.user),
             success=status.HTTP_201_CREATED,
         )
 
     @action(
-        detail=True, methods=["patch"],
+        detail=True, methods=["patch", "delete"],
         url_path=r"review-comments/(?P<comment_id>[0-9]+)", url_name="review-comment",
     )
     def review_comment(self, request, pk=None, comment_id=None):
         """
-        PATCH /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+        PATCH  /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+        DELETE /records/<id>/review-comments/<comment_id>/
 
-        Its author edits a comment; a changed body stamps `edited_at`.
+        Its author edits a comment; a changed body stamps `edited_at`. A
+        writer deletes only their own draft (IR-874); a sent comment stays.
         """
         record = self.get_object()
+        if request.method == "DELETE":
+            return self._comment_response(
+                lambda c: c.delete_draft(record, request.user, int(comment_id)),
+                success=status.HTTP_204_NO_CONTENT,
+            )
         return self._comment_response(lambda c: c.comment_payload(c.edit_comment(
             record, request.user, int(comment_id), body=request.data.get("body"),
         ), request.user))
+
+    @action(
+        detail=True, methods=["post"],
+        url_path=r"review-comments/(?P<comment_id>[0-9]+)/(?P<act>severity|resolve|reopen|answer)",
+        url_name="review-thread-act",
+    )
+    def review_thread_act(self, request, pk=None, comment_id=None, act=None):
+        """
+        POST /records/<id>/review-comments/<comment_id>/severity/ `{"severity": "must_fix" | "suggestion"}`
+        POST /records/<id>/review-comments/<comment_id>/resolve/
+        POST /records/<id>/review-comments/<comment_id>/reopen/
+        POST /records/<id>/review-comments/<comment_id>/answer/ `{"answer": "addressed" | "declined", "note": str}`
+
+        A review thread's acts (ADR-032 §7, IR-874; `apps.reviews.threads`).
+        Answers with the thread. 404 for a record, review or thread the caller
+        may not see -- another person's draft included -- 403 for one they
+        see but may not act on, 400 for what cannot be done now.
+        """
+        from apps.reviews import comments, threads
+
+        record = self.get_object()
+        user, thread_id = request.user, int(comment_id)
+        acts = {
+            "severity": lambda: threads.change_severity(
+                record, user, thread_id, request.data.get("severity")),
+            "resolve": lambda: threads.resolve(record, user, thread_id),
+            "reopen": lambda: threads.reopen(record, user, thread_id),
+            "answer": lambda: threads.answer(
+                record, user, thread_id,
+                kind=request.data.get("answer"), note=request.data.get("note")),
+        }
+        try:
+            thread = acts[act]()
+        except threads.ThreadNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except threads.ThreadRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except threads.ThreadError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        thread.refresh_from_db()
+        return Response(comments.comment_payload(thread, user))
+
+    @action(detail=True, methods=["post"], url_path="finish-review")
+    def finish_review(self, request, pk=None):
+        """
+        POST /records/<id>/finish-review/
+        `{"verdict": str, "summary": str, "to"?: [...], "suggested_offices"?: [...], "token"?: str}`
+
+        A Seat holder sends their draft threads with a summary and a verdict
+        (ADR-032 §7, IR-874). `comment_only` is a recorded round with no
+        outcome; every other verdict is taken, and refused, by the act that
+        owns it, with its status codes: `send_to_rdco` as accept-and-route/,
+        `cleared` and `finding` as office-review/, `request_revision` as
+        request-revision/, and `accept`, `publish`, `keep_unlisted` and
+        `reject` as decide/ (`token`; 409 when stale). Answers with the tracker.
+        """
+        from apps.reviews import decisions, finish_review, office_review, revisions, routing
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        forbidden = (
+            finish_review.FinishRefused, revisions.RevisionRefused, routing.RoutingRefused,
+            office_review.OfficeReviewRefused, decisions.DecisionRefused,
+        )
+        invalid = (
+            finish_review.FinishError, revisions.RevisionError, routing.RoutingError,
+            office_review.OfficeReviewError, decisions.DecisionError,
+        )
+        try:
+            finish_review.finish_review(
+                record, request.user,
+                verdict=request.data.get("verdict"),
+                summary=request.data.get("summary", ""),
+                to=request.data.get("to"),
+                suggested_offices=request.data.get("suggested_offices"),
+                token=request.data.get("token"),
+            )
+        except finish_review.FinishNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except forbidden as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except invalid as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except decisions.DecisionStale as exc:
+            return Response(
+                {"detail": str(exc), "decision": decisions.decision_flags(record, request.user)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
 
     @action(detail=True, methods=["get"], url_path="metadata-suggestions")
     def metadata_suggestions(self, request, pk=None):

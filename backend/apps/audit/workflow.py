@@ -304,3 +304,52 @@ def embargo_released(record, actor, *, until) -> None:
 
 def ip_released(record, actor) -> None:
     _write(AuditEvent.IP_RELEASED, actor, record, ip_type=record.ip_type or None)
+
+
+# --- review threads (ADR-032 §7, 2026-11-04; IR-874) -------------------------------
+# Ids, parties and values only: never a thread's body, an answer's note or a
+# finished review's summary (IR-479).
+
+def review_finished(round_, actor, *, threads, must_fix):
+    """
+    A Seat holder finished a review: `verdict` (`comment_only` included, which
+    writes no `DECISION_RECORDED`), the threads it sent and how many were
+    *Must fix*. A verdict's own event sits beside it, `review` naming it.
+    """
+    _write(
+        AuditEvent.REVIEW_FINISHED, actor, round_.record,
+        party=str(round_.party), verdict=round_.verdict, round=round_.pk,
+        review=round_.review_id, threads=list(threads), must_fix=int(must_fix),
+        version=round_.version.number if round_.version_id else None,
+    )
+
+
+def _thread(event_type, thread, actor, **extra):
+    _write(
+        event_type, actor, thread.record,
+        thread=thread.pk, party=thread.party or None, severity=thread.severity, **extra,
+    )
+
+
+def review_thread_resolved(thread, actor):
+    _thread(AuditEvent.REVIEW_THREAD_RESOLVED, thread, actor)
+
+
+def review_thread_reopened(thread, actor):
+    _thread(AuditEvent.REVIEW_THREAD_REOPENED, thread, actor)
+
+
+def review_thread_severity_changed(thread, actor, *, previous):
+    _thread(AuditEvent.REVIEW_THREAD_SEVERITY_CHANGED, thread, actor, previous=previous)
+
+
+def review_thread_answered(thread, actor):
+    _thread(AuditEvent.REVIEW_THREAD_ANSWERED, thread, actor, answer=thread.answer)
+
+
+def review_threads_closed(record, actor, *, decision, threads, must_fix):
+    """A Decision closed the record's open threads, naming the Decision's Review."""
+    _write(
+        AuditEvent.REVIEW_THREADS_CLOSED, actor, record,
+        decision=decision.pk, threads=list(threads), must_fix=int(must_fix),
+    )

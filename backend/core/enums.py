@@ -320,6 +320,66 @@ class DocumentRequestItemState(models.TextChoices):
     REJECTED = "rejected", "Rejected"
 
 
+class ThreadSeverity(models.TextChoices):
+    """
+    How much a reviewer's review thread asks of the author (ADR-032 §7,
+    2026-11-04). `ReviewComment.severity`; null on a reply and on an owner's
+    thread. A *Suggestion* never blocks anything.
+    """
+
+    MUST_FIX = "must_fix", "Must fix"
+    SUGGESTION = "suggestion", "Suggestion"
+
+
+class ThreadState(models.TextChoices):
+    """
+    Where a review thread stands (ADR-032 §7). `CLOSED` is a Decision ending
+    the review with the thread still open (`closed_by_decision`).
+    """
+
+    OPEN = "open", "Open"
+    RESOLVED = "resolved", "Resolved"
+    CLOSED = "closed", "Closed by Decision"
+
+
+class ThreadAnswer(models.TextChoices):
+    """
+    An owner's answer to a reviewer's thread (ADR-032 §7). Neither resolves
+    it: the reviewer checks the change and resolves.
+    """
+
+    ADDRESSED = "addressed", "Addressed"
+    DECLINED = "declined", "Declined"
+
+
+class ReviewVerdict(models.TextChoices):
+    """
+    What a finished review was finished with (ADR-032 §7). `ReviewRound.verdict`.
+    *Comment only* changes no Clearance and writes no `Review`; every other
+    verdict is taken by the service that owns it.
+    """
+
+    COMMENT_ONLY = "comment_only", "Comment only"
+    REQUEST_REVISION = "request_revision", "Request revision"
+    SEND_TO_RDCO = "send_to_rdco", "Accept & send to RDCO"
+    CLEARED = "cleared", "Clear"
+    FINDING = "finding", "Record a finding"
+    ACCEPT = "accept", "Accept"
+    PUBLISH = "publish", "Publish"
+    KEEP_UNLISTED = "keep_unlisted", "Keep unlisted"
+    REJECT = "reject", "Reject"
+
+
+class ThreadEventKind(models.TextChoices):
+    """One change to a published review thread, shown in the timeline."""
+
+    SEVERITY_CHANGED = "severity_changed", "Severity changed"
+    RESOLVED = "resolved", "Resolved"
+    REOPENED = "reopened", "Reopened"
+    ANSWERED = "answered", "Answered"
+    CLOSED_BY_DECISION = "closed_by_decision", "Closed by Decision"
+
+
 class WorkflowState(models.TextChoices):
     """
     Where an in-review record stands, as the API states it (ADR-021 §4).

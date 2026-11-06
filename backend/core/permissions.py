@@ -447,6 +447,11 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         offered.append("withdraw_revision")
     elif revision["party"] is not None:
         offered.append("request_revision")
+    # `finish-review/`: anyone holding an open seat here, the party
+    # `revision.party` names (ADR-032 §7, IR-874). Each verdict it carries is
+    # still offered, and refused, by its own key above.
+    if revision["party"] is not None:
+        offered.append("finish_review")
 
     if is_record_owner(user, record):
         from apps.records.continuation import continuable

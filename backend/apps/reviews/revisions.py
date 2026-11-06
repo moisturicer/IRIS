@@ -201,7 +201,7 @@ def request_payload(request: ResubmissionRequest, *, readable: bool) -> dict:
 # --- the acts -------------------------------------------------------------------------
 
 @transaction.atomic
-def request_revision(record, actor, *, reason) -> ResubmissionRequest:
+def request_revision(record, actor, *, reason, threads=0) -> ResubmissionRequest:
     """
     Ask the owners for a revision, as the party `actor` holds an open seat
     for. Who comes first, then what (ADR-022 §Amendment 4): a caller with no
@@ -239,7 +239,9 @@ def request_revision(record, actor, *, reason) -> ResubmissionRequest:
 
     from apps.notifications.services import notify_revision_requested
 
-    transaction.on_commit(lambda: notify_revision_requested(request, party_label=_label(party)))
+    transaction.on_commit(lambda: notify_revision_requested(
+        request, party_label=_label(party), threads=threads,
+    ))
     return request
 
 
