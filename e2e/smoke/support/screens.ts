@@ -118,9 +118,19 @@ export const SCREENS: Screen[] = [
     heading: "Create an Account",
     primary: (p) => p.getByRole("button", { name: "Continue to affiliation" }), primaryLabel: "Continue to affiliation",
   },
+  // IR-928: the secret is in the fragment and the page POSTs it in a body. The
+  // link is one the server refuses, so the screen is drawn in its failed state.
   {
-    id: "activate", path: "/activate/abc/def", route: "/activate/:uidb64/:token", role: null,
-    mocks: (api) => api.on("GET", "/auth/activate/abc/def/", { detail: "Invalid link" }, 400),
+    id: "activate", path: "/activate#uid=abc&token=def", route: "/activate", role: null,
+    mocks: (api) => api.on("POST", "/auth/activate/", { detail: "Invalid link" }, 400),
+    heading: "Verification Failed",
+    primary: (p) => p.getByRole("link", { name: "Register again" }), primaryLabel: "Register again",
+  },
+  // The deprecated path shape of links emailed before IR-928 is still routed
+  // (until those tokens expire), so it keeps a row; it now POSTs too.
+  {
+    id: "activate-path", path: "/activate/abc/def", route: "/activate/:uidb64/:token", role: null,
+    mocks: (api) => api.on("POST", "/auth/activate/", { detail: "Invalid link" }, 400),
     heading: "Verification Failed",
     primary: (p) => p.getByRole("link", { name: "Register again" }), primaryLabel: "Register again",
   },
