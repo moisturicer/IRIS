@@ -13,7 +13,9 @@ import { ReadinessPanel, ReadinessSummary } from "./ReadinessPanel";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { detailsTarget, ReviewDetails } from "./ReviewDetails";
 import { ReviewTimeline } from "./ReviewTimeline";
-import { REVIEW_ACTIONS, type DialogReviewAction } from "./reviewActions";
+import { REVIEW_ACTIONS, VERDICT_CAPABILITIES, type DialogReviewAction } from "./reviewActions";
+import { ReviewThreads } from "./threads/ReviewThreads";
+import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
 import type { ReviewWorkspaceProps } from "./ReviewWorkspace";
 import "./reviewWorkspace.css";
 
@@ -28,6 +30,13 @@ const ADD_COLLEAGUE = REVIEW_ACTIONS.filter((a) => a.capability === "add_reviewe
   .map((a) => ({ ...a, label: "Add a colleague…" }));
 const ROUTE = REVIEW_ACTIONS.find((a): a is DialogReviewAction => a.capability === "route" && a.kind === "dialog");
 const FOOTER_ACTIONS = REVIEW_ACTIONS.filter((a) => a.capability !== "route" && a.capability !== "add_reviewer");
+/**
+ * With *Finish review* granted every verdict goes through it, so the drafts
+ * go with it (ADR-032 §7, IR-875): the footer keeps only the acts that are
+ * not verdicts -- requesting documents, withdrawing a revision request.
+ */
+const FINISH_FOOTER_ACTIONS = FOOTER_ACTIONS.filter((a) => !VERDICT_CAPABILITIES.includes(a.capability));
+type Tab = "conversation" | "threads" | "details";
 type Widths = { mid: number | null; side: number | null };
 
 function readWidths(): Widths {
@@ -55,7 +64,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const [wanted, setWanted] = useState(readWidths);
   const sizes = fitWidths(width, wanted);
   const [statusTarget, setStatusTarget] = useState<HTMLDivElement | null>(null);
-  const [tab, setTab] = useState<"conversation" | "details">("conversation");
+  const [tab, setTab] = useState<Tab>("conversation");
   const [open, setOpen] = useState(true);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
@@ -80,8 +89,17 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   };
 
   useEffect(() => {
-    if (!folded) setTab("conversation");
+    if (!folded) setTab((t) => (t === "details" ? "conversation" : t));
   }, [folded]);
+
+  const tw = useThreadsWorkspace({
+    record, can, onChanged,
+    showThreads: () => { setTab("threads"); if (drawer) setOpen(true); },
+    showPaper: () => { if (drawer && open) closeDrawer(); },
+    announce: setRouted,
+  });
+  const finishing = can.has("finish_review");
+  const tabs: Tab[] = folded ? ["conversation", "threads", "details"] : ["conversation", "threads"];
 
   useEffect(() => {
     if (!drawer || !open) return;
@@ -147,6 +165,8 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     // Documents moved into a drawer (IR-879): a document request's link opens it.
     else if (action.kind === "open_documents") onDocuments(true);
     else if (action.kind === "show_party") goTo(action.target ?? "reviewers");
+    // An open thread's item shows that party's open threads (IR-875).
+    else if (action.kind === "show_threads") tw.showParty(action.target);
     // The footer's own Withdraw asks first, as it always has.
     else if (action.kind === "withdraw_revision") {
       Array.from(footer.current?.querySelectorAll("button") ?? [])
@@ -183,7 +203,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     <div ref={observe} className="review-workspace-container">
       <div className={cn("review-workspace", !reader && "review-without-paper")}
         style={{ "--mid-w": `${sizes.mid}px`, "--side-w": `${sizes.side}px` } as CSSProperties}>
-        {reader && <div className="review-paper" {...(drawer && open ? { inert: "" } : {})}>{reader}</div>}
+        {reader && <div className="review-paper" {...(drawer && open ? { inert: "" } : {})}>{tw.wrapReader(reader)}</div>}
         <section ref={pane} id={`${ids}-mid`} aria-label="Review pane" tabIndex={-1}
           role={drawer && open ? "dialog" : "region"} aria-modal={drawer && open || undefined}
           aria-hidden={drawer && !open || undefined} {...(drawer && !open ? { inert: "" } : {})}
@@ -215,17 +235,20 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
               }} />
             )}
             <div role="tablist" aria-label="Review pane sections" onKeyDown={(e) => {
-              if (!folded || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
               e.preventDefault();
-              const next = e.key === "Home" ? "conversation" : e.key === "End" ? "details" : tab === "conversation" ? "details" : "conversation";
+              const at = tabs.indexOf(tab);
+              const next = e.key === "Home" ? tabs[0] : e.key === "End" ? tabs[tabs.length - 1]
+                : tabs[(at + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length];
               setTab(next);
               document.getElementById(`${ids}-tab-${next}`)?.focus();
             }}>
-              {(["conversation", ...(folded ? ["details"] : [])] as const).map((name) => (
+              {tabs.map((name) => (
                 <button key={name} type="button" role="tab" id={`${ids}-tab-${name}`}
                   aria-selected={tab === name} aria-controls={`${ids}-${name}`} tabIndex={tab === name ? 0 : -1}
-                  onClick={() => setTab(name as typeof tab)} className={cn("review-tab", FOCUS_RING)}>
-                  {name === "conversation" ? "Conversation" : "Details"}
+                  onClick={() => setTab(name)} className={cn("review-tab", FOCUS_RING)}>
+                  {name === "conversation" ? "Conversation" : name === "details" ? "Details" : "Threads"}
+                  {name === "threads" && tw.count && <>{" "}<span className="ml-1 text-2xs font-normal text-stone-600">{tw.count}</span></>}
                 </button>
               ))}
             </div>
@@ -238,18 +261,33 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           >
             <div role="tabpanel" id={`${ids}-conversation`} aria-labelledby={`${ids}-tab-conversation`} hidden={tab !== "conversation"} className="p-4">
               <ReviewTimeline key={`${record.id}-${timelineVersion}`} recordId={record.id} canComment={can.has("comment_review")} statusTarget={statusTarget}
+                onCommented={tw.threads.reload}
                 renderStatus={renderDetails}
                 beforeComment={record.readiness ? <ReadinessPanel id={`${ids}-readiness`} readiness={record.readiness} onAction={onReadinessAction} /> : null} />
+            </div>
+            <div role="tabpanel" id={`${ids}-threads`} aria-labelledby={`${ids}-tab-threads`} hidden={tab !== "threads"} className="p-4">
+              <ReviewThreads {...tw.panel} />
             </div>
             {folded && <div role="tabpanel" id={`${ids}-details`} aria-labelledby={`${ids}-tab-details`} hidden={tab !== "details"} className="p-4">{details}</div>}
           </div>
           <footer ref={footer} className="review-pane-foot" aria-label="Your review">
             <p className="text-small font-semibold text-stone-900"><i className="fas fa-clipboard-check mr-2" aria-hidden />Your review: {ownSeat?.verdict_label ?? ownSeat?.state_label ?? "No verdict recorded"}</p>
+            {finishing && (
+              <p className="text-2xs text-stone-600">
+                {tw.threads.drafts.length
+                  ? `${tw.threads.drafts.length} draft comment${tw.threads.drafts.length === 1 ? "" : "s"}, not sent`
+                  : "No draft comments"}
+              </p>
+            )}
             {record.review_claim
               ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
               : can.has("open_review") && <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button>}
+            {finishing && !record.review_claim && !can.has("open_review") && (
+              <button type="button" onClick={tw.finish} className={cn(PILL_PRIMARY, FOCUS_RING)}>Finish review…</button>
+            )}
             {claimError && <p role="alert" className="text-small text-brand">{claimError}</p>}
-            <ReviewActionBar record={record} can={can} actions={FOOTER_ACTIONS} onChanged={onChanged} primary={!can.has("open_review") && !record.review_claim} />
+            <ReviewActionBar record={record} can={can} actions={finishing ? FINISH_FOOTER_ACTIONS : FOOTER_ACTIONS} onChanged={onChanged}
+              primary={!finishing && !can.has("open_review") && !record.review_claim} />
           </footer>
         </section>
         {!folded && <aside id={`${ids}-side`} aria-label="Review details" className="review-details">
@@ -259,6 +297,7 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
           {details}
         </aside>}
         <p role="status" aria-live="polite" className="sr-only">{routed}</p>
+        {tw.dialogs}
         {/* Into <body>, as the action bar mounts its dialogs, so no sticky
             column's stacking context draws it under the page. */}
         {requesting && RouteDialog && createPortal(

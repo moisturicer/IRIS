@@ -20,6 +20,8 @@ import type { TextRun } from "@/lib/pdf";
 import type { Region } from "@/types/ai";
 
 import { PaperPdfReader } from "./PaperPdfReader";
+import type { Passage } from "./threads/passage";
+import { ReaderAnnotationsContext } from "./threads/readerAnnotations";
 import { PublishDetailsPreview } from "@/features/publish/PublishDetailsPreview";
 import { useAuthStore } from "@/store/auth.store";
 import { PANE_TOP_PX, READER_TOOLBAR_TOP_PX } from "./paneLayout";
@@ -1047,6 +1049,47 @@ describe("find in this paper (IR-353)", () => {
 
     await expectNoBlockingA11yViolations(container);
   });
+
+  /**
+   * Review's Comment (IR-875): find is the keyboard's way to a passage, so
+   * the current match is what Comment anchors to when nothing is selected.
+   */
+  describe("commenting on find's match", () => {
+    function openCommentable(onComment: (passage: Passage, version: number) => void) {
+      paperText = PAPER;
+      render(
+        <ReaderAnnotationsContext.Provider value={{ currentVersion: 2, marks: [], onComment, landing: null }}>
+          <PaperPdfReader recordId={7} scrollToPage={null} highlightRegions={[]} navKey="a" />
+        </ReaderAnnotationsContext.Provider>,
+      );
+      return screen.findByText("Page 1 / 3");
+    }
+
+    it("is offered only inside Review, and armed only by a passage", async () => {
+      await openCommentable(vi.fn());
+      const comment = screen.getByRole("button", { name: "Comment" });
+      expect(comment).toBeDisabled();
+      expect(comment).toHaveAttribute("aria-keyshortcuts", "C");
+    });
+
+    it("comments on the current match, by keyboard, on the Version shown", async () => {
+      const onComment = vi.fn();
+      await openCommentable(onComment);
+      const input = await openFind();
+      await userEvent.type(input, "robot arm");
+      await waitFor(() => expect(screen.getByRole("button", { name: "Comment" })).toBeEnabled());
+      await userEvent.keyboard("{Escape}");
+      // Find closed: its match is gone, and so is the passage.
+      await waitFor(() => expect(screen.getByRole("button", { name: "Comment" })).toBeDisabled());
+
+      await userEvent.type(await openFind(), "robot arm");
+      await waitFor(() => expect(screen.getByRole("button", { name: "Comment" })).toBeEnabled());
+      screen.getByRole("button", { name: "Comment" }).focus();
+      await userEvent.keyboard("{Enter}");
+      expect(onComment).toHaveBeenCalledWith(expect.objectContaining({ page: 3, quote: "robot arm" }), 2);
+    });
+  });
+
 });
 
 /**

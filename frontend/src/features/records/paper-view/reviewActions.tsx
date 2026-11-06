@@ -206,6 +206,15 @@ const officeReviewBlocked = (record: RecordDetail) => record.office_review.block
  * last of all. *Clear* and *Record finding* share one capability,
  * `office_review` (ADR-032 §10 Amendment, 2026-10-08).
  */
+/**
+ * The acts *Finish review* takes as verdicts (ADR-032 §7, IR-875). Where
+ * `finish_review` is granted they leave the bar for its dialog, so a verdict
+ * never strands the reviewer's drafts.
+ */
+export const VERDICT_CAPABILITIES: readonly Capability[] = [
+  "accept_proposal", "accept_publish", "keep_unlisted", "send_to_rdco", "office_review", "request_revision", "reject",
+];
+
 export const REVIEW_ACTIONS: readonly ReviewAction[] = [
   {
     kind: "dialog",

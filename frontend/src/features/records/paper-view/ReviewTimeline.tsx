@@ -53,9 +53,11 @@ interface Discussion {
  *
  * The host remounts it (a new `key`) when something it shows has changed.
  */
-export function ReviewTimeline({ recordId, canComment = false, statusTarget, renderStatus, beforeComment }: {
+export function ReviewTimeline({ recordId, canComment = false, statusTarget, renderStatus, beforeComment, onCommented }: {
   recordId: number;
   canComment?: boolean;
+  /** A comment was posted: the Threads tab reads its threads again (IR-875). */
+  onCommented?: () => void;
   /** Move the status to the workspace sidebar, sharing this tracker read. */
   statusTarget?: HTMLElement | null;
   /** What the sidebar draws from this read; the party status strip by default. */
@@ -85,10 +87,16 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
   }, [recordId, attempt]);
 
   const reread = () => setAttempt((n) => n + 1);
+  const [draftNote, setDraftNote] = useState("");
   const discussion: Discussion = {
     canComment,
     post: async (body, replyTo) => {
-      await recordsApi.postReviewComment(recordId, replyTo === undefined ? { body } : { body, reply_to: replyTo });
+      const { data } = await recordsApi.postReviewComment(recordId, replyTo === undefined ? { body } : { body, reply_to: replyTo });
+      // A seated reviewer's new thread is a draft: it waits in Threads, unseen.
+      setDraftNote(data?.is_draft
+        ? "Added to your drafts in Threads. Only you see it until you finish your review."
+        : "");
+      onCommented?.();
       reread();
     },
     edit: async (commentId, body) => {
@@ -151,6 +159,7 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
                 clearOnSuccess
               />
             )}
+            <p role="status" className="text-small text-stone-700">{draftNote}</p>
           </>
         )}
       </section>
