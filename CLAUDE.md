@@ -171,6 +171,17 @@ python manage.py reextract_manuscripts --dry-run
                                    # the new one swaps in. --record N narrows it; --rollback reactivates the
                                    # previous ChunkSet. Verified 2026-11-03 on 5 proxy papers (55 pages,
                                    # 1,256 credits). Figure descriptions not exercised
+python manage.py read_review_texts --dry-run [--record N]
+                                   # give Versions from before IR-871 their review text (ADR-058 §1
+                                   # as amended): each read from its own manuscript file on this
+                                   # machine with pdfplumber, no network and no model, so it spends
+                                   # nothing and asks no embargo. A metadata-only Version shares the
+                                   # previous one's; a missing file reads "text not kept"; texts left
+                                   # `unavailable` are retried. Never re-reads a stored text. Needs
+                                   # every REVIEW_TEXT_* limit and Linux, else refuses before writing.
+                                   # Verified 2026-11-05 on a copy of the dev database: migrated from
+                                   # records 0021 to 0033, and it found nothing to read, because none
+                                   # of that copy's 18 Versions names a manuscript
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 python manage.py run_research_tool --user EMAIL --call TOOL='{json}' [--call ...]
                                    # run research-lane tools as a user, no model

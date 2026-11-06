@@ -23,6 +23,13 @@ cd ../e2e && npm ci && npx playwright install chromium
 npm run test:smoke
 ```
 
+The smoke tier also holds the **viewport matrix** (IR-910): every routed screen at
+360, 768, 1280 and 1745 px, asserting the page does not scroll sideways and the
+screen's primary action can be reached. Each run writes the per-screen, per-width
+table to `test-results-smoke/viewport-matrix.md`; CI prints it in the run summary.
+The screens are listed in `smoke/support/screens.ts`; see
+[`docs/engineering/RESPONSIVE_LAYOUT.md`](../docs/engineering/RESPONSIVE_LAYOUT.md).
+
 Output goes to `playwright-report-smoke/` and `test-results-smoke/` (trace and
 video for a failure only). Mark the "Frontend smoke" check required in the
 branch protection rules for `main` to make a failure block the merge.

@@ -589,7 +589,10 @@ class DetailFlagTests(DecisionTestBase):
         self.assertEqual(flag["party"], Party.ADVISER)
         self.assertIsNone(flag["blocked"])
         self.assertTrue(flag["token"])
-        self.assertEqual(flag["closes"], {"assignments": [], "document_requests": 0, "revision_requests": [], "findings": []})
+        self.assertEqual(flag["closes"], {
+            "assignments": [], "document_requests": 0, "revision_requests": [], "findings": [],
+            "threads": [],
+        })
         self.assertEqual(flag["author_hints"], ["The author flagged possible intellectual property."])
 
     def test_rdco_is_offered_all_three_and_told_what_closes(self):

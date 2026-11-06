@@ -229,6 +229,7 @@ export type Capability =
   | "tag_ip"
   | "attach_file"
   | "comment_review"
+  | "finish_review"
   | "comment_public"
   | "cite";
 
@@ -495,6 +496,18 @@ export interface RecordVersion {
   documents_added?:         VersionDocument[];
   /** True when `documents` is a best guess, for versions older than IR-872. */
   documents_reconstructed?: boolean;
+  /** Its review text's state (ADR-058 §1 as amended, IR-871). Null with no manuscript. */
+  review_text?:             VersionReviewText | null;
+}
+
+/** Whether a version's review text was read, and what to say if not (IR-871). */
+export interface VersionReviewText {
+  state:    "pending" | "read" | "no_text" | "unavailable" | "not_kept" | "not_read";
+  /** Server-authored, e.g. "No text for v2, so it can't be compared." Null when read. */
+  message:  string | null;
+  warnings: { code: string; [detail: string]: unknown }[];
+  /** `GET .../versions/<n>/text/` when read, else null. */
+  url:      string | null;
 }
 
 /** One slot's file, as a version names it (IR-872). */

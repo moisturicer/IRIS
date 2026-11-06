@@ -9,6 +9,7 @@ import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
 import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
 import { remarkLimitMath } from "./mathLimit";
+import { breakLongRuns } from "./runLimit";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -150,7 +151,7 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
         }}
         urlTransform={urlTransform}
       >
-        {toMarkdownLinks(text, streaming)}
+        {toMarkdownLinks(breakLongRuns(text), streaming)}
       </ReactMarkdown>
     </div>
   );
