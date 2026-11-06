@@ -12,6 +12,7 @@ import { fieldClasses, LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { useAuth } from "@/hooks/useAuth";
+import { pathFor } from "@/lib/access";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { ORCID_EXAMPLE, orcidProblem } from "@/lib/orcid";
 import { cn } from "@/lib/utils";
@@ -102,7 +103,7 @@ export default function EditProfilePage() {
         });
         updateUser(data);
       }
-      navigate("/profile", { state: { saved: true } });
+      navigate(pathFor("profile"), { state: { saved: true } });
     } catch (err) {
       setError(
         fieldError(err, "bio", "research_interests", "orcid") ??
@@ -199,7 +200,7 @@ export default function EditProfilePage() {
       {error && <p role="alert" className={cn(LOAD_ERROR, "mt-6")}>{error}</p>}
 
       <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-stone-200 pt-4">
-        <Link to="/profile" className={cn(PILL_SECONDARY, FOCUS_RING)}>Cancel</Link>
+        <Link to={pathFor("profile")} className={cn(PILL_SECONDARY, FOCUS_RING)}>Cancel</Link>
         <button
           type="submit"
           disabled={!dirty || saving || !!orcidIssue}

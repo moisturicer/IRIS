@@ -3,6 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { useAuth } from "@/hooks/useAuth";
+import { pathFor } from "@/lib/access";
 import { cn } from "@/lib/utils";
 
 import { displayName, initialsOf, affiliationOf } from "./names";
@@ -42,7 +43,7 @@ export default function ProfilePage() {
         className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-stone-100 py-2 pl-4 pr-2 text-small text-stone-700"
       >
         This is how other people signed in to IRIS see you.
-        <Link to="/profile/edit" className={cn(PILL_PRIMARY, FOCUS_RING)}>Edit profile</Link>
+        <Link to={pathFor("profileEdit")} className={cn(PILL_PRIMARY, FOCUS_RING)}>Edit profile</Link>
       </p>
 
       <header className="flex flex-wrap items-start gap-6">

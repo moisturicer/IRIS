@@ -7,6 +7,7 @@ import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { TONES } from "@/components/ui/statusTones";
 import { useAuth } from "@/hooks/useAuth";
+import { pathFor } from "@/lib/access";
 import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
@@ -53,7 +54,7 @@ export default function SettingsPage() {
       <PageHeader
         title="Settings"
         description="Your sign-in, your data and what your role lets you do."
-        actions={<Link to="/profile" className={cn(PILL_SECONDARY, FOCUS_RING)}>Your profile</Link>}
+        actions={<Link to={pathFor("profile")} className={cn(PILL_SECONDARY, FOCUS_RING)}>Your profile</Link>}
       />
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">

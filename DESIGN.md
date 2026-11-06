@@ -124,6 +124,17 @@ components:
     textColor: "{colors.page-white}"
     rounded: "{rounded.pill}"
     size: "56px"
+  profile-note:
+    backgroundColor: "{colors.bar-stone}"
+    textColor: "{colors.body-ink}"
+    typography: "{typography.label}"
+    rounded: "{rounded.sheet}"
+    padding: "8px 8px 8px 16px"
+  profile-avatar:
+    backgroundColor: "{colors.maroon-wash}"
+    textColor: "{colors.binding-maroon}"
+    rounded: "{rounded.pill}"
+    size: "112px"
   entry-masthead:
     backgroundColor: "{colors.page-white}"
     textColor: "{colors.binding-maroon}"
@@ -296,6 +307,9 @@ Sign in, register, email verification and the pending and declined screens share
 - **Motion:** the sheet settles once (280 ms, 0.5 rem rise and fade, a recorded exception to the 150–200 ms rule because it runs once on load) and register's steps cross-fade (150 ms), both only when motion is welcome.
 
 Replaced the split screen with its "shelf of bound work" brand panel (IR-535, IR-586), deleted in IR-711.
+
+### Profile and Settings (IR-933)
+Two pages. **Profile** reads like a short typeset entry: an initials avatar (112 px, Maroon Wash with maroon Garamond initials) or the person's photo beside a Garamond name, the role and the affiliation, then About, Research interests and ORCID iD, each under one hairline. A field left empty is left out. On your own profile a Bar Stone **note** strip says this is how others see you and holds the page's one filled pill, Edit profile. **Edit profile** is the same sections as fields, closed by Cancel and Save, and returns to Profile with a "Profile saved." line. **Settings** holds the account only: sign-in and password, consent, and role.
 
 ### Identity (IR-744)
 **Folio Ribbon.** The mark is a serif I standing in the gutter of an open folio: four maroon pieces (two leaves, two ribbons), with the I as the white space between them. `IrisMark`, `IrisWordmark`, `IrisLoader`, `SearchGlyph` and `AskIrisGlyph` (`frontend/src/components/brand/IrisBrand.tsx`) fill with `currentColor`: maroon on white, white only on maroon. The loader replays the concept's storyboard (one leaf, its partner, the ribbons, then the I) on a 2 s loop; Ask IRIS is a speech bubble with the mark's serif I cut out of it; answering sets that I in type (top serif, stem, bottom serif). Both fade instead under reduced motion. Assets and their build: `docs/brand/folio-ribbon/final/`.
