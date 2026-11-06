@@ -13,33 +13,46 @@ export function token(): string {
   return `${b64url({ alg: "HS256", typ: "JWT" })}.${b64url({ user_id: 1, role_id: 1, exp })}.signature`;
 }
 
-export function student() {
+export type SmokeRole = "Student" | "RDCO" | "System Admin";
+
+/** What differs between the roles the smoke specs sign in as. */
+const PROFILES: Record<SmokeRole, { email: string; office: boolean; admin: boolean }> = {
+  Student: { email: "student@cit.edu", office: false, admin: false },
+  RDCO: { email: "rdco@cit.edu", office: true, admin: false },
+  "System Admin": { email: "admin@cit.edu", office: false, admin: true },
+};
+
+export function account(role: SmokeRole = "Student") {
+  const { email, office, admin } = PROFILES[role];
   return {
     id: 1,
-    email: "student@cit.edu",
+    email,
     first_name: "Sam",
     middle_initial: "",
-    last_name: "Student",
+    last_name: role,
     role: 1,
-    role_name: "Student",
-    is_staff: false,
-    is_superuser: false,
+    role_name: role,
+    is_staff: office,
+    is_superuser: admin,
     is_verified: true,
     is_locked: false,
     is_active: true,
-    is_office_coordinator: false,
+    is_office_coordinator: office,
     consent_given: true,
     date_joined: "2026-01-05T00:00:00Z",
     college_name: "",
     department_name: "",
     course_name: "",
-    review_access: { my_reviews: false },
+    review_access: { my_reviews: office, offices: office ? ["rdco"] : [], is_coordinator: office },
   };
 }
 
+/** The signed-in student the auth specs use. */
+export const student = () => account("Student");
+
 /** Start the page already signed in, the way a reload does: a stored refresh token the app exchanges. */
-export async function signedIn(page: Page, api: MockApi) {
-  const user = student();
+export async function signedIn(page: Page, api: MockApi, role: SmokeRole = "Student") {
+  const user = account(role);
   api.on("POST", "/auth/token/refresh/", { access: token(), refresh: "refresh-2" });
   api.on("GET", "/users/me/", user);
   await page.addInitScript(() => sessionStorage.setItem("iris_refresh_token", "refresh-1"));
@@ -66,7 +79,7 @@ export const PAPER = {
   authors: [{ id: 1, name: "Sam Student", role: 1 }],
 };
 
-const paginated = <T,>(results: T[]) => ({ count: results.length, next: null, previous: null, results });
+export const paginated = <T,>(results: T[]) => ({ count: results.length, next: null, previous: null, results });
 
 /** Everything the app shell and the Discover page ask for on load. */
 export function mockShell(
@@ -87,3 +100,45 @@ export function mockShell(
   api.on("GET", "/notifications/", paginated([]));
   api.on("GET", "/library/saves/", { results: [] });
 }
+
+/**
+ * A published Thesis/Research as Paper View's detail endpoint returns it to a
+ * reader who is not one of its authors. Shape follows RecordDetail; fields the
+ * screen does not read are left out.
+ */
+export const PAPER_DETAIL = {
+  ...PAPER,
+  year_completed: null,
+  abstract_file: null,
+  classification: "Agriculture",
+  psced: null,
+  record_type: "Thesis / Research",
+  adviser: null,
+  adviser_name: null,
+  added_by: null,
+  requires_ethics_review: false,
+  requested_itso: false,
+  requested_ierc: false,
+  requested_ktto: false,
+  owners: [],
+  is_deleted: false,
+  reviews: [],
+  clearances: [],
+  resubmission: { count: 0, last_resubmitted_at: null, declining_office: null, offices_preserved: [] },
+  stage_label: "Published",
+  files: [],
+  workflow_state: "published",
+  workflow_state_label: "Published",
+  current_holders: [],
+  capabilities: ["cite"],
+  can_request_document: [],
+  my_seats: [],
+  is_participant: false,
+  routing: { send_to_rdco: false, route_as: null, targets: [] },
+  office_review: { party: null, label: null, blocked: null, assignment: null },
+  revision: { party: null, label: null, blocked: null, withdrawable: null, decision_blocked: null, open: [], new_version: null },
+  decision: { party: null, outcomes: [], blocked: null, closes: null, token: null, author_hints: [] },
+  versions: null,
+  manuscript_unsubmitted: false,
+  submitter_status: null,
+};

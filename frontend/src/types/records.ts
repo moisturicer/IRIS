@@ -32,7 +32,11 @@ export interface RecordListItem {
   title:                 string;
   abstract:              string;
   year_accomplished:     number | null;
-  classification_name:   string | null;
+  /**
+   * Absent, not null, when the record has no classification: the serializer's
+   * `source="classification.name"` skips the field (found by IR-915's contract check).
+   */
+  classification_name?:  string | null;
   record_type_name:      string | null;
   pipeline_status:       PipelineStatus;
   is_ip:                 boolean;

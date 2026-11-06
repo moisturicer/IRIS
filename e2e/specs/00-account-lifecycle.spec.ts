@@ -58,7 +58,7 @@ test("an unverified account is told so, and the emailed link verifies it", async
   expect(await refused.text()).toContain("not verified");
 
   const mail = await waitForMail(email, /verify/i);
-  await page.goto(linkPath(mail.text || mail.html, "/activate/"));
+  await page.goto(linkPath(mail.text || mail.html, "/activate"));
   await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
   await expect(page.getByText(/verified|approval/i).first()).toBeVisible();
 });

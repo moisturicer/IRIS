@@ -1,6 +1,8 @@
 import { INSTITUTION } from "@/config/institution";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
+import { InterruptedState } from "@/components/shared/InterruptedState";
+import { readFailureKind } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
@@ -333,8 +335,11 @@ export default function PaperViewPage() {
   const chat = usePaperChat();
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  /** The last load failed for a reason other than "no such record"; Try again bumps `attempt`. */
-  const [loadFailed, setLoadFailed] = useState(false);
+  /**
+   * The last load failed for a reason other than "no such record": `failed`
+   * for an error, `interrupted` for no answer in time. Retry bumps `attempt`.
+   */
+  const [loadFailed, setLoadFailed] = useState<"failed" | "interrupted" | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
@@ -564,18 +569,19 @@ export default function PaperViewPage() {
       .detail(Number(id))
       .then(({ data }) => {
         setRecord(data);
-        setLoadFailed(false);
+        setLoadFailed(null);
         // access_count is a global counter, so it cannot answer "what have I
         // read?". My Library's reading history is written here instead, per
         // browser. See lib/recordLibrary.
         recordVisit(data.id, data.title);
       })
       // A 404 is a missing record and a refused one alike (IR-153): the API
-      // never says which, so neither does this page. Any other failure is
-      // not "not found", and says so with a way to try again.
-      .catch((err: { response?: { status?: number } }) => {
+      // never says which, so neither does this page, and a 403 reads the same.
+      // Any other failure is not "not found", and says so with a way to try again.
+      .catch((err: unknown) => {
+        const kind = readFailureKind(err);
         setRecord(null);
-        setLoadFailed(err?.response?.status !== 404);
+        setLoadFailed(kind === "unavailable" ? null : kind);
       })
       .finally(() => setLoading(false));
     if (attempt === 0) recordsApi.incrementAccess(Number(id)).catch(() => {});
@@ -598,27 +604,28 @@ export default function PaperViewPage() {
     window.setTimeout(() => setShareState("idle"), 2500);
   };
 
-  /** The viewer's download state may have moved (IR-677): re-read the record. */
+  /**
+   * Re-read the record after something changed -- the viewer's download state
+   * (IR-677), a document request. A failure leaves the page as
+   * it was, except one that means the viewer can no longer read the record
+   * (revoked while it was open, IR-906): that becomes the same not-available
+   * screen as a record that never existed.
+   */
   const reloadRecord = async () => {
     if (!id) return;
     try {
       const { data } = await recordsApi.detail(Number(id));
       setRecord(data);
-    } catch {
-      // The control keeps its last state; a reload catches up.
+    } catch (err) {
+      if (readFailureKind(err) === "unavailable") setRecord(null);
+      // Otherwise the control keeps its last state; a reload catches up.
     }
   };
 
   /** A document or request changed: re-read what derives from it. */
   const handleDocumentRequestChanged = async () => {
     setTrackerVersion((v) => v + 1);
-    if (!id) return;
-    try {
-      const { data } = await recordsApi.detail(Number(id));
-      setRecord(data);
-    } catch {
-      // The panel already shows the new state; the badge catches up on reload.
-    }
+    await reloadRecord();
   };
 
   // The whole page is a skeleton only before the first record arrives.
@@ -626,6 +633,10 @@ export default function PaperViewPage() {
   // it, and swaps only the main column (IR-355): a citation followed from
   // the chat must not unmount the conversation it was followed from.
   if (loading && !record) return <LoadingSkeleton />;
+
+  if (!record && loadFailed === "interrupted") {
+    return <InterruptedState what="record" onRetry={() => setAttempt((n) => n + 1)} />;
+  }
 
   if (!record && loadFailed) {
     return (

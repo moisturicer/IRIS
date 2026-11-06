@@ -52,6 +52,9 @@ export const routes: RouteObject[] = [{
   children: [
   { path: "/login",  element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
+  // IR-928: the secret is in the fragment. The path form is the deprecated shape of
+  // links emailed earlier; remove it once their tokens have expired (3 days).
+  { path: "/activate", element: <EmailVerifyPage /> },
   { path: "/activate/:uidb64/:token", element: <EmailVerifyPage /> },
   // ADR-045 (IR-642). Public: recovery must never require signing in.
   { path: "/password/forgot", element: <ForgotPasswordPage /> },

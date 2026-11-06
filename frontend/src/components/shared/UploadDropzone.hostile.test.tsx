@@ -37,7 +37,7 @@ describe("an upload's file name", () => {
       <UploadDropzone label="Upload manuscript" onFiles={vi.fn()} accept=".pdf" validate />,
     );
 
-    fireEvent.drop(screen.getByRole("button", { name: "Upload manuscript" }), {
+    fireEvent.drop(screen.getByRole("button", { name: /^Upload manuscript/ }), {
       dataTransfer: { files: [new File(["PK"], name, { type: "application/octet-stream" })] },
     });
 
