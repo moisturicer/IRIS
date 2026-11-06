@@ -17,12 +17,19 @@ import { measureOverflow } from "./viewport";
  * One axe pass over the page as it stands: WCAG 2.x A and AA, contrast included
  * (a real browser). Returns every violation for the attachment and one line per
  * serious or critical node for the verdict. Shared by the journeys' ledger and
- * the smoke tier's every-route scan (IR-908), so both fail on the same bar.
+ * the smoke tier's scans of routes, states and dialogs (IR-908), so all fail on
+ * the same bar. With `testInfo`, every violation is attached as `axe-<label>.json`.
  */
-export async function axeScan(page: Page, label: string) {
+export async function axeScan(page: Page, label: string, testInfo?: TestInfo) {
   const results = await new AxeBuilder({ page })
     .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
     .analyze();
+  if (testInfo) {
+    await testInfo.attach(`axe-${label}.json`, {
+      body: JSON.stringify(results.violations, null, 2),
+      contentType: "application/json",
+    });
+  }
   const findings: string[] = [];
   for (const v of results.violations) {
     if (v.impact !== "serious" && v.impact !== "critical") continue;
@@ -41,11 +48,7 @@ export class A11yLedger {
   private readonly checked: string[] = [];
 
   async scan(page: Page, testInfo: TestInfo, label: string) {
-    const { violations, findings } = await axeScan(page, label);
-    await testInfo.attach(`axe-${label}.json`, {
-      body: JSON.stringify(violations, null, 2),
-      contentType: "application/json",
-    });
+    const { findings } = await axeScan(page, label, testInfo);
     this.checked.push(`axe ${label}`);
     this.findings.push(...findings);
   }

@@ -181,7 +181,7 @@ it("opens a continuation in Publish, requires its manuscript, and keeps copied d
   }) } as never);
   const user = userEvent.setup();
   renderScreen(<PublishDialog />, { route: "/?publish=42" });
-  await screen.findByRole("button", { name: "Upload manuscript" });
+  await screen.findByRole("button", { name: /^Upload manuscript./ });
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   dropFile(pdf("full-thesis.pdf"));
   await screen.findByText(/uploaded/i, { selector: "p" });
@@ -206,7 +206,7 @@ async function chooseType(user: ReturnType<typeof userEvent.setup>, name: RegExp
 }
 
 function dropFile(file: File) {
-  fireEvent.drop(screen.getByRole("button", { name: "Upload manuscript" }), {
+  fireEvent.drop(screen.getByRole("button", { name: /^Upload manuscript./ }), {
     dataTransfer: { files: [file] },
   });
 }
@@ -296,7 +296,7 @@ describe("a file drop", () => {
 
   it("is not possible before a type is chosen", async () => {
     await openNew();
-    const zone = await screen.findByRole("button", { name: "Upload manuscript" });
+    const zone = await screen.findByRole("button", { name: /^Upload manuscript./ });
 
     expect(zone).toHaveAttribute("aria-disabled", "true");
     dropFile(pdf());

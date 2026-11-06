@@ -31,9 +31,7 @@ table to `test-results-smoke/viewport-matrix.md`; CI prints it in the run summar
 The screens are listed in `smoke/support/screens.ts`; see
 [`docs/engineering/RESPONSIVE_LAYOUT.md`](../docs/engineering/RESPONSIVE_LAYOUT.md).
 
-The smoke tier also runs **axe on every routed screen** (IR-908, `smoke/axe-routes.spec.ts`): WCAG 2.x A and AA, contrast
-included, failing on serious and critical findings. It scans the same `screens.ts` catalogue, so a new route is scanned as
-soon as it has a row. Dialogs and states are not routes and are not scanned there.
+The smoke tier also runs **axe in a real browser** (IR-908): on every routed screen (`axe-routes.spec.ts`), on every state of the UI states matrix (`axe-states.spec.ts`, cells in `smoke/support/states.ts`), and with every dialog open (`axe-dialogs.spec.ts`, cases in `smoke/support/dialogs.ts`). WCAG 2.0/2.1 A and AA, contrast included; serious and critical findings fail the test, with each screen's full axe result attached. A new route needs a row in `screens.ts`, and `dialog-coverage.spec.ts` fails when a dialog source file is neither opened by a case nor listed in `UNSCANNED` with a reason.
 
 Output goes to `playwright-report-smoke/` and `test-results-smoke/` (trace and
 video for a failure only). Mark the "Frontend smoke" check required in the
