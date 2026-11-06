@@ -401,6 +401,30 @@ def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: st
         _log_failure("notify_new_version", record=record)
 
 
+def notify_review_finished(record, *, actor, party_label: str, version, threads: int, reviewers):
+    """
+    A reviewer finished a review with *Comment only* (ADR-032 §7, IR-874):
+    one notice each to the owners and to the other open Seat holders, however
+    many threads it sent. A verdict's own service notifies for every other
+    finish. In-app only, like the review discussion itself.
+    """
+    try:
+        on = f" v{version}" if version else ""
+        said = f"{threads} comment{'' if threads == 1 else 's'}" if threads else "a summary"
+        message = f'{party_label} reviewed{on} of "{record.title}": {said}, no decision.'
+        notif_type = NotificationType.objects.get_or_create(name="Review Finished")[0]
+        recipients = {o.user for o in record.owners.select_related("user")} | set(reviewers)
+        for recipient in recipients:
+            if recipient.pk == getattr(actor, "pk", None):
+                continue
+            Notification.objects.create(
+                sender=actor, recipient=recipient, record=record,
+                notif_type=notif_type, message=message,
+            )
+    except Exception:
+        _log_failure("notify_review_finished", record=record)
+
+
 def notify_document_requested(document_request, *, party_label: str):
     """
     Tell every owner that a party has asked for documents (ADR-022 §3.1).

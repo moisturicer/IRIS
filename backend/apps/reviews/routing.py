@@ -194,10 +194,14 @@ def routing_flags(record, user) -> dict:
     endpoints re-check both.
     """
     if user is None or not getattr(user, "is_authenticated", False):
-        return {"send_to_rdco": False, "route_as": None, "targets": []}
+        return {"send_to_rdco": False, "send_to_rdco_blocked": None, "route_as": None, "targets": []}
     route_as = _route_as(record, user)
+    sending = _may_accept_and_route(record, user)
     return {
-        "send_to_rdco": _may_accept_and_route(record, user),
+        "send_to_rdco": sending,
+        # The Adviser's own open Must fix (ADR-032 §7, IR-874). A revision
+        # request's block is `decision.blocked`, which Readiness already reads.
+        "send_to_rdco_blocked": _thread_block(record) if sending else None,
         "route_as": route_as,
         # Where *Request review* may send it (IR-685): the sidebar lists these
         # and keeps no table of its own, so a new party graph needs no release.
@@ -205,6 +209,13 @@ def routing_flags(record, user) -> dict:
             {"party": party, "label": _label(party)} for party in ROUTE_TARGETS[route_as]
         ] if route_as is not None else [],
     }
+
+
+def _thread_block(record):
+    """The Adviser's own open *Must fix* threads hold its acceptance (ADR-032 §7, IR-874)."""
+    from .threads import approval_blocked_reason
+
+    return approval_blocked_reason(record, Party.ADVISER)
 
 
 def _require_routable(record):
@@ -454,7 +465,7 @@ def accept_and_route(record, actor, *, to, reason, suggested_offices=None):
     from_party = _from_party_for(record, actor, accepting=True)
     # Acceptance completes the Adviser’s turn, so it waits for revisions.
     # Office-to-office requests do not complete a turn.
-    blocked = decision_blocked_reason(record)
+    blocked = decision_blocked_reason(record) or _thread_block(record)
     if blocked:
         raise RoutingError(blocked)
     plan = _plan(record, from_party, to, reason)

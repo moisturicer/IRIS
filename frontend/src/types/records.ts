@@ -229,6 +229,7 @@ export type Capability =
   | "tag_ip"
   | "attach_file"
   | "comment_review"
+  | "finish_review"
   | "comment_public"
   | "cite";
 
