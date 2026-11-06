@@ -1,6 +1,7 @@
 [
   "*",
   "/",
+  "/activate",
   "/activate/:uidb64/:token",
   "/admin/audit",
   "/admin/users",
