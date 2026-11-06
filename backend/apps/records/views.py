@@ -653,6 +653,44 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "private, no-store"
         return response
 
+    @action(
+        detail=True, methods=["get"],
+        url_path=r"versions/(?P<number>[0-9]+)/text", url_name="version-text",
+    )
+    def version_text(self, request, pk=None, number=None):
+        """
+        GET /records/<id>/versions/<n>/text/ -- version n's review text, its
+        sections and passages (ADR-058 §1 as amended, IR-871).
+
+        Review material, so the same rule as `version_manuscript`: a viewer
+        `may_read_review` refuses gets the 404 a missing version gets. A
+        version with no text yet answers with its state and message, and no
+        sections. Audited as the version's manuscript is (ADR-058 §4).
+        """
+        from core.permissions import may_read_review
+
+        from .models import RecordVersion
+        from .review_text.store import payload
+
+        record = self.get_object()
+        version = (
+            RecordVersion.objects.select_related("review_text")
+            .filter(record=record, number=number).first()
+            if may_read_review(request.user, record) else None
+        )
+        if version is None:
+            return Response(
+                {"detail": "No such version of this paper."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        create_audit_event(
+            "DOWNLOAD", request.user, record=record,
+            metadata={"source": "review_text", "version": version.number},
+        )
+        response = Response(payload(version))
+        response["Cache-Control"] = "private, no-store"
+        return response
+
     @action(detail=True, methods=["get"])
     def similar(self, request, pk=None):
         """

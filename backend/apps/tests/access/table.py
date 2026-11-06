@@ -164,6 +164,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
             kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
         ),
     }),
+    # A Version's review text is review material too (ADR-058 §4, IR-871).
+    "record-version-text": Entry({
+        "GET": _case(
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
+        ),
+    }),
     "record-similar": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     # ADR-029: novelty results belong only to the Proposal's owner.
     "record-related-research": Entry({
