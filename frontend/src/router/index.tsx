@@ -44,6 +44,7 @@ const RoleRequestsPage = lazy(() => import("@/features/accounts/RoleRequestsPage
 const DownloadRequestsPage = lazy(() => import("@/features/admin/DownloadRequestsPage"));
 const DeleteRequestsPage = lazy(() => import("@/features/admin/DeleteRequestsPage"));
 const AuditLogPage = lazy(() => import("@/features/audit/AuditLogPage"));
+const AccountDeletionRequestsPage = lazy(() => import("@/features/admin/AccountDeletionRequestsPage"));
 
 export const routes: RouteObject[] = [{
   // The last resort (IR-745): a crash outside the shell's own boundary below,
@@ -189,6 +190,15 @@ export const routes: RouteObject[] = [{
                 handle: { crumb: "Audit Log", width: "full" },
               },
             ],
+          },
+          {
+            // The System Admin alone (ADR-051 §8, IR-788).
+            element: <ProtectedRoute allowedRoles={rolesFor("accountDeletionRequests")} />,
+            children: [{
+              path: pathFor("accountDeletionRequests"),
+              element: <DeferredPage name="Account Deletion Requests"><AccountDeletionRequestsPage /></DeferredPage>,
+              handle: { crumb: "Account Deletions", width: "full" },
+            }],
           },
 
           // Any other address (IR-745). Behind sign-in like every app

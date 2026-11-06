@@ -5,6 +5,10 @@ export const AUDIT_EVENT_GROUPS = {
     ACCOUNT_LOCKED: "Account Locked", ACCOUNT_UNLOCKED: "Account Unlocked", SESSION_REVOKE: "Session Revoked",
     PASSWORD_CHANGED: "Password Changed",
     SYSTEM_SETTING_CHANGED: "System Setting Changed",
+    ACCOUNT_DELETION_REQUESTED: "Account Deletion Requested",
+    ACCOUNT_DELETION_CANCELLED: "Account Deletion Cancelled",
+    ACCOUNT_DELETION_CONFIRMED: "Account Deleted",
+    ACCOUNT_DELETION_REJECTED: "Account Deletion Rejected",
   },
   Files: { ACCESS: "Record Access", UPLOAD: "File Upload", DOWNLOAD: "File Download", DELETE: "File Delete", RENAME: "File Rename" },
   "Download requests": {

@@ -153,10 +153,13 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Discover", "Users", "Audit Log"]);
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Discover", "Users", "Audit Log", "Account Deletions"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
+    // IR-788 adds the account deletion queue to the System Admin's section.
+    expect(within(admin).getByRole("link", { name: "Account Deletions" }))
+      .toHaveAttribute("href", "/admin/account-deletion-requests");
     expect(within(nav).queryByRole("list", { name: "RDCO" })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
