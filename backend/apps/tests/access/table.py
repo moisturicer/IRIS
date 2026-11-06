@@ -265,6 +265,46 @@ RECORDS: dict[str, Entry | Shadowed] = {
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
             data={"body": "Is the signed endorsement enough?"},
         ),
+        # A writer deletes only their own draft (IR-874). The owner's comment
+        # is sent, so the owner is authorized and then told so (400).
+        "DELETE": _case(
+            OWNER_ACTS, kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
+        ),
+    }),
+    # Review threads (ADR-032 §7, IR-874): read under `may_read_review`, acted on
+    # by participants. On ITSO's sent Must fix: its seated reviewer alone changes
+    # its severity, the owner answers it but may not resolve it, and a
+    # participant resolves it. On the owner's own thread any participant resolves.
+    "record-review-thread-act": Entry({"POST": [
+        _case(
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment"), "act": "resolve"},
+        ),
+        _case(
+            row(ANON, HIDE, DENY, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "resolve"},
+        ),
+        _case(
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "reopen"},
+        ),
+        _case(
+            SEAT_ACTS,
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "severity"},
+            data={"severity": "suggestion"},
+        ),
+        _case(
+            OWNER_ACTS,
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "answer"},
+            data={"answer": "addressed", "note": "Section 4."},
+        ),
+    ]}),
+    # Finish review (IR-874): an open Seat holder alone. The Adviser's part on
+    # `record` is over and RDCO holds no seat there, so both are refused.
+    "record-finish-review": Entry({
+        "POST": _case(
+            SEAT_ACTS, kwargs=RECORD, data={"verdict": "comment_only", "summary": "Read it through."},
+        ),
     }),
 
     # -- bulk import: staff file on others' behalf --------------------------

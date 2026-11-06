@@ -136,7 +136,7 @@ def comment_payload(comment: ReviewComment, user, viewer: Optional[_Viewer] = No
         "party": (comment.party or None) if top else None,
         "party_label": threads.party_label(comment.party) if top else None,
         "severity": comment.severity if top else None,
-        "draft": comment.is_draft,
+        "is_draft": comment.is_draft,
         "round": comment.round_id,
         "anchor": _anchor_payload(comment) if top else None,
         "state": comment.state if top else None,

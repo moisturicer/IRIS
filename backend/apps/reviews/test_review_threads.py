@@ -90,7 +90,7 @@ class AThreadOnTheWireTests(ThreadTestBase):
 
         made = self.thread(record, self.owner, "Is the consent form attached?")
 
-        self.assertFalse(made["draft"])
+        self.assertFalse(made["is_draft"])
         self.assertIsNone(made["severity"])
         self.assertIsNone(made["party"])
         self.assertEqual(made["party_label"], "The authors")
@@ -166,7 +166,7 @@ class DraftsTests(ThreadTestBase):
     def test_a_seated_reviewer_s_thread_is_seen_by_nobody_else_until_sent(self):
         record = self.itso_open()
         draft = self.thread(record, self.itso, "Check the patent search.")
-        self.assertTrue(draft["draft"])
+        self.assertTrue(draft["is_draft"])
 
         # The writer, and nobody else: owner, Adviser (done), RDCO (seated),
         # and a fellow ITSO member who reads the review from the pool.
@@ -229,8 +229,8 @@ class DraftsTests(ThreadTestBase):
         reply = self.thread(record, self.rdco, "Yes.", reply_to=question["id"])
         former = self.thread(record, self.itso, "One more note.")
 
-        self.assertFalse(reply["draft"])
-        self.assertEqual((former["draft"], former["party"]), (False, Party.ITSO))
+        self.assertFalse(reply["is_draft"])
+        self.assertEqual((former["is_draft"], former["party"]), (False, Party.ITSO))
         self.assertIn(reply["id"], self.ids(record, self.owner))
         self.assertIn(former["id"], self.ids(record, self.owner))
 

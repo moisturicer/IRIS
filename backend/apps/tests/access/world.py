@@ -34,7 +34,7 @@ from apps.records.models import DeleteRequest, DownloadRequest, Record, RecordOw
 from apps.reviews import revisions, seats
 from apps.reviews.models import ReviewComment, ReviewerSeat
 from apps.reviews.routing import accept_and_route, enter_at_adviser, route
-from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName
+from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName, ThreadSeverity
 
 #: The matrix's columns, in the order every table row lists them.
 ROLES = (
@@ -234,6 +234,12 @@ def build_world() -> World:
     # The owner's, so only the owner may edit it (IR-419).
     o["review_comment"] = ReviewComment.objects.create(
         record=record, author=owner, body="Is the endorsement enough?", version=o["version"],
+    )
+    # A sent ITSO Must fix thread (IR-874): ITSO's, so its seated reviewer
+    # owns its severity, and the owner answers it rather than resolving it.
+    o["review_thread"] = ReviewComment.objects.create(
+        record=record, author=itso, body="Cite the prior-art search.", version=o["version"],
+        party=Party.ITSO, severity=ThreadSeverity.MUST_FIX,
     )
 
     # -- a record still at its Adviser's step, with the review opened ----
