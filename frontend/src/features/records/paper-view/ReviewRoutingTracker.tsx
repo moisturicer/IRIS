@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { recordsApi } from "@/api/records";
+import { isRequestTimeout } from "@/api/requestPolicy";
+import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
 import type {
   RecordTracker,
@@ -58,24 +60,26 @@ const HEADING_ID = "review-routing-tracker-heading";
  */
 export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
   const [data, setData] = useState<RecordTracker | null>(null);
-  const [failed, setFailed] = useState(false);
+  /** Why the read failed (IR-906): a timeout is worded as one, and both offer a retry. */
+  const [failed, setFailed] = useState<"failed" | "interrupted" | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setData(null);
-    setFailed(false);
+    setFailed(null);
     recordsApi
       .tracker(recordId)
       .then(({ data: payload }) => {
         if (!cancelled) setData(payload);
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      .catch((error: unknown) => {
+        if (!cancelled) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
       });
     return () => {
       cancelled = true;
     };
-  }, [recordId]);
+  }, [recordId, attempt]);
 
   return (
     <section
@@ -87,9 +91,20 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
       <RailHeading id={HEADING_ID} className="mb-3">Review &amp; Routing</RailHeading>
 
       {failed ? (
-        <p role="alert" className="text-xs text-stone-600">
-          Could not load the review tracker. Reload the page to try again.
-        </p>
+        <div role="alert" className="space-y-2 text-xs text-stone-600">
+          <p>
+            {failed === "interrupted"
+              ? "The review tracker took too long to load."
+              : "Could not load the review tracker."}
+          </p>
+          <button
+            type="button"
+            onClick={() => setAttempt((n) => n + 1)}
+            className={cn("font-semibold text-brand hover:underline min-h-11", FOCUS_RING)}
+          >
+            {failed === "interrupted" ? "Retry" : "Try again"}
+          </button>
+        </div>
       ) : !data ? (
         <div aria-hidden className="space-y-2">
           {[0, 1, 2, 3].map((i) => (

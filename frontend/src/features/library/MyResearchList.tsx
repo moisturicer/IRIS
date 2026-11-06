@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 
 import { SearchGlyph } from "@/components/brand/IrisBrand";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ReadFailedState } from "@/components/shared/ReadFailedState";
 import { FOCUS_RING } from "@/components/ui/interaction";
-import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
 import type { MyResearchItem } from "@/types/records";
 
@@ -50,6 +51,8 @@ interface MyResearchListProps {
   items:    MyResearchItem[];
   loading:  boolean;
   failed:   boolean;
+  /** The read timed out (IR-906): Retry, not a refusal. */
+  interrupted?: boolean;
   onRetry:  () => void;
   filter:   ResearchFilter;
   onFilterChange: (filter: ResearchFilter) => void;
@@ -62,7 +65,7 @@ interface MyResearchListProps {
  * starts folded. Picking a filter shows that group alone, open. Who has a
  * record now is on its own row, in the server's words. No counts.
  */
-export function MyResearchList({ items, loading, failed, onRetry, filter, onFilterChange }: MyResearchListProps) {
+export function MyResearchList({ items, loading, failed, interrupted = false, onRetry, filter, onFilterChange }: MyResearchListProps) {
   const [query, setQuery] = useState("");
 
   const all = useMemo(() => groupByFilter(items), [items]);
@@ -92,13 +95,12 @@ export function MyResearchList({ items, loading, failed, onRetry, filter, onFilt
 
   if (failed) {
     return (
-      <EmptyState
-        framed
-        tone="error"
-        icon="fa-plug-circle-xmark"
+      <ReadFailedState
+        interrupted={interrupted}
+        what="research list"
         title="Could not load your research"
         message="Nothing was changed. Check your connection and try again."
-        action={<button type="button" onClick={onRetry} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>}
+        onRetry={onRetry}
       />
     );
   }

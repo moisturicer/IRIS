@@ -30,6 +30,7 @@ import { LibraryOverview } from "./LibraryOverview";
 import { MyResearchList } from "./MyResearchList";
 import { FolderPicker, isSameView, viewKey, type LibraryView } from "./ReadingPanel";
 import type { ResearchFilter } from "./researchSections";
+import { isRequestTimeout } from "@/api/requestPolicy";
 import { SavedView } from "./SavedView";
 import { useLibrary } from "./useLibrary";
 
@@ -84,7 +85,7 @@ export default function MyLibraryPage() {
   const [collections, setCollections] = useState<Collection[]>(() => getCollections());
   const [history, setHistory] = useState<ReadingVisit[]>(() => getReadingHistory());
 
-  const { load: libraryLoad, retry: retryLibrary } = useLibrary();
+  const { load: libraryLoad, interrupted: libraryInterrupted, retry: retryLibrary } = useLibrary();
   const library = useLibraryStore((s) => s.items);
   const failure = useLibraryStore((s) => s.failure);
   const unsave = useLibraryStore((s) => s.unsave);
@@ -93,15 +94,18 @@ export default function MyLibraryPage() {
   const [research, setResearch] = useState<MyResearchItem[]>([]);
   const [loading, setLoading] = useState(canAuthor);
   const [failed, setFailed] = useState(false);
+  const [interrupted, setInterrupted] = useState(false);
 
   const loadResearch = useCallback(async () => {
     setLoading(true);
     setFailed(false);
+    setInterrupted(false);
     try {
       const { data } = await recordsApi.mine();
       setResearch(Array.isArray(data) ? data : []);
-    } catch {
+    } catch (error) {
       setFailed(true);
+      setInterrupted(isRequestTimeout(error));
     } finally {
       setLoading(false);
     }
@@ -171,6 +175,7 @@ export default function MyLibraryPage() {
           history={history}
           library={library}
           libraryLoad={libraryLoad}
+          libraryInterrupted={libraryInterrupted}
           onRetryLibrary={retryLibrary}
           onRemove={removeFromView}
           onRename={(id, name) => setCollections(renameCollection(collections, id, name))}
@@ -264,6 +269,7 @@ export default function MyLibraryPage() {
             research={research}
             loading={loading}
             failed={failed}
+            interrupted={interrupted}
             onRetry={() => void loadResearch()}
             library={library}
             history={history}
@@ -277,6 +283,7 @@ export default function MyLibraryPage() {
             items={research}
             loading={loading}
             failed={failed}
+            interrupted={interrupted}
             onRetry={() => void loadResearch()}
             filter={researchFilter}
             onFilterChange={setResearchFilter}

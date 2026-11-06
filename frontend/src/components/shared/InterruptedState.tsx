@@ -6,6 +6,8 @@ interface InterruptedStateProps {
   /** What was being loaded, in the reader's words: "delete requests". */
   what: string;
   onRetry: () => void;
+  /** Draw it as a card of its own, as `EmptyState` does for a feed. */
+  framed?: boolean;
 }
 
 /**
@@ -13,9 +15,10 @@ interface InterruptedStateProps {
  * not an empty result: nothing is known about the server, so the one thing
  * offered is another try. The reader chooses it; nothing retries on its own.
  */
-export function InterruptedState({ what, onRetry }: InterruptedStateProps) {
+export function InterruptedState({ what, onRetry, framed }: InterruptedStateProps) {
   return (
     <EmptyState
+      framed={framed}
       tone="error"
       icon="fa-hourglass-half"
       title="This took too long"

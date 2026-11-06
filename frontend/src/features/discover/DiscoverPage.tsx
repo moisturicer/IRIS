@@ -7,6 +7,8 @@ import { recordsApi } from "@/api/records";
 import { Modal } from "@/components/ui/Modal";
 import { PAGE_WIDTH } from "@/components/layout/PageContainer";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { InterruptedState } from "@/components/shared/InterruptedState";
+import { isRequestTimeout } from "@/api/requestPolicy";
 import { Spinner } from "@/components/ui/Spinner";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -127,6 +129,8 @@ export default function DiscoverPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [failed, setFailed] = useState<string | null>(null);
+  /** The failed read got no answer in time (IR-914): offer Retry, not a refusal. */
+  const [interrupted, setInterrupted] = useState(false);
   const [loadMoreFailed, setLoadMoreFailed] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
 
@@ -296,6 +300,7 @@ export default function DiscoverPage() {
 
     setLoading(true);
     setFailed(null);
+    setInterrupted(false);
     setLoadingMore(false);
     setLoadMoreFailed(null);
     setNextCursor(null);
@@ -333,6 +338,7 @@ export default function DiscoverPage() {
         if (current !== generation.current) return;
         setRecords([]);
         setTotalCount(null);
+        setInterrupted(isRequestTimeout(error));
         setFailed(errorDetail(error, "Check your connection, then try again."));
       })
       .finally(() => {
@@ -606,6 +612,8 @@ export default function DiscoverPage() {
       <div className="mt-4">
       {loading ? (
         <ResultsSkeleton columns={gridColumns} />
+      ) : failed && interrupted ? (
+        <InterruptedState framed what="research" onRetry={() => setAttempt((n) => n + 1)} />
       ) : failed ? (
         <EmptyState
           framed

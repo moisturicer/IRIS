@@ -1,4 +1,8 @@
 import { errorDetail } from "@/lib/errorDetail";
+import { readFailureKind } from "@/lib/readFailure";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Skeleton } from "@/components/ui";
+import { InterruptedState } from "@/components/shared/InterruptedState";
 import { TONES } from "@/components/ui/statusTones";
 /**
  * FR-M3-01 — Conversational RAG chatbot UI (SDD Module 3).
@@ -138,6 +142,13 @@ function LegacyRAGChatPage() {
   const [deleteTarget, setDeleteTarget] = useState<ConversationSummary | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  /**
+   * A conversation (or the list) that did not load (IR-906). `interrupted` is a
+   * timeout (Retry); anything else is a failure (Try again). A missing or
+   * refused conversation is not this: it is `client.unavailable`.
+   */
+  const [loadFailure, setLoadFailure] = useState<{ interrupted: boolean; subject: string } | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   // Too narrow to hold history and sources beside the answer, they open one at
   // a time as drawers over it, closed until asked for (IR-570). Unmeasured
   // (jsdom, the first paint) counts as wide: the layout this page always had.
@@ -228,6 +239,7 @@ function LegacyRAGChatPage() {
   useEffect(() => {
     let cancelled = false;
     const recordId = recordParam;
+    setLoadFailure(null);
 
     (async () => {
       try {
@@ -262,10 +274,7 @@ function LegacyRAGChatPage() {
         goTo(data, true);
       } catch (error) {
         if (!cancelled) {
-          addToast({
-            type:    "error",
-            message: errorDetail(error, "Could not load your conversations. Check that the AI service is available."),
-          });
+          setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", subject: "your conversations" });
         }
       }
     })();
@@ -275,7 +284,7 @@ function LegacyRAGChatPage() {
     // and `handoff` is read once on arrival — only the `record` query param, or arriving at `/ai`
     // itself, should re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordParam, atIndex]);
+  }, [recordParam, atIndex, loadAttempt]);
 
   // A draft that arrived with a conversation's own address -- a reload after
   // a handoff -- belongs to the first conversation that address opens.
@@ -283,6 +292,7 @@ function LegacyRAGChatPage() {
 
   // Opening an address: directly, on refresh, or by back and forward.
   useEffect(() => {
+    setLoadFailure(null);
     if (routeId === undefined || (routeId !== null && isOnScreen(routeId))) return;
     if (routeId === null) {
       showUnavailable();
@@ -295,12 +305,9 @@ function LegacyRAGChatPage() {
         if (draft && isOnScreen(routeId)) setDraftFor(routeId, draft);
       })
       .catch((error: unknown) => {
-        addToast({
-          type:    "error",
-          message: errorDetail(error, "Could not load this conversation. Check that the AI service is available."),
-        });
+        setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", subject: "this conversation" });
       });
-  }, [routeId, isOnScreen, open, setDraftFor, showUnavailable, addToast]);
+  }, [routeId, isOnScreen, open, setDraftFor, showUnavailable, loadAttempt]);
 
   // A drawer belongs to the layout that opened it, and to the conversation it
   // was opened over: widening the page or moving to another conversation (a
@@ -499,6 +506,24 @@ function LegacyRAGChatPage() {
                   Start a new chat
                 </button>
               </div>
+            </div>
+          ) : loadFailure ? (
+            <div className="flex-1 flex items-center justify-center">
+              {loadFailure.interrupted ? (
+                <InterruptedState what={loadFailure.subject.replace(/^(this|your) /, "")} onRetry={() => setLoadAttempt((n) => n + 1)} />
+              ) : (
+                <EmptyState
+                  icon="fa-plug-circle-xmark"
+                  tone="error"
+                  title={`Could not load ${loadFailure.subject}`}
+                  message="Check that the AI service is available, then try again."
+                  action={<button type="button" onClick={() => setLoadAttempt((n) => n + 1)} className="rounded-lg bg-white px-4 py-2 text-[14px] font-semibold text-brand ring-1 ring-stone-300 hover:bg-stone-100">Try again</button>}
+                />
+              )}
+            </div>
+          ) : client.isOpening && messages.length === 0 ? (
+            <div className="flex-1">
+              <Skeleton rows={3} label="Loading this conversation…" />
             </div>
           ) : (
             <ChatMessageList
