@@ -103,8 +103,11 @@ export const SCREEN_ACCESS = {
   // The bell at the top of the sidebar is the entry; its "View all" opens the
   // page, so a sidebar link would say the same thing twice (IR-519).
   notifications: { path: "/notifications", roles: EVERYONE },
-  // Settings and Help live in the account menu in the sidebar's user block
-  // (IR-413, spec §4.2), not in the nav list.
+  // Profile, Settings and Help live in the account menu in the sidebar's user
+  // block (IR-413, spec §4.2), not in the nav list. Profile (who you are) and
+  // Settings (your account) are separate pages since IR-933.
+  profile:       { path: "/profile",       roles: EVERYONE },
+  profileEdit:   { path: "/profile/edit",  roles: EVERYONE },
   settings:      { path: "/settings",      roles: EVERYONE },
   help:          { path: "/help",          roles: EVERYONE },
   // Reached from Discover and the queues, never from the nav. Which *records*

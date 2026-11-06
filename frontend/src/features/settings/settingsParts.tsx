@@ -1,10 +1,8 @@
 /**
- * The panel every Settings & Profile section sits in, shared so the profile
- * fields (IR-699) sit in the same frame as the panels already there.
+ * The panel every Settings section sits in.
  *
  * Named by its title, so each panel is a landmark region. The title is
- * sentence case at a named size (DESIGN.md, the Named Size Rule); it was
- * small tracked capitals before IR-699.
+ * sentence case at a named size (DESIGN.md, the Named Size Rule).
  */
 import { useId, type ReactNode } from "react";
 

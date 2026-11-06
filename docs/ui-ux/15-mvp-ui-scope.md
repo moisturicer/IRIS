@@ -337,7 +337,8 @@ Roles and screen gates come from `lib/access.ts`, with backend permissions enfor
 | My Library | `/records/mine` | Main, research roles |
 | Calls & Conferences | `/opportunities` | Main, research roles; outside MVP validation per ADR-050 |
 | Notifications | `/notifications` | Bell, every role |
-| Settings & Profile | `/settings` | Account menu, every role |
+| Profile | `/profile`, `/profile/edit` | Account menu, every role (IR-933) |
+| Settings | `/settings` | Account menu, every role |
 | Help | `/help` | Account menu, every role |
 
 Student and Adviser publish from Discover. `/records/add` opens that dialog; My Workspace has become My Library's research section. The System Admin's sidebar offers Discover and Administration, with no research-tool or workflow links.

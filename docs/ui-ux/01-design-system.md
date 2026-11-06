@@ -89,6 +89,19 @@ IRIS's mark is now **Folio Ribbon**: a serif I standing in the gutter of an open
 
 Gold is no longer on the logo: Folio Ribbon is maroon only.
 
+### IR-933 amendment: Profile and Settings are two pages
+
+The single Settings & Profile page is split. **Profile** is who you are to other signed-in people; **Settings** is your account. Approved from a clickable prototype (2026-11-06). Another person's profile page is IR-700.
+
+| Element | Now | Replaces |
+|---|---|---|
+| **Account menu** | Profile (`/profile`), Settings (`/settings`), Help, Sign out. Paths come from `SCREEN_ACCESS` (`profile`, `profileEdit`, `settings`) through `pathFor`, never typed into a page | One "Settings & Profile" item |
+| **Own-view note** | On your own Profile only: a `role="note"` strip, `rounded-xl`, `stone-200` border, `stone-100` fill, `text-small stone-700`, saying this is how other signed-in people see you, with the page's **one filled pill**, Edit profile. It is a control bar, not a card around reading content. Someone else's profile (IR-700) carries no such strip | The "View my profile" link inside the About you panel |
+| **Initials avatar** | `rounded-full`, `brand-50` fill, the initials in `font-display` `text-brand`, `aria-hidden`. 112 px on Profile, 80 px on Edit profile. A photo replaces it (`object-cover`, `ring-1 ring-stone-200`) with the person's name as its alt text; photos are fetched with auth (`useAuthedImage`) | Initials sized and styled separately in the photo field |
+| **Profile sections** | About, Research interests and ORCID iD under one `stone-200` hairline each, headings in `font-display` `text-title`, no cards. **A field left empty is left out**, with no placeholder; the account email is never printed. ORCID iD is a `font-mono` link to orcid.org | A "Profile — shown on records you author" panel |
+| **Edit profile** | Sections on hairlines (Photo and name, About you), then a footer rule with Cancel (secondary) and Save (the one filled action). Save sends the name and the profile fields, returns to Profile, which says "Profile saved." in a `role="status"` line. The photo saves on crop | A Save inside each of two panels |
+| **Settings** | Account & security (with the read-only sign-in email), Data privacy & consent, Role & access. A secondary "Your profile" pill sits in the header | A Profile tab first |
+
 ## 1 · Tokens as defined
 
 `frontend/tailwind.config.js`:
@@ -216,7 +229,7 @@ Font Awesome 6 via CDN, `<i className="fas fa-…" />`, 95 usages.
   - **Active** is the brand tint: `bg-brand-50`, `text-brand`, semibold, with the icon in brand. The 4 px maroon left bar is gone.
   - **Hover** is neutral, `bg-stone-100`, so it is never mistaken for the active row.
   - Every row carries `FOCUS_RING`.
-- **The account menu** in the user block holds Settings & Profile, Help and Sign out (`AccountMenu.tsx`). It is a disclosure: a button that shows and hides a list of plain links and buttons, not an ARIA `menu`. It opens upward, or to the right of the rail, and uses `shadow-card-md`.
+- **The account menu** in the user block holds Profile, Settings, Help and Sign out (`AccountMenu.tsx`). Profile and Settings are separate pages (IR-933): Profile is what other signed-in people see, with an own-view note and one filled **Edit profile** action; Settings is the account. It is a disclosure: a button that shows and hides a list of plain links and buttons, not an ARIA `menu`. It opens upward, or to the right of the rail, and uses `shadow-card-md`.
 - **Collapse / Expand** is one always-visible control at the bottom. It replaced a toggle that only appeared when you hovered the logo, which a touch tablet could not reach.
 - **Widths:** `w-60` / `w-16` instead of `230px` / `60px`.
 - **One new token:** `transition-shell` (`transitionProperty.shell`: transform, width, margin) in `tailwind.config.js`. The drawer slides, the rail narrows and the content margin follows. Two separate `transition-*` classes on one element silently override each other, because `cn` does not merge Tailwind classes.

@@ -20,7 +20,7 @@ const ITEM =
 /**
  * The account menu in the sidebar's user block (IR-413, spec §4.2).
  *
- * Settings & Profile, Help and Sign out live here rather than in the nav
+ * Profile, Settings, Help and Sign out live here rather than in the nav
  * list: they are about the person, not places in the research. A disclosure
  * (a button that shows and hides a list of links), not an ARIA `menu` --
  * every item is a plain link or button, so Tab and Enter behave exactly as
@@ -139,9 +139,15 @@ export function AccountMenu({ collapsed, onNavigate }: AccountMenuProps) {
           </div>
           <ul role="list" className="pt-1.5">
             <li>
+              <Link to={pathFor("profile")} onClick={choose} className={ITEM}>
+                <i aria-hidden className="fas fa-user w-4 text-center text-stone-500" />
+                Profile
+              </Link>
+            </li>
+            <li>
               <Link to={pathFor("settings")} onClick={choose} className={ITEM}>
                 <i aria-hidden className="fas fa-gear w-4 text-center text-stone-500" />
-                Settings &amp; Profile
+                Settings
               </Link>
             </li>
             <li>

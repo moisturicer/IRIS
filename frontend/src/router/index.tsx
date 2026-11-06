@@ -25,6 +25,8 @@ import OfficeConsolePage    from "@/features/review/OfficeConsolePage";
 
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import SettingsPage         from "@/features/settings/SettingsPage";
+import ProfilePage          from "@/features/profile/ProfilePage";
+import EditProfilePage      from "@/features/profile/EditProfilePage";
 import HelpPage             from "@/features/help/HelpPage";
 
 // Error screens (IR-745)
@@ -100,7 +102,15 @@ export const routes: RouteObject[] = [{
             ],
           },
           { path: "help",                  element: <HelpPage />,        handle: { crumb: "Help" } },
-          { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings & Profile" } },
+          {
+            // Edit profile sits under Profile, so its breadcrumb reads Profile > Edit profile.
+            path: "profile", handle: { crumb: "Profile" },
+            children: [
+              { index: true,  element: <ProfilePage /> },
+              { path: "edit", element: <EditProfilePage />, handle: { crumb: "Edit profile" } },
+            ],
+          },
+          { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings" } },
 
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,

@@ -1,82 +1,109 @@
-import { useEffect, useId, useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { Link, useNavigate } from "react-router-dom";
 
 import {
-  BIO_MAX_LENGTH, INTEREST_MAX_LENGTH, MAX_INTERESTS, profileApi, profilePath,
+  BIO_MAX_LENGTH, INTEREST_MAX_LENGTH, MAX_INTERESTS, profileApi,
 } from "@/api/profile";
+import { authApi } from "@/api/auth";
+import { PageHeader } from "@/components/layout/PageHeader";
 import { FieldError } from "@/components/ui/FieldError";
 import { FieldLabel } from "@/components/ui/FieldLabel";
 import { fieldClasses, LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { useAuth } from "@/hooks/useAuth";
+import { pathFor } from "@/lib/access";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
 import { ORCID_EXAMPLE, orcidProblem } from "@/lib/orcid";
 import { cn } from "@/lib/utils";
-import type { User } from "@/types/auth";
 
+import { affiliationOf } from "./names";
 import { PhotoField } from "./PhotoField";
-import { Panel } from "./settingsParts";
 
 /**
- * The optional Profile fields (IR-699): photo, bio, research interests and
- * ORCID iD, as the IR-694 spec decided and IR-695's contract carries them.
+ * Edit profile (IR-933): the name and the optional Profile fields (IR-699:
+ * photo, bio, research interests, ORCID iD), on a page of their own, apart
+ * from Settings.
  *
- * Every one is optional, and leaving one empty is how a person keeps it off
+ * Every optional field may be left empty, which is how a person keeps it off
  * their Profile: there is no privacy switch. The photo saves as soon as it is
- * cropped; the text fields save together with Save.
+ * cropped. The name and the text fields save together with Save, as the two
+ * requests the API takes, and Save and Cancel both return to the Profile.
  */
 
 const HINT = "text-small text-stone-600 mt-1";
 
 const sameInterest = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
 
-export function AboutYouPanel({ user, onSaved }: { user: User; onSaved: (u: User) => void }) {
-  const [bio, setBio] = useState(user.bio ?? "");
-  const [interests, setInterests] = useState<string[]>(user.research_interests ?? []);
-  const [orcid, setOrcid] = useState(user.orcid ?? "");
+export default function EditProfilePage() {
+  const { user, updateUser } = useAuth();
+  const navigate = useNavigate();
+
+  const [firstName, setFirstName] = useState(user?.first_name ?? "");
+  const [middle, setMiddle] = useState(user?.middle_initial ?? "");
+  const [lastName, setLastName] = useState(user?.last_name ?? "");
+  const [bio, setBio] = useState(user?.bio ?? "");
+  const [interests, setInterests] = useState<string[]>(user?.research_interests ?? []);
+  const [orcid, setOrcid] = useState(user?.orcid ?? "");
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const firstId = useId();
+  const middleId = useId();
+  const lastId = useId();
+  const affiliationId = useId();
   const bioId = useId();
   const bioCountId = useId();
   const orcidId = useId();
   const orcidHintId = useId();
+  const aboutId = useId();
+  const nameSectionId = useId();
 
   const orcidIssue = orcidProblem(orcid);
 
-  const dirty = useMemo(() => {
-    const stored = user.research_interests ?? [];
-    return (
-      bio !== (user.bio ?? "") ||
-      orcid.trim() !== (user.orcid ?? "") ||
-      interests.length !== stored.length ||
-      interests.some((tag, i) => tag !== stored[i])
-    );
-  }, [bio, orcid, interests, user]);
+  const stored = user?.research_interests ?? [];
+  const nameDirty = !!user && (
+    firstName !== user.first_name ||
+    middle !== (user.middle_initial ?? "") ||
+    lastName !== user.last_name
+  );
+  const fieldsDirty = !!user && (
+    bio !== (user.bio ?? "") ||
+    orcid.trim() !== (user.orcid ?? "") ||
+    interests.length !== stored.length ||
+    interests.some((tag, i) => tag !== stored[i])
+  );
 
-  const resetTo = (u: User) => {
-    setBio(u.bio ?? "");
-    setInterests(u.research_interests ?? []);
-    setOrcid(u.orcid ?? "");
-  };
+  if (!user) return null;
+  const dirty = nameDirty || fieldsDirty;
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     if (orcidIssue) return;
     setError(null);
-    setSaved(false);
+    if (!firstName.trim() || !lastName.trim()) {
+      setError("First and last name are required.");
+      return;
+    }
     setSaving(true);
     try {
-      const { data } = await profileApi.updateFields({
-        bio,
-        research_interests: interests,
-        orcid: orcid.trim() || null,
-      });
-      onSaved(data);
-      // The server may have matched an interest to an existing tag's casing.
-      resetTo(data);
-      setSaved(true);
+      if (nameDirty) {
+        const { data } = await authApi.updateMe({
+          first_name: firstName.trim(),
+          middle_initial: middle.trim(),
+          last_name: lastName.trim(),
+        });
+        updateUser(data);
+      }
+      if (fieldsDirty) {
+        const { data } = await profileApi.updateFields({
+          bio,
+          research_interests: interests,
+          orcid: orcid.trim() || null,
+        });
+        updateUser(data);
+      }
+      navigate(pathFor("profile"), { state: { saved: true } });
     } catch (err) {
       setError(
         fieldError(err, "bio", "research_interests", "orcid") ??
@@ -87,15 +114,50 @@ export function AboutYouPanel({ user, onSaved }: { user: User; onSaved: (u: User
     }
   };
 
-  return (
-    <form onSubmit={save}>
-      <Panel
-        title="About you"
-        caption="Optional. What you add here appears on your Profile, which anyone signed in to IRIS can open. Leave a field empty to keep it off."
-      >
-        <PhotoField user={user} onSaved={onSaved} />
+  const affiliation = affiliationOf(user);
 
-        <div className="mt-6 space-y-1">
+  return (
+    <form onSubmit={save} className="max-w-3xl">
+      <PageHeader
+        title="Edit profile"
+        description="What you add here appears on your Profile, which anyone signed in to IRIS can open. Leave an optional field empty to keep it off."
+      />
+
+      <Section id={nameSectionId} title="Photo and name" caption="Your name is attached to disclosures, paper citations and clearances.">
+        <PhotoField user={user} onSaved={updateUser} />
+
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_7rem_1fr]">
+          <div className="space-y-1">
+            <FieldLabel htmlFor={firstId} label="First name" />
+            <input id={firstId} className={fieldClasses(false)} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel htmlFor={middleId} label="M.I." />
+            <input id={middleId} className={fieldClasses(false)} value={middle} maxLength={20} onChange={(e) => setMiddle(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <FieldLabel htmlFor={lastId} label="Last name" />
+            <input id={lastId} className={fieldClasses(false)} value={lastName} onChange={(e) => setLastName(e.target.value)} />
+          </div>
+        </div>
+
+        <div className="mt-4 space-y-1">
+          <FieldLabel htmlFor={affiliationId} label="Affiliation" />
+          <input
+            id={affiliationId}
+            className={cn(fieldClasses(false), "bg-stone-50 text-stone-600")}
+            value={affiliation || "Not recorded for this account"}
+            readOnly
+            aria-readonly
+          />
+          <p className={HINT}>
+            Recorded by the university. Ask RDCO if this is wrong; it decides how your disclosures are routed.
+          </p>
+        </div>
+      </Section>
+
+      <Section id={aboutId} title="About you" caption="Optional.">
+        <div className="space-y-1">
           <FieldLabel htmlFor={bioId} label="Bio" />
           <textarea
             id={bioId}
@@ -133,42 +195,34 @@ export function AboutYouPanel({ user, onSaved }: { user: User; onSaved: (u: User
             </p>
           )}
         </div>
+      </Section>
 
-        {error && <p role="alert" className={cn(LOAD_ERROR, "mt-6")}>{error}</p>}
+      {error && <p role="alert" className={cn(LOAD_ERROR, "mt-6")}>{error}</p>}
 
-        <div className="flex flex-wrap items-center gap-3 mt-6 pt-4 border-t border-stone-100">
-          <Link
-            to={profilePath(user.id)}
-            className={cn("text-small font-semibold text-brand hover:underline underline-offset-2 rounded", FOCUS_RING)}
-          >
-            View my profile
-          </Link>
-          {saved && (
-            <p role="status" className="flex items-center gap-1.5 text-small text-stone-700">
-              <i className="fas fa-check" aria-hidden />
-              Profile saved.
-            </p>
-          )}
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => { resetTo(user); setError(null); setSaved(false); }}
-              disabled={!dirty || saving}
-              className={cn(PILL_SECONDARY, FOCUS_RING)}
-            >
-              Discard
-            </button>
-            <button
-              type="submit"
-              disabled={!dirty || saving || !!orcidIssue}
-              className={cn(PILL_PRIMARY, FOCUS_RING)}
-            >
-              {saving ? "Saving..." : "Save"}
-            </button>
-          </div>
-        </div>
-      </Panel>
+      <div className="mt-6 flex flex-wrap items-center justify-end gap-2 border-t border-stone-200 pt-4">
+        <Link to={pathFor("profile")} className={cn(PILL_SECONDARY, FOCUS_RING)}>Cancel</Link>
+        <button
+          type="submit"
+          disabled={!dirty || saving || !!orcidIssue}
+          className={cn(PILL_PRIMARY, FOCUS_RING)}
+        >
+          {saving ? "Saving..." : "Save"}
+        </button>
+      </div>
     </form>
+  );
+}
+
+/** A titled group on the edit page, divided from the next by one hairline. */
+function Section({
+  id, title, caption, children,
+}: { id: string; title: string; caption: string; children: ReactNode }) {
+  return (
+    <section aria-labelledby={id} className="border-t border-stone-200 py-6">
+      <h2 id={id} className="font-display text-title font-semibold text-stone-900">{title}</h2>
+      <p className="mt-1 text-small text-stone-600">{caption}</p>
+      <div className="mt-5">{children}</div>
+    </section>
   );
 }
 
