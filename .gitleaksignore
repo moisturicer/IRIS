@@ -9,3 +9,5 @@ cb5ab9b95b04ef5c14629809989af82931c4ee18:frontend/scripts/bundle-scan.test.mjs:g
 cb5ab9b95b04ef5c14629809989af82931c4ee18:frontend/scripts/bundle-scan.test.mjs:generic-api-key:116
 cb5ab9b95b04ef5c14629809989af82931c4ee18:frontend/scripts/bundle-scan.test.mjs:generic-api-key:132
 cb5ab9b95b04ef5c14629809989af82931c4ee18:frontend/scripts/bundle-scan.test.mjs:generic-api-key:196
+# IR-928: a made-up wrong activation token in a test, to prove a bad token is refused. Not a credential.
+20e5aca3346b2f583352b8033f2432e2d3c67e6b:backend/apps/accounts/test_activation_fragment.py:generic-api-key:118

@@ -9,7 +9,7 @@
  *
  * Queries go through the accessible tree, as in `LoginPage.test.tsx`.
  */
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
@@ -19,9 +19,19 @@ import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render"
 
 import EmailVerifyPage from "./EmailVerifyPage";
 
-function renderVerify(route = "/activate/abc/def") {
+/**
+ * The link as emailed since IR-928: the secret is in the fragment, which the
+ * browser never sends. The page reads `window.location`, so the address is set
+ * there as well as in the router.
+ */
+const FRAGMENT = "#uid=abc&token=def-123";
+
+function renderVerify(route = `/activate${FRAGMENT}`) {
+  window.history.replaceState(null, "", route);
   return renderScreen(
     <Routes>
+      <Route path="/activate" element={<EmailVerifyPage />} />
+      {/* Deprecated (IR-928): links emailed before the token moved to the fragment. */}
       <Route path="/activate/:uidb64/:token" element={<EmailVerifyPage />} />
       <Route path="/login" element={<p>Sign-in screen</p>} />
       <Route path="/signup" element={<p>Register screen</p>} />
@@ -40,8 +50,83 @@ function activationFails(detail?: string) {
   });
 }
 
+beforeEach(() => {
+  window.history.replaceState(null, "", "/");
+});
+
 afterEach(() => {
   vi.restoreAllMocks();
+  window.history.replaceState(null, "", "/");
+});
+
+/**
+ * The secret is read once from the fragment (IR-928, ASVS 8.3.1), posted in a
+ * body, and gone from the address bar; the reset page does the same (ADR-045 §3).
+ */
+describe("a link with its secret in the fragment", () => {
+  it("posts the uid and token it carries", async () => {
+    const activate = vi.spyOn(authApi, "activate").mockResolvedValue({ data: {} } as never);
+    renderVerify();
+
+    await waitFor(() => expect(activate).toHaveBeenCalledWith("abc", "def-123"));
+  });
+
+  it("removes the fragment from the address bar", async () => {
+    activationSucceeds();
+    renderVerify();
+    await screen.findByRole("heading", { level: 2, name: "Email Verified" });
+
+    expect(window.location.hash).toBe("");
+    expect(window.location.pathname).toBe("/activate");
+  });
+
+  it("asks the browser to send no referrer while it holds the secret", async () => {
+    activationSucceeds();
+    renderVerify();
+    await screen.findByRole("heading", { level: 2, name: "Email Verified" });
+
+    expect(document.head.querySelector('meta[name="referrer"]')).toHaveAttribute("content", "no-referrer");
+  });
+
+  it.each([
+    ["no fragment", "/activate"],
+    ["only a uid", "/activate#uid=abc"],
+    ["only a token", "/activate#token=def-123"],
+    ["an empty token", "/activate#uid=abc&token="],
+    ["other characters", "/activate#uid=abc&token=de%20f"],
+    ["extra fields", "/activate#uid=abc&token=def-123&next=/admin"],
+  ])("with %s, makes no request and says the link is invalid", async (_name, route) => {
+    const activate = vi.spyOn(authApi, "activate").mockResolvedValue({ data: {} } as never);
+    renderVerify(route);
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Verification Failed"));
+    expect(screen.getByRole("status")).toHaveTextContent("Invalid verification link.");
+    expect(activate).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * Links emailed before IR-928 carry the secret in the path. They keep working
+ * until their tokens expire, but the page sends the secret in a body and
+ * replaces the address, so the old shape no longer reaches the server's path.
+ */
+describe("a link emailed before the secret moved to the fragment (deprecated)", () => {
+  it("posts the uid and token from the path in a body", async () => {
+    const activate = vi.spyOn(authApi, "activate").mockResolvedValue({ data: {} } as never);
+    renderVerify("/activate/abc/def-123");
+
+    await waitFor(() => expect(activate).toHaveBeenCalledWith("abc", "def-123"));
+    await screen.findByRole("heading", { level: 2, name: "Email Verified" });
+  });
+
+  it("replaces the secret in the address bar", async () => {
+    activationSucceeds();
+    renderVerify("/activate/abc/def-123");
+    await screen.findByRole("heading", { level: 2, name: "Email Verified" });
+
+    expect(window.location.pathname).toBe("/activate");
+    expect(window.location.href).not.toContain("def-123");
+  });
 });
 
 describe("while the link is being checked", () => {

@@ -37,10 +37,14 @@ export async function register(email: string, first = "Journey", last = "Student
 /** Follow the verification link Mailpit received; returns its path. */
 export async function verify(email: string): Promise<string> {
   const mail = await waitForMail(email, /verify/i);
-  const path = linkPath(mail.text || mail.html, "/activate/");
+  // The secret is in the fragment (IR-928), so it goes to the API in a body.
+  const path = linkPath(mail.text || mail.html, "/activate");
+  const fields = new URLSearchParams(path.split("#")[1] ?? "");
   const anon = await anonymous();
-  const [, , uid, token] = path.split("/");
-  await ok(await anon.get(`/api/v1/auth/activate/${uid}/${token}/`), `activate ${email}`);
+  await ok(
+    await anon.post("/api/v1/auth/activate/", { data: { uid: fields.get("uid"), token: fields.get("token") } }),
+    `activate ${email}`,
+  );
   await anon.dispose();
   return path;
 }

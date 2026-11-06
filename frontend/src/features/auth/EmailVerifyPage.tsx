@@ -7,6 +7,15 @@
  * live region, title and reason together, so a screen-reader user hears how the check ended rather than
  * being left on "Verifying Email". A verified email does not open the account:
  * RDCO approves it next, and the success copy says so.
+ *
+ * The secret is in the URL fragment, `/activate#uid=…&token=…` (IR-928, ASVS
+ * 8.3.1), which the browser never sends: it stays out of server logs, `Referer`
+ * and proxies, and goes to the server only in a request body. This is the
+ * reset page's pattern (ADR-045 §3). Links emailed before IR-928 carry it in
+ * the path, `/activate/:uidb64/:token`; that route is deprecated, still read
+ * here so those emails work until their tokens expire (3 days), and removable
+ * after. Either way the secret is read once into memory and the address bar is
+ * replaced with the bare `/activate`.
  */
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
@@ -15,6 +24,7 @@ import { EntryFrame, EntryTab } from "@/components/auth/EntryFrame";
 import { ButtonLink } from "@/components/ui/Button";
 import { Spinner } from "@/components/ui/Spinner";
 import { cn } from "@/lib/utils";
+import { useNoReferrer } from "./recovery";
 
 type Status = "loading" | "success" | "error";
 
@@ -47,19 +57,46 @@ function StatusMark({ status }: { status: Status }) {
   );
 }
 
+interface ActivationLink {
+  uid: string;
+  token: string;
+}
+
+/**
+ * Exactly the two fields and nothing else: a fragment with anything extra is
+ * not a link this app emailed. Reading has no side effect, so StrictMode's
+ * second mount in development still finds it.
+ */
+function readFragment(): ActivationLink | null {
+  const match = /^#uid=([A-Za-z0-9_-]+)&token=([A-Za-z0-9_-]+)$/.exec(window.location.hash);
+  return match ? { uid: match[1], token: match[2] } : null;
+}
+
+/** Take the secret out of the address bar, whichever shape the link had. */
+function useForgetAddress(): void {
+  useEffect(() => {
+    window.history.replaceState(window.history.state, "", "/activate");
+  }, []);
+}
+
 export default function EmailVerifyPage() {
-  const { uidb64, token } = useParams<{ uidb64: string; token: string }>();
+  useNoReferrer();
+  useForgetAddress();
+  // Deprecated path shape (IR-928): only an email sent before the change has it.
+  const { uidb64, token: pathToken } = useParams<{ uidb64: string; token: string }>();
+  const [link] = useState<ActivationLink | null>(() =>
+    uidb64 && pathToken ? { uid: uidb64, token: pathToken } : readFragment());
   const [status, setStatus]   = useState<Status>("loading");
   const [message, setMessage] = useState("Checking your verification link.");
 
   useEffect(() => {
-    if (!uidb64 || !token) {
+    if (!link) {
       setStatus("error");
       setMessage("Invalid verification link.");
       return;
     }
 
-    authApi.activate(uidb64, token)
+    authApi.activate(link.uid, link.token)
       .then(() => {
         setStatus("success");
         setMessage(SUCCESS_MESSAGE);
@@ -70,7 +107,7 @@ export default function EmailVerifyPage() {
         setStatus("error");
         setMessage(detail ?? FALLBACK_FAILURE);
       });
-  }, [uidb64, token]);
+  }, [link]);
 
   return (
     <EntryFrame tabs={<EntryTab>Email verification</EntryTab>}>

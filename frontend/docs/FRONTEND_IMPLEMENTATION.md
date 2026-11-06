@@ -14,7 +14,7 @@ This document tracks what we can build **now** against the SRS/SDD and current b
 |------|----------------|-----------------|
 | Login page (default) | `/login` · `LoginPage.tsx` | FR-M1-01 · Figure 4 |
 | Signup page | `/signup` · `SignupPage.tsx` | Self-service (repo extension) |
-| Email verification | `/activate/:uidb64/:token` · `EmailVerifyPage.tsx` | Post-register verify |
+| Email verification | `/activate#uid=…&token=…` (deprecated: `/activate/:uidb64/:token`) · `EmailVerifyPage.tsx` | Post-register verify; the secret is in the fragment (IR-928) |
 | Auth layout theme | Cream / maroon / gold split panels | Module 1 responsive UI |
 | Login error alert | `AuthAlert` · invalid credentials + attempt count | Figure 5 |
 | Session expired alert | `AuthAlert` · `?reason=session_expired` | SDD Module 6 · NFR-S2 |
