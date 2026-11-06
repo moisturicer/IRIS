@@ -626,6 +626,17 @@ describe("filtering", () => {
     expect(lastListParams()).toMatchObject({ college: "4", classification: "7", is_ip: true });
   });
 
+  it("reads its visible text and count as separate words, so the accessible name contains them (IR-934)", async () => {
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await choose(/^type/i, /^project$/i);
+    const trigger = await screen.findByRole("button", { name: "Filters, 1 active" });
+    // axe's label-content-name-mismatch compares the name with the button's visible
+    // text, where "Filters" and its count are one word unless a space separates them.
+    // jsdom cannot run that rule; this pins the text it reads.
+    expect(trigger.textContent).toMatch(/^Filters 1 active$/);
+  });
+
   it("filters by one IP type through ip_type", async () => {
     renderDiscover();
     await screen.findByText(publishedThesis.title);
