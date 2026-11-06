@@ -6,6 +6,7 @@ import { Button } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { errorDetail } from "@/lib/errorDetail";
+import { isRequestTimeout } from "@/api/requestPolicy";
 import { cn, formatDate } from "@/lib/utils";
 import type { RecordTracker, ReviewComment } from "@/types/records";
 
@@ -65,19 +66,20 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
 }) {
   const headingId = useId();
   const [data, setData] = useState<RecordTracker | null>(null);
-  const [failed, setFailed] = useState(false);
+  /** Why the read failed (IR-906): a timeout offers Retry, anything else Try again. */
+  const [failed, setFailed] = useState<"failed" | "interrupted" | null>(null);
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    setFailed(false);
+    setFailed(null);
     recordsApi
       .tracker(recordId)
       .then(({ data: payload }) => {
         if (!cancelled) setData(payload);
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      .catch((error: unknown) => {
+        if (!cancelled) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
       });
     return () => {
       cancelled = true;
@@ -110,14 +112,14 @@ export function ReviewTimeline({ recordId, canComment = false, statusTarget, ren
         {failed ? (
           <div className="space-y-2">
             <p role="alert" className="text-small text-stone-700">
-              Could not load the review timeline.
+              {failed === "interrupted" ? "The review timeline took too long to load." : "Could not load the review timeline."}
             </p>
             <button
               type="button"
               onClick={reread}
               className={cn("text-small font-semibold text-brand hover:underline min-h-11", FOCUS_RING)}
             >
-              Try again
+              {failed === "interrupted" ? "Retry" : "Try again"}
             </button>
           </div>
         ) : !data ? (

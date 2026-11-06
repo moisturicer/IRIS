@@ -44,7 +44,7 @@ jobs:
           # workflow_dispatch has no pull request: always run.
           if [ -z "$PR" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
           files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
-          if echo "$files" | grep -Eq '^(frontend/|e2e/smoke/|e2e/playwright\.smoke\.config\.ts$|e2e/package(-lock)?\.json$|\.github/workflows/frontend-smoke\.yml$)'; then
+          if echo "$files" | grep -Eq '^(frontend/|e2e/smoke/|e2e/support/viewport\.ts$|e2e/playwright\.smoke\.config\.ts$|e2e/package(-lock)?\.json$|\.github/workflows/frontend-smoke\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "run=false" >> "$GITHUB_OUTPUT"
@@ -83,6 +83,18 @@ jobs:
         env:
           CI: "true"
         run: npm run test:smoke
+
+      - name: Show the viewport matrix (IR-910)
+        # One row per screen, one column per width: overflow in px and whether
+        # the primary action could be reached. Also when a test failed, since a
+        # failing cell is the part worth reading.
+        if: always() && steps.scope.outputs.run == 'true'
+        run: |
+          if [ -f e2e/test-results-smoke/viewport-matrix.md ]; then
+            cat e2e/test-results-smoke/viewport-matrix.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No viewport matrix was written." >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Record the job time
         # Also when a test failed: a slow failing run is the one worth timing.

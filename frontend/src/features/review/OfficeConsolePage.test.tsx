@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
 import type { OfficeConsole, OfficeConsoleRow } from "@/types/reviews";
@@ -178,6 +179,16 @@ describe("OfficeConsolePage", () => {
 
     expect(await screen.findByText("Could not load the console")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("list", { name: "Open reviews" })).toBeInTheDocument();
+  });
+
+  it("shows a console that timed out as interrupted, and Retry reads again (IR-906)", async () => {
+    office.mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/reviews/office/"));
+    show();
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+    expect(screen.queryByText("Could not load the console")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByRole("list", { name: "Open reviews" })).toBeInTheDocument();
   });
 

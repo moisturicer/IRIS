@@ -1,6 +1,7 @@
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import generics, status
+from rest_framework.parsers import JSONParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -143,6 +144,15 @@ class LogoutView(APIView):
 
 
 class ActivateView(APIView):
+    """
+    DEPRECATED (IR-928): the link as emailed before the token moved to the
+    fragment, `GET /auth/activate/<uid>/<token>/`. Kept only so those emails
+    work until their tokens expire -- Django's `PASSWORD_RESET_TIMEOUT`, 3 days
+    and not overridden here -- and so a bundle cached across the deploy still
+    works. Remove it, its URL, the SPA's `/activate/:uidb64/:token` route and
+    nginx's `/activate/` locations once 3 days have passed since IR-928 shipped,
+    or sooner with IR-643's single-use verification (ADR-045 §8). IR-937 tracks it.
+    """
     permission_classes = [AllowAny]
 
     def get(self, request, uidb64, token):
@@ -150,6 +160,35 @@ class ActivateView(APIView):
         if user:
             return Response({"detail": "Account activated."})
         return Response({"detail": "Invalid or expired link."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ActivateConfirmView(APIView):
+    """
+    `POST /auth/activate/` with `{"uid", "token"}` (IR-928, ASVS 8.3.1).
+
+    What the verification page calls after reading the secret from the URL
+    fragment: the credentials travel in the body, never in a path or query.
+    One answer for every refusal, as `ActivateView` gives, so nothing says why a
+    link failed. A secret in the query string is not read. No authentication is
+    attempted, so a stale bearer token the browser still holds cannot turn a
+    valid link into a 401 (as the reset views, ADR-045 §2).
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+
+    REFUSED = {"detail": "Invalid or expired link."}
+
+    def post(self, request):
+        data = request.data
+        uid, token = (data.get("uid"), data.get("token")) if isinstance(data, dict) else (None, None)
+        user = activate_user(uid, token) if isinstance(uid, str) and isinstance(token, str) else None
+        if user:
+            response = Response({"detail": "Account activated."})
+        else:
+            response = Response(self.REFUSED, status=status.HTTP_400_BAD_REQUEST)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class ChangePasswordView(APIView):

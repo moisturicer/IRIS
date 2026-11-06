@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { Link } from "react-router-dom";
 
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ReadFailedState } from "@/components/shared/ReadFailedState";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { formatAuthorList, recordYearLabel } from "@/features/discover/discoverUtils";
@@ -32,6 +33,8 @@ interface LibraryOverviewProps {
   research:    MyResearchItem[];
   loading:     boolean;
   failed:      boolean;
+  /** The read timed out (IR-906): Retry, not a refusal. */
+  interrupted?: boolean;
   onRetry:     () => void;
   library:     Record<number, LibraryItem>;
   history:     ReadingVisit[];
@@ -47,7 +50,7 @@ interface LibraryOverviewProps {
  * except beside Waiting on you, where each one is a thing to do.
  */
 export function LibraryOverview({
-  research, loading, failed, onRetry, library, history, collections, onOpenSubmissions, onOpenSaved,
+  research, loading, failed, interrupted = false, onRetry, library, history, collections, onOpenSubmissions, onOpenSaved,
 }: LibraryOverviewProps) {
   const waiting = useMemo(() => research.filter(isWaiting), [research]);
   const recent = useMemo(
@@ -136,13 +139,12 @@ export function LibraryOverview({
               <span className="sr-only">Loading your research…</span>
             </div>
           ) : failed ? (
-            <EmptyState
-              framed
-              tone="error"
-              icon="fa-plug-circle-xmark"
+            <ReadFailedState
+              interrupted={interrupted}
+              what="research list"
               title="Could not load your research"
               message="Nothing was changed. Check your connection and try again."
-              action={<button type="button" onClick={onRetry} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>}
+              onRetry={onRetry}
             />
           ) : recent.length === 0 ? (
             <EmptyState

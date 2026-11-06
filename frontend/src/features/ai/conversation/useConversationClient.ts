@@ -25,13 +25,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { aiApi } from "@/api/ai";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
+import { readFailureKind } from "@/lib/readFailure";
 import type { SSEEvent } from "@/lib/sse";
 import type { ConversationDetail } from "@/types/ai";
 import type { ComparisonRecord } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 
-function isNotFound(err: unknown): boolean {
-  return (err as { response?: { status?: number } })?.response?.status === 404;
+/** Missing and refused read alike (IR-153, IR-906): the API never says which. */
+function isUnavailable(err: unknown): boolean {
+  return readFailureKind(err) === "unavailable";
 }
 import { ENDED_RUN_TEXT, StreamDetached, streamAnswer, type StreamingState } from "./answerStream";
 
@@ -108,6 +110,8 @@ function selectedAnswer({ messages, selectedId }: Thread): ChatMessage | null {
 export function useConversationClient(events: ConversationClientEvents = {}, comparisonLimit?: number) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [unavailable, setUnavailable] = useState(false);
+  /** A Conversation is being fetched and nothing has replaced it yet (IR-906). */
+  const [isOpening, setIsOpening] = useState(false);
   const [threads, setThreads] = useState<Record<number, Thread>>({});
   const [answering, setAnswering] = useState<Record<number, Answering>>({});
 
@@ -200,6 +204,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
     (conversation: ConversationDetail, landedAtLoad?: number) => {
       const id = conversation.id;
       opening.current += 1;
+      setIsOpening(false);
       activeRef.current = id;
       setActiveId(id);
       setUnavailable(false);
@@ -236,6 +241,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
    */
   const showEmpty = useCallback(() => {
     opening.current += 1;
+    setIsOpening(false);
     activeRef.current = null;
     setActiveId(null);
     setUnavailable(false);
@@ -244,6 +250,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
   /** Missing, deleted, malformed or someone else's: one state for all. */
   const showUnavailable = useCallback(() => {
     opening.current += 1;
+    setIsOpening(false);
     activeRef.current = null;
     setActiveId(null);
     setUnavailable(true);
@@ -257,13 +264,17 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
   const open = useCallback(
     async (id: number) => {
       const request = ++opening.current;
+      setIsOpening(true);
       const landedAtLoad = landed.current.get(id) ?? 0;
       try {
         const { data } = await aiApi.conversations.get(id);
         if (opening.current === request) show(data, landedAtLoad);
       } catch (err) {
         if (opening.current !== request) return;
-        if (!isNotFound(err)) throw err;
+        if (!isUnavailable(err)) {
+          setIsOpening(false);
+          throw err;
+        }
         showUnavailable();
       }
     },
@@ -279,9 +290,16 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
   const openFound = useCallback(
     async (find: () => Promise<ConversationDetail | null>) => {
       const request = ++opening.current;
+      setIsOpening(true);
       // The id is unknown until the lookup returns, so every count is kept.
       const landedBefore = new Map(landed.current);
-      const found = await find();
+      let found: ConversationDetail | null;
+      try {
+        found = await find();
+      } catch (err) {
+        if (opening.current === request) setIsOpening(false);
+        throw err;
+      }
       if (opening.current !== request) return;
       if (found === null) showEmpty();
       else show(found, landedBefore.get(found.id) ?? 0);
@@ -412,6 +430,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
   return {
     activeId,
     unavailable,
+    isOpening,
     messages:    thread.messages,
     draft:       thread.draft,
     record:      thread.record,
