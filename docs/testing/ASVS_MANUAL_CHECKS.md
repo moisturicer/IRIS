@@ -6,7 +6,7 @@
 
 Results: 6 Pass, 7 Fail, 2 Deferred and 1 N/A by decision, 5 not yet runnable. Every Fail has an `area-security` ticket: IR-923 (5.1.3 and 5.1.4, one defect), IR-924, IR-925, IR-926, IR-928 and IR-929. In `SECURITY_CHECKLIST.md` a Fail is a Gap, or Partial where the row says which part holds.
 
-`Confirmed` by Ashlee Sean that the group A and B results stand: ____ Date: ____
+`Confirmed` by Ashlee Sean that the group A and B results stand: Yes. Date: 2026-11-06
 
 **How to fill it in.** Replace each blank on an item's `Record` line.
 
