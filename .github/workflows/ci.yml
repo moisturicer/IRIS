@@ -353,6 +353,41 @@ jobs:
         # Runs `tsc && vite build`, so a type error fails the build. Intended.
         run: npm run build
 
+      # IR-918. The repository secret scan and `npm audit` never read what the
+      # browser is handed; Vite inlines every VITE_ variable and imported file
+      # into dist/. This job already runs on every pull request, so the scan
+      # does too, whether or not frontend/ changed.
+      - name: Scan the built bundle for secrets
+        # Secret patterns, the values of secret-named environment variables, and
+        # any VITE_ variable named like a secret. No third-party scanner: it is
+        # frontend/scripts/bundle-scan.mjs. Exit 1 on a finding, 2 on no build.
+        run: npm run scan:bundle
+
+      - name: Bundle scan and address-privacy self-test
+        # The scan's own tests (planted secrets must fail) and the check that no
+        # query-string key outside scripts/query-keys.json is built anywhere in src/.
+        run: npm run test:security
+
+      - name: Bundle scan fails on a planted secret
+        # The self-test against the REAL build: copy dist/, plant a fake key in
+        # one asset, and require the scan to refuse it. A scan that cannot fail
+        # is not a gate. The key is assembled here so the repository's own secret
+        # scan does not report this file.
+        run: |
+          planted="$RUNNER_TEMP/dist-planted"
+          cp -r dist "$planted"
+          asset=$(ls "$planted"/assets/*.js | head -n 1)
+          printf '\nvar plantedKey="%s%s";\n' AKIA QWERTYUIOP123456 >> "$asset"
+          # Exactly 1 means "found a secret". 0 passed it; 2 means the scan could
+          # not run (no build, bad copy), which must not count as a refusal.
+          code=0
+          node scripts/bundle-scan.mjs "$planted" || code=$?
+          if [ "$code" -ne 1 ]; then
+            echo "::error::expected the scan to refuse the planted secret (exit 1), got exit $code"
+            exit 1
+          fi
+          echo "the bundle scan refused the planted secret, as it must"
+
   compose:
     name: Docker Compose
     runs-on: ubuntu-latest

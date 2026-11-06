@@ -177,6 +177,22 @@ python -m security.audit_gate --allowlist security/allowlist.yml --bandit bandit
 
 The registry rulesets are fetched at run time and are not versioned: pinning semgrep pins the engine, not the rules, so a registry update can add a finding without a change here.
 
+### Security gate — the built frontend (IR-918)
+
+The repository secret scan and `npm audit` never read what the browser is handed: Vite inlines every `VITE_` variable and imported file into `frontend/dist/`. Three steps in the CI `Frontend` job, right after `npm run build`, close that. The job runs on **every** pull request (`ci.yml` has no path filter), so they run whether or not `frontend/` changed.
+
+- **Bundle scan** (`npm run scan:bundle`, [`frontend/scripts/bundle-scan.mjs`](../../frontend/scripts/bundle-scan.mjs)). Reads every text file in `dist/` and fails on a high-confidence secret pattern (private keys, AWS, GitHub, Slack, Google, `sk-`, Stripe and Voyage keys, JWTs, passwords inside URLs), on the **value** of any environment variable whose name looks secret (`*SECRET*`, `*PASSWORD*`, `*TOKEN*`, `*API_KEY*` and similar, value of 12+ characters), and on any `VITE_` variable *named* like a secret. A finding names the file and rule and shows four characters, never the secret. An empty or missing `dist/` fails too. It is a small in-repo script: **no third-party scanner was added.**
+- **Self-test** (`npm run test:security`, `node --test`). The scan's own tests plant a fake secret of each kind, in `.js`, `.map` and `.txt` files, and require a non-zero exit; fake keys are assembled at run time so the repository scan does not report them.
+- **Planted-secret step.** CI copies the real `dist/`, appends a fake AWS key to one asset and requires the scan to **refuse** it, so a scan that has stopped working turns the job red.
+
+**Personal data in addresses.** `frontend/scripts/url-privacy.test.mjs` (part of `test:security`) reads every `.ts`/`.tsx` file under `frontend/src/` and fails on any query-string key not named in [`frontend/scripts/query-keys.json`](../../frontend/scripts/query-keys.json), each with the reason it is safe. No listed key may be named after personal data. `src/lib/urlPrivacy.test.ts` (Vitest) holds the two builders that take structured input, citation links and Discover's query, to the same list. Adding a key is a review decision made in the same change.
+
+**Limits.** Patterns catch recognisable credentials, not an arbitrary string; the environment check sees only variables present when it runs, so it is most useful where the build runs with real values. The address check reads the source, it does not crawl the running app, and it sees a key only when it is written in a link or through a receiver named `params`, `searchParams`, `next`, `prev` or `query`; a key built another way is not seen. `q` (Discover's search text, typed by the reader) and `next` (an in-app path) are the two keys that carry user-chosen text; the list records that decision. The `npm audit` findings are triaged in [`docs/security/NPM_AUDIT_TRIAGE.md`](../security/NPM_AUDIT_TRIAGE.md).
+
+```bash
+cd frontend && npm run build && npm run scan:bundle && npm run test:security
+```
+
 ---
 
 ## 7 · Entry and exit
