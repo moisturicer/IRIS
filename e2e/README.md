@@ -4,8 +4,9 @@ Playwright journeys against **one integrated build** under production
 settings. The plan, the acceptance-criterion mapping and the status rules are
 in [`docs/testing/CORE_JOURNEYS.md`](../docs/testing/CORE_JOURNEYS.md).
 
-The journeys are not a PR gate. The pinned run is the manually started workflow
-`.github/workflows/core-journeys.yml`; this folder is also runnable locally.
+The journeys are not a PR gate. The pinned run is the workflow
+`.github/workflows/core-journeys.yml`, started by hand or on a schedule against
+the head of `main` (IR-905); this folder is also runnable locally.
 
 ## Smoke tier (IR-904)
 

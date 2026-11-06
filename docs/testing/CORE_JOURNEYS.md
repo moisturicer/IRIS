@@ -17,7 +17,7 @@ record under [`runs/`](runs/), copied from
 | Build | One commit SHA, chosen when the delivery gates (below) have landed |
 | Stack | `docker-compose.prod.yml` + [`docker-compose.e2e.yml`](../../docker-compose.e2e.yml): production settings, gunicorn + UvicornWorker, every Celery worker and beat, Docling (CPU), nginx. Feature flags at their defaults; no disclosure bypass |
 | Data | Fresh database; `seed_demo --accounts-only`; a 5-working-day Turnaround per party (`review_clock_for_testing`). Every Record is created by the journey that uses it, with a unique `[E2E …]` title, origin `synthetic` |
-| Runner | `.github/workflows/core-journeys.yml`, started by hand with the SHA. Locally: [`e2e/README.md`](../../e2e/README.md) |
+| Runner | `.github/workflows/core-journeys.yml`, started by hand with the SHA, and on a schedule against the head of `main` (IR-905; cadence is a team choice, set by the `cron` line). A scheduled failure opens or updates one issue labelled `core-journeys-failure`. Locally: [`e2e/README.md`](../../e2e/README.md) |
 | Browser | Chromium, one journey at a time, no retries — a pass on a second attempt is not a pass |
 | Evidence | Playwright HTML report, JSON results, traces/video of failures, axe results per key screen, `build.json` (SHA, settings, Turnaround) and the stack log, uploaded as one artifact named for the SHA |
 
