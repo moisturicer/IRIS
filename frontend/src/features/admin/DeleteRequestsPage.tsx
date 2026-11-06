@@ -12,7 +12,7 @@
  *   GET  /records/delete-requests/              → list all requests
  *   POST /records/delete-requests/<id>/approve/ → approve (soft-deletes record)
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
 import { PageHeader }  from "@/components/layout/PageHeader";
@@ -20,29 +20,34 @@ import { Button }      from "@/components/ui/Button";
 import { LOAD_ERROR, WARNING_NOTICE }  from "@/components/ui/fieldClasses";
 import { Spinner }     from "@/components/ui/Spinner";
 import { EmptyState }  from "@/components/shared/EmptyState";
+import { InterruptedState } from "@/components/shared/InterruptedState";
+import { useApiRead } from "@/hooks/useApiRead";
 import { RequestStatusChip } from "@/components/shared/RequestStatusChip";
 import { formatDate }  from "@/lib/utils";
 import type { DeleteRequest } from "@/types/records";
 
 export default function DeleteRequestsPage() {
-  const [requests,     setRequests]     = useState<DeleteRequest[]>([]);
-  const [loading,      setLoading]      = useState(true);
   const [approving,    setApproving]    = useState<number | null>(null);
   const [error,        setError]        = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<"" | "pending" | "approved">("pending");
 
-  const load = () => {
-    setLoading(true);
-    setError(null);
-    const params: Record<string, unknown> = {};
-    if (filterStatus) params.status = filterStatus;
-    recordsApi.listDeleteRequests(params)
-      .then(({ data }) => setRequests(data.results ?? []))
-      .catch(() => setError("Failed to load delete requests."))
-      .finally(() => setLoading(false));
-  };
+  // Cancelled when the filter changes or the page closes, so a slow earlier
+  // answer cannot replace the one the reader is waiting for (IR-914).
+  const read = useApiRead(
+    (signal) =>
+      recordsApi
+        .listDeleteRequests(filterStatus ? { status: filterStatus } : {}, { signal })
+        .then(({ data }) => data.results ?? []),
+    [filterStatus],
+  );
+  const loading = read.status === "loading";
+  const requests = read.data ?? [];
 
-  useEffect(load, [filterStatus]);
+  // Reading again also clears an earlier failed approval, as it always has.
+  const reload = () => {
+    setError(null);
+    read.retry();
+  };
 
   const handleApprove = async (req: DeleteRequest) => {
     if (!confirm(
@@ -53,7 +58,7 @@ export default function DeleteRequestsPage() {
     setError(null);
     try {
       await recordsApi.approveDeleteRequest(req.id);
-      load();
+      reload();
     } catch {
       setError("Failed to approve deletion. You may need admin privileges.");
     } finally {
@@ -94,7 +99,7 @@ export default function DeleteRequestsPage() {
         ))}
         <Button
           type="button"
-          onClick={load}
+          onClick={reload}
           disabled={loading}
           variant="outline"
           size="sm"
@@ -105,16 +110,18 @@ export default function DeleteRequestsPage() {
         </Button>
       </div>
 
-      {error && (
+      {(error || read.status === "failed") && (
         <div role="alert" className={`mb-4 ${LOAD_ERROR}`}>
           <i className="fas fa-circle-exclamation mt-0.5" aria-hidden />
-          {error}
+          {error ?? "Failed to load delete requests."}
         </div>
       )}
 
-      {loading ? (
+      {read.status === "interrupted" ? (
+        <InterruptedState what="delete requests" onRetry={reload} />
+      ) : loading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" /></div>
-      ) : requests.length === 0 ? (
+      ) : read.status === "failed" ? null : requests.length === 0 ? (
         <EmptyState
           icon="fa-trash-alt"
           title="No delete requests"
