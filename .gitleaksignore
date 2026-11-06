@@ -3,3 +3,5 @@
 2238d124259a4b14941b9a928a6fe82614fe2f23:docs/evaluation/runs/ir489-offline-answers.json:generic-api-key:904
 # IR-884: the prose words "anonymous/disabled" in the evidence spec, not a credential.
 9b7032a1e3ec1c5fb7bd7442d416d63164098ccd:docs/superpowers/specs/2026-10-31-ai-runtime/01-evidence.md:generic-api-key:57
+# IR-928: a made-up wrong activation token in a test, to prove a bad token is refused. Not a credential.
+20e5aca3346b2f583352b8033f2432e2d3c67e6b:backend/apps/accounts/test_activation_fragment.py:generic-api-key:118
