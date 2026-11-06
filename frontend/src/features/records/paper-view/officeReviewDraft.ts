@@ -11,6 +11,7 @@
  * somebody's opinion of somebody else's work, and should not outlive the tab
  * on a shared machine. Every access is guarded; losing a draft is a shame,
  * losing the dialog would be a defect.
+ *
  * One draft per user, record and outcome (IR-931): the key carries the signed-in
  * user's id, so the next person signed in on this tab never sees it, and nothing
  * is cleared on sign-out, which would lose a draft to an idle expiry. With nobody

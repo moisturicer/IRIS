@@ -7,6 +7,7 @@
  * for this tab only. One draft per record and outcome, so a half-written
  * rejection never turns up pre-filled as a publish comment. Every access is
  * guarded.
+ *
  * One draft per user, record and outcome (IR-931): the key carries the signed-in
  * user's id, so the next person signed in on this tab never sees it, and nothing
  * is cleared on sign-out, which would lose a draft to an idle expiry. With nobody
