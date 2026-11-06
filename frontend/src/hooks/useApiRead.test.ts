@@ -107,6 +107,16 @@ describe("useApiRead", () => {
     expect(result.current.error).toBe(boom);
   });
 
+  it("reports a read that throws before returning a promise as failed", async () => {
+    const { result } = renderHook(() =>
+      useApiRead<string>(() => {
+        throw new Error("sync");
+      }, []),
+    );
+
+    await waitFor(() => expect(result.current.status).toBe("failed"));
+  });
+
   it("says nothing about a read the screen itself cancelled", async () => {
     const pending = deferred<string>();
     const { result, unmount } = renderHook(() => useApiRead(() => pending.promise, []));

@@ -17,7 +17,7 @@
 | Ordinary (lists, details, small writes) | 30 seconds |
 | Upload (`FormData` body) or blob download (`responseType: "blob"`) | 5 minutes |
 
-A caller that passes its own `timeout` keeps it. Server timeouts and the Ask IRIS stream protocol (which already abort, follow and cancel) are unchanged.
+A caller that passes its own non-zero `timeout` keeps it (`0` means "none" to axios, so it cannot be told from unset). The token refresh uses the ordinary timeout too, so a refresh that never answers cannot hold every 401'd request; a timeout there ends the session like any failed refresh. Server timeouts and the Ask IRIS stream protocol (which already abort, follow and cancel) are unchanged.
 
 **Typed error.** A request that exceeds its timeout rejects with `RequestTimeoutError` (`timeoutMs`, `method`, `url`, `cause`), recognised by `isRequestTimeout`. It is not a server refusal: nothing is known about whether the server acted.
 

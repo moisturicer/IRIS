@@ -13,7 +13,7 @@
  * never sent again without a person asking, and a read is sent again only by
  * the reader's Retry (`useApiRead`).
  */
-import { isAxiosError, type AxiosError } from "axios";
+import type { AxiosError } from "axios";
 
 /** An ordinary request: a list, a detail, a small write. */
 export const DEFAULT_TIMEOUT_MS = 30_000;
@@ -49,7 +49,9 @@ export function isRequestTimeout(err: unknown): err is RequestTimeoutError {
 
 /** The typed error for an axios timeout, or `null` for any other failure. */
 export function asTimeoutError(error: AxiosError): RequestTimeoutError | null {
-  if (!isAxiosError(error) || error.code !== "ETIMEDOUT") return null;
+  // `code` alone, so this module (imported by every screen that reads) loads no
+  // axios at run time; only `client.ts` needs it.
+  if (error?.code !== "ETIMEDOUT") return null;
   return new RequestTimeoutError(
     error.config?.timeout ?? DEFAULT_TIMEOUT_MS,
     error.config?.method?.toLowerCase(),

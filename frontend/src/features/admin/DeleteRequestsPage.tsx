@@ -42,7 +42,12 @@ export default function DeleteRequestsPage() {
   );
   const loading = read.status === "loading";
   const requests = read.data ?? [];
-  const load = read.retry;
+
+  // Reading again also clears an earlier failed approval, as it always has.
+  const reload = () => {
+    setError(null);
+    read.retry();
+  };
 
   const handleApprove = async (req: DeleteRequest) => {
     if (!confirm(
@@ -53,7 +58,7 @@ export default function DeleteRequestsPage() {
     setError(null);
     try {
       await recordsApi.approveDeleteRequest(req.id);
-      load();
+      reload();
     } catch {
       setError("Failed to approve deletion. You may need admin privileges.");
     } finally {
@@ -94,7 +99,7 @@ export default function DeleteRequestsPage() {
         ))}
         <Button
           type="button"
-          onClick={load}
+          onClick={reload}
           disabled={loading}
           variant="outline"
           size="sm"
@@ -113,7 +118,7 @@ export default function DeleteRequestsPage() {
       )}
 
       {read.status === "interrupted" ? (
-        <InterruptedState what="delete requests" onRetry={read.retry} />
+        <InterruptedState what="delete requests" onRetry={reload} />
       ) : loading ? (
         <div className="flex justify-center py-16"><Spinner size="lg" label="Loading delete requests" /></div>
       ) : read.status === "failed" ? null : requests.length === 0 ? (

@@ -17,7 +17,7 @@ export const apiClient = axios.create({
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   // The timeout is chosen per request here rather than set as an instance
   // default, so an upload or a blob cannot be left on the short one by a caller
-  // that forgot. A caller that passes its own `timeout` keeps it (IR-914).
+  // that forgot. A caller that passes its own non-zero `timeout` keeps it (IR-914).
   if (!config.timeout) {
     config.timeout = isTransfer(config) ? TRANSFER_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
   }
@@ -45,7 +45,10 @@ async function requestNewTokens(refresh: string): Promise<RefreshedTokens> {
   const { data } = await axios.post(
     `${API_BASE}/auth/token/refresh/`,
     { refresh },
-    { headers: { [IDLE_HEADER]: String(idleSeconds()) } },
+    // A refresh that never answers would leave every 401'd request waiting on
+    // it, so it carries the same timeout (IR-914). A timeout here ends the
+    // session like any other failed refresh.
+    { headers: { [IDLE_HEADER]: String(idleSeconds()) }, timeout: DEFAULT_TIMEOUT_MS },
   );
   return { access: data.access, refresh: data.refresh };
 }

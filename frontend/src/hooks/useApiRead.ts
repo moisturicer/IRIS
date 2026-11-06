@@ -19,19 +19,9 @@ export interface ApiRead<T> {
   retry: () => void;
 }
 
-interface Settled<T> {
-  status: ApiReadStatus;
-  data: T | undefined;
-  error: unknown;
-}
+type Settled<T> = Omit<ApiRead<T>, "retry">;
 
 const LOADING = { status: "loading", data: undefined, error: undefined } as const;
-
-/** Whether the read was cancelled by this hook (or by its caller) rather than failing. */
-function isCancelled(err: unknown): boolean {
-  return (err as { code?: unknown } | null)?.code === "ERR_CANCELED"
-    || (err as { name?: unknown } | null)?.name === "AbortError";
-}
 
 /**
  * A list or detail read tied to the life of a screen (IR-914, ADR-061).
@@ -59,13 +49,15 @@ export function useApiRead<T>(
     const controller = new AbortController();
     setState(LOADING);
 
-    read(controller.signal).then(
+    // Wrapped so a read that throws before it returns a promise fails like any other.
+    new Promise<T>((resolve) => resolve(read(controller.signal))).then(
       (data) => {
         if (controller.signal.aborted) return;
         setState({ status: "ready", data, error: undefined });
       },
       (error: unknown) => {
-        if (controller.signal.aborted || isCancelled(error)) return;
+        // A read this hook cancelled is not a failure; its screen has moved on.
+        if (controller.signal.aborted) return;
         setState({
           status: isRequestTimeout(error) ? "interrupted" : "failed",
           data: undefined,
