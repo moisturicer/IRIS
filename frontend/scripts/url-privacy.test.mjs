@@ -23,8 +23,15 @@ const PERSONAL = /(e-?mail|name|phone|mobile|password|passwd|token|jwt|secret|or
 /** Every query-string key one file's text writes into, or reads out of, an address. */
 function queryKeysIn(text) {
   const keys = new Set();
-  // `/records/1?page=2&turn=3`
-  for (const m of text.matchAll(/[?&]([a-z][a-zA-Z_]*)=/g)) keys.add(m[1]);
+  // `/records/1?page=2&turn=3`. A `&key=` that follows a `#` in the same unbroken
+  // run is a URL fragment parameter (`/activate#uid=..&token=..`, IR-928): the
+  // browser never sends a fragment to the server, a log or a Referer, which is
+  // why that secret lives there. Only `&` is skipped; a `?key=` always counts.
+  for (const m of text.matchAll(/([?&])([a-z][a-zA-Z_]*)=/g)) {
+    const before = text.slice(0, m.index);
+    const inFragment = m[1] === "&" && /#[^\s"'`?]*$/.test(before);
+    if (!inFragment) keys.add(m[2]);
+  }
   // params.set("page", ...), searchParams.get("q"), next.delete("section")
   for (const m of text.matchAll(/\b(?:params|searchParams|next|prev|query)\.(?:set|get|getAll|has|delete|append)\(\s*["'`]([A-Za-z_]+)["'`]/g)) keys.add(m[1]);
   // const PUBLISH_PARAM = "publish"
@@ -64,6 +71,16 @@ describe("the key finder", () => {
 
   it("finds a personal key written into a link", () => {
     assert.deepEqual([...queryKeysIn("`/records/1?email=${e}`")], ["email"]);
+  });
+
+  it("does not count a parameter in the URL fragment, which is never sent to the server (IR-928)", () => {
+    assert.deepEqual([...queryKeysIn("`/activate#uid=${u}&token=${t}`")], []);
+    assert.deepEqual([...queryKeysIn("const m = /^#uid=([A-Za-z0-9_-]+)&token=([A-Za-z0-9_-]+)$/.exec(hash);")], []);
+  });
+
+  it("still counts a token in a real query string, and a key after the fragment has ended", () => {
+    assert.deepEqual([...queryKeysIn("`/activate?uid=${u}&token=${t}`")].sort(), ["token", "uid"]);
+    assert.deepEqual([...queryKeysIn('a = "/x#top"; b = "/y?email=1"')], ["email"]);
   });
 });
 
