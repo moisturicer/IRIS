@@ -1,18 +1,18 @@
 # Frontend `npm audit` triage
 
-**Ticket:** [IR-918](https://citiris.atlassian.net/browse/IR-918) · **Taken:** 2026-11-06, `frontend/package-lock.json` at `origin/main` 5272bf9d, `npm audit --json` run locally
+**Ticket:** [IR-918](https://citiris.atlassian.net/browse/IR-918) · **Taken:** 2026-11-06, `frontend/package-lock.json` at `origin/main` 5272bf9d, `npm audit --json` run locally · **Updated:** 2026-11-06 by [IR-935](https://citiris.atlassian.net/browse/IR-935), which removed Tiptap
 
 **Owners confirmed 2026-11-06.** Lee Jasmin Adolfo confirmed in chat that they own every finding below (frontend dependencies and tooling). Where an entry says "Owner", that is the confirmed owner; no finding is unassigned.
 
 ## Result
 
-`npm audit` reports **38 findings: 0 critical, 0 high, 34 moderate, 4 low.** The CI `Security` job fails only on high or critical ([`TEST_PLAN.md`](../testing/TEST_PLAN.md) §Security gate), so the gate is green and [`security/allowlist.yml`](../../security/allowlist.yml) stays empty. Nothing here is accepted by exception; this file records why each finding is or is not a risk to IRIS, so it can be revisited rather than re-derived.
+`npm audit` reports **14 findings: 0 critical, 0 high, 10 moderate, 4 low.** (It reported 38 when this was taken; IR-935 removed the 24 Tiptap findings.) The CI `Security` job fails only on high or critical ([`TEST_PLAN.md`](../testing/TEST_PLAN.md) §Security gate), so the gate is green and [`security/allowlist.yml`](../../security/allowlist.yml) stays empty. Nothing here is accepted by exception; this file records why each finding is or is not a risk to IRIS, so it can be revisited rather than re-derived.
 
-The 38 are six root advisories. The rest are packages npm lists only because they depend on a vulnerable one.
+The 38 were six root advisories; five remain. The rest are packages npm lists only because they depend on a vulnerable one.
 
 | # | Advisory | Package (installed) | Severity | In the browser bundle? | Findings it accounts for |
 |---|---|---|---|---|---|
-| 1 | [GHSA-cp6q-959q-f8rh](https://github.com/advisories/GHSA-cp6q-959q-f8rh) `mergeAttributes()` turns an own `__proto__` key into executable DOM attributes | `@tiptap/core` via `@tiptap/react` / `starter-kit` 2.27.3 | moderate | **No.** Not imported anywhere in `src/`, absent from `dist/` | 24 (`@tiptap/*`) |
+| 1 (resolved by IR-935) | [GHSA-cp6q-959q-f8rh](https://github.com/advisories/GHSA-cp6q-959q-f8rh) `mergeAttributes()` turns an own `__proto__` key into executable DOM attributes | `@tiptap/core` via `@tiptap/react` / `starter-kit` 2.27.3 | moderate | **No.** Not imported anywhere in `src/`, absent from `dist/` | 0 now (was 24, `@tiptap/*`) |
 | 2 | [GHSA-238p-pmpm-9mq7](https://github.com/advisories/GHSA-238p-pmpm-9mq7) KaTeX prototype pollution bypasses `trust` restrictions | `katex` 0.16.47, nested under `rehype-katex` and `micromark-extension-math` | low | Yes (Ask IRIS answers) | 4 (`katex`, `micromark-extension-math`, `rehype-katex`, `remark-math`) |
 | 3 | [GHSA-g3hv-75wg-m249](https://github.com/advisories/GHSA-g3hv-75wg-m249) minimatch denial of service | `minimatch` 10.2.5 under `@typescript-eslint/typescript-estree` | moderate | **No.** Lint tooling | 6 (`@typescript-eslint/*`, `minimatch`) |
 | 4 | [GHSA-rj75-hqrm-r3gf](https://github.com/advisories/GHSA-rj75-hqrm-r3gf) PostCSS selector parser quadratic complexity | `postcss-selector-parser` 6.0.10 under `@tailwindcss/typography` | moderate | **No.** Build-time CSS generation | 2 |
@@ -21,12 +21,12 @@ The 38 are six root advisories. The rest are packages npm lists only because the
 
 ## Per-finding triage
 
-### 1. Tiptap, 24 findings: remove the dependency
+### 1. Tiptap, 24 findings: resolved by IR-935
 
 `@tiptap/react` and `@tiptap/starter-kit` are listed in `frontend/package.json` and have been since the initial commit (`a350e06e`). **Nothing in `frontend/src/` imports them, and `dist/` holds no Tiptap or ProseMirror code**, so the advisory cannot be reached. npm's suggested fix is a semver-major move to Tiptap 3, which would add a large upgrade to a package nothing uses.
 
 - **Decision:** not exploitable; the right fix is to delete the two dependencies, not upgrade them. That clears 24 of the 38 findings.
-- **Not done in IR-918.** It is a `package.json` and lockfile change outside this ticket's scope. Tracked as [IR-935](https://citiris.atlassian.net/browse/IR-935).
+- **Done in [IR-935](https://citiris.atlassian.net/browse/IR-935).** Both packages are removed from `frontend/package.json` and the lockfile; `npm audit` now reports 14 and `npm run build` passes.
 - **Owner:** Lee Jasmin Adolfo (frontend), confirmed.
 
 ### 2. KaTeX, 4 findings: not reachable while `trust` stays off
@@ -62,9 +62,8 @@ Reached through `@tailwindcss/typography` while Tailwind generates CSS from our 
 
 | Follow-up | Clears | Owner |
 |---|---|---|
-| [IR-935](https://citiris.atlassian.net/browse/IR-935): remove `@tiptap/react` and `@tiptap/starter-kit` from `frontend/package.json` and the lockfile | 24 findings | Lee Jasmin Adolfo |
 | [IR-936](https://citiris.atlassian.net/browse/IR-936): plan the `react-router-dom` 7 migration | 2 findings | Lee Jasmin Adolfo |
-| Re-run this triage after either lands, or when `npm audit` reports a high | any new finding | whoever owns the PR |
+| Re-run this triage after IR-936 lands, or when `npm audit` reports a high | any new finding | whoever owns the PR |
 
 ## Re-running
 
