@@ -57,7 +57,7 @@ function StatusMark({ status }: { status: Status }) {
   );
 }
 
-interface Link {
+interface ActivationLink {
   uid: string;
   token: string;
 }
@@ -67,7 +67,7 @@ interface Link {
  * not a link this app emailed. Reading has no side effect, so StrictMode's
  * second mount in development still finds it.
  */
-function readFragment(): Link | null {
+function readFragment(): ActivationLink | null {
   const match = /^#uid=([A-Za-z0-9_-]+)&token=([A-Za-z0-9_-]+)$/.exec(window.location.hash);
   return match ? { uid: match[1], token: match[2] } : null;
 }
@@ -84,7 +84,7 @@ export default function EmailVerifyPage() {
   useForgetAddress();
   // Deprecated path shape (IR-928): only an email sent before the change has it.
   const { uidb64, token: pathToken } = useParams<{ uidb64: string; token: string }>();
-  const [link] = useState<Link | null>(() =>
+  const [link] = useState<ActivationLink | null>(() =>
     uidb64 && pathToken ? { uid: uidb64, token: pathToken } : readFragment());
   const [status, setStatus]   = useState<Status>("loading");
   const [message, setMessage] = useState("Checking your verification link.");

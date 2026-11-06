@@ -169,8 +169,11 @@ class ActivateConfirmView(APIView):
     What the verification page calls after reading the secret from the URL
     fragment: the credentials travel in the body, never in a path or query.
     One answer for every refusal, as `ActivateView` gives, so nothing says why a
-    link failed. A secret in the query string is not read.
+    link failed. A secret in the query string is not read. No authentication is
+    attempted, so a stale bearer token the browser still holds cannot turn a
+    valid link into a 401 (as the reset views, ADR-045 §2).
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
     parser_classes = [JSONParser]
 
@@ -185,7 +188,6 @@ class ActivateConfirmView(APIView):
         else:
             response = Response(self.REFUSED, status=status.HTTP_400_BAD_REQUEST)
         response["Cache-Control"] = "no-store"
-        response["Referrer-Policy"] = "no-referrer"
         return response
 
 

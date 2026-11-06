@@ -154,10 +154,15 @@ class ActivateConfirmTests(APITestCase):
     def test_get_is_not_allowed_on_the_body_endpoint(self):
         self.assertEqual(self.client.get(self.url).status_code, status.HTTP_405_METHOD_NOT_ALLOWED)
 
-    def test_the_answer_is_never_cached_or_sent_on_as_a_referrer(self):
-        response = self.post(_credentials(self.user))
-        self.assertEqual(response["Cache-Control"], "no-store")
-        self.assertEqual(response["Referrer-Policy"], "no-referrer")
+    def test_the_answer_is_never_cached(self):
+        self.assertEqual(self.post(_credentials(self.user))["Cache-Control"], "no-store")
+
+    def test_a_stale_bearer_token_does_not_turn_a_valid_link_into_a_401(self):
+        response = self.client.post(
+            self.url, _credentials(self.user), format="json",
+            HTTP_AUTHORIZATION="Bearer expired.or.garbage",
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_it_needs_no_sign_in(self):
         self.assertEqual(self.post(_credentials(self.user)).status_code, status.HTTP_200_OK)
