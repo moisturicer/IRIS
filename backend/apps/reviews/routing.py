@@ -411,7 +411,7 @@ def _apply(record, actor, plan: _Plan) -> list[_Target]:
     return opened
 
 
-def _notify(record, actor, plan, opened, *, accepted):
+def _notify(record, actor, plan, opened, *, accepted, threads=0):
     from apps.notifications.services import notify_routed
 
     targets = [t.party for t in plan.targets]
@@ -426,6 +426,7 @@ def _notify(record, actor, plan, opened, *, accepted):
         nominees=[(n, _label(t.party)) for t in plan.targets for n in t.nominees],
         reason=plan.reason,
         accepted=accepted,
+        threads=threads,
     ))
 
 
@@ -453,7 +454,7 @@ def _seat_errors_as_routing_errors(act):
 
 
 @transaction.atomic
-def accept_and_route(record, actor, *, to, reason, suggested_offices=None):
+def accept_and_route(record, actor, *, to, reason, suggested_offices=None, threads=0):
     """
     The Adviser accepts the work and sends it to RDCO (ADR-047). The Adviser's review is an `approved` `Review` carrying the
     reason; their seat is done, so their assignment completes. The record stays
@@ -497,7 +498,7 @@ def accept_and_route(record, actor, *, to, reason, suggested_offices=None):
         return _apply(record, actor, plan)
 
     opened = _seat_errors_as_routing_errors(accept_then_route)
-    _notify(record, actor, plan, opened, accepted=True)
+    _notify(record, actor, plan, opened, accepted=True, threads=threads)
     return plan
 
 

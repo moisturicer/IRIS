@@ -151,7 +151,7 @@ def office_review_flags(record, user) -> dict:
 # --- the act ------------------------------------------------------------------------
 
 @transaction.atomic
-def record_office_review(record, actor, *, outcome, comment=""):
+def record_office_review(record, actor, *, outcome, comment="", threads=0):
     """
     Clear, or record a finding, for the office `actor` is seated for.
 
@@ -190,7 +190,7 @@ def record_office_review(record, actor, *, outcome, comment=""):
     )
     audit.decision_recorded(record, actor, party=party, outcome=outcome, final=False, review=review)
     try:
-        completed = seats.complete_seat(seat, actor)
+        completed = seats.complete_seat(seat, actor, threads=threads)
     except seats.SeatError as exc:
         raise OfficeReviewError(str(exc))
     return party, completed
@@ -198,7 +198,7 @@ def record_office_review(record, actor, *, outcome, comment=""):
 
 # --- when an office completes --------------------------------------------------------
 
-def office_completed(assignment, actor) -> None:
+def office_completed(assignment, actor, threads=0) -> None:
     """
     `assignment` has just completed (`seats._close_if_complete`). For a
     specialist office: settle its clearance and notify RDCO, which already
@@ -225,10 +225,10 @@ def office_completed(assignment, actor) -> None:
     rdco = RecordAssignment.objects.filter(
         record=record, party=Party.RDCO, state=AssignmentState.ACTIVE,
     ).first()
-    _notify(record, actor, party, outcome, rdco)
+    _notify(record, actor, party, outcome, rdco, threads=threads)
 
 
-def _notify(record, actor, party, outcome, rdco):
+def _notify(record, actor, party, outcome, rdco, threads=0):
     from apps.notifications.services import notify_office_completed
 
     rdco_holders = []
@@ -244,4 +244,5 @@ def _notify(record, actor, party, outcome, rdco):
         outcome_label=str(ClearanceStatus(outcome).label),
         rdco_holding=rdco is not None,
         rdco_holders=rdco_holders,
+        threads=threads,
     ))

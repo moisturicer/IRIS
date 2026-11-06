@@ -784,8 +784,71 @@ class OneNotificationTests(ThreadTestBase):
 
         owner_notices = Notification.objects.filter(record=record, recipient=self.owner)
         self.assertEqual(owner_notices.count(), 1)
-        self.assertEqual(owner_notices.get().notif_type.name, "Revision Requested")
+        notice = owner_notices.get()
+        self.assertEqual(notice.notif_type.name, "Revision Requested")
+        # The verdict's own notice counts what came with it.
+        self.assertTrue(notice.message.endswith("The review came with 2 comments."), notice.message)
         self.assertFalse(Notification.objects.filter(notif_type__name="Review Finished").exists())
+
+    def owner_messages(self, record):
+        return [n.message for n in Notification.objects.filter(record=record, recipient=self.owner)]
+
+    def test_a_decision_s_notice_counts_its_comments(self):
+        record = self.at_rdco()
+        self.thread(record, self.rdco, "Tighten the abstract.")
+        token = self.token(record, self.rdco)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.sent(record, self.rdco, "keep_unlisted", summary="Kept.", token=token)
+
+        [message] = [m for m in self.owner_messages(record) if "kept it unlisted" in m]
+        self.assertTrue(message.endswith("The review came with 1 comment."), message)
+
+    def test_send_to_rdco_tells_the_owners_with_the_count(self):
+        record = self.at_adviser_open()
+        self.thread(record, self.adviser, "Nice work on §2.")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.sent(record, self.adviser, "send_to_rdco", summary="Sound.", to=[{"party": Party.RDCO}])
+
+        [message] = self.owner_messages(record)
+        self.assertIn("Your Adviser accepted", message)
+        self.assertTrue(message.endswith("The review came with 1 comment."), message)
+
+    def test_an_office_completing_counts_its_comments_in_its_outcome_notice(self):
+        record = self.itso_open()
+        self.thread(record, self.itso, "Prior art looks clear.")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.sent(record, self.itso, "cleared", summary="Nothing patentable.")
+
+        [message] = self.owner_messages(record)
+        self.assertIn("ITSO finished its review", message)
+        self.assertTrue(message.endswith("The review came with 1 comment."), message)
+
+    def test_an_office_verdict_that_completes_nothing_tells_only_of_its_comments(self):
+        # Two ITSO seats: the first Clear completes nothing, so no outcome is
+        # announced (IR-269), and the comments it sent are told on their own.
+        record = self.itso_open()
+        self.opened_seat(record, Party.ITSO, self.itso2)
+        self.thread(record, self.itso, "One.")
+        self.thread(record, self.itso, "Two.")
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.sent(record, self.itso, "cleared", summary="Nothing patentable.")
+
+        [message] = self.owner_messages(record)
+        self.assertEqual(message, f'ITSO sent 2 comments on v1 of "{record.title}".')
+        self.assertNotIn("cleared", message.lower())
+
+    def test_a_verdict_with_no_comments_reads_as_before(self):
+        record = self.itso_open()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            self.sent(record, self.itso, "request_revision", summary="Please revise.")
+
+        [message] = self.owner_messages(record)
+        self.assertNotIn("came with", message)
 
 
 class DraftsAndStrangersTests(ThreadTestBase):

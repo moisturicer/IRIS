@@ -32,8 +32,12 @@ anything is written, it refuses -- who before what:
   thread as soon as it was sent (400).
 
 **One notification per finished review.** A verdict's service tells whom it
-always tells; the threads it carries add none. *Comment only* tells the
-owners and the other open Seat holders, once.
+always tells, and its notice now counts the comments sent with it ("The
+review came with 3 comments."); the threads add no notice of their own.
+*Comment only* tells the owners and the other open Seat holders, once. So
+does an office reviewer's Clear or finding that does not complete the
+office, which no notice announced before: it says only that comments were
+sent, never the verdict (`notify_office_completed`).
 """
 
 from __future__ import annotations
@@ -73,7 +77,7 @@ class FinishError(Exception):
     """400: understood, but not possible as asked."""
 
 
-def _take_verdict(record, actor, verdict, summary, *, to, suggested_offices, token):
+def _take_verdict(record, actor, verdict, summary, *, to, suggested_offices, token, threads):
     """
     Take `verdict` through the service that owns it, and return the `Review` it
     wrote. Routing and office review return no Review, so theirs is the one
@@ -83,18 +87,24 @@ def _take_verdict(record, actor, verdict, summary, *, to, suggested_offices, tok
 
     before = Review.objects.filter(record=record).order_by("-pk").values_list("pk", flat=True).first() or 0
     if verdict == ReviewVerdict.REQUEST_REVISION:
-        return revisions.request_revision(record, actor, reason=summary).review
+        return revisions.request_revision(record, actor, reason=summary, threads=threads).review, True
     if verdict in DECISION_VERDICTS:
         return decisions.decide(
             record, actor, outcome=DECISION_VERDICTS[verdict], comment=summary, token=token,
-        )
+            thread_count=threads,
+        ), True
     if verdict == ReviewVerdict.SEND_TO_RDCO:
         routing.accept_and_route(
             record, actor, to=to, reason=summary, suggested_offices=suggested_offices,
+            threads=threads,
         )
+        announced = True
     else:
-        office_review.record_office_review(record, actor, outcome=verdict, comment=summary)
-    return Review.objects.filter(record=record, reviewed_by=actor, pk__gt=before).order_by("-pk").first()
+        _, announced = office_review.record_office_review(
+            record, actor, outcome=verdict, comment=summary, threads=threads,
+        )
+    review = Review.objects.filter(record=record, reviewed_by=actor, pk__gt=before).order_by("-pk").first()
+    return review, announced
 
 
 @transaction.atomic
@@ -136,11 +146,11 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
     # draft is dated when it was sent: that is when anyone else first read it.
     ReviewComment.objects.filter(pk__in=[d.pk for d in drafts]).update(is_draft=False, created_at=now)
 
-    review = None
+    review, announced = None, False
     if verdict != ReviewVerdict.COMMENT_ONLY:
-        review = _take_verdict(
+        review, announced = _take_verdict(
             record, actor, verdict, summary,
-            to=to, suggested_offices=suggested_offices, token=token,
+            to=to, suggested_offices=suggested_offices, token=token, threads=len(drafts),
         )
     round_ = ReviewRound.objects.create(
         record=record, actor=actor, party=party, version=version,
@@ -150,11 +160,15 @@ def finish_review(record, actor, *, verdict, summary="", to=None, suggested_offi
     audit.review_finished(round_, actor, threads=[d.pk for d in drafts], must_fix=must_fix)
 
     if verdict == ReviewVerdict.COMMENT_ONLY:
-        _notify_comment_only(record, actor, round_, len(drafts))
+        _notify_unannounced(record, actor, round_, len(drafts), comment_only=True)
+    elif not announced and drafts:
+        # An office reviewer's verdict that completed nothing announces nothing,
+        # so the comments it sent are told on their own.
+        _notify_unannounced(record, actor, round_, len(drafts), comment_only=False)
     return round_
 
 
-def _notify_comment_only(record, actor, round_, threads):
+def _notify_unannounced(record, actor, round_, threads, *, comment_only):
     from apps.notifications.services import notify_review_finished
 
     others = list({
@@ -166,7 +180,7 @@ def _notify_comment_only(record, actor, round_, threads):
     transaction.on_commit(lambda: notify_review_finished(
         record, actor=actor, party_label=label,
         version=round_.version.number if round_.version_id else None,
-        threads=threads, reviewers=others,
+        threads=threads, reviewers=others, comment_only=comment_only,
     ))
 
 

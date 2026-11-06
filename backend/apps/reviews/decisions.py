@@ -420,7 +420,7 @@ def _close_assignment(assignment, actor, now, review, state):
 
 
 @transaction.atomic
-def decide(record, actor, *, outcome, comment="", token=None) -> Review:
+def decide(record, actor, *, outcome, comment="", token=None, thread_count=0) -> Review:
     """
     Decide `record` as the caller's party. Returns the decider's `Review`.
     Raises `DecisionRefused` (403), `DecisionError` (400) or `DecisionStale`
@@ -545,7 +545,8 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         audit.published(record, actor, party=party)
 
     _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off,
-            closed_revisions=[{"id": r.pk, "label": _label(r.party)} for r in closed_revisions])
+            closed_revisions=[{"id": r.pk, "label": _label(r.party)} for r in closed_revisions],
+            threads=thread_count)
     return review
 
 
@@ -565,7 +566,8 @@ def withdrawn_by_label(review) -> str:
     return f"{DECIDER_NAME[str(review.stage)]} {OUTCOME_PHRASE[outcome]}"
 
 
-def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off, closed_revisions):
+def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off, closed_revisions,
+            threads=0):
     from apps.notifications.services import notify_decided
 
     transaction.on_commit(lambda: notify_decided(
@@ -577,4 +579,5 @@ def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off, 
         closed_requests=closed_requests,
         cut_off=cut_off,
         closed_revisions=closed_revisions,
+        threads=threads,
     ))

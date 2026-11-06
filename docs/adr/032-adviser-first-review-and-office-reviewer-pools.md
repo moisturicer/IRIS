@@ -459,7 +459,7 @@ Moving an anchor never resolves a thread, and a removed passage still needs reso
 - **The reason is the Decision's own comment.** It is required for every outcome while a *Must fix* thread is open (*Reject* already required it), and each thread closes with it. There is no second reason field.
 - **The Adviser accepting a Proposal is an approval,** so the Adviser's own open *Must fix* blocks it, as it blocks *Accept & send to RDCO*. *Reject* stays unblocked.
 - **An approval that would send one of its own *Must fix* drafts is refused** by *Finish review*: the thread would block that approval as soon as it was sent.
-- **A verdict's own notification is the one notification.** *Finish review* adds none to it. Only *Comment only*, which has no service of its own, sends a new one, to the owners and the other open Seat holders.
+- **A verdict's own notification is the one notification, and it counts the comments.** *Finish review* adds no notice to a verdict; the verdict's notice ends "The review came with 3 comments." *Comment only*, which has no service of its own, sends a new one to the owners and the other open Seat holders. So does an office reviewer's *Clear* or finding that doesn't complete the office: a single reviewer's verdict is still not announced (§4), so that notice says only that comments were sent.
 
 ### 8. Discover: research, and Discoverable Proposals
 
