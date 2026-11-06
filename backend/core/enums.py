@@ -243,6 +243,23 @@ class SeatSource(models.TextChoices):
     ADDED = "added", "Added"
 
 
+class ReviewTextState(models.TextChoices):
+    """
+    Whether a Version's review text was read (`ReviewText.state`, IR-871,
+    ADR-058 §1 as amended). Only `PENDING` and `UNAVAILABLE` are ever read;
+    a stored reading is never read again in place.
+    """
+
+    PENDING     = "pending", "Being read"
+    READ        = "read", "Read"
+    #: A scan, an unreadable or encrypted file, or one over the limits: never empty text.
+    NO_TEXT     = "no_text", "No text"
+    #: The sandbox couldn't run (limits unset, not Linux). `read_review_texts` retries it.
+    UNAVAILABLE = "unavailable", "Not read yet"
+    #: A Version from before IR-871 whose manuscript file is gone.
+    NOT_KEPT    = "not_kept", "Text not kept"
+
+
 class VersionCause(models.TextChoices):
     """
     Why a record has a new Version. `RecordVersion.cause`. ADR-032 §5.

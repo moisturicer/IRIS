@@ -41,6 +41,18 @@ export class A11yLedger {
   async reflow360(page: Page, label: string) {
     const previous = page.viewportSize();
     await page.setViewportSize({ width: 360, height: 740 });
+    // Reflow is judged on the settled layout. The app shell animates its margin
+    // for 200 ms when the window narrows past `md`, and the sidebar's old
+    // margin pushes the page sideways until it finishes: a measurement taken
+    // straight after the resize reports that, which no one loading the page at
+    // 360px ever sees (IR-934). Only transitions are awaited, and for 3 s at most:
+    // an endless animation (a spinner, a skeleton) must not hang the check.
+    await page.evaluate(async () => {
+      const ended = Promise.all(
+        document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => undefined)),
+      );
+      await Promise.race([ended, new Promise((resolve) => setTimeout(resolve, 3000))]);
+    });
     const { overflow, culprits } = await measureOverflow(page);
     this.checked.push(`reflow ${label}`);
     if (overflow > 0) {

@@ -246,8 +246,11 @@ export const recordsApi = {
 
   // Delete requests: raised by `delete` above (DELETE /records/<id>/), then only
   // read and decided here. The queue has no create or update route (IR-496).
-  listDeleteRequests:      (params?: Record<string, unknown>) =>
-    apiClient.get<PaginatedResponse<DeleteRequest>>("/records/delete-requests/", { params }),
+  listDeleteRequests:      (params?: Record<string, unknown>, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<PaginatedResponse<DeleteRequest>>("/records/delete-requests/", {
+      params,
+      signal: options.signal,
+    }),
   approveDeleteRequest:    (id: number) =>
     apiClient.post(`/records/delete-requests/${id}/approve/`),
   declineDeleteRequest:    (id: number) =>

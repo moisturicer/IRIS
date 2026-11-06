@@ -21,6 +21,10 @@ export type DraftOptions = {
   adviserId: number;
   offices?: { itso?: boolean; ierc?: boolean; ktto?: boolean };
   withManuscript?: boolean;
+  /** The manuscript's bytes, in place of the one-page default (IR-902). */
+  manuscript?: Buffer;
+  /** Year completed; the current year when absent. */
+  yearAccomplished?: number;
 };
 
 /** A draft owned by `owner`, created through POST /records/ as Publish does. */
@@ -32,13 +36,13 @@ export async function createDraft(owner: Client, opts: DraftOptions): Promise<nu
     record_type: String(typeId),
     adviser: String(opts.adviserId),
     origin: "synthetic",
-    year_accomplished: String(new Date().getFullYear()),
+    year_accomplished: String(opts.yearAccomplished ?? new Date().getFullYear()),
     requested_itso: String(Boolean(opts.offices?.itso)),
     requested_ierc: String(Boolean(opts.offices?.ierc)),
     requested_ktto: String(Boolean(opts.offices?.ktto)),
   };
   if (opts.withManuscript !== false) {
-    fields.abstract_file = { name: "manuscript.pdf", mimeType: "application/pdf", buffer: manuscriptPdf(opts.title) };
+    fields.abstract_file = { name: "manuscript.pdf", mimeType: "application/pdf", buffer: opts.manuscript ?? manuscriptPdf(opts.title) };
   }
   const created = await ok(await owner.multipart("post", "/records/", fields), `create draft ${opts.title}`);
   return created.id as number;
@@ -165,4 +169,21 @@ export async function decide(decider: Client, recordId: number, outcome: "accept
   const token = detail.decision?.token;
   expect(token, `decision token for ${decider.email} on ${recordId}`).toBeTruthy();
   return decider.act(`/records/${recordId}/decide/`, { outcome, comment, token });
+}
+
+/**
+ * Publish a submitted Thesis/Research or Project the shortest way ADR-047
+ * allows: the Adviser sends it to RDCO, RDCO releases the embargo and
+ * publishes. No office is requested, so no Clearance is exercised; journeys
+ * that need a published paper to read or search for use this, and spec 01
+ * covers the full routing (IR-902).
+ */
+export async function publishViaRdco(owner: Client, adviser: Client, rdco: Client, recordId: number) {
+  await acknowledgeLikelyMatches(owner, recordId);
+  await submit(owner, recordId);
+  await claimAndOpen(adviser, recordId, "adviser");
+  await sendToRdco(adviser, recordId, "Ready to publish (IR-902 journey).");
+  await claimAndOpen(rdco, recordId, "rdco");
+  await releaseEmbargo(rdco, recordId);
+  await decide(rdco, recordId, "publish");
 }

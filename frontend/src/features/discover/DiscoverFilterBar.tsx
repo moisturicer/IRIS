@@ -183,6 +183,10 @@ export function DiscoverFilterBar({
         >
           <i className="fas fa-sliders text-[12px]" aria-hidden />
           <span className="hidden sm:inline">Filters</span>
+          {/* A real space: the button is a flex row, which draws none, but the
+              visible text a checker compares with the name reads "Filters1"
+              without it (IR-934, WCAG 2.5.3). */}
+          {" "}
           {count > 0 && (
             <span className="absolute -right-1 -top-1 sm:static min-w-[18px] h-[18px] px-1 rounded-full bg-brand text-white text-label font-semibold flex items-center justify-center">
               {count}
