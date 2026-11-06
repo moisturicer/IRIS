@@ -606,6 +606,19 @@ describe("Not interested, Undo and reset (IR-576)", () => {
     expect(await screen.findByRole("button", { name: "Choose Areas" })).toBeInTheDocument();
   });
 
+  it("tells the reader a reset leaves saved papers shaping For you (IR-575)", async () => {
+    vi.mocked(recordsApi.interests).mockResolvedValueOnce({
+      data: { classifications: [{ id: 7, name: "Applied Research" }], psced: [] },
+    } as unknown as Awaited<ReturnType<typeof recordsApi.interests>>);
+    renderDiscover("/?feed=for_you");
+    await userEvent.click(await screen.findByRole("button", { name: "Edit Areas" }));
+    const dialog = await screen.findByRole("dialog");
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Reset my interests" }));
+
+    expect(within(dialog).getByText(/papers you saved still shape For you until you unsave them/i)).toBeInTheDocument();
+  });
+
   it("keeps the dialog open with a message when the reset fails", async () => {
     vi.mocked(recordsApi.resetInterests).mockRejectedValueOnce(new Error("offline"));
     renderDiscover("/?feed=for_you");
