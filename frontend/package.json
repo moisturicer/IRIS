@@ -19,8 +19,6 @@
     "@fontsource/eb-garamond": "^5.3.0",
     "@hookform/resolvers": "^5.9.2",
     "@tanstack/react-table": "^8.17.3",
-    "@tiptap/react": "^2.4.0",
-    "@tiptap/starter-kit": "^2.4.0",
     "axios": "^1.7.2",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
