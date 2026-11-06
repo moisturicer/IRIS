@@ -26,7 +26,7 @@ The 38 are six root advisories. The rest are packages npm lists only because the
 `@tiptap/react` and `@tiptap/starter-kit` are listed in `frontend/package.json` and have been since the initial commit (`a350e06e`). **Nothing in `frontend/src/` imports them, and `dist/` holds no Tiptap or ProseMirror code**, so the advisory cannot be reached. npm's suggested fix is a semver-major move to Tiptap 3, which would add a large upgrade to a package nothing uses.
 
 - **Decision:** not exploitable; the right fix is to delete the two dependencies, not upgrade them. That clears 24 of the 38 findings.
-- **Not done in IR-918.** It is a `package.json` and lockfile change outside this ticket's scope. A follow-up ticket is needed; none exists yet, and one has not been invented here.
+- **Not done in IR-918.** It is a `package.json` and lockfile change outside this ticket's scope. Tracked as [IR-935](https://citiris.atlassian.net/browse/IR-935).
 - **Owner:** Lee Jasmin Adolfo (frontend), confirmed.
 
 ### 2. KaTeX, 4 findings: not reachable while `trust` stays off
@@ -54,16 +54,16 @@ Reached through `@tailwindcss/typography` while Tailwind generates CSS from our 
 
 - **#6 (SSR hydration).** IRIS is a single-page app with no server rendering, no `hydrateRoot` and no `StaticRouter`, so `deserializeErrors()` has no server-provided data to be fed.
 - **#5 (open redirect by backslash in `<Link>` / `useNavigate`).** Every redirect destination that comes from outside the code (`?next=`, router state) passes through `safeRedirectPath` in `src/lib/redirectTarget.ts` first, which strips the control characters a browser drops and rejects `//` and `/\` prefixes (IR-236). Our own `<Link>`s take paths built from ids. So an attacker would need a path that survives that check, and the advisory's bypass is a backslash form it already refuses.
-- The real fix is `react-router-dom` 7, a semver-major migration. That is worth its own ticket rather than a drive-by, because it touches the route table.
-- **Decision:** accepted for now, with the mitigation above, and **upgrade to v7 as planned work.** Because this is the only finding that ships and has a plausible exploit class, it is the one to prioritise. No ticket exists for it yet.
+- The real fix is `react-router-dom` 7, a semver-major migration. It has its own ticket, [IR-936](https://citiris.atlassian.net/browse/IR-936), rather than a drive-by, because it touches the route table.
+- **Decision:** accepted for now, with the mitigation above, and **upgrade to v7 as planned work.** Because this is the only finding that ships and has a plausible exploit class, it is the one to prioritise.
 - **Owner:** Lee Jasmin Adolfo (frontend; owns the router), confirmed.
 
-## Follow-ups this triage needs (not created)
+## Follow-ups this triage needs
 
 | Follow-up | Clears | Owner |
 |---|---|---|
-| Remove `@tiptap/react` and `@tiptap/starter-kit` from `frontend/package.json` and the lockfile | 24 findings | Lee Jasmin Adolfo |
-| Plan the `react-router-dom` 7 migration | 2 findings | Lee Jasmin Adolfo |
+| [IR-935](https://citiris.atlassian.net/browse/IR-935): remove `@tiptap/react` and `@tiptap/starter-kit` from `frontend/package.json` and the lockfile | 24 findings | Lee Jasmin Adolfo |
+| [IR-936](https://citiris.atlassian.net/browse/IR-936): plan the `react-router-dom` 7 migration | 2 findings | Lee Jasmin Adolfo |
 | Re-run this triage after either lands, or when `npm audit` reports a high | any new finding | whoever owns the PR |
 
 ## Re-running
