@@ -6,8 +6,10 @@
  * screens 01 and 05 run in a browser. What these cases hold is the cause that
  * check found: three rows that could not shrink below their content, because a
  * native select is as wide as its longest option and a flex or table child
- * defaults to `min-width: auto`. Each is asserted by what it lets the row do,
- * not by a class it happens to use for it elsewhere.
+ * defaults to `min-width: auto`. These are class-string assertions, so they pin
+ * the fix, not the outcome: a refactor that shrinks the row another way will
+ * fail them and should update them, and only the journeys' browser check says
+ * the page really stopped scrolling.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
