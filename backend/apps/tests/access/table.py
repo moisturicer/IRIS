@@ -14,13 +14,14 @@ correct outcome and fails the day the bug is fixed.
 
 Each row lists one outcome per role, in `world.ROLES` order:
 
-    anon  other  owner  adviser  seated  unseated  coordinator  rdco  admin
+    anon  other  owner  adviser  seated  unseated  coordinator  rdco  admin  sysadmin
 
 `anon` has no credentials; `other` is a Student with no claim on anything;
 `owner` owns every record in the world; `adviser` advises them; `seated`
 holds an opened ITSO seat on `record` and `revising`; `unseated` is an ITSO
 pool member and `coordinator` an ITSO coordinator, neither seated; `rdco` is
-RDCO, seated nowhere; `admin` is the role-less superuser. Each role's
+RDCO, seated nowhere; `admin` is the role-less superuser; `sysadmin` is the
+System Admin, which holds no workflow access and so mostly reads like `admin`. Each role's
 relation to an object is the world's (see `world.build_world`), so on
 `at_adviser`, which no office holds yet, `seated` is one more ITSO member.
 """
@@ -37,19 +38,33 @@ from .cells import (
 # -- shorthands -------------------------------------------------------------
 
 #: Any signed-in account; the anonymous caller is refused before lookup.
-SIGNED_IN = row(ANON, OK, OK, OK, OK, OK, OK, OK, OK)
+SIGNED_IN = row(ANON, OK, OK, OK, OK, OK, OK, OK, OK, OK)
+#: The System Admin alone (`IsSystemAdmin`, ADR-051 §3): the Audit Log, system
+#: settings and the coordinator flag. RDCO and a role-less superuser are refused.
+SYSTEM_ADMIN_ONLY = row(ANON, DENY, DENY, DENY, DENY, DENY, DENY, DENY, DENY, OK)
+#: RDCO or the System Admin (`IsAccountAdmin`): the Users page and role changes,
+#: where `role_change_refusal` then says who may give which role.
+ACCOUNT_ADMINS = row(ANON, DENY, DENY, DENY, DENY, DENY, DENY, OK, DENY, OK)
 #: RDCO alone: `IsAdmin` / `IsRDCO`, a role gate before any lookup.
-RDCO_ONLY = row(ANON, DENY, DENY, DENY, DENY, DENY, DENY, OK, DENY)
+RDCO_ONLY = row(ANON, DENY, DENY, DENY, DENY, DENY, DENY, OK, DENY, DENY)
 #: Office staff alone (`IsStaff`): KTTO, RDCO, ITSO, IERC.
-OFFICE_ONLY = row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY)
+OFFICE_ONLY = row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY, DENY)
 #: `record` read through `visible_to()`: owner, Adviser, every office.
-READS_RECORD = row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE)
+READS_RECORD = row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE)
 #: `record`, an owner's act: visible non-owners are refused, others hidden.
-OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE)
+OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
+# ADR-052 §5 as amended for IR-882: the Adviser or RDCO date an embargo, and no
+# owner or other office does. The same people as a release.
+SETS_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
+# ADR-052 §6: the Adviser or RDCO release one, and never a student owner.
+RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
+# ADR-052 §11: KTTO alone releases an IP mark. The world seats no KTTO member,
+# so everyone here is refused; KTTO's success is `records/test_ip_release.py`.
+RELEASES_IP = row(ANON, HIDE, DENY, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
 #: `record`, the seated ITSO reviewer's act alone.
-SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE)
+SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE)
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
-DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY)
+DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY, DENY)
 
 #: ADR-022 Â§Amendment 4 point 4, recorded 2026-09-24: `authorize_record_documents`
 #: answers 403 even to a caller who cannot see the Record, because the Record id
@@ -95,7 +110,7 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "GET": _case(SIGNED_IN),
         # Authors only: Student or Adviser (IR-165, AUTHOR_ROLES).
         "POST": _case(
-            row(ANON, OK, OK, OK, DENY, DENY, DENY, DENY, DENY),
+            row(ANON, OK, OK, OK, DENY, DENY, DENY, DENY, DENY, DENY),
             data={"title": "A disclosure", "abstract": "x"},
         ),
     }),
@@ -128,28 +143,57 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "DELETE": _case(OWNER_ACTS, kwargs=RECORD),
     }),
     "record-submit": Entry({"POST": _case(OWNER_ACTS, kwargs=RECORD, data={})}),
+    "record-embargo-set": Entry({"POST": _case(
+        SETS_EMBARGO, kwargs=RECORD, data={"embargoed_until": "2099-01-01"},
+    )}),
+    "record-embargo-release": Entry({"POST": _case(RELEASES_EMBARGO, kwargs=RECORD)}),
+    "record-ip-release": Entry({"POST": _case(RELEASES_IP, kwargs=RECORD)}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
     "record-manuscript": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
+    # A Figure is read as the paper is (IR-845).
+    "record-figure": Entry({
+        "GET": _case(READS_RECORD, kwargs={"pk": Ref("record"), "figure_id": Ref("figure")}),
+    }),
     # Earlier versions are review material: participants, or the pool of a
     # party with an active assignment (IR-479). ADR-047 makes RDCO active on `record`.
     "record-version-manuscript": Entry({
         "GET": _case(
-            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE),
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
+        ),
+    }),
+    # A Version's review text is review material too (ADR-058 §4, IR-871).
+    "record-version-text": Entry({
+        "GET": _case(
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
         ),
     }),
     "record-similar": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     # ADR-029: novelty results belong only to the Proposal's owner.
     "record-related-research": Entry({
-        "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
+        "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
     }),
     "record-tracker": Entry({"GET": _case(READS_RECORD, kwargs=RECORD)}),
     "record-increment-access": Entry({"POST": _case(READS_RECORD, kwargs=RECORD, data={})}),
     # The manuscript's own text, for the person publishing it (IR-406).
     "record-metadata-suggestions": Entry({
-        "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
+        "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
+    }),
+    # IR-832: only an owner may inspect or acknowledge candidates for Publish.
+    "record-duplicate-matches": Entry({
+        "GET": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD),
+    }),
+    "record-acknowledge-duplicates": Entry({
+        "POST": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs=RECORD,
+                      data={"candidate_ids": []}),
+    }),
+    # IR-831: only an owner can explicitly retry the current Manuscript.
+    "record-retry-extraction": Entry({
+        "POST": _case(row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+                      kwargs=RECORD, data={}),
     }),
     # Any office, on any record it can see (decided 2026-10-11). A role gate
     # before lookup, so a non-office caller's 403 is the same for a missing id.
@@ -160,10 +204,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # staff a party that took part -- the Adviser, ITSO's whole pool. RDCO
     # took no part in `record`, so sees it but not its requests.
     "record-document-requests": Entry({
-        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE), kwargs=RECORD),
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
         # Asked by an active assignment the caller can staff: ITSO's, here.
         "POST": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, OK, HIDE), kwargs=RECORD,
+            row(ANON, HIDE, DENY, DENY, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD,
             data={"message": "Please attach it.", "items": [{"label": "Endorsement"}]},
         ),
     }),
@@ -173,14 +217,14 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # At the Adviser's step: only the record's Adviser accepts and routes, or decides.
     "record-accept-and-route": Entry({
         "POST": _case(
-            row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, DENY, HIDE),
+            row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("at_adviser")},
             data={"to": [{"party": "rdco"}], "reason": "Possible IP."},
         ),
     }),
     "record-decide": Entry({
         "POST": _case(
-            row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, DENY, HIDE),
+            row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("at_adviser")},
             data={"outcome": "reject", "comment": "Out of scope.", "token": "stale"},
         ),
@@ -209,17 +253,57 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # participants alone, so ITSO's unseated pool reads and is refused. RDCO
     # holds an assignment from the Adviser’s send (ADR-047), but this account has no Seat. An edit is its author’s.
     "record-review-comments": Entry({
-        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE), kwargs=RECORD),
+        "GET": _case(row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE), kwargs=RECORD),
         "POST": _case(
-            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE),
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
             kwargs=RECORD, data={"body": "Which version is this?"},
         ),
     }),
     "record-review-comment": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE),
+            row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
             data={"body": "Is the signed endorsement enough?"},
+        ),
+        # A writer deletes only their own draft (IR-874). The owner's comment
+        # is sent, so the owner is authorized and then told so (400).
+        "DELETE": _case(
+            OWNER_ACTS, kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
+        ),
+    }),
+    # Review threads (ADR-032 §7, IR-874): read under `may_read_review`, acted on
+    # by participants. On ITSO's sent Must fix: its seated reviewer alone changes
+    # its severity, the owner answers it but may not resolve it, and a
+    # participant resolves it. On the owner's own thread any participant resolves.
+    "record-review-thread-act": Entry({"POST": [
+        _case(
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment"), "act": "resolve"},
+        ),
+        _case(
+            row(ANON, HIDE, DENY, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "resolve"},
+        ),
+        _case(
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "reopen"},
+        ),
+        _case(
+            SEAT_ACTS,
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "severity"},
+            data={"severity": "suggestion"},
+        ),
+        _case(
+            OWNER_ACTS,
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "answer"},
+            data={"answer": "addressed", "note": "Section 4."},
+        ),
+    ]}),
+    # Finish review (IR-874): an open Seat holder alone. The Adviser's part on
+    # `record` is over and RDCO holds no seat there, so both are refused.
+    "record-finish-review": Entry({
+        "POST": _case(
+            SEAT_ACTS, kwargs=RECORD, data={"verdict": "comment_only", "summary": "Read it through."},
         ),
     }),
 
@@ -255,7 +339,7 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # everyone else's lookup is narrowed to their own, so it is hidden.
     "download-request-cancel": Entry({
         "POST": _case(
-            row(ANON, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
+            row(ANON, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE),
             kwargs={"pk": Ref("download_request")}, data={},
         ),
     }),
@@ -263,7 +347,7 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # `published`; the role-less superuser holds none and is exempt from nothing.
     "record-download": Entry({
         "GET": [
-            Case(Call(kwargs={"pk": Ref("published")}), row(ANON, OK, OK, OK, OK, OK, OK, OK, DENY),
+            Case(Call(kwargs={"pk": Ref("published")}), row(ANON, OK, OK, OK, OK, OK, OK, OK, DENY, DENY),
                  label="a published record"),
             Case(Call(kwargs=RECORD), READS_RECORD, label="a record in review"),
         ],
@@ -314,32 +398,32 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     # -- one upload or file, named by its own id: the 404 convention ------
     "record-upload-download": Entry({
         "GET": _case(
-            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE),
+            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE, HIDE),
             kwargs=UPLOAD,
         ),
     }),
     "record-upload-delete": Entry({
         "DELETE": _case(
-            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE),
+            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE, HIDE),
             kwargs=UPLOAD,
         ),
     }),
     "record-file-download": Entry({
         "GET": _case(
-            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE),
+            row(ANON, HIDE, OK, DENY, OK, OK, OK, OK, HIDE, HIDE),
             kwargs=RECORD_FILE,
         ),
     }),
     # The office that filed it, while it takes part (IR-476): ITSO's pool.
     "record-file-delete": Entry({
-        "DELETE": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=RECORD_FILE),
+        "DELETE": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE), kwargs=RECORD_FILE),
     }),
 
     # -- office acts on documents ----------------------------------------
     # An office taking part files its own supplementary file (IR-474); RDCO is now active by ADR-047.
     "record-file-upload": Entry(
         {"POST": _case(
-            row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY),
+            row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY, DENY),
             data={"record": Ref("record"), "file": Upload("note.pdf")}, format="multipart",
         )},
         waiver=DOCUMENTS_EXCEPTION,
@@ -355,13 +439,13 @@ DOCUMENTS_APP: dict[str, Entry | Shadowed] = {
     # requesting party; the party, not the person: ITSO's whole pool.
     "document-request-detail": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE),
+            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("document_request")}, data={"action": "withdraw"},
         ),
     }),
     "document-request-item-detail": Entry({
         "PATCH": _case(
-            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE),
+            row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("document_request_item")}, data={"action": "accept"},
         ),
     }),
@@ -372,7 +456,7 @@ REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
     # convention as seats. The document request supplies its assignment id.
     "assignment-extend": Entry({
         "POST": _case(
-            row(ANON, HIDE, DENY, DENY, DENY, DENY, OK, DENY, HIDE),
+            row(ANON, HIDE, DENY, DENY, DENY, DENY, OK, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("document_request", "assignment_id")},
             data={"due_at": "2099-12-31T23:59:00+08:00", "reason": "Committee unavailable"},
         ),
@@ -381,26 +465,27 @@ REVIEW_DEADLINES: dict[str, Entry | Shadowed] = {
     # every signed-in caller but ITSO's coordinator is refused outright.
     "reviews-office": Entry({
         "GET": _case(
-            row(ANON, DENY, DENY, DENY, DENY, DENY, OK, DENY, DENY),
+            row(ANON, DENY, DENY, DENY, DENY, DENY, OK, DENY, DENY, DENY),
             query={"office": "itso"},
         ),
     }),
 }
 
 # IR-616: every remaining app is declared; there is no pending exemption.
-PUBLIC = row(OK, OK, OK, OK, OK, OK, OK, OK, OK)
-PRIVATE = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
-COORDINATOR = row(ANON, HIDE, DENY, DENY, DENY, DENY, OK, DENY, HIDE)
-REVIEWER = row(ANON, DENY, DENY, OK, OK, OK, OK, OK, DENY)
-POSTER = row(ANON, DENY, DENY, OK, DENY, DENY, DENY, OK, DENY)
+PUBLIC = row(OK, OK, OK, OK, OK, OK, OK, OK, OK, OK)
+PRIVATE = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
+COORDINATOR = row(ANON, HIDE, DENY, DENY, DENY, DENY, OK, DENY, HIDE, HIDE)
+REVIEWER = row(ANON, DENY, DENY, OK, OK, OK, OK, OK, DENY, DENY)
+POSTER = row(ANON, DENY, DENY, OK, DENY, DENY, DENY, OK, DENY, DENY)
 
 ACCOUNTS = {
     "auth-register": Entry({"POST": _case(PUBLIC, data={})}),
     # Missing credentials are rejected for every caller, including signed-in users.
-    "auth-login": Entry({"POST": _case(row(*([ANON]*9)), data={})}),
+    "auth-login": Entry({"POST": _case(row(*([ANON]*10)), data={})}),
     "auth-logout": Entry({"POST": _case(SIGNED_IN, data={})}),
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
+    "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),
     "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),
     # ADR-045: both recovery endpoints are anonymous and ignore incidental
     # credentials. Confirmation checks the link, not the caller's role.
@@ -408,15 +493,15 @@ ACCOUNTS = {
     "password-reset-confirm": Entry({"POST": _case(PUBLIC, data={
         "token": "x" * 43, "new_password": "Recovery-test-42", "confirm_password": "Recovery-test-42",
     })}),
-    "user-list": Entry({"GET": _case(RDCO_ONLY)}),
+    "user-list": Entry({"GET": _case(ACCOUNT_ADMINS)}),
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                       for m in ("GET", "PUT", "PATCH")}),
-    "user-detail": Entry({m: _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")},
+    "user-detail": Entry({m: _case(ACCOUNT_ADMINS, kwargs={"pk": Ref("target_user")},
                                  **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                           for m in ("GET", "PUT", "PATCH")}),
-    "user-change-role": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"role_name": "Adviser"})}),
-    "user-coordinator": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={"is_office_coordinator": True})}),
+    "user-change-role": Entry({"PATCH": _case(ACCOUNT_ADMINS, kwargs={"pk": Ref("target_user")}, data={"role_name": "Adviser"})}),
+    "user-coordinator": Entry({"PATCH": _case(SYSTEM_ADMIN_ONLY, kwargs={"pk": Ref("target_user")}, data={"is_office_coordinator": True})}),
     "user-lock": Entry({"PATCH": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={})}),
     "user-locked": Entry({"GET": _case(RDCO_ONLY)}),
     "user-unlock": Entry({"POST": _case(RDCO_ONLY, kwargs={"pk": Ref("target_user")}, data={})}),
@@ -427,8 +512,8 @@ ACCOUNTS = {
     "college-list": Entry({"GET": _case(PUBLIC)}),
     "department-list": Entry({"GET": _case(PUBLIC)}),
     "course-list": Entry({"GET": _case(PUBLIC)}),
-    "system-setting": Entry({"GET": _case(RDCO_ONLY, kwargs={"key": "matrix-setting"}),
-                             "PATCH": _case(RDCO_ONLY, kwargs={"key": "matrix-setting"}, data={"value": "updated"})}),
+    "system-setting": Entry({"GET": _case(SYSTEM_ADMIN_ONLY, kwargs={"key": "matrix-setting"}),
+                             "PATCH": _case(SYSTEM_ADMIN_ONLY, kwargs={"key": "matrix-setting"}, data={"value": "updated"})}),
 }
 
 ASSIGNMENT = {"pk": Ref("assignment")}
@@ -439,7 +524,7 @@ REVIEWS = {
     "reviews-submit": Entry({"POST": _case(REVIEWER, data={})}),
     "reviews-resubmit": Entry({"POST": _case(SIGNED_IN, data={})}),
     "reviews-analytics": Entry({"GET": _case(OFFICE_ONLY)}),
-    "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE), kwargs=ASSIGNMENT, data={})}),
+    "assignment-claim": Entry({"POST": _case(row(ANON, HIDE, DENY, DENY, OK, OK, OK, DENY, HIDE, HIDE), kwargs=ASSIGNMENT, data={})}),
     "assignment-assign": Entry({m: _case(COORDINATOR, kwargs=ASSIGNMENT,
                                        **({} if m == "GET" else {"data": {"reviewer": Ref("reviewer_target")}}))
                                for m in ("GET", "POST")}),
@@ -475,6 +560,12 @@ AI = {
     "ai-ask-run-grant": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-ask-run-grant-renew": Entry({"POST": _case(PRIVATE, kwargs={"pk": Ref("ask_run")}, data={})}),
     "ai-runtime-grant": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # Invalid scope tests the authentication gate without requiring deployment grant keys.
+    # Configured issuance and actual Record visibility are covered by test_runtime_reader_edge.
+    "ai-runtime-edge-grant": Entry({"GET": _case(
+        SIGNED_IN, headers={"HTTP_X_IRIS_RECORD": "invalid"},
+    )}),
+    "ai-reader-path": Entry({"GET": _case(SIGNED_IN)}),
     "ai-embed-record": Entry({"POST": _case(OFFICE_ONLY, kwargs=RECORD, data={})}),
     "ai-embed-all": Entry({"POST": _case(OFFICE_ONLY, data={})}),
     "ai-embed-jobs": Entry({"GET": _case(OFFICE_ONLY)}),
@@ -484,8 +575,8 @@ NOTIFICATIONS = {
     "notification-list": Entry({"GET": _case(SIGNED_IN)}),
     "notification-read": Entry({"PATCH": [
         _case(PRIVATE, kwargs={"pk": Ref("notification")}, data={}),
-        _case(row(ANON, OK, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs={"pk": Ref("student_broadcast")}, data={}),
-        _case(row(ANON, HIDE, HIDE, HIDE, OK, OK, OK, HIDE, HIDE), kwargs={"pk": Ref("office_broadcast")}, data={}),
+        _case(row(ANON, OK, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE), kwargs={"pk": Ref("student_broadcast")}, data={}),
+        _case(row(ANON, HIDE, HIDE, HIDE, OK, OK, OK, HIDE, HIDE, HIDE), kwargs={"pk": Ref("office_broadcast")}, data={}),
     ]}),
     "notification-mark-all-read": Entry({"POST": _case(SIGNED_IN, data={})}),
 }
@@ -516,8 +607,9 @@ TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "records": RECORDS, "documents": DOCUMENTS_APP, "accounts": ACCOUNTS,
     "reviews": REVIEWS, "ai": AI, "notifications": NOTIFICATIONS,
     "audit": {
-        "audit-list": Entry({"GET": _case(RDCO_ONLY)}),
-        "audit-export": Entry({"GET": _case(RDCO_ONLY)}),
+        "audit-list": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
+        "audit-export": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
+        "audit-event-types": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
     },
     "opportunities": OPPORTUNITIES,
     "library": LIBRARY,

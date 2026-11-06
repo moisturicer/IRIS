@@ -36,13 +36,11 @@ const TAB =
  * steps". The state is told by shape and outline as well as colour (story 14):
  *
  * - completed: a check and a solid outline, and a link back to that step;
- * - current: raised, joined to the sheet, `aria-current="step"`;
+ * - current: joined to the sheet, a label with `aria-current="step"`;
  * - not started: a dashed outline, `aria-disabled`, and out of the Tab order.
  *
- * Every tab is a link in the accessibility tree, so each is found and heard
- * the same way; only a completed one has an `href` and can be reached. The
- * link points at the page it is on and moves between steps in memory, so the
- * URL never changes (IR-704).
+ * Only completed steps are interactive. Their links point at this page and
+ * move between steps in memory, so the URL never changes (IR-704).
  */
 export function EntrySteps({ steps, onSelect }: EntryStepsProps) {
   const { pathname } = useLocation();
@@ -85,17 +83,26 @@ export function EntrySteps({ steps, onSelect }: EntryStepsProps) {
             );
           }
 
+          if (step.state === "current") {
+            return (
+              <li key={step.name} aria-current="step" className="flex">
+                <span
+                  className={cn(TAB, "entry-label z-10 mr-3 rounded-tl-xl border-t-2 border-stone-200 border-t-brand bg-white text-brand")}
+                >
+                  {label}
+                </span>
+              </li>
+            );
+          }
+
           return (
             <li key={step.name} className="flex">
               <a
                 role="link"
-                aria-current={step.state === "current" ? "step" : undefined}
-                aria-disabled={step.state === "not-started" ? true : undefined}
+                aria-disabled
                 className={cn(
                   TAB,
-                  step.state === "current"
-                    ? "relative z-10 border-t-2 border-stone-200 border-t-brand bg-white text-brand"
-                    : "border-dashed border-stone-400 text-stone-600",
+                  "border-dashed border-stone-400 text-stone-600",
                 )}
               >
                 {label}

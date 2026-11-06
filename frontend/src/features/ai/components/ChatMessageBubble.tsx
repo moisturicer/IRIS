@@ -39,7 +39,8 @@ interface ChatMessageBubbleProps {
  * Which answer the sources panel describes, chosen on the answer itself: the
  * panel follows the latest answer until the reader picks an earlier one.
  */
-function SourcesButton({ count, selected, onSelect }: { count: number; selected: boolean; onSelect: () => void }) {
+function SourcesButton({ markers, selected, onSelect }: { markers: number[]; selected: boolean; onSelect: () => void }) {
+  const count = markers.length;
   const label = `${count} ${count === 1 ? "source" : "sources"}`;
   return (
     <button
@@ -48,11 +49,24 @@ function SourcesButton({ count, selected, onSelect }: { count: number; selected:
       aria-pressed={selected}
       aria-label={`${label} for this answer`}
       className={cn(
-        "inline-flex items-center gap-1.5 min-h-8 px-2 -ml-2 rounded-md text-[13px] font-medium transition-colors",
-        selected ? "text-brand" : "text-stone-500 hover:text-stone-900 hover:bg-stone-100",
+        "inline-flex items-center gap-2 min-h-8 px-2 -ml-2 rounded-lg text-small font-medium transition-colors",
+        selected ? "text-brand" : "text-stone-600 hover:text-stone-900 hover:bg-stone-100",
       )}
     >
-      <i className="fas fa-quote-left text-[10px]" aria-hidden />
+      {/* The same numbers the answer's text cites, so the two read as one set. */}
+      <span aria-hidden className="flex -space-x-1">
+        {markers.slice(0, 3).map((marker) => (
+          <span
+            key={marker}
+            className={cn(
+              "grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-2xs font-semibold leading-none tabular-nums ring-2 ring-surface",
+              selected ? "bg-brand-50 text-brand" : "bg-stone-100 text-stone-700",
+            )}
+          >
+            {marker}
+          </span>
+        ))}
+      </span>
       {label}
     </button>
   );
@@ -90,7 +104,7 @@ export function ChatMessageBubble({
   message, compact = false, retryDisabled, onRetry, sourcesSelected = false, onSelectSources,
 }: ChatMessageBubbleProps) {
   const isUser = message.role === "user";
-  const cited = message.citations?.length ?? 0;
+  const markers = [...new Set((message.citations ?? []).map((citation) => citation.marker))];
 
   return (
     // Its citations name this answer, the way back to it (IR-578).
@@ -98,9 +112,11 @@ export function ChatMessageBubble({
     <div
       data-turn={isUser ? undefined : message.turnId}
       className={cn(
-        "group flex animate-fade-in-up motion-reduce:animate-none",
+        // An answer arrived by streaming, so only the question enters: moving
+        // the whole answer here would make it jump as the stream finishes.
+        "group flex",
         compact ? "gap-2.5" : "gap-3",
-        isUser && "flex-row-reverse",
+        isUser && "flex-row-reverse animate-fade-in-up motion-reduce:animate-none",
       )}
     >
       <div
@@ -169,15 +185,16 @@ export function ChatMessageBubble({
         )}
 
         {!isUser && (
-          <div className="mt-1.5 flex items-center gap-2">
-            {onSelectSources && cited > 0 && (
+          <div className="mt-1.5 flex items-center gap-2 motion-safe:animate-fade-in-up">
+            {onSelectSources && markers.length > 0 && (
               <SourcesButton
-                count={cited}
+                markers={markers}
                 selected={sourcesSelected}
                 onSelect={() => onSelectSources(message)}
               />
             )}
-            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity duration-200">
+            {/* Touch has no hover, so Copy stays visible there. */}
+            <div className="opacity-0 group-hover:opacity-100 focus-within:opacity-100 [@media(hover:none)]:opacity-100 transition-opacity duration-200">
               <CopyButton text={message.content} label="Copy answer" />
             </div>
           </div>

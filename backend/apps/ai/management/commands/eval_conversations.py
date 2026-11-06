@@ -4,7 +4,7 @@
         [--lock s.lock.json] [--write-lock s.lock.json] [--min-conversations 100]
     python manage.py eval_conversations --set s.json --score \\
         --runs current=a.json --runs controller=b.json --reviews reviews.json \\
-        [--preferences p.json] [--judge j.json] [--mode architecture|model]
+        [--preferences p.json] [--judge j.json] [--mode architecture|model|capability]
 
 Scoring reads collected runs and human reviews; it collects nothing and
 calls no model. A run made with fake providers is a contract check, never

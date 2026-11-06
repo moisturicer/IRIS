@@ -20,11 +20,23 @@ import socket
 
 import pytest
 
+# Explicit synthetic test profile; deployment values are configured separately.
+PDF_TEST_LIMITS = {
+    "PDF_VALIDATION_WALL_SECONDS": 10, "PDF_VALIDATION_MEMORY_MIB": 256,
+    "PDF_VALIDATION_MAX_PAGES": 1000, "PDF_VALIDATION_MAX_OBJECTS": 200000,
+    "PDF_VALIDATION_MAX_DEPTH": 100,
+    # IR-871: the review text reader's own sandbox.
+    "REVIEW_TEXT_WALL_SECONDS": 60, "REVIEW_TEXT_MEMORY_MIB": 1024, "REVIEW_TEXT_MAX_PAGES": 1000,
+}
+
+from testing import run_lock
 from testing.harness import (
     HarnessMode,
     harness_decision,
     strict_mode_requested,
 )
+
+pytest_plugins = ["testing.slow_tests", "testing.parallel"]
 
 
 def pytest_configure(config):
@@ -37,6 +49,7 @@ def pytest_configure(config):
     # Before the Hypothesis work below, and deliberately not after it: that
     # block returns early when Hypothesis is absent, and the hasher matters
     # to the Django half of the suite whether or not Hypothesis is installed.
+    _configure_pdf_test_limits()
     _use_fast_password_hashing()
     _use_in_process_celery_broker()
     _use_local_memory_cache()
@@ -53,6 +66,16 @@ def pytest_configure(config):
         # this wrongly" error, so a typo reads as a one-line usage message
         # rather than an INTERNALERROR traceback.
         raise pytest.UsageError(str(exc)) from exc
+
+
+def _configure_pdf_test_limits():
+    try:
+        from django.conf import settings
+    except ImportError:
+        return
+    for key, value in PDF_TEST_LIMITS.items():
+        if getattr(settings, key, None) is None:
+            setattr(settings, key, value)
 
 
 #: Every Django test that logs anyone in pays for a password hash, and PBKDF2
@@ -276,6 +299,7 @@ def pytest_collection_modifyitems(config, items):
         pytest.exit(decision.reason, returncode=1)
 
     if decision.mode is HarnessMode.FULL:
+        _hold_the_run_lock(config, items)
         return
 
     skip = pytest.mark.skip(reason=decision.reason)
@@ -290,3 +314,33 @@ def pytest_collection_modifyitems(config, items):
         # these hit the database in setUp with no marker to opt in with).
         if "db_required" in item.keywords or _needs_a_real_database(item):
             item.add_marker(skip)
+
+
+def _hold_the_run_lock(config, items):
+    needs_database = any(
+        "db_required" in item.keywords or "django_db" in item.keywords
+        or _needs_a_real_database(item)
+        for item in items
+    )
+    if not run_lock.should_lock(
+        environ=os.environ,
+        collect_only=config.option.collectonly,
+        xdist_worker=hasattr(config, "workerinput"),
+        needs_database=needs_database,
+    ):
+        return
+    from django.conf import settings
+
+    try:
+        connection = run_lock.connect_to_maintenance_database(settings.DATABASES["default"])
+        config._iris_run_lock = run_lock.acquire(connection)
+    except run_lock.ConcurrentTestRun as refused:
+        pytest.exit(str(refused), returncode=1)
+    os.environ[run_lock.HELD_ENV_VAR] = "1"
+
+
+def pytest_unconfigure(config):
+    connection = getattr(config, "_iris_run_lock", None)
+    if connection is not None:
+        connection.close()
+        os.environ.pop(run_lock.HELD_ENV_VAR, None)

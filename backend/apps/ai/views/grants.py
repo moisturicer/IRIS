@@ -4,12 +4,13 @@ Outcomes: 404 missing or foreign, 409 `ended`, 403 `unauthorized`,
 200 `unavailable` (ADR-008) for anything else.
 """
 
+from django.conf import settings
 from django.http import Http404
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.ai.grants import config, database, issue
+from apps.ai.grants import config, database, issue, reads
 
 
 def _owned_run(user, pk):
@@ -85,3 +86,45 @@ class ReaderSessionGrantView(APIView):
             return Response({"status": "invalid"}, status=400)
         return _outcome(
             lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
+
+
+class RuntimeEdgeGrantView(APIView):
+    """Authenticate a same-origin nginx subrequest; no service credential leaves nginx."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if not settings.AI_RUNTIME_READER:
+            # The switch is the deployment's, so the edge refuses rather than
+            # letting a browser reach the runtime on its own (IR-863).
+            return Response(status=403)
+        raw = request.headers.get("X-IRIS-Record")
+        record_id = None
+        if raw:
+            if not raw.isascii() or not raw.isdigit() or len(raw) > 19:
+                return Response({"status": "invalid"}, status=400)
+            record_id = int(raw)
+            if not 0 < record_id < 2**63:
+                return Response({"status": "invalid"}, status=400)
+            if not reads.research_records(request.user, scope_record_id=record_id).exists():
+                raise Http404
+        result = _outcome(lambda: issue.reader_session_grant(request.user, record_id), issue.READER_SESSION)
+        if result.status_code != 201:
+            return Response(status=403)
+        return Response(status=204, headers={
+            "X-IRIS-Reader-Grant": result.data["grant"], "Cache-Control": "no-store",
+        })
+
+
+class ReaderPathView(APIView):
+    """Which path answers this deployment's Ask IRIS questions (IR-863).
+
+    `runtime` or `django`, from `AI_RUNTIME_READER` alone: nothing the request
+    carries changes it.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        path = "runtime" if settings.AI_RUNTIME_READER else "django"
+        return Response({"path": path}, headers={"Cache-Control": "no-store"})

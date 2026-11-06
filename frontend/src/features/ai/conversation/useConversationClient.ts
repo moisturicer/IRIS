@@ -1,5 +1,5 @@
 /**
- * The one Conversation client on Ask IRIS (IR-562).
+ * The one Conversation client: Ask IRIS and Paper Chat (IR-562, IR-571).
  *
  * It owns what each Conversation the reader has opened is showing: its
  * transcript, its unsent draft, the answer whose sources are selected, and
@@ -27,6 +27,7 @@ import { aiApi } from "@/api/ai";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
 import type { SSEEvent } from "@/lib/sse";
 import type { ConversationDetail } from "@/types/ai";
+import type { ComparisonRecord } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 
 function isNotFound(err: unknown): boolean {
@@ -40,6 +41,8 @@ interface Thread {
   draft:      string;
   /** The answer whose sources are shown; `null` follows the latest answer. */
   selectedId: string | null;
+  record: number | null;
+  comparisonRecords: ComparisonRecord[];
 }
 
 /** The answer a Conversation is waiting for, under the request that asked it. */
@@ -50,7 +53,18 @@ interface Answering {
   streaming: StreamingState | null;
 }
 
-const EMPTY_THREAD: Thread = { messages: [], draft: "", selectedId: null };
+const EMPTY_THREAD: Thread = { messages: [], draft: "", selectedId: null, record: null, comparisonRecords: [] };
+
+/** What one question may carry beyond its text. */
+export interface SendOptions {
+  /** Paper Chat's "All papers": search past the Conversation's own Record (IR-298). */
+  widen?: boolean;
+  /**
+   * The Conversation to ask in, when it is not the one on screen: Paper Chat
+   * started it for a paper the reader has since moved away from.
+   */
+  conversationId?: number;
+}
 
 export interface ConversationClientEvents {
   /** An answer arrived for `conversationId`; `onScreen` when the reader is looking at it. */
@@ -91,7 +105,7 @@ function selectedAnswer({ messages, selectedId }: Thread): ChatMessage | null {
   return null;
 }
 
-export function useConversationClient(events: ConversationClientEvents = {}) {
+export function useConversationClient(events: ConversationClientEvents = {}, comparisonLimit?: number) {
   const [activeId, setActiveId] = useState<number | null>(null);
   const [unavailable, setUnavailable] = useState(false);
   const [threads, setThreads] = useState<Record<number, Thread>>({});
@@ -122,6 +136,7 @@ export function useConversationClient(events: ConversationClientEvents = {}) {
       question: string,
       open: (signal: AbortSignal) => AsyncGenerator<SSEEvent>,
       knownRunId: string | null = null,
+      widen?: boolean,
     ) => {
       // One answer per Conversation: a new request supersedes the last one.
       flights.current.get(conversationId)?.controller.abort();
@@ -137,7 +152,7 @@ export function useConversationClient(events: ConversationClientEvents = {}) {
 
       setAnswering((all) => ({ ...all, [conversationId]: { requestId, runId: knownRunId, streaming: null } }));
       try {
-        const { message } = await streamAnswer(question, { conversationId }, open, {
+        const { message } = await streamAnswer(question, { conversationId, widen }, open, {
           signal: controller.signal,
           knownRunId,
           onState: (next) =>
@@ -197,7 +212,11 @@ export function useConversationClient(events: ConversationClientEvents = {}) {
         const kept = chosen?.turnId !== undefined
           ? messages.find((m) => m.role === "assistant" && m.turnId === chosen.turnId)
           : messages.find((m) => m.id === thread.selectedId);
-        return { ...thread, messages, selectedId: kept?.id ?? null };
+        return {
+          ...thread, messages, selectedId: kept?.id ?? null,
+          record: conversation.record,
+          comparisonRecords: conversation.record === null ? thread.comparisonRecords : [],
+        };
       });
       const run = conversation.latest_run;
       if (run && (run.state === "queued" || run.state === "running")) {
@@ -209,6 +228,18 @@ export function useConversationClient(events: ConversationClientEvents = {}) {
 
   /** Whether Conversation `id` is the one on screen, as of now rather than the last render. */
   const isOnScreen = useCallback((id: number) => activeRef.current === id, []);
+
+  /**
+   * Shows no Conversation at all: Paper Chat on a paper that has none yet,
+   * whose first question starts one. An answer still arriving for the one
+   * left behind stays with it.
+   */
+  const showEmpty = useCallback(() => {
+    opening.current += 1;
+    activeRef.current = null;
+    setActiveId(null);
+    setUnavailable(false);
+  }, []);
 
   /** Missing, deleted, malformed or someone else's: one state for all. */
   const showUnavailable = useCallback(() => {
@@ -239,20 +270,51 @@ export function useConversationClient(events: ConversationClientEvents = {}) {
     [show, showUnavailable],
   );
 
+  /**
+   * Finds a Conversation through `find` and shows it, or shows none when there
+   * is none. Dropped the same ways `open` is: the reader asked for another
+   * since, or an answer landed in the one found while it was being looked up.
+   * A failure rejects, for the caller to say so.
+   */
+  const openFound = useCallback(
+    async (find: () => Promise<ConversationDetail | null>) => {
+      const request = ++opening.current;
+      // The id is unknown until the lookup returns, so every count is kept.
+      const landedBefore = new Map(landed.current);
+      const found = await find();
+      if (opening.current !== request) return;
+      if (found === null) showEmpty();
+      else show(found, landedBefore.get(found.id) ?? 0);
+    },
+    [show, showEmpty],
+  );
+
   /** Asks `question` in the Conversation on screen, unless it is still answering. */
   const send = useCallback(
-    (question: string) => {
-      const id = activeRef.current;
+    (question: string, { widen, conversationId }: SendOptions = {}) => {
+      const id = conversationId ?? activeRef.current;
       if (id === null || flights.current.has(id)) return;
+      const thread = threads[id] ?? EMPTY_THREAD;
+      const records = thread.comparisonRecords;
+      if (records.length && (thread.record !== null || comparisonLimit === undefined ||
+        records.length < 2 || records.length > comparisonLimit)) return;
+      const comparison = records.length ? { comparisonRecordIds: records.map((r) => r.id) } : {};
       updateThread(id, (thread) => ({
         ...thread,
         draft: "",
         messages: [...thread.messages, newChatMessage("user", question)],
       }));
-      return answer(id, question, (signal) => aiApi.askStream(question, { conversationId: id }, signal));
+      const asked = { conversationId: id, requestId: crypto.randomUUID(), widen, ...comparison };
+      return answer(id, question, (signal) => aiApi.askStream(question, asked, signal), null, widen);
     },
-    [answer, updateThread],
+    [answer, comparisonLimit, threads, updateThread],
   );
+
+  const setComparisonRecords = useCallback((records: ComparisonRecord[]) => {
+    const id = activeRef.current;
+    if (id === null || flights.current.has(id)) return;
+    updateThread(id, (thread) => thread.record !== null ? thread : { ...thread, comparisonRecords: records });
+  }, [updateThread]);
 
   /**
    * Retries the queued question `message` stands for as a new run (IR-548).
@@ -286,6 +348,15 @@ export function useConversationClient(events: ConversationClientEvents = {}) {
       // Already over: its own terminal event is on its way.
     }
   }, [answering]);
+
+  /**
+   * Adds `message` to Conversation `id`'s transcript, wherever the reader is
+   * now: a failure notice belongs with the question that failed.
+   */
+  const note = useCallback(
+    (id: number, message: ChatMessage) => updateThread(id, (thread) => ({ ...thread, messages: [...thread.messages, message] })),
+    [updateThread],
+  );
 
   /** The unsent draft of Conversation `id`; nothing is sent until Send. */
   const setDraftFor = useCallback(
@@ -343,14 +414,20 @@ export function useConversationClient(events: ConversationClientEvents = {}) {
     unavailable,
     messages:    thread.messages,
     draft:       thread.draft,
+    record:      thread.record,
+    comparisonRecords: thread.comparisonRecords,
+    setComparisonRecords,
     /** The answer the sources panel describes. */
     selected,
     isAnswering: live !== undefined,
     streaming:   live?.streaming ?? null,
     isOnScreen,
     open,
+    openFound,
     show,
+    showEmpty,
     showUnavailable,
+    note,
     send,
     retry,
     stop,

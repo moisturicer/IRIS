@@ -11,7 +11,7 @@ interface DiscoverSearchComposerProps {
 
 const EXAMPLES = [
   "What research explores flood resilience in Cebu?",
-  "How can AI support learning at CIT-U?",
+  "How can AI support learning in higher education?",
   "What studies explore renewable energy for local communities?",
   "How can technology make transport more accessible?",
 ];

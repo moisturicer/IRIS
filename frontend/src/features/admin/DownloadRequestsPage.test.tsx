@@ -63,6 +63,19 @@ beforeEach(() => {
 });
 
 describe("the queue", () => {
+  it("keeps Refresh on its own phone row and restores the compact toolbar placement from sm (IR-772)", () => {
+    serve();
+    renderScreen(<DownloadRequestsPage />);
+
+    const refresh = screen.getByRole("button", { name: "Refresh" });
+    expect(refresh).toHaveClass(
+      "w-full",
+      "justify-center",
+      "sm:ml-auto",
+      "sm:w-auto",
+    );
+  });
+
   it("shows the reader's note, and says so when an old request has none", async () => {
     serve(
       request({ id: 1 }),

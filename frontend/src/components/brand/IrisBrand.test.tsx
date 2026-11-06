@@ -47,6 +47,28 @@ describe("Folio Ribbon brand marks (IR-744)", () => {
     expect(screen.getAllByRole("img", { name: "Search" })).toHaveLength(1);
   });
 
+  it("draws Ask IRIS as one path at rest, with no mask to collide on", () => {
+    const { container } = render(<AskIrisGlyph title="Ask IRIS" />);
+    expect(container.querySelectorAll("path")).toHaveLength(1);
+    expect(container.querySelector("mask")).toBeNull();
+  });
+
+  it("sets the I in type while answering, and gives each glyph its own mask", () => {
+    const { container } = render(
+      <>
+        <AskIrisGlyph answering />
+        <AskIrisGlyph answering />
+      </>,
+    );
+    const masks = Array.from(container.querySelectorAll("mask"));
+    expect(masks).toHaveLength(2);
+    expect(masks[0].id).not.toBe(masks[1].id);
+    expect(masks[0].querySelectorAll(".iris-ask-part")).toHaveLength(3);
+    // each bubble points at its own mask, so unmounting one cannot blank the other
+    const referenced = Array.from(container.querySelectorAll("path")).map((p) => p.getAttribute("mask"));
+    expect(referenced).toEqual(masks.map((m) => `url(#${m.id})`));
+  });
+
   it("has no serious accessibility violations", async () => {
     const { container } = render(
       <div>

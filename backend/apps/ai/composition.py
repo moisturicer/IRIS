@@ -73,6 +73,7 @@ from apps.records.models import Record
 
 if TYPE_CHECKING:
     from apps.ai.evidence.model_decision import ModelEvidenceDecision
+    from apps.ai.providers.vision import ImageDescribingLLM
     from apps.ai.inference import InferenceTask
     from apps.ai.memory import ConversationMemory
     from apps.ai.providers.tool_calling import ToolCallingLLM
@@ -287,6 +288,15 @@ class CompositionRoot:
                 return None
         return ModelEvidenceDecision(self._shadow_llm)
 
+    def figure_describer(self) -> Optional["ImageDescribingLLM"]:
+        """The ``describe_figure`` model, or ``None`` while its Profile is unset (IR-852)."""
+        from apps.ai.inference import InferenceTask, profile_for
+        from apps.ai.providers.vision import require_image_describing
+
+        if self._llm is None and not profile_for(InferenceTask.DESCRIBE_FIGURE).is_configured:
+            return None
+        return require_image_describing(self.llm_for(InferenceTask.DESCRIBE_FIGURE))
+
     def memory(self) -> Optional["ConversationMemory"]:
         """The conversation-memory recaller, or ``None`` when off.
 
@@ -478,17 +488,6 @@ def composition_root() -> CompositionRoot:
     to work around.
     """
     return _installed if _installed is not None else CompositionRoot()
-
-
-def composition_root_installed() -> bool:
-    """Whether something has replaced the default root.
-
-    Asked by anything that would install one *only if nobody else has* — the
-    development bypass (IR-317) does, so a process that reaches
-    ``AppConfig.ready()`` twice cannot reinstall a permissive root over a root
-    a caller deliberately set.
-    """
-    return _installed is not None
 
 
 def install_composition_root(root: Optional[CompositionRoot]) -> None:

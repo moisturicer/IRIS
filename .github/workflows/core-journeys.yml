@@ -5,8 +5,8 @@ name: Core journeys (IR-631)
 # production settings (docker-compose.e2e.yml says exactly what differs),
 # runs every journey once, serially, and uploads the evidence.
 #
-# Not a PR gate on purpose (IR-631 Q7): the stack builds Docling and every
-# worker, which would slow every PR and make CI flaky, and IR-631 asks for one
+# Not a PR gate on purpose (IR-631 Q7): the stack builds every worker, which
+# would slow every PR and make CI flaky, and IR-631 asks for one
 # run on one build, not a run per change. A failure here is a failed check in
 # the run record, not a red PR.
 
@@ -33,8 +33,7 @@ jobs:
   journeys:
     name: Core journeys on ${{ inputs.ref }}
     runs-on: ubuntu-latest
-    # Docling's CPU image and the worker builds dominate; the journeys are
-    # minutes. A hang must fail rather than bill.
+    # The worker builds dominate; the journeys are minutes. A hang must fail rather than bill.
     timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
@@ -47,7 +46,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 

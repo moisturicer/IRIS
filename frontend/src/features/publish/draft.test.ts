@@ -42,6 +42,12 @@ describe("firstIncompleteStep", () => {
   it.each(cases)("$label → step $step", ({ draft, step }) => {
     expect(firstIncompleteStep(draft, 7)).toBe(step);
   });
+
+  it("never stops at an embargo question, which Publish no longer asks (IR-882)", () => {
+    const draft = { typeId: null, hasManuscript: false, values: complete };
+
+    expect(firstIncompleteStep(draft, 7)).toBe(1);
+  });
 });
 
 describe("describeFailure", () => {

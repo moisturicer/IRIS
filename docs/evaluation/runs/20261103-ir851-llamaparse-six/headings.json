@@ -1,0 +1,210 @@
+{
+ "Accelerating massive ensembles of ordinary differential equations-with-annotations": {
+  "llamaparse": {
+   "numbered": 30,
+   "off_level": 10,
+   "nesting_ordered": false,
+   "off_level_examples": [
+    [
+     3,
+     "1 INTRODUCTION"
+    ],
+    [
+     4,
+     "1.1 Background"
+    ],
+    [
+     4,
+     "1.2.2 DIFFRAX"
+    ],
+    [
+     4,
+     "1.2.3 TORCHDIFFEQ"
+    ],
+    [
+     4,
+     "1.2.4 GRADSOLVE"
+    ],
+    [
+     2,
+     "2.2.3 Tsit5: explicit solver"
+    ]
+   ],
+   "false_headings": []
+  },
+  "docling": {
+   "numbered": 30,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning": {
+  "llamaparse": {
+   "numbered": 19,
+   "off_level": 5,
+   "nesting_ordered": false,
+   "off_level_examples": [
+    [
+     3,
+     "1 INTRODUCTION"
+    ],
+    [
+     3,
+     "2.1 Protocluster candidate catalogue by PCFNet"
+    ],
+    [
+     3,
+     "3.1 Procluster identification"
+    ],
+    [
+     3,
+     "3.2 Properties of procluster members and others"
+    ],
+    [
+     3,
+     "4.1 Comparison with previous studies"
+    ]
+   ],
+   "false_headings": []
+  },
+  "docling": {
+   "numbered": 22,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties": {
+  "llamaparse": {
+   "numbered": 25,
+   "off_level": 5,
+   "nesting_ordered": false,
+   "off_level_examples": [
+    [
+     3,
+     "1.1 Context"
+    ],
+    [
+     3,
+     "2.1 Bayesian optimal decision under uncertainties"
+    ],
+    [
+     3,
+     "3.1 Uncrowded hypervolume for deterministic MOO"
+    ],
+    [
+     1,
+     "4 Gaussian Process Regression and Bayesian Optimization"
+    ],
+    [
+     1,
+     "6 Conclusion and discussion"
+    ]
+   ],
+   "false_headings": [
+    "A PREPRINT",
+    "Figure 7: 4DProblem: Error in the estimation of the upper bound, depen"
+   ]
+  },
+  "docling": {
+   "numbered": 25,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators": {
+  "llamaparse": {
+   "numbered": 18,
+   "off_level": 2,
+   "nesting_ordered": true,
+   "off_level_examples": [
+    [
+     2,
+     "D. Ablation and sensitivity"
+    ],
+    [
+     1,
+     "X. CONCLUSION"
+    ]
+   ],
+   "false_headings": [
+    "TABLE I: Flit classes in MESHKV.",
+    "TABLE II: Per-router parameters in the FPGA implementation.",
+    "TABLE III: Alveo U280 resource utilization for an 8×8 MESHKV instance ",
+    "TABLE IV: Normalized interconnect traffic (CENT = 1.00), T=32K, B=1.",
+    "TABLE V: Bisection KV bandwidth utilization (%), LLaMA-2-7B.",
+    "TABLE III: Alveo U280 resource utilization for an 8×8 MESHKV instance "
+   ]
+  },
+  "docling": {
+   "numbered": 17,
+   "off_level": 0,
+   "nesting_ordered": false,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "Noise-adjusted turnover in estimated networks": {
+  "llamaparse": {
+   "numbered": 5,
+   "off_level": 2,
+   "nesting_ordered": true,
+   "off_level_examples": [
+    [
+     3,
+     "1 Introduction"
+    ],
+    [
+     1,
+     "4 Numerical illustration"
+    ]
+   ],
+   "false_headings": [
+    "Table 1: Expected turnover under no structural change",
+    "Table 2: Sensitivity of adjusted turnover to false-positive calibratio",
+    "Table 3: Adjusted turnover with an estimated false-positive probabilit"
+   ]
+  },
+  "docling": {
+   "numbered": 5,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "State-Space-Based FIR Filtering on a Quantum Computer": {
+  "llamaparse": {
+   "numbered": 16,
+   "off_level": 3,
+   "nesting_ordered": true,
+   "off_level_examples": [
+    [
+     2,
+     "4.3. Parameter conversion"
+    ],
+    [
+     1,
+     "7. ACKNOWLEDGMENTS"
+    ],
+    [
+     1,
+     "8. REFERENCES"
+    ]
+   ],
+   "false_headings": []
+  },
+  "docling": {
+   "numbered": 16,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ }
+}

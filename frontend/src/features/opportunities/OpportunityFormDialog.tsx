@@ -3,8 +3,10 @@ import { useId, useRef, useState, type FormEvent } from "react";
 import { opportunitiesApi } from "@/api/opportunities";
 import { Button } from "@/components/ui/Button";
 import { FieldError } from "@/components/ui/FieldError";
+import { FieldLabel } from "@/components/ui/FieldLabel";
 import { Input } from "@/components/ui/Input";
 import { Modal } from "@/components/ui/Modal";
+import { Select } from "@/components/ui/Select";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import type { Opportunity } from "@/types/opportunities";
 
@@ -64,7 +66,6 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
     type:  useId(),
     desc:  useId(),
     descHint: useId(),
-    typeError: useId(),
     descError: useId(),
     source: useId(),
   };
@@ -164,29 +165,26 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           </p>
         )}
 
-        <div>
-          <label htmlFor={ids.type} className={LABEL}>Type</label>
-          <select
-            id={ids.type}
-            name="opportunity_type"
-            value={draft.opportunity_type}
-            onChange={(e) => set("opportunity_type", e.target.value as OpportunityDraft["opportunity_type"])}
-            aria-invalid={errors.opportunity_type ? true : undefined}
-            aria-describedby={errors.opportunity_type ? ids.typeError : undefined}
-            className={fieldClasses(Boolean(errors.opportunity_type))}
-          >
-            <option value="" disabled>Choose a type</option>
-            {OPPORTUNITY_TYPES.map((t) => (
-              <option key={t.id} value={t.id}>{t.label}</option>
-            ))}
-          </select>
-          {errors.opportunity_type && <FieldError id={ids.typeError}>{errors.opportunity_type}</FieldError>}
-        </div>
+        <Select
+          id={ids.type}
+          name="opportunity_type"
+          label="Type"
+          required
+          value={draft.opportunity_type}
+          onChange={(e) => set("opportunity_type", e.target.value as OpportunityDraft["opportunity_type"])}
+          error={errors.opportunity_type}
+        >
+          <option value="" disabled>Choose a type</option>
+          {OPPORTUNITY_TYPES.map((t) => (
+            <option key={t.id} value={t.id}>{t.label}</option>
+          ))}
+        </Select>
 
         <Input
           id={`${ids.form}-title`}
           name="title"
           label="Title"
+          required
           value={draft.title}
           maxLength={300}
           onChange={(e) => set("title", e.target.value)}
@@ -199,6 +197,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
               id={`${ids.form}-office`}
               name="posting_office"
               label="Posting office"
+              required
               placeholder="e.g. Research & Development Coordinating Office (RDCO)"
               value={draft.posting_office}
               maxLength={200}
@@ -211,6 +210,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
             name="due_date"
             type="date"
             label="Deadline"
+            required
             value={draft.due_date}
             onChange={(e) => set("due_date", e.target.value)}
             error={errors.due_date}
@@ -220,7 +220,8 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
         <Input
           id={`${ids.form}-audience`}
           name="audience"
-          label="Who can apply (optional)"
+          label="Who can apply"
+          optional
           placeholder="e.g. Faculty researchers and graduate students"
           value={draft.audience}
           maxLength={300}
@@ -228,8 +229,8 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           error={errors.audience}
         />
 
-        <div>
-          <label htmlFor={ids.desc} className={LABEL}>Description (optional)</label>
+        <div className="flex flex-col gap-1">
+          <FieldLabel htmlFor={ids.desc} label="Description" optional />
           <textarea
             id={ids.desc}
             name="description"
@@ -242,7 +243,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           />
           {errors.description
             ? <FieldError id={ids.descError}>{errors.description}</FieldError>
-            : <p id={ids.descHint} className="text-small text-stone-600 mt-1">The board shows the first two lines.</p>}
+            : <p id={ids.descHint} className="text-small text-stone-600">The board shows the first two lines.</p>}
         </div>
 
         <div className="grid gap-section-sm sm:grid-cols-2">
@@ -250,7 +251,8 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
             id={`${ids.form}-ceiling`}
             name="funding_ceiling"
             inputMode="decimal"
-            label="Funding ceiling in pesos (optional)"
+            label="Funding ceiling in pesos"
+            optional
             placeholder="e.g. 150000"
             value={draft.funding_ceiling}
             onChange={(e) => set("funding_ceiling", e.target.value)}
@@ -261,7 +263,8 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
             id={`${ids.form}-url`}
             name="external_url"
             type="url"
-            label="Link (optional)"
+            label="Link"
+            optional
             placeholder="https://"
             value={draft.external_url}
             maxLength={500}
@@ -274,7 +277,8 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
         <Input
           id={`${ids.form}-tags`}
           name="tags"
-          label="Tags (optional)"
+          label="Tags"
+          optional
           placeholder="e.g. Seed grant, AI and robotics"
           value={draft.tags}
           onChange={(e) => set("tags", e.target.value)}
@@ -286,7 +290,7 @@ export function OpportunityFormDialog({ opportunity, onClose, onSaved }: Opportu
           <legend className={LABEL}>Source</legend>
           <div className="flex flex-col sm:flex-row gap-2 sm:gap-section">
             {([
-              ["internal", "Posted by a CIT-U office"],
+              ["internal", "Posted by an institutional office"],
               ["external", "Reposted from an outside body"],
             ] as const).map(([value, label]) => (
               <label key={value} className="flex items-center gap-2 min-h-11 sm:min-h-0 text-small text-stone-700">

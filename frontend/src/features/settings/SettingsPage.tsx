@@ -1,20 +1,23 @@
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { INSTITUTION } from "@/config/institution";
+import { useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { TONES } from "@/components/ui/statusTones";
 import { useAuth } from "@/hooks/useAuth";
+import { pathFor } from "@/lib/access";
 import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
-import { AboutYouPanel } from "./AboutYouPanel";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
 import { Panel } from "./settingsParts";
 
 /**
- * Settings & Profile.
+ * Settings: the account. Who you are on IRIS (name, photo, bio, interests,
+ * ORCID iD) is the Profile, a page of its own since IR-933.
  *
- * Four tabs, not the six the mockup drew. The two that are missing were cut
+ * Three sections, not the six the mockup drew. The two that are missing were cut
  * because nothing backs them, and shipping a panel that cannot persist is the
  * dead-end IR-86's acceptance criteria forbid:
  *
@@ -31,18 +34,17 @@ import { Panel } from "./settingsParts";
  * Both are filed rather than faked.
  */
 
-type TabId = "profile" | "security" | "privacy" | "role";
+type TabId = "security" | "privacy" | "role";
 
 const TABS: { id: TabId; label: string; icon: string }[] = [
-  { id: "profile",  label: "Profile",                icon: "fa-user"         },
   { id: "security", label: "Account & security",     icon: "fa-shield-halved" },
   { id: "privacy",  label: "Data privacy & consent", icon: "fa-lock"         },
   { id: "role",     label: "Role & access",          icon: "fa-id-badge"     },
 ];
 
 export default function SettingsPage() {
-  const { user, updateUser } = useAuth();
-  const [tab, setTab] = useState<TabId>("profile");
+  const { user } = useAuth();
+  const [tab, setTab] = useState<TabId>("security");
 
   if (!user) return null;
 
@@ -50,12 +52,9 @@ export default function SettingsPage() {
     // Width and padding come from AppShell's PageContainer (IR-522).
     <div className="space-y-4">
       <PageHeader
-        title="Settings & Profile"
-        description={[user.first_name && `${user.first_name} ${user.last_name}`.trim(),
-          user.role_name,
-          user.college_name]
-          .filter(Boolean)
-          .join(" · ")}
+        title="Settings"
+        description="Your sign-in, your data and what your role lets you do."
+        actions={<Link to={pathFor("profile")} className={cn(PILL_SECONDARY, FOCUS_RING)}>Your profile</Link>}
       />
 
       <div className="flex flex-col lg:flex-row gap-4 items-start">
@@ -88,8 +87,7 @@ export default function SettingsPage() {
         </nav>
 
         <div className="flex-1 min-w-0 w-full">
-          {tab === "profile"  && <ProfileTab user={user} onSaved={updateUser} />}
-          {tab === "security" && <SecurityTab />}
+          {tab === "security" && <SecurityTab email={user.email} isVerified={user.is_verified} />}
           {tab === "privacy"  && <PrivacyTab user={user} />}
           {tab === "role"     && <RoleTab user={user} />}
         </div>
@@ -139,148 +137,10 @@ function Notice({ tone, children }: { tone: "ok" | "error"; children: React.Reac
 }
 
 /* -------------------------------------------------------------------------- */
-/* Profile                                                                    */
-/* -------------------------------------------------------------------------- */
-
-function ProfileTab({ user, onSaved }: { user: NonNullable<ReturnType<typeof useAuth>["user"]>; onSaved: (u: typeof user) => void }) {
-  const [firstName, setFirstName] = useState(user.first_name);
-  const [middle,    setMiddle]    = useState(user.middle_initial ?? "");
-  const [lastName,  setLastName]  = useState(user.last_name);
-  const [saving,    setSaving]    = useState(false);
-  const [ok,        setOk]        = useState(false);
-  const [error,     setError]     = useState<string | null>(null);
-
-  const dirty = useMemo(
-    () =>
-      firstName !== user.first_name ||
-      middle !== (user.middle_initial ?? "") ||
-      lastName !== user.last_name,
-    [firstName, middle, lastName, user],
-  );
-
-  const reset = () => {
-    setFirstName(user.first_name);
-    setMiddle(user.middle_initial ?? "");
-    setLastName(user.last_name);
-    setError(null);
-    setOk(false);
-  };
-
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    setOk(false);
-    if (!firstName.trim() || !lastName.trim()) {
-      setError("First and last name are required.");
-      return;
-    }
-    setSaving(true);
-    try {
-      const { data } = await authApi.updateMe({
-        first_name: firstName.trim(),
-        middle_initial: middle.trim(),
-        last_name: lastName.trim(),
-      });
-      onSaved(data);
-      setOk(true);
-    } catch {
-      setError("Could not save your profile. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Affiliation reaches a student and an adviser by different routes, so the
-  // label has to change with the role rather than pretend it is one field.
-  const affiliation = [user.college_name, user.department_name, user.course_name]
-    .filter(Boolean)
-    .join(" · ");
-
-  return (
-    <div className="space-y-4">
-      <form onSubmit={save}>
-        <Panel
-          title="Profile — shown on records you author"
-          caption="This identity is attached to disclosures, paper citations and clearances."
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_120px_1fr] gap-4">
-            <Field label="First name">
-              <input className={inputClass} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-            </Field>
-            <Field label="M.I.">
-              <input className={inputClass} value={middle} onChange={(e) => setMiddle(e.target.value)} maxLength={20} />
-            </Field>
-            <Field label="Last name">
-              <input className={inputClass} value={lastName} onChange={(e) => setLastName(e.target.value)} />
-            </Field>
-          </div>
-
-          <div className="mt-4">
-            <Field
-              label="Institutional email"
-              hint={
-                <span className="flex items-center gap-1.5">
-                  <i className="fas fa-circle-check text-stone-900 text-[12px]" aria-hidden />
-                  {user.is_verified ? "Verified · " : ""}
-                  Managed by CIT-U. Your email is your sign-in identity and the name attached to
-                  every clearance decision, so it cannot be changed here.
-                </span>
-              }
-            >
-              <input className={readOnlyClass} value={user.email} readOnly aria-readonly />
-            </Field>
-          </div>
-
-          <div className="mt-4">
-            <Field
-              label={user.course_name ? "College · Department · Course" : "College · Department"}
-              hint="Recorded by the university. Ask RDCO if this is wrong — it is not self-service, because it determines how your disclosures are routed."
-            >
-              <input
-                className={readOnlyClass}
-                value={affiliation || "Not recorded for this account"}
-                readOnly
-                aria-readonly
-              />
-            </Field>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-stone-100">
-            {ok && <Notice tone="ok">Profile saved.</Notice>}
-            {error && <Notice tone="error">{error}</Notice>}
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                type="button"
-                onClick={reset}
-                disabled={!dirty || saving}
-                className="px-3.5 py-2 rounded-lg text-[13px] font-semibold text-stone-600
-                  border border-stone-200 hover:bg-stone-50 disabled:opacity-40"
-              >
-                Discard
-              </button>
-              <button
-                type="submit"
-                disabled={!dirty || saving}
-                className="px-4 py-2 rounded-lg text-[13px] font-bold uppercase tracking-wider
-                  bg-brand text-white hover:bg-brand-light disabled:opacity-40"
-              >
-                {saving ? "Saving..." : "Save changes"}
-              </button>
-            </div>
-          </div>
-        </Panel>
-      </form>
-
-      <AboutYouPanel user={user} onSaved={onSaved} />
-    </div>
-  );
-}
-
-/* -------------------------------------------------------------------------- */
 /* Account & security                                                         */
 /* -------------------------------------------------------------------------- */
 
-function SecurityTab() {
+function SecurityTab({ email, isVerified }: { email: string; isVerified: boolean }) {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const [oldPassword,     setOldPassword]     = useState("");
@@ -325,6 +185,20 @@ function SecurityTab() {
   return (
     <form onSubmit={submit}>
       <Panel title="Account & security" caption="Change the password you use to sign in to IRIS.">
+        <div className="mb-6 max-w-md">
+          <Field label="Sign-in email">
+            <input className={readOnlyClass} value={email} readOnly aria-readonly />
+          </Field>
+          <p className="flex items-start gap-1.5 text-label text-stone-500 mt-1.5">
+            <i className="fas fa-circle-check text-stone-900 text-label mt-0.5" aria-hidden />
+            <span>
+              {isVerified ? "Verified · " : ""}
+              Managed by {INSTITUTION.name}. Your email is your sign-in identity and the name attached to
+              every clearance decision, so it cannot be changed here.
+            </span>
+          </p>
+        </div>
+
         <div className="space-y-4 max-w-md">
           <Field label="Current password">
             <input type="password" className={inputClass} value={oldPassword}
@@ -466,14 +340,11 @@ function RoleTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["user"
           </ul>
         )}
 
-        {/* Role changes are an administrative act: RoleRequest rows are created
-            at signup, and both the list and decide endpoints are Django-staff
-            only. There is no self-service request endpoint to call, so this
-            says who to ask rather than rendering a button that has no API. */}
+        {/* Role changes are administrative acts, with no self-service request endpoint. */}
         <p className="text-[13px] text-stone-500 mt-5 pt-4 border-t border-stone-100">
-          Roles are assigned by a system administrator. If your role is wrong, or you need adviser
-          or office access, contact the Research and Development Coordinating Office — it cannot be
-          changed from this screen.
+          RDCO approves Student and Adviser roles. The System Admin assigns office roles and office
+          coordinators. If your role is wrong, contact the Research and Development Coordinating
+          Office. Your role cannot be changed from this screen.
         </p>
       </Panel>
     </div>

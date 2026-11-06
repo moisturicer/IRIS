@@ -1,6 +1,6 @@
 from io import BytesIO
 
-from rest_framework import viewsets, mixins, status
+from rest_framework import mixins, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
@@ -15,18 +15,22 @@ from rest_framework.filters import SearchFilter, OrderingFilter
 from core.enums import (
     DELETE_REVIEW_STATUSES,
     PUBLICLY_VISIBLE_STATUSES,
+    EmbargoState,
     IPType,
     PipelineStatus,
     RecordTypeName,
     RequestStatus,
 )
-from . import embargo, lifecycle
+from . import embargo, ip_release, lifecycle
 from core.permissions import (
     IsAdmin,
     IsAuthor,
     IsRDCO,
     IsRecordOwner,
     IsStaff,
+    MayReleaseEmbargo,
+    MayReleaseIp,
+    MaySetEmbargo,
 )
 from .download_service import (
     DownloadRequestAlreadyDecided,
@@ -93,7 +97,7 @@ class RecordViewSet(viewsets.ModelViewSet):
             "classification", "psced", "record_type", "adviser", "ai_overview"
         ).prefetch_related("owners__user", "authors")
 
-        if self.action in ("metadata_suggestions", "related_research"):
+        if self.action in ("metadata_suggestions", "retry_extraction", "related_research", "duplicate_matches", "acknowledge_duplicates"):
             # The Publish dialog's prefill is the manuscript's own text, offered
             # to the person publishing it (IR-406; IR-374 spec Appendix D:
             # "the owner through visible_to(), with a 404 otherwise").
@@ -145,8 +149,14 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "destroy"):
+        if self.action in ("update", "partial_update", "submit", "destroy", "duplicate_matches", "acknowledge_duplicates"):
             return [IsAuthenticated(), IsRecordOwner()]
+        if self.action == "embargo_set":
+            return [IsAuthenticated(), MaySetEmbargo()]
+        if self.action == "embargo_release":
+            return [IsAuthenticated(), MayReleaseEmbargo()]
+        if self.action == "ip_release":
+            return [IsAuthenticated(), MayReleaseIp()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -161,6 +171,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # is exactly [IsAuthenticated]. See tests.py::DeadPermissionKwargSweepTests.
         return super().get_permissions()
 
+    @transaction.atomic
     def perform_create(self, serializer):
         from .models import RecordOwner
         record = serializer.save(
@@ -199,28 +210,46 @@ class RecordViewSet(viewsets.ModelViewSet):
         self._queue_manuscript_extraction_if_present(serializer, record)
 
     def _queue_manuscript_extraction_if_present(self, serializer, record):
-        # abstract_file is the manuscript (see RecordWriteSerializer). Any
-        # save that changes it -- create or update -- must reach the chunker
-        # (IR-195 / ADR-013's 2026-09-08 amendment), the same way
-        # SubmitDocumentView does for a supplementary upload. "in
-        # validated_data" rather than diffing old vs. new: a client
-        # re-sending an unchanged file is rare enough that re-running
-        # extraction on it costs nothing, and the alternative (comparing
-        # file contents) costs a read on every save just to skip the common
-        # case.
-        #
-        # Except an owner's revised manuscript, which waits for its version
-        # (IR-273): reviewers are served the submitted one meanwhile, and the
-        # chunks Ask IRIS answers from must be the same file.
+        # The canonical writer removes unchanged bytes from validated_data.
+        # A changed revision is extracted only at the submission boundary.
         if "abstract_file" not in serializer.validated_data:
             return
 
-        from .services import queue_manuscript_extraction
+        from apps.documents.sources import reset_manuscript
         from .versions import manuscript_awaits_submission
 
-        if manuscript_awaits_submission(record):
-            return
-        queue_manuscript_extraction(record)
+        reset_manuscript(record, defer=manuscript_awaits_submission(record))
+
+    @action(detail=True, methods=["get"], url_path="duplicate-matches")
+    def duplicate_matches(self, request, pk=None):
+        """Current owner-visible likely matches for Publish's Details and Review."""
+        from .duplicates import acknowledgement_basis, exact_matches, likely_matches
+
+        record = self.get_object()
+        exact = exact_matches(request.user, record.pk, record.manuscript_sha256)
+        likely = likely_matches(request.user, record)
+        return Response({"exact": exact, "likely": likely,
+                         "acknowledged": bool(likely) and record.duplicate_acknowledgement == acknowledgement_basis(record, likely)})
+
+    @action(detail=True, methods=["post"], url_path="acknowledge-duplicates")
+    @transaction.atomic
+    def acknowledge_duplicates(self, request, pk=None):
+        from .duplicates import ExactDuplicate, acknowledgement_basis, exact_matches, likely_matches
+
+        record = self.get_object()
+        Record.objects.select_for_update().get(pk=record.pk)
+        record.refresh_from_db()
+        exact = exact_matches(request.user, record.pk, record.manuscript_sha256)
+        if exact:
+            raise ExactDuplicate(exact)
+        likely = likely_matches(request.user, record)
+        ids = sorted(item["id"] for item in likely)
+        supplied = request.data.get("candidate_ids", [])
+        if not isinstance(supplied, list) or any(type(item) is not int for item in supplied) or sorted(supplied) != ids:
+            return Response({"code": "acknowledgement_required", "detail": "Review the current likely matches.", "matches": likely}, status=409)
+        record.duplicate_acknowledgement = acknowledgement_basis(record, likely) if likely else ""
+        record.save(update_fields=["duplicate_acknowledgement"])
+        return Response({"acknowledged": bool(likely), "matches": likely})
 
     def destroy(self, request, *args, **kwargs):
         """
@@ -353,19 +382,19 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        # The embargo answer (ADR-052 §2). Parsed here too, so a bad one refuses
-        # before anything is written. No answer leaves the paper Unknown and so
-        # blocked from the AI; IR-816 makes the form send one, then requires it.
-        embargo_answer = embargo.answer_from(request.data)
+        from .duplicates import acknowledgement_basis, enforce_exact, likely_matches, lock_digest
+        lock_digest(record.manuscript_sha256)
+        enforce_exact(request.user, record.pk, record.manuscript_sha256)
+        likely = likely_matches(request.user, record)
+        if likely and record.duplicate_acknowledgement != acknowledgement_basis(record, likely):
+            return Response({"code": "acknowledgement_required", "detail": "Review and acknowledge the likely matches before submitting.", "matches": likely}, status=409)
         try:
-            # Consent, embargo answer, assignment, entry seat and v1 commit together.
+            # Consent, assignment, entry seat and v1 commit together.
             with transaction.atomic():
                 if not record.dpa_accepted:
                     record.dpa_accepted_at = timezone.now()
                     record.dpa_accepted_by = request.user
                     record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-                if embargo_answer is not None:
-                    embargo.record_answer(record, embargo_answer, actor=request.user)
                 enter_at_adviser(record, actor=request.user)
         except RoutingError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -381,6 +410,65 @@ class RecordViewSet(viewsets.ModelViewSet):
             {"detail": "Record submitted successfully. The adviser has been notified."},
             status=status.HTTP_200_OK,
         )
+
+    def _paper_under_lock(self):
+        record = self.get_object()  # a 404 for a paper they can't see, then a 403
+        Record.objects.select_for_update().get(pk=record.pk)
+        return self.get_object()
+
+    def _submitted_paper_under_lock(self):
+        record = self._paper_under_lock()
+        if record.pipeline_status == PipelineStatus.DRAFT:
+            raise serializers.ValidationError({"detail": embargo.NOT_SUBMITTED})
+        return record
+
+    @action(detail=True, methods=["post"], url_path="embargo-set")
+    @transaction.atomic
+    def embargo_set(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-set/  {"embargoed_until": date}
+
+        The Adviser or RDCO gives a submitted paper's embargo a review date,
+        moves it, or embargoes a released paper again (ADR-052 §5 as amended for
+        IR-882, IR-812). Owners can't. The date is required, so this never blanks
+        one; a date is a reminder and ends nothing.
+        """
+        record = self._submitted_paper_under_lock()
+        until = embargo.until_from(request.data)
+        return Response(embargo.set_embargo(record, until, actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="embargo-release")
+    @transaction.atomic
+    def embargo_release(self, request, pk=None):
+        """
+        POST /records/<id>/embargo-release/
+
+        The Adviser or RDCO ends an active embargo and sends the paper on to the
+        AI (ADR-052 §6, §10, IR-812). Who may ask is checked before where the
+        embargo stands, so a refusal says nothing about it.
+        """
+        record = self._submitted_paper_under_lock()
+        if record.embargo_state != EmbargoState.ACTIVE:
+            return Response(
+                {"detail": embargo.NOTHING_TO_RELEASE}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response(embargo.release_embargo(record, actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="ip-release")
+    @transaction.atomic
+    def ip_release(self, request, pk=None):
+        """
+        POST /records/<id>/ip-release/
+
+        KTTO releases an IP-marked paper for the AI and sends it on (ADR-052 §11,
+        IR-813). The mark stays. Who may ask is checked before whether there is a
+        mark to release, so a refusal says nothing about the paper.
+        """
+        record = self._paper_under_lock()
+        refused = ip_release.why_not_releasable(record)
+        if refused is not None:
+            return Response({"detail": refused}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(ip_release.release_ip(record, actor=request.user))
 
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):
@@ -428,6 +516,36 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Content-Disposition"] = f'inline; filename="{filename}"'
         response["Accept-Ranges"] = "bytes"
         response["Cache-Control"] = "private, no-store"
+        return response
+
+    @action(detail=True, methods=["get"], url_path=r"figures/(?P<figure_id>[0-9]+)", url_name="figure")
+    def figure(self, request, pk=None, figure_id=None):
+        """
+        GET /records/<id>/figures/<figure_id>/ -- one Figure's image (IR-845).
+
+        A Figure is part of the paper, so it is read as the paper is:
+        `get_object()` resolves through `visible_to(user)`, and the Figure
+        must belong to this record and to the Manuscript revision this reader
+        is served (`versions.served_manuscript_revision`). Every refusal is
+        the 404 of a missing record. It takes an id, never a file path.
+
+        Stored images are checked to be what their media type says
+        (`documents.figures`); `nosniff` holds the browser to that type.
+        """
+        from apps.documents.models import ExtractionFigure
+        from .versions import served_manuscript_revision
+
+        record = self.get_object()
+        figure = ExtractionFigure.objects.filter(
+            pk=figure_id, extraction__record=record,
+            source_revision=served_manuscript_revision(record, request.user),
+        ).first()
+        if figure is None:
+            raise Http404
+        response = FileResponse(figure.image.open("rb"), content_type=figure.media_type)
+        response["Content-Disposition"] = "inline"
+        response["Cache-Control"] = "private, no-store"
+        response["X-Content-Type-Options"] = "nosniff"
         return response
 
     @action(detail=True, methods=["get"])
@@ -535,6 +653,44 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "private, no-store"
         return response
 
+    @action(
+        detail=True, methods=["get"],
+        url_path=r"versions/(?P<number>[0-9]+)/text", url_name="version-text",
+    )
+    def version_text(self, request, pk=None, number=None):
+        """
+        GET /records/<id>/versions/<n>/text/ -- version n's review text, its
+        sections and passages (ADR-058 §1 as amended, IR-871).
+
+        Review material, so the same rule as `version_manuscript`: a viewer
+        `may_read_review` refuses gets the 404 a missing version gets. A
+        version with no text yet answers with its state and message, and no
+        sections. Audited as the version's manuscript is (ADR-058 §4).
+        """
+        from core.permissions import may_read_review
+
+        from .models import RecordVersion
+        from .review_text.store import payload
+
+        record = self.get_object()
+        version = (
+            RecordVersion.objects.select_related("review_text")
+            .filter(record=record, number=number).first()
+            if may_read_review(request.user, record) else None
+        )
+        if version is None:
+            return Response(
+                {"detail": "No such version of this paper."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        create_audit_event(
+            "DOWNLOAD", request.user, record=record,
+            metadata={"source": "review_text", "version": version.number},
+        )
+        response = Response(payload(version))
+        response["Cache-Control"] = "private, no-store"
+        return response
+
     @action(detail=True, methods=["get"])
     def similar(self, request, pk=None):
         """
@@ -546,8 +702,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         narrower second visibility rule — and of the module IR-285 deleted.
 
         **Empty until the corpus is indexed.** A record with no vector has no
-        neighbours, and the disclosure gate refuses a record with no embargo
-        answer (ADR-052). That is a visible behaviour change from keyword
+        neighbours, and the disclosure gate refuses a record whose embargo
+        hasn't been released (ADR-052). That is a visible behaviour change from keyword
         matching, and it is the intended one — a keyword fallback would hide
         "nothing is indexed" behind plausible results.
         """
@@ -630,24 +786,122 @@ class RecordViewSet(viewsets.ModelViewSet):
             lambda c: c.comment_payload(c.post_comment(
                 record, request.user,
                 body=request.data.get("body"), reply_to=request.data.get("reply_to"),
+                severity=request.data.get("severity"), anchor=request.data.get("anchor"),
             ), request.user),
             success=status.HTTP_201_CREATED,
         )
 
     @action(
-        detail=True, methods=["patch"],
+        detail=True, methods=["patch", "delete"],
         url_path=r"review-comments/(?P<comment_id>[0-9]+)", url_name="review-comment",
     )
     def review_comment(self, request, pk=None, comment_id=None):
         """
-        PATCH /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+        PATCH  /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+        DELETE /records/<id>/review-comments/<comment_id>/
 
-        Its author edits a comment; a changed body stamps `edited_at`.
+        Its author edits a comment; a changed body stamps `edited_at`. A
+        writer deletes only their own draft (IR-874); a sent comment stays.
         """
         record = self.get_object()
+        if request.method == "DELETE":
+            return self._comment_response(
+                lambda c: c.delete_draft(record, request.user, int(comment_id)),
+                success=status.HTTP_204_NO_CONTENT,
+            )
         return self._comment_response(lambda c: c.comment_payload(c.edit_comment(
             record, request.user, int(comment_id), body=request.data.get("body"),
         ), request.user))
+
+    @action(
+        detail=True, methods=["post"],
+        url_path=r"review-comments/(?P<comment_id>[0-9]+)/(?P<act>severity|resolve|reopen|answer)",
+        url_name="review-thread-act",
+    )
+    def review_thread_act(self, request, pk=None, comment_id=None, act=None):
+        """
+        POST /records/<id>/review-comments/<comment_id>/severity/ `{"severity": "must_fix" | "suggestion"}`
+        POST /records/<id>/review-comments/<comment_id>/resolve/
+        POST /records/<id>/review-comments/<comment_id>/reopen/
+        POST /records/<id>/review-comments/<comment_id>/answer/ `{"answer": "addressed" | "declined", "note": str}`
+
+        A review thread's acts (ADR-032 §7, IR-874; `apps.reviews.threads`).
+        Answers with the thread. 404 for a record, review or thread the caller
+        may not see -- another person's draft included -- 403 for one they
+        see but may not act on, 400 for what cannot be done now.
+        """
+        from apps.reviews import comments, threads
+
+        record = self.get_object()
+        user, thread_id = request.user, int(comment_id)
+        acts = {
+            "severity": lambda: threads.change_severity(
+                record, user, thread_id, request.data.get("severity")),
+            "resolve": lambda: threads.resolve(record, user, thread_id),
+            "reopen": lambda: threads.reopen(record, user, thread_id),
+            "answer": lambda: threads.answer(
+                record, user, thread_id,
+                kind=request.data.get("answer"), note=request.data.get("note")),
+        }
+        try:
+            thread = acts[act]()
+        except threads.ThreadNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except threads.ThreadRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except threads.ThreadError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        thread.refresh_from_db()
+        return Response(comments.comment_payload(thread, user))
+
+    @action(detail=True, methods=["post"], url_path="finish-review")
+    def finish_review(self, request, pk=None):
+        """
+        POST /records/<id>/finish-review/
+        `{"verdict": str, "summary": str, "to"?: [...], "suggested_offices"?: [...], "token"?: str}`
+
+        A Seat holder sends their draft threads with a summary and a verdict
+        (ADR-032 §7, IR-874). `comment_only` is a recorded round with no
+        outcome; every other verdict is taken, and refused, by the act that
+        owns it, with its status codes: `send_to_rdco` as accept-and-route/,
+        `cleared` and `finding` as office-review/, `request_revision` as
+        request-revision/, and `accept`, `publish`, `keep_unlisted` and
+        `reject` as decide/ (`token`; 409 when stale). Answers with the tracker.
+        """
+        from apps.reviews import decisions, finish_review, office_review, revisions, routing
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        forbidden = (
+            finish_review.FinishRefused, revisions.RevisionRefused, routing.RoutingRefused,
+            office_review.OfficeReviewRefused, decisions.DecisionRefused,
+        )
+        invalid = (
+            finish_review.FinishError, revisions.RevisionError, routing.RoutingError,
+            office_review.OfficeReviewError, decisions.DecisionError,
+        )
+        try:
+            finish_review.finish_review(
+                record, request.user,
+                verdict=request.data.get("verdict"),
+                summary=request.data.get("summary", ""),
+                to=request.data.get("to"),
+                suggested_offices=request.data.get("suggested_offices"),
+                token=request.data.get("token"),
+            )
+        except finish_review.FinishNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except forbidden as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except invalid as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except decisions.DecisionStale as exc:
+            return Response(
+                {"detail": str(exc), "decision": decisions.decision_flags(record, request.user)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
 
     @action(detail=True, methods=["get"], url_path="metadata-suggestions")
     def metadata_suggestions(self, request, pk=None):
@@ -660,7 +914,30 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         from .metadata_suggestions import suggestions_payload
 
-        return Response(suggestions_payload(self.get_object()))
+        from apps.publication.status import processing_status
+
+        record = self.get_object()
+        payload = suggestions_payload(record)
+        payload["runtime_processing"] = processing_status(record)
+        return Response(payload)
+
+    @action(detail=True, methods=["post"], url_path="retry-extraction")
+    @transaction.atomic
+    def retry_extraction(self, request, pk=None):
+        from apps.documents.models import PdfExtraction
+        from apps.documents.sources import reset_manuscript
+        from .metadata_suggestions import suggestions_payload
+        from .versions import manuscript_awaits_submission
+
+        record = self.get_object()
+        record = Record.objects.select_for_update().get(pk=record.pk)
+        if str(request.data.get("manuscript_revision")) != str(record.manuscript_revision):
+            return Response({"detail": "The manuscript has changed. Check its status again."}, status=409)
+        extraction = PdfExtraction.objects.filter(record=record, status="failed").first()
+        if not extraction or manuscript_awaits_submission(record):
+            return Response({"detail": "There is no failed extraction to retry."}, status=400)
+        reset_manuscript(record, retry=True)
+        return Response(suggestions_payload(record), status=202)
 
     @action(detail=True, methods=["get", "post"], url_path="document-requests")
     def document_requests(self, request, pk=None):
@@ -1022,7 +1299,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         PATCH /records/<id>/tags/
         Staff (KTTO, RDCO, ITSO, IERC) may update IP classification
-        flags and the structured ip_type label on any record.
+        flags and the structured ip_type label on any record. `is_ip` can be
+        set and never cleared: KTTO releases a marked paper with `ip-release/`.
 
         Boolean fields (all optional):
           { "is_ip": true, "for_commercialization": false, "community_extension": false }
@@ -1047,6 +1325,14 @@ class RecordViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_400_BAD_REQUEST,
                     )
                 updates[field] = value
+
+        # Only KTTO's release opens the disclosure check for a marked paper
+        # (ADR-052 §12, IR-813), so no office clears the mark, KTTO included.
+        if updates.get("is_ip") is False and record.is_ip:
+            return Response(
+                {"is_ip": [ip_release.MARK_CANNOT_BE_CLEARED]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         if "ip_type" in request.data:
             ip_type_value = request.data["ip_type"]

@@ -16,7 +16,7 @@ from django.contrib.auth import get_user_model
 
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.tests.corpus import seed_record_vector
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.retrieval.degraded import FullTextRetriever
@@ -71,7 +71,7 @@ def make_record(*, title, status, owner=None, adviser=None, embedder=None, space
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
 
-    RecordEmbedding.objects.create(
+    seed_record_vector(
         record=record,
         embedding=embedder.embed_documents([title])[0],
         model_name="fake-test",

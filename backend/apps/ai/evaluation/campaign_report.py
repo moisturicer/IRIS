@@ -15,13 +15,17 @@ from .conversation_scoring import (ARMS, CONDITION_KEYS, DEFAULT_MIN_EXAMPLES, M
                                    TARGET_LABEL, TARGETS, ZERO_BREACH_NOTE, ScoringError,
                                    diagnostic_stages, score_reviews)
 from .conversations import check_lock, postdates_lock, split_digests
+from .engines import (RUNTIME_ARM, RUNTIME_ENGINE, RUNTIME_TRANSPORT, effective_limits,
+                      effective_models, mismatches, runtime_identity)
 from .pilot_report import percentile
 
 MIN_REPETITIONS = 3
 REQUIRED_MANIFEST = ("run_id", "timestamp_utc", "git_commit", "engine_version",
                      "protocol_version", "cache_state", *CONDITION_KEYS)
 ARM_ENGINES = {"controller": CONTROLLER_ENGINE, "current": LEGACY_ENGINE,
-               "fixed_synthesis": LEGACY_ENGINE}
+               "fixed_synthesis": LEGACY_ENGINE, RUNTIME_ARM: RUNTIME_ENGINE}
+#: The reader protocol each arm speaks; the runtime's is its own, not `public-1`.
+ARM_PROTOCOLS = {RUNTIME_ARM: RUNTIME_TRANSPORT}
 #: Arms with no engine of their own in this codebase must name a pinned release.
 NEEDS_REF = ("fixed_synthesis",)
 APPROVALS = ("funding", "provider_data_policy", "dataset_transmission")
@@ -35,6 +39,15 @@ SCENARIOS = ("access_and_recovery", "durability", "browser")
 DISABLED = {"scenario:A15_public_research":
             "public research stays disabled pending its own approval (ADR-042)"}
 EXAMPLES = 3
+COMPARISONS = {
+    "architecture": "architecture: arms share corpus, models, data policy, budget and cache",
+    "model": "model: one architecture, models vary; never credited to an architecture",
+    "capability": ("capability: one architecture and model, the allowance varies; the gain from "
+                   "more spend is never credited to the architecture or to efficiency"),
+}
+CAPABILITY_NOTE = ("A larger allowance measures what the system can do with more spend. Any "
+                   "gain is never credited to the architecture or to efficiency; each label is "
+                   "reported against its own allowance.")
 
 
 class CampaignRefused(ValueError):
@@ -79,48 +92,61 @@ def _check_manifests(campaign) -> None:
 
 
 def _check_conditions(data: Mapping, campaign, mode: str) -> None:
-    keys = CONDITION_KEYS if mode == "architecture" else tuple(
-        k for k in CONDITION_KEYS if k != "model_ids")
     runs = _runs(campaign)
-    first = runs[0][1]["manifest"]
-    for label, run in runs:
-        manifest = run["manifest"]
-        for key in keys:
-            if manifest[key] != first[key]:
-                raise CampaignRefused(f"{label}: {key} differs from {runs[0][0]}; "
-                                      "conditions are not equal")
-    if first["set_digests"] != split_digests(data):
+    problems = mismatches([(label, run["manifest"]) for label, run in runs], mode)
+    if problems:
+        raise CampaignRefused(problems[0])
+    if runs[0][1]["manifest"]["set_digests"] != split_digests(data):
         raise CampaignRefused("run set_digests do not match the locked set")
 
 
 def _check_arms(campaign, mode: str) -> None:
     for label, run in _runs(campaign):
-        if run["manifest"]["protocol_version"] != PUBLIC_PROTOCOL:
-            raise CampaignRefused(f"{label}: runs must use the authenticated {PUBLIC_PROTOCOL} "
-                                  "reader protocol")
         arm = run.get("arm")
         if arm not in ARMS:
             raise CampaignRefused(f"{label}: unknown arm {arm!r}")
+        protocol = ARM_PROTOCOLS.get(arm, PUBLIC_PROTOCOL)
+        if run["manifest"]["protocol_version"] != protocol:
+            raise CampaignRefused(f"{label}: runs must use the authenticated {protocol} "
+                                  "reader protocol")
+        if arm == RUNTIME_ARM and run["manifest"].get("identity") != runtime_identity():
+            raise CampaignRefused(f"{label}: a runtime run must carry the runtime engine, "
+                                  "transport and schema identity")
         if run["manifest"]["engine_version"] != ARM_ENGINES[arm]:
             raise CampaignRefused(f"{label}: arm {arm} ran engine "
                                   f"{run['manifest']['engine_version']}, not {ARM_ENGINES[arm]}")
         if arm in NEEDS_REF and not str(run["manifest"].get("implementation_ref") or "").strip():
             raise CampaignRefused(f"{label}: {arm} has no engine of its own here; its manifest "
                                   "needs the implementation_ref of a pinned release")
-    if mode == "model":
+    if mode in ("model", "capability"):
         if len({run.get("arm") for _, run in _runs(campaign)}) != 1:
-            raise CampaignRefused("a model comparison holds the architecture fixed; "
+            raise CampaignRefused(f"a {mode} comparison holds the architecture fixed; "
                                   "compare architectures separately")
-        models = [str(runs[0]["manifest"]["model_ids"]) for runs in campaign.values()]
-        if len(set(models)) != len(models):
-            raise CampaignRefused("a model comparison needs different model_ids per label")
+        if mode == "model":
+            models = [str(effective_models(runs[0]["manifest"])) for runs in campaign.values()]
+            if len(set(models)) != len(models):
+                raise CampaignRefused("a model comparison needs different model_ids per label")
+        else:
+            code = {(r["manifest"]["engine_version"], r["manifest"]["git_commit"],
+                     r["manifest"].get("implementation_ref"), str(r["manifest"].get("identity")))
+                    for _, r in _runs(campaign)}
+            if len(code) != 1:
+                raise CampaignRefused("a capability report holds the code fixed: every label "
+                                      "needs the same engine, commit and release")
+            limits = [str(sorted(effective_limits(runs[0]["manifest"].get("limits")).items()))
+                      for runs in campaign.values()]
+            if len(set(limits)) != len(limits):
+                raise CampaignRefused("equal allowances make this an architecture comparison, not "
+                                      "a capability report: each label needs its own "
+                                      "allowance (limits)")
         return
     identities = {}
     for label, runs in campaign.items():
         if any(run.get("arm") != label for run in runs):
             raise CampaignRefused(f"{label}: every run under an arm label must be that arm")
         pinned = {(r["manifest"]["engine_version"], r["manifest"]["git_commit"],
-                   r["manifest"].get("implementation_ref")) for r in runs}
+                   r["manifest"].get("implementation_ref"),
+                   str(r["manifest"].get("identity"))) for r in runs}
         if len(pinned) != 1:
             raise CampaignRefused(f"{label}: repetitions ran different implementations")
         identities[label] = pinned.pop()
@@ -199,9 +225,24 @@ def _uncosted(rows) -> int:
 def _cost_group(rows: Sequence[tuple[str, Mapping]], successes) -> dict:
     latencies = [r["latency_ms"] for _, r in rows if r.get("latency_ms") is not None]
     operations: dict[str, dict] = {}
+    purposes: dict[str, dict] = {}
+    states: Counter = Counter()
+    reserved = 0.0
     models = set()
+    outcomes = Counter(t.get("outcome") for _, r in rows for t in r.get("turns", ()))
     for _, r in rows:
         for a in _attempts(r):
+            if a.get("state"):
+                states[a["state"]] += 1
+            if a.get("reserved_cost_usd") is not None:
+                reserved += a["reserved_cost_usd"]
+            if a.get("purpose"):
+                why = purposes.setdefault(a["purpose"], {
+                    "attempts": 0, "reported_usd": 0, "unreported_reserved_usd": 0})
+                why["attempts"] += 1
+                if a.get("cost_usd") is not None:
+                    why["reported_usd" if a.get("usage_reported")
+                        else "unreported_reserved_usd"] += a["cost_usd"]
             op = operations.setdefault(a.get("operation", "unknown"), {
                 "attempts": 0, "reported_usd": 0, "unreported_reserved_usd": 0})
             op["attempts"] += 1
@@ -217,7 +258,9 @@ def _cost_group(rows: Sequence[tuple[str, Mapping]], successes) -> dict:
                                              for run_id, r in rows)
     out = {"conversations": len(rows), "no_latency_recorded": len(rows) - len(latencies),
            "p50_ms": percentile(latencies, 0.5), "p95_ms": percentile(latencies, 0.95),
-           "operations": operations, "models": sorted(models), "reported_usd": reported,
+           "operations": operations, "purposes": purposes, "outcomes": dict(outcomes),
+           "attempt_states": dict(states), "reserved_usd": reserved,
+           "models": sorted(models), "reported_usd": reported,
            "unreported_reserved_usd": sum(op["unreported_reserved_usd"]
                                           for op in operations.values()),
            "turns_missing_usage": missing, "attempts_missing_cost": uncosted,
@@ -319,7 +362,7 @@ def _reviews_for(run: Mapping, label: str, reviews: Sequence[Mapping], *, repeat
         if mode == "architecture" and r.get("arm") != run.get("arm"):
             continue
         if "run_id" not in r:
-            if repeated or mode == "model":
+            if repeated or mode != "architecture":
                 raise CampaignRefused(f"{r.get('conversation')}: with repetitions every review "
                                       "must name the run_id it judged")
         elif r["run_id"] != run.get("run_id"):
@@ -406,6 +449,8 @@ def _arm(label: str, runs: Sequence[Mapping], data: Mapping, reviews, *, mode: s
     return {"status": "measured", "architecture": runs[0].get("arm"),
             "git_commit": runs[0]["manifest"]["git_commit"],
             "engine_version": runs[0]["manifest"]["engine_version"],
+            "identity": runs[0]["manifest"].get("identity"),
+            "allowance": effective_limits(runs[0]["manifest"].get("limits")),
             "repetitions": repetitions, "summary": summary, "families": family_report,
             "access_breaches": breaches, "spend": spend(runs, successes),
             "single_reviewed": singles,
@@ -509,9 +554,7 @@ def build_report(data: Mapping, lock: Optional[Mapping],
     corpus = data.get("corpus") or {}
     return {
         "issue": "IR-609", "set_id": data.get("set_id"), "mode": mode,
-        "comparison": ("architecture: arms share corpus, models, data policy and budget"
-                       if mode == "architecture" else
-                       "model: one architecture, models vary; never credited to an architecture"),
+        "comparison": COMPARISONS[mode],
         "counted": counted and not reasons, "not_counted_reasons": reasons,
         "label_status": data.get("label_status"), "min_examples": min_examples,
         "corpus": {"snapshot_id": corpus.get("snapshot_id"),
@@ -519,7 +562,8 @@ def build_report(data: Mapping, lock: Optional[Mapping],
         "approvals": approvals_status(approvals), "arms": arms, "scenarios": scenario_rows,
         "unmeasured": unmeasured, "excluded_runs": [dict(e) for e in excluded],
         "enablement_blocked": bool(blocking), "blocking": blocking,
-        "notes": [NOT_AUTHORIZED, ZERO_BREACH_NOTE, TARGET_LABEL],
+        "notes": [NOT_AUTHORIZED, ZERO_BREACH_NOTE, TARGET_LABEL,
+                  *([CAPABILITY_NOTE] if mode == "capability" else [])],
     }
 
 
@@ -539,7 +583,8 @@ def _arm_markdown(label: str, arm: Mapping) -> list[str]:
     if arm["status"] != "measured":
         return lines + [f"not_measured: {arm['reason']}", ""]
     runs = arm["repetitions"]
-    lines += [f"{arm['engine_version']} @ {arm['git_commit']}, {len(runs)} repetitions", "",
+    lines += [f"{arm['engine_version']} @ {arm['git_commit']}, {len(runs)} repetitions",
+              f"allowance {arm['allowance']}", "",
               "| Metric | " + " | ".join(r["run_id"] for r in runs) + " |",
               "|---|" + "---|" * len(runs)]
     lines += [f"| {metric} | " + " | ".join(_frac(f) for f in row["per_repetition"]) + " |"
@@ -557,6 +602,12 @@ def _arm_markdown(label: str, arm: Mapping) -> list[str]:
                      f"unreported reserved {_usd(g['unreported_reserved_usd'])}, "
                      f"missing usage {g['turns_missing_usage']} turns, "
                      f"cost/success {_usd(g['cost_per_successful_task'])}")
+        if g["outcomes"] or g["purposes"]:
+            purposes = ", ".join(f"{name}={row['attempts']}"
+                                 for name, row in sorted(g["purposes"].items())) or "none"
+            lines.append(f"  - turn outcomes {dict(sorted(g['outcomes'].items()))}; attempt "
+                         f"purposes {purposes}; reserved {_usd(g['reserved_usd'])}; "
+                         f"attempt states {dict(sorted(g['attempt_states'].items()))}")
     stages: Counter = Counter()
     for rep in runs:
         stages.update(rep["diagnostics"]["stages"])

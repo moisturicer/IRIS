@@ -49,6 +49,7 @@ from .clearance_state import (
     carryover_fields, clearance_payload, is_preserved, record_versions, resubmission_payload,
 )
 from .comments import comments_payload
+from .finish_review import rounds_payload
 from .decisions import withdrawn_by_label
 from .models import (
     RecordAssignment, RecordClearance, ResubmissionRequest, Review, ReviewerSeat, RoutingEvent,
@@ -800,6 +801,8 @@ def tracker_payload(record, user) -> dict[str, Any]:
         # The review discussion (ADR-032 §7, IR-419), oldest first. `None`,
         # as `reviews` is, to a viewer who may not read the review.
         "review_comments": comments_payload(record, user) if readable else None,
+        # Finished reviews, Comment only included (ADR-032 §7, IR-874).
+        "review_rounds": rounds_payload(record) if readable else None,
         "resubmissions": _resubmissions(record, staff=staff, readable=readable),
         "reassignments": _reassignments(record, staff=staff, readable=readable),
         "document_requests": (

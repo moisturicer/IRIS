@@ -20,6 +20,7 @@ from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.records.models import RecordVersion
 from apps.documents.testing import real_pdf_bytes
 from .models import DeleteRequest, Record, RecordOwner, RecordType
+from .testing import released_embargo
 from apps.reviews.test_decisions import DecisionTestBase
 
 MANUSCRIPT_BYTES = real_pdf_bytes()
@@ -64,7 +65,8 @@ class SubmitOwnershipTests(APITestCase):
         # gate before the permission check it exists to exercise ever ran.
         # Changed deliberately, not to make a red test green: the assertions
         # are untouched, and consent has its own suite in
-        # `DpaConsentAtSubmitTests` below.
+        # `DpaConsentAtSubmitTests` below. The embargo answer likewise (IR-816).
+        released_embargo(self.record.id)
         return self.client.post(
             reverse("record-submit", args=[self.record.id]),
             {"dpa_accepted": True},
@@ -334,7 +336,8 @@ class ManuscriptExtractionTriggerTests(APITestCase):
                 response = self._patch_manuscript()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        mock_delay.assert_called_once_with(self.record.id)
+        self.record.refresh_from_db()
+        mock_delay.assert_called_once_with(self.record.id, str(self.record.manuscript_revision))
 
     def test_patching_abstract_file_creates_a_pdf_extraction_row(self):
         from unittest.mock import patch
@@ -370,7 +373,8 @@ class ManuscriptExtractionTriggerTests(APITestCase):
                 )
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED, response.data)
-        mock_delay.assert_called_once_with(response.data["id"])
+        record = Record.objects.get(pk=response.data["id"])
+        mock_delay.assert_called_once_with(record.pk, str(record.manuscript_revision))
 
     def test_patching_an_unrelated_field_does_not_queue_extraction(self):
         from unittest.mock import patch
@@ -689,6 +693,7 @@ class DpaConsentAtSubmitTests(APITestCase):
         self.assertEqual(self.record.pipeline_status, "draft")
 
     def test_consent_is_stamped_with_who_and_when(self):
+        released_embargo(self.record.id)
         response = self._post({"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.record.refresh_from_db()

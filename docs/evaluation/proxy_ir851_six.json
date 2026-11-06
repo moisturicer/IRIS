@@ -1,0 +1,222 @@
+{
+  "name": "proxy_ir851_six",
+  "tier": "proxy",
+  "corpus": "docs/corpus (openly-licensed arXiv papers, 6 categories)",
+  "notes": "IR-851 subset of proxy_starter.json, less q15 (its quote sits on page 1 in a fresh Docling extraction and page 2 in LlamaParse and the starter label, so it cannot be scored on both): questions whose every expected passage is in one of six papers, one per category (ADR-056 amendment of 2026-11-03). Proxy tier, ADR-023: never a finding about CIT-U research. ADR-023 tier 1: an engineering gate. A number from this set decides whether a retrieval switch earns its place and is NEVER cited as a finding about CIT-U research. Question kinds follow docs/evaluation/README.md: paraphrased mechanism (the default), exact term or number, near-duplicate discrimination, and cross-paper; IR-463 adds general-knowledge, off-corpus-research, ambiguous, follow-up-after-direct and follow-up-after-grounded, which carry evidence_required and expected_outcome. Every quote is copied from the chunk text `manage.py inspect_chunks` prints, not from the PDF, because Docling respaces parentheses and maths.",
+  "questions": [
+    {
+      "id": "q01",
+      "kind": "mechanism",
+      "question": "how did earlier work deal with not knowing exactly where the trade-off frontier sits?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+          "page": 2,
+          "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
+        }
+      ]
+    },
+    {
+      "id": "q08",
+      "kind": "mechanism",
+      "question": "where is the waveform actually held in their scheme?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": 2,
+          "quote": "signals are represented in the probability amplitudes of a quantum state"
+        }
+      ]
+    },
+    {
+      "id": "q18",
+      "kind": "mechanism",
+      "question": "how do they stop the two kinds of on-chip traffic from jamming each other?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+          "page": 3,
+          "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
+        }
+      ]
+    },
+    {
+      "id": "q19",
+      "kind": "exact-term",
+      "question": "how many qubits are needed to index the signal samples?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": 2,
+          "quote": "qubits are needed for the sample position"
+        }
+      ]
+    },
+    {
+      "id": "q22",
+      "kind": "exact-term",
+      "question": "which model and numeric precision were instrumented to observe cache access patterns?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+          "page": 2,
+          "quote": "An instrumented FP16 decoder on LLaMA-2-7B"
+        }
+      ]
+    },
+    {
+      "id": "q29",
+      "kind": "mechanism",
+      "question": "how did they assemble the list of candidate young galaxy clusters to follow up?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 2,
+          "quote": "protocluster candidate catalogue using the deep learning framework PCFNet"
+        }
+      ]
+    },
+    {
+      "id": "q30",
+      "kind": "exact-term",
+      "question": "how many candidate protoclusters did the network flag?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 3,
+          "quote": "121 protocluster candidates identified by PCFNet"
+        }
+      ]
+    },
+    {
+      "id": "q42",
+      "kind": "exact-term",
+      "question": "which two solvers did they implement, one for easy equations and one for hard ones?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 2,
+          "quote": "explicit Tsitouras 5(4) method for non-stiff systems and the fifth-order Rodas5P"
+        }
+      ]
+    },
+    {
+      "id": "q61",
+      "kind": "follow-up-after-grounded",
+      "question": "what exactly did they say about that?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "what exactly did the authors say about quantifying uncertainties around Pareto fronts?",
+      "expected": [
+        {
+          "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+          "page": 2,
+          "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
+        }
+      ]
+    },
+    {
+      "id": "q75",
+      "kind": "follow-up-after-grounded",
+      "question": "and how many of those does it need?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "and how many qubits does State-Space-Based FIR Filtering on a Quantum Computer need for the sample position?",
+      "expected": [
+        {
+          "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+          "page": 2,
+          "quote": "qubits are needed for the sample position"
+        }
+      ]
+    },
+    {
+      "id": "q76",
+      "kind": "follow-up-after-grounded",
+      "question": "so how many did it flag?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "so how many protocluster candidates did PCFNet flag?",
+      "expected": [
+        {
+          "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+          "page": 3,
+          "quote": "121 protocluster candidates identified by PCFNet"
+        }
+      ]
+    },
+    {
+      "id": "q77",
+      "kind": "follow-up-after-grounded",
+      "question": "which two of those did they build?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "resolved_question": "which two ODE solvers did the GPU-accelerated ensembles work implement, one for non-stiff and one for stiff systems?",
+      "expected": [
+        {
+          "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+          "page": 2,
+          "quote": "explicit Tsitouras 5(4) method for non-stiff systems and the fifth-order Rodas5P"
+        }
+      ]
+    },
+    {
+      "id": "q105",
+      "kind": "near-duplicate",
+      "question": "which cache design treats the stored keys and values as traffic to be routed rather than as a storage problem?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+          "page": 1,
+          "quote": "We treat the KV cache as a communication substrate"
+        }
+      ]
+    },
+    {
+      "id": "q112",
+      "kind": "cross-paper",
+      "question": "which work corrects a measure of how much a network changed for mistakes in estimating its links?",
+      "evidence_required": "corpus",
+      "expected_outcome": "answer",
+      "institutional": false,
+      "expected": [
+        {
+          "record": "Noise-adjusted turnover in estimated networks",
+          "page": 1,
+          "quote": "latent turnover admits a closed-form unbiased adjustment based only on observed turnover and the two estimated graph sizes"
+        }
+      ]
+    }
+  ]
+}

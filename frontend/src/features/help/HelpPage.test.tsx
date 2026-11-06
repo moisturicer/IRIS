@@ -45,6 +45,17 @@ describe("Help", () => {
     expect(section("Administration")).not.toBeInTheDocument();
   });
 
+  it("tells an author every paper starts embargoed, and who ends it (ADR-052, IR-882)", () => {
+    renderAs({ role_name: ROLES.STUDENT });
+
+    const publishing = section("Publishing your research")!;
+    expect(within(publishing).queryByText(/asks first whether/)).not.toBeInTheDocument();
+    expect(within(publishing).getByText(/Every paper starts under an embargo/)).toBeInTheDocument();
+    expect(within(publishing).getByText(/outside AI companies/)).toBeInTheDocument();
+    expect(within(publishing).getByText(/doesn.t end the embargo/)).toBeInTheDocument();
+    expect(within(publishing).getByText(/Only your Adviser or RDCO can release it/)).toBeInTheDocument();
+  });
+
   it("always explains the review workflow and who to contact", () => {
     renderAs({ role_name: ROLES.STUDENT });
 
@@ -85,6 +96,14 @@ describe("Help", () => {
     renderAs({ role_name: ROLES.RDCO, review_access: { my_reviews: true, offices: ["rdco"], is_coordinator: true } });
 
     expect(section("Coordinating your office")).toBeInTheDocument();
+    expect(section("RDCO")).toBeInTheDocument();
+  });
+
+  it("shows the System Admin its own administration (IR-783)", () => {
+    renderAs({ role_name: ROLES.SYSTEM_ADMIN, review_access: { my_reviews: false, offices: [], is_coordinator: false } });
+
     expect(section("Administration")).toBeInTheDocument();
+    expect(section("RDCO")).not.toBeInTheDocument();
+    expect(section("Coordinating your office")).not.toBeInTheDocument();
   });
 });

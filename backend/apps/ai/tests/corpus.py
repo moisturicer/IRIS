@@ -35,6 +35,26 @@ FLOOD_QUESTION = "neural network rainfall flooding catchment"
 POND_QUESTION = "tilapia pond stocking brackish water"
 
 
+def seed_record_vector(*, record, embedding, model_name, space=None, keyed=True):
+    """A Record's summary vector as every reader now finds it (IR-739).
+
+    The legacy ``RecordEmbedding`` row still exists (it is removed in the
+    contract phase), and the space-keyed row readers query is written beside
+    it, for the active space unless ``space`` names another. ``keyed=False``
+    leaves the legacy row alone: a vector from a model no space holds.
+    """
+    from apps.ai.models.embedding import RecordSpaceEmbedding
+    from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
+
+    row = RecordEmbedding.objects.create(
+        record=record, embedding=embedding, model_name=model_name)
+    space = space or EmbeddingSpace.objects.filter(state=EmbeddingSpaceState.ACTIVE).first()
+    if keyed and space is not None:
+        RecordSpaceEmbedding.objects.update_or_create(
+            record=record, space=space, defaults={"embedding": embedding})
+    return row
+
+
 # -- the corpus ---------------------------------------------------------------
 
 
@@ -53,7 +73,7 @@ def make_user(email, role_name=ROLE_STUDENT):
 
 #: `page_sizes` for a letter-size page 4 -- `make_record`'s chunk is always
 #: `source_page=4`, and `page_sizes` is keyed by page number as a string,
-#: the same shape `apps.ai.extraction.docling_mapping._page_sizes` writes.
+#: the same shape `document_to_json` writes.
 LETTER = {"4": [612.0, 792.0]}
 
 
@@ -75,7 +95,7 @@ def make_record(*, title, text, embedder, space, status=PipelineStatus.PUBLISHED
     if owner is not None:
         RecordOwner.objects.create(record=record, user=owner, is_primary=True)
 
-    RecordEmbedding.objects.create(
+    seed_record_vector(
         record=record,
         embedding=embedder.embed_documents([f"{title}. {text}"])[0],
         model_name="fake-test",

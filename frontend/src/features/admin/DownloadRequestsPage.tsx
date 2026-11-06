@@ -198,7 +198,7 @@ export default function DownloadRequestsPage() {
           disabled={loading}
           variant="outline"
           size="sm"
-          className="ml-auto"
+          className="w-full justify-center sm:ml-auto sm:w-auto"
         >
           <i className={`fas fa-sync-alt text-[12px] ${loading ? "animate-spin" : ""}`} aria-hidden />
           Refresh
@@ -228,7 +228,7 @@ export default function DownloadRequestsPage() {
             </span>
           </div>
 
-          <div className="overflow-x-auto">
+          <div className="relative overflow-x-auto">
             <table className="w-full text-[14px]">
               <thead>
                 <tr className="bg-stone-50 border-b border-stone-200 text-left">

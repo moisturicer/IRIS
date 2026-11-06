@@ -48,14 +48,18 @@ Refuses to run with `DEBUG` off unless `--force`, because these are
 known-password accounts.
 """
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.models import College, Course, Role, StudentProfile, User
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.records import lifecycle
+from apps.records.embargo import mark_released, set_embargo
 from apps.records.models import (
     Author,
     Classification,
@@ -63,7 +67,7 @@ from apps.records.models import (
     RecordOwner,
     RecordType,
 )
-from core.enums import IPType, Office, RecordTypeName, RoleName
+from core.enums import IPType, Office, PipelineStatus, RecordTypeName, RoleName
 
 #: The convention that already existed, kept deliberately (see module docstring).
 PASSWORD = "IrisDemo123!"
@@ -89,13 +93,14 @@ COORDINATOR_ACCOUNTS = [
     ("rdco.coordinator@cit.edu", "Ramon", "Bautista", RoleName.RDCO),
 ]
 
-#: The seventh account: **a Django superuser holding no application role.**
+#: The seventh account: **the System Admin, and a Django superuser too.**
 #:
-#: `core.permissions.ADMIN_ROLES` is `{RDCO}` -- RDCO is IRIS's administrator,
-#: holding account administration, the audit log and the request queues. This
-#: account opens /admin and nothing else, because IR-165 deliberately left
-#: `is_superuser` with no API standing. Giving it a role would look harmless and
-#: quietly recreate the privilege bypass that ticket removed.
+#: The System Admin runs IRIS itself: the Audit Log, system settings and office
+#: roles (ADR-051 §3, IR-781). RDCO administers people's accounts and the request
+#: queues. The superuser flag only opens Django's admin site, because IR-165 left
+#: `is_superuser` with no API standing, so the role is what this account does in
+#: IRIS. ADR-051 §6 lets only this demo login hold both; a real System Admin is a
+#: named person's account and not a superuser.
 ADMIN_EMAIL = "admin@cit.edu"
 
 CLASSIFICATIONS = [
@@ -160,6 +165,16 @@ AT_RDCO_TITLE = f"{_PREFIX} Thesis ITSO cleared, RDCO's turn to decide"
 PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} Proposal at its Adviser, ready to accept or reject"
 AWAITING_DOCUMENT_TITLE = f"{_PREFIX} Adviser requested a supporting document"
 
+#: Every paper starts embargoed (ADR-052, amended for IR-882), and decision 16
+#: as amended leaves some submitted papers Active and releases the rest, so both
+#: paths can be shown. This one is in front of RDCO, which can't publish it until
+#: it is released, and carries a date always ahead, so it never reads as overdue.
+EMBARGOED_TITLE = AT_RDCO_TITLE
+EMBARGO_DAYS_AHEAD = 365
+#: Active with no date, at its Adviser, who can add a date or release it.
+UNDATED_EMBARGO_TITLE = AWAITING_DOCUMENT_TITLE
+STAYS_EMBARGOED = (EMBARGOED_TITLE, UNDATED_EMBARGO_TITLE)
+
 
 class Command(BaseCommand):
     help = "Seed demo accounts, the Discover catalogue, and every pipeline state (IR-227)."
@@ -198,6 +213,7 @@ class Command(BaseCommand):
             self._seed_classifications()
             self._seed_catalogue(users)
             self._seed_workflow(users)
+            self._settle_papers_seeded_earlier()
 
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Demo data ready."))
@@ -208,6 +224,8 @@ class Command(BaseCommand):
             self.stdout.write(f"  Already-preserved badges render on: '{RESUBMITTED_TITLE}'")
             self.stdout.write(f"  Pick the offices as RDCO on: '{IN_RDCO_POOL_TITLE}'")
             self.stdout.write(f"  Decide early as RDCO on: '{RDCO_DECIDES_EARLY_TITLE}'")
+            self.stdout.write(f"  Under embargo until a date, so RDCO can't publish it: '{EMBARGOED_TITLE}'")
+            self.stdout.write(f"  Under embargo with no date, for the Adviser to release: '{UNDATED_EMBARGO_TITLE}'")
 
     # -- phase 1: accounts -------------------------------------------------
 
@@ -222,14 +240,15 @@ class Command(BaseCommand):
         admin, created = User.objects.get_or_create(
             email=ADMIN_EMAIL, defaults={"first_name": "Iris", "last_name": "Admin"},
         )
-        # role stays None deliberately -- see ADMIN_EMAIL's docstring.
+        admin.role = Role.objects.get_or_create(name=RoleName.SYSTEM_ADMIN)[0]
+        admin.is_office_coordinator = False
         admin.is_staff = True
         admin.is_superuser = True
         admin.is_verified = True
         admin.is_active = True
         admin.set_password(self.password)
         admin.save()
-        self._report(created, f"{ADMIN_EMAIL:26} Django superuser, no application role")
+        self._report(created, f"{ADMIN_EMAIL:26} System Admin, and a Django superuser")
 
         return users
 
@@ -384,7 +403,48 @@ class Command(BaseCommand):
         record.dpa_accepted_at = timezone.now()
         record.dpa_accepted_by = owner
         record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-        return enter_at_adviser(record, owner)
+        entry = enter_at_adviser(record, owner)
+        self._settle_embargo(record)
+        return entry
+
+    def _settle_embargo(self, record: Record) -> None:
+        """
+        What the Adviser would do: date the one paper RDCO is shown, leave the
+        undated one Active, and release every other. As the Adviser, because only
+        the Adviser or RDCO set a date or release (ADR-052 §5-6, amended for IR-882).
+        """
+        if record.title == EMBARGOED_TITLE:
+            until = timezone.localdate() + timedelta(days=EMBARGO_DAYS_AHEAD)
+            set_embargo(record, until, actor=record.adviser)
+        elif record.title not in STAYS_EMBARGOED:
+            mark_released(record, actor=record.adviser)
+
+    def _settle_papers_seeded_earlier(self):
+        """
+        Settle this command's own papers that an older run left embargoed.
+
+        A second run creates nothing, so without this a database seeded before
+        IR-882 would keep papers it meant to show as released out of Ask IRIS.
+        Only papers still embargoed with no date set and never released: a date
+        someone set, or a released paper held again, is left as it is. Named by
+        title and origin together, so nothing from anywhere else is released. The
+        draft stays as it is.
+        """
+        catalogue = [entry[0] for entry in CATALOGUE]
+        earlier = (
+            Record.objects.filter(
+                Q(title__startswith=_PREFIX) | Q(title__in=catalogue),
+                origin=Record.Origin.SYNTHETIC,
+                is_embargoed=True, embargo_date_set_at__isnull=True,
+            )
+            .exclude(pipeline_status=PipelineStatus.DRAFT)
+            .select_related("added_by")
+        )
+        for record in earlier.select_related("adviser"):
+            if record.title == UNDATED_EMBARGO_TITLE:
+                continue  # already as it should be; say nothing about it
+            self._settle_embargo(record)
+            self.stdout.write(f"  ~ {record.title[:58]} (embargo settled)")
 
     @transaction.atomic
     def _scenario_draft(self, users):
@@ -584,17 +644,12 @@ class Command(BaseCommand):
         Entered through `routing.enter_at_adviser`, as every submission is.
         This one is where *Accept & send to RDCO…* is demoed (as adviser@cit.edu).
         """
-        from apps.reviews.routing import enter_at_adviser
-
         record = self._make(
             NEW_MODEL_TITLE, RecordTypeName.THESIS_RESEARCH, users[RoleName.STUDENT],
             adviser=users[RoleName.ADVISER], is_ip=True,
         )
         if record:
-            record.dpa_accepted_at = timezone.now()
-            record.dpa_accepted_by = users[RoleName.STUDENT]
-            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-            enter_at_adviser(record, users[RoleName.STUDENT])
+            self._submit(record, users[RoleName.STUDENT])
             self._done(record)
 
     @transaction.atomic
@@ -604,18 +659,13 @@ class Command(BaseCommand):
         through `routing.enter_at_adviser`; adviser@cit.edu opens the review and
         demos *Accept* and *Reject*, which a Proposal's Adviser alone decides.
         """
-        from apps.reviews.routing import enter_at_adviser
-
         student = users[RoleName.STUDENT]
         record = self._make(
             PROPOSAL_AT_ADVISER_TITLE, RecordTypeName.PROPOSAL, student,
             adviser=users[RoleName.ADVISER],
         )
         if record:
-            record.dpa_accepted_at = timezone.now()
-            record.dpa_accepted_by = student
-            record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-            enter_at_adviser(record, student)
+            self._submit(record, student)
             self._done(record)
 
     @transaction.atomic
@@ -629,7 +679,7 @@ class Command(BaseCommand):
         from apps.reviews import seats
         from apps.reviews.models import RecordAssignment, ReviewerSeat
         from apps.reviews.office_review import CLEARED, record_office_review
-        from apps.reviews.routing import accept_and_route, enter_at_adviser, route
+        from apps.reviews.routing import accept_and_route, route
 
         student, adviser, itso = (
             users[RoleName.STUDENT], users[RoleName.ADVISER], users[RoleName.ITSO],
@@ -640,10 +690,7 @@ class Command(BaseCommand):
         )
         if not record:
             return
-        record.dpa_accepted_at = timezone.now()
-        record.dpa_accepted_by = student
-        record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-        entry = enter_at_adviser(record, student)
+        entry = self._submit(record, student)
         seats.open_review(entry.seats.get(), adviser)
         rdco = users[RoleName.RDCO]
         accept_and_route(record, adviser, to=[{"party": "rdco", "nominees": [rdco.pk]}], reason="The sensor fusion method needs technical review.")

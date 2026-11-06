@@ -24,7 +24,7 @@ from apps.ai.history import (
     estimate_tokens,
     history_window,
     readable_record_ids,
-    readable_turns,
+    sendable_turns,
 )
 from apps.ai.models import ChunkSet, Conversation, ConversationState, Turn, TurnCitation
 
@@ -357,10 +357,10 @@ def conversation_context(conversation: Conversation, user, request: str,
     candidates = list(
         conversation.turns.in_model_history().order_by("-id")[:HISTORY_CANDIDATE_LIMIT]
     )[::-1]
-    readable = readable_turns(candidates, user)
-    recent = history_window(readable)
+    sendable = sendable_turns(candidates, user)
+    recent = history_window(sendable)
     first_recent = recent[0].pk if recent else None
-    older = [t for t in readable if first_recent is None or t.pk < first_recent]
+    older = [t for t in sendable if first_recent is None or t.pk < first_recent]
     cited = _cited_by_turn([t.pk for t in older])
 
     earlier, spent, budget = [], 0, _earlier_budget()

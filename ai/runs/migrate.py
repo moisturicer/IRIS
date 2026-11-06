@@ -24,6 +24,13 @@ GRANTS = (
     " iris_ai.research_handle TO {role}",
     "GRANT SELECT, INSERT, UPDATE ON iris_ai.attempt_accounting TO {role}",
     "GRANT USAGE ON SEQUENCE iris_ai.attempt_accounting_id_seq TO {role}",
+    "GRANT SELECT, INSERT, DELETE ON iris_ai.manuscript_receipt TO {role}",
+    "GRANT UPDATE (authority_generation, acknowledged_at) ON iris_ai.manuscript_receipt TO {role}",
+    "GRANT SELECT, INSERT ON iris_ai.manuscript_invalidation_receipt TO {role}",
+    "GRANT SELECT, INSERT, UPDATE ON iris_ai.extraction_job TO {role}",
+    "GRANT SELECT, INSERT ON iris_ai.extraction_revision TO {role}",
+    "GRANT SELECT, INSERT, UPDATE, DELETE ON iris_ai.run_checkpoint TO {role}",
+    "GRANT SELECT, INSERT, DELETE ON iris_ai.conversation_handoff TO {role}",
 )
 
 

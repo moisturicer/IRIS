@@ -32,8 +32,9 @@ what IR-282's backfill needs.
 
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
-from typing import Any, Callable, Optional, Sequence
+from typing import Optional, Sequence
 
 from django.core.exceptions import ImproperlyConfigured
 
@@ -42,13 +43,6 @@ from apps.ai.policy.disclosure import Decision
 from apps.ai.policy.outbound import Dependency, OutboundGuard, Withheld
 from apps.ai.providers.batching import window_for_embedding
 from apps.ai.providers.ports import EmbeddingProvider
-
-#: What a caller may inject in place of the gate. A ``Decision`` rather than a
-#: ``bool`` so a refusal carries its own explanation — see
-#: ``_require_disclosure``. ``apps.ai.policy.bypass.permit_everything`` is the
-#: only alternative in the tree (IR-317), and it is development-only.
-DisclosurePredicate = Callable[[Any], Decision]
-
 
 class EmbeddingRefused(Exception):
     """The disclosure policy will not let this record's content be sent.
@@ -113,8 +107,12 @@ class EmbeddingOutcome:
         }
 
 
-def build_embedding_provider() -> EmbeddingProvider:
+def build_embedding_provider(model: Optional[str] = None) -> EmbeddingProvider:
     """The adapter the indexing path uses.
+
+    ``model`` names the embedding model to ask for; unset, the configured one.
+    Only a pending-space build passes it (IR-752), so the second identity can
+    be built while the setting readers embed their queries with stays put.
 
     A function rather than a module-level instance so a test can monkeypatch
     one place, and so nothing is constructed at import time — ``VoyageEmbedding
@@ -127,7 +125,7 @@ def build_embedding_provider() -> EmbeddingProvider:
     """
     from apps.ai.providers.voyage import VoyageEmbeddingProvider
 
-    return VoyageEmbeddingProvider()
+    return VoyageEmbeddingProvider(model=model)
 
 
 def _checked_space(provider: EmbeddingProvider, space_id: Optional[int] = None):
@@ -177,20 +175,28 @@ def _checked_space(provider: EmbeddingProvider, space_id: Optional[int] = None):
             f"but space {space.pk} ({space.model_id!r}) is {space.dimensions}. "
             f"Refusing before the vendor call rather than after it."
         )
+    # A provider that names its model must name this space's. After a promotion
+    # the active space is a different model; a worker still configured for the
+    # old one would otherwise write old-model vectors into the new space, a
+    # mix of two spaces under one identity (IR-739). A provider that names no
+    # model (a fake) cannot be shown to differ and is let by.
+    if provider.model_id is not None and provider.model_id != space.model_id:
+        raise ImproperlyConfigured(
+            f"The embedding provider is model {provider.model_id!r} but space "
+            f"{space.pk} is {space.model_id!r}. Refusing before the vendor call: "
+            f"its vectors do not belong in this space."
+        )
     return space
 
 
 def default_permits(record) -> Decision:
-    """The real gate: ADR-015 §Security Impact, and the default everywhere here.
+    """The real gate: ADR-015 §Security Impact, and the only one here.
 
     **It refuses a record nobody has answered for**, because an undetermined
     embargo is treated as an embargo (ADR-052 §3) — the correct failure direction
     for a gate whose purpose is to stop content leaving. Nothing in this module
     works around it: the way around a fail-closed gate is to supply the missing
     fact.
-
-    A named function rather than an inline import, so the default in both
-    signatures below reads as "the gate" instead of as a lambda.
     """
     from apps.ai.policy import decision_for_record
 
@@ -207,18 +213,55 @@ def _withheld(record_id, space, refused) -> "EmbeddingOutcome":
     return EmbeddingOutcome(record_id=record_id, space_id=space.id, refused=True, reason=reason)
 
 
-def _require_disclosure(record, permits: DisclosurePredicate) -> None:
-    """Enforce ``permits`` for this record, or raise with the reason.
+def _require_disclosure(record) -> None:
+    """Enforce the gate for this record, or raise with the reason.
 
-    ``permits`` returns a ``Decision`` rather than a bare ``bool``, unlike the
-    query lane's predicate of the same name: a refusal here has to be
+    The gate returns a ``Decision`` rather than a bare ``bool``, unlike the
+    query lane's predicate: a refusal here has to be
     *reportable* — a backfill counts withheld records and prints why, and
     "refused" with no cause sends an operator to guess which of three
     independent inputs to fix.
     """
-    decision = permits(record)
+    decision = default_permits(record)
     if not decision:
         raise EmbeddingRefused(decision.explain())
+
+
+#: Why a write stopped because its space was retired while it embedded (IR-739).
+SPACE_RETIRED = "The embedding space was retired while this was embedding; nothing was written."
+
+
+def _hold_space(space) -> bool:
+    """Share-lock ``space``'s row until the transaction ends; True while it is writable.
+
+    A promotion holds every space row ``FOR UPDATE``, so a write that began
+    against the then-active space either commits before the promotion's final
+    check (and is counted) or waits, and then finds the space retired and
+    writes nothing. Without this a vector computed for the old space could land
+    after the flip and leave the retired space ahead of the live one.
+    """
+    from django.db import connection
+
+    from apps.ai.models import EmbeddingSpaceState
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT state FROM ai_embeddingspace WHERE id = %s FOR SHARE", [space.pk])
+        row = cursor.fetchone()
+    return row is not None and row[0] != EmbeddingSpaceState.RETIRED
+
+
+def summary_text(record) -> str:
+    """The exact text a Record's summary vector is computed from."""
+    return f"{record.title}. {record.abstract}"
+
+
+def record_source_hash(record) -> str:
+    """SHA-256 of ``summary_text``: the source revision a summary vector pins.
+
+    A summary vector whose stored hash differs from this one was computed from
+    a title or abstract that has since changed (IR-752).
+    """
+    return hashlib.sha256(summary_text(record).encode("utf-8")).hexdigest()
 
 
 @charged_to("ingestion")
@@ -227,56 +270,71 @@ def embed_record_summary(
     *,
     provider: Optional[EmbeddingProvider] = None,
     skip_existing: bool = False,
-    permits: DisclosurePredicate = default_permits,
+    space_id: Optional[int] = None,
 ) -> EmbeddingOutcome:
-    """Embed a record's title and abstract into ``RecordEmbedding``.
+    """Embed a record's title and abstract.
 
-    ``permits`` defaults to the real gate and is injectable for the same
-    reason ``CompositionRoot(permits=...)`` is on the query side: the
-    development bypass (IR-317) is an argument a dev tool passes, never a
-    different default.
+    With no ``space_id`` this is the live path: the vector goes to
+    ``RecordEmbedding``, which every reader still uses, and is mirrored into
+    the space-keyed ``RecordSpaceEmbedding`` for the active space (IR-752).
+    With a ``space_id`` it fills **that** space only -- a pending one, through
+    ``apps.ai.space_build`` -- and never touches the legacy row, which holds
+    one vector per record and belongs to the active space.
 
     ``skip_existing`` is off by default and on for a backfill. The task path
     is queued *because* a record changed, so re-embedding is the point; a
     backfill walking thousands of records must not pay again for the ones a
     previous, interrupted run already did. The skip keys on the model id the
     existing row was written under, which is what ``RecordEmbedding`` records
-    — so a record whose title or abstract changed under an unchanged model is
+    -- so a record whose title or abstract changed under an unchanged model is
     *not* re-embedded by a backfill. Say so plainly rather than implying a
     freshness guarantee this table cannot give: re-indexing edited text is the
-    task path's job, and a text-hash column that would let a backfill notice
-    is schema IR-281 did not add.
+    task path's job. The space-keyed table does keep a text hash, which is how
+    a pending build notices an edit.
     """
+    from django.db import transaction
+
     from apps.ai.models import RecordEmbedding
+    from apps.ai.models.embedding import RecordSpaceEmbedding
     from apps.records.models import Record
 
     record = Record.objects.get(pk=record_id)
     provider = provider or build_embedding_provider()
-    space = _checked_space(provider)
+    space = _checked_space(provider, space_id)
 
-    if skip_existing and RecordEmbedding.objects.filter(
+    if space_id is None and skip_existing and RecordEmbedding.objects.filter(
         record_id=record_id, model_name=space.model_id
     ).exists():
         return EmbeddingOutcome(record_id=record_id, space_id=space.id, skipped=1)
 
     try:
-        _require_disclosure(record, permits)
+        _require_disclosure(record)
     except EmbeddingRefused as exc:
         return EmbeddingOutcome(
             record_id=record_id, space_id=space.id, refused=True, reason=str(exc)
         )
 
-    text = f"{record.title}. {record.abstract}"
+    text = summary_text(record)
     sent = Dependency.abstract(record.pk, record.title, record.abstract)
     try:
-        with OutboundGuard(principal=None, permits=permits).fence(lambda: {sent}):
+        with OutboundGuard(principal=None, permits=default_permits).fence(lambda: {sent}):
             vector = provider.embed_documents([text])[0]
     except Withheld as refused:
         return _withheld(record_id, space, refused)
-    RecordEmbedding.objects.update_or_create(
-        record=record,
-        defaults={"embedding": vector, "model_name": space.model_id},
-    )
+    with transaction.atomic():
+        if not _hold_space(space):
+            return EmbeddingOutcome(
+                record_id=record_id, space_id=space.id, refused=True, reason=SPACE_RETIRED)
+        if space_id is None:
+            RecordEmbedding.objects.update_or_create(
+                record=record,
+                defaults={"embedding": vector, "model_name": space.model_id},
+            )
+        RecordSpaceEmbedding.objects.update_or_create(
+            record=record,
+            space=space,
+            defaults={"embedding": vector, "source_hash": record_source_hash(record)},
+        )
     return EmbeddingOutcome(record_id=record_id, space_id=space.id, embedded=1)
 
 
@@ -323,7 +381,8 @@ def embed_active_chunk_set(
     provider: Optional[EmbeddingProvider] = None,
     force: bool = False,
     space_id: Optional[int] = None,
-    permits: DisclosurePredicate = default_permits,
+    chunk_set_id=None,
+    source_revision=None,
 ) -> EmbeddingOutcome:
     """Embed the chunks of ``record_id``'s active chunk set that lack a vector.
 
@@ -348,6 +407,13 @@ def embed_active_chunk_set(
     space = _checked_space(provider, space_id)
 
     chunks = pending_chunks(record_id, space.id, force=force)
+    if chunk_set_id is not None and (
+        any(chunk.chunk_set_id != chunk_set_id for chunk in chunks)
+        or not ChunkSet.objects.filter(pk=chunk_set_id, record_id=record_id,
+                                       is_active=True, source_revision=source_revision).exists()
+    ):
+        return EmbeddingOutcome(record_id=record_id, space_id=space.id,
+                                refused=True, reason="The manuscript source has changed.")
     total = active_chunks(record_id).count()
     if not chunks:
         # Nothing to pay for, so nothing to check a gate about and no reason
@@ -355,7 +421,7 @@ def embed_active_chunk_set(
         return EmbeddingOutcome(record_id=record_id, space_id=space.id, skipped=total)
 
     try:
-        _require_disclosure(Record.objects.get(pk=record_id), permits)
+        _require_disclosure(Record.objects.get(pk=record_id))
     except EmbeddingRefused as exc:
         return EmbeddingOutcome(
             record_id=record_id, space_id=space.id, refused=True, reason=str(exc)
@@ -372,7 +438,7 @@ def embed_active_chunk_set(
     }
     try:
         # Rechecked per window and per retry: a refusal mid-paper sends no more.
-        with OutboundGuard(principal=None, permits=permits).fence(lambda: versions):
+        with OutboundGuard(principal=None, permits=default_permits).fence(lambda: versions):
             vectors = [
                 vector
                 for group in provider.embed_document_chunks(windows)
@@ -386,16 +452,25 @@ def embed_active_chunk_set(
             f"chunks of record {record_id}. Vectors are matched positionally."
         )
 
-    ChunkEmbedding.objects.bulk_create(
-        (
-            ChunkEmbedding(chunk=chunk, space=space, embedding=vector)
-            for chunk, vector in zip(chunks, vectors)
-        ),
-        # A second worker that embedded the same chunk while this one was
-        # waiting on the vendor has written an identical vector under the
-        # same (chunk, space) key. Losing the race is not an error.
-        ignore_conflicts=True,
-    )
+    from django.db import transaction
+    with transaction.atomic():
+        Record.objects.select_for_update().get(pk=record_id)
+        if not _hold_space(space):
+            return EmbeddingOutcome(
+                record_id=record_id, space_id=space.id, refused=True, reason=SPACE_RETIRED)
+        if chunk_set_id is not None and not ChunkSet.objects.filter(
+            pk=chunk_set_id, record_id=record_id, is_active=True, source_revision=source_revision,
+        ).exists():
+            return EmbeddingOutcome(record_id=record_id, space_id=space.id,
+                                    refused=True, reason="The manuscript source has changed.")
+        ChunkEmbedding.objects.bulk_create(
+            (
+                ChunkEmbedding(chunk=chunk, space=space, embedding=vector)
+                for chunk, vector in zip(chunks, vectors)
+            ),
+            # A second worker may already have written this same vector.
+            ignore_conflicts=True,
+        )
     return EmbeddingOutcome(
         record_id=record_id,
         space_id=space.id,

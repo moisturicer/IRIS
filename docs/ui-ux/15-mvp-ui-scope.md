@@ -73,12 +73,16 @@ Four dispositions:
 | `NotificationsPage` | **KEEP** | Index into the workflow ([02](02-information-architecture.md) §7) |
 | `ForbiddenPage` | **KEEP** | Required by the URL-access rule ([03](03-navigation.md) §4) |
 
-### RDCO — 2 screens
+### RDCO and System Admin (IR-783, ADR-051)
 
-| Page | Disposition | Doc |
+| Page | Disposition | Role and address |
 |---|---|---|
-| `AuditLogPage` | **KEEP** | [10](10-audit-history.md) — needs `W-04`'s events |
-| `RoleRequestsPage` | **KEEP** | [11](11-saas-admin.md) — the only administration in the pilot |
+| `UserListPage` | **KEEP** | RDCO at `/rdco/users`; System Admin at `/admin/users` |
+| `RoleRequestsPage` | **KEEP** | RDCO at `/rdco/role-requests` |
+| `DownloadRequestsPage` | **KEEP** | RDCO at `/rdco/download-requests` |
+| `DeleteRequestsPage` | **KEEP** | RDCO at `/rdco/delete-requests` |
+| `ImportRecordsPage` | **KEEP** | RDCO at `/records/import` |
+| `AuditLogPage` | **KEEP** | System Admin alone at `/admin/audit`; an IRIS page with read/export controls |
 
 **That is 18 components producing 16 destinations** — `ForbiddenPage` and `PendingApprovalPage` are
 states rather than destinations. This was the original sixteen; [§10](#10--the-surface-by-role)
@@ -93,7 +97,7 @@ supersedes it as the definition of scope, and the two differ — §10 is what is
 | `ApprovedRecordsPage` | A filter on the queue ([07](07-review-clearance.md)) |
 | `DeclinedRecordsPage` | A filter on the queue |
 | `ApprovedProposalsPage` | A filter on the queue |
-| `UserListPage` | Django admin covers it at pilot scale |
+| `UserListPage` | **Reversed: KEEP.** RDCO and System Admin have distinct Users addresses and server-enforced actions (ADR-051, IR-781/783) |
 | ~~`SettingsPage`~~ | **Reason was wrong — recommended for KEEP.** See the correction below |
 | `SessionsPage` | Real, but an operator task at this scale |
 | `DownloadRequestsPage` | The download-token flow **fails at import** (`records/views.py:535–579`) |
@@ -322,59 +326,50 @@ ratified or rejected.**
 Read off `frontend/src/router/index.tsx` and `components/layout/Sidebar.tsx` as built, not aspirational.
 **This section is the scope boundary.** A screen is in the MVP when it appears below.
 
-Roles come from `backend/core/permissions.py`: `REVIEWER_ROLES` = Adviser, KTTO, RDCO, ITSO, IERC ·
-`STAFF_ROLES` = KTTO, RDCO, ITSO, IERC · Django admin is `is_staff`/`is_superuser`.
+Roles and screen gates come from `lib/access.ts`, with backend permissions enforcing access. Django flags do not override a named application's role in the router. The System Admin is separate from the four office roles (ADR-051).
 
-### Every signed-in user — 8
+### Shared navigation
 
-| Screen | Route | Group |
+| Screen | Route | Entry |
 |---|---|---|
-| Discover | `/` | Research Exploration |
-| Ask IRIS | `/ai` | Research Exploration |
-| My Library | `/records/mine` | Research Exploration |
-| Calls & Conferences | `/opportunities` | Research Exploration |
-| Submit Disclosure | `/records/add` | IP Management |
-| My Workspace | `/workspace` | IP Management |
-| Notifications | `/notifications` | Tools |
-| Settings & Profile | `/settings` | Tools |
+| Discover | `/` | Main, every role |
+| Ask IRIS | `/ai` | Main, research roles |
+| My Library | `/records/mine` | Main, research roles |
+| Calls & Conferences | `/opportunities` | Main, research roles; outside MVP validation per ADR-050 |
+| Notifications | `/notifications` | Bell, every role |
+| Profile | `/profile`, `/profile/edit` | Account menu, every role (IR-933) |
+| Settings | `/settings` | Account menu, every role |
+| Help | `/help` | Account menu, every role |
 
-**This is the student surface** — a student sees these eight and nothing else. Every other role sees
-these eight *plus* the sections below, because every role also submits and browses.
+Student and Adviser publish from Discover. `/records/add` opens that dialog; My Workspace has become My Library's research section. The System Admin's sidebar offers Discover and Administration, with no research-tool or workflow links.
 
-### + Reviewer — 3, or 4 for RDCO
+### Reviewers
 
-`REVIEWER_ROLES`. Rendered behind `isReviewer`.
+Adviser, RDCO, ITSO, IERC and KTTO see **My Reviews** at `/review` only when `review_access.my_reviews` says they have work. Approved and declined work are filters on that queue. Office coordinators reach `/review/office` from My Reviews; the four offices can open `/review/analytics`. System Admin has no workflow access.
+
+### RDCO section
 
 | Screen | Route |
 |---|---|
-| Pending Records | `/review/pending` |
-| Approved | `/review/approved` |
-| Declined | `/review/declined` |
-| ~~Approved Proposals *(RDCO only)*~~ removed by IR-271: ADR-032 §2 retires the *complete* act | ~~`/review/approved-proposals`~~ |
+| Import Records | `/records/import` |
+| Users | `/rdco/users` |
+| Role Requests | `/rdco/role-requests` |
+| Download Requests | `/rdco/download-requests` |
+| Delete Requests | `/rdco/delete-requests` |
 
-### + Staff — 4, or 6 for a Django admin
+RDCO approves Student and Adviser roles. Paper deletion requests here are distinct from the account deletion feature tracked by IR-788.
 
-`STAFF_ROLES`. Rendered behind `isStaff`.
+### Administration section (System Admin alone)
 
-| Screen | Route | Gate |
-|---|---|---|
-| Manage Users | `/admin/users` | `isStaff` |
-| Download Requests | `/admin/download-requests` | `isStaff` |
-| Delete Requests | `/admin/delete-requests` | `isStaff` |
-| Active Sessions | `/admin/sessions` | `isStaff` |
-| Role Requests | `/admin/role-requests` | Django admin |
-| Audit Log | `/admin/audit` | Django admin |
+| Screen | Route |
+|---|---|
+| Users | `/admin/users` |
+| Audit Log | `/admin/audit` |
 
-### Reached from a screen, not from nav
+The System Admin assigns office roles and office coordinators and reads/exports the Audit Log. It lands on Users after ordinary sign-in. RDCO cannot open either System Admin address; System Admin cannot open RDCO's addresses. Both Users routes reuse the same page, with server-enforced account actions.
 
-Not counted above, because nobody navigates to them directly: `/records/:id` (paper view),
-`/records/:id/edit`, `/records/:id/documents`, `/review/:id/evaluate`, `/records/import`, `/help`,
-and the entry screens (`/login`, `/signup`, `/activate/...`, `/download`).
+Old `/admin/role-requests`, `/admin/download-requests` and `/admin/delete-requests` addresses are removed without redirects. `/django-admin/` is the separate Django site (IR-782), not the Audit Log or IRIS account management.
 
-### What this replaces
+### Reached from a screen
 
-The per-role lists answer the question the global count could not: **what does this role see?**
-The count was a proxy for "is the pilot small enough". The lists are the thing itself — and they make
-the next gap obvious, which is that the reviewer surface is three queue screens and a decision screen
-while the student surface is eight built-out ones. That asymmetry is the work
-[IR-143](https://citiris.atlassian.net/browse/IR-143) covers, not a scope question.
+Paper View at `/records/:id` is reached from Discover, the library or a queue. Record editing and files are parts of Paper View, and `/records/import` is a sidebar item for RDCO. There is no standalone Active Sessions route. Account-deletion, retention and notices pages are separate IR-779 subtasks; this change does not add placeholders for them.

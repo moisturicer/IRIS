@@ -1,0 +1,100 @@
+{
+ "Accelerating massive ensembles of ordinary differential equations-with-annotations": {
+  "llamaparse": {
+   "numbered": 30,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  },
+  "docling": {
+   "numbered": 30,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning": {
+  "llamaparse": {
+   "numbered": 19,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  },
+  "docling": {
+   "numbered": 22,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties": {
+  "llamaparse": {
+   "numbered": 25,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": [
+    "A PREPRINT"
+   ]
+  },
+  "docling": {
+   "numbered": 25,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators": {
+  "llamaparse": {
+   "numbered": 18,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  },
+  "docling": {
+   "numbered": 17,
+   "off_level": 0,
+   "nesting_ordered": false,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "Noise-adjusted turnover in estimated networks": {
+  "llamaparse": {
+   "numbered": 5,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  },
+  "docling": {
+   "numbered": 5,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ },
+ "State-Space-Based FIR Filtering on a Quantum Computer": {
+  "llamaparse": {
+   "numbered": 16,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  },
+  "docling": {
+   "numbered": 16,
+   "off_level": 0,
+   "nesting_ordered": true,
+   "off_level_examples": [],
+   "false_headings": []
+  }
+ }
+}

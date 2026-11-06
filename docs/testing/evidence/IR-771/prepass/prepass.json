@@ -1,0 +1,121 @@
+{
+  "base": "http://127.0.0.1:5174",
+  "api": "http://127.0.0.1:8019",
+  "frontendRef": "5f024e31",
+  "backendRef": "fixture-only-no-live-backend",
+  "ranAt": "2026-11-02T10:51:58.771Z",
+  "browser": "chromium 156.0.8078.4",
+  "viewports": [
+    {
+      "name": "360",
+      "width": 360,
+      "height": 740,
+      "scale": 1,
+      "keyboard": true
+    },
+    {
+      "name": "768",
+      "width": 768,
+      "height": 1024,
+      "scale": 1
+    },
+    {
+      "name": "1280",
+      "width": 1280,
+      "height": 800,
+      "scale": 1,
+      "keyboard": true
+    },
+    {
+      "name": "1745",
+      "width": 1745,
+      "height": 982,
+      "scale": 1
+    },
+    {
+      "name": "1280@200%",
+      "width": 640,
+      "height": 360,
+      "scale": 2
+    }
+  ],
+  "results": [
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "360",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/9",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 7,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Ask_IRIS__360.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "768",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/9",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Ask_IRIS__768.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "1280",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/9",
+      "overflow": null,
+      "axe": [],
+      "keyboard": {
+        "stops": 14,
+        "cycled": false,
+        "reachedLimit": false,
+        "noIndicator": [],
+        "covered": [],
+        "invisible": []
+      },
+      "shot": "shots/Ask_IRIS__1280.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "1745",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/9",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Ask_IRIS__1745.jpg",
+      "consoleErrors": []
+    },
+    {
+      "role": "student",
+      "name": "Ask IRIS",
+      "url": "/ai",
+      "viewport": "1280@200%",
+      "device": "headless Chromium (emulated viewport)",
+      "landedOn": "/ai/conversations/9",
+      "overflow": null,
+      "axe": [],
+      "shot": "shots/Ask_IRIS__1280_200pct.jpg",
+      "consoleErrors": []
+    }
+  ],
+  "interactions": []
+}

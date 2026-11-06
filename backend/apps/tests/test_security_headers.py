@@ -26,6 +26,7 @@ import re
 
 import pytest
 from django.test import SimpleTestCase, override_settings
+from testing.nginx import location_blocks
 
 from apps.documents.tests.test_document_access_control import NEEDS_CHECKOUT, REPO_ROOT
 
@@ -98,7 +99,7 @@ class DjangoResponseHeaderTests(SimpleTestCase):
         assert_policy_is_strict(self.get()["Content-Security-Policy-Report-Only"])
 
     def test_admin_pages_carry_it_too(self):
-        self.assertIn("Content-Security-Policy-Report-Only", self.get("/admin/login/"))
+        self.assertIn("Content-Security-Policy-Report-Only", self.get("/django-admin/login/"))
 
     @override_settings(CONTENT_SECURITY_POLICY_REPORT_ONLY=False)
     def test_enforcing_is_one_setting(self):
@@ -139,18 +140,6 @@ def _snippet_headers():
     return headers
 
 
-def _location_blocks(conf):
-    """`[(location line, body)]` for each location block, nested ones included."""
-    blocks = []
-    for match in re.finditer(r"^\s*location\b[^{]*\{", conf, re.MULTILINE):
-        depth, i = 1, match.end()
-        while depth:
-            depth += {"{": 1, "}": -1}.get(conf[i], 0)
-            i += 1
-        blocks.append((match.group(0).strip(), conf[match.end():i - 1]))
-    return blocks
-
-
 def _without_comments(text):
     return re.sub(r"#[^\n]*", "", text)
 
@@ -172,11 +161,12 @@ def test_every_location_nginx_answers_itself_includes_the_snippet():
     nginx inherits `add_header` into a location only when that location sets
     none of its own -- the asset location sets Cache-Control -- so a server-level
     header would silently vanish from every JS and CSS file. Each location that
-    serves files includes the snippet instead. Proxied locations do not: Django
-    sets the same headers, and nginx would send them twice.
+    serves files includes the snippet instead. Django proxies do not: Django
+    sets the same headers, and nginx would send them twice. The private AI
+    runtime does not set them, so its reader proxy includes the snippet.
     """
     conf = _without_comments(_frontend("nginx.conf"))
-    blocks = _location_blocks(conf)
+    blocks = location_blocks(conf)
     assert blocks, "no location blocks found -- has nginx.conf changed shape?"
     served = [(line, body) for line, body in blocks if "proxy_pass" not in body]
     assert served, "nginx serves nothing itself?"
@@ -184,8 +174,17 @@ def test_every_location_nginx_answers_itself_includes_the_snippet():
         assert re.search(rf"include\s+{re.escape(SNIPPET_INCLUDE_PATH)}\s*;", body), (
             f"`{line}` serves the SPA without the security headers"
         )
+    # The reader proxy is found by where it sends requests, not by one spelling of
+    # its proxy_pass: since IR-892 the upstream is a variable resolved per request.
+    # It must exist, so a rewrite can't quietly move it into the Django branch.
+    gateway = [line for line, body in blocks if "proxy_pass" in body and "ai-gateway:8001" in body]
+    assert len(gateway) == 1, f"expected one AI-runtime reader proxy, found {gateway}"
     for line, body in blocks:
-        if "proxy_pass" in body:
+        if "proxy_pass" in body and "ai-gateway:8001" in body:
+            assert re.search(rf"include\s+{re.escape(SNIPPET_INCLUDE_PATH)}\s*;", body), (
+                f"`{line}` proxies the reader without the security headers"
+            )
+        elif "proxy_pass" in body:
             assert "security-headers.conf" not in body, f"`{line}` would duplicate Django's"
 
 

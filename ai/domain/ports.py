@@ -10,6 +10,10 @@ class TransientProviderError(Exception):
     """A sent attempt failed in a way another attempt may not (IR-725)."""
 
 
+class ProviderRejected(Exception):
+    """The vendor refused a sent attempt; another attempt would be refused too (IR-860)."""
+
+
 class LLMProvider(ABC):
     """
     Abstract Base Class for LLM providers (e.g. OpenAI).

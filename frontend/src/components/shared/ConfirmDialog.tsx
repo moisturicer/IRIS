@@ -1,3 +1,4 @@
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 import { Modal } from "@/components/ui/Modal";
 
@@ -12,6 +13,7 @@ interface ConfirmDialogProps {
   confirming?: boolean;
   /** Why the last attempt failed, shown in the dialog so the choice stays in front of them. */
   error?:     string | null;
+  focusCancel?: boolean;
 }
 
 /** Closing is refused while confirming; one function, so `Modal` keeps its listener. */
@@ -33,7 +35,12 @@ export function ConfirmDialog({
   danger,
   confirming = false,
   error = null,
+  focusCancel = false,
 }: ConfirmDialogProps) {
+  const cancelRef = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (open && focusCancel) cancelRef.current?.focus();
+  }, [open, focusCancel]);
   return (
     <Modal
       open={open}
@@ -42,11 +49,12 @@ export function ConfirmDialog({
       size="max-w-sm"
       footer={
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="outline" onClick={onCancel} disabled={confirming}>
+          <Button ref={cancelRef} type="button" variant="outline" className="min-h-11" onClick={onCancel} disabled={confirming}>
             Cancel
           </Button>
           <Button
             type="button"
+            className="min-h-11"
             variant={danger ? "danger" : "primary"}
             onClick={onConfirm}
             loading={confirming}

@@ -30,11 +30,14 @@ any offer until IR-507 narrowed them to owners, and an owner's edit to where
 import shutil
 import tempfile
 
+import pytest
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.test import override_settings
 from django.urls import reverse
+from django.utils import timezone
 
+from apps.records.models import Record
 from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import AssignmentState, Party, RecordTypeName, ResubmissionRequestState, SeatState
@@ -73,6 +76,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # --- the states ------------------------------------------------------------------
 
     def draft(self):
+        # Embargoed, as every paper starts (IR-882); submitting needs no answer.
         return self.make_record()
 
     def with_adviser_unopened(self):
@@ -100,6 +104,15 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     def published(self):
         record = self.at_adviser()
         self.publish_via_rdco(record)
+        return record
+
+    def under_embargo(self):
+        """Published once released, then held again with a date (IR-812)."""
+        record = self.published()
+        Record.objects.filter(pk=record.pk).update(
+            is_embargoed=True, embargo_released_at=None, embargo_released_by=None,
+            embargo_date_set_at=timezone.now(), embargoed_until="2099-01-01",
+        )
         return record
 
     def proposal_with_adviser(self):
@@ -228,6 +241,16 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "comment_review": lambda r, u, d: self._call(
                 u, "post", url("record-review-comments", r), {"body": "A question on section 3."},
             ),
+            # Comment only: the one verdict no other key already probes (IR-874).
+            "finish_review": lambda r, u, d: self._call(
+                u, "post", url("record-finish-review", r),
+                {"verdict": "comment_only", "summary": "Read through section 3."},
+            ),
+            "set_embargo": lambda r, u, d: self._call(
+                u, "post", url("record-embargo-set", r), {"embargoed_until": "2099-06-01"},
+            ),
+            "release_embargo": lambda r, u, d: self._call(u, "post", url("record-embargo-release", r)),
+            "release_ip": lambda r, u, d: self._call(u, "post", url("record-ip-release", r)),
             "delete_record": delete_as("delete_record"),
             "withdraw_submission": delete_as("withdraw_submission"),
             "request_deletion": delete_as("request_deletion"),
@@ -250,19 +273,30 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
     # reviewer whose part is done keeps it, so the Adviser keeps it after
     # routing and ITSO after clearing.
     TAKES_PART = {"cite", "comment_review"}
+    # Every paper starts embargoed (ADR-052, IR-882). Once it is submitted, the
+    # Adviser and RDCO may date it, and release it while it is held (§5-6 as
+    # amended). Owners and the other offices never do either.
+    EMBARGO_ACTS = {"set_embargo", "release_embargo"}
+    ADVISER_TAKES_PART = TAKES_PART | EMBARGO_ACTS
+    # An open seat finishes a review (ADR-032 §7, IR-874): every verdict it
+    # carries is its own key as well.
+    SEATED = {"finish_review"}
     ADVISER_AT_ENTRY = {
         "cite", "open_review", "send_to_rdco", "reject",
         "request_document", "request_revision", "comment_review",
-    }
+    } | EMBARGO_ACTS | SEATED
     ITSO_SEATED = {
         "cite", "tag_ip", "attach_file", "request_document", "open_review",
         "office_review", "add_reviewer", "route", "comment_review",
-    }
+    } | SEATED
     # An owner is offered the one delete its record's status names (IR-508).
     OWNER_IN_REVIEW = {"cite", "withdraw_submission", "comment_review"}
+    # RDCO publishes only a released paper (ADR-052 §14 as amended), so while
+    # these are held it keeps them unlisted or rejects them.
+    RDCO_UNSEATED = OFFICE | EMBARGO_ACTS
     RDCO_SEATED = {"cite", "tag_ip", "attach_file", "request_document", "open_review",
                    "add_reviewer", "route", "comment_review", "request_revision",
-                   "accept_publish", "keep_unlisted", "reject"}
+                   "keep_unlisted", "reject"} | EMBARGO_ACTS | SEATED
     EXPECTED = {
         "draft": {
             "owner": {"cite", "continue_draft", "edit_details", "delete_record"}, "adviser": {"cite"},
@@ -270,43 +304,47 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         },
         "with_adviser_unopened": {
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },
         "with_adviser_open": {
             "owner": OWNER_IN_REVIEW, "adviser": ADVISER_AT_ENTRY,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },
         # ITSO's pool: any ITSO member may file and ask for documents, but
         # opens, clears and routes only once seated.
         "itso_pool": {
-            "owner": OWNER_IN_REVIEW, "adviser": TAKES_PART,
+            "owner": OWNER_IN_REVIEW, "adviser": ADVISER_TAKES_PART,
             "itso": {"cite", "tag_ip", "attach_file", "request_document"},
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         "itso_open": {
-            "owner": OWNER_IN_REVIEW, "adviser": TAKES_PART, "itso": ITSO_SEATED | {"request_revision"},
+            "owner": OWNER_IN_REVIEW, "adviser": ADVISER_TAKES_PART, "itso": ITSO_SEATED | {"request_revision"},
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         # ITSO asked once, so it is offered the withdrawal, not a second ask.
         "revision_asked_by_itso": {
             "owner": OWNER_IN_REVIEW | {"create_version", "replace_manuscript", "edit_details"},
-            "adviser": TAKES_PART, "itso": ITSO_SEATED | {"withdraw_revision"},
+            "adviser": ADVISER_TAKES_PART, "itso": ITSO_SEATED | {"withdraw_revision"},
             "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
         # RDCO decides, and -- seated on an office party -- may add a colleague.
         "rdco_open": {
-            "owner": OWNER_IN_REVIEW, "adviser": TAKES_PART, "itso": OFFICE | TAKES_PART,
-            "ierc": OFFICE,
-            "rdco": {
-                "cite", "tag_ip", "attach_file", "request_document", "open_review",
-                "add_reviewer", "route", "request_revision",
-                "accept_publish", "keep_unlisted", "reject", "comment_review",
-            },
-            "stranger": None,
+            "owner": OWNER_IN_REVIEW, "adviser": ADVISER_TAKES_PART, "itso": OFFICE | TAKES_PART,
+            "ierc": OFFICE, "rdco": RDCO_SEATED, "stranger": None,
         },
+        # Published once its Adviser released it, so nothing is left to release.
         "published": {
-            "owner": {"cite", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review"}, "stranger": {"cite"},
+            "owner": {"cite", "request_deletion", "comment_review"},
+            "adviser": TAKES_PART | {"set_embargo"},
+            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE | {"comment_review", "set_embargo"},
+            "stranger": {"cite"},
+        },
+        # A stranger reading the paper learns nothing of its embargo.
+        "under_embargo": {
+            "owner": {"cite", "request_deletion", "comment_review"},
+            "adviser": ADVISER_TAKES_PART,
+            "itso": OFFICE, "ierc": OFFICE,
+            "rdco": OFFICE | {"comment_review"} | EMBARGO_ACTS, "stranger": {"cite"},
         },
         # A Proposal's Adviser accepts it or rejects it; it is never routed.
         "proposal_with_adviser": {
@@ -314,17 +352,19 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "adviser": {
                 "cite", "open_review", "accept_proposal", "reject",
                 "request_document", "request_revision", "comment_review",
-            },
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            } | EMBARGO_ACTS | SEATED,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },
         # An accepted Proposal's owner may continue it once (ADR-032 §6, IR-417).
         "accepted_proposal": {
-            "owner": {"cite", "continue_as", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "owner": {"cite", "continue_as", "request_deletion", "comment_review"},
+            "adviser": ADVISER_TAKES_PART,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },
         "continued_proposal": {
-            "owner": {"cite", "request_deletion", "comment_review"}, "adviser": TAKES_PART,
-            "itso": OFFICE, "ierc": OFFICE, "rdco": OFFICE, "stranger": None,
+            "owner": {"cite", "request_deletion", "comment_review"},
+            "adviser": ADVISER_TAKES_PART,
+            "itso": OFFICE, "ierc": OFFICE, "rdco": RDCO_UNSEATED, "stranger": None,
         },
     }
 
@@ -333,6 +373,7 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
         response = self.client.get(reverse("record-detail", args=[record.pk]))
         return response.status_code, (response.data if response.status_code == 200 else None)
 
+    @pytest.mark.slow
     def test_each_role_and_state_matches_the_endpoints(self):
         probes = self._probes()
         for state, row in self.EXPECTED.items():

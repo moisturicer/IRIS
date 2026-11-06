@@ -2,6 +2,8 @@ version: "3.9"
 
 services:
   db:
+    networks:
+      - private
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
@@ -25,6 +27,8 @@ services:
         max-file: "3"
 
   redis:
+    networks:
+      - private
     image: redis:7-alpine
     restart: unless-stopped
     # A password in both stacks (IR-669). redis-server stays the command so the
@@ -45,6 +49,8 @@ services:
         max-file: "3"
 
   migrate:
+    networks:
+      - private
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -65,6 +71,9 @@ services:
         condition: service_healthy
 
   backend:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -92,8 +101,10 @@ services:
       - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-      - DOCLING_API_URL=http://docling:5001
       - AI_GATEWAY_URL=http://ai-gateway:8001
+      # The Ask IRIS reader path (IR-863), from the repo-root .env so nginx and
+      # Django read one value. Off: Django answers as before.
+      - AI_RUNTIME_READER=${AI_RUNTIME_READER:-false}
     depends_on:
       db:
         condition: service_healthy
@@ -112,18 +123,10 @@ services:
           cpus: '1.0'
           memory: 1G
 
-  docling:
-    # Variant (GPU or CPU) is chosen once by scripts/setup_env.py, which writes
-    # DOCLING_VARIANT to the repo-root .env. Sizing, workers, the VRAM cap and
-    # the reasoning are in docling/compose.yml and
-    # docs/engineering/DOCLING_RESOURCES.md.
-    extends:
-      file: docling/compose.yml
-      service: ${DOCLING_VARIANT:-docling-gpu}
-    environment:
-      - DOCLING_SERVE_ENABLE_UI=0
-
   ai-gateway:
+    networks:
+      - private
+      - egress
     build:
       context: ./ai
       dockerfile: Dockerfile
@@ -131,12 +134,11 @@ services:
     env_file:
       - ./ai/.env
     environment:
-      # Same repo-root .env as every other service, so the credential is
-      # configured in exactly one place. Note ADR-014 precondition 4 says
-      # the gateway gets no direct DB access at all -- that this DSN
-      # exists is a contradiction recorded on IR-154, to be resolved by
-      # IR-58, not silently here.
-      - DATABASE_URL=postgresql+asyncpg://${DB_USER:?set DB_USER in the repo-root .env}:${DB_PASSWORD:?set DB_PASSWORD in the repo-root .env}@db:5432/${DB_NAME:?set DB_NAME in the repo-root .env}
+      # No DATABASE_URL (IR-826, ADR-014 precondition 4): nothing here read
+      # it, and it handed Django's login to a service with egress. AI-owned
+      # runs still connect as iris_ai_runtime through RUNS_DATABASE_URL in
+      # ./ai/.env, hence depends_on db; ADR-014's IR-826 amendment allows
+      # that login and no other.
       - UVICORN_WORKERS=4
       - MAX_CONCURRENT_LLM=80
     depends_on:
@@ -153,6 +155,9 @@ services:
           memory: 1g
 
   celery-default:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -191,6 +196,12 @@ services:
         condition: service_completed_successfully
 
   celery-extraction:
+    # LlamaParse is a cloud service (ADR-056, IR-842), so the worker that sends
+    # PDFs to it needs a route out. It also downloads results from presigned
+    # storage URLs on another host.
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -220,24 +231,18 @@ services:
       - REDIS_CACHE_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/1
       - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
       - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/0
-      - DOCLING_API_URL=http://docling:5001
-      # Read by config.settings.base.DOCLING_TIMEOUT_SECONDS. Replaces
-      # EXTRACTION_TIMEOUT, which was declared here and read by nothing.
-      # Must stay equal to DOCLING_SERVE_MAX_SYNC_WAIT on the docling service
-      # above -- that one is the real ceiling, and this one alone buys nothing
-      # (IR-249).
-      - DOCLING_TIMEOUT_SECONDS=900
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-      docling:
-        condition: service_healthy
       migrate:
         condition: service_completed_successfully
 
   celery-embedding:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -280,6 +285,9 @@ services:
   # much shadow traffic competes with readers at the vendor, which has no
   # priority mechanism. Idle unless AI_EVIDENCE_DECISION=shadow.
   celery-shadow:
+    networks:
+      - private
+      - egress
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -318,6 +326,8 @@ services:
         condition: service_completed_successfully
 
   celery-beat:
+    networks:
+      - private
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -345,20 +355,24 @@ services:
         condition: service_completed_successfully
 
   frontend:
+    networks:
+      - private
     build:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
-    ports:
-      # 8080, not 80: the runtime image is nginx-unprivileged, which
-      # listens on 8080 because it does not run as root. Mapping 80:80
-      # made the frontend unreachable even when it started (IR-156).
-      - "80:8080"
+    # Not published (IR-847): Caddy is the only way in. nginx listens on 8080
+    # because the runtime image is nginx-unprivileged (IR-156).
     # Set in the repo-root .env (IR-668). No allowlist closes /django-admin/ to
     # everyone. The proxy count must match backend/.env's.
     environment:
       - DJANGO_ADMIN_ALLOWED_NETWORKS=${DJANGO_ADMIN_ALLOWED_NETWORKS:-}
       - TRUSTED_PROXY_COUNT=${TRUSTED_PROXY_COUNT:-}
+      # Server-only nginx credential. Never use a VITE_ prefix for this secret.
+      - AI_GATEWAY_SERVICE_SECRET=${AI_GATEWAY_SERVICE_SECRET:-}
+      # The Ask IRIS reader path (IR-863): the same value backend reads, so nginx
+      # requires the gateway secret exactly when Django opens the path.
+      - AI_RUNTIME_READER=${AI_RUNTIME_READER:-false}
     # media_files is deliberately NOT mounted here (IR-152 / S-01). nginx no
     # longer serves /media/, so the web container has no reason to be able to
     # read uploaded documents at all.
@@ -376,6 +390,47 @@ services:
           cpus: '0.5'
           memory: 512M
 
+  # TLS (IR-847, ADR-057). Needs a public IRIS_DOMAIN with ports 80 and 443 open,
+  # and TRUSTED_PROXY_COUNT=2. Certificates persist in caddy_data, so a restart
+  # doesn't request new ones.
+  caddy:
+    networks:
+      - private
+      - egress
+    image: caddy:2.11-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - IRIS_DOMAIN=${IRIS_DOMAIN:?set IRIS_DOMAIN in the repo-root .env}
+    volumes:
+      - ./deploy/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - frontend
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+
+# IR-825: `private` has no route to the internet, which contains a compromised
+# parser, database or cache. Only services that call a vendor, send mail or get
+# certificates also join `egress`. docs/security/SECURITY.md §7 lists why each does.
+networks:
+  private:
+    internal: true
+  egress:
+
 volumes:
   postgres_data:
   media_files:
+  caddy_data:
+  caddy_config:

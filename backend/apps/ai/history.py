@@ -193,6 +193,25 @@ def readable_record_ids(user, record_ids) -> set:
     )
 
 
+def disclosable_record_ids(record_ids) -> set:
+    """The ids among ``record_ids`` the disclosure check lets out now."""
+    from apps.ai.composition import composition_root
+    from apps.records.models import Record
+
+    permits = composition_root().vendor_permits()
+    return {record.pk for record in Record.objects.filter(pk__in=record_ids) if permits(record)}
+
+
+def sendable_record_ids(user, record_ids) -> set:
+    """The ids among ``record_ids`` whose text may reach a vendor for ``user`` now.
+
+    Readable, and past the disclosure check (ADR-052, IR-812). An answer that
+    quotes a paper is that paper's text, so reading it isn't enough to send it:
+    an embargo set after the answer was written has to stop it too.
+    """
+    return disclosable_record_ids(readable_record_ids(user, record_ids))
+
+
 def stale_citation_turn_ids(citations):
     """Turns derived from a missing, tombstoned or superseded chunk version.
 
@@ -208,17 +227,22 @@ def stale_citation_turn_ids(citations):
     ).values_list("turn_id", flat=True)
 
 
-def readable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
-    """``turns`` minus any citing unreadable or stale sources (IR-592/597).
+def sendable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
+    """``turns`` minus any citing unreadable, undisclosable or stale sources
+    (IR-592/597, IR-812).
 
     ``allowed`` maps cited ids to the permitted ones; it defaults to
-    ``visible_to(user)``. A Turn built on a revoked or superseded source is
+    ``sendable_record_ids``. A Turn built on a revoked or superseded source is
     dropped whole, so nothing derived from it reaches a prompt or cache key.
+    The reader's own transcript doesn't come through here and keeps the Turn.
+
+    **It goes by what a Turn cites**, the only sources a Turn stores. An answer
+    that repeats a paper without citing it isn't caught (ADR-052's IR-812 Amendment).
     """
     from apps.ai.models import TurnCitation
 
     if user is None and allowed is None:
-        raise ValueError("readable_turns needs a user or an allowed function")
+        raise ValueError("sendable_turns needs a user or an allowed function")
     turns = list(turns)
     cited: dict[int, set] = {}
     citations = TurnCitation.objects.filter(turn_id__in=[turn.pk for turn in turns])
@@ -228,7 +252,7 @@ def readable_turns(turns, user=None, *, allowed=None) -> list["Turn"]:
     every = set().union(*cited.values()) if cited else set()
     if not every:
         return turns
-    permitted = readable_record_ids(user, every) if allowed is None else set(allowed(every))
+    permitted = sendable_record_ids(user, every) if allowed is None else set(allowed(every))
     return [turn for turn in turns
             if turn.pk not in stale and cited.get(turn.pk, set()) <= permitted]
 
@@ -238,13 +262,13 @@ def recent_window(turns, user=None, *, allowed=None) -> list["Turn"]:
     candidates, oldest first, then the budget. One shape for the chat views
     and the evidence shadow's parity check (IR-466).
 
-    With ``user`` or ``allowed``, Turns citing a now-unreadable Record are
-    dropped before the budget is spent (IR-592)."""
+    With ``user`` or ``allowed``, Turns citing a Record that can no longer be
+    read or sent are dropped before the budget is spent (IR-592, IR-812)."""
     candidates = list(
         turns.in_model_history().order_by("-id")[:HISTORY_CANDIDATE_LIMIT]
     )[::-1]
     if user is not None or allowed is not None:
-        candidates = readable_turns(candidates, user, allowed=allowed)
+        candidates = sendable_turns(candidates, user, allowed=allowed)
     return history_window(candidates)
 
 

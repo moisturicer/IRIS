@@ -14,6 +14,12 @@ Every action endpoint still re-checks its own predicate.
   one blocker item, so nothing the services refuse is left unsaid.
 - `None` -- not disclosed, which is not an empty list -- to a viewer who may
   not read the review (IR-479).
+- `open_thread` (ADR-032 §7, 2026-11-04; IR-874): one item per party with
+  open review threads, a `blocker` exactly where a thread block applies to
+  the viewer -- their party's approval (`routing.send_to_rdco_blocked`,
+  `office_review.clear_blocked`, `decision.blocked_outcomes`) or, for an
+  owner, an unanswered *Must fix* of a requesting party, which holds the next
+  Version (`revision.new_version.blocked`) -- and `info` otherwise.
 """
 
 from __future__ import annotations
@@ -92,12 +98,68 @@ def readiness_facts(record, user) -> dict:
         for r in DocumentRequest.objects.filter(record=record, state=DocumentRequestState.OPEN)
         .select_related("requested_by").order_by("created_at", "pk")
     ] if may_read_requests(record, user) else []
-    return {"assignments": assignments, "document_requests": requests}
+    from core.permissions import is_record_owner
+
+    from .threads import party_counts
+
+    return {
+        "assignments": assignments, "document_requests": requests,
+        "threads": party_counts(record), "owner": is_record_owner(user, record),
+    }
+
+
+def _threads_said(row) -> str:
+    parts = []
+    if row["must_fix"]:
+        parts.append(f"{row['must_fix']} open Must fix thread{'' if row['must_fix'] == 1 else 's'}")
+    if row["suggestions"]:
+        parts.append(f"{row['suggestions']} open suggestion{'' if row['suggestions'] == 1 else 's'}")
+    return " and ".join(parts)
+
+
+def _thread_items(*, facts, routing, office_review, decision, revision, deciding) -> list[dict]:
+    """One `open_thread` item per party with open threads (module note)."""
+    from .threads import OWNER
+
+    office = office_review.get("party")
+    adviser_blocked = bool(
+        (routing or {}).get("send_to_rdco_blocked") or (decision.get("blocked_outcomes") or {}).get("accept")
+    )
+    requesting = {r["party"] for r in revision.get(ResubmissionRequestState.OPEN.value) or []}
+    upcoming = (revision.get("new_version") or {}).get("number")
+    items = []
+    for row in facts.get("threads", []):
+        party, label = row["party"], row["label"]
+        action = _action("show_threads", party or "owner")
+        holds_approval = row["must_fix"] and (
+            (party == office and office_review.get("clear_blocked"))
+            or (party == Party.ADVISER and adviser_blocked)
+        )
+        holds_version = facts.get("owner") and row["unanswered"] and party in requesting
+        if holds_approval:
+            text = (f"{label} has {_threads_said(row)}. Resolve each Must fix, or change it to "
+                    f"Suggestion, before approving.")
+        elif holds_version:
+            n = row["unanswered"]
+            text = (f"Answer {label}'s {n} open Must fix thread{'' if n == 1 else 's'} "
+                    f"before you submit v{upcoming}." if upcoming else
+                    f"Answer {label}'s open Must fix threads before you submit a new version.")
+        else:
+            who = "The authors have" if party == OWNER else f"{label} has"
+            text = f"{who} {_threads_said(row)}."
+            if deciding and decision.get("party") == Party.RDCO and row["must_fix"]:
+                text += " A Decision now closes them, with your reason."
+        items.append(_item(
+            "open_thread", BLOCKER if holds_approval or holds_version else INFO, text,
+            party=party or None, action=action,
+        ))
+    return items
 
 
 def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
                     revision: dict, office_review: dict, my_seats: list,
-                    review_claim: Optional[dict], facts: dict) -> Optional[dict]:
+                    review_claim: Optional[dict], facts: dict,
+                    routing: Optional[dict] = None) -> Optional[dict]:
     """The `readiness` block, from blocks record detail already computed."""
     if not readable:
         return None
@@ -130,6 +192,11 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
             action=(_action("withdraw_revision", request["id"])
                     if revision.get("withdrawable") == request["id"] else None),
         ))
+
+    items.extend(_thread_items(
+        facts=facts, routing=routing, office_review=office_review, decision=decision,
+        revision=revision, deciding=deciding,
+    ))
 
     for request in facts["document_requests"]:
         # The service refuses an office's finish only on its own request.

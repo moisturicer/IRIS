@@ -21,8 +21,9 @@
 #     The frontend's start-order dependency on it is dropped to match.
 #
 # Not changed: the image builds, gunicorn + UvicornWorker, every Celery worker
-# and beat, Docling, nginx, migrations, feature flags (all at their defaults).
-# TLS is out of IR-631's scope; see e2e/README.md, Limitations.
+# and beat, nginx, migrations, feature flags (all at their defaults).
+# TLS is out of IR-631's scope, so caddy is behind a profile and the frontend
+# is published directly; see e2e/README.md, Limitations.
 
 x-e2e-env: &e2e-env
   env_file: !override
@@ -47,7 +48,14 @@ services:
   ai-gateway:
     profiles: ["ai-gateway"]
 
+  caddy:
+    profiles: ["tls"]
+
   frontend:
+    # A published port needs a network with a route out (IR-825).
+    networks:
+      - private
+      - egress
     ports: !override
       - "${E2E_PORT:-8090}:8080"
     depends_on: !override
@@ -55,6 +63,9 @@ services:
 
   mailpit:
     image: axllent/mailpit:v1.27
+    networks:
+      - private
+      - egress
     restart: unless-stopped
     environment:
       # Django sends EMAIL_HOST_USER/PASSWORD because production settings

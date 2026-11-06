@@ -36,6 +36,22 @@ _Avoid_: Submitting owner, import actor
 One research/IP disclosure submission moving through the workflow. Has one or more uploads, authors (byline names, not accounts), and owners (the `User` accounts who submitted/manage it).
 _Avoid_: Submission, paper, thesis (a Record's `record_type` may be a thesis, but not every Record is one), document (too generic — see Upload/Extraction below for the file-shaped things).
 
+**Extraction**:
+The structured document read out of one PDF (a `PdfExtraction` row): its elements in reading order with page boxes, the flattened search text derived from them, and the Provenance of the Extractor that produced it.
+_Avoid_: Parse, OCR result, the PDF text
+
+**Review text**:
+What reviewers compare and comment against: one Version's sections and passages, each with its page, read from that Version's own Manuscript on campus with no AI. Every Version that changes the Manuscript has its own. Distinct from the Extraction, which the AI reads, exists only for the latest released Version, and comes from a different reader, so the two can disagree about the same page.
+_Avoid_: Extraction (the AI's text, not the reviewers'), Version text alone (ambiguous between the two), diff text.
+
+**Extractor**:
+The adapter that turns PDF bytes into an Extraction behind the `StructuredExtractor` port. `EXTRACTION_BACKEND` chooses which one runs; every non-legacy Extractor passes the contract suite.
+_Avoid_: Parser, Docling (one legacy Extractor, not the role)
+
+**Transient failure** / **Permanent failure**:
+How an Extraction attempt failed (IR-839). Transient is an unavailable Extractor and is retried; permanent is everything else, an unexpected exception included, and fails once.
+_Avoid_: Retryable (that names the reader's retry action, offered after either kind)
+
 **Conversation**:
 A persisted, multi-turn Ask IRIS chat thread, owned by exactly one `User`. Optionally scoped to one `Record` (a "Paper Chat" conversation) via a nullable FK; unscoped when general Ask IRIS. One `Conversation` model covers both the full-page Ask IRIS surface and the per-record docked panel — they are two presentations of the same underlying thread, not two features.
 _Avoid_: Chat, session, thread (used loosely elsewhere in the codebase for unrelated things), Paper Chat (a UI surface/preset scope, not a distinct data concept).
@@ -65,7 +81,7 @@ A quoted span of a Record's text that an Ask IRIS answer is grounded in, carryin
 _Avoid_: Chunk (the internal retrieval unit — correct in code, wrong in UI copy and specs aimed at a reader), snippet, excerpt, source (a Passage cites a source; it is not itself the source).
 
 **Figure**:
-A picture inside a Record's document — a chart, diagram, schematic or photograph — identified by the page and the rectangle it occupies rather than by any text it contains. Distinct from its **caption**, which is the text labelling it and is read as ordinary prose, and from a [[Passage]], which is quoted text a reader can check. A Figure is shown to a reader; it is not quoted, and IRIS makes no claim about what it depicts.
+A picture inside a Record's document — a chart, diagram, schematic or photograph — identified by the page and the rectangle it occupies rather than by any text it contains. Distinct from its **caption**, which is the text labelling it and is read as ordinary prose, and from a [[Passage]], which is quoted text a reader can check. A Figure is shown to a reader and is not quoted. IRIS stores a machine-written description of it for retrieval only: the description is never shown and never cited as a Passage, so IRIS makes no claim to a reader about what a Figure depicts (ADR-056).
 _Avoid_: Image (the rendering of a Figure, not the Figure itself), picture (the extractor's word), diagram or chart (kinds of Figure, not synonyms for it), figure caption used to mean the Figure.
 
 **Formula**:
@@ -110,7 +126,7 @@ _Avoid_: Trends or gaps alone (each is one question asked of a landscape, not th
 
 **Collaboration opt-in**:
 A Record owner's explicit, separate permission for their Proposal to be surfaced to another researcher working in a similar area. Its own decision, deliberately not the Data Privacy Act acceptance a submission already carries — accepting terms for how data is processed is a different act from agreeing that strangers may be told your unsubmitted work exists, and someone may reasonably say yes to one and no to the other. An opt-in permits an introduction; it never makes a Record readable.
-_Avoid_: Consent alone (ambiguous next to the DPA acceptance the disclosure gate reads), DPA consent, sharing, visibility (an opt-in changes neither).
+_Avoid_: Consent alone (ambiguous next to AI consent), DPA consent, sharing, visibility (an opt-in changes neither).
 
 **Novelty check**:
 Comparing a newly submitted Proposal against work the institution has already completed, to tell a proposer that something close to their idea has been done here before. Distinct from collaboration matching, which compares one Proposal against other Proposals: a Novelty check looks only at finished work that is already in the public catalogue, so it discloses nothing and needs no [[Collaboration opt-in]].
@@ -327,16 +343,16 @@ Removing a person from IRIS at their own request, once the System Admin confirms
 _Avoid_: Closure, close account, deactivate.
 
 **Notice**:
-The text a person accepts to give Signup consent or Submission consent. RDCO or the System Admin publishes each new version by pasting it, and a published version never changes.
+The text a person answers to give Signup consent and AI consent. RDCO or the System Admin publishes each new version by pasting it, and a published version never changes.
 _Avoid_: Terms, DPA terms, privacy policy (a document the university writes).
 
 **Signup consent**:
-A person's acceptance of the signup Notice, which having an account requires. Withdrawing it means Account deletion.
+A person's acceptance of the Notice, which having an account requires. Withdrawing it means Account deletion.
 _Avoid_: Consent (on its own), terms.
 
-**Submission consent**:
-An owner's acceptance of the submission Notice, which lets AI features use one paper. Any one owner can withdraw it, which stops AI use of the whole paper and leaves its review untouched.
-_Avoid_: Consent (on its own), DPA acceptance, Discoverable (a separate decision).
+**AI consent**:
+A person's Yes or No to AI using their papers, asked with the Notice. A No leaves their account as it was. A Record takes its Contact person's answer when it is created and keeps it, so a later change only reaches later Records, unless a person going from No to Yes chooses to include their earlier ones.
+_Avoid_: Consent (on its own), Submission consent (the per-paper version this replaced), DPA acceptance, Discoverable (a separate decision).
 
 **Retention period**:
 How long IRIS keeps one kind of personal data before erasing it for good. The System Admin enters it once the data protection officer approves it, and a blank period erases nothing.

@@ -55,8 +55,11 @@ def _records_model(name):
 
 def _versions(record):
     return [
-        (v.number, v.cause, v.manuscript.name or None, v.created_by_id, v.created_at)
-        for v in RecordVersion.objects.filter(record_id=record.pk).order_by("number")
+        (number, cause, manuscript or None, created_by_id, created_at)
+        for number, cause, manuscript, created_by_id, created_at in
+        RecordVersion.objects.filter(record_id=record.pk).order_by("number").values_list(
+            "number", "cause", "manuscript", "created_by_id", "created_at",
+        )
     ]
 
 

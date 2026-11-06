@@ -108,7 +108,7 @@ IR-545 asks for the following:
 - A process frozen past its lease (not crashed) could still be inside a non-streaming call when its slot is reused. The lease includes the call's own timeout plus a grace period, and the SDK's retries are off. The exposure is a stall longer than that grace.
 
 **Not decided here**
-- **Every number.** Run caps, lane and queue allocations, prices, the campaign ceiling and whether its reserve is released all need the budget owner's approval (pilot README §6). Sizing for 100 simultaneous submissions has not been done. "Three concurrent research calls" is an evaluation starting point only.
+- **Every number.** Run caps, lane and queue allocations, prices, the campaign ceiling and whether its reserve is released all need the budget owner's approval (pilot README §6). Sizing for 100 simultaneous submissions has not been done. Development values are recorded, once a person signs them, in [the pilot's development-limits record](../evaluation/fixed-workflow-pilot/development-limits.md) (IR-861). "Three concurrent research calls" is an evaluation starting point only.
 - Any paid run, load test or institutional transmission.
 
 ## MVP Impact

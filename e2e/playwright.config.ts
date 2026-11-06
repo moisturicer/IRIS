@@ -30,8 +30,8 @@ export default defineConfig({
   use: {
     baseURL,
     // TLS ends in a proxy in front of nginx in production, and production
-    // settings redirect any request not marked as HTTPS. Nothing in this
-    // repository terminates TLS (IR-662), and TLS is out of IR-631's scope,
+    // settings redirect any request not marked as HTTPS. This stack runs
+    // without Caddy (IR-847), because TLS is out of IR-631's scope,
     // so the run sends the header that proxy would. nginx passes only
     // "https" through (frontend/nginx.conf). Recorded as a limitation.
     extraHTTPHeaders: { "X-Forwarded-Proto": "https" },

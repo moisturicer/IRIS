@@ -44,5 +44,17 @@ export default defineConfig({
     // watch; this is it. Linux CI is unaffected either way, so the pool is set
     // unconditionally rather than behind a platform check nobody would test.
     pool: "forks",
+    // Coverage runs when asked for (`--coverage`, as CI does), never in
+    // `npm test`. The floor below is the team's decision on IR-912, enforced by
+    // IR-932: a run under it exits non-zero. Branches are reported, with no
+    // floor on purpose. Raise a number by a ticket; never lower one to pass a run.
+    coverage: {
+      thresholds: { lines: 80, statements: 80, functions: 80 },
+      provider: "v8",
+      include: ["src/**/*.{ts,tsx}"],
+      exclude: ["src/**/*.{test,spec}.{ts,tsx}", "src/test/**", "src/**/*.d.ts"],
+      reporter: ["text-summary", "json-summary", "html"],
+      reportsDirectory: "./coverage",
+    },
   },
 });

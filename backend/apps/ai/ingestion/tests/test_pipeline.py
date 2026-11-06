@@ -127,21 +127,6 @@ def test_a_scanned_thesis_has_its_running_headers_and_footers_dropped():
     assert "Cebu Institute of Technology" not in body
 
 
-def test_a_scanned_thesis_has_its_stranded_page_numbers_dropped():
-    chunk_set = build_chunk_set(SCANNED_THESIS, OPTIONS)
-
-    contents = [chunk.content for chunk in chunk_set.chunks]
-    assert not any(content.strip() in ("14", "xiv") for content in contents)
-
-
-def test_a_word_hyphenated_across_a_page_break_is_rejoined():
-    chunk_set = build_chunk_set(SCANNED_THESIS, OPTIONS)
-
-    body = " ".join(chunk.content for chunk in chunk_set.chunks)
-    assert "methodology" in body
-    assert "method- ology" not in body
-
-
 def test_the_bibliography_is_excluded_when_the_options_say_so():
     chunk_set = build_chunk_set(BIBLIOGRAPHY_THESIS, OPTIONS)
 

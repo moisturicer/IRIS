@@ -1,6 +1,7 @@
 import { apiClient } from "./client";
 import type {
-  RecordListItem, RecordDetail, RecordFormData, MyResearchItem,
+  RecordListItem, RecordDetail, RecordFormData, MyResearchItem, RecordEmbargo,
+  IpReleaseResult,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
@@ -8,6 +9,14 @@ import type {
   DiscoverInterests, ForYouPage, MetadataSuggestions,
 } from "@/types/records";
 import type { SemanticSearchResult } from "@/types/ai";
+
+export interface ManuscriptMatch {
+  id: number;
+  title: string;
+  url: string;
+  action: "resume_draft" | "open_record";
+  reason?: "same_title" | "similar_title_and_author";
+}
 
 interface PaginatedResponse<T> {
   count:    number;
@@ -114,12 +123,15 @@ export const recordsApi = {
   similar:        (id: number) =>
     apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
   /**
-   * The manuscript's own title and abstract, read from its Docling structure
+   * The manuscript's own title and abstract, read from its extracted structure
    * (IR-406), for the Publish dialog's prefill (IR-409). Owner-only; anyone
    * else gets a 404. No model and no vendor call, so polling it is free.
    */
   metadataSuggestions: (id: number) =>
     apiClient.get<MetadataSuggestions>(`/records/${id}/metadata-suggestions/`),
+  /** Read a failed manuscript again. 409 when the manuscript has changed since. */
+  retryExtraction: (id: number, manuscriptRevision: string | null) =>
+    apiClient.post<MetadataSuggestions>(`/records/${id}/retry-extraction/`, { manuscript_revision: manuscriptRevision }),
   /**
    * The Novelty check (IR-312): published work close to this Proposal.
    * Owner-only; anyone else gets a 404. `checked` is false when no comparison
@@ -190,6 +202,16 @@ export const recordsApi = {
   // that already carries consent ignores the value, so passing it is always safe.
   submit:         (id: number, dpaAccepted: boolean) =>
     apiClient.post<{ detail: string }>(`/records/${id}/submit/`, { dpa_accepted: dpaAccepted }),
+  duplicateMatches: (id: number) =>
+    apiClient.get<{ exact: ManuscriptMatch[]; likely: ManuscriptMatch[]; acknowledged: boolean }>(`/records/${id}/duplicate-matches/`),
+  acknowledgeDuplicates: (id: number, candidateIds: number[]) =>
+    apiClient.post<{ acknowledged: boolean; matches: ManuscriptMatch[] }>(`/records/${id}/acknowledge-duplicates/`, { candidate_ids: candidateIds }),
+  // Every paper starts embargoed; after submission the Adviser or RDCO date or
+  // release it, and KTTO releases an IP mark (ADR-052 §5, §6, §11, IR-882).
+  setEmbargo:     (id: number, until: string) =>
+    apiClient.post<RecordEmbargo>(`/records/${id}/embargo-set/`, { embargoed_until: until }),
+  releaseEmbargo: (id: number) => apiClient.post<RecordEmbargo>(`/records/${id}/embargo-release/`),
+  releaseIp:      (id: number) => apiClient.post<IpReleaseResult>(`/records/${id}/ip-release/`),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),
@@ -201,7 +223,7 @@ export const recordsApi = {
   downloadTemplate: () => apiClient.get("/records/download_template/", { responseType: "blob" }),
 
   // Reference data
-  classifications: () => apiClient.get<PaginatedResponse<Classification>>("/records/classifications/"),
+  classifications: (params?: { page: number }) => apiClient.get<PaginatedResponse<Classification>>("/records/classifications/", params ? { params } : undefined),
   pscedList:       () => apiClient.get<PaginatedResponse<PSCEDClassification>>("/records/psced-classifications/"),
   recordTypes:     () => apiClient.get<PaginatedResponse<RecordType>>("/records/record-types/"),
 
@@ -224,8 +246,11 @@ export const recordsApi = {
 
   // Delete requests: raised by `delete` above (DELETE /records/<id>/), then only
   // read and decided here. The queue has no create or update route (IR-496).
-  listDeleteRequests:      (params?: Record<string, unknown>) =>
-    apiClient.get<PaginatedResponse<DeleteRequest>>("/records/delete-requests/", { params }),
+  listDeleteRequests:      (params?: Record<string, unknown>, options: { signal?: AbortSignal } = {}) =>
+    apiClient.get<PaginatedResponse<DeleteRequest>>("/records/delete-requests/", {
+      params,
+      signal: options.signal,
+    }),
   approveDeleteRequest:    (id: number) =>
     apiClient.post(`/records/delete-requests/${id}/approve/`),
   declineDeleteRequest:    (id: number) =>

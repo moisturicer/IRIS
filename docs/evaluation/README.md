@@ -81,11 +81,28 @@ no expected passage, and it must be *answered*, not refused.
   is never skipped.
 - A contradiction is refused: `evidence_required: none` or
   `decline-no-evidence` with expected passages, or `corpus` + `answer` with none.
-- A question with no expected passage has nothing to recall, so the retrieval
-  harness does not run it and it does not enter either recall average; the run
-  reports how many it left out (`without_passages`). Scoring a refusal is
-  IR-454's measure, and the model-facing command is IR-464's. **This harness
+- A question with no expected passage has nothing to recall, so it never
+  enters either recall average; the run reports how many there are
+  (`without_passages`). The model-facing command is IR-464's. **This harness
   still calls no model.**
+- **An unanswerable question is retrieved for and scored by correct refusal
+  (IR-454).** That is a `corpus` or `corpus_multi` question whose
+  `expected_outcome` is `decline-no-evidence`. It goes through the same
+  retriever and selection as the answerable ones, and **correct refusal** is the
+  share of them whose final set (what the model would be given) is empty. It is
+  reported beside recall, never averaged into it, and is `n/a` for a set with
+  none. Any answerable question whose final set is empty is a **false refusal**
+  and is named by id: that is the floor-set-too-high failure a reader never
+  sees. General-knowledge and `decline-restricted` questions are not run.
+  `proxy_starter.json` holds ten unanswerable questions (kind
+  `off-corpus-research`); their empty `expected` list is deliberate.
+  **Until a relevance cut-off is built (IR-396), retrieval returns the nearest
+  passages for every question, so correct refusal reads 0 when every paper is
+  cleared.** (A disclosure gate refusing papers also empties final sets, and
+  then shows up as false refusals too.) A real run retrieves for these
+  questions as well, so it embeds and reranks ten more questions per
+  configuration than before.
+  That is the gap the measure exists to show, not a defect in it.
 - `--dry-run` validates every field (an invalid value is refused at load), calls
   no vendor and costs nothing.
 
@@ -444,17 +461,67 @@ before its `declared_at`, so a confirmatory figure cannot come from data seen
 before the plan. The 200 decisions that circulated during design is an
 exploratory planning estimate with no statistical basis and is not used.
 
+## Clearing the proxy corpus (IR-815, IR-882)
+
+Every paper starts embargoed and the disclosure gate refuses it until it is
+released (ADR-052 as amended 2026-11-04), and a loaded test paper has no Adviser
+to release it. These steps release test papers only: a CIT-U paper is released by
+its Adviser or RDCO. Both commands refuse
+with `DEBUG` off, and `--force` doesn't change that. `load_corpus` also refuses
+`--clear-for-ai` with `--origin institutional`, and `mark_corpus_cleared` leaves
+such a paper embargoed and names it. Neither can recognise a real paper whose origin
+was never declared, so don't point them at one.
+
+**A database that already holds the proxy papers**, once:
+
+```bash
+python manage.py migrate
+python manage.py mark_corpus_cleared --dry-run   # how many; with none, it says whose papers are waiting
+python manage.py mark_corpus_cleared             # --owner-email if loaded under another account
+python manage.py backfill_embeddings --dry-run   # what any missing vectors would cost
+python manage.py backfill_embeddings             # only if that shows some; spends Voyage credits
+```
+
+Marking sends nothing to anyone, never releases a draft, and never overrides a
+date someone set. A paper that
+already has both vectors needs no backfill, and the dry run counts nothing for it.
+An AI Overview someone opened before marking stays `unavailable` until it's
+retried.
+
+**Loading papers fresh**, releasing them as they load:
+
+```bash
+python manage.py load_corpus <dir> --origin imported_reference --clear-for-ai --dry-run
+python manage.py load_corpus <dir> --origin imported_reference --clear-for-ai
+# Once the workers have extracted and chunked them:
+python manage.py backfill_embeddings --dry-run
+python manage.py backfill_embeddings
+```
+
+After chunking, the worker embeds each paper's chunks, which **spends Voyage
+credits**, and queues its AI Overview, which **spends model credits** if
+`LLM_SUMMARY_MODEL` is set. Retrieval still can't find the paper until the backfill
+adds its title-and-abstract vector, because that's what its first stage ranks. A
+paper the load finds already there is skipped, so mark those with the first set of
+steps.
+
+**`seed_demo`** releases its own papers, except the two it keeps embargoed. On a
+database seeded earlier, run it again.
+
+Run files from before this have `"disclosure_bypass": true` in their provenance:
+they measured the same papers with the gate stepped around, through IR-317's
+bypass, now deleted. Later files don't have the key.
+
 ## What blocks a real number today
 
 - **The corpus has no Voyage vectors.** Every vector observed so far came from
   the deterministic fake. Indexing is `manage.py backfill_embeddings` (measured
   on the dev database: 26 records, 1,236 chunks, ~381,073 tokens; a proxy number that decides
   engineering and is never cited as a finding about CIT-U research, per ADR-023).
-- **The disclosure gate refuses every record** until `Record` carries an embargo
-  field (IR-250), so the final set is empty and final-set recall is 0. Use
-  `AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT` / `manage.py
-  index_with_disclosure_bypass` (IR-317, development only) meanwhile. The
-  command warns when it sees this.
+- **The disclosure gate refuses a paper nobody has released** (ADR-052), so
+  until they're marked the final set is empty and final-set recall is 0. See
+  [Clearing the proxy corpus](#clearing-the-proxy-corpus-ir-815). The command
+  warns when it sees this.
 - **Passage selection does not exist yet** (IR-397), so final-set recall today
   differs from recall@10 only by the gate and the source cap. The number is
   reported anyway: the seam it measures is `apps/ai/answers/selection.py`, and

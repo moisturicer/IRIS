@@ -184,9 +184,9 @@ python manage.py seed_demo --password hunter2
 |---|---|
 | `student@cit.edu` | Student — owns the demo records |
 | `adviser@cit.edu` | Adviser |
-| `rdco@cit.edu` | RDCO — **IRIS's administrator** (`ADMIN_ROLES` is `{RDCO}`) |
+| `rdco@cit.edu` | RDCO — administers people's accounts and the request queues, and gives Student and Adviser (`ADMIN_ROLES` is `{RDCO}`) |
 | `itso@cit.edu` · `ierc@cit.edu` · `ktto@cit.edu` | The three clearing offices |
-| `admin@cit.edu` | Django superuser, **no application role** — `/admin` only (IR-165) |
+| `admin@cit.edu` | **System Admin**, and a Django superuser — the Audit Log, system settings and office roles in IRIS, and Django's admin site (ADR-051, IR-781). Only this demo login holds both |
 
 Re-running is idempotent for records (keyed by title) but **resets all seven passwords** to the default, so say so before a rehearsal if someone has changed one.
 
@@ -230,7 +230,7 @@ docker compose logs -f backend
 docker compose down                # add -v to drop volumes
 ```
 
-**Services:** `db` (PostgreSQL) · `redis` · `backend` (Django) · `frontend` (nginx) · `docling` (docling-serve, structured extraction — ADR-016) · `ai-gateway` (FastAPI, ADR-014) · `celery-default` / `celery-extraction` / `celery-embedding` / `celery-shadow` / `celery-beat` (Celery workers, routed by queue).
+**Services:** `db` (PostgreSQL) · `redis` · `backend` (Django) · `frontend` (nginx) · `ai-gateway` (FastAPI, ADR-014) · `celery-default` / `celery-extraction` / `celery-embedding` / `celery-shadow` / `celery-beat` (Celery workers, routed by queue).
 
 **`ai-gateway` now has a real build context (`./ai`)** and builds, given `./ai/.env` (gitignored, absent in CI and on a fresh checkout) — but it crashes at runtime: `ai/api/chat.py` imports `ai.services.chat_service` and `ai.services.embedding_service` from an `ai/services/` package that contains only an `__init__.py`. [ADR-014](../adr/014-ai-gateway-as-a-service.md) supersedes ADR-010/012's earlier rejection and adopts the gateway as a service under five preconditions, none yet met — this is what's tracked in IR-58, not a missing file to bolt on. Do not deploy it.
 
@@ -266,7 +266,10 @@ docker compose exec backend python manage.py seed_demo
 
 Workers consume the `default`, `extraction`, `embedding` and `shadow` queues (`docker-compose.yml`'s `celery-default`/`celery-extraction`/`celery-embedding`/`celery-shadow` services). `shadow` (IR-466) runs only `decide_evidence_shadow` at concurrency 1 and is idle unless `AI_EVIDENCE_DECISION=shadow`. `config/settings/base.py` sets `CELERY_TASK_ROUTES` (`extract_pdf_text` → `extraction`, `embed_record` → `embedding`) and `CELERY_TASK_DEFAULT_QUEUE = "default"` for everything else, including `chunk_record_document` (IR-164) — so publishers and consumers agree on queue names. Verified against the real docker-compose stack, not just the config: a task dispatched over the real Redis broker was consumed and completed by the real `celery-default` and `celery-extraction` containers.
 
-**`celery-beat` schedules one task (IR-620, ADR-043 §8).** `CELERY_BEAT_SCHEDULE` in `config/settings/base.py` sends `apps.reviews.tasks.send_deadline_notifications` to `default` at minute 0 of every hour. The task asks the database which deadline reminders are owed, so beat keeps no reminder schedule of its own: a missed tick is caught up by the next one, and the `DeadlineMoment` unique key stops a re-run or a second beat instance from sending twice. Beat keeps its own bookkeeping in `/tmp/celerybeat-schedule` inside the container, which is safe to lose. Until an administrator enters a Turnaround, no assignment has a due date and the task sends nothing. To run it once by hand: `docker compose exec backend python manage.py shell -c "from apps.reviews.reminders import run_deadline_notifications; print(run_deadline_notifications())"`.
+**`celery-beat` schedules the reminder tasks.** Recovery mail's dispatch (ADR-045) runs too.
+
+- **Review deadlines (IR-620, ADR-043 §8).** `CELERY_BEAT_SCHEDULE` in `config/settings/base.py` sends `apps.reviews.tasks.send_deadline_notifications` to `default` at minute 0 of every hour. The task asks the database which deadline reminders are owed, so beat keeps no reminder schedule of its own: a missed tick is caught up by the next one, and the `DeadlineMoment` unique key stops a re-run or a second beat instance from sending twice. Beat keeps its own bookkeeping in `/tmp/celerybeat-schedule` inside the container, which is safe to lose. Until an administrator enters a Turnaround, no assignment has a due date and the task sends nothing. To run it once by hand: `docker compose exec backend python manage.py shell -c "from apps.reviews.reminders import run_deadline_notifications; print(run_deadline_notifications())"`.
+- **Embargo reviews (IR-814, ADR-052 §9).** `apps.records.tasks.send_embargo_reminders` runs on `default` daily at 00:00 UTC, which is 08:00 in Manila (Celery runs on UTC here, and Manila has no daylight saving). It reminds the owners and the Adviser in-app on an active embargo's review date, then every 5 working days, and changes nothing about the embargo. The `EmbargoReminder` unique key stops a re-run sending twice, and after downtime only the latest reminder is sent. To run it once by hand: `docker compose exec backend python manage.py shell -c "from apps.records.embargo_reminders import run_embargo_reminders; print(run_embargo_reminders())"`.
 
 **Each worker declares a healthcheck** (IR-225). `celery -A config inspect ping -d <node>@$HOSTNAME` round-trips through the broker to that specific node, so it fails if the process is dead, wedged, or cannot reach Redis. This exists because `celery-extraction` once crash-looped for nine hours on a missing dependency in a stale image while `docker ps` showed only `Restarting` — with `restart: unless-stopped` and no healthcheck, a permanently broken worker looks exactly like one that happened to bounce. **When a worker misbehaves, check `docker ps` for `unhealthy` first, and rebuild it (`docker compose up -d --build <service>`) before debugging the task**: the four workers share one build spec but are separate images, and only one of them going stale is the failure that hides best.
 
@@ -318,7 +321,15 @@ cp backend/.env.example backend/.env
 - The application fails to start on a missing required secret rather than defaulting silently. `SECRET_KEY`, `DB_NAME`, `DB_USER` and `DB_PASSWORD` have **no defaults**: `config/settings/base.py`'s `required()` raises `ImproperlyConfigured` naming the variable, and a value set to the empty string counts as missing
 - Production must run with `TRUSTED_PROXY_COUNT` set to the number of proxies in front of Django, nginx included (IR-656). `apps/accounts/client_address.py` reads the sign-in lockout's client address from it.
 - Compose publishes development Postgres and Redis on `127.0.0.1` only, and Redis requires `REDIS_PASSWORD` in both stacks (IR-669). `python scripts/setup_env.py` generates it in the repo-root `.env` when it is missing. **After pulling this change, run that script again**, or Compose stops by name. If a local Postgres or Redis already holds the port, Compose stops with "ports are not available": set `DB_HOST_PORT` or `REDIS_HOST_PORT` in the repo-root `.env`. A Django or Celery run on the host keeps using `backend/.env`. To point it at Compose's Redis, use `redis://:<REDIS_PASSWORD>@localhost:<port>/0`.
-- `/django-admin/` answers 403 in production unless the client is in `DJANGO_ADMIN_ALLOWED_NETWORKS` (IR-668). Set it in the repo-root `.env`, as addresses or CIDRs separated by spaces or commas: `DJANGO_ADMIN_ALLOWED_NETWORKS=203.0.113.0/24, 198.51.100.7`. Empty allows nobody. With a value set, also put `TRUSTED_PROXY_COUNT` in that `.env`, matching `backend/.env`, because nginx reads the client address the same way. A bad value, `/0` or a missing count stops the frontend container. Restart it after a change: `docker compose -f docker-compose.prod.yml up -d frontend`. Port 80 must be reachable only from the TLS proxy, or a client could forge its address (IR-662). Development has no nginx, so it is unaffected. **Django serves its admin at `/admin/` until IR-782 moves it, and that path is not restricted until then.**
+- To test from a phone on the same network, publish the frontend for that session in the gitignored `docker-compose.override.yml`, then delete the file. Anyone on that network can reach the frontend meanwhile, so use it on a network you trust. This recipe hasn't been run on a phone yet.
+
+  ```yaml
+  services:
+    frontend:
+      ports: !override
+        - "5173:5173"
+  ```
+- `/django-admin/` answers 403 in production unless the client is in `DJANGO_ADMIN_ALLOWED_NETWORKS` (IR-668). Set it in the repo-root `.env`, as addresses or CIDRs separated by spaces or commas: `DJANGO_ADMIN_ALLOWED_NETWORKS=203.0.113.0/24, 198.51.100.7`. Empty allows nobody. With a value set, also put `TRUSTED_PROXY_COUNT` in that `.env`, matching `backend/.env`, because nginx reads the client address the same way. A bad value, `/0` or a missing count stops the frontend container. Restart it after a change: `docker compose -f docker-compose.prod.yml up -d frontend`. Port 80 must be reachable only from the TLS proxy, or a client could forge its address (IR-662). Development has no nginx, so it is unaffected. Django's admin is at `/django-admin/` in every environment, `http://localhost:8000/django-admin/` in development (IR-782); `/admin/...` is IRIS's own pages.
 - Production must run with `DEBUG=False`, an explicit `ALLOWED_HOSTS`, and an explicit `CORS_ALLOWED_ORIGINS`. `config/settings/production.py` re-reads the last two without base's `localhost` default and refuses to start on an empty, `*` or non-https value
 
 `CORS_ALLOW_ALL_ORIGINS` is **gone** from every settings module (IR-154 — earlier text here attributing this to IR-61 is superseded; IR-61 was replaced by IR-154). It was set in development and, combined with `CORS_ALLOW_CREDENTIALS`, permitted any origin to make authenticated requests on a logged-in user's behalf. `development.py` now lists its dev origins explicitly, and `production.py` refuses to start if the setting reappears anywhere.
@@ -333,24 +344,68 @@ cp backend/.env.example backend/.env
 cd backend && python -m pytest -q
 cd backend && python -m pytest apps/reviews -v
 cd backend && python -m pytest apps/ai apps/documents   # the RAG pipeline suites
+cd backend && python -m pytest -m "not slow"           # skip the slowest tests locally (IR-835)
 ```
 
-**Backend CI (IR-810)** runs the complete pytest collection across four isolated
-runners/PostgreSQL services. Whole test modules stay together, assigned by test
-count; tests within a shard retain collection order. This avoids sharing the
-database roles and migration state that integration tests mutate. The required
-`Backend` check passes only when all four shards succeed. Each shard retains
-its JUnit report as a `backend-tests-N` artifact and logs its slowest 25 tests.
-Static/configuration/migration checks and `IRIS_REQUIRE_DB=1` remain enabled.
-PR updates cancel that PR's obsolete run; main push runs remain independent.
+**One run per Postgres server (IR-835).** Two runs sharing one server slow each
+other several-fold (measured: 24 minutes alone, about two hours shared), and two
+checkouts with the same `DB_NAME` fight over one test database. A run that needs
+the database takes a session advisory lock in the server's `postgres` database;
+a second run exits at once naming the holder's pid and directory. The lock dies
+with its connection, so a crashed run leaves nothing to clean up. Collect-only
+runs and pytest runs started from inside a locked run do not take it.
 
-The optional plugin is loaded only in CI (ordinary local pytest remains serial).
-The shard regression tests execute actual pytest subprocesses and verify that
-their union runs every collected test once, preserving module order. Shard
-balance currently uses counts; use the reports to judge elapsed time before
-claiming a speedup or changing the partition policy.
+**`slow` (IR-835)** marks every `*_migration.py` test automatically (each migrates
+the schema backwards and forwards) and a few tests marked by hand. `-m "not slow"`
+saves about five minutes locally. CI selects nothing and runs all of them.
 
-**Frontend still has no test runner** — `npm test` is not wired up, deliberately deferred (P3). `npm run lint` and `npm run build` (`tsc && vite build`) are the only automated frontend checks.
+**Tests do not read your AI configuration (IR-853).** A test run reads only what
+CI supplies from `backend/.env`: `SECRET_KEY`, the two `RECOVERY_*` keys and the
+`DB_*` connection. Vendor keys, LLM profiles and AI switches there are ignored,
+so a local run tests the same configuration CI does and cannot reach a paid
+vendor. `testing/hermetic_env.py` sets `IRIS_DOTENV_ALLOWLIST` before Django
+loads; `config/settings/dotenv.py` applies it, and child processes inherit it.
+A value exported in your shell still applies, as it would in CI. To test with
+real settings, run the app, not the suite.
+
+**Full suite in parallel (IR-854).** After installing
+`backend/requirements/development.txt`, run `cd backend && python -m pytest -n 4`.
+Use fewer workers if memory or database connections are limited; `-n 0` runs
+serially. Every selected test still runs. pytest-django creates one migrated
+database per worker (`test_<DB_NAME>_gw0`, etc.). The controller holds IR-835's
+server lock before starting workers, so separate invocations cannot collide.
+Each worker restores migration-created lookup rows when moving from a test
+that flushes tables back to rollback-based tests. This preserves the initial data
+that serial pytest-django normally protects through test ordering.
+Whole modules stay on one worker, and the research-role consumers share one
+worker because Postgres roles belong to the server. Schema rewinds and advisory
+locks stay inside their worker's database. Tests launching child processes must
+pass the active connection's database name/DSN, as the existing process tests do.
+Run on Linux (or in a Linux container) for the PDF validation suites.
+
+**Backend CI (IR-810, IR-854)** runs the complete collection across four isolated
+runners/Postgres services. Complete modules are assigned longest-first to the
+shard with the lowest estimated duration, with stable path/index tie breaks.
+`backend/testing/module_durations.json` holds seconds including setup/teardown
+from successful CI run **41455637632** (2026-11-02). Unseen modules use **0.2 seconds
+per collected test**; old entries for removed modules are ignored. To refresh,
+download all four `backend-tests-*` JUnit artifacts from one successful run and
+execute, from `backend`:
+
+```bash
+python -m testing.timings path/to/shard1/pytest-results.xml path/to/shard2/pytest-results.xml path/to/shard3/pytest-results.xml path/to/shard4/pytest-results.xml
+```
+
+Commit the updated JSON. Duplicate cases and invalid durations are refused;
+keep reports from different runs separate. Refresh after substantial suite
+changes. The required `Backend` check still waits for all four shards.
+
+The CI shard plugin is opt-in; local runs use one process unless `-n` is supplied.
+Regression tests verify complete coverage and stable assignment.
+
+**AI gateway:** CI's `AI gateway` job runs `ai/tests` with `ai/requirements-dev.txt` (IR-844). Run it with `cd ai && python -m pytest -ra`.
+
+**Frontend:** CI runs `npm run lint`, `npm test` (Vitest with axe-core, IR-210) and `npm run build`.
 
 Rules: **never modify a test to make it pass**; if the test is wrong, fix it deliberately and say so in the PR. A requirement is not satisfied because code exists — only when a test demonstrates it and the evidence is recorded.
 
@@ -366,27 +421,9 @@ Rules: **never modify a test to make it pass**; if the test is wrong, fix it del
 6. Move the item to **In Review** only when the conditions in `DEFINITION_OF_DONE.md` §2 hold
 7. Address review; merge on approval
 
-### Merge conflicts in the traceability matrix
+### Recording traceability
 
-`docs/testing/TRACEABILITY.md` stores each requirement as one table row on a
-single line thousands of characters long. Git merges by line, so two branches
-that each append a note to the same requirement conflict on the whole row even
-though they edited different sentences. It is almost never a real disagreement.
-
-When that file is the conflict, resolve it a cell at a time:
-
-```bash
-python scripts/resolve_traceability.py   # mid-merge, after the conflict appears
-git commit --no-edit
-```
-
-The script takes whichever side changed a cell when only one did, and replays
-both sides' inserts in offset order when both did, so every note keeps the
-position its author chose. Everything outside a conflict block is git's own
-merge and is left alone. It refuses — exits non-zero, leaves the markers — if
-either side rewrote or deleted existing text, or if the conflict is not made
-only of table rows. **Read what it produced before committing**; it is a
-mechanical merge, not a review.
+Add `docs/testing/traceability/IR-XXX.md` for your ticket, and change a row in `docs/testing/TRACEABILITY.md` only when a requirement's status changes ([ADR-055](../adr/055-traceability-evidence-lives-in-one-file-per-ticket.md)). A conflict on a row is then a real disagreement, so read both sides. A branch that appended to the old file should move its entry into its own file when it merges `main`.
 
 Fixing the row format so this stops happening is IR-276.
 
@@ -402,7 +439,7 @@ Full process: [`SDLC.md`](SDLC.md). Done gates: [`DEFINITION_OF_DONE.md`](DEFINI
 | Compose will not start / `ai-gateway` container exits | IR-58 — `ai-gateway` has no `ai/.env`, and even with one, its service package is missing (`ai.services.chat_service`, `ai.services.embedding_service`); do not deploy it |
 | Celery task never runs | First check the worker is actually up: `docker ps` for `unhealthy` or `Restarting`, then `docker compose up -d --build <service>` — a stale image missing a dependency crash-loops silently (IR-225). Routing itself is fixed (IR-164, §6 above), so once the worker is healthy, look at the task, not queue names |
 | Frontend up, not reachable | Prod port mapping, `80:80` vs `8080` |
-| Uploads not extracted | `DoclingExtractor` calls `POST {DOCLING_API_URL}/v1/convert/file` — check the `docling` service is up and reachable; there is no fallback extractor (ADR-016) |
+| Uploads not extracted | LlamaParse reads every Manuscript (ADR-056). With `DEBUG` on and no `LLAMAPARSE_API_KEY`/`LLAMAPARSE_VERSION`, every read fails as unavailable (IR-843). Otherwise check the `celery-extraction` worker's outbound access, and the consent and embargo gate, which holds a paper with no answer unread; there is no fallback extractor |
 | Migrations conflict | `showmigrations`, then resolve deliberately; never edit an applied migration |
 | Type error on build | Intended — `npm run build` runs `tsc` first. Fix the type |
 | `npm run lint` can't find a config | Shouldn't happen — `eslint.config.js` is committed. If it does, check it wasn't accidentally removed |

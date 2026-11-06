@@ -4,8 +4,35 @@ Playwright journeys against **one integrated build** under production
 settings. The plan, the acceptance-criterion mapping and the status rules are
 in [`docs/testing/CORE_JOURNEYS.md`](../docs/testing/CORE_JOURNEYS.md).
 
-This is not a PR gate. The pinned run is the manually started workflow
+The journeys are not a PR gate. The pinned run is the manually started workflow
 `.github/workflows/core-journeys.yml`; this folder is also runnable locally.
+
+## Smoke tier (IR-904)
+
+`smoke/` is a different, small set that **does** run on every pull request that
+touches `frontend/` (`.github/workflows/frontend-smoke.yml`). It needs no stack:
+it serves the built `frontend/dist` and answers every `/api` request from the
+test (`smoke/support/mock-api.ts`). A request a test did not mock is answered
+501 and fails the test, so the set cannot go green while the page calls
+something nobody looked at. Because the API is mocked, it says nothing about the
+backend; the journeys above do.
+
+```bash
+cd ../frontend && npm ci && npm run build   # the smoke tier does not build for you
+cd ../e2e && npm ci && npx playwright install chromium
+npm run test:smoke
+```
+
+The smoke tier also holds the **viewport matrix** (IR-910): every routed screen at
+360, 768, 1280 and 1745 px, asserting the page does not scroll sideways and the
+screen's primary action can be reached. Each run writes the per-screen, per-width
+table to `test-results-smoke/viewport-matrix.md`; CI prints it in the run summary.
+The screens are listed in `smoke/support/screens.ts`; see
+[`docs/engineering/RESPONSIVE_LAYOUT.md`](../docs/engineering/RESPONSIVE_LAYOUT.md).
+
+Output goes to `playwright-report-smoke/` and `test-results-smoke/` (trace and
+video for a failure only). Mark the "Frontend smoke" check required in the
+branch protection rules for `main` to make a failure block the merge.
 
 ## Run it locally
 
@@ -39,7 +66,7 @@ Both run inside the backend container (`support/stack.ts`).
 ## Limitations
 
 - **TLS.** Production settings redirect any request not marked HTTPS, and
-  nothing in this repository terminates TLS (IR-662). The run sends
+  this stack turns Caddy off (IR-847) and publishes nginx directly. The run sends
   `X-Forwarded-Proto: https`, which nginx passes through as a fronting proxy
   would. Emailed links name the `https://` `FRONTEND_URL`; the run follows
   their path on the plain-HTTP address.
@@ -52,7 +79,9 @@ Both run inside the backend container (`support/stack.ts`).
   through one full run. No acceptance criterion measures them. The lockout
   under test is axes', left at its default of three failures.
 - **Ask IRIS** is not driven here. IR-631 reuses IR-630 and IR-605/IR-608
-  evidence from the same SHA, and until IR-250 lands every question answers
-  "no readable sources" under normal settings.
+  evidence from the same SHA. IR-250 (the embargo field) is Done, but a paper
+  still reaches the AI only once someone has answered for it (ADR-052), and a
+  real answer needs an approved provider run. The Ask IRIS browser journey
+  waits on IR-903, which is a decision for Jive.
 - **Latency** is recorded, never judged: no application target is agreed
   (IR-95).

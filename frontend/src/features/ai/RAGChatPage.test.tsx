@@ -57,6 +57,14 @@ const cancelRun = vi.fn();
 const retryRun = vi.fn();
 const status = vi.fn();
 const classifications = vi.fn();
+const catalogue = vi.fn();
+
+// The Django path; which path answers is the deployment's switch (IR-863),
+// tested in RAGChatPage.runtime.test.tsx and RAGChatPage.switchOff.test.tsx.
+vi.mock("@/api/runtimeReader", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/runtimeReader")>()),
+  useReaderPath: () => "django",
+}));
 
 vi.mock("@/api/ai", () => ({
   aiApi: {
@@ -76,6 +84,7 @@ vi.mock("@/api/ai", () => ({
 
 vi.mock("@/api/records", () => ({
   recordsApi: {
+    list: (...args: unknown[]) => catalogue(...(args as [])),
     classifications: (...args: unknown[]) => classifications(...(args as [])),
   },
 }));
@@ -91,9 +100,162 @@ beforeEach(() => {
   askStream.mockImplementation(() => doneStreamOf());
   status.mockResolvedValue({ data: { generative: true, indexed_records: 4 } as AIStatus });
   classifications.mockResolvedValue({ data: { results: [] } });
+  catalogue.mockResolvedValue({ data: { results: [], next: null, count: 0 } });
+});
+
+describe("comparison picker (IR-574)", () => {
+  const papers = [
+    { id: 31, title: "Flood sensors", origin: "institutional", classification_name: "Engineering" },
+    { id: 32, title: "River monitoring", origin: "imported_reference", classification_name: "Engineering" },
+    { id: 33, title: "Synthetic rainfall", origin: "synthetic", classification_name: "Engineering" },
+  ];
+
+  async function openPicker(maximum = 3) {
+    status.mockResolvedValue({ data: { generative: true, indexed_records: 4, comparison_max_records: maximum } });
+    catalogue.mockResolvedValue({ data: { results: papers, next: null, count: papers.length } });
+    renderScreen(<RAGChatPage />);
+    // Opening a Conversation remounts the picker; query the current control,
+    // not the disabled element from the initial, conversation-less paint.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Compare papers" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Compare papers" }));
+    const dialog = await screen.findByRole("dialog", { name: "Compare papers" });
+    await within(dialog).findByRole("checkbox", { name: "Compare Flood sensors" });
+    return dialog;
+  }
+
+  it("uses the authorized catalogue, filters by title and Area, and states declared origins", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9 }), summary({ id: 10, title: "Private draft", record: 99, record_title: "Private draft" })] });
+    classifications.mockResolvedValue({ data: { results: [{ id: 7, name: "Engineering" }] } });
+    const dialog = await openPicker();
+    expect(within(dialog).getByText(/CIT-U research/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Imported reference/)).toBeInTheDocument();
+    expect(within(dialog).getByText(/Engineering · Synthetic/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Private draft/ })).toBeInTheDocument();
+    expect(within(dialog).queryByRole("checkbox", { name: "Compare Private draft" })).not.toBeInTheDocument();
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Search papers" }), "Flood");
+    await userEvent.selectOptions(within(dialog).getByRole("combobox", { name: "Area" }), "7");
+    await waitFor(() => expect(catalogue).toHaveBeenLastCalledWith(expect.objectContaining({ search: "Flood", classification: "7" })));
+  });
+
+  it("uses the server maximum, requires two picks, and removes IDs from the next request", async () => {
+    const dialog = await openPicker(2);
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Compare Flood sensors" }));
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Compare River monitoring" }));
+    expect(within(dialog).getByRole("checkbox", { name: "Compare Synthetic rainfall" })).toBeDisabled();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Done" }));
+    await userEvent.click(screen.getByRole("button", { name: "Remove Flood sensors from comparison" }));
+    await userEvent.type(screen.getByRole("textbox", { name: /ask a follow-up/i }), "Compare their methods");
+    expect(screen.getByRole("button", { name: "Send message" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Compare papers" }));
+    const reopened = screen.getByRole("dialog", { name: "Compare papers" });
+    await userEvent.click(await within(reopened).findByRole("checkbox", { name: "Compare Synthetic rainfall" }));
+    await userEvent.click(within(reopened).getByRole("button", { name: "Done" }));
+    await userEvent.click(screen.getByRole("button", { name: "Send message" }));
+    await waitFor(() => expect(askStream).toHaveBeenCalledWith("Compare their methods", expect.objectContaining({ comparisonRecordIds: [32, 33] }), expect.any(AbortSignal)));
+  });
+
+  it("never offers to widen a single-Record Conversation", async () => {
+    status.mockResolvedValue({ data: { comparison_max_records: 3 } });
+    create.mockResolvedValue({ data: detail({ record: 5 }) });
+    renderScreen(<RAGChatPage />, { route: "/ai?record=5" });
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ record: 5 }));
+    expect(await screen.findByRole("button", { name: "Compare papers" })).toBeDisabled();
+    expect(screen.getByText(/start a new chat to compare papers/i)).toBeInTheDocument();
+    expect(catalogue).not.toHaveBeenCalled();
+  });
+
+  it("closing the picker never submits the drafted comparison", async () => {
+    const dialog = await openPicker();
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Compare Flood sensors" }));
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Compare River monitoring" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Done" }));
+    const composer = screen.getByRole("textbox", { name: /ask a follow-up/i });
+    await userEvent.type(composer, "Compare their methods");
+    await userEvent.click(screen.getByRole("button", { name: "Compare papers" }));
+    const reopened = screen.getByRole("dialog", { name: "Compare papers" });
+    await userEvent.type(within(reopened).getByRole("textbox", { name: "Search papers" }), "River{enter}");
+    expect(askStream).not.toHaveBeenCalled();
+    await userEvent.click(within(reopened).getByRole("button", { name: /^Close$/ }));
+    expect(askStream).not.toHaveBeenCalled();
+    expect(composer).toHaveValue("Compare their methods");
+  });
+
+  it("does not guess a comparison limit when status is unavailable", async () => {
+    status.mockRejectedValue(new Error("offline"));
+    renderScreen(<RAGChatPage />);
+    expect(await screen.findByRole("button", { name: "Compare papers" })).toBeDisabled();
+    expect(catalogue).not.toHaveBeenCalled();
+  });
+
+  it("keeps selections with their Conversation and restores them when returning", async () => {
+    status.mockResolvedValue({ data: { comparison_max_records: 3 } });
+    catalogue.mockResolvedValue({ data: { results: papers, next: null, count: 3 } });
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "First" }), summary({ id: 10, title: "Second" })] });
+    get.mockImplementation((id: number) => Promise.resolve({ data: detail({ id, title: id === 9 ? "First" : "Second" }) }));
+    renderScreen(<Routes><Route path="/ai/conversations/:conversationId" element={<RAGChatPage />} /></Routes>, { route: "/ai/conversations/9" });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Compare papers" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Compare papers" }));
+    const dialog = await screen.findByRole("dialog", { name: "Compare papers" });
+    await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Compare Flood sensors" }));
+    await userEvent.click(within(dialog).getByRole("button", { name: "Done" }));
+    await userEvent.click(screen.getByRole("link", { name: /Second/ }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Remove Flood sensors from comparison" })).not.toBeInTheDocument());
+    await userEvent.click(screen.getByRole("link", { name: /First/ }));
+    expect(await screen.findByRole("button", { name: "Remove Flood sensors from comparison" })).toBeInTheDocument();
+  });
+
+  it("discards a search reply that arrives after a newer query", async () => {
+    const dialog = await openPicker();
+    let release!: (value: unknown) => void;
+    catalogue.mockImplementation(({ search }: { search: string }) => search === "Old"
+      ? new Promise((resolve) => { release = resolve; })
+      : Promise.resolve({ data: { results: [papers[1]], next: null, count: 1 } }));
+    const search = within(dialog).getByRole("textbox", { name: "Search papers" });
+    await userEvent.type(search, "Old");
+    await waitFor(() => expect(release).toBeDefined());
+    await userEvent.clear(search);
+    await userEvent.type(search, "River");
+    expect(await within(dialog).findByRole("checkbox", { name: "Compare River monitoring" })).toBeInTheDocument();
+    await act(async () => release({ data: { results: [papers[0]], next: null, count: 1 } }));
+    expect(within(dialog).queryByRole("checkbox", { name: "Compare Flood sensors" })).not.toBeInTheDocument();
+  });
+
+  it("keeps selections across a failed search and retries without losing them", async () => {
+    const dialog = await openPicker();
+    await userEvent.click(within(dialog).getByRole("checkbox", { name: "Compare Flood sensors" }));
+    catalogue.mockRejectedValueOnce(new Error("offline"));
+    await userEvent.type(within(dialog).getByRole("textbox", { name: "Search papers" }), "River");
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("Your selections are kept");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Retry search" }));
+    expect(await within(dialog).findByRole("checkbox", { name: "Compare Flood sensors" })).toBeChecked();
+  });
 });
 
 describe("persisted conversations", () => {
+  it("uses AA secondary text and omits the persistent keyboard hint (IR-771, IR-365)", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" })] });
+    get.mockResolvedValue({ data: detail({ id: 9, title: "Flooding" }) });
+
+    renderScreen(<RAGChatPage />);
+
+    expect(await screen.findByText("Ask IRIS")).toHaveClass("text-stone-600");
+    expect(screen.queryByText("Enter to send · Shift+Enter for new line")).toBeNull();
+    const conversation = screen.getByRole("link", { name: /Flooding/ });
+    expect(conversation).toHaveClass("bg-brand-50", "text-brand");
+    expect(within(conversation).getByText(/Sep 20/)).toHaveClass("text-stone-600");
+  });
+
+  it("keeps retrieval-only mode soft maroon and identifiable by icon and text (IR-365)", async () => {
+    status.mockResolvedValue({ data: { generative: false, indexed_records: 4 } as AIStatus });
+
+    renderScreen(<RAGChatPage />);
+
+    const label = await screen.findByText(/Retrieval-only mode/i);
+    const banner = label.closest("div");
+    expect(banner).toHaveClass("bg-brand-50", "text-brand");
+    expect(banner?.querySelector("svg")).not.toBeNull();
+  });
+
   it("announces a throttled question with the server's wait", async () => {
     useUIStore.setState({ toasts: [] });
     list.mockResolvedValue({ data: [summary()] });
@@ -192,9 +354,44 @@ describe("persisted conversations", () => {
     list.mockResolvedValue({ data: [] });
 
     await userEvent.click(screen.getByRole("button", { name: /delete flooding/i }));
-
+    const dialog = await screen.findByRole("dialog", { name: "Delete conversation?" });
+    expect(remove).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole("button", { name: /^Delete conversation$/ }));
     await waitFor(() => expect(remove).toHaveBeenCalledWith(9));
     expect(create).toHaveBeenCalled();
+  });
+
+  it("asks before deleting, names the chat, and Cancel or Escape preserves it", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    renderScreen(<RAGChatPage />);
+    const trigger = await screen.findByRole("button", { name: "Delete Flooding" });
+    await userEvent.click(trigger);
+    let dialog = await screen.findByRole("dialog", { name: "Delete conversation?" });
+    expect(within(dialog).getByText(/Delete “Flooding” and its messages/)).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toHaveFocus();
+    expect(remove).not.toHaveBeenCalled();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(trigger).toHaveFocus();
+    expect(remove).not.toHaveBeenCalled();
+    await userEvent.click(trigger);
+    dialog = await screen.findByRole("dialog", { name: "Delete conversation?" });
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Delete conversation?" })).not.toBeInTheDocument();
+    expect(remove).not.toHaveBeenCalled();
+  });
+
+  it("keeps a failed delete in the confirmation dialog for retry", async () => {
+    list.mockResolvedValue({ data: [summary({ id: 9, title: "Flooding" })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+    remove.mockRejectedValueOnce(new Error("offline"));
+    renderScreen(<RAGChatPage />);
+    await userEvent.click(await screen.findByRole("button", { name: "Delete Flooding" }));
+    const dialog = await screen.findByRole("dialog", { name: "Delete conversation?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: /^Delete conversation$/ }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/could not delete/i);
+    expect(within(dialog).getByRole("button", { name: "Cancel" })).toBeEnabled();
+    expect(screen.getByRole("link", { name: /Flooding/ })).toBeInTheDocument();
   });
 });
 
@@ -499,7 +696,8 @@ describe("owned conversation URLs (IR-548)", () => {
 
     renderRoutes("/ai/conversations/404");
 
-    expect(await screen.findByText(/this conversation is not available/i)).toBeTruthy();
+    const message = await screen.findByText(/this conversation is not available/i);
+    expect(message.parentElement).toHaveClass("bg-brand", "text-white");
     expect(create).not.toHaveBeenCalled();
     expect(askStream).not.toHaveBeenCalled();
     expect((screen.getByRole("textbox", { name: /ask a follow-up/i }) as HTMLTextAreaElement).disabled).toBe(true);

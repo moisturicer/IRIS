@@ -27,15 +27,23 @@ class RecordUploadSerializer(serializers.ModelSerializer):
     status_name      = serializers.CharField(source="status.name", read_only=True, default=None)
     uploaded_by_name = serializers.SerializerMethodField()
     reviews          = UploadReviewSerializer(many=True, read_only=True)
+    #: Why this file can't be deleted, or null -- the delete service's own
+    #: rule (ADR-058 §2, IR-872), so Paper View never offers a delete that fails.
+    delete_refused   = serializers.SerializerMethodField()
 
     class Meta:
         model  = RecordUpload
         fields = [
             "id", "record", "slot", "slot_name", "file", "version",
             "status", "status_name", "uploaded_by", "uploaded_by_name",
-            "created_at", "reviews",
+            "created_at", "reviews", "delete_refused",
         ]
         read_only_fields = ["version", "uploaded_by"]
+
+    def get_delete_refused(self, obj):
+        from apps.records.versions import deletion_refused_reason
+
+        return deletion_refused_reason(obj)
 
     def get_uploaded_by_name(self, obj):
         if obj.uploaded_by:
@@ -105,10 +113,20 @@ class PdfExtractionSerializer(serializers.ModelSerializer):
     because "what produced this?" is the question an operator asks about a
     bad extraction, and the ticket asks for it to be observable.
     """
+    manuscript_revision = serializers.UUIDField(source="source_revision", read_only=True)
+    retryable = serializers.SerializerMethodField()
+    message = serializers.SerializerMethodField()
+
+    def get_retryable(self, obj):
+        return obj.status == "failed"
+
+    def get_message(self, obj):
+        return obj.reader_message
+
     class Meta:
         model  = PdfExtraction
         fields = [
             "id", "upload", "status", "extractor",
-            "celery_task_id", "error", "created_at", "completed_at",
+            "manuscript_revision", "phase", "retryable", "message", "created_at", "completed_at",
         ]
         read_only_fields = fields

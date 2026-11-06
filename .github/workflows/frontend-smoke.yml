@@ -1,0 +1,121 @@
+name: Frontend smoke (IR-904)
+
+# A small Playwright set against the BUILT frontend with every /api request
+# answered by the test (e2e/smoke/support/mock-api.ts). No database, worker or
+# Compose stack, so it is quick enough to gate every pull request that touches
+# frontend/. The full-stack journeys stay a hand-started run (core-journeys.yml,
+# IR-631) and are not part of this tier.
+#
+# The workflow runs on EVERY pull request and decides inside the job whether
+# the PR touched the frontend. A `paths:` filter would leave this check
+# "pending" forever on a PR that did not match, and a pending required check
+# blocks the merge; a job that finds nothing to test passes at once instead.
+# To make a failure BLOCK the PR, mark the check "Frontend smoke" as required
+# in the branch protection rules for main (a repository setting, not code).
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  smoke:
+    name: Frontend smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Start the job clock
+        run: echo "JOB_STARTED=$(date +%s)" >> "$GITHUB_ENV"
+
+      - name: Did this pull request touch frontend/?
+        id: scope
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          # workflow_dispatch has no pull request: always run.
+          if [ -z "$PR" ]; then echo "run=true" >> "$GITHUB_OUTPUT"; exit 0; fi
+          files=$(gh api "repos/$REPO/pulls/$PR/files" --paginate --jq '.[].filename')
+          if echo "$files" | grep -Eq '^(frontend/|e2e/smoke/|e2e/support/viewport\.ts$|e2e/playwright\.smoke\.config\.ts$|e2e/package(-lock)?\.json$|\.github/workflows/frontend-smoke\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            echo "No frontend/ or smoke-tier file changed; nothing to smoke-test." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/checkout@v5
+        if: steps.scope.outputs.run == 'true'
+
+      - uses: actions/setup-node@v5
+        if: steps.scope.outputs.run == 'true'
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            frontend/package-lock.json
+            e2e/package-lock.json
+
+      - name: Build the frontend
+        if: steps.scope.outputs.run == 'true'
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install Playwright
+        if: steps.scope.outputs.run == 'true'
+        working-directory: e2e
+        run: |
+          npm ci
+          npx playwright install --with-deps chromium
+
+      - name: Run the smoke tests
+        if: steps.scope.outputs.run == 'true'
+        working-directory: e2e
+        env:
+          CI: "true"
+        run: npm run test:smoke
+
+      - name: Show the viewport matrix (IR-910)
+        # One row per screen, one column per width: overflow in px and whether
+        # the primary action could be reached. Also when a test failed, since a
+        # failing cell is the part worth reading.
+        if: always() && steps.scope.outputs.run == 'true'
+        run: |
+          if [ -f e2e/test-results-smoke/viewport-matrix.md ]; then
+            cat e2e/test-results-smoke/viewport-matrix.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "No viewport matrix was written." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Record the job time
+        # Also when a test failed: a slow failing run is the one worth timing.
+        if: always() && steps.scope.outputs.run == 'true'
+        run: |
+          elapsed=$(( $(date +%s) - JOB_STARTED ))
+          mkdir -p e2e/test-results-smoke
+          echo "$elapsed" > e2e/test-results-smoke/job-seconds.txt
+          {
+            echo "### Frontend smoke job time"
+            echo
+            echo "$((elapsed / 60)) min $((elapsed % 60)) s (checkout through this step)"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload report, traces and videos
+        if: always() && steps.scope.outputs.run == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-smoke-${{ github.run_id }}
+          path: |
+            e2e/playwright-report-smoke/
+            e2e/test-results-smoke/
+          if-no-files-found: ignore
+          retention-days: 30

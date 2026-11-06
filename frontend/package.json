@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "lint": "eslint src",
     "test": "vitest run",
+    "test:changed": "vitest run --changed origin/main",
     "test:watch": "vitest"
   },
   "dependencies": {
@@ -19,7 +20,6 @@
     "axios": "^1.7.2",
     "clsx": "^2.1.1",
     "date-fns": "^3.6.0",
-    "formik": "^2.4.9",
     "highlight.js": "^11.11.1",
     "katex": "^0.18.10",
     "pdfjs-dist": "^6.3.289",
@@ -33,7 +33,6 @@
     "rehype-katex": "^7.0.1",
     "remark-gfm": "^4.0.1",
     "remark-math": "^6.0.0",
-    "yup": "^1.7.1",
     "zod": "^4.6.7",
     "zustand": "^4.5.2"
   },
@@ -49,6 +48,7 @@
     "@typescript-eslint/eslint-plugin": "^8.0.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@vitejs/plugin-react": "^6.1.2",
+    "@vitest/coverage-v8": "^5.0.5",
     "autoprefixer": "^10.4.19",
     "axe-core": "^4.13.0",
     "eslint": "^9.6.0",

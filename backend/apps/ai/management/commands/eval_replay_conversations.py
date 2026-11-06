@@ -2,12 +2,20 @@
 
 The API runs in this process, so the manifest describes the settings that
 actually served it. Fake mode injects deterministic providers explicitly.
+
+With ``--runtime-url`` the cases go through the dedicated AI runtime's
+authenticated submit / progress / reopen routes at that deployment instead
+(IR-740). That service is not this process, so its provider mode and model are
+declared by the operator and recorded as declared. The run is ``arm: runtime``
+with its own engine, transport and schema identity, never ``controller-v1``.
 """
 
 from __future__ import annotations
 
 from contextlib import nullcontext
+from functools import partial
 
+import httpx
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.test import override_settings
@@ -19,8 +27,13 @@ from apps.ai.controller import versions
 from apps.ai.evaluation.campaign_report import (CampaignRefused, require_frozen_for_held_out,
                                                 require_paid_held_out)
 from apps.ai.evaluation.conversations import check_lock, split_digests, validate_set
+from apps.ai.evaluation.engines import (RUNTIME_ARM, RUNTIME_ENGINE, RUNTIME_TRANSPORT,
+                                        runtime_identity)
 from apps.ai.evaluation.faults import ToolOutage
-from apps.ai.evaluation.replay import CampaignAttempts, ResearchDiagnostics, collect_run
+from apps.ai.evaluation.replay import (CampaignAttempts, ResearchDiagnostics, RuntimeAttempts,
+                                       collect_run)
+from apps.ai.evaluation.runtime_replay import (DEFAULT_DEADLINE_SECONDS, RuntimeSeam,
+                                               collect_case_runtime)
 from apps.ai.evaluation.runfile import eval_token, file_digest, load_json, write_run
 from apps.ai.inference.profiles import profile_for
 from apps.ai.inference.tasks import InferenceTask
@@ -39,6 +52,13 @@ class LocalReader:
         return self.client.get(path)
 
 
+def runtime_seam(url: str, token: str) -> RuntimeSeam:
+    """The reader's own edge at ``url``; the token goes only into the Authorization header."""
+    client = httpx.Client(base_url=url, headers={"Authorization": f"Bearer {token}"},
+                          timeout=DEFAULT_DEADLINE_SECONDS)
+    return RuntimeSeam(client)
+
+
 class Command(BaseCommand):
     help = "Collect selected development conversations through authenticated Ask IRIS."
 
@@ -47,8 +67,17 @@ class Command(BaseCommand):
         parser.add_argument("--lock", required=True)
         parser.add_argument("--case", action="append", required=True,
                             help="Development case ID; repeat to collect several.")
-        parser.add_argument("--arm", choices=("current", "fixed_synthesis", "controller"),
+        parser.add_argument("--arm", choices=("current", "fixed_synthesis", "controller", RUNTIME_ARM),
                             help="Evaluation arm label; never changes the reader engine.")
+        parser.add_argument("--runtime-url",
+                            help="Collect through the dedicated runtime's authenticated reader "
+                                 "edge at this origin (IR-740) instead of this process.")
+        parser.add_argument("--runtime-model", default="scripted",
+                            help="The model the runtime deployment is configured to use; "
+                                 "recorded as declared by the operator.")
+        parser.add_argument("--depth", choices=("ordinary", "deep"), default="deep")
+        parser.add_argument("--run-deadline-seconds", type=float,
+                            default=DEFAULT_DEADLINE_SECONDS)
         parser.add_argument("--providers", choices=("fake", "real"), default="fake")
         parser.add_argument("--smoke", action="store_true",
                             help="Require exactly one development case and fake providers.")
@@ -96,6 +125,8 @@ class Command(BaseCommand):
         if options["smoke"] and (len(selected) != 1 or options["providers"] != "fake"
                                  or options["held_out"]):
             raise CommandError("--smoke requires one development case and fake providers")
+        if options["runtime_url"] or options["arm"] == RUNTIME_ARM:
+            return self._runtime(options, data, selected, split)
         engine = versions.NEW_RUN_ENGINE
         arm = options["arm"] or ("controller" if engine == versions.CONTROLLER_ENGINE
                                  else "current")
@@ -142,10 +173,7 @@ class Command(BaseCommand):
 
         corpus = dict(data["corpus"])
         corpus["set_sha256"] = file_digest(options["set"])
-        corpus["authorization_policy_version"] = (
-            "Record.visible_to+development-disclosure-bypass"
-            if getattr(settings, "AI_DISCLOSURE_BYPASS_FOR_DEVELOPMENT", False)
-            else "Record.visible_to+disclosure-gate")
+        corpus["authorization_policy_version"] = "Record.visible_to+disclosure-gate"
         if attempt_reader:
             profiles = {task.value: profile_for(task) for task in
                         (InferenceTask.PLAN, InferenceTask.ANSWER)}
@@ -204,4 +232,67 @@ class Command(BaseCommand):
                               diagnostics=ResearchDiagnostics(), faults=outage)
         run["manifest"]["set_sha256"] = corpus["set_sha256"]
         path = write_run(options["out"], f"IR-606-replay-{run['run_id']}", run)
+        self.stdout.write(f"wrote {path} ({len(run['conversations'])} conversations)")
+
+    def _runtime(self, options, data, selected, split):
+        """Collect through the dedicated runtime's reader edge; see the module docstring."""
+        if not options["runtime_url"] or options["arm"] not in (None, RUNTIME_ARM):
+            raise CommandError(f"the runtime arm needs --runtime-url, and --runtime-url means "
+                               f"--arm {RUNTIME_ARM}")
+        if options["run_deadline_seconds"] <= 0:
+            raise CommandError("--run-deadline-seconds must be positive")
+        caps = {"case_attempts": options["case_attempts"]}
+        attempts, pricing = None, {}
+        if options["providers"] == "real":
+            if not options["approval_id"] or options["data_policy"] == "deterministic-fake-local":
+                raise CommandError("real providers need an approval ID and approved data policy")
+            if options["case_cost_usd"] is None or mode() != ENFORCE:
+                raise CommandError("real providers need a case cost cap and enforced admission")
+            if options["runtime_model"] == "scripted":
+                raise CommandError("real providers need the deployment's --runtime-model")
+            try:
+                admission = read_limits()
+            except Exception as exc:
+                raise CommandError(f"admission limits unavailable: {exc}") from None
+            attempts = RuntimeAttempts(admission.campaign_key)
+            if attempts.snapshot() != 0:
+                raise CommandError("the evaluation campaign already has attempts; "
+                                   "use a fresh dedicated key")
+            caps.update({
+                "case_cost_usd": options["case_cost_usd"],
+                "turn_max_attempts": admission.run.attempts,
+                "turn_max_input_tokens": admission.run.input_tokens,
+                "turn_max_output_tokens": admission.run.output_tokens,
+                "turn_max_cost_usd": admission.run.cost_micros / 1_000_000,
+                "campaign_attempts": admission.spendable.attempts,
+                "campaign_input_tokens": admission.spendable.input_tokens,
+                "campaign_output_tokens": admission.spendable.output_tokens,
+                "campaign_cost_usd": admission.spendable.cost_micros / 1_000_000,
+                "campaign_active_ms": admission.spendable.active_ms,
+                "campaign_key": admission.campaign_key,
+            })
+            pricing = {model: {"input": price.input, "output": price.output}
+                       for model, price in admission.prices.items()}
+        elif options["case_cost_usd"] is not None:
+            caps["case_cost_usd"] = options["case_cost_usd"]
+        corpus = dict(data["corpus"])
+        corpus["set_sha256"] = file_digest(options["set"])
+        corpus["authorization_policy_version"] = "Record.visible_to+disclosure-gate"
+        model = options["runtime_model"]
+        profile = {"vendor": "operator_declared", "model": model, "fallbacks": [],
+                   "reasoning_visible": False}
+        run = collect_run(
+            runtime_seam(options["runtime_url"], eval_token()), selected,
+            set_id=data["set_id"], set_digests=split_digests(data), corpus=corpus,
+            model_ids={"agent": model}, limits=caps, data_policy=options["data_policy"],
+            cache=options["cache"], attempts=attempts, approval_id=options["approval_id"],
+            model_profiles={"agent": profile}, partition_method=data.get("partition_method"),
+            retrieval={"research": "runtime-local-tools", "declared_by": "operator"},
+            pricing=pricing, arm=RUNTIME_ARM, engine_version=RUNTIME_ENGINE, split=split,
+            protocol=RUNTIME_TRANSPORT, identity=runtime_identity(),
+            runtime={"depth": options["depth"], "declared_by": "operator", "edge": "reader-edge"},
+            case_collector=partial(collect_case_runtime, depth=options["depth"],
+                                   deadline_seconds=options["run_deadline_seconds"]))
+        run["manifest"]["set_sha256"] = corpus["set_sha256"]
+        path = write_run(options["out"], f"IR-740-runtime-replay-{run['run_id']}", run)
         self.stdout.write(f"wrote {path} ({len(run['conversations'])} conversations)")

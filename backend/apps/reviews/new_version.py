@@ -35,6 +35,10 @@ chunks Ask IRIS and Paper Chat answer from must stay that file's too
 (`versions.manuscript_awaits_submission`). A metadata-only version re-extracts
 nothing.
 
+**Every open *Must fix* thread of a requesting party needs an answer first**
+-- *Addressed* or *Declined* (ADR-032 §7, 2026-11-04 as corrected; IR-874,
+`threads.new_version_blocked_reason`).
+
 **What counts as a change** (`unchanged_reason`): a manuscript other than the
 latest version's, a supporting document an owner uploaded since the newest
 request, or a detail edited since then (`Record.details_edited_at`).
@@ -65,6 +69,7 @@ from core.enums import (
 from core.permissions import is_record_owner
 
 from . import revisions, routing
+from .threads import new_version_blocked_reason
 from .models import RecordAssignment, RecordClearance, ResubmissionRequest, ReviewerSeat
 
 logger = logging.getLogger(__name__)
@@ -177,7 +182,7 @@ def new_version_hint(record, user) -> Optional[dict]:
         "number": (latest.number if latest else 0) + 1,
         "rereview": [_label(p) for p in rereview],
         "kept": [_label(o) for o in kept],
-        "blocked": unchanged_reason(record, requests),
+        "blocked": unchanged_reason(record, requests) or new_version_blocked_reason(record, requests),
     }
 
 
@@ -204,9 +209,16 @@ def submit_new_version(record, actor):
             "No reviewer has asked for a revision, so there is nothing for a new "
             "version to answer."
         )
-    blocked = unchanged_reason(record, requests)
+    blocked = unchanged_reason(record, requests) or new_version_blocked_reason(record, requests)
     if blocked:
         raise NewVersionError(blocked)
+    if stored_manuscript_unsubmitted(record):
+        # The file was accepted while the owner could read a particular set of
+        # Records. Recheck that set at the actual version boundary as well.
+        from apps.records.duplicates import enforce_exact, lock_digest
+
+        lock_digest(record.manuscript_sha256)
+        enforce_exact(actor, record.pk, record.manuscript_sha256)
 
     parties = _parties(requests)
     reset = _reset_offices(record, parties)
@@ -248,8 +260,12 @@ def submit_new_version(record, actor):
     requesting_seats.filter(state=SeatState.DONE).update(state=SeatState.IN_REVIEW, done_at=None)
     from .deadlines import start_clock
 
+    # Every assignment that reopens gets a fresh due date (ADR-043 §5): the
+    # requesting parties', and under `RESTART_ALL` each reopened office's, so
+    # the arms differ in nothing but who reviews again (IR-869). An office
+    # still reviewing reopened nothing and keeps its date.
     for assignment in RecordAssignment.objects.select_for_update().filter(
-        record=record, party__in=parties, state=AssignmentState.ACTIVE,
+        record=record, party__in=rereview, state=AssignmentState.ACTIVE,
     ):
         start_clock(assignment, now)
         assignment.save(update_fields=[

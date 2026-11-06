@@ -13,11 +13,15 @@ SUITES = {
         "apps/ai/tests/test_public_protocol_http.py",
         "apps/ai/tests/test_public_history_http.py",
         "apps/ai/research/tests/test_general_tools.py",
+        # The AI runtime's reader journal replay and Retry link (IR-726).
+        "apps/ai/tests/test_ai_runtime_lifecycle_public.py",
     ]),
     "durability": ("postgres_independent_processes_scripted_provider", [
         "apps/ai/tests/test_durable_processes.py",
         "apps/ai/tests/test_durable_ask_http.py",
         "apps/ai/tests/test_conversation_state.py",
+        # The AI runtime's Stop, reconnect and Retry across worker races (IR-726).
+        "apps/ai/tests/test_ai_runtime_lifecycle_db.py",
     ]),
 }
 BROWSER_CHECKS = (

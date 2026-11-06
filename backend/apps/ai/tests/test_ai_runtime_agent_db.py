@@ -97,9 +97,11 @@ def test_a_run_is_never_continued_under_another_pin(runtime):
     upgraded = Pin(**{**PIN.as_dict(), "requires": PIN.requires, "prompt_version": "agent-direct-2"})
     provider = recording(reply("Would be the wrong interpretation."))
     worker = service(runtime, AgentExecutor(provider, upgraded, RESERVES), notifier=Quiet())
-    assert asyncio_run(worker.run_next())
+    # IR-862: a worker that does not serve the run's pin leaves it queued for
+    # one that does, rather than claiming and refusing it.
+    assert asyncio_run(worker.run_next()) is False
     status = asyncio_run(RunStore(runtime).status(session(reader), run_["id"]))
-    assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
+    assert status["state"] == "queued"
     assert status["pinned"]["agent"] == PIN.as_dict()
     assert provider.requests == []
 
@@ -146,6 +148,7 @@ def test_an_agent_run_is_not_answered_by_a_worker_without_its_pin(runtime):
         base_revision=None,
     ))
     worker = service(runtime, notifier=Quiet())
-    assert asyncio_run(worker.run_next())
+    # IR-862: left queued for a worker that serves its pin.
+    assert asyncio_run(worker.run_next()) is False
     status = asyncio_run(RunStore(runtime).status(session(reader), run_["id"]))
-    assert (status["state"], status["end_reason"]) == ("failed", "unavailable")
+    assert status["state"] == "queued"

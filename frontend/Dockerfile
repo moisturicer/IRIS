@@ -2,7 +2,7 @@
 # Multi-stage: build with Node, serve with nginx.
 
 # ------ builder ------
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
 
 WORKDIR /app
 
@@ -27,6 +27,8 @@ RUN rm /etc/nginx/conf.d/default.conf
 # entrypoint runs this directory when the command is nginx.
 COPY docker-entrypoint.d/40-iris-django-admin.sh /docker-entrypoint.d/40-iris-django-admin.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.d/40-iris-django-admin.sh && chmod 755 /docker-entrypoint.d/40-iris-django-admin.sh
+COPY docker-entrypoint.d/41-iris-runtime-reader.sh /docker-entrypoint.d/41-iris-runtime-reader.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.d/41-iris-runtime-reader.sh && chmod 755 /docker-entrypoint.d/41-iris-runtime-reader.sh
 USER nginx
 
 # Our custom config -- handles SPA routing (all routes fall back to index.html)

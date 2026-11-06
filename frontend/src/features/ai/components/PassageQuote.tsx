@@ -3,6 +3,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import type { ChatCitation, Citation } from "@/types/ai";
 import { openCitationLabel, useCitationLink } from "@/lib/citedPage";
+import { MAX_FORMULA_CHARS } from "./mathLimit";
 
 /**
  * The pieces every surface that shows a Passage needs (IR-284).
@@ -21,6 +22,24 @@ import { openCitationLabel, useCitationLink } from "@/lib/citedPage";
 
 const DISPLAY_MATH = /\$\$([\s\S]+?)\$\$/g;
 
+/**
+ * KaTeX's HTML for one formula, or `null` when it should be shown as source.
+ *
+ * `trust` is off (the default), so `\href`, `\url` and `\html*` cannot make a
+ * link or an attribute. `throwOnError: false` covers a parse error only: an
+ * over-long formula is refused up front (it blocks the page), and a stack
+ * overflow from deep nesting is caught, since either would otherwise crash
+ * the render of every passage on the screen.
+ */
+function typeset(source: string): string | null {
+  if (source.length > MAX_FORMULA_CHARS) return null;
+  try {
+    return katex.renderToString(source, { throwOnError: false, displayMode: true });
+  } catch {
+    return null;
+  }
+}
+
 /** A passage's `$$...$$` formulas rendered; not run through Markdown. */
 function withMathRendered(text: string) {
   const parts: React.ReactNode[] = [];
@@ -28,9 +47,9 @@ function withMathRendered(text: string) {
   for (const match of text.matchAll(DISPLAY_MATH)) {
     const start = match.index ?? 0;
     if (start > last) parts.push(text.slice(last, start));
-    // KaTeX output; `trust` is off by default.
-    const html = katex.renderToString(match[1].trim(), { throwOnError: false, displayMode: true });
-    parts.push(<span key={start} dangerouslySetInnerHTML={{ __html: html }} />);
+    const html = typeset(match[1].trim());
+    // Typeset KaTeX output; a formula that cannot be typeset stays text (IR-917).
+    parts.push(html === null ? match[0] : <span key={start} dangerouslySetInnerHTML={{ __html: html }} />);
     last = start + match[0].length;
   }
   if (last === 0) return text;

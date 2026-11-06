@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import type { FormikHelpers } from "formik";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,7 +34,7 @@ const CLIENT_LOCKOUT_MS = 15 * 60 * 1000;
 type LoginAlert = Exclude<LoginFailure, { kind: "locked" }>;
 
 export default function LoginPage() {
-  // The submitting button may lose focus when Formik disables it, before the
+  // The submitting button may lose focus when the form disables it, before the
   // lock reply arrives. Keep its actual element as the dialog's return target.
   const signInRef = useRef<HTMLButtonElement>(null);
   const navigate       = useNavigate();
@@ -138,17 +137,13 @@ export default function LoginPage() {
     }
   };
 
-  const handleLogin = async (
-    data: LoginFormValues,
-    { setSubmitting }: FormikHelpers<LoginFormValues>
-  ) => {
+  const handleLogin = async (data: LoginFormValues) => {
     setLoginAlert(null);
 
     const loginId = data.identifier.trim();
 
     if (isAccountLocked(loginId)) {
       openLockout(loginId, { by: "attempts", unlockAt: getLockoutUntil(loginId)! });
-      setSubmitting(false);
       return;
     }
 
@@ -187,8 +182,6 @@ export default function LoginPage() {
       }
 
       setLoginAlert(failure);
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -201,7 +194,7 @@ export default function LoginPage() {
 
   return (
     <EntryFrame
-      crossLink={{ prompt: "New to IRIS?", label: "Create an account", to: "/signup" }}
+      help
       lede={{
         headline: <>Your research has <span className="text-brand">a place.</span></>,
         sentence:

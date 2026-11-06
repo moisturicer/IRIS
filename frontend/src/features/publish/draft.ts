@@ -7,7 +7,13 @@ import type { Classification, PSCEDClassification, RecordDetail, RecordType } fr
 
 import { emptyMetadata, metadataSchema, type MetadataValues } from "@/features/records/metadata/metadataSchema";
 
+/** The three numbered steps. */
 export type PublishStep = 1 | 2 | 3;
+
+/** Today in Manila, where the server decides whether a date has passed. */
+export function manilaToday(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Manila" }).format(new Date());
+}
 
 /**
  * A record type's name reduced to a stable key ("Thesis / Research" →
@@ -127,7 +133,7 @@ export function describeFailure(err: unknown, fallback: string): ApiFailure {
       const text = Array.isArray(value) ? value.filter((v) => typeof v === "string").join(" ") : value;
       if (typeof text !== "string" || !text) continue;
       if (key === "non_field_errors") message = text;
-      else if (key === "detail") continue;
+      else if (key === "detail" || key === "code") continue;
       else fields[key] = text;
     }
   } else if (typeof data === "string" && (response.status ?? 0) < 500) {

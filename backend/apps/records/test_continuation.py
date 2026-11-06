@@ -7,17 +7,21 @@ At the REST seam IR-255 confirmed, on IR-271's accept: a Proposal reaches
 One class per acceptance criterion.
 """
 
+from datetime import timedelta
+
 from django.db import IntegrityError, transaction
 from django.forms.models import model_to_dict
 from django.urls import reverse
+from django.utils import timezone
 from django.test import override_settings
 from rest_framework import status
 from rest_framework.test import APITransactionTestCase, APIClient
 
 from apps.documents.testing import real_pdf_bytes
 from apps.records.models import Classification, Record, RecordOwner, RecordType
+from apps.records.testing import released_embargo
 from apps.reviews.test_decisions import DecisionTestBase
-from core.enums import PipelineStatus, RecordTypeName
+from core.enums import EmbargoState, PipelineStatus, RecordTypeName
 
 PROPOSAL = RecordTypeName.PROPOSAL
 
@@ -155,12 +159,32 @@ class ContinueCreatesALinkedDraftTests(ContinuationTestBase):
 
         self.assertEqual(self.snapshot(proposal), before)
 
+    def test_the_child_starts_embargoed_whatever_its_proposal_holds(self):
+        """ADR-052's Amendment: a Continuation is its own paper, so nothing about
+        its Proposal's embargo is carried over: not its date, and not a release.
+        Like every paper, it starts embargoed with no date (IR-882)."""
+        for name, stamps in {
+            "dated": {"embargo_date_set_at": timezone.now(),
+                      "embargoed_until": timezone.localdate() + timedelta(days=30)},
+            "released": {"is_embargoed": False, "embargo_released_at": timezone.now()},
+        }.items():
+            with self.subTest(name):
+                proposal = self.accepted_proposal()
+                Record.objects.filter(pk=proposal.pk).update(**stamps)
+
+                child = Record.objects.get(pk=self.continue_as(proposal, self.owner).data["id"])
+
+                self.assertEqual(child.embargo_state, EmbargoState.ACTIVE)
+                self.assertIsNone(child.embargoed_until)
+                self.assertIsNone(child.embargo_released_at)
+
     @override_settings(STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}})
     def test_the_child_requires_its_own_manuscript_then_enters_at_its_adviser(self):
         from django.core.files.uploadedfile import SimpleUploadedFile
 
         proposal = self.accepted_proposal()
         child_id = self.continue_as(proposal, self.owner).data["id"]
+        released_embargo(child_id)
         submit = reverse("record-submit", args=[child_id])
         response = self.post(submit, self.owner, {"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
@@ -172,6 +196,13 @@ class ContinueCreatesALinkedDraftTests(ContinuationTestBase):
             format="multipart",
         )
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        matches = self.client.get(reverse("record-duplicate-matches", args=[child_id])).data["likely"]
+        self.assertIn(proposal.pk, [match["id"] for match in matches])
+        acknowledged = self.client.post(
+            reverse("record-acknowledge-duplicates", args=[child_id]),
+            {"candidate_ids": [match["id"] for match in matches]}, format="json",
+        )
+        self.assertEqual(acknowledged.status_code, status.HTTP_200_OK, acknowledged.data)
         response = self.post(submit, self.owner, {"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         detail = self.detail(Record.objects.get(pk=child_id), self.owner)

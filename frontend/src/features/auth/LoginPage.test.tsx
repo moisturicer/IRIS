@@ -103,12 +103,15 @@ describe("the frame sign in opens in", () => {
     expect(screen.getByRole("heading", { level: 2, name: "Welcome back" })).toBeInTheDocument();
   });
 
-  it("offers Create an account in the masthead and under the form, and no longer says 'Sign up'", () => {
+  it("offers one Create an account link under the form and Help in the masthead", () => {
     renderScreen(<LoginPage />, { route: "/login" });
 
     const links = screen.getAllByRole("link", { name: "Create an account" });
-    expect(links).toHaveLength(2);
+    expect(links).toHaveLength(1);
     links.forEach((link) => expect(link).toHaveAttribute("href", "/signup"));
+    const header = screen.getByRole("banner");
+    expect(within(header).getAllByRole("link")).toHaveLength(1);
+    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("aria-haspopup", "dialog");
     expect(screen.queryByRole("link", { name: /sign up/i })).not.toBeInTheDocument();
   });
 
@@ -128,13 +131,22 @@ describe("the frame sign in opens in", () => {
     expect(document.body).not.toHaveTextContent(/CIT-U/);
   });
 
-  it("names IRIS and its pilot institution in the footer, and no policy link until IR-214", () => {
+  it("opens privacy and terms from the footer without clearing sign-in details", async () => {
+    const user = userEvent.setup();
     renderScreen(<LoginPage />, { route: "/login" });
 
     const footer = screen.getByRole("contentinfo");
     expect(footer).toHaveTextContent("© 2026 IRIS · Research and IP disclosure");
-    expect(footer).toHaveTextContent("Pilot institution: Cebu Institute of Technology – University");
-    expect(within(footer).queryAllByRole("link")).toEqual([]);
+    expect(footer).not.toHaveTextContent(/Pilot institution/);
+    await user.type(screen.getByRole("textbox", { name: "Email Address" }), "reader@example.edu");
+    await user.click(within(footer).getByRole("link", { name: "Data privacy" }));
+    expect(screen.getByRole("dialog", { name: "Data privacy" })).toHaveTextContent("What IRIS keeps when you register");
+    await user.keyboard("{Escape}");
+    expect(within(footer).getByRole("link", { name: "Data privacy" })).toHaveFocus();
+    await user.click(within(footer).getByRole("link", { name: "Terms" }));
+    expect(screen.getByRole("dialog", { name: "Terms" })).toHaveTextContent(/pending institutional review/i);
+    await user.click(screen.getByRole("button", { name: "Close dialog" }));
+    expect(screen.getByRole("textbox", { name: "Email Address" })).toHaveValue("reader@example.edu");
   });
 
   it("announces a failed sign-in once, by the banner, and only marks the fields", async () => {

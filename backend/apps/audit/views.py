@@ -4,8 +4,10 @@ import json
 from django.http import StreamingHttpResponse
 from rest_framework import generics, serializers
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from core.permissions import IsAdmin
+from core.permissions import IsSystemAdmin
 from .models import AuditEvent
 from .serializers import AuditEventSerializer
 
@@ -29,8 +31,9 @@ class AuditFilters(serializers.Serializer):
 class AuditEventListView(generics.ListAPIView):
     """
     GET /audit/
-    RDCO only (ADR-009). Was DRF IsAdminUser, which reads Django's
-    is_staff flag and therefore admitted all four offices (IR-165). Supports filtering via query params:
+    The System Admin alone (ADR-051 §3; RDCO until IR-781). Was DRF IsAdminUser,
+    which reads Django's is_staff flag and therefore admitted all four offices
+    (IR-165). Supports filtering via query params:
       ?event_type=LOGIN
       ?record=<id>
       ?user=<id>
@@ -38,7 +41,7 @@ class AuditEventListView(generics.ListAPIView):
       ?to=YYYY-MM-DD     (inclusive)
     """
     serializer_class   = AuditEventSerializer
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
 
     def get_queryset(self):
         qs = AuditEvent.objects.select_related("user__role", "record").order_by("-created_at", "-id")
@@ -65,6 +68,27 @@ class AuditEventListView(generics.ListAPIView):
             qs = qs.filter(created_at__date__lte=to_date)
 
         return qs
+
+
+class AuditEventTypeListView(APIView):
+    """
+    GET /audit/event-types/
+    Every event type the log can hold, as `{"type", "label"}`, in the order of
+    `AuditEvent.EVENT_TYPE_CHOICES`. The Audit Log's filter builds its options
+    from this, so a type added here appears there with no frontend change
+    (IR-913). The frontend used to carry its own list, checked against this
+    file by a test, and a backend PR adding a type failed the Frontend job.
+
+    Not paginated: the list is the fixed choices, not rows. Same reader as the
+    log itself, the System Admin alone.
+    """
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
+
+    def get(self, request):
+        return Response([
+            {"type": value, "label": str(label)}
+            for value, label in AuditEvent.EVENT_TYPE_CHOICES
+        ])
 
 
 CSV_COLUMNS = (

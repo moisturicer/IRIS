@@ -1,0 +1,7 @@
+
+Accelerating massive ensembles of ordinary differential equa | llamaparse 2026-09-28 17 448.000 {'cost_optimizer': {'enable': True}, 'specialized_chart_parsing': 'agentic'}
+Diverse Metallicities in Protoclusters at $z sim 3.4$ detect | llamaparse 2026-09-28 23 475.000 {'cost_optimizer': {'enable': True}, 'specialized_chart_parsing': 'agentic'}
+Expected Hypervolume Maximization for Multiobjective Optimiz | llamaparse 2026-09-28 20 551.000 {'cost_optimizer': {'enable': True}, 'specialized_chart_parsing': 'agentic'}
+MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transf | llamaparse 2026-09-28 5 136.000 {'cost_optimizer': {'enable': True}, 'specialized_chart_parsing': 'agentic'}
+Noise-adjusted turnover in estimated networks | llamaparse 2026-09-28 8 65.000 {'cost_optimizer': {'enable': True}, 'specialized_chart_parsing': 'agentic'}
+State-Space-Based FIR Filtering on a Quantum Computer | llamaparse 2026-09-28 5 56.000 {'cost_optimizer': {'enable': True}, 'specialized_chart_parsing': 'agentic'}

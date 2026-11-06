@@ -15,7 +15,7 @@ from django.utils import timezone
 
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.tests.corpus import seed_record_vector
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider
 from apps.ai.retrieval.scan_depth import configured_depth
@@ -56,7 +56,7 @@ def reader(db):
 def published_record(title, owner, embedder):
     record = Record.objects.create(title=title, pipeline_status=PipelineStatus.PUBLISHED)
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
-    RecordEmbedding.objects.create(
+    seed_record_vector(
         record=record,
         embedding=embedder.embed_documents([title])[0],
         model_name="fake-test",
@@ -196,7 +196,7 @@ class RecordScopingTests:
             title="Hidden Draft", pipeline_status=PipelineStatus.DRAFT
         )
         RecordOwner.objects.create(record=hidden, user=owner, is_primary=True)
-        RecordEmbedding.objects.create(
+        seed_record_vector(
             record=hidden,
             embedding=embedder.embed_documents(["Hidden Draft"])[0],
             model_name="fake-test",

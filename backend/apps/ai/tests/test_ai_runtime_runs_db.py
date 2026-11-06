@@ -43,7 +43,7 @@ DISPATCH = runs_config.Dispatch(
     deep_concurrency=1, worker_concurrency=2, poll_seconds=0.1,
 )
 IRIS_AI_TABLES = "iris_ai.research_handle, iris_ai.citation,iris_ai.run_event, iris_ai.turn, iris_ai.ask_run," \
-                 " iris_ai.conversation, iris_ai.attempt_accounting"
+                 " iris_ai.conversation_handoff, iris_ai.conversation, iris_ai.attempt_accounting, iris_ai.run_checkpoint"
 
 
 def dsn(user, password):
@@ -174,7 +174,7 @@ def test_the_original_deadline_allowance_and_versions_are_persisted(api):
     assert run_["allowance"] == LIMITS.allowance()
     assert run_["pinned"] == {
         "executor": "deterministic", "executor_version": "1",
-        "protocol": "runs-1", "schema": "0003_dispatch.sql",
+        "protocol": "runs-1", "schema": "0004_agent.sql",
     }
     assert run_["version"] >= 1
     created = run_["created_at"]

@@ -1,8 +1,8 @@
 import { useEffect, useId, useState, type FormEvent } from "react";
 
 import { seatsApi } from "@/api/reviews";
-import { Button, Modal, Skeleton } from "@/components/ui";
-import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
+import { Button, Modal, Select, Skeleton } from "@/components/ui";
+import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
 import type { AddReviewerOptions } from "@/types/records";
 
@@ -100,24 +100,14 @@ export function AssignReviewerDialog({
         ) : options == null ? (
           <Skeleton rows={2} label="Loading your office's members…" />
         ) : (
-          <div>
-            <label htmlFor={pickId} className={LABEL}>
-              Reviewer at {office}
-            </label>
-            <select
-              id={pickId}
-              value={chosen}
-              onChange={(e) => setChosen(e.target.value)}
-              className={fieldClasses(false)}
-            >
-              <option value="">{available.length ? "Choose a member" : "Everyone is already reviewing"}</option>
-              {options.members.map((m) => (
-                <option key={m.id} value={m.id} disabled={m.seated}>
-                  {m.seated ? `${m.name} (already reviewing)` : m.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          <Select id={pickId} label={`Reviewer at ${office}`} required value={chosen} onChange={(e) => setChosen(e.target.value)}>
+            <option value="">{available.length ? "Choose a member" : "Everyone is already reviewing"}</option>
+            {options.members.map((m) => (
+              <option key={m.id} value={m.id} disabled={m.seated}>
+                {m.seated ? `${m.name} (already reviewing)` : m.name}
+              </option>
+            ))}
+          </Select>
         )}
 
         {error && (

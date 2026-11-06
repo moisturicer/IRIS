@@ -10,8 +10,6 @@ with the extraction package's own serializer, so the stored structure is the
 real wire format rather than a hand-written approximation of it.
 """
 
-from unittest import mock
-
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.urls import reverse
 
@@ -21,6 +19,7 @@ from rest_framework.test import APITestCase
 from apps.ai.chunking.document import (
     HEADING, PAGE_FOOTER, PAGE_HEADER, PARAGRAPH, DocumentElement, NormalizedDocument,
 )
+from apps.ai.extraction import InMemoryExtractor, use_extractor
 from apps.ai.extraction.serialization import document_to_json
 from apps.documents.models import DocumentKind, PdfExtraction
 from apps.records.models import Record, RecordOwner, RecordType
@@ -298,11 +297,10 @@ class MetadataSuggestionsAccessTests(APITestCase):
         structure and never reaches the extractor, even when one is pending."""
         PdfExtraction.objects.filter(record=self.record).update(status="queued")
 
-        with mock.patch(
-            "apps.documents.tasks._build_extractor",
-            side_effect=AssertionError("the extractor must not be called"),
-        ):
+        extractor = InMemoryExtractor(AssertionError("the extractor must not be called"))
+        with use_extractor(extractor):
             response = self._get(self.owner)
 
+        self.assertEqual(extractor.calls, [])
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data["state"], "pending")

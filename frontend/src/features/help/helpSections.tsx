@@ -119,7 +119,7 @@ export const HELP_SECTIONS: HelpSection[] = [
     shownTo: (r) => canAccess(r.role, "opportunities"),
     body: (
       <p>
-        Calls for papers and conferences open to the CIT-U research community. RDCO and Advisers
+        Calls for papers and conferences open to your institution's research community. RDCO and Advisers
         post them and keep them up to date.
       </p>
     ),
@@ -134,6 +134,15 @@ export const HELP_SECTIONS: HelpSection[] = [
           Choose <strong>Publish</strong> on Discover to start a record. Pick its type (Proposal,
           Thesis / Research or Project), fill in its details, name your Adviser and upload the
           manuscript. Your Adviser cannot also be one of the record&rsquo;s owners.
+        </p>
+        <p>
+          Every paper starts under an embargo. An embargo keeps a paper&rsquo;s text from going to
+          outside AI companies, so Ask IRIS won&rsquo;t use it, and it can&rsquo;t be published. It
+          doesn&rsquo;t hide the paper from people who can read it in IRIS.
+          Only your Adviser or RDCO can release it, or give it a date to review it by. That date
+          doesn&rsquo;t end the embargo. If your paper may be covered by an agreement or a patent,
+          tell your Adviser.
+          Text already sent can&rsquo;t be recalled.
         </p>
         <p>
           Once submitted, the record goes to your Adviser first. If anyone reviewing it asks for a
@@ -211,19 +220,34 @@ export const HELP_SECTIONS: HelpSection[] = [
     ),
   },
   {
-    id: "administration",
-    title: "Administration",
-    shownTo: (r) => canAccess(r.role, "audit"),
+    id: "rdco",
+    title: "RDCO",
+    shownTo: (r) => canAccess(r.role, "users"),
     body: (
       <>
-        <p>The Administration part of the sidebar is RDCO&rsquo;s:</p>
+        <p>The RDCO part of the sidebar holds the research office&rsquo;s coordination tools:</p>
         <ul>
-          <li><strong>Role Requests</strong>: approve or decline the role someone asked for when they registered.</li>
-          <li><strong>Users</strong>: change a role, lock or unlock an account, and name office coordinators.</li>
-          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong>: decide what readers and owners have asked for.</li>
+          <li><strong>Users</strong>: give Student or Adviser roles and lock or unlock accounts. Office roles and coordinator assignments belong to the System Admin.</li>
+          <li><strong>Role Requests</strong>: approve or decline the Student or Adviser role someone requested at registration.</li>
+          <li><strong>Download Requests</strong> and <strong>Delete Requests</strong>: decide requests to download or delete a paper.</li>
           <li><strong>Import Records</strong>: file research on someone&rsquo;s behalf.</li>
-          <li><strong>Audit Log</strong>: the record of workflow acts.</li>
         </ul>
+        <p>The System Admin alone reads the Audit Log. RDCO cannot change a System Admin account.</p>
+      </>
+    ),
+  },
+  {
+    id: "administration",
+    title: "Administration",
+    shownTo: (r) => canAccess(r.role, "adminUsers"),
+    body: (
+      <>
+        <p>The Administration part of the sidebar belongs to the System Admin:</p>
+        <ul>
+          <li><strong>Users</strong>: give office roles (RDCO, ITSO, IERC and KTTO) and name office coordinators. RDCO approves Student and Adviser roles and handles role requests.</li>
+          <li><strong>Audit Log</strong>: read and export the record of workflow acts.</li>
+        </ul>
+        <p>The System Admin has no review or clearance duties. RDCO handles research coordination, paper download requests and paper deletion requests.</p>
       </>
     ),
   },
@@ -234,8 +258,9 @@ export const HELP_SECTIONS: HelpSection[] = [
     body: (
       <>
         <p>
-          Settings &amp; Profile, in the menu under your name, holds your profile (shown on records
-          you author), your account and security, data privacy and consent, and your role.
+          The menu under your name has two pages. <strong>Profile</strong> is what other people signed in to
+          IRIS see of you, and where you edit it. <strong>Settings</strong> holds your account and security,
+          data privacy and consent, and your role.
         </p>
         <p>
           Notifications arrive under the bell at the top of the sidebar; <strong>View all

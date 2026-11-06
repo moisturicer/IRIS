@@ -10,8 +10,13 @@ from core.enums import (
     ResubmissionRequestState,
     ReviewDecision,
     ReviewStage,
+    ReviewVerdict,
     SeatSource,
     SeatState,
+    ThreadAnswer,
+    ThreadEventKind,
+    ThreadSeverity,
+    ThreadState,
 )
 
 #: Every party, the retired Intake included: these columns hold history, and
@@ -466,9 +471,134 @@ class ReviewComment(models.Model):
     #: Stamped by an edit that changed the body; null until then.
     edited_at  = models.DateTimeField(null=True, blank=True)
 
+    # --- a top-level comment is a thread (ADR-032 §7, 2026-11-04; IR-874) ---------
+    # Every field below describes the thread, so a reply leaves them at their
+    # defaults: it is never a draft, has no severity, and is never resolved.
+
+    #: The party the thread belongs to, not the person: the writer's party when
+    #: they wrote it. Blank for an owner's thread. A withdrawn writer's thread
+    #: stays the party's, and its current Seat holders own it.
+    party      = models.CharField(max_length=20, choices=PARTY_CHOICES, blank=True, default="")
+    #: A reviewer's thread only. Existing rows were backfilled as *Suggestion*.
+    severity   = models.CharField(
+        max_length=20, choices=ThreadSeverity.choices, null=True, blank=True,
+    )
+    #: Seen only by its writer until *Finish review* sends it (`round`).
+    is_draft   = models.BooleanField(default=False)
+    #: The finished review that sent it; null for a thread posted directly.
+    round      = models.ForeignKey(
+        "ReviewRound", on_delete=models.SET_NULL, null=True, blank=True, related_name="threads",
+    )
+
+    #: An anchored thread's passage: the Version, the page, the quoted text, the
+    #: text either side of it and its regions in ADR-031's page-fraction shape,
+    #: so the passage can be found again in a later Version. All empty on a
+    #: general thread.
+    anchor_version = models.ForeignKey(
+        "records.RecordVersion", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="anchored_threads",
+    )
+    anchor_page    = models.PositiveIntegerField(null=True, blank=True)
+    anchor_quote   = models.TextField(blank=True, default="")
+    anchor_prefix  = models.TextField(blank=True, default="")
+    anchor_suffix  = models.TextField(blank=True, default="")
+    anchor_regions = models.JSONField(default=list, blank=True)
+
+    state       = models.CharField(
+        max_length=20, choices=ThreadState.choices, default=ThreadState.OPEN,
+    )
+    resolved_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="review_threads_resolved",
+    )
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    #: The Decision that closed it while open, as Seats and requests name it.
+    closed_by_decision = models.ForeignKey(
+        Review, on_delete=models.RESTRICT, null=True, blank=True,
+        related_name="closed_threads",
+    )
+    closed_reason = models.TextField(blank=True, default="")
+
+    #: An owner's answer to a reviewer's thread: where it was addressed, or why
+    #: it was declined. Answering never resolves it.
+    answer      = models.CharField(max_length=20, choices=ThreadAnswer.choices, blank=True, default="")
+    answer_note = models.TextField(blank=True, default="")
+    answered_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="review_threads_answered",
+    )
+    answered_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["record", "created_at", "pk"]
+        indexes  = [
+            models.Index(fields=["record", "created_at"]),
+            models.Index(fields=["record", "state", "severity"]),
+        ]
+
+    def __str__(self):
+        return f"Record {self.record_id} | comment {self.pk} by {self.author_id}"
+
+
+class ReviewRound(models.Model):
+    """
+    One finished review (ADR-032 §7, 2026-11-04; IR-874): a Seat holder sent
+    their draft threads with a summary and a verdict.
+
+    *Comment only* is a recorded round with no outcome: it writes this row and
+    no `Review`, so nothing that reads `Review.status` can mistake it for one.
+    Every other verdict was taken by the service that owns it, and `review` is
+    the `Review` that service wrote.
+    """
+
+    record     = models.ForeignKey(
+        "records.Record", on_delete=models.CASCADE, related_name="review_rounds",
+    )
+    actor      = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="review_rounds",
+    )
+    party      = models.CharField(max_length=20, choices=PARTY_CHOICES)
+    version    = models.ForeignKey(
+        "records.RecordVersion", on_delete=models.RESTRICT,
+        null=True, blank=True, related_name="review_rounds",
+    )
+    verdict    = models.CharField(max_length=20, choices=ReviewVerdict.choices)
+    summary    = models.TextField(blank=True, default="")
+    review     = models.ForeignKey(
+        Review, on_delete=models.RESTRICT, null=True, blank=True, related_name="rounds",
+    )
+    created_at = models.DateTimeField(default=timezone.now)
+
     class Meta:
         ordering = ["record", "created_at", "pk"]
         indexes  = [models.Index(fields=["record", "created_at"])]
 
     def __str__(self):
-        return f"Record {self.record_id} | comment {self.pk} by {self.author_id}"
+        return f"Record {self.record_id} | {self.party} finished: {self.verdict}"
+
+
+class ReviewThreadEvent(models.Model):
+    """
+    One change to a published review thread: its severity, resolving,
+    reopening, an owner's answer, or a Decision closing it. Each is shown in
+    the timeline with the person and the time (ADR-032 §7). A thread's
+    current state is on the thread; these rows are its history.
+    """
+
+    thread     = models.ForeignKey(ReviewComment, on_delete=models.CASCADE, related_name="events")
+    actor      = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="review_thread_events",
+    )
+    kind       = models.CharField(max_length=30, choices=ThreadEventKind.choices)
+    #: The value before and after, where the change has one: a severity, an answer.
+    old_value  = models.CharField(max_length=20, blank=True, default="")
+    new_value  = models.CharField(max_length=20, blank=True, default="")
+    created_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["thread", "created_at", "pk"]
+
+    def __str__(self):
+        return f"Thread {self.thread_id} | {self.kind}"

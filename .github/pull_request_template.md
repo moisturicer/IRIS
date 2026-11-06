@@ -33,13 +33,13 @@
 **Required**
 - [ ] Acceptance criteria satisfied and self-verified
 - [ ] CI passing, or the failure is explained above and understood
-- [ ] Branch is up to date with `feat/rag-service`
+- [ ] Branch is up to date with `main`
 - [ ] No secret, credential or real institutional data committed
 - [ ] No test was modified to make it pass
 
 **When applicable**
 - [ ] Tests added or updated, and executed
-- [ ] `docs/testing/TRACEABILITY.md` updated for a requirement-bearing change
+- [ ] `docs/testing/traceability/IR-XXX.md` added for a requirement-bearing change
 - [ ] Documentation updated
 - [ ] Security implications addressed — auth, permissions, file access, secrets, external calls
 - [ ] Migration included and tested against a realistic database copy

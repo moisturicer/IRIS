@@ -95,7 +95,7 @@ GOVERNED_ENUMS = (
     # the start. Its "completed" collides only with `ai/models/shadow.py`,
     # already allowed below as a Celery job's own lifecycle.
     ReadingStatus,
-    # `EmbargoState` (IR-811) is left out on purpose: its "unknown" and "none"
+    # `EmbargoState` (IR-811) is left out on purpose: its "active" and "released"
     # mean unrelated things in more than twenty places, and each of those files
     # would be exempted from every other governed value to allow them.
 )
@@ -105,6 +105,14 @@ GOVERNED_VALUES = {str(member.value) for enum in GOVERNED_ENUMS for member in en
 #: Sites where a bare literal is correct and must stay. Each entry needs a
 #: reason -- an allowlist without one is just a silenced test.
 ALLOWED = {
+    # IR-831: ExtractionPhase declares processing vocabulary. Its "reading"
+    # is Docling reading a PDF, not a person's ReadingStatus on a saved paper.
+    # Keep the exemption on this narrow declaration module, not the task body.
+    "documents/phases.py",
+    # IR-833: declares the author's field-source decisions for Publish. Its
+    # "accepted" is an author taking a value the PDF offered, not a workflow
+    # request's RequestStatus.ACCEPTED. Declaration only; no workflow state.
+    "records/metadata_sources.py",
     # (IR-227) Replaces the entry for the deleted `seed_test_users.py`. Every
     # *workflow* value in this seeder is an enum member -- it drives the real
     # services, so it has to be. The two literals here are the demo students'
@@ -191,6 +199,10 @@ ALLOWED = {
     # "open" is a provider reservation awaiting settlement. Neither is a
     # document-request item or request state.
     "ai/evaluation/replay.py",
+    # (IR-740) The same labels for the dedicated runtime's rows, plus that
+    # service's own run states ("completed", "cancelled"), which Django cannot
+    # import from the `ai` package. A runtime run is not a request's state.
+    "ai/evaluation/runtime_replay.py",
     # "missing" reads that report key from milestone.py to print it.
     "ai/management/commands/eval_pilot_milestone.py",
     # (IR-500) A research tool call's outcome: "rejected" means a malformed

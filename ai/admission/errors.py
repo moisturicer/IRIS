@@ -20,6 +20,8 @@ DEADLINE = "deadline"
 ACCESS_REVOKED = "access_revoked"
 WITHHELD = "source_unavailable"
 PROVIDER_REFUSED = "provider_refused"
+#: A paid adapter reached outside an admitted attempt (IR-860).
+NOT_ADMITTED = "not_admitted"
 #: A fitted completion cap above `AI_ADMISSION_MAX_OUTPUT_TOKENS` (IR-732).
 OUTPUT_CAP_EXCEEDED = "output_cap_exceeded"
 

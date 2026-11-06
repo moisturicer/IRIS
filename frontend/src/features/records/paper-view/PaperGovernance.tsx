@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import type { RecordDetail } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
 import { RailHeading } from "./headings";
@@ -10,9 +12,9 @@ import { RailHeading } from "./headings";
  * "not modelled".
  */
 export function PaperGovernance({ record }: { record: RecordDetail }) {
-  const rows: { label: string; value: string; emphasis?: boolean }[] = [
-    // The API's own wording for where the record stands (IR-259).
-    { label: "Pipeline Status", value: record.workflow_state_label, emphasis: true },
+  const headingId = useId();
+  const rows: { label: string; value: string }[] = [
+    // No status row: the title badge states where the record stands, once (IR-525).
     { label: "Classification", value: record.classification_name ?? "—" },
     { label: "Record Type", value: record.record_type_name ?? "—" },
     { label: "Year Accomplished", value: record.year_accomplished ? String(record.year_accomplished) : "—" },
@@ -24,6 +26,14 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
           : "Declared, untyped"
         : "Not declared",
     },
+    // KTTO's release (ADR-052 §11): sent only for a marked paper, to the people
+    // who see its embargo.
+    ...(record.ip_release
+      ? [{
+          label: "IP Release",
+          value: record.ip_release.released ? "Released for the AI by KTTO" : "Not released for the AI",
+        }]
+      : []),
     {
       label: "Commercialization",
       value: record.for_commercialization ? "Eligible" : "Not flagged",
@@ -31,21 +41,15 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
   ];
 
   return (
-    <section className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
-      <RailHeading className="mb-3">Institutional Governance</RailHeading>
+    <section aria-labelledby={headingId} className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card">
+      <RailHeading id={headingId} className="mb-3">Institutional Governance</RailHeading>
       <dl className="space-y-2">
         {rows.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-3">
             <dt className="text-xs text-stone-500 shrink-0">{row.label}</dt>
-            <dd
-              className={
-                row.emphasis
-                  ? "text-xs font-bold text-stone-900 text-right"
-                  : "text-xs font-semibold text-stone-700 text-right"
-              }
-            >
-              {row.value}
-            </dd>
+            {/* `min-w-0` and anywhere-wrapping: a long Classification name wraps
+                inside the row rather than widening the page (IR-921). */}
+            <dd className="min-w-0 text-xs font-semibold text-stone-700 text-right [overflow-wrap:anywhere]">{row.value}</dd>
           </div>
         ))}
       </dl>

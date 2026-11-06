@@ -39,6 +39,8 @@ def behind_proxies(client_address, forged=""):
     }
 
 
+# The lockout is off by default for now (IR-865); these prove it works when on.
+@override_settings(AXES_ENABLED=True)
 class LoginAttempts(APITestCase):
     def setUp(self):
         self.user = make_user("client.address@cit.edu")
@@ -116,6 +118,9 @@ class ProductionSettingTests(APITestCase):
             "EMAIL_HOST": "smtp.example.edu",
             "EMAIL_HOST_USER": "iris@example.edu",
             "EMAIL_HOST_PASSWORD": "test-only",
+            # LlamaParse is required in production too (IR-843).
+            "LLAMAPARSE_API_KEY": "llx-test",
+            "LLAMAPARSE_VERSION": "2026-09-28",
         }
         env.pop("TRUSTED_PROXY_COUNT", None)
         env.update(extra)

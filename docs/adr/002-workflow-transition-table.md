@@ -4,6 +4,13 @@
 
 Accepted — 2026-09-01 · **amended 2026-09-09, §Amendment (shape and mechanism — PROPOSED, not yet built)**
 
+**Corrected 2026-11-04.** The table this ADR describes now governs only deletion and restoring:
+
+- **`lifecycle.TRANSITIONS` holds only the delete and restore edges**, keyed `(status, event)` (`apps/records/lifecycle.py:51-56`, `:127-151`). The `(from_status, event, actor_role)` key and the submit, approve, decline, mark-complete and legacy-import events are gone.
+- **Workflow status is written in two places, outside `apply()`:** entering review (`apps/reviews/routing.py:140`) and a Decision (`apps/reviews/decisions.py:489`), as ADR-032 §11's IR-270 amendment records. Waiting states are derived (ADR-021 §4).
+- **The 2026-09-09 amendment's `STAGES` registry was never built**, and IR-274 removed its scaffolding (`lifecycle.py:4-9`). `reviews/services.py` no longer exists.
+- **What still holds:** the policy is settings-driven configuration that refuses a bad value (`lifecycle.py:168-193`), and authorization stays outside the table.
+
 ## Context
 
 `Record.pipeline_status` is assigned in **18 places across four modules**. `reviews/services.py` owns 11 of them, guarded by `InvalidPipelineTransition`. The other seven live in views and one service, guarded by hand-written HTTP 400s or nothing at all:

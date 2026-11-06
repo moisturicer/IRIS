@@ -32,7 +32,7 @@ from apps.reviews.models import RecordAssignment
 # Every application role. The matrix is only honest if it enumerates all of
 # them -- a suite that tests "RDCO can, Student cannot" and stops would have
 # passed throughout the entire is_staff bypass.
-ALL_ROLES = ["Student", "Adviser", "RDCO", "KTTO", "ITSO", "IERC"]
+ALL_ROLES = ["Student", "Adviser", "RDCO", "KTTO", "ITSO", "IERC", "System Admin"]
 
 # ADR-043 §6, IR-619: the extension act follows the same object-scoped
 # convention as reviewer seats. IR-615's generic route table also declares
@@ -137,33 +137,33 @@ class AuthorizationMatrixTests(APITestCase):
 
     # --- audit ------------------------------------------------------------
 
-    def test_audit_log_is_rdco_only(self):
+    def test_audit_log_is_the_system_admin_s_alone(self):
         """
-        The headline case. `docs/ui-ux/02-information-architecture.md` §5 says
-        audit is RDCO-only and notes the frontend constant is already correct
-        while the backend is not; SRS FR-M6-06 says the log is read-only to all
-        roles except system administrators. The view used DRF's `IsAdminUser`,
-        which reads `is_staff` -- so all four offices could read it.
+        The headline case. The view used DRF's `IsAdminUser`, which reads
+        `is_staff` -- so all four offices could read it. IR-165 narrowed it to
+        RDCO; IR-781 moved it to the System Admin (ADR-051 §3), and RDCO is
+        refused now, deliberately.
         """
-        self.assert_only(["RDCO"], "get", reverse("audit-list"))
+        self.assert_only(["System Admin"], "get", reverse("audit-list"))
 
     # --- account administration -------------------------------------------
 
     def test_role_requests_are_rdco_only(self):
         self.assert_only(["RDCO"], "get", reverse("role-request-list"))
 
-    def test_user_list_is_rdco_only(self):
+    def test_user_list_is_rdco_and_the_system_admin_only(self):
         """
         `ADMIN_ROLES` was {KTTO, RDCO}. The 2026-09-06 role-screen review
         narrowed account administration to RDCO: KTTO is a technology-transfer
-        office and has no reason to manage user accounts.
+        office and has no reason to manage user accounts. IR-781 added the
+        System Admin, which gives office roles (ADR-051 §4, amended).
         """
-        self.assert_only(["RDCO"], "get", reverse("user-list"))
+        self.assert_only(["RDCO", "System Admin"], "get", reverse("user-list"))
 
-    def test_change_user_role_is_rdco_only(self):
+    def test_change_user_role_is_rdco_and_the_system_admin_only(self):
         target = make_user("target@cit.edu", "Student")
         self.assert_only(
-            ["RDCO"], "post",
+            ["RDCO", "System Admin"], "post",
             reverse("user-change-role", args=[target.pk]),
             {"role": "Adviser"},
         )

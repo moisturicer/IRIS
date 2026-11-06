@@ -243,6 +243,23 @@ class SeatSource(models.TextChoices):
     ADDED = "added", "Added"
 
 
+class ReviewTextState(models.TextChoices):
+    """
+    Whether a Version's review text was read (`ReviewText.state`, IR-871,
+    ADR-058 §1 as amended). Only `PENDING` and `UNAVAILABLE` are ever read;
+    a stored reading is never read again in place.
+    """
+
+    PENDING     = "pending", "Being read"
+    READ        = "read", "Read"
+    #: A scan, an unreadable or encrypted file, or one over the limits: never empty text.
+    NO_TEXT     = "no_text", "No text"
+    #: The sandbox couldn't run (limits unset, not Linux). `read_review_texts` retries it.
+    UNAVAILABLE = "unavailable", "Not read yet"
+    #: A Version from before IR-871 whose manuscript file is gone.
+    NOT_KEPT    = "not_kept", "Text not kept"
+
+
 class VersionCause(models.TextChoices):
     """
     Why a record has a new Version. `RecordVersion.cause`. ADR-032 §5.
@@ -301,6 +318,66 @@ class DocumentRequestItemState(models.TextChoices):
     UPLOADED = "uploaded", "Uploaded"
     ACCEPTED = "accepted", "Accepted"
     REJECTED = "rejected", "Rejected"
+
+
+class ThreadSeverity(models.TextChoices):
+    """
+    How much a reviewer's review thread asks of the author (ADR-032 §7,
+    2026-11-04). `ReviewComment.severity`; null on a reply and on an owner's
+    thread. A *Suggestion* never blocks anything.
+    """
+
+    MUST_FIX = "must_fix", "Must fix"
+    SUGGESTION = "suggestion", "Suggestion"
+
+
+class ThreadState(models.TextChoices):
+    """
+    Where a review thread stands (ADR-032 §7). `CLOSED` is a Decision ending
+    the review with the thread still open (`closed_by_decision`).
+    """
+
+    OPEN = "open", "Open"
+    RESOLVED = "resolved", "Resolved"
+    CLOSED = "closed", "Closed by Decision"
+
+
+class ThreadAnswer(models.TextChoices):
+    """
+    An owner's answer to a reviewer's thread (ADR-032 §7). Neither resolves
+    it: the reviewer checks the change and resolves.
+    """
+
+    ADDRESSED = "addressed", "Addressed"
+    DECLINED = "declined", "Declined"
+
+
+class ReviewVerdict(models.TextChoices):
+    """
+    What a finished review was finished with (ADR-032 §7). `ReviewRound.verdict`.
+    *Comment only* changes no Clearance and writes no `Review`; every other
+    verdict is taken by the service that owns it.
+    """
+
+    COMMENT_ONLY = "comment_only", "Comment only"
+    REQUEST_REVISION = "request_revision", "Request revision"
+    SEND_TO_RDCO = "send_to_rdco", "Accept & send to RDCO"
+    CLEARED = "cleared", "Clear"
+    FINDING = "finding", "Record a finding"
+    ACCEPT = "accept", "Accept"
+    PUBLISH = "publish", "Publish"
+    KEEP_UNLISTED = "keep_unlisted", "Keep unlisted"
+    REJECT = "reject", "Reject"
+
+
+class ThreadEventKind(models.TextChoices):
+    """One change to a published review thread, shown in the timeline."""
+
+    SEVERITY_CHANGED = "severity_changed", "Severity changed"
+    RESOLVED = "resolved", "Resolved"
+    REOPENED = "reopened", "Reopened"
+    ANSWERED = "answered", "Answered"
+    CLOSED_BY_DECISION = "closed_by_decision", "Closed by Decision"
 
 
 class WorkflowState(models.TextChoices):
@@ -439,15 +516,15 @@ class IPType(models.TextChoices):
 
 class EmbargoState(models.TextChoices):
     """
-    Where a paper's embargo stands (ADR-052 §3). `Record.embargo_state`.
+    Where a paper's embargo stands (ADR-052 §3, amended for IR-882).
+    `Record.embargo_state`.
 
-    Derived from the answer stored on the record, never stored itself, and read
-    by the disclosure gate. Only `NONE` and `RELEASED` let text reach an AI
-    company. A date never moves a paper out of `ACTIVE`: a person does (§9).
+    Derived from `Record.is_embargoed`, never stored itself, and read by the
+    disclosure gate. Every paper starts `ACTIVE`, and only `RELEASED` lets text
+    reach an AI company or the paper be published. A date never moves a paper
+    out of `ACTIVE`: the Adviser or RDCO does (§6, §9).
     """
 
-    UNKNOWN = "unknown", "Not answered"
-    NONE = "none", "No embargo"
     ACTIVE = "active", "Under embargo"
     RELEASED = "released", "Embargo released"
 
@@ -472,6 +549,8 @@ class RoleName(models.TextChoices):
     RDCO = "RDCO", "RDCO"
     ITSO = "ITSO", "ITSO"
     IERC = "IERC", "IERC"
+    #: Runs IRIS itself, with no workflow access (ADR-051 §1-2). Seeded by `accounts/0018`.
+    SYSTEM_ADMIN = "System Admin", "System Admin"
 
 
 class RecordTypeName(models.TextChoices):

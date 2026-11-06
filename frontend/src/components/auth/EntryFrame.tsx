@@ -1,16 +1,12 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { Modal } from "@/components/ui/Modal";
+import { Button } from "@/components/ui/Button";
+import { DataNotice } from "@/features/auth/DataNotice";
 import { IrisMark, IrisWordmark } from "@/components/brand/IrisBrand";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { INSTITUTION } from "@/config/institution";
 import { cn } from "@/lib/utils";
-
-interface CrossLink {
-  /** The words before the link, shown from `sm` up ("New to IRIS?"). */
-  prompt: string;
-  label: string;
-  to: string;
-}
 
 interface EntryLede {
   headline: ReactNode;
@@ -18,12 +14,8 @@ interface EntryLede {
 }
 
 interface EntryFrameProps {
-  /**
-   * The masthead's link to the other entry screen; never hidden at any width.
-   * Sign in and register only: verification's sheet already offers every way
-   * on, and the pending screen's reader is signed in (IR-710).
-   */
-  crossLink?: CrossLink;
+  /** Account help on sign in and register, without leaving the form. */
+  help?: boolean;
   /** Headline and plain sentence, on sign in and register only (IR-704). */
   lede?: EntryLede;
   /** The folder's index tabs, sitting on the sheet's top edge. */
@@ -38,7 +30,7 @@ interface EntryFrameProps {
 /**
  * The editorial entry frame, the Dossier Folder (IR-704): a masthead, an
  * optional lede, a folder whose tabs sit on a white sheet, and the
- * footer naming IRIS and its pilot institution (IR-768).
+ * footer naming IRIS and linking to privacy and terms (IR-769).
  *
  * Sign in moved onto it first (IR-706), register in IR-707, and email
  * verification and the pending and declined screens without the lede in
@@ -56,12 +48,51 @@ interface EntryFrameProps {
  * text, so the visual order and the reading order differing loses nothing a
  * keyboard user moves through.
  *
- * The footer carries no policy link until IR-214's documents are approved.
+ * Policy dialogs identify interim material; approval remains with IR-214.
  */
-export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: EntryFrameProps) {
+export function EntryFrame({ help, lede, tabs, before, wide, children }: EntryFrameProps) {
+  const [information, setInformation] = useState<"Help" | "Data privacy" | "Terms" | null>(null);
+  const informationLink = (label: "Help" | "Data privacy" | "Terms", fragment: string) => (
+    <a
+      href={`#${fragment}`}
+      aria-haspopup="dialog"
+      onClick={(event) => { event.preventDefault(); setInformation(label); }}
+      className={cn(
+        "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
+        FOCUS_RING,
+      )}
+    >
+      {label}
+    </a>
+  );
   return (
     <div className="flex min-h-screen flex-col bg-canvas font-sans">
       {before}
+      <Modal
+        open={information !== null}
+        onClose={() => setInformation(null)}
+        title={information ?? undefined}
+        footer={<Button variant="outline" size="full" onClick={() => setInformation(null)}>Close dialog</Button>}
+      >
+        {information === "Data privacy" && <DataNotice />}
+        {information === "Terms" && (
+          <p className="text-small text-stone-700">
+            Terms of Service are pending institutional review. Approved terms have
+            not yet been published. The interim data notice describes how IRIS uses your
+            registration details.
+          </p>
+        )}
+        {information === "Help" && (
+          <div className="space-y-3 text-small text-stone-700">
+            <p>Sign in with your registered email address and password.</p>
+            <p>To join IRIS, choose Create an account, complete your details, and verify your email.
+              An administrator reviews your role request before you can access the workspace.</p>
+            <Link to="/password/forgot" className={cn("inline-flex min-h-11 items-center rounded font-semibold text-brand underline", FOCUS_RING)}>
+              Reset your password
+            </Link>
+          </div>
+        )}
+      </Modal>
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-page items-center justify-between gap-3 px-4 py-2 sm:px-8 lg:px-12">
           <h1 className="flex min-w-0 items-center gap-2.5 sm:gap-4">
@@ -79,20 +110,7 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
               className="h-6 w-auto min-w-0 object-contain sm:h-9"
             />
           </h1>
-          {crossLink && (
-            <p className="shrink-0 text-small text-stone-600">
-              <span className="hidden sm:inline">{crossLink.prompt} </span>
-              <Link
-                to={crossLink.to}
-                className={cn(
-                  "inline-flex min-h-11 min-w-11 items-center justify-center rounded font-semibold text-brand underline underline-offset-4 hover:text-brand-light",
-                  FOCUS_RING,
-                )}
-              >
-                {crossLink.label}
-              </Link>
-            </p>
-          )}
+          {help && <div className="shrink-0 text-small">{informationLink("Help", "entry-help")}</div>}
         </div>
       </header>
 
@@ -116,12 +134,12 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
             wide ? "max-w-5xl" : "max-w-xl",
           )}
         >
-          <div className="relative z-10 flex gap-1 pl-4 sm:pl-5">{tabs}</div>
+          <div className="relative z-10 flex gap-1">{tabs}</div>
           <div
             className="absolute inset-x-0 bottom-0 top-11 -z-10 translate-x-2 translate-y-2 rounded-xl border border-stone-200 bg-stone-100"
             aria-hidden
           />
-          <div className="rounded-xl border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
+          <div className="rounded-b-xl rounded-tr-xl border border-stone-200 bg-white px-5 py-8 shadow-card-md sm:px-11 sm:py-10">
             {children}
           </div>
         </div>
@@ -129,8 +147,11 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
 
       <footer className="border-t border-stone-200">
         <div className="mx-auto flex max-w-page flex-col gap-1 px-4 py-6 text-small text-stone-600 sm:flex-row sm:justify-between sm:px-8 lg:px-12">
+          <nav aria-label="Privacy and terms" className="flex flex-wrap gap-x-5">
+            {informationLink("Data privacy", "data-privacy")}
+            {informationLink("Terms", "terms")}
+          </nav>
           <p>© 2026 IRIS · Research and IP disclosure</p>
-          <p>Pilot institution: {INSTITUTION.name}</p>
         </div>
       </footer>
     </div>
@@ -147,7 +168,7 @@ export function EntryFrame({ crossLink, lede, tabs, before, wide, children }: En
  */
 export function EntryTab({ children }: { children: ReactNode }) {
   return (
-    <span className="-mb-px rounded-t-lg border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
+    <span className="entry-label -mb-px rounded-tl-xl rounded-tr-xl border border-b-0 border-t-2 border-stone-200 border-t-brand bg-white px-5 py-3 text-small font-semibold text-brand">
       {children}
     </span>
   );

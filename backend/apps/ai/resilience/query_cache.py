@@ -66,6 +66,10 @@ class CachingEmbeddingProvider(EmbeddingProvider):
     def dimensions(self) -> int:
         return self._inner.dimensions
 
+    @property
+    def model_id(self):
+        return self._inner.model_id
+
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         return self._inner.embed_documents(texts)
 

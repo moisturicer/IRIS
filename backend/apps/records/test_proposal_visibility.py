@@ -44,7 +44,8 @@ from rest_framework.test import APITestCase
 from apps.ai.composition import CompositionRoot, use_composition_root
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.models.embedding import RecordEmbedding, RecordSpaceEmbedding
+from apps.ai.tests.corpus import seed_record_vector
 from apps.ai.models.embedding_space import EmbeddingSpace
 from apps.ai.providers.fakes import (
     DeterministicEmbeddingProvider,
@@ -95,7 +96,10 @@ class ProposalVisibilityTests(APITestCase):
         # scan before these fixtures are reached. Keep this visibility test's
         # real indexes, but start them empty, as the index-recall tests do.
         with connection.cursor() as cursor:
-            cursor.execute(f"TRUNCATE {RecordEmbedding._meta.db_table}, {ChunkEmbedding._meta.db_table}")
+            cursor.execute(
+                f"TRUNCATE {RecordEmbedding._meta.db_table}, {RecordSpaceEmbedding._meta.db_table}, "
+                f"{ChunkEmbedding._meta.db_table}"
+            )
         cls.owner = _user("vis-owner@cit.edu", RoleName.STUDENT)
         cls.stranger = _user("vis-stranger@cit.edu", RoleName.STUDENT)
         cls.adviser = _user("vis-adviser@cit.edu", RoleName.ADVISER)
@@ -143,7 +147,7 @@ class ProposalVisibilityTests(APITestCase):
         )
         RecordOwner.objects.create(record=record, user=cls.owner, is_primary=True)
 
-        RecordEmbedding.objects.create(
+        seed_record_vector(
             record=record,
             embedding=cls.embedder.embed_documents([f"{record.title}. {text}"])[0],
             model_name=cls.space.model_id,
