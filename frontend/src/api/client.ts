@@ -4,13 +4,23 @@ import { API_BASE } from "@/lib/constants";
 import { redirectToLoginSessionExpired } from "@/lib/authSession";
 import { refreshOnce, type RefreshedTokens } from "@/lib/tokenRefresh";
 import { useAuthStore } from "@/store/auth.store";
+import { DEFAULT_TIMEOUT_MS, TRANSFER_TIMEOUT_MS, asTimeoutError, isTransfer } from "./requestPolicy";
 
 export const apiClient = axios.create({
   baseURL: API_BASE,
   headers: { "Content-Type": "application/json" },
+  // Make a timeout an `ETIMEDOUT`, not the `ECONNABORTED` a dropped connection
+  // also gets, so the response interceptor can tell it apart (IR-914).
+  transitional: { clarifyTimeoutError: true },
 });
 
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
+  // The timeout is chosen per request here rather than set as an instance
+  // default, so an upload or a blob cannot be left on the short one by a caller
+  // that forgot. A caller that passes its own `timeout` keeps it (IR-914).
+  if (!config.timeout) {
+    config.timeout = isTransfer(config) ? TRANSFER_TIMEOUT_MS : DEFAULT_TIMEOUT_MS;
+  }
   const token = useAuthStore.getState().accessToken;
   if (token && config.headers) {
     config.headers.Authorization = `Bearer ${token}`;
@@ -91,6 +101,11 @@ export async function refreshSession(): Promise<string | null> {
 apiClient.interceptors.response.use(
   (res) => res,
   async (error: AxiosError) => {
+    // A request that got no answer reaches the UI as a typed error (IR-914).
+    // Never replayed here: see requestPolicy.ts.
+    const timedOut = asTimeoutError(error);
+    if (timedOut) return Promise.reject(timedOut);
+
     const original = error.config as InternalAxiosRequestConfig & { _retry?: boolean };
 
     if (error.response?.status !== 401 || original?._retry) {
