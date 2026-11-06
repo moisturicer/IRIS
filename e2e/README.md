@@ -4,8 +4,28 @@ Playwright journeys against **one integrated build** under production
 settings. The plan, the acceptance-criterion mapping and the status rules are
 in [`docs/testing/CORE_JOURNEYS.md`](../docs/testing/CORE_JOURNEYS.md).
 
-This is not a PR gate. The pinned run is the manually started workflow
+The journeys are not a PR gate. The pinned run is the manually started workflow
 `.github/workflows/core-journeys.yml`; this folder is also runnable locally.
+
+## Smoke tier (IR-904)
+
+`smoke/` is a different, small set that **does** run on every pull request that
+touches `frontend/` (`.github/workflows/frontend-smoke.yml`). It needs no stack:
+it serves the built `frontend/dist` and answers every `/api` request from the
+test (`smoke/support/mock-api.ts`). A request a test did not mock is answered
+501 and fails the test, so the set cannot go green while the page calls
+something nobody looked at. Because the API is mocked, it says nothing about the
+backend; the journeys above do.
+
+```bash
+cd ../frontend && npm ci && npm run build   # the smoke tier does not build for you
+cd ../e2e && npm ci && npx playwright install chromium
+npm run test:smoke
+```
+
+Output goes to `playwright-report-smoke/` and `test-results-smoke/` (trace and
+video for a failure only). Mark the "Frontend smoke" check required in the
+branch protection rules for `main` to make a failure block the merge.
 
 ## Run it locally
 

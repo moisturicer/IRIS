@@ -84,6 +84,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-534** | F1b: the redirect table, Discover home for everyone, the post-login landing on `review_access`, and the My Library needs-action dot (B2) — … | [details](traceability/IR-534.md) | **IMPLEMENTED** |
 | **IR-537** | A declined applicant is told so: `role_request` on `/users/me/`, and the pending screen in the entry frame — no FR- id; subtask 3 of IR-533 … | [details](traceability/IR-537.md) | **IMPLEMENTED** |
 | **IR-539** | Every register control has a name: the `Select` primitive, `Input` adoption, the role radio group — no FR- id; subtask 5 of IR-533 (entry … | [details](traceability/IR-539.md) | **IMPLEMENTED** |
+| **IR-904** | A small Playwright smoke tier gates every pull request that touches `frontend/`, against the built app with the network mocked — no FR- id; subtask … | [details](traceability/IR-904.md) | **PARTIAL** |
 | **IR-778** | The account menu's accessible name begins with the name and role it shows — no FR- id; WCAG 2.1 2.5.3 Label in Name, found by IR-631's axe … | [details](traceability/IR-778.md) | **PARTIAL** |
 | **IR-777** | The notification bell's accessible name contains the count it shows — no FR- id; WCAG 2.1 2.5.3 Label in Name, found by IR-631's axe run … | [details](traceability/IR-777.md) | **PARTIAL** |
 | **IR-774** | Scrolling regions are reachable and scrollable from the keyboard: Workflow Analytics tables at 360px and the office Review pane at 200% — … | [details](traceability/IR-774.md) | **IMPLEMENTED** |
