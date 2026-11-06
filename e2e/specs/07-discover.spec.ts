@@ -150,8 +150,12 @@ test("filters narrow the results, the address holds them, and Clear all undoes t
   await sheet.getByRole("button", { name: /^Show \d+ results?$/ }).click();
   await expect(sheet).toHaveCount(0);
 
-  // The address holds the whole query, so a reload brings the same view back.
-  await page.reload();
+  // The address holds the whole query, so opening it again brings the same view
+  // back. Not `page.reload()`: `signInBrowser` replays its refresh token on every
+  // load, and the server has already rotated it, so a reload would sign the
+  // reader out. A new sign-in to the same address is the same thing a copied link is.
+  const address = new URL(page.url());
+  await signInBrowser(page, reader.email, `${address.pathname}${address.search}`, NEW_PASSWORD);
   await expect(searchBox(page)).toHaveValue(stem);
   await expect(paperLink(page, thesisTitle)).toBeVisible();
   await expect(paperLink(page, projectTitle)).toHaveCount(0);
