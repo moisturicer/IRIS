@@ -1,0 +1,127 @@
+{
+  "schema_version": 1,
+  "purpose": "local PDF source audit, not human label review",
+  "sources_sha256": "dd6c0c09fb7ecc41873dcc2628025980ba836f8afe54c39a5bd65af470ee1931",
+  "sources": [
+    {
+      "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+      "split": "development",
+      "status": "pdf_found",
+      "file": "Correlation-Free_Transition_Path_Sampling_through_Shooting_Point_Generation_Gu_OAbnjAz.pdf",
+      "sha256": "1d7fb23e1690c2ff0fd35784064a4550ac0f8bbb06b116355c2a6a5508bcd07d",
+      "page_count": 18,
+      "word_count": 11191,
+      "labelled_page": 3,
+      "labelled_page_fraction": 0.167,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+      "split": "development",
+      "status": "pdf_found",
+      "file": "Alignment-Path_Distillation_from_Non-streaming_ASR-LLMs_for_Streaming_Speech_R_hqUTVsu.pdf",
+      "sha256": "0ca47397c2b812c0673f3c1a3b7f53e56a31eeca85c358fc5d015b660cd8292d",
+      "page_count": 5,
+      "word_count": 3509,
+      "labelled_page": 2,
+      "labelled_page_fraction": 0.4,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "split": "development",
+      "status": "pdf_found",
+      "file": "Multimodal_Conversational_Context_for_LLM-Based_ASR_Data_Construction_Training_pdTD5oy.pdf",
+      "sha256": "f47f39c5fce16e79b414ad665cb69f80a9cab5c1c0653bc5abd06f8bba0ef62a",
+      "page_count": 14,
+      "word_count": 6347,
+      "labelled_page": 4,
+      "labelled_page_fraction": 0.286,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+      "split": "development",
+      "status": "pdf_found",
+      "file": "State-Space-Based_FIR_Filtering_on_a_Quantum_Computer.pdf",
+      "sha256": "a84f170003ea37dfaffc3b2f15cecbf6f732af6efb9cf588399fc346f0b8d8f0",
+      "page_count": 5,
+      "word_count": 5074,
+      "labelled_page": 2,
+      "labelled_page_fraction": 0.4,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+      "split": "development",
+      "status": "pdf_found",
+      "file": "TTM-Bench_A_Framework_for_Text-to-Music_System_Performance_Benchmarking.pdf",
+      "sha256": "730bb233cb1d49f26ccfd73f1dd4e3d655b3c2748c7b0f066696f6a6ebda6d0e",
+      "page_count": 5,
+      "word_count": 3743,
+      "labelled_page": 3,
+      "labelled_page_fraction": 0.6,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "Stable Policy Learning",
+      "split": "development",
+      "status": "pdf_found",
+      "file": "Stable_Policy_Learning.pdf",
+      "sha256": "505c30ac5c7fffe724ecda25eaf108a1e67800addcfb82e700a3f6900a3e82d2",
+      "page_count": 73,
+      "word_count": 22090,
+      "labelled_page": 4,
+      "labelled_page_fraction": 0.055,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+      "split": "held_out",
+      "status": "pdf_found",
+      "file": "Expected_Hypervolume_Maximization_for_Multiobjective_Optimization_under_Uncertainties.pdf",
+      "sha256": "c9d452ad566849e95bde7c94ab74ad4ff61e48e6f2a310f98e093e1fa7bb46e9",
+      "page_count": 20,
+      "word_count": 9090,
+      "labelled_page": 2,
+      "labelled_page_fraction": 0.1,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+      "split": "held_out",
+      "status": "pdf_found",
+      "file": "Online_Adaptive_Kernel_Mixing_for_Gaussian_Process_Decision_Making.pdf",
+      "sha256": "7628fa3c0aedd848941d189b6b917520563b72f9c1502679d9ace324326b0bb0",
+      "page_count": 35,
+      "word_count": 16092,
+      "labelled_page": 2,
+      "labelled_page_fraction": 0.057,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+      "split": "held_out",
+      "status": "pdf_found",
+      "file": "MeshKV_A_Network-on-Chip_KV_Cache_Fabric_for_Scalable_Transformer_Decoding_Acc_sc3q6jZ.pdf",
+      "sha256": "3de679e8c29a24c28592df1192bcd4b8527f38a9c158ecfad032d92496c3e4e7",
+      "page_count": 5,
+      "word_count": 4130,
+      "labelled_page": 3,
+      "labelled_page_fraction": 0.6,
+      "quote_on_labelled_pdf_page": true
+    },
+    {
+      "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+      "split": "held_out",
+      "status": "pdf_found",
+      "file": "Nested_Parallel_von_Neumann_Architecture_and_Nested_BSP.pdf",
+      "sha256": "2fe5d6c9805510be56ad940474ed4a0be3e4647857a73c396c2cf571537ec42b",
+      "page_count": 7,
+      "word_count": 3701,
+      "labelled_page": 4,
+      "labelled_page_fraction": 0.571,
+      "quote_on_labelled_pdf_page": true
+    }
+  ]
+}

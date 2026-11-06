@@ -45,11 +45,11 @@
     "source_state": "proxy_reference_needs_recheck"
   },
   {
-    "question_id": "q10",
-    "question": "how did the older approach get the emotion label back out of the model?",
-    "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-    "page": 3,
-    "quote": "read the predicted emotion off the LLM by decoding",
+    "question_id": "q12",
+    "question": "what can settle down a learner that swings wildly when the data shifts a little?",
+    "title": "Stable Policy Learning",
+    "page": 4,
+    "quote": "Bagging can stabilize an unstable base learner",
     "split": "development",
     "source_state": "proxy_reference_needs_recheck"
   },
@@ -72,11 +72,11 @@
     "source_state": "proxy_reference_needs_recheck"
   },
   {
-    "question_id": "q05",
-    "question": "with the next view not yet visible, how does the agent decide where to look?",
-    "title": "Towards Active Cross-View Object Geo-Localization",
-    "page": 4,
-    "quote": "infer where to observe next from its current localization state and observation history",
+    "question_id": "q18",
+    "question": "how do they stop the two kinds of on-chip traffic from jamming each other?",
+    "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+    "page": 3,
+    "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing",
     "split": "held_out",
     "source_state": "proxy_reference_needs_recheck"
   },

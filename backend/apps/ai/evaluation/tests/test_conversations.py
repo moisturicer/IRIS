@@ -2,6 +2,9 @@
 
 import copy
 
+import pytest
+
+from apps.ai.evaluation.campaign_report import CampaignRefused, preflight
 from apps.ai.evaluation.conversations import (
     FAMILIES,
     check_lock,
@@ -88,6 +91,21 @@ def test_versioned_case_pack_declares_its_own_families_and_minimum():
     frozen = lock_record(data)
     assert check_lock({**data, "min_family_cases": 7}, frozen) == ["min_family_cases"]
     assert check_lock(data, {**frozen, "thresholds": {"task_completion": 0.1}}) == ["thresholds"]
+
+
+def test_unverified_cases_do_not_make_a_family_reportable():
+    rows = [conv(f"d{i}", "L01", "development", f"development {i}", (f"D{i}",),
+                 reportable=i < 7) for i in range(10)]
+    data = make_set(rows, families=["L01"], min_family_cases=10)
+    report = validate_set(data, min_conversations=10)
+    assert report["counts"]["development"]["L01"] == 10
+    assert report["reportable_counts"]["L01"] == 7
+    assert report["lock_blockers"] == ["L01"]
+    assert report["ready"] is False
+    with pytest.raises(CampaignRefused, match="L01"):
+        preflight(data, {**lock_record(data), "locked_at": "2026-11-06T00:00:00+00:00"},
+                  {"controller": [{"run_id": "forged"}]}, mode="architecture",
+                  counted=True)
 
 
 def test_every_leakage_collision_is_reported():

@@ -89,6 +89,9 @@ class Command(BaseCommand):
           f"{report['supported_unambiguous']} supported and unambiguous")
         for split, counts in report["counts"].items():
             w(f"{split}: " + " ".join(f"{f}={n}" for f, n in counts.items()))
+        if data.get("min_family_cases"):
+            w("reportable: " + " ".join(
+                f"{f}={n}" for f, n in report["reportable_counts"].items()))
         for warning in report["warnings"]:
             w(f"WARNING topic overlap {warning['development_topic']!r} / "
               f"{warning['held_out_topic']!r} share {', '.join(warning['words'])}")
@@ -131,12 +134,15 @@ class Command(BaseCommand):
                                         "sha256": file_digest(options["label_review"])}
             write_json(options["write_lock"], lock)
             w(f"wrote lock {options['write_lock']}")
-        w("valid" + ("" if report["ready"] else " (not ready: coverage gaps)"))
+        w("valid" + ("" if report["ready"] else " (not ready: coverage gaps or lock blockers)"))
 
     def _score(self, data, options):
         report = validate_set(data, min_conversations=0)
         if report["errors"]:
             raise CommandError("the set is invalid: " + "; ".join(report["errors"]))
+        if options["counted"] and report["lock_blockers"]:
+            raise CommandError("not a counted campaign: unreportable families "
+                               + ", ".join(report["lock_blockers"]))
         if not options["lock"]:
             raise CommandError("--score requires --lock")
         lock = load_json(options["lock"])

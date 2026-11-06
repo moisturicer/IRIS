@@ -236,6 +236,7 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
         if n > 1:
             errors.append(f"duplicate id {cid}")
     counts = {split: {f: 0 for f in families} for split in SPLITS}
+    reportable_counts = {f: 0 for f in families}
     for c in conversations:
         for field in CONVERSATION_FIELDS:
             if field not in c:
@@ -246,6 +247,10 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
             errors.append(f"{c.get('id')}: unknown split {c.get('split')!r}")
         if c.get("family") in families and c.get("split") in SPLITS:
             counts[c["split"]][c["family"]] += 1
+            if c.get("reportable", True) is True:
+                reportable_counts[c["family"]] += 1
+        if "reportable" in c and type(c["reportable"]) is not bool:
+            errors.append(f"{c.get('id')}: reportable must be a boolean")
         _check_turns(c, errors)
         if "a09_case" in c and c["a09_case"] not in A09_CASES:
             errors.append(f"{c.get('id')}: a09_case {c['a09_case']!r} is not one of {A09_CASES}")
@@ -259,14 +264,14 @@ def validate_set(data: Mapping[str, Any], *, min_conversations: int = DEFAULT_MI
     gaps = [f for f in families
             if not any(counts[s][f] for s in SPLITS)]
     held_gaps = [f for f in families if not counts["held_out"][f]]
-    lock_blockers += [f for f in families
-                      if sum(counts[s][f] for s in SPLITS) < minimum]
+    lock_blockers += [f for f in families if reportable_counts[f] < minimum]
     if len(conversations) < min_conversations:
         errors.append(f"fewer than {min_conversations} conversations ({len(conversations)})")
     return {
         "set_id": data.get("set_id"), "label_status": status,
         "labelled_by": list(data.get("labelled_by", ())),
         "total": len(conversations), "counts": counts,
+        "reportable_counts": reportable_counts,
         "supported_unambiguous": sum(bool(c.get("supported_unambiguous")) for c in conversations),
         "leakage": leaks, "allowed_shared": shared,
         "coverage_gaps": gaps, "held_out_coverage_gaps": held_gaps,

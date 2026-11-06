@@ -14,7 +14,7 @@ from apps.ai.public import PUBLIC_PROTOCOL
 from .conversation_scoring import (ARMS, CONDITION_KEYS, DEFAULT_MIN_EXAMPLES, MODES,
                                    TARGET_LABEL, TARGETS, ZERO_BREACH_NOTE, ScoringError,
                                    diagnostic_stages, score_reviews)
-from .conversations import check_lock, postdates_lock, split_digests
+from .conversations import check_lock, postdates_lock, split_digests, validate_set
 from .pilot_report import percentile
 
 MIN_REPETITIONS = 3
@@ -137,6 +137,9 @@ def preflight(data: Mapping, lock: Optional[Mapping], campaign: Mapping[str, Seq
     if not campaign or not any(campaign.values()):
         raise CampaignRefused("no runs")
     _require_current_lock(data, lock)
+    blockers = validate_set(data, min_conversations=0)["lock_blockers"]
+    if blockers:
+        raise CampaignRefused("set has unreportable families: " + ", ".join(blockers))
     _check_manifests(campaign)
     _check_arms(campaign, mode)
     _check_conditions(data, campaign, mode)

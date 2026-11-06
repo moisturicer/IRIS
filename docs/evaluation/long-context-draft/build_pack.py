@@ -15,8 +15,8 @@ FAMILIES = {
     "L06": "partial_outage",
     "L07": "interrupted_research",
 }
-SOURCE_QUESTION_IDS = ("q04", "q06", "q07", "q08", "q09", "q10",
-                       "q01", "q03", "q05", "q16")
+SOURCE_QUESTION_IDS = ("q04", "q06", "q07", "q08", "q09", "q12",
+                       "q01", "q03", "q18", "q16")
 
 
 def turn(user, task, evidence=(), uncertainty="Report limits and cite the original page."):
@@ -113,6 +113,9 @@ def build():
                 "supported_unambiguous": True, "turns": turns,
                 "harness_setup": setup, "source_state": source["source_state"],
                 "proxy_question_id": source["question_id"],
+                "reportable": family not in ("L01", "L02"),
+                **({"inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"}
+                   if family in ("L01", "L02") else {}),
             })
     pack = {
         "schema_version": 1, "set_id": "long-context-ir753-draft-v2",

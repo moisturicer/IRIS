@@ -53,7 +53,9 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q04"
+      "proxy_question_id": "q04",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-D02",
@@ -83,7 +85,9 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q06"
+      "proxy_question_id": "q06",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-D03",
@@ -113,7 +117,9 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q07"
+      "proxy_question_id": "q07",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-D04",
@@ -143,7 +149,9 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q08"
+      "proxy_question_id": "q08",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-D05",
@@ -173,28 +181,30 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q09"
+      "proxy_question_id": "q09",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-D06",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "development",
-      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+      "topic": "Stable Policy Learning",
       "papers": [
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
+        "Stable Policy Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how did the older approach get the emotion label back out of the model?",
+          "user": "In Stable Policy Learning, what can settle down a learner that swings wildly when the data shifts a little?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -203,7 +213,9 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q10"
+      "proxy_question_id": "q12",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-H07",
@@ -233,7 +245,9 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q01"
+      "proxy_question_id": "q01",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-H08",
@@ -263,28 +277,30 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q03"
+      "proxy_question_id": "q03",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-H09",
       "family": "L01",
       "scenario": "long_manuscript",
       "split": "held_out",
-      "topic": "Towards Active Cross-View Object Geo-Localization",
+      "topic": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
       "papers": [
-        "Towards Active Cross-View Object Geo-Localization"
+        "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Towards Active Cross-View Object Geo-Localization, with the next view not yet visible, how does the agent decide where to look?",
+          "user": "In MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators, how do they stop the two kinds of on-chip traffic from jamming each other?",
           "intended_task": "read_selected_manuscript",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -293,7 +309,9 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q05"
+      "proxy_question_id": "q18",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L01-H10",
@@ -323,7 +341,9 @@
       ],
       "harness_setup": "Read the selected source and record actual page coverage. This proxy source is not yet verified as a long Manuscript.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q16"
+      "proxy_question_id": "q16",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-D01",
@@ -353,7 +373,9 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q04"
+      "proxy_question_id": "q04",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-D02",
@@ -383,7 +405,9 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q06"
+      "proxy_question_id": "q06",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-D03",
@@ -413,7 +437,9 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q07"
+      "proxy_question_id": "q07",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-D04",
@@ -443,7 +469,9 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q08"
+      "proxy_question_id": "q08",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-D05",
@@ -473,28 +501,30 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q09"
+      "proxy_question_id": "q09",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-D06",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "development",
-      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+      "topic": "Stable Policy Learning",
       "papers": [
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
+        "Stable Policy Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the relevant sections of Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition before answering: how did the older approach get the emotion label back out of the model?",
+          "user": "Check the relevant sections of Stable Policy Learning before answering: what can settle down a learner that swings wildly when the data shifts a little?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -503,7 +533,9 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q10"
+      "proxy_question_id": "q12",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-H07",
@@ -533,7 +565,9 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q01"
+      "proxy_question_id": "q01",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-H08",
@@ -563,28 +597,30 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q03"
+      "proxy_question_id": "q03",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-H09",
       "family": "L02",
       "scenario": "middle_late_evidence",
       "split": "held_out",
-      "topic": "Towards Active Cross-View Object Geo-Localization",
+      "topic": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
       "papers": [
-        "Towards Active Cross-View Object Geo-Localization"
+        "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Check the relevant sections of Towards Active Cross-View Object Geo-Localization before answering: with the next view not yet visible, how does the agent decide where to look?",
+          "user": "Check the relevant sections of MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators before answering: how do they stop the two kinds of on-chip traffic from jamming each other?",
           "intended_task": "find_middle_late_evidence",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -593,7 +629,9 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q05"
+      "proxy_question_id": "q18",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L02-H10",
@@ -623,7 +661,9 @@
       ],
       "harness_setup": "Verify page position against the actual Manuscript; this proxy citation alone does not establish middle/late coverage.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q16"
+      "proxy_question_id": "q16",
+      "reportable": false,
+      "inconclusive_reason": "selected proxy source has not established the required long or late-page behavior"
     },
     {
       "id": "L03-D01",
@@ -677,7 +717,8 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q04"
+      "proxy_question_id": "q04",
+      "reportable": true
     },
     {
       "id": "L03-D02",
@@ -731,7 +772,8 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q06"
+      "proxy_question_id": "q06",
+      "reportable": true
     },
     {
       "id": "L03-D03",
@@ -785,7 +827,8 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q07"
+      "proxy_question_id": "q07",
+      "reportable": true
     },
     {
       "id": "L03-D04",
@@ -839,7 +882,8 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q08"
+      "proxy_question_id": "q08",
+      "reportable": true
     },
     {
       "id": "L03-D05",
@@ -893,21 +937,22 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q09"
+      "proxy_question_id": "q09",
+      "reportable": true
     },
     {
       "id": "L03-D06",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "development",
-      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+      "topic": "Stable Policy Learning",
       "papers": [
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
+        "Stable Policy Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition selected. I want to answer: how did the older approach get the emotion label back out of the model?",
+          "user": "Keep Stable Policy Learning selected. I want to answer: what can settle down a learner that swings wildly when the data shifts a little?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -936,9 +981,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -947,7 +992,8 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q10"
+      "proxy_question_id": "q12",
+      "reportable": true
     },
     {
       "id": "L03-H07",
@@ -1001,7 +1047,8 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q01"
+      "proxy_question_id": "q01",
+      "reportable": true
     },
     {
       "id": "L03-H08",
@@ -1055,21 +1102,22 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q03"
+      "proxy_question_id": "q03",
+      "reportable": true
     },
     {
       "id": "L03-H09",
       "family": "L03",
       "scenario": "repeated_manual_compaction",
       "split": "held_out",
-      "topic": "Towards Active Cross-View Object Geo-Localization",
+      "topic": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
       "papers": [
-        "Towards Active Cross-View Object Geo-Localization"
+        "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Keep Towards Active Cross-View Object Geo-Localization selected. I want to answer: with the next view not yet visible, how does the agent decide where to look?",
+          "user": "Keep MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators selected. I want to answer: how do they stop the two kinds of on-chip traffic from jamming each other?",
           "intended_task": "set_research_goal",
           "expected_pair": [],
           "required_evidence": [],
@@ -1098,9 +1146,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -1109,7 +1157,8 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q05"
+      "proxy_question_id": "q18",
+      "reportable": true
     },
     {
       "id": "L03-H10",
@@ -1163,7 +1212,8 @@
       ],
       "harness_setup": "Harness must trigger two automatic compactions and a manual one; preserve selection, goal and citation.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q16"
+      "proxy_question_id": "q16",
+      "reportable": true
     },
     {
       "id": "L04-D01",
@@ -1215,7 +1265,8 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q04"
+      "proxy_question_id": "q04",
+      "reportable": true
     },
     {
       "id": "L04-D02",
@@ -1267,7 +1318,8 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q06"
+      "proxy_question_id": "q06",
+      "reportable": true
     },
     {
       "id": "L04-D03",
@@ -1319,7 +1371,8 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q07"
+      "proxy_question_id": "q07",
+      "reportable": true
     },
     {
       "id": "L04-D04",
@@ -1371,7 +1424,8 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q08"
+      "proxy_question_id": "q08",
+      "reportable": true
     },
     {
       "id": "L04-D05",
@@ -1423,28 +1477,29 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q09"
+      "proxy_question_id": "q09",
+      "reportable": true
     },
     {
       "id": "L04-D06",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "development",
-      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+      "topic": "Stable Policy Learning",
       "papers": [
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
+        "Stable Policy Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how did the older approach get the emotion label back out of the model?",
+          "user": "In Stable Policy Learning, what can settle down a learner that swings wildly when the data shifts a little?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -1464,9 +1519,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -1475,7 +1530,8 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q10"
+      "proxy_question_id": "q12",
+      "reportable": true
     },
     {
       "id": "L04-H07",
@@ -1527,7 +1583,8 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q01"
+      "proxy_question_id": "q01",
+      "reportable": true
     },
     {
       "id": "L04-H08",
@@ -1579,28 +1636,29 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q03"
+      "proxy_question_id": "q03",
+      "reportable": true
     },
     {
       "id": "L04-H09",
       "family": "L04",
       "scenario": "exact_detail_recovery",
       "split": "held_out",
-      "topic": "Towards Active Cross-View Object Geo-Localization",
+      "topic": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
       "papers": [
-        "Towards Active Cross-View Object Geo-Localization"
+        "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Towards Active Cross-View Object Geo-Localization, with the next view not yet visible, how does the agent decide where to look?",
+          "user": "In MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators, how do they stop the two kinds of on-chip traffic from jamming each other?",
           "intended_task": "read_and_remember_detail",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -1620,9 +1678,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -1631,7 +1689,8 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q05"
+      "proxy_question_id": "q18",
+      "reportable": true
     },
     {
       "id": "L04-H10",
@@ -1683,7 +1742,8 @@
       ],
       "harness_setup": "Recover the original Turn/source binding; a paraphrased handoff is not exact evidence.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q16"
+      "proxy_question_id": "q16",
+      "reportable": true
     },
     {
       "id": "L05-D01",
@@ -1721,7 +1781,8 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q04"
+      "proxy_question_id": "q04",
+      "reportable": true
     },
     {
       "id": "L05-D02",
@@ -1759,7 +1820,8 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q06"
+      "proxy_question_id": "q06",
+      "reportable": true
     },
     {
       "id": "L05-D03",
@@ -1797,7 +1859,8 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q07"
+      "proxy_question_id": "q07",
+      "reportable": true
     },
     {
       "id": "L05-D04",
@@ -1835,7 +1898,8 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q08"
+      "proxy_question_id": "q08",
+      "reportable": true
     },
     {
       "id": "L05-D05",
@@ -1873,28 +1937,29 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q09"
+      "proxy_question_id": "q09",
+      "reportable": true
     },
     {
       "id": "L05-D06",
       "family": "L05",
       "scenario": "revocation",
       "split": "development",
-      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+      "topic": "Stable Policy Learning",
       "papers": [
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
+        "Stable Policy Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how did the older approach get the emotion label back out of the model?",
+          "user": "In Stable Policy Learning, what can settle down a learner that swings wildly when the data shifts a little?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -1911,7 +1976,8 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q10"
+      "proxy_question_id": "q12",
+      "reportable": true
     },
     {
       "id": "L05-H07",
@@ -1949,7 +2015,8 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q01"
+      "proxy_question_id": "q01",
+      "reportable": true
     },
     {
       "id": "L05-H08",
@@ -1987,28 +2054,29 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q03"
+      "proxy_question_id": "q03",
+      "reportable": true
     },
     {
       "id": "L05-H09",
       "family": "L05",
       "scenario": "revocation",
       "split": "held_out",
-      "topic": "Towards Active Cross-View Object Geo-Localization",
+      "topic": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
       "papers": [
-        "Towards Active Cross-View Object Geo-Localization"
+        "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Towards Active Cross-View Object Geo-Localization, with the next view not yet visible, how does the agent decide where to look?",
+          "user": "In MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators, how do they stop the two kinds of on-chip traffic from jamming each other?",
           "intended_task": "read_before_revocation",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -2025,7 +2093,8 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q05"
+      "proxy_question_id": "q18",
+      "reportable": true
     },
     {
       "id": "L05-H10",
@@ -2063,7 +2132,8 @@
       ],
       "harness_setup": "Harness must revoke Record access between turns, then check prompt, answer, citation and handoff.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q16"
+      "proxy_question_id": "q16",
+      "reportable": true
     },
     {
       "id": "L06-D01",
@@ -2107,7 +2177,8 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q04"
+      "proxy_question_id": "q04",
+      "reportable": true
     },
     {
       "id": "L06-D02",
@@ -2151,7 +2222,8 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q06"
+      "proxy_question_id": "q06",
+      "reportable": true
     },
     {
       "id": "L06-D03",
@@ -2195,7 +2267,8 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q07"
+      "proxy_question_id": "q07",
+      "reportable": true
     },
     {
       "id": "L06-D04",
@@ -2239,7 +2312,8 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q08"
+      "proxy_question_id": "q08",
+      "reportable": true
     },
     {
       "id": "L06-D05",
@@ -2283,28 +2357,29 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q09"
+      "proxy_question_id": "q09",
+      "reportable": true
     },
     {
       "id": "L06-D06",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "development",
-      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+      "topic": "Stable Policy Learning",
       "papers": [
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
+        "Stable Policy Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Read Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition and investigate the question: how did the older approach get the emotion label back out of the model?",
+          "user": "Read Stable Policy Learning and investigate the question: what can settle down a learner that swings wildly when the data shifts a little?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -2316,9 +2391,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -2327,7 +2402,8 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q10"
+      "proxy_question_id": "q12",
+      "reportable": true
     },
     {
       "id": "L06-H07",
@@ -2371,7 +2447,8 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q01"
+      "proxy_question_id": "q01",
+      "reportable": true
     },
     {
       "id": "L06-H08",
@@ -2415,28 +2492,29 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q03"
+      "proxy_question_id": "q03",
+      "reportable": true
     },
     {
       "id": "L06-H09",
       "family": "L06",
       "scenario": "partial_outage",
       "split": "held_out",
-      "topic": "Towards Active Cross-View Object Geo-Localization",
+      "topic": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
       "papers": [
-        "Towards Active Cross-View Object Geo-Localization"
+        "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "Read Towards Active Cross-View Object Geo-Localization and investigate the question: with the next view not yet visible, how does the agent decide where to look?",
+          "user": "Read MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators and investigate the question: how do they stop the two kinds of on-chip traffic from jamming each other?",
           "intended_task": "read_before_partial_outage",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -2448,9 +2526,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -2459,7 +2537,8 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q05"
+      "proxy_question_id": "q18",
+      "reportable": true
     },
     {
       "id": "L06-H10",
@@ -2503,7 +2582,8 @@
       ],
       "harness_setup": "Harness must fail a subsequent read after the first succeeds and record fault=fired.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q16"
+      "proxy_question_id": "q16",
+      "reportable": true
     },
     {
       "id": "L07-D01",
@@ -2547,7 +2627,8 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q04"
+      "proxy_question_id": "q04",
+      "reportable": true
     },
     {
       "id": "L07-D02",
@@ -2591,7 +2672,8 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q06"
+      "proxy_question_id": "q06",
+      "reportable": true
     },
     {
       "id": "L07-D03",
@@ -2635,7 +2717,8 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q07"
+      "proxy_question_id": "q07",
+      "reportable": true
     },
     {
       "id": "L07-D04",
@@ -2679,7 +2762,8 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q08"
+      "proxy_question_id": "q08",
+      "reportable": true
     },
     {
       "id": "L07-D05",
@@ -2723,28 +2807,29 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q09"
+      "proxy_question_id": "q09",
+      "reportable": true
     },
     {
       "id": "L07-D06",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "development",
-      "topic": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+      "topic": "Stable Policy Learning",
       "papers": [
-        "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
+        "Stable Policy Learning"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition, how did the older approach get the emotion label back out of the model?",
+          "user": "In Stable Policy Learning, what can settle down a learner that swings wildly when the data shifts a little?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -2756,9 +2841,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
-              "page": 3,
-              "quote": "read the predicted emotion off the LLM by decoding"
+              "title": "Stable Policy Learning",
+              "page": 4,
+              "quote": "Bagging can stabilize an unstable base learner"
             }
           ],
           "clarification_necessary": false,
@@ -2767,7 +2852,8 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q10"
+      "proxy_question_id": "q12",
+      "reportable": true
     },
     {
       "id": "L07-H07",
@@ -2811,7 +2897,8 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q01"
+      "proxy_question_id": "q01",
+      "reportable": true
     },
     {
       "id": "L07-H08",
@@ -2855,28 +2942,29 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q03"
+      "proxy_question_id": "q03",
+      "reportable": true
     },
     {
       "id": "L07-H09",
       "family": "L07",
       "scenario": "interrupted_research",
       "split": "held_out",
-      "topic": "Towards Active Cross-View Object Geo-Localization",
+      "topic": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
       "papers": [
-        "Towards Active Cross-View Object Geo-Localization"
+        "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
       ],
       "supported_unambiguous": true,
       "turns": [
         {
-          "user": "In Towards Active Cross-View Object Geo-Localization, with the next view not yet visible, how does the agent decide where to look?",
+          "user": "In MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators, how do they stop the two kinds of on-chip traffic from jamming each other?",
           "intended_task": "start_research",
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -2888,9 +2976,9 @@
           "expected_pair": [],
           "required_evidence": [
             {
-              "title": "Towards Active Cross-View Object Geo-Localization",
-              "page": 4,
-              "quote": "infer where to observe next from its current localization state and observation history"
+              "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+              "page": 3,
+              "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
             }
           ],
           "clarification_necessary": false,
@@ -2899,7 +2987,8 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q05"
+      "proxy_question_id": "q18",
+      "reportable": true
     },
     {
       "id": "L07-H10",
@@ -2943,7 +3032,8 @@
       ],
       "harness_setup": "Harness must interrupt the worker after a committed step and reconnect the same run.",
       "source_state": "proxy_reference_needs_recheck",
-      "proxy_question_id": "q16"
+      "proxy_question_id": "q16",
+      "reportable": true
     }
   ]
 }
