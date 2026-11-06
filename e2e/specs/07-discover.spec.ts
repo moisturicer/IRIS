@@ -166,6 +166,11 @@ test("filters narrow the results, the address holds them, and Clear all undoes t
 test("a card opens its paper, and Back returns to the same search", async ({ page }) => {
   await openDiscover(page);
   await search(page, `${stem} Mangrove`);
+  // The thesis is on screen before the search has applied (the box waits 300 ms
+  // before writing the address), so wait for the list to narrow and the address
+  // to carry the query, or the click would leave nothing for Back to restore.
+  await expect(paperLink(page, projectTitle)).toHaveCount(0);
+  await expect(page).toHaveURL(/[?&]q=/);
   await paperLink(page, thesisTitle).click();
 
   await expect(page).toHaveURL(new RegExp(`/records/${thesisId}$`));
