@@ -29,6 +29,12 @@ const FAKE = {
   urlPassword: "postgres://iris:" + "hunter2hunter2" + "@db.internal:5432/iris",
 };
 
+// Values for the environment-variable tests, assembled here for the same reason
+// as FAKE, and never written beside a secret-looking name as a plain literal:
+// gitleaks' generic-api-key rule reads `NAME_TOKEN = "value"` as a real secret.
+const TOKEN = "tok-" + "0123456789abcdef";
+const LLM = "llm-" + "0123456789abcdef";
+
 let dist;
 beforeEach(() => {
   dist = mkdtempSync(path.join(tmpdir(), "bundle-scan-"));
@@ -109,11 +115,12 @@ describe("env files, which Vite inlines but process.env does not show", () => {
   it("reads KEY=value lines from the .env files Vite loads, ignoring comments and quotes", () => {
     const dir = mkdtempSync(path.join(tmpdir(), "bundle-scan-env-"));
     try {
-      writeFileSync(path.join(dir, ".env"), '# a comment\nVITE_API_BASE_URL=/api/v1\nSERVICE_TOKEN="tok-0123456789abcdef"\n\nexport OTHER=1\n');
+      const lines = ["# a comment", "VITE_API_BASE_URL=/api/v1", `SERVICE_TOKEN="${TOKEN}"`, "", "export OTHER=1", ""];
+      writeFileSync(path.join(dir, ".env"), lines.join("\n"));
       writeFileSync(path.join(dir, ".env.production.local"), "VITE_VOYAGE_API_KEY=pa-whatever\n");
       assert.deepEqual(readEnvFiles(dir), {
         VITE_API_BASE_URL: "/api/v1",
-        SERVICE_TOKEN: "tok-0123456789abcdef",
+        SERVICE_TOKEN: TOKEN,
         OTHER: "1",
         VITE_VOYAGE_API_KEY: "pa-whatever",
       });
@@ -129,8 +136,8 @@ describe("env files, which Vite inlines but process.env does not show", () => {
   it("a secret value kept only in an env file is found in the build, and a secret-named VITE_ key there fails", () => {
     const envDir = mkdtempSync(path.join(tmpdir(), "bundle-scan-env-"));
     try {
-      writeFileSync(path.join(envDir, ".env"), "SERVICE_TOKEN=tok-0123456789abcdef\nVITE_ADMIN_PASSWORD=x\n");
-      plant("assets/app.js", 'const t="tok-0123456789abcdef";');
+      writeFileSync(path.join(envDir, ".env"), [`SERVICE_TOKEN=${TOKEN}`, "VITE_ADMIN_PASSWORD=x", ""].join("\n"));
+      plant("assets/app.js", `const t="${TOKEN}";`);
       const log = newLog();
       assert.equal(main([dist], {}, logTo(log), envDir), 1);
       const text = log.err.join("\n");
@@ -192,8 +199,8 @@ describe("main (the command CI runs)", () => {
   });
 
   it("exits 1 when the build holds the value of a sensitive environment variable", () => {
-    plant("assets/app.js", 'const a="llm-0123456789abcdef";');
-    assert.equal(main([dist], { LLM_API_KEY: "llm-0123456789abcdef" }, logTo(newLog())), 1);
+    plant("assets/app.js", `const a="${LLM}";`);
+    assert.equal(main([dist], { LLM_API_KEY: LLM }, logTo(newLog())), 1);
   });
 
   it("exits 1 for a secret-named VITE_ variable even when the build text is clean", () => {
