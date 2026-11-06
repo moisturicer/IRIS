@@ -291,7 +291,11 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
             for anyone else and nothing is drawn (ADR-032 §10, IR-269). Always
             shown rather than on hover, so touch and keyboard read it too. */}
         {row.seats && row.seats.length > 0 && (
-          <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-0.5 text-2xs text-stone-600">
+          // A reviewer's name is free text: wrapping anywhere in the seat list keeps
+          // one long name from holding the table wider than the card at 360px
+          // (IR-921). Scoped here, not to the table, so the party and status
+          // columns keep their widths and never break inside a word.
+          <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-0.5 text-2xs text-stone-600 [overflow-wrap:anywhere]">
             {row.seats.map((seat, i) => (
               <li key={i}>
                 {seat.reviewer_name ?? "A reviewer"} — {seat.state_label.toLowerCase()}
