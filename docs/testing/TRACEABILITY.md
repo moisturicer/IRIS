@@ -84,6 +84,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-534** | F1b: the redirect table, Discover home for everyone, the post-login landing on `review_access`, and the My Library needs-action dot (B2) — … | [details](traceability/IR-534.md) | **IMPLEMENTED** |
 | **IR-537** | A declined applicant is told so: `role_request` on `/users/me/`, and the pending screen in the entry frame — no FR- id; subtask 3 of IR-533 … | [details](traceability/IR-537.md) | **IMPLEMENTED** |
 | **IR-539** | Every register control has a name: the `Select` primitive, `Input` adoption, the role radio group — no FR- id; subtask 5 of IR-533 (entry … | [details](traceability/IR-539.md) | **IMPLEMENTED** |
+| **IR-904** | A small Playwright smoke tier gates every pull request that touches `frontend/`, against the built app with the network mocked — no FR- id; subtask … | [details](traceability/IR-904.md) | **PARTIAL** |
 | **IR-778** | The account menu's accessible name begins with the name and role it shows — no FR- id; WCAG 2.1 2.5.3 Label in Name, found by IR-631's axe … | [details](traceability/IR-778.md) | **PARTIAL** |
 | **IR-777** | The notification bell's accessible name contains the count it shows — no FR- id; WCAG 2.1 2.5.3 Label in Name, found by IR-631's axe run … | [details](traceability/IR-777.md) | **PARTIAL** |
 | **IR-774** | Scrolling regions are reachable and scrollable from the keyboard: Workflow Analytics tables at 360px and the office Review pane at 200% — … | [details](traceability/IR-774.md) | **IMPLEMENTED** |
@@ -117,6 +118,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-382** | Groq dialect: the vendor's request shape behind the adapter, with citation-marker normalisation — no FR- id; part H of IR-375's spec, and … | [details](traceability/IR-382.md) | **IMPLEMENTED** |
 | **IR-852** | Figures are described for retrieval only, never shown to readers — no FR- id; part of IR-848 (ADR-056 §10) | [details](traceability/IR-852.md) | **IMPLEMENTED** |
 | **IR-647** | The API enforces the configured password policy — no FR- id; subtask 4 of IR-644 (account-security findings, 2026-10-30) | [details](traceability/IR-647.md) | **VERIFIED** |
+| **IR-829** | The ASVS items marked "Needs manual check" are run: 16 of 21 have a result, and every Fail is ticketed (IR-923, IR-924, IR-925, IR-926, IR-928, IR-929); four wait for IR-806's server and one for the DPO — no FR- id; from IR-617, covers NFR-S1…S6 | [details](traceability/IR-829.md) | **PARTIAL** |
 | **IR-645** | A refused session's 401 says why it ended — no FR- id; subtask 1 of IR-644 (account-security findings, 2026-10-30), extends NFR-S2 (IR-166) | [details](traceability/IR-645.md) | **IMPLEMENTED** |
 | **FR-M5-01** | Hierarchical submission workflow | [details](traceability/FR-M5-01.md) | **VERIFIED** |
 | FR-M5-03 | Explicit document requests, distinct from resubmission | [details](traceability/FR-M5-03.md) | **IMPLEMENTED** |
@@ -169,6 +171,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-752** | An operator builds a pending Embedding Space beside the active one, with space-keyed Record and Passage vectors, while readers keep searching the active space — under IR-716, ADR-049 §23; additive expand only, no activation (IR-739); no FR- id | [details](traceability/IR-752.md) | **PARTIAL** |
 | **IR-739** | An operator verifies and atomically promotes a complete Embedding Space pair (Record and Passage vectors), or rolls back to the previous revision, with readers and the `ai/` runtime moved onto space-keyed Record vectors and no revoked source resurrected — under IR-716, ADR-049 §23; no live provider, no production upgrade; no FR- id | [details](traceability/IR-739.md) | **PARTIAL** |
 | **IR-740** | IR-605 collects the dedicated runtime through its real authenticated routes under an explicit engine identity, and rescores old baselines with effective-condition preflight and a separate capability report — under IR-716, ADR-049 §24; no FR- id | [details](traceability/IR-740.md) | **PARTIAL** |
+| **IR-882** | Every paper starts embargoed; Publish asks no embargo question; only the Adviser or RDCO date or release one, and RDCO publishes only a released paper — extends FR-M3-02 (stable label only); ADR-052 IR-879 amendment | [details](traceability/IR-882.md) | **IMPLEMENTED** |
 
 ### Non-functional
 

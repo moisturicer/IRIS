@@ -131,16 +131,17 @@ export const HELP_SECTIONS: HelpSection[] = [
     body: (
       <>
         <p>
-          Choose <strong>Publish</strong> on Discover to start a record. IRIS asks first whether the
-          paper is under an embargo. Then pick its type (Proposal, Thesis / Research or Project),
-          fill in its details, name your Adviser and upload the manuscript. Your Adviser cannot also
-          be one of the record&rsquo;s owners.
+          Choose <strong>Publish</strong> on Discover to start a record. Pick its type (Proposal,
+          Thesis / Research or Project), fill in its details, name your Adviser and upload the
+          manuscript. Your Adviser cannot also be one of the record&rsquo;s owners.
         </p>
         <p>
-          An embargo keeps a paper&rsquo;s text from going to outside AI companies. It doesn&rsquo;t
-          hide the paper from people who can read it in IRIS.
-          Its date doesn&rsquo;t end the embargo. After you submit, only your Adviser or RDCO can,
-          by releasing it.
+          Every paper starts under an embargo. An embargo keeps a paper&rsquo;s text from going to
+          outside AI companies, so Ask IRIS won&rsquo;t use it, and it can&rsquo;t be published. It
+          doesn&rsquo;t hide the paper from people who can read it in IRIS.
+          Only your Adviser or RDCO can release it, or give it a date to review it by. That date
+          doesn&rsquo;t end the embargo. If your paper may be covered by an agreement or a patent,
+          tell your Adviser.
           Text already sent can&rsquo;t be recalled.
         </p>
         <p>
@@ -257,8 +258,9 @@ export const HELP_SECTIONS: HelpSection[] = [
     body: (
       <>
         <p>
-          Settings &amp; Profile, in the menu under your name, holds your profile (shown on records
-          you author), your account and security, data privacy and consent, and your role.
+          The menu under your name has two pages. <strong>Profile</strong> is what other people signed in to
+          IRIS see of you, and where you edit it. <strong>Settings</strong> holds your account and security,
+          data privacy and consent, and your role.
         </p>
         <p>
           Notifications arrive under the bell at the top of the sidebar; <strong>View all

@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
-import { COLOUR_TRANSITION } from "@/components/ui/interaction";
+import { Select } from "@/components/ui/Select";
 import type { ReadingStatus } from "@/api/library";
 import type { Collection } from "@/lib/recordLibrary";
-import { cn } from "@/lib/utils";
 
 /**
  * Which part of My Library the main column shows. `research` is the owner's
@@ -86,30 +85,26 @@ export function FolderPicker({ collections, view, onViewChange, onCreate }: Fold
   const value = view.kind === "folder" ? `folder:${view.id}` : "";
 
   return (
-    <label className="flex items-center gap-2 text-small text-stone-600">
-      Folder
-      <select
-        value={value}
-        onChange={(e) => {
-          const next = e.target.value;
-          if (next === NEW_FOLDER) setCreating(true);
-          else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: next.slice("folder:".length) });
-          else onViewChange({ kind: "saved" });
-        }}
-        className={cn(
-          "min-h-9 max-w-[12rem] rounded-lg border bg-white px-2 text-small focus:border-brand focus:outline-none",
-          COLOUR_TRANSITION,
-          value ? "border-brand-200 text-brand" : "border-stone-300 text-stone-800",
-        )}
-      >
-        <option value="">All saved papers</option>
-        {collections.length > 0 && (
-          <optgroup label="Your folders">
-            {collections.map((c) => <option key={c.id} value={`folder:${c.id}`}>{c.name}</option>)}
-          </optgroup>
-        )}
-        <option value={NEW_FOLDER}>+ New folder…</option>
-      </select>
-    </label>
+    <Select
+      label="Folder"
+      size="sm"
+      inline
+      value={value}
+      onChange={(e) => {
+        const next = e.target.value;
+        if (next === NEW_FOLDER) setCreating(true);
+        else if (next.startsWith("folder:")) onViewChange({ kind: "folder", id: next.slice("folder:".length) });
+        else onViewChange({ kind: "saved" });
+      }}
+      className="max-w-[12rem]"
+    >
+      <option value="">All saved papers</option>
+      {collections.length > 0 && (
+        <optgroup label="Your folders">
+          {collections.map((c) => <option key={c.id} value={`folder:${c.id}`}>{c.name}</option>)}
+        </optgroup>
+      )}
+      <option value={NEW_FOLDER}>+ New folder…</option>
+    </Select>
   );
 }

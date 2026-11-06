@@ -5,9 +5,12 @@ from django.utils import timezone
 from apps.records.models import Record
 
 
-def answered_no_embargo(record_id: int) -> None:
+def released_embargo(record_id: int) -> None:
     """
-    Give a draft the answer Publish saves first (ADR-052 decision 2), so a test
-    about something else can submit it. The answer's own tests use the route.
+    Release a paper's embargo the way its Adviser or RDCO would (ADR-052 §6), so
+    a test about something else sees the gate open. Every paper starts embargoed
+    (IR-882); the release's own tests use the route.
     """
-    Record.objects.filter(pk=record_id).update(embargo_answered_at=timezone.now())
+    Record.objects.filter(pk=record_id).update(
+        is_embargoed=False, embargo_released_at=timezone.now(),
+    )

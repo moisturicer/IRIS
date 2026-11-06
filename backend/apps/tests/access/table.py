@@ -53,8 +53,9 @@ OFFICE_ONLY = row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY, DENY)
 READS_RECORD = row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE)
 #: `record`, an owner's act: visible non-owners are refused, others hidden.
 OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
-# ADR-052 §5: owners or the Adviser set an embargo, and no office does.
-SETS_EMBARGO = row(ANON, HIDE, OK, OK, DENY, DENY, DENY, DENY, HIDE, HIDE)
+# ADR-052 §5 as amended for IR-882: the Adviser or RDCO date an embargo, and no
+# owner or other office does. The same people as a release.
+SETS_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
 # ADR-052 §6: the Adviser or RDCO release one, and never a student owner.
 RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
 # ADR-052 §11: KTTO alone releases an IP mark. The world seats no KTTO member,
@@ -142,10 +143,6 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "DELETE": _case(OWNER_ACTS, kwargs=RECORD),
     }),
     "record-submit": Entry({"POST": _case(OWNER_ACTS, kwargs=RECORD, data={})}),
-    # A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
-    "record-embargo-answer": Entry({"POST": _case(
-        OWNER_ACTS, kwargs=RECORD, data={"embargoed": False},
-    )}),
     "record-embargo-set": Entry({"POST": _case(
         SETS_EMBARGO, kwargs=RECORD, data={"embargoed_until": "2099-01-01"},
     )}),
@@ -564,6 +561,7 @@ TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "audit": {
         "audit-list": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
         "audit-export": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
+        "audit-event-types": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
     },
     "opportunities": OPPORTUNITIES,
     "library": LIBRARY,

@@ -332,8 +332,11 @@ export interface PaperDetails {
   due_dates: PaperDueDate[] | null;
 }
 
-/** Where a paper's embargo stands (ADR-052 §3). A date never moves it: a person does. */
-export type EmbargoState = "unknown" | "none" | "active" | "released";
+/**
+ * Where a paper's embargo stands (ADR-052 §3, amended for IR-882). Every paper
+ * starts `active`, with or without a date; a date never moves it, a release does.
+ */
+export type EmbargoState = "active" | "released";
 
 export interface RecordEmbargo {
   state: EmbargoState;
@@ -352,12 +355,6 @@ export interface RecordIpRelease {
 export interface IpReleaseResult {
   marked:   boolean;
   released: boolean;
-}
-
-/** What `POST /records/<id>/embargo-answer/` takes. */
-export interface EmbargoAnswer {
-  embargoed:       boolean;
-  embargoed_until: string | null;
 }
 
 export interface RecordDetail extends RecordListItem {
@@ -529,7 +526,7 @@ export interface DecisionFlags {
   token:        string | null;
   /** The author's flags, shown in the Adviser's *Accept & send to RDCO* dialog. */
   author_hints: string[];
-  /** For RDCO only, the embargo it is warned about and may still publish through (ADR-052 §14). */
+  /** For RDCO only: while it is `active` RDCO can't publish, only keep unlisted or reject (ADR-052 §14). */
   embargo?:     RecordEmbargo | null;
 }
 

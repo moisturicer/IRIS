@@ -48,11 +48,11 @@ class EmbargoReminderTests(TestCase):
     def _paper(self, status_=PipelineStatus.PUBLISHED, *, until=REVIEW_DATE, released=False):
         now = timezone.now()
         stamps = {
-            "embargo_answered_at": now, "embargo_answered_by": self.owner, "embargoed_until": until,
+            "embargo_date_set_at": now, "embargo_date_set_by": self.adviser, "embargoed_until": until,
             "dpa_accepted_at": now, "dpa_accepted_by": self.owner,
         }
         if released:
-            stamps.update(embargo_released_at=now, embargo_released_by=self.adviser)
+            stamps.update(is_embargoed=False, embargo_released_at=now, embargo_released_by=self.adviser)
         record = Record.objects.create(
             title="A held paper", abstract="An abstract long enough to read.",
             record_type=self.record_type, added_by=self.owner, adviser=self.adviser,

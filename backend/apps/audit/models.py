@@ -62,7 +62,8 @@ class AuditEvent(models.Model):
     DOCUMENT_REQUEST_REJECTED  = "DOCUMENT_REQUEST_REJECTED"
     DOCUMENT_REQUEST_WITHDRAWN = "DOCUMENT_REQUEST_WITHDRAWN"
 
-    # A paper's embargo (ADR-052 §8, IR-812).
+    # A paper's embargo (ADR-052 §8, IR-812). Nothing writes EMBARGO_ANSWERED
+    # since IR-882 removed Publish's question; it names the rows written before.
     EMBARGO_ANSWERED = "EMBARGO_ANSWERED"
     EMBARGO_SET      = "EMBARGO_SET"
     EMBARGO_EXTENDED = "EMBARGO_EXTENDED"

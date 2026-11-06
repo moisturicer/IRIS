@@ -147,7 +147,7 @@ def _record_with_vectors(space, title, count, seed=0):
 
     record = Record.objects.create(
         title=title, abstract="An abstract.", is_ip=False,
-        dpa_accepted_at=timezone.now(), embargo_answered_at=timezone.now(),
+        dpa_accepted_at=timezone.now(), is_embargoed=False, embargo_released_at=timezone.now(),
     )
     values = tuple(
         Chunk(text=f"passage {i}", content=f"passage {i}", context_path=(),

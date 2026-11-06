@@ -4,6 +4,7 @@ import { recordsApi } from "@/api/records";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { Select } from "@/components/ui/Select";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import type { Collection, ReadingVisit } from "@/lib/recordLibrary";
 import { readingStatusLabel, sortedItems, type LibraryItem } from "@/store/library.store";
@@ -201,16 +202,15 @@ export function SavedView({
           />
         </label>
         {folderControl}
-        <label className="flex items-center gap-2 text-small text-stone-600">
-          Sort
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="min-h-9 rounded-lg border border-stone-300 bg-white px-2 text-small text-stone-800 focus:border-brand focus:outline-none"
-          >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <option key={key} value={key}>{SORT_LABELS[key]}</option>)}
-          </select>
-        </label>
+        <Select
+          label="Sort"
+          size="sm"
+          inline
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+        >
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <option key={key} value={key}>{SORT_LABELS[key]}</option>)}
+        </Select>
         <div className="flex items-center rounded-lg border border-stone-300 bg-white p-0.5">
           {(["list", "grid"] as const).map((mode) => (
             <button

@@ -149,7 +149,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "embargo_answer", "destroy", "duplicate_matches", "acknowledge_duplicates"):
+        if self.action in ("update", "partial_update", "submit", "destroy", "duplicate_matches", "acknowledge_duplicates"):
             return [IsAuthenticated(), IsRecordOwner()]
         if self.action == "embargo_set":
             return [IsAuthenticated(), MaySetEmbargo()]
@@ -382,15 +382,6 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        # The embargo answer (ADR-052 §2). Publish saved it through `embargo-answer/`
-        # before the file was sent. Refused like consent, before anything is written,
-        # so nothing enters review unanswered. A new Version goes through its own
-        # action and is not asked again.
-        if record.embargo_state == EmbargoState.UNKNOWN:
-            return Response(
-                {"embargoed": embargo.ANSWER_REQUIRED},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         from .duplicates import acknowledgement_basis, enforce_exact, likely_matches, lock_digest
         lock_digest(record.manuscript_sha256)
         enforce_exact(request.user, record.pk, record.manuscript_sha256)
@@ -420,35 +411,6 @@ class RecordViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=["post"], url_path="embargo-answer")
-    @transaction.atomic
-    def embargo_answer(self, request, pk=None):
-        """
-        POST /records/<id>/embargo-answer/  {"embargoed": bool, "embargoed_until": date}
-
-        A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
-        It is saved before the file is sent, so nothing that runs at upload can
-        act on a paper whose answer the server doesn't have yet. Draft only:
-        after submission an embargo changes by its own acts (IR-812).
-        """
-        record = self.get_object()  # enforces IsRecordOwner object permission
-        Record.objects.select_for_update().get(pk=record.pk)
-        record = self.get_object()
-
-        if record.pipeline_status != PipelineStatus.DRAFT:
-            return Response(
-                {"detail": "This paper has been submitted, so its embargo can't be answered here."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        answer = embargo.answer_from(request.data)
-        if answer is None:
-            return Response(
-                {"embargoed": embargo.ANSWER_REQUIRED},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        embargo.record_answer(record, answer, actor=request.user)
-        return Response(embargo.state_payload(record))
-
     def _paper_under_lock(self):
         record = self.get_object()  # a 404 for a paper they can't see, then a 403
         Record.objects.select_for_update().get(pk=record.pk)
@@ -457,7 +419,7 @@ class RecordViewSet(viewsets.ModelViewSet):
     def _submitted_paper_under_lock(self):
         record = self._paper_under_lock()
         if record.pipeline_status == PipelineStatus.DRAFT:
-            raise serializers.ValidationError({"detail": embargo.DRAFT_ANSWERS_INSTEAD})
+            raise serializers.ValidationError({"detail": embargo.NOT_SUBMITTED})
         return record
 
     @action(detail=True, methods=["post"], url_path="embargo-set")
@@ -466,9 +428,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         POST /records/<id>/embargo-set/  {"embargoed_until": date}
 
-        An owner or the Adviser sets an embargo on a submitted paper, or moves an
-        active one's date (ADR-052 §5, IR-812). The date is required, so this can
-        never blank one: that would read as "no embargo" with no release.
+        The Adviser or RDCO gives a submitted paper's embargo a review date,
+        moves it, or embargoes a released paper again (ADR-052 §5 as amended for
+        IR-882, IR-812). Owners can't. The date is required, so this never blanks
+        one; a date is a reminder and ends nothing.
         """
         record = self._submitted_paper_under_lock()
         until = embargo.until_from(request.data)
@@ -701,8 +664,8 @@ class RecordViewSet(viewsets.ModelViewSet):
         narrower second visibility rule — and of the module IR-285 deleted.
 
         **Empty until the corpus is indexed.** A record with no vector has no
-        neighbours, and the disclosure gate refuses a record with no embargo
-        answer (ADR-052). That is a visible behaviour change from keyword
+        neighbours, and the disclosure gate refuses a record whose embargo
+        hasn't been released (ADR-052). That is a visible behaviour change from keyword
         matching, and it is the intended one — a keyword fallback would hide
         "nothing is indexed" behind plausible results.
         """

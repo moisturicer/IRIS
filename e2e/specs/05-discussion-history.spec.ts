@@ -12,12 +12,12 @@ test.describe.configure({ mode: "serial" });
 
 const a11y = new A11yLedger();
 
-let student: Client, adviser: Client, rdco: Client, ktto: Client, stranger: Client;
+let student: Client, adviser: Client, rdco: Client, ktto: Client, stranger: Client, admin: Client;
 let recordId: number, firstComment: number;
 const title = uniqueTitle("discussion");
 
 test.beforeAll(async () => {
-  [student, adviser, rdco, ktto] = await Promise.all(["student", "adviser", "rdco", "ktto"].map((w) => as(w)));
+  [student, adviser, rdco, ktto, admin] = await Promise.all(["student", "adviser", "rdco", "ktto", "admin"].map((w) => as(w)));
   stranger = await newStudent("reader");
   recordId = await createDraft(student, { title, type: "Thesis / Research", adviserId: adviser.userId });
   await submit(student, recordId);
@@ -25,7 +25,7 @@ test.beforeAll(async () => {
 });
 
 test.afterAll(async () => {
-  await Promise.all([student, adviser, rdco, ktto, stranger].map((c) => c?.dispose()));
+  await Promise.all([student, adviser, rdco, ktto, stranger, admin].map((c) => c?.dispose()));
 });
 
 test("a comment and its reply are bound to the Version they were made on", async () => {
@@ -73,23 +73,24 @@ test("history keeps both Versions and each comment's Version", async () => {
   expect(byId.get(later.id)).toBe(2);
 });
 
-test("RDCO filters the audit log and the CSV export carries every matching row", async () => {
+// The System Admin alone reads the Audit Log (IR-781), RDCO included in the refused.
+test("the System Admin filters the audit log and the CSV export carries every matching row", async () => {
   const filter = { record: recordId, event_type: "RESUBMITTED" };
-  const list = await rdco.json("/audit/", filter);
+  const list = await admin.json("/audit/", filter);
   const rows = Array.isArray(list) ? list : list.results;
   const total = Array.isArray(list) ? list.length : list.count;
   expect(total, "one resubmission on this Record").toBeGreaterThanOrEqual(1);
   expect(rows.every((r: any) => r.event_type === "RESUBMITTED")).toBe(true);
 
-  const all = await rdco.json("/audit/", { record: recordId });
+  const all = await admin.json("/audit/", { record: recordId });
   const allTotal = Array.isArray(all) ? all.length : all.count;
-  const csv = await rdco.get("/audit/export/", { record: recordId });
+  const csv = await admin.get("/audit/export/", { record: recordId });
   expect(csv.status()).toBe(200);
   const lines = (await csv.text()).trim().split(/\r?\n/);
   expect(lines[0]).toContain("event_type");
   expect(lines.length - 1, "export rows == filtered list total").toBe(allTotal);
 
-  for (const who of [student, adviser, ktto]) {
+  for (const who of [student, adviser, ktto, rdco]) {
     expect((await who.get("/audit/", filter)).status(), `${who.email} may not read the audit log`).toBe(403);
     expect((await who.get("/audit/export/", { record: recordId })).status()).toBe(403);
   }

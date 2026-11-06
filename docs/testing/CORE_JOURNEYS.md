@@ -47,22 +47,23 @@ Every row of a run record ends in exactly one of:
 
 ## Delivery gates
 
-The final run waits for: IR-250 (embargo field — without it the disclosure
-gate refuses every Record, so Ask IRIS can only answer "no readable
-sources"), IR-630 (upload → grounded answer → page citation), IR-414
-(accessibility verification) and IR-95 (DEV-20 performance/reliability).
-Every other gate named on IR-631 was Done on 2026-11-01.
+The final run waits for: IR-630 (upload → grounded answer → page citation),
+IR-414 (accessibility verification) and IR-95 (DEV-20 performance/reliability).
+IR-250 (embargo field) was a gate and is Done. Status on 2026-11-05: IR-630
+Closed, IR-414 Done, IR-95 To Do. Whether a Closed IR-630 still gates the run
+is for IR-631's owner to say. Every other gate named on IR-631 was Done on
+2026-11-01.
 
 ## Checks by acceptance criterion
 
 | AC | What is checked | How | Spec / instrument | Reuses |
 |---|---|---|---|---|
 | 1 · Account lifecycle | Register, verify by emailed link, await approval, RDCO approves the requested role, sign in, three failures lock out with the server's notice, recovery by emailed link, inactivity expiry and reauthentication | Browser + Mailpit; expiry in the short idle pass | `e2e/specs/00-account-lifecycle.spec.ts` | IR-166, IR-555, IR-642 |
-| 2 · Thesis/Project | Draft, edit, upload, submit; adviser-first; document request and fulfilment; accept & route to three parallel pools; member claim and coordinator assignment; IERC Revision request; new Version resets only IERC while ITSO and KTTO are **Preserved** (API and Paper View); Hand-back to RDCO; RDCO's Decision; published Record readable anonymously | API acts, browser for what the owner is shown | `e2e/specs/01-thesis-project.spec.ts` | IR-624, IR-625 |
-| 3 · Proposal | Adviser accepts; non-owner refused; two simultaneous `continue-as` requests make exactly one Continuation (201 + 409); the Continuation cannot be submitted without its own manuscript; lineage both ways in API and on the page | API + browser | `e2e/specs/03-proposal-continuation.spec.ts` | IR-417 |
-| 4 · Coordination | RDCO grants and removes a coordinator, and the grant is what permits assigning; assign and reassign with reason; Extension needs a reason, is coordinator-only and moves the date later; an overdue turn escalates to coordinators and changes no state; analytics scoped to own office, RDCO sees all | API + browser (My Reviews overdue) + `review_clock_for_testing` | `e2e/specs/04-coordination.spec.ts` | IR-478, IR-619–IR-623, IR-626 |
-| 5 · Discussion/history | Comments and replies bound to their Version; private to participants; owner's next action follows a Revision request and the new Version; both Versions in history; RDCO's audit filters; CSV export row count equals the filtered total; non-RDCO refused | API + browser | `e2e/specs/05-discussion-history.spec.ts` | IR-419, IR-529, IR-625 |
-| 6 · Reading and Ask IRIS | Permitted discovery, truthful author/origin/provenance, manuscript/page citation, follow-up, conversation switching, retry/cancel/reload, one logical Turn | **Reused, not re-run here**: IR-630 and IR-605/IR-608 evidence from the same SHA. Unmeasured until IR-250 lands | — | IR-630, IR-605, IR-608, IR-563 |
+| 2 · Thesis/Project | Draft, edit, upload, submit; adviser-first; document request and fulfilment; the Adviser sends to RDCO and RDCO routes to three parallel pools (ADR-047); member claim and coordinator assignment; IERC Revision request; new Version resets only IERC while ITSO and KTTO are **Preserved** (API and Paper View); RDCO holds the record from the send onward, with no Hand-back, and decides once every office has cleared; published Record readable anonymously | API acts, browser for what the owner is shown | `e2e/specs/01-thesis-project.spec.ts` | IR-624, IR-625 |
+| 3 · Proposal | Adviser accepts; non-owner refused; two simultaneous `continue-as` requests make exactly one Continuation (201 + 409); the Continuation cannot be submitted without its own manuscript, then is, after the owner acknowledges the likely matches Publish shows (IR-832); lineage both ways in API and on the page | API + browser | `e2e/specs/03-proposal-continuation.spec.ts` | IR-417 |
+| 4 · Coordination | The System Admin grants and removes a coordinator (RDCO refused, IR-781), and the grant is what permits assigning; assign and reassign with reason; Extension needs a reason, is coordinator-only and moves the date later; an overdue turn escalates to coordinators and changes no state; analytics scoped to own office, RDCO sees all | API + browser (My Reviews overdue) + `review_clock_for_testing` | `e2e/specs/04-coordination.spec.ts` | IR-478, IR-619–IR-623, IR-626 |
+| 5 · Discussion/history | Comments and replies bound to their Version; private to participants; owner's next action follows a Revision request and the new Version; both Versions in history; the System Admin's audit filters; CSV export row count equals the filtered total; everyone else, RDCO included, refused (IR-781) | API + browser | `e2e/specs/05-discussion-history.spec.ts` | IR-419, IR-529, IR-625 |
+| 6 · Reading and Ask IRIS | Permitted discovery, truthful author/origin/provenance, manuscript/page citation, follow-up, conversation switching, retry/cancel/reload, one logical Turn | **Reused, not re-run here**: IR-630 and IR-605/IR-608 evidence from the same SHA. Unmeasured: needs an approved way to answer without spending provider credits (IR-903, a decision for Jive) | — | IR-630, IR-605, IR-608, IR-563 |
 | 7 · Adversarial access | Anonymous, another user, cross-office, guessed file ids and a withdrawn Seat fail safely; a hidden Record answers exactly as a missing id; the UI shows a stranger no part of it; private Records stay out of search, notifications and exports | API + browser | `e2e/specs/02-adversarial-access.spec.ts` | IR-153, IR-615/616, IR-627 |
 | 8 · Integrity | Double submit → one submission; simultaneous claims → one Seat per reviewer; a stale decision form → 409 and nothing changed; double new Version → one Version; a retried reminder job → each notification once | Simultaneous API requests | `e2e/specs/06-integrity.spec.ts` | IR-561, IR-370 |
 | 9 · Keyboard, zoom, 360px | axe (serious/critical, WCAG 2.1 A/AA, contrast included) and 360px reflow on each journey's key screen; keyboard, 400% zoom and screen-reader use by a person | Automated in each spec; manual checklist in the run record | `support/a11y.ts` + run record §Manual | IR-414 and its linked defects |

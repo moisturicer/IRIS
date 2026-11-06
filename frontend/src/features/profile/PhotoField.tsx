@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useId, useState } from "react";
 
 import { profileApi } from "@/api/profile";
 import { FieldError } from "@/components/ui/FieldError";
@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { User } from "@/types/auth";
 
 import { PhotoCropDialog } from "./PhotoCropDialog";
+import { useAuthedImage } from "./useAuthedImage";
 
 const PHOTO_MAX_BYTES = 2 * 1024 * 1024;
 const PHOTO_TYPES = ["image/jpeg", "image/png"];
@@ -106,30 +107,4 @@ export function PhotoField({ user, onSaved }: { user: User; onSaved: (u: User) =
       )}
     </div>
   );
-}
-
-/**
- * An object URL for a photo served behind auth, or `null` while it loads,
- * when there is none, or when it cannot be fetched.
- */
-function useAuthedImage(photoUrl: string | null): string | null {
-  const [src, setSrc] = useState<string | null>(null);
-  useEffect(() => {
-    setSrc(null);
-    if (!photoUrl) return;
-    let objectUrl: string | null = null;
-    let current = true;
-    profileApi.photo(photoUrl)
-      .then(({ data }) => {
-        if (!current) return;
-        objectUrl = URL.createObjectURL(data);
-        setSrc(objectUrl);
-      })
-      .catch(() => { if (current) setSrc(null); });
-    return () => {
-      current = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [photoUrl]);
-  return src;
 }

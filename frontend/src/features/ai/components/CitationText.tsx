@@ -8,6 +8,7 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
 import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
+import { remarkLimitMath } from "./mathLimit";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -107,7 +108,12 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
   const byMarker = new Map(citations.map((citation) => [citation.marker, citation]));
 
   function CitationLink({ href, children }: ComponentPropsWithoutRef<"a">) {
-    if (!href?.startsWith(CITATION_SCHEME)) {
+    // `react-markdown` blanks a link whose scheme it refuses (`javascript:`,
+    // `data:`, ...). An `<a href="">` would still be a live link back to this
+    // page in a new tab, so the words stay and the link goes (IR-917).
+    if (!href) return <span>{children}</span>;
+
+    if (!href.startsWith(CITATION_SCHEME)) {
       return (
         <a href={href} target="_blank" rel="noreferrer">
           {children}
@@ -129,7 +135,7 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkLimitMath]}
         rehypePlugins={[rehypeHighlight, rehypeKatex]}
         components={{
           a: CitationLink,
