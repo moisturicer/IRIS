@@ -151,7 +151,7 @@ class ActivateView(APIView):
     and not overridden here -- and so a bundle cached across the deploy still
     works. Remove it, its URL, the SPA's `/activate/:uidb64/:token` route and
     nginx's `/activate/` locations once 3 days have passed since IR-928 shipped,
-    or sooner with IR-643's single-use verification (ADR-045 §8).
+    or sooner with IR-643's single-use verification (ADR-045 §8). IR-937 tracks it.
     """
     permission_classes = [AllowAny]
 
