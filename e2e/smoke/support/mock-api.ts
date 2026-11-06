@@ -5,7 +5,7 @@
 // and the fixture fails the test afterwards. Without that, a page that quietly
 // started calling a new endpoint would get an error it swallows, and the smoke
 // set would stay green while exercising something else.
-import { test as base, expect, type Page, type Route } from "@playwright/test";
+import { test as base, expect, type Route } from "@playwright/test";
 
 export type Handler = (route: Route, request: ReturnType<Route["request"]>) => unknown | Promise<unknown>;
 
@@ -54,4 +54,3 @@ export const test = base.extend<{ api: MockApi }>({
 });
 
 export { expect };
-export type { Page };
