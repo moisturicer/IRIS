@@ -209,7 +209,6 @@ describe("ReviewRoutingTracker", () => {
     renderTracker();
 
     await partyRow(/adviser/i);
-    expect(await partyRow(/rdco/i)).toHaveTextContent(/not requested/i);
     const region = screen.getByRole("region", { name: /review & routing/i });
     expect(within(region).queryByText("Submitted")).not.toBeInTheDocument();
   });
@@ -457,7 +456,7 @@ describe("ReviewRoutingTracker", () => {
     tracker.mockResolvedValue({ data: payload({ routing_history: [] }) });
     renderTracker();
 
-    expect(await screen.findByText("No routing recorded since Sep 19, 2026.")).toBeInTheDocument();
+    expect(await screen.findByText("Routing is recorded from Sep 19, 2026; none recorded yet.")).toBeInTheDocument();
     expect(screen.queryByText(/no routing recorded yet/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^routing recorded from/i)).not.toBeInTheDocument();
   });

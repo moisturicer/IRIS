@@ -18,8 +18,8 @@ interface ReviewRoutingTrackerProps {
 /**
  * Presentation only: glyph and colour per state (workflow_routing_architecture.md
  * §9.1). Every *word* on this panel -- party names, states, outcomes -- comes
- * from the server, so an institution can rename one without a release and the
- * student/staff wording of Intake stays the server's call.
+ * from the server, so an institution can rename one without a release. The one
+ * decision made here is that the retired Intake is never a step (`RETIRED_PARTY`).
  */
 const STATE_META: Record<TrackerPartyState, { glyph: string; tone: string; muted: boolean }> = {
   completed:     { glyph: "✓", tone: "text-stone-900", muted: false },
@@ -334,10 +334,11 @@ function RoutingHistory({
         Routing history
       </h3>
       {groups.length === 0 ? (
-        // One statement: with a start date, nothing has been routed since it.
+        // One line. The date is when the system began recording routing, not
+        // when this record did, so it is stated as that and not as "since".
         <p className="text-xs text-stone-500">
           {recordedFrom
-            ? `No routing recorded since ${formatDate(recordedFrom)}.`
+            ? `Routing is recorded from ${formatDate(recordedFrom)}; none recorded yet.`
             : "No routing recorded yet."}
         </p>
       ) : (
