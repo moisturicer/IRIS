@@ -25,6 +25,13 @@ interface DiscoverResultCardProps {
   onNotInterested?: () => void;
 }
 
+/** What a For you reason says. A chosen Area is named; a saved one deliberately is not. */
+function reasonLabel(reason: ForYouItem["reason"]): string {
+  if (reason.kind === "selected_area" && reason.area) return `Because you chose ${reason.area}`;
+  if (reason.kind === "saved_area") return "Same Area as a paper you saved";
+  return "Latest research";
+}
+
 /**
  * A Discover result: `ResearchCard` filled from the list payload (IR-407,
  * spec §4.3 and §4.12).
@@ -56,11 +63,7 @@ export function DiscoverResultCard({ record, searchHighlight, onCite, reason, ex
           )}
           {record.record_type_name && <span>{record.record_type_name}</span>}
           {reason && <span aria-label="Why this was suggested" className="inline-flex rounded-md bg-stone-100 px-1.5 py-0.5 text-[11px] font-medium text-stone-700">
-            {reason.kind === "selected_area" && reason.area
-              ? `Because you chose ${reason.area}`
-              : reason.kind === "saved_area"
-                ? "Same Area as a paper you saved"
-                : "Latest research"}
+            {reasonLabel(reason)}
           </span>}
         </span>
       }

@@ -368,15 +368,16 @@ class DiscoveryFeedTests(APITestCase):
 
         response = self.client.get(FEED)
 
-        # Round-robin in stable Area-ID order: Agriculture was created first.
-        self.assertEqual(self.ids(response), [ag_new.id, cs_new.id, ag_saved.id, cs_old.id])
+        # Unsaved Records rotate across both Areas in stable Area-ID order
+        # (Agriculture was created first); the saved one comes after them all.
+        self.assertEqual(self.ids(response), [ag_new.id, cs_new.id, cs_old.id, ag_saved.id])
         self.assertEqual(
             self.reasons(response),
             [
                 {"kind": "saved_area", "area": "Agriculture"},
                 {"kind": "selected_area", "area": "Computer Science"},
-                {"kind": "saved_area", "area": "Agriculture"},
                 {"kind": "selected_area", "area": "Computer Science"},
+                {"kind": "saved_area", "area": "Agriculture"},
             ],
         )
 
@@ -404,6 +405,41 @@ class DiscoveryFeedTests(APITestCase):
 
         # Older research stays eligible; only the saved ones move, keeping their own order.
         self.assertEqual(self.ids(response), [unread.id, oldest.id, saved.id, completed.id])
+
+    def test_saved_records_come_after_new_ones_across_areas_too(self):
+        ag_saved = self.record("Agriculture saved", classification=self.agriculture)
+        cs_new = self.record("Computing new", classification=self.computing, days_old=10)
+        cs_old = self.record("Computing older", classification=self.computing, days_old=4000)
+        self.client.put(
+            INTERESTS,
+            {"classification_ids": [self.agriculture.id, self.computing.id], "psced_ids": []},
+            format="json",
+        )
+        self.save(ag_saved)
+
+        # A saved Record in a short Area must not outrank new ones in a longer Area.
+        self.assertEqual(self.ids(self.client.get(FEED)), [cs_new.id, cs_old.id, ag_saved.id])
+
+    def test_a_record_in_a_chosen_area_is_explained_by_it_even_when_a_saved_area_holds_it_too(self):
+        saved = self.record("Agriculture saved", classification=self.agriculture, days_old=100)
+        both = self.record(
+            "Agriculture and Education", classification=self.agriculture, psced=self.psced
+        )
+        self.client.put(
+            INTERESTS, {"classification_ids": [], "psced_ids": [self.psced.id]}, format="json"
+        )
+        self.save(saved)
+
+        response = self.client.get(FEED)
+
+        self.assertEqual(self.ids(response), [both.id, saved.id])
+        self.assertEqual(
+            self.reasons(response),
+            [
+                {"kind": "selected_area", "area": "Education"},
+                {"kind": "saved_area", "area": "Agriculture"},
+            ],
+        )
 
     def test_a_dismissed_record_still_contributes_the_area_it_was_saved_in(self):
         saved = self.record("Saved then dismissed", classification=self.agriculture, days_old=100)

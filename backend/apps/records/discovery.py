@@ -171,11 +171,13 @@ def _ordered_entries(records, interests, saved_areas, saved_ids):
     """Metadata recipe v2 (IR-567, IR-575).
 
     The interest Areas are the reader's chosen ones plus the Areas of
-    currently readable saved Records. Within an Area, Records the reader has
-    not saved come before ones they have (a completed Record is a saved one),
-    each group keeping added-date order, so older research stays eligible.
-    An entry says which kind of input put it there: a chosen Area wins over a
-    saved one, so the reason names what the reader actually did.
+    currently readable saved Records. Matching Records the reader has not
+    saved come first, rotated across the Areas; matching Records they have
+    saved (a completed Record is a saved one) come after all of those, rotated
+    the same way. Each Area's Records keep added-date order, so older research
+    stays eligible. An entry says which kind of input put it there: a Record
+    in any chosen Area is attributed to that Area, so the reason names what
+    the reader actually did even when a saved Area also holds the Record.
     """
     chosen = {
         ("classification", area_id)
@@ -185,26 +187,38 @@ def _ordered_entries(records, interests, saved_areas, saved_ids):
         for area_id in interests.psced.values_list("id", flat=True)
     }
     selected = sorted(chosen | saved_areas, key=lambda area: (area[1], area[0]))
-    buckets = []
-    for kind, area_id in selected:
-        matching = [record for record in records if getattr(record, f"{kind}_id") == area_id]
-        buckets.append(deque(
-            [record for record in matching if record.pk not in saved_ids]
-            + [record for record in matching if record.pk in saved_ids]
-        ))
+    matching = {
+        area: [record for record in records if getattr(record, f"{area[0]}_id") == area[1]]
+        for area in selected
+    }
+
+    def attributed(record, area):
+        if area not in chosen:
+            area = next(
+                (own for own in selected
+                 if own in chosen and getattr(record, f"{own[0]}_id") == own[1]),
+                area,
+            )
+        return {
+            "id": record.pk, "area_type": area[0], "area_id": area[1],
+            "source": "selected" if area in chosen else "saved",
+        }
+
     entries = []
     seen = set()
-    while any(buckets):
-        for area, bucket in zip(selected, buckets):
-            if not bucket:
-                continue
-            record = bucket.popleft()
-            if record.pk not in seen:
-                entries.append({
-                    "id": record.pk, "area_type": area[0], "area_id": area[1],
-                    "source": "selected" if area in chosen else "saved",
-                })
-                seen.add(record.pk)
+    for saved_tier in (False, True):
+        buckets = [
+            deque(record for record in matching[area] if (record.pk in saved_ids) is saved_tier)
+            for area in selected
+        ]
+        while any(buckets):
+            for area, bucket in zip(selected, buckets):
+                if not bucket:
+                    continue
+                record = bucket.popleft()
+                if record.pk not in seen:
+                    entries.append(attributed(record, area))
+                    seen.add(record.pk)
     mode = "for_you" if entries else "latest"
     entries.extend({"id": record.pk} for record in records if record.pk not in seen)
     return mode, entries

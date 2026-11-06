@@ -21,7 +21,7 @@ import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
 import { libraryApi } from "@/api/library";
 import { useLibraryStore } from "@/store/library.store";
-import type { RecordListItem } from "@/types/records";
+import type { ForYouItem, RecordListItem } from "@/types/records";
 import type { User } from "@/types/auth";
 
 import DiscoverPage from "./DiscoverPage";
@@ -62,7 +62,7 @@ const approvedProposal = listItem({
 
 let listed: RecordListItem[] = [publishedThesis];
 let total: number | null = null;
-let recommended: { mode: "for_you" | "latest"; results: (RecordListItem & { reason: { kind: "selected_area" | "saved_area" | "latest"; area?: string } })[]; next_cursor: string | null; count: number } = {
+let recommended: { mode: "for_you" | "latest"; results: (RecordListItem & { reason: ForYouItem["reason"] })[]; next_cursor: string | null; count: number } = {
   mode: "latest", results: [{ ...publishedThesis, reason: { kind: "latest" } }], next_cursor: null, count: 1,
 };
 
