@@ -9,7 +9,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { useAuthStore } from "@/store/auth.store";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
+import type { User } from "@/types/auth";
 import type { DecisionFlags, DecisionOutcome, RecordDetail } from "@/types/records";
 
 import { DecisionDialog } from "./DecisionDialog";
@@ -60,8 +62,14 @@ function open(outcome: DecisionOutcome, decision: DecisionFlags = RDCO_ALONE, ty
   return { onClose, onDone, view };
 }
 
+/** The signed-in user; null is nobody signed in. */
+function signInAs(id: number | null) {
+  useAuthStore.setState({ user: id === null ? null : ({ id } as User) });
+}
+
 beforeEach(() => {
   sessionStorage.clear();
+  signInAs(1);
   decide.mockReset().mockResolvedValue({ data: {} });
 });
 
@@ -203,7 +211,62 @@ describe("DecisionDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Reject and archive" }));
     await waitFor(() => expect(decide).toHaveBeenCalled());
 
-    expect(readDecisionDraft(7, "reject")).toBe("");
+    expect(readDecisionDraft(1, 7, "reject")).toBe("");
+  });
+
+  describe("drafts belong to the signed-in user (IR-931)", () => {
+    const reason = () => screen.getByRole("textbox", { name: "Why is it rejected?" });
+
+    it("does not show A's unsent reason to B on the same tab, and gives it back to A", async () => {
+      signInAs(1);
+      const first = open("reject");
+      await userEvent.type(reason(), "A's unsent reason.");
+      first.view.unmount();
+
+      signInAs(2);
+      const asB = open("reject");
+      expect(reason()).toHaveValue("");
+      asB.view.unmount();
+
+      // Back after an idle expiry: nothing was cleared on the way out.
+      signInAs(1);
+      open("reject");
+      expect(reason()).toHaveValue("A's unsent reason.");
+    });
+
+    it("keeps B's decision from touching A's draft", async () => {
+      signInAs(1);
+      const first = open("reject");
+      await userEvent.type(reason(), "A's unsent reason.");
+      first.view.unmount();
+
+      signInAs(2);
+      open("reject");
+      expect(reason()).toHaveValue("");
+      await userEvent.type(reason(), "B's reason.");
+      await userEvent.click(screen.getByRole("button", { name: "Reject and archive" }));
+      await waitFor(() => expect(decide).toHaveBeenCalled());
+
+      expect(readDecisionDraft(2, 7, "reject")).toBe("");
+      expect(readDecisionDraft(1, 7, "reject")).toBe("A's unsent reason.");
+    });
+
+    it("reads and writes nothing with nobody signed in, and ignores the old unkeyed key", async () => {
+      sessionStorage.setItem("iris_decision_draft:7:reject", "From before the change.");
+      signInAs(null);
+      const none = open("reject");
+      expect(reason()).toHaveValue("");
+
+      await userEvent.type(reason(), "Nobody's draft.");
+      expect(Object.keys(sessionStorage)).toEqual(["iris_decision_draft:7:reject"]);
+      expect(sessionStorage.getItem("iris_decision_draft:7:reject")).toBe("From before the change.");
+      none.view.unmount();
+
+      // Signed in, the old key is not picked up either.
+      signInAs(1);
+      open("reject");
+      expect(reason()).toHaveValue("");
+    });
   });
 });
 

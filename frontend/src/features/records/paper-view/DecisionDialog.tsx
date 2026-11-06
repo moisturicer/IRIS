@@ -5,6 +5,7 @@ import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
 import { formatDate, joinLabels } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
 import type { DecisionCloses, DecisionFlags, DecisionOutcome, RecordDetail } from "@/types/records";
 
 import { clearDecisionDrafts, readDecisionDraft, writeDecisionDraft } from "./decisionDraft";
@@ -123,7 +124,8 @@ function closingLines(closes: DecisionCloses | null): string[] {
 export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDialogProps) {
   const ids = useId();
   const [flags, setFlags] = useState<DecisionFlags>(record.decision);
-  const [text, setText] = useState(() => readDecisionDraft(record.id, outcome));
+  const userId = useAuthStore(s => s.user?.id);
+  const [text, setText] = useState(() => readDecisionDraft(userId, record.id, outcome));
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -149,7 +151,7 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
 
   const change = (value: string) => {
     setText(value);
-    writeDecisionDraft(record.id, outcome, value);
+    writeDecisionDraft(userId, record.id, outcome, value);
   };
 
   const submit = async (e: FormEvent) => {
@@ -159,7 +161,7 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
     setSending(true);
     try {
       await recordsApi.decide(record.id, { outcome, comment: text.trim(), token: flags.token ?? "" });
-      clearDecisionDrafts(record.id);
+      clearDecisionDrafts(userId, record.id);
       onDone(CONFIRM[outcome].done);
     } catch (err) {
       const fresh = (err as { response?: { status?: number; data?: { decision?: DecisionFlags } } })

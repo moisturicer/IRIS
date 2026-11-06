@@ -10,6 +10,7 @@ import { DegradedNotice } from "@/features/ai/components/PassageQuote";
 import { cn } from "@/lib/utils";
 import { CONTROL_BASE } from "./controls";
 import { SectionHeading } from "./headings";
+import { OverviewNote } from "./OverviewNote";
 
 /**
  * AI Overview — a grounded summary of the record being viewed.
@@ -189,15 +190,7 @@ export function PaperAiOverview({ record }: { record: RecordDetail }) {
       )}
 
       {!loading && !failed && state === "not_indexed" && (
-        <div className="flex items-start gap-3">
-          <i className="fas fa-circle-info text-sm text-stone-300 mt-0.5" aria-hidden />
-          <div className="min-w-0">
-            <p className="text-sm font-semibold text-stone-700">Nothing indexed to summarise</p>
-            <p className="text-xs text-stone-500 mt-0.5">
-              This record has no indexed text the retrieval service could draw on.
-            </p>
-          </div>
-        </div>
+        <OverviewNote>Nothing indexed to summarise.</OverviewNote>
       )}
 
       {!loading && !failed && state === "ready" && overview && (

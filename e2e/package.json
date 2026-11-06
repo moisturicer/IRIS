@@ -9,6 +9,7 @@
     "stack:seed": "docker compose -p iris-e2e --env-file .env.e2e --project-directory .. -f ../docker-compose.prod.yml -f ../docker-compose.e2e.yml exec -T backend python manage.py seed_demo --accounts-only --force",
     "stack:down": "docker compose -p iris-e2e --env-file .env.e2e --project-directory .. -f ../docker-compose.prod.yml -f ../docker-compose.e2e.yml down -v",
     "test": "playwright test",
+    "test:smoke": "playwright test -c playwright.smoke.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
