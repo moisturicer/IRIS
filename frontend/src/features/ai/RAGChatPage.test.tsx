@@ -720,6 +720,18 @@ describe("owned conversation URLs (IR-548)", () => {
     expect(screen.queryByText("Loading this conversation…")).toBeNull();
   });
 
+  it("keeps a failed conversation list on screen, and Try again loads it (IR-906)", async () => {
+    list.mockRejectedValueOnce(new Error("Network Error"));
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+
+    renderRoutes("/ai");
+
+    expect(await screen.findByRole("heading", { name: "Could not load your conversations" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(address()).toBe("/ai/conversations/9"));
+  });
+
   it("treats a refused conversation (403) exactly like a missing one (IR-906)", async () => {
     get.mockRejectedValue({ response: { status: 403 } });
 

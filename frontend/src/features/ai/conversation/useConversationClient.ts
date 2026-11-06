@@ -25,16 +25,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { aiApi } from "@/api/ai";
 import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
+import { readFailureKind } from "@/lib/readFailure";
 import type { SSEEvent } from "@/lib/sse";
 import type { ConversationDetail } from "@/types/ai";
 import type { ComparisonRecord } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
 
 /** Missing and refused read alike (IR-153, IR-906): the API never says which. */
-function isNotFound(err: unknown): boolean {
+function isUnavailable(err: unknown): boolean {
   return readFailureKind(err) === "unavailable";
 }
-import { readFailureKind } from "@/lib/readFailure";
 import { ENDED_RUN_TEXT, StreamDetached, streamAnswer, type StreamingState } from "./answerStream";
 
 /** What one Conversation is showing, kept while the reader is elsewhere. */
@@ -271,7 +271,7 @@ export function useConversationClient(events: ConversationClientEvents = {}, com
         if (opening.current === request) show(data, landedAtLoad);
       } catch (err) {
         if (opening.current !== request) return;
-        if (!isNotFound(err)) {
+        if (!isUnavailable(err)) {
           setIsOpening(false);
           throw err;
         }

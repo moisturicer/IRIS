@@ -2,6 +2,9 @@ import { errorDetail } from "@/lib/errorDetail";
 import { readFailureKind } from "@/lib/readFailure";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { Skeleton } from "@/components/ui";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { cn } from "@/lib/utils";
 import { InterruptedState } from "@/components/shared/InterruptedState";
 import { TONES } from "@/components/ui/statusTones";
 /**
@@ -147,7 +150,7 @@ function LegacyRAGChatPage() {
    * timeout (Retry); anything else is a failure (Try again). A missing or
    * refused conversation is not this: it is `client.unavailable`.
    */
-  const [loadFailure, setLoadFailure] = useState<{ interrupted: boolean; subject: string } | null>(null);
+  const [loadFailure, setLoadFailure] = useState<{ interrupted: boolean; noun: string; subject: string } | null>(null);
   const [loadAttempt, setLoadAttempt] = useState(0);
   // Too narrow to hold history and sources beside the answer, they open one at
   // a time as drawers over it, closed until asked for (IR-570). Unmeasured
@@ -274,7 +277,7 @@ function LegacyRAGChatPage() {
         goTo(data, true);
       } catch (error) {
         if (!cancelled) {
-          setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", subject: "your conversations" });
+          setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", noun: "conversations", subject: "your conversations" });
         }
       }
     })();
@@ -292,8 +295,10 @@ function LegacyRAGChatPage() {
 
   // Opening an address: directly, on refresh, or by back and forward.
   useEffect(() => {
+    // At `/ai` the first effect owns the failure; clearing it here would erase it.
+    if (routeId === undefined) return;
     setLoadFailure(null);
-    if (routeId === undefined || (routeId !== null && isOnScreen(routeId))) return;
+    if (routeId !== null && isOnScreen(routeId)) return;
     if (routeId === null) {
       showUnavailable();
       return;
@@ -305,7 +310,7 @@ function LegacyRAGChatPage() {
         if (draft && isOnScreen(routeId)) setDraftFor(routeId, draft);
       })
       .catch((error: unknown) => {
-        setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", subject: "this conversation" });
+        setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", noun: "conversation", subject: "this conversation" });
       });
   }, [routeId, isOnScreen, open, setDraftFor, showUnavailable, loadAttempt]);
 
@@ -510,14 +515,14 @@ function LegacyRAGChatPage() {
           ) : loadFailure ? (
             <div className="flex-1 flex items-center justify-center">
               {loadFailure.interrupted ? (
-                <InterruptedState what={loadFailure.subject.replace(/^(this|your) /, "")} onRetry={() => setLoadAttempt((n) => n + 1)} />
+                <InterruptedState what={loadFailure.noun} onRetry={() => setLoadAttempt((n) => n + 1)} />
               ) : (
                 <EmptyState
                   icon="fa-plug-circle-xmark"
                   tone="error"
                   title={`Could not load ${loadFailure.subject}`}
                   message="Check that the AI service is available, then try again."
-                  action={<button type="button" onClick={() => setLoadAttempt((n) => n + 1)} className="rounded-lg bg-white px-4 py-2 text-[14px] font-semibold text-brand ring-1 ring-stone-300 hover:bg-stone-100">Try again</button>}
+                  action={<button type="button" onClick={() => setLoadAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>}
                 />
               )}
             </div>
