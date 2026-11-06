@@ -9,13 +9,15 @@ import { cn } from "@/lib/utils";
 import type { DecisionFlags, RecordDetail, ReviewComment, ReviewVerdict } from "@/types/records";
 
 import { closingLines } from "../DecisionDialog";
-import { verdictOptions } from "./threadModel";
+import { plural, verdictOptions, type Thread } from "./threadModel";
 
 export interface FinishReviewDialogProps {
   record: RecordDetail;
   can: ReadonlySet<Capability>;
   /** The viewer's draft threads: sent with the verdict, in one act. */
   drafts: ReviewComment[];
+  /** The sent threads, so a Decision names each one it closes by its pin and quote. */
+  sent?: Thread[];
   onClose: () => void;
   /** Finished: the sentence to announce. */
   onDone: (outcome: string) => void;
@@ -49,7 +51,6 @@ const DONE_WORDS: Record<Exclude<ReviewVerdict, "send_to_rdco">, string> = {
   reject: "Rejected.",
 };
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
 /**
  * *Finish review* (ADR-032 §7, 2026-11-04; IR-875): the summary, then a
@@ -60,7 +61,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
  * is open; its token is the server's, and a 409 brings the fresh one back so
  * the next press decides into the record as it now is.
  */
-export function FinishReviewDialog({ record, can, drafts, onClose, onDone, onSendToRdco }: FinishReviewDialogProps) {
+export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, onDone, onSendToRdco }: FinishReviewDialogProps) {
   const ids = useId();
   const [decision, setDecision] = useState<DecisionFlags>(record.decision);
   const options = verdictOptions(can, { ...record, decision }, drafts);
@@ -134,7 +135,7 @@ export function FinishReviewDialog({ record, can, drafts, onClose, onDone, onSen
             Summary{chosen.reasonRequired ? " (required: it is this act's reason)" : ""}
           </label>
           <textarea id={summaryId} rows={4} value={summary} onChange={(e) => setSummary(e.target.value)}
-            aria-required={chosen.reasonRequired} aria-invalid={missingReason && error !== null}
+            aria-required={chosen.reasonRequired}
             placeholder="What the authors and the other reviewers read first"
             className={fieldClasses(false)} />
         </div>
@@ -174,7 +175,7 @@ export function FinishReviewDialog({ record, can, drafts, onClose, onDone, onSen
                   {closingMustFix.length ? `, ${closingMustFix.length} Must fix:` : ""}
                   {closingMustFix.length > 0 && (
                     <ul className="list-[circle] pl-5">
-                      {closingMustFix.map((t) => <li key={t.id}>{t.label}{t.anchored ? ", on a passage" : ", on the record"}</li>)}
+                      {closingMustFix.map((t) => <li key={t.id}>{closingName(t, sent)}</li>)}
                     </ul>
                   )}
                 </li>
@@ -190,4 +191,14 @@ export function FinishReviewDialog({ record, can, drafts, onClose, onDone, onSen
       </form>
     </Modal>
   );
+}
+
+/** A closing thread as the reviewer knows it: its pin, party and quote, where the Threads tab has it. */
+function closingName(
+  t: NonNullable<NonNullable<DecisionFlags["closes"]>["threads"]>[number],
+  sent: Thread[],
+): string {
+  const known = sent.find((s) => s.root.id === t.id);
+  const where = known?.root.anchor ? `: “${known.root.anchor.quote}”` : t.anchored ? ", on a passage" : ", on the record";
+  return `${known ? `Thread ${known.pin}, ` : ""}${t.label}${where}`;
 }

@@ -34,6 +34,10 @@ describe("countLabel", () => {
     expect(countLabel(sent)).toBe("2 must fix · 1 suggestion");
   });
 
+  it("leaves out a side with none open", () => {
+    expect(countLabel(groupThreads([comment(), comment(), comment()]).sent)).toBe("3 suggestions");
+  });
+
   it("says nothing when no reviewer's thread is open", () => {
     expect(countLabel(groupThreads([comment({ state: "resolved" })]).sent)).toBe("");
   });

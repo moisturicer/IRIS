@@ -11,6 +11,7 @@ import type { RecordDetail } from "@/types/records";
 import { READING_PANE_HEIGHT, READING_PANE_TOP } from "./paneLayout";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { ReviewTimeline } from "./ReviewTimeline";
+import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
 import { ReviewThreads } from "./threads/ReviewThreads";
 import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
@@ -151,6 +152,13 @@ function AuthorReviewWorkspace({
             <i className="fas fa-folder-open text-xs" aria-hidden />
             Documents
           </button>
+          {/* What waits on the owner, an open Must fix thread among it (IR-875). */}
+          {record.readiness && (
+            <ReadinessPanel readiness={record.readiness} onAction={(action) => {
+              if (action.kind === "show_threads") tw.showParty(action.target);
+              else if (action.kind === "open_documents") onDocuments(true);
+            }} />
+          )}
           <div role="tablist" aria-label="Review sections" className="flex gap-1 border-b border-stone-200"
             onKeyDown={(e) => {
               if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;

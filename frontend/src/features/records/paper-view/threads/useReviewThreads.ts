@@ -24,7 +24,10 @@ export function useReviewThreads(recordId: number, enabled: boolean) {
     Promise.resolve()
       .then(() => recordsApi.reviewComments(recordId))
       .then(({ data }) => {
-        if (!cancelled) setComments(data);
+        if (cancelled) return;
+        // A shape we don't know degrades to "could not load", never a throw (F1).
+        if (Array.isArray(data)) setComments(data);
+        else setFailed(true);
       })
       .catch(() => {
         if (!cancelled) setFailed(true);

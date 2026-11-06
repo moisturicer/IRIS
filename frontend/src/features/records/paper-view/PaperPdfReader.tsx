@@ -528,6 +528,9 @@ function PaperPdfReaderSource({
       const target = e.target instanceof HTMLElement ? e.target : null;
       if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
       if (target?.closest('[role="dialog"],[role="alertdialog"]')) return;
+      // The reader's own key: from inside it, or from nowhere in particular,
+      // as after a pointer selection -- never from another control's focus.
+      if (target && target !== document.body && !paneRef.current?.contains(target)) return;
       const passage = currentPassageRef.current();
       if (!passage) return;
       e.preventDefault();

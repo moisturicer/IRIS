@@ -10,7 +10,7 @@ import { cn, formatDate } from "@/lib/utils";
 import type { ReviewComment, ThreadSeverity } from "@/types/records";
 
 import type { Passage } from "./passage";
-import { filterThreads, isOpen, threadStatus, type Thread, type ThreadFilter, type ThreadViewer } from "./threadModel";
+import { SEVERITY_WORDS, filterThreads, isOpen, threadStatus, type Thread, type ThreadFilter, type ThreadViewer } from "./threadModel";
 import type { ReviewThreadsState } from "./useReviewThreads";
 
 /** What the composer comments on: a passage of a Version, or the whole record. */
@@ -36,7 +36,6 @@ export interface ReviewThreadsProps {
 }
 
 const FILTER_NAMES: Record<ThreadFilter, string> = { open: "Open", yours: "Yours", resolved: "Resolved", all: "All" };
-const SEVERITY_WORDS: Record<ThreadSeverity, string> = { must_fix: "Must fix", suggestion: "Suggestion" };
 
 /**
  * The Threads tab (ADR-032 §7, 2026-11-04; IR-875): the composer, the

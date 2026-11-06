@@ -38,16 +38,16 @@ export function regionsFromRects(rects: readonly Box[], pages: readonly { page: 
   for (const r of rects) {
     if (r.width <= 0 || r.height <= 0) continue;
     // The page it overlaps most: a line's box can stick out past the page's edge.
-    let on: (typeof pages)[number] | undefined;
+    let page: (typeof pages)[number] | undefined;
     let best = 0;
     for (const p of pages) {
       const overlap = Math.min(r.bottom, p.box.bottom) - Math.max(r.top, p.box.top);
-      if (p.box.width > 0 && p.box.height > 0 && overlap > best) { best = overlap; on = p; }
+      if (p.box.width > 0 && p.box.height > 0 && overlap > best) { best = overlap; page = p; }
     }
-    if (!on) continue;
-    const { box } = on;
+    if (!page) continue;
+    const { box } = page;
     const region = {
-      page: on.page,
+      page: page.page,
       left: fraction((r.left - box.left) / box.width),
       top: fraction((r.top - box.top) / box.height),
       right: fraction((r.right - box.left) / box.width),
@@ -72,7 +72,7 @@ export const normalizeQuote = (text: string) => collapse(text).trim().slice(0, M
 
 /**
  * The passage a DOM range selects in the reader, or null when it is not on a
- * page's text. `pageOf` finds the page box an element sits in.
+ * page's text. `root` is the reader's scroll area, holding every page box.
  */
 export function passageFromRange(range: Range, root: HTMLElement): Passage | null {
   const quote = normalizeQuote(range.toString());

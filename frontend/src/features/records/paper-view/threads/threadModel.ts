@@ -5,7 +5,7 @@
  * and blocked flags. Nothing compares a role.
  */
 import type { Capability } from "@/features/records/capabilities";
-import type { DecisionOutcome, Party, RecordDetail, ReviewComment, ReviewVerdict } from "@/types/records";
+import type { DecisionOutcome, Party, RecordDetail, ReviewComment, ReviewVerdict, ThreadSeverity } from "@/types/records";
 
 /** A top-level comment and its replies, with the pin it shows on the paper. */
 export interface Thread {
@@ -36,18 +36,23 @@ export function groupThreads(comments: readonly ReviewComment[]): { sent: Thread
   return { sent, drafts };
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+export const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** A severity in words, wherever it is shown. */
+export const SEVERITY_WORDS: Record<ThreadSeverity, string> = { must_fix: "Must fix", suggestion: "Suggestion" };
 
 /** Open and sent: what still asks something of someone. */
 export const isOpen = (t: Thread) => t.root.state === "open";
 
-/** The Threads tab's count (ADR-032 §7): "2 must fix · 5 suggestions", or "" when none is open. */
+/** The Threads tab's count (ADR-032 §7): "2 must fix · 5 suggestions", a side left out at 0, "" when none is open. */
 export function countLabel(sent: readonly Thread[]): string {
   const open = sent.filter(isOpen);
   const mustFix = open.filter((t) => t.root.severity === "must_fix").length;
   const suggestions = open.filter((t) => t.root.severity === "suggestion").length;
-  if (!mustFix && !suggestions) return "";
-  return `${mustFix} must fix · ${plural(suggestions, "suggestion", "suggestions")}`;
+  return [
+    mustFix ? `${mustFix} must fix` : "",
+    suggestions ? plural(suggestions, "suggestion", "suggestions") : "",
+  ].filter(Boolean).join(" · ");
 }
 
 /**

@@ -154,6 +154,17 @@ describe("threads in the review workspace", () => {
     expect(screen.queryByRole("button", { name: "Finish review…" })).toBeNull();
   });
 
+  it("gives the owner Readiness, whose open-thread link opens Threads", async () => {
+    const user = userEvent.setup();
+    renderScreen(
+      <ReviewWorkspace record={record} authorView can={new Set<Capability>(["comment_review"])} reader={<StandInReader />}
+        timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false} onDocuments={() => {}} />,
+    );
+    await user.click(await screen.findByRole("button", { name: "Show threads" }));
+    expect(screen.getByRole("tab", { name: /Threads/ })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByText(/Showing ITSO's threads/)).toBeInTheDocument();
+  });
+
   it("has no serious or critical accessibility violations with Threads open", async () => {
     const user = userEvent.setup();
     const { container } = openWorkspace();

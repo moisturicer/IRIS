@@ -14,6 +14,7 @@ import type { DecisionFlags, RecordDetail, ReviewComment } from "@/types/records
 
 import { FinishReviewDialog } from "./FinishReviewDialog";
 import { comment } from "./threadFixtures";
+import { groupThreads } from "./threadModel";
 
 const finishReview = vi.fn();
 vi.mock("@/api/records", () => ({
@@ -72,8 +73,11 @@ describe("Finish review", () => {
     open(["office_review"], [], record({
       office_review: { party: "itso", label: "ITSO", blocked: null, clear_blocked: "ITSO has 1 open Must fix thread.", assignment: 3 },
     } as Partial<RecordDetail>));
-    const radios = screen.getAllByRole("radio").map((r) => r.closest("label")?.querySelector("span span")?.textContent);
-    expect(radios).toEqual(["Comment only", "Clear for ITSO", "Record a finding"]);
+    const radios = screen.getAllByRole("radio");
+    expect(radios).toHaveLength(3);
+    expect(radios[0]).toHaveAccessibleName(/^Comment only/);
+    expect(radios[1]).toHaveAccessibleName(/^Clear for ITSO/);
+    expect(radios[2]).toHaveAccessibleName(/^Record a finding/);
     const clear = screen.getByRole("radio", { name: /Clear for ITSO/ });
     expect(clear).toBeDisabled();
     expect(clear).toHaveAccessibleDescription("Unavailable: ITSO has 1 open Must fix thread.");
@@ -136,6 +140,19 @@ describe("a Decision with open threads", () => {
     await user.type(screen.getByRole("textbox", { name: /Summary \(required/ }), "Ahead of a patent filing.");
     await user.click(send);
     expect(finishReview).toHaveBeenCalledWith(9, { verdict: "keep_unlisted", summary: "Ahead of a patent filing.", token: "t1" });
+  });
+
+  it("names each closing Must fix by its pin and quote when the tab has it", async () => {
+    const user = userEvent.setup();
+    const sent = groupThreads([comment({ id: 1, party: "itso", party_label: "ITSO", severity: "must_fix",
+      anchor: { version: 1, page: 2, quote: "a sample of 40" } })]).sent;
+    renderScreen(
+      <FinishReviewDialog record={withThreads} can={new Set<Capability>(["finish_review", "reject"])} drafts={[]}
+        sent={sent} onClose={vi.fn()} onDone={vi.fn()} onSendToRdco={vi.fn()} />,
+    );
+    await user.click(screen.getByRole("radio", { name: /Reject/ }));
+    expect(screen.getByRole("region", { name: "What this Decision closes" }))
+      .toHaveTextContent("Thread 1, ITSO: “a sample of 40”");
   });
 
   it("takes the fresh token from a 409 and keeps the summary", async () => {

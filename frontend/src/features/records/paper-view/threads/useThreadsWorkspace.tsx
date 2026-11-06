@@ -5,13 +5,13 @@ import { recordsApi } from "@/api/records";
 import type { Capability } from "@/features/records/capabilities";
 import { joinLabels } from "@/lib/utils";
 import { useAuthStore } from "@/store/auth.store";
-import type { RecordDetail } from "@/types/records";
+import type { Party, RecordDetail } from "@/types/records";
 
 import { RouteDialog } from "../RouteDialog";
 import { FinishReviewDialog } from "./FinishReviewDialog";
 import { ReaderAnnotationsContext, type ReaderAnnotations, type ReaderMark } from "./readerAnnotations";
 import type { CommentTarget, ReviewThreadsProps } from "./ReviewThreads";
-import { countLabel, type Thread } from "./threadModel";
+import { SEVERITY_WORDS, countLabel, type Thread } from "./threadModel";
 import { useReviewThreads } from "./useReviewThreads";
 
 interface Options {
@@ -36,7 +36,8 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
   const threads = useReviewThreads(record.id, record.readiness !== null);
   const userId = useAuthStore((s) => s.user?.id ?? null);
   const [composing, setComposing] = useState<CommentTarget | null>(null);
-  const [party, setParty] = useState<string | null>(null);
+  // A party, or "owner" for the authors: Readiness's `show_threads` target.
+  const [party, setParty] = useState<Party | "owner" | null>(null);
   const [focus, setFocus] = useState<{ id: number; key: number } | null>(null);
   const [landing, setLanding] = useState<ReaderAnnotations["landing"]>(null);
   const [finishing, setFinishing] = useState(false);
@@ -60,7 +61,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
       const a = t.root.anchor;
       if (!a || !(a.regions ?? []).length) return null;
       const label = [pending ? `Draft ${t.pin}` : `Thread ${t.pin}`, t.root.party_label,
-        t.root.severity === "must_fix" ? "Must fix" : t.root.severity === "suggestion" ? "Suggestion" : null]
+        t.root.severity ? SEVERITY_WORDS[t.root.severity] : null]
         .filter(Boolean).join(", ");
       return { key: `t${t.root.id}`, pin: t.pin, version: a.version, regions: a.regions ?? [], label, pending,
         onActivate: () => openThread(t) };
@@ -102,7 +103,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     <>
       {finishing && (
         <FinishReviewDialog
-          record={record} can={can} drafts={threads.drafts.map((t) => t.root)}
+          record={record} can={can} drafts={threads.drafts.map((t) => t.root)} sent={threads.sent}
           onClose={() => setFinishing(false)} onDone={done}
           onSendToRdco={(summary) => { setFinishing(false); setRoutingSummary(summary); }}
         />
@@ -129,7 +130,7 @@ export function useThreadsWorkspace({ record, can, onChanged, showThreads, showP
     count: countLabel(threads.sent),
     /** Readiness's `show_threads`: the party's open threads. */
     showParty: (target: string | null) => {
-      setParty(target);
+      setParty(target as Party | "owner" | null);
       showThreads();
     },
     finish: () => setFinishing(true),
