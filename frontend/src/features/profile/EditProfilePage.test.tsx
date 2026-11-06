@@ -1,7 +1,8 @@
 /**
- * The profile fields in Settings & Profile (IR-699), asserted through the
+ * Edit profile (IR-933; the fields are IR-699's), asserted through the
  * accessible tree. `profileApi` is mocked at its module boundary: it is the
- * one place the IR-695 contract lives, so these tests pin what is sent.
+ * one place the IR-695 contract lives, so these tests pin what is sent. One
+ * Save sends the name and the profile fields, then returns to the Profile.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { fireEvent, waitFor } from "@testing-library/react";
@@ -9,9 +10,12 @@ import { fireEvent, waitFor } from "@testing-library/react";
 import { profileApi } from "@/api/profile";
 import { useAuthStore } from "@/store/auth.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { Route, Routes } from "react-router-dom";
+
+import { authApi } from "@/api/auth";
 import { renderScreen, screen, userEvent, within } from "@/test/render";
 
-import SettingsPage from "./SettingsPage";
+import EditProfilePage from "./EditProfilePage";
 
 const baseUser = {
   id: 7, email: "ana@cit.edu", first_name: "Ana", middle_initial: "", last_name: "Reyes",
@@ -41,12 +45,20 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+/** The edit page, and a stand-in for the Profile it returns to. */
+const withProfile = () => (
+  <Routes>
+    <Route path="/profile/edit" element={<EditProfilePage />} />
+    <Route path="/profile" element={<h1>Your profile</h1>} />
+  </Routes>
+);
+
 const aboutYou = () => screen.getByRole("region", { name: "About you" });
 
 describe("bio", () => {
   it("counts characters against the 500 allowed", async () => {
     const user = userEvent.setup();
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     await user.type(screen.getByLabelText("Bio"), "Coastal floods");
 
@@ -58,7 +70,7 @@ describe("research interests", () => {
   it("adds an interest, offers suggestions, and removes one", async () => {
     const user = userEvent.setup();
     vi.mocked(profileApi.suggestInterests).mockResolvedValue({ data: ["Machine Learning"] } as never);
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     await user.type(screen.getByLabelText("Research interests"), "GIS{Enter}");
     expect(within(aboutYou()).getByRole("button", { name: "Remove GIS" })).toBeVisible();
@@ -74,7 +86,7 @@ describe("research interests", () => {
 
   it("stops at ten", async () => {
     signIn({ research_interests: Array.from({ length: 10 }, (_, i) => `Topic ${i + 1}`) });
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     expect(screen.getByLabelText("Research interests")).toBeDisabled();
     expect(screen.getByText("You've added the 10 interests allowed.")).toBeVisible();
@@ -83,7 +95,7 @@ describe("research interests", () => {
   it("does not add the same interest twice, whatever its case", async () => {
     const user = userEvent.setup();
     signIn({ research_interests: ["GIS"] });
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     await user.type(screen.getByLabelText("Research interests"), "gis{Enter}");
 
@@ -94,44 +106,44 @@ describe("research interests", () => {
 describe("ORCID iD", () => {
   it("checks the iD as you type and will not save a bad one", async () => {
     const user = userEvent.setup();
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     await user.type(screen.getByLabelText("ORCID iD"), "0000-0002-1825-0098");
 
     expect(screen.getByLabelText("ORCID iD")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getByLabelText("ORCID iD")).toHaveAccessibleDescription(/doesn't check out/);
-    expect(within(aboutYou()).getByRole("button", { name: "Save" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
   });
 });
 
 describe("saving", () => {
-  it("sends the profile fields and confirms", async () => {
+  it("sends the profile fields and returns to the Profile", async () => {
     const user = userEvent.setup();
     vi.spyOn(profileApi, "updateFields").mockImplementation(async (fields) =>
       ({ data: { ...baseUser, ...fields } }) as never);
-    const { container } = renderScreen(<SettingsPage />, { route: "/settings" });
+    const { container } = renderScreen(withProfile(), { route: "/profile/edit" });
 
     await user.type(screen.getByLabelText("Bio"), "Floods.");
     await user.type(screen.getByLabelText("Research interests"), "GIS{Enter}");
     await user.type(screen.getByLabelText("ORCID iD"), "0000-0002-1825-0097");
-    await user.click(within(aboutYou()).getByRole("button", { name: "Save" }));
+    await expectNoBlockingA11yViolations(container);
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(profileApi.updateFields).toHaveBeenCalledWith({
       bio: "Floods.", research_interests: ["GIS"], orcid: "0000-0002-1825-0097",
     });
-    expect(await within(aboutYou()).findByRole("status")).toHaveTextContent("Profile saved.");
+    expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
     expect(useAuthStore.getState().user?.bio).toBe("Floods.");
-    await expectNoBlockingA11yViolations(container);
   });
 
   it("clears an emptied ORCID iD as null", async () => {
     const user = userEvent.setup();
     signIn({ orcid: "0000-0002-1825-0097" });
     vi.spyOn(profileApi, "updateFields").mockResolvedValue({ data: baseUser } as never);
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     await user.clear(screen.getByLabelText("ORCID iD"));
-    await user.click(within(aboutYou()).getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
     expect(profileApi.updateFields).toHaveBeenCalledWith({ bio: "", research_interests: [], orcid: null });
   });
@@ -141,12 +153,12 @@ describe("saving", () => {
     vi.spyOn(profileApi, "updateFields").mockRejectedValue({
       response: { status: 400, data: { research_interests: ["Keep each interest to 40 characters or fewer."] } },
     });
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     await user.type(screen.getByLabelText("Bio"), "x");
-    await user.click(within(aboutYou()).getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(await within(aboutYou()).findByRole("alert")).toHaveTextContent(
+    expect(await screen.findByRole("alert")).toHaveTextContent(
       "Keep each interest to 40 characters or fewer.",
     );
   });
@@ -162,21 +174,71 @@ describe("saving", () => {
         },
       },
     });
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     await user.type(screen.getByLabelText("Bio"), "x");
-    await user.click(within(aboutYou()).getByRole("button", { name: "Save" }));
+    await user.click(screen.getByRole("button", { name: "Save" }));
 
-    const alert = await within(aboutYou()).findByRole("alert");
+    const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Keep your bio to 500 characters or fewer.");
     expect(alert).toHaveTextContent("Keep each interest to 40 characters or fewer.");
   });
 });
 
-it("links to your own profile", () => {
-  renderScreen(<SettingsPage />, { route: "/settings" });
+describe("name", () => {
+  it("sends a changed name and returns to the Profile", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(authApi, "updateMe").mockResolvedValue({ data: { ...baseUser, first_name: "Anna" } } as never);
+    renderScreen(withProfile(), { route: "/profile/edit" });
 
-  expect(screen.getByRole("link", { name: "View my profile" })).toHaveAttribute("href", "/people/7");
+    await user.clear(screen.getByLabelText("First name"));
+    await user.type(screen.getByLabelText("First name"), "Anna");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(authApi.updateMe).toHaveBeenCalledWith({ first_name: "Anna", middle_initial: "", last_name: "Reyes" });
+    expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
+    expect(useAuthStore.getState().user?.first_name).toBe("Anna");
+  });
+
+  it("requires a first and a last name", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(authApi, "updateMe");
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
+
+    await user.clear(screen.getByLabelText("First name"));
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("First and last name are required.");
+    expect(authApi.updateMe).not.toHaveBeenCalled();
+  });
+
+  it("shows the affiliation as the university recorded it, and does not let it be edited", () => {
+    signIn({ college_name: "CCS", course_name: "BSCS" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
+
+    expect(screen.getByLabelText("Affiliation")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Affiliation")).toHaveValue("CCS · BSCS");
+  });
+});
+
+describe("leaving", () => {
+  it("Save waits for a change", () => {
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
+
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+  });
+
+  it("Cancel goes back to the Profile without saving", async () => {
+    const user = userEvent.setup();
+    vi.spyOn(profileApi, "updateFields");
+    renderScreen(withProfile(), { route: "/profile/edit" });
+
+    await user.type(screen.getByLabelText("Bio"), "Not kept");
+    await user.click(screen.getByRole("link", { name: "Cancel" }));
+
+    expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
+    expect(profileApi.updateFields).not.toHaveBeenCalled();
+  });
 });
 
 describe("photo", () => {
@@ -195,7 +257,7 @@ describe("photo", () => {
     const user = userEvent.setup();
     vi.spyOn(profileApi, "uploadPhoto").mockResolvedValue({ data: { photo_url: "/users/7/photo/?v=2" } } as never);
     vi.spyOn(profileApi, "photo").mockResolvedValue({ data: new Blob(["png"]) } as never);
-    const { container } = renderScreen(<SettingsPage />, { route: "/settings" });
+    const { container } = renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     const { file, dialog } = await choosePhoto(user);
     expect(within(dialog).getByRole("slider", { name: "Zoom" })).toBeVisible();
@@ -211,7 +273,7 @@ describe("photo", () => {
     const user = userEvent.setup();
     vi.spyOn(profileApi, "uploadPhoto").mockResolvedValue({ data: { photo_url: "/users/7/photo/?v=2" } } as never);
     vi.spyOn(profileApi, "photo").mockResolvedValue({ data: new Blob(["png"]) } as never);
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     const { file, dialog } = await choosePhoto(user);
     within(dialog).getByRole("group", { name: /Drag or use the arrow keys/ }).focus();
@@ -229,7 +291,7 @@ describe("photo", () => {
     vi.spyOn(profileApi, "uploadPhoto").mockRejectedValue({
       response: { status: 400, data: { photo: ["The photo must be 2 MB or smaller."] } },
     });
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     const { dialog } = await choosePhoto(user);
     await user.click(within(dialog).getByRole("button", { name: "Use photo" }));
@@ -242,7 +304,7 @@ describe("photo", () => {
     signIn({ photo_url: "/users/7/photo/?v=1" });
     vi.spyOn(profileApi, "photo").mockResolvedValue({ data: new Blob(["png"]) } as never);
     vi.spyOn(profileApi, "removePhoto").mockResolvedValue({} as never);
-    renderScreen(<SettingsPage />, { route: "/settings" });
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
 
     expect(await screen.findByRole("img", { name: "Your profile photo" })).toBeVisible();
     await user.click(screen.getByRole("button", { name: "Remove photo" }));

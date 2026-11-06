@@ -216,7 +216,7 @@ Font Awesome 6 via CDN, `<i className="fas fa-…" />`, 95 usages.
   - **Active** is the brand tint: `bg-brand-50`, `text-brand`, semibold, with the icon in brand. The 4 px maroon left bar is gone.
   - **Hover** is neutral, `bg-stone-100`, so it is never mistaken for the active row.
   - Every row carries `FOCUS_RING`.
-- **The account menu** in the user block holds Settings & Profile, Help and Sign out (`AccountMenu.tsx`). It is a disclosure: a button that shows and hides a list of plain links and buttons, not an ARIA `menu`. It opens upward, or to the right of the rail, and uses `shadow-card-md`.
+- **The account menu** in the user block holds Profile, Settings, Help and Sign out (`AccountMenu.tsx`). Profile and Settings are separate pages (IR-933): Profile is what other signed-in people see, with an own-view note and one filled **Edit profile** action; Settings is the account. It is a disclosure: a button that shows and hides a list of plain links and buttons, not an ARIA `menu`. It opens upward, or to the right of the rail, and uses `shadow-card-md`.
 - **Collapse / Expand** is one always-visible control at the bottom. It replaced a toggle that only appeared when you hovered the logo, which a touch tablet could not reach.
 - **Widths:** `w-60` / `w-16` instead of `230px` / `60px`.
 - **One new token:** `transition-shell` (`transitionProperty.shell`: transform, width, margin) in `tailwind.config.js`. The drawer slides, the rail narrows and the content margin follows. Two separate `transition-*` classes on one element silently override each other, because `cn` does not merge Tailwind classes.
