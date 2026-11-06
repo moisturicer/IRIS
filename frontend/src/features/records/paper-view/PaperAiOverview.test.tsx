@@ -176,11 +176,18 @@ describe("the AI overview on a paper", () => {
     expect(await screen.findByText(/AI summary unavailable/i)).toBeTruthy();
   });
 
-  it("says nothing is indexed yet when the record has no chunks", async () => {
+  // IR-526: updated deliberately. This used to find a card's title ("Nothing indexed to
+  // summarise") and a second explanatory sentence; the state is now one quiet line, so the
+  // test asserts that single line and that no second sentence or button comes with it.
+  it("says nothing is indexed in one quiet line when the record has no chunks", async () => {
     overview.mockResolvedValue({ data: { state: "not_indexed", overview: null } });
     renderScreen(<PaperAiOverview record={record} />);
 
-    expect(await screen.findByText(/nothing indexed to summarise/i)).toBeTruthy();
+    const line = await screen.findByText(/nothing indexed to summarise/i);
+    expect(line.tagName).toBe("P");
+    expect(line.parentElement?.tagName).toBe("SECTION");
+    expect(screen.queryByText(/retrieval service could draw on/i)).toBeNull();
+    expect(screen.queryByRole("button")).toBeNull();
   });
 
   it("reports a failure rather than showing an empty summary", async () => {
