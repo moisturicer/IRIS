@@ -47,7 +47,9 @@ export function PaperGovernance({ record }: { record: RecordDetail }) {
         {rows.map((row) => (
           <div key={row.label} className="flex items-baseline justify-between gap-3">
             <dt className="text-xs text-stone-500 shrink-0">{row.label}</dt>
-            <dd className="text-xs font-semibold text-stone-700 text-right">{row.value}</dd>
+            {/* `min-w-0` and anywhere-wrapping: a long Classification name wraps
+                inside the row rather than widening the page (IR-921). */}
+            <dd className="min-w-0 text-xs font-semibold text-stone-700 text-right [overflow-wrap:anywhere]">{row.value}</dd>
           </div>
         ))}
       </dl>
