@@ -494,6 +494,16 @@ ACCOUNTS = {
     })}),
     "user-list": Entry({"GET": _case(ACCOUNT_ADMINS)}),
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
+    # IR-785: a person asks about, makes or cancels their own deletion request;
+    # nothing is looked up by id, so every signed-in caller acts on their own.
+    "user-me-deletion-request": Entry({"GET": _case(SIGNED_IN), "POST": _case(SIGNED_IN, data={}),
+                                       "DELETE": _case(SIGNED_IN)}),
+    # ADR-051 §8: the System Admin alone decides; RDCO has no access.
+    "account-deletion-request-list": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
+    "account-deletion-request-confirm": Entry({"POST": _case(
+        SYSTEM_ADMIN_ONLY, kwargs={"pk": Ref("deletion_request")}, data={})}),
+    "account-deletion-request-reject": Entry({"POST": _case(
+        SYSTEM_ADMIN_ONLY, kwargs={"pk": Ref("deletion_request")}, data={"reason": "Matrix check."})}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                       for m in ("GET", "PUT", "PATCH")}),
     "user-detail": Entry({m: _case(ACCOUNT_ADMINS, kwargs={"pk": Ref("target_user")},

@@ -89,6 +89,12 @@ class AuditEvent(models.Model):
     PASSWORD_RESET_COMPLETED     = "PASSWORD_RESET_COMPLETED"
     EMAIL_VERIFICATION_COMPLETED = "EMAIL_VERIFICATION_COMPLETED"
 
+    # Account deletion (ADR-051 §8-§12, IR-785)
+    ACCOUNT_DELETION_REQUESTED = "ACCOUNT_DELETION_REQUESTED"
+    ACCOUNT_DELETION_CANCELLED = "ACCOUNT_DELETION_CANCELLED"
+    ACCOUNT_DELETION_CONFIRMED = "ACCOUNT_DELETION_CONFIRMED"
+    ACCOUNT_DELETION_REJECTED  = "ACCOUNT_DELETION_REJECTED"
+
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
         (LOGOUT,           "Logout"),
@@ -152,6 +158,10 @@ class AuditEvent(models.Model):
         (RECOVERY_EMAIL_FAILED,        "Recovery Email Failed"),
         (PASSWORD_RESET_COMPLETED,     "Password Reset Completed"),
         (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
+        (ACCOUNT_DELETION_REQUESTED, "Account Deletion Requested"),
+        (ACCOUNT_DELETION_CANCELLED, "Account Deletion Cancelled"),
+        (ACCOUNT_DELETION_CONFIRMED, "Account Deleted"),
+        (ACCOUNT_DELETION_REJECTED,  "Account Deletion Rejected"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

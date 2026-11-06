@@ -148,6 +148,16 @@ class AuthorizationMatrixTests(APITestCase):
 
     # --- account administration -------------------------------------------
 
+    def test_account_deletion_decisions_are_the_system_admin_s_alone(self):
+        """
+        ADR-051 §8 (IR-785): the System Admin confirms or rejects an account
+        deletion, and RDCO has no access. The request id need not exist: the
+        role gate answers before any lookup.
+        """
+        self.assert_only(["System Admin"], "get", reverse("account-deletion-request-list"))
+        for name in ("account-deletion-request-confirm", "account-deletion-request-reject"):
+            self.assert_only(["System Admin"], "post", reverse(name, args=[999999]), {"reason": "x"})
+
     def test_role_requests_are_rdco_only(self):
         self.assert_only(["RDCO"], "get", reverse("role-request-list"))
 

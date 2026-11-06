@@ -118,6 +118,9 @@ class World:
         from apps.accounts.models import RoleRequest
         if isinstance(obj, RoleRequest):
             return role == "rdco"
+        from apps.accounts.models import AccountDeletionRequest
+        if isinstance(obj, AccountDeletionRequest):
+            return role == "sysadmin"   # ADR-051 §8 (IR-785)
         from apps.opportunities.models import Opportunity
         if isinstance(obj, Opportunity):
             return user is not None
@@ -285,6 +288,13 @@ def build_world() -> World:
     o["reviewer_target"] = users["unseated"]
     o["target_user"] = users["other"]
     o["role_request"] = RoleRequest.objects.create(user=other, requested_role=users["adviser"].role)
+    # IR-785: someone with nothing in review asks to delete their account.
+    from apps.accounts.models import AccountDeletionRequest
+    leaving = User.objects.create_user(
+        email="matrix-leaving@cit.edu", password="unused", first_name="Leaving", last_name="Person",
+        role=users["other"].role, is_verified=True,
+    )
+    o["deletion_request"] = AccountDeletionRequest.objects.create(user=leaving)
     SystemSetting.objects.get_or_create(key="matrix-setting", defaults={"value": "test"})
     o["assignment"] = record.assignments.get(party=Party.ITSO)
     o["seat"] = o["assignment"].seats.get(reviewer=itso)
