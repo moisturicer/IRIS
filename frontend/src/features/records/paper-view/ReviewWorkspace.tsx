@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 
 import { Modal } from "@/components/ui/Modal";
 import { FOCUS_RING } from "@/components/ui/interaction";
@@ -11,7 +11,10 @@ import type { RecordDetail } from "@/types/records";
 import { READING_PANE_HEIGHT, READING_PANE_TOP } from "./paneLayout";
 import { ReviewActionBar } from "./ReviewActionBar";
 import { ReviewTimeline } from "./ReviewTimeline";
+import { ReadinessPanel } from "./ReadinessPanel";
 import { ReviewWorkspaceLayout } from "./ReviewWorkspaceLayout";
+import { ReviewThreads } from "./threads/ReviewThreads";
+import { useThreadsWorkspace } from "./threads/useThreadsWorkspace";
 
 export interface ReviewWorkspaceProps {
   record: RecordDetail;
@@ -92,6 +95,10 @@ function DocumentsDrawer({ open, onClose, children }: { open: boolean; onClose: 
  * contained reader ignores the inset.
  *
  * Decisions use the adviser-first review actions in `REVIEW_ACTIONS`.
+ *
+ * **Threads** (IR-875): the pane has the timeline and the Threads tab, where
+ * an owner answers a reviewer's thread, replies, reopens -- each where the
+ * thread's own flags allow -- and the paper carries the threads' pins.
  */
 function AuthorReviewWorkspace({
   record,
@@ -103,6 +110,10 @@ function AuthorReviewWorkspace({
   onBarInset,
 }: ReviewWorkspaceProps) {
   const [measureBar, barHeight] = useElementHeight<HTMLDivElement>();
+  const ids = useId();
+  const [tab, setTab] = useState<"conversation" | "threads">("conversation");
+  const [announced, setAnnounced] = useState("");
+  const tw = useThreadsWorkspace({ record, can, onChanged, showThreads: () => setTab("threads"), announce: setAnnounced });
   const reportRef = useRef(onBarInset);
   reportRef.current = onBarInset;
   useEffect(() => {
@@ -112,7 +123,7 @@ function AuthorReviewWorkspace({
 
   return (
     <div className={cn("reading-wide:flex reading-wide:gap-6 reading-wide:items-start", !reader && "max-w-3xl mx-auto")}>
-      {reader && <div className="min-w-0 reading-wide:flex-1">{reader}</div>}
+      {reader && <div className="min-w-0 reading-wide:flex-1">{tw.wrapReader(reader)}</div>}
 
       {/* The pane and its bar. One column when wide; narrower this box is
           `contents`, so the bar's sticky range is the whole section, paper
@@ -141,7 +152,40 @@ function AuthorReviewWorkspace({
             <i className="fas fa-folder-open text-xs" aria-hidden />
             Documents
           </button>
-          <ReviewTimeline key={timelineVersion} recordId={record.id} canComment={can.has("comment_review")} />
+          {/* What waits on the owner, an open Must fix thread among it (IR-875). */}
+          {record.readiness && (
+            <ReadinessPanel readiness={record.readiness} onAction={(action) => {
+              if (action.kind === "show_threads") tw.showParty(action.target);
+              else if (action.kind === "open_documents") onDocuments(true);
+            }} />
+          )}
+          <div role="tablist" aria-label="Review sections" className="flex gap-1 border-b border-stone-200"
+            onKeyDown={(e) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+              e.preventDefault();
+              const next = e.key === "Home" ? "conversation" : e.key === "End" ? "threads"
+                : tab === "conversation" ? "threads" : "conversation";
+              setTab(next);
+              document.getElementById(`${ids}-tab-${next}`)?.focus();
+            }}>
+            {(["conversation", "threads"] as const).map((name) => (
+              <button key={name} type="button" role="tab" id={`${ids}-tab-${name}`} aria-selected={tab === name}
+                aria-controls={`${ids}-${name}`} tabIndex={tab === name ? 0 : -1} onClick={() => setTab(name)}
+                className={cn("min-h-11 px-3 text-small font-semibold border-b-2 -mb-px",
+                  tab === name ? "border-brand text-brand" : "border-transparent text-stone-600 hover:text-brand", FOCUS_RING)}>
+                {name === "conversation" ? "Conversation" : "Threads"}
+                {name === "threads" && tw.count && <>{" "}<span className="ml-1 text-2xs font-normal text-stone-600">{tw.count}</span></>}
+              </button>
+            ))}
+          </div>
+          <div role="tabpanel" id={`${ids}-conversation`} aria-labelledby={`${ids}-tab-conversation`} hidden={tab !== "conversation"}>
+            <ReviewTimeline key={timelineVersion} recordId={record.id} canComment={can.has("comment_review")} onCommented={tw.threads.reload} />
+          </div>
+          <div role="tabpanel" id={`${ids}-threads`} aria-labelledby={`${ids}-tab-threads`} hidden={tab !== "threads"}>
+            <ReviewThreads {...tw.panel} />
+          </div>
+          <p role="status" aria-live="polite" className="sr-only">{announced}</p>
+          {tw.dialogs}
         </div>
 
         <ReviewActionBar

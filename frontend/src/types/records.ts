@@ -564,6 +564,10 @@ export interface DecisionFlags {
   blocked:      string | null;
   /** What deciding now would close; null for anyone who may not decide. */
   closes:       DecisionCloses | null;
+  /** An outcome held back while the rest are not: a Proposal's Accept, by the Adviser's own Must fix (IR-874). */
+  blocked_outcomes?: Partial<Record<DecisionOutcome, string>>;
+  /** Deciding now closes an open Must fix, so the comment is required as its reason. */
+  reason_required?:  boolean;
   /** Echoed to `decide/`: a record that moved since is refused with a 409. */
   token:        string | null;
   /** The author's flags, shown in the Adviser's *Accept & send to RDCO* dialog. */
@@ -579,6 +583,8 @@ export interface DecisionCloses {
   document_requests: number;
   revision_requests?: { id: number; party: Party; label: string; reason: string }[];
   findings?: { party: Party; label: string; comment: string }[];
+  /** The open threads deciding closes, the decider's own drafts included (IR-874). */
+  threads?: { id: number; party: Party | null; label: string; severity: ThreadSeverity | null; anchored: boolean }[];
 }
 
 export interface OfficeReviewFlags {
@@ -587,6 +593,8 @@ export interface OfficeReviewFlags {
   label:      string | null;
   /** Why the act cannot be taken yet (an unopened seat, an open document request). */
   blocked:    string | null;
+  /** Why *Clear* alone is held: the office's own open Must fix threads (IR-874). */
+  clear_blocked?: string | null;
   assignment: number | null;
 }
 
@@ -646,6 +654,8 @@ export interface AddReviewerOptions {
 
 export interface RoutingFlags {
   send_to_rdco: boolean;
+  /** Why *Accept & send to RDCO* is held: the Adviser's own open Must fix threads (IR-874). */
+  send_to_rdco_blocked?: string | null;
   route_as:         Party | null;
   /**
    * Where onward *Route* may send this record, as the server's party graph
@@ -806,6 +816,121 @@ export interface ReviewComment {
   edited_at:   string | null;
   /** The server's answer: Edit is offered only where this is true. */
   can_edit:    boolean;
+  /*
+   * The thread (ADR-032 §7, 2026-11-04; IR-874). A top-level comment is a
+   * thread; a reply carries these empty. Optional so an older payload or a
+   * fixture without them still reads as a plain comment.
+   */
+  /** The party it belongs to; null for the authors' own threads. */
+  party?:                ThreadParty | null;
+  /** Server-worded party: "The authors", "Adviser", "ITSO"... */
+  party_label?:          string | null;
+  /** A reviewer's thread only; null on an owner's thread and on a reply. */
+  severity?:             ThreadSeverity | null;
+  /** Unsent: seen only by its writer until *Finish review* sends it. */
+  is_draft?:             boolean;
+  /** The finished review that sent it, or null. */
+  round?:                number | null;
+  /** The passage it is about; null for a general thread. */
+  anchor?:               ThreadAnchor | null;
+  state?:                ThreadState | null;
+  resolved_by?:          string | null;
+  resolved_at?:          string | null;
+  closed_by_decision?:   number | null;
+  /** The Decision's comment, the reason it closed. */
+  closed_reason?:        string | null;
+  answer?:               ThreadAnswerPayload | null;
+  /** Severity changes, resolving and reopening, oldest first. Empty on a draft. */
+  events?:               ThreadEvent[];
+  /*
+   * The server's answers. Every thread control is offered exactly where its
+   * flag is true; the screen compares no role (ADR-032 §10).
+   */
+  can_delete?:           boolean;
+  can_change_severity?:  boolean;
+  can_resolve?:          boolean;
+  can_reopen?:           boolean;
+  can_answer?:           boolean;
+}
+
+/** A thread's party: an office, the Adviser, or (null) the authors. */
+export type ThreadParty = Party;
+
+/** How much a reviewer's thread asks (ADR-032 §7). A Suggestion never blocks. */
+export type ThreadSeverity = "must_fix" | "suggestion";
+
+/** `closed`: a Decision ended the review with the thread still open. */
+export type ThreadState = "open" | "resolved" | "closed";
+
+/** ADR-031's page-fraction rectangle, the same shape a citation's region has. */
+export interface PageRegion {
+  page:   number;
+  left:   number;
+  top:    number;
+  right:  number;
+  bottom: number;
+}
+
+/** A passage of one Version: where an anchored thread points. */
+export interface ThreadAnchor {
+  version:  number;
+  page:     number;
+  quote:    string;
+  prefix?:  string;
+  suffix?:  string;
+  regions?: PageRegion[];
+}
+
+/** The owner's answer to a reviewer's thread. Neither answer resolves it. */
+export interface ThreadAnswerPayload {
+  kind: "addressed" | "declined";
+  note: string;
+  by:   string | null;
+  at:   string | null;
+}
+
+export interface ThreadEvent {
+  kind:       "severity_changed" | "resolved" | "reopened" | "answered" | "closed_by_decision";
+  actor_name: string | null;
+  from:       string | null;
+  to:         string | null;
+  at:         string;
+}
+
+/** What `finish-review/` finishes a review with (ADR-032 §7). */
+export type ReviewVerdict =
+  | "comment_only"
+  | "request_revision"
+  | "send_to_rdco"
+  | "cleared"
+  | "finding"
+  | "accept"
+  | "publish"
+  | "keep_unlisted"
+  | "reject";
+
+/** `POST /records/<id>/finish-review/`. */
+export interface FinishReviewRequest {
+  verdict:            ReviewVerdict;
+  summary:            string;
+  to?:                RouteRequest["to"];
+  suggested_offices?: string[];
+  token?:             string;
+}
+
+/** One finished review, on the tracker (IR-874). Review content. */
+export interface ReviewRound {
+  id:         number;
+  party:      Party;
+  label:      string;
+  actor_name: string | null;
+  version:    number | null;
+  verdict:    ReviewVerdict;
+  summary:    string;
+  review:     number | null;
+  /** How many threads it sent. */
+  threads:    number;
+  created_at: string;
 }
 
 export interface TrackerHolder {
@@ -990,6 +1115,8 @@ export interface RecordTracker {
   versions:              RecordVersion[] | null;
   /** The review discussion, oldest first (IR-419). Null as `reviews` is. */
   review_comments:       ReviewComment[] | null;
+  /** Each finished review, oldest first (IR-874). Null as `reviews` is; absent on older APIs. */
+  review_rounds?:        ReviewRound[] | null;
   resubmissions:         TrackerResubmission[];
   /**
    * RDCO published the paper from Unlisted after its Decision (IR-878), or

@@ -187,6 +187,8 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/library/saves/", { results: [] });
       api.on("GET", `/ai/records/${PAPER.id}/overview/`, { state: "not_indexed", overview: null });
       api.on("GET", `/records/${PAPER.id}/similar/`, { results: [] });
+      // Review threads (IR-875): the review workspace reads them beside the tracker.
+      api.on("GET", `/records/${PAPER.id}/review-comments/`, []);
     }),
     heading: PAPER.title,
     primary: (p) => p.getByRole("button", { name: /Cite/ }).first(), primaryLabel: "Cite",

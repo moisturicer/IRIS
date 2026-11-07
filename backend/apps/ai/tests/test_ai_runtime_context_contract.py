@@ -249,7 +249,7 @@ def test_an_oversized_tool_result_is_withheld_explicitly_and_the_group_stays_who
     assert packed.history[2].content == "small one"
     assert packed.history[4].content == "small three"
     marker = json.loads(packed.history[3].content)
-    assert marker == {"withheld": "exceeds_context", "bytes": 50_004, "coverage": "none"}
+    assert marker == {"withheld": "exceeds_context", "coverage": "none"}
 
     run(fitted.converse(packed))
     [payload] = target.requests
