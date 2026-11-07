@@ -286,6 +286,27 @@ class ConfirmTests(DeletionBase):
         self.assertTrue(AuditEvent.objects.filter(
             event_type=AuditEvent.ACCOUNT_DELETION_CONFIRMED, metadata__target_user=email).exists())
 
+    def test_the_optional_profile_goes_with_the_person(self):
+        from apps.accounts import profile
+        from apps.accounts.models import ResearchInterest
+        from apps.library.models import SavedFeed
+
+        self.person.bio = "I study mangroves."
+        self.person.photo = "profile_photos/gone.jpg"
+        self.person.save(update_fields=["bio", "photo"])
+        profile.set_interests(self.person, ["Only this person uses it"])
+        SavedFeed.objects.create(owner=self.person, name="Water", query={"q": "water"})
+
+        response, _send = self.confirm(self.sysadmin, self.made.pk)
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.content)
+
+        self.person.refresh_from_db()
+        self.assertEqual(self.person.bio, "")
+        self.assertFalse(self.person.photo)
+        self.assertFalse(self.person.interest_links.exists())
+        self.assertFalse(ResearchInterest.objects.filter(name="Only this person uses it").exists())
+        self.assertFalse(SavedFeed.objects.filter(owner=self.person).exists())
+
     def test_the_row_and_the_history_that_points_at_it_survive(self):
         self.confirm(self.sysadmin, self.made.pk)
         self.assertTrue(User.objects.filter(pk=self.person.pk).exists())

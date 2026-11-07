@@ -38,6 +38,7 @@ PENDING = {"status": RequestStatus.PENDING}
 RELATIONS: dict[str, Rule] = {
     # --- accounts
     "accounts.StudentProfile.user":   Rule(DELETE, "Student profile: personal details"),
+    "accounts.UserInterest.user":     Rule(DELETE, "The person's research-interest tags (IR-695); a tag nobody uses is then deleted"),
     "accounts.AdviserProfile.user":   Rule(DELETE, "Adviser profile: personal details"),
     "accounts.RoleRequest.user":      Rule(DELETE, "A pending role request is withdrawn; decided ones are history", PENDING),
     "accounts.RoleRequest.reviewed_by": Rule(KEEP, "Who decided someone else's request"),
@@ -103,6 +104,7 @@ RELATIONS: dict[str, Rule] = {
     # --- other features
     "opportunities.Opportunity.posted_by": Rule(KEEP, "A Call's Posted by shows \"Former user\""),
     "library.SavedRecord.owner":           Rule(DELETE, "Saved papers and reading status"),
+    "library.SavedFeed.owner":             Rule(DELETE, "Private custom feeds (IR-577)"),
 }
 
 

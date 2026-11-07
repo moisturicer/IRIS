@@ -19,7 +19,7 @@ from apps.audit.services import create_audit_event
 from core.enums import PipelineStatus, RequestStatus, SessionEndReason
 from core.utils import send_email_async
 
-from ..models import AccountDeletionRequest, User
+from ..models import AccountDeletionRequest, ResearchInterest, User
 from . import registry
 from .blockers import blockers_for
 
@@ -181,12 +181,21 @@ def _delete_private_rows(person) -> None:
         rule = registry.RELATIONS[registry.label(model, field_name)]
         if rule.action == registry.DELETE:
             model._base_manager.filter(**{field_name: person}, **rule.where).delete()
+    # A research-interest tag is shared; once its last user is gone it goes too
+    # (the same rule `profile.set_interests` follows).
+    ResearchInterest.objects.filter(user_links__isnull=True).delete()
 
 
 def _erase_person(person) -> None:
+    from .. import profile
     from ..sessions import end_all_sessions
 
     end_all_sessions(person, SessionEndReason.DELETED)
+    # The account row stays, so the optional profile (IR-695) must be cleared
+    # here: nothing deletes it with the row. The photo's file goes once the
+    # act commits.
+    profile.remove_photo(person)
+    person.bio = ""
     person.email = former_email(person.pk)
     person.first_name = FORMER_FIRST_NAME
     person.middle_initial = ""
@@ -203,7 +212,7 @@ def _erase_person(person) -> None:
     person.save(update_fields=[
         "email", "first_name", "middle_initial", "last_name", "role", "is_office_coordinator",
         "is_active", "is_staff", "is_superuser", "is_verified", "password",
-        "credential_version", "deleted_at",
+        "credential_version", "deleted_at", "bio",
     ])
 
 
