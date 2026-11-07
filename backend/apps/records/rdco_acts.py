@@ -251,4 +251,4 @@ def withdraw(record: Record, reason, *, actor) -> dict:
         record, withdrawn_by=actor, seats=work.seats,
         requesting_parties=work.requesting_parties, reason=reason,
     ))
-    return {"id": record.pk, "withdrawn": True}
+    return dict(id=record.pk, withdrawn=True)

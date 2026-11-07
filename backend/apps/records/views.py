@@ -491,7 +491,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         record = self._paper_under_lock()
         body = request.data if isinstance(request.data, dict) else {}
         return Response(rdco_acts.replace_adviser(
-            record, body.get("adviser"), actor=request.user,
+            record, body.get(rdco_acts.ADVISER_FIELD), actor=request.user,
             reason=body.get("reason", ""),
         ))
 
