@@ -53,11 +53,51 @@ def _user(email, reader: str):
     return user
 
 
-def _bearer(user):
-    """Headers with a token minted per request: a run lasts longer than one token."""
-    from rest_framework_simplejwt.tokens import AccessToken
+def _service_secret():
+    import os
 
-    return lambda: {"Authorization": f"Bearer {AccessToken.for_user(user)}"}
+    return os.environ.get("AI_GATEWAY_SERVICE_SECRET", "").strip()
+
+
+def _bearer(user, *, start=None, clock=time.monotonic, idle_seconds=15 * 60):
+    """Headers with an access token minted per request from a tracked session.
+
+    The app refuses a token without a session (ADR-045 §4), and a session idle
+    for thirty minutes ends, so one left unused for fifteen is replaced.
+    """
+    if start is None:
+        from apps.accounts.sessions import start_session as start
+    state = {"refresh": None, "used": None}
+
+    def headers():
+        if state["refresh"] is None or clock() - state["used"] > idle_seconds:
+            state["refresh"] = start(user)
+        state["used"] = clock()
+        return {"Authorization": f"Bearer {state['refresh'].access_token}"}
+    return headers
+
+
+def _edge_headers(fetch, *, secret, record_id):
+    """What the reader edge adds before the gateway: a fresh grant, never the reader's token."""
+    def headers():
+        grant = fetch(record_id)
+        if not grant:
+            raise CommandError("Django refused the runtime grant (is AI_RUNTIME_READER on?)")
+        out = {"X-IRIS-Reader-Grant": grant, "X-IRIS-Protocol": "runs-reader-1",
+               "X-IRIS-Service-Secret": secret}
+        if record_id is not None:
+            out["X-IRIS-Record"] = str(record_id)
+        return out
+    return headers
+
+
+def _grant_fetcher(reader):
+    """The edge's subrequest, made in-process as ``reader``."""
+    def fetch(record_id):
+        extra = {"HTTP_X_IRIS_RECORD": str(record_id)} if record_id is not None else {}
+        response = reader._fresh().get("/api/v1/ai/runtime/edge-grant/", **extra)
+        return response.headers.get("X-IRIS-Reader-Grant") if response.status_code == 204 else None
+    return fetch
 
 
 def _stray_attempts(since, rows) -> list[str]:
@@ -119,9 +159,14 @@ def _served_model_problems(rows, runtime_model) -> list[str]:
     return [f"the runtime also answered with {other}, not only {runtime_model!r}"] if other else []
 
 
+def _allowed_host():
+    hosts = [h for h in settings.ALLOWED_HOSTS if h and h[0] not in "*."]
+    return hosts[0] if hosts else "localhost"
+
+
 class _Reader:
     def __init__(self, user):
-        self.client, self.headers = APIClient(), _bearer(user)
+        self.client, self.headers = APIClient(HTTP_HOST=_allowed_host()), _bearer(user)
 
     def _fresh(self):
         self.client.credentials(HTTP_AUTHORIZATION=self.headers()["Authorization"],
@@ -185,7 +230,11 @@ class Command(BaseCommand):
                             help="Keep this run file's Django answers; collect only the agent.")
         parser.add_argument("--reader-a", metavar="EMAIL")
         parser.add_argument("--reader-b", metavar="EMAIL")
+        parser.add_argument("--preflight", action="store_true",
+                            help="with --run: check everything, send nothing")
         parser.add_argument("--runtime-url")
+        parser.add_argument("--runtime-gateway", metavar="URL",
+                            help="the gateway itself; the command plays the reader edge")
         parser.add_argument("--runtime-model",
                             help="The model the runtime deployment answers with.")
         parser.add_argument("--depth", choices=("ordinary", "deep"), default="deep")
@@ -263,8 +312,13 @@ class Command(BaseCommand):
         from apps.ai.inference.profiles import profile_for
         from apps.ai.inference.tasks import InferenceTask
 
-        if not options["runtime_url"] or not options["runtime_model"]:
-            raise CommandError("--run needs --runtime-url and --runtime-model")
+        if not (options["runtime_url"] or options["runtime_gateway"]) or not options["runtime_model"]:
+            raise CommandError("--run needs --runtime-url (or --runtime-gateway) and "
+                               "--runtime-model")
+        if options["runtime_gateway"] and not settings.AI_RUNTIME_READER:
+            raise CommandError("--runtime-gateway needs AI_RUNTIME_READER on, as the edge does")
+        if options["runtime_gateway"] and not _service_secret():
+            raise CommandError("--runtime-gateway needs AI_GATEWAY_SERVICE_SECRET")
         if NEW_RUN_ENGINE != LEGACY_ENGINE:
             raise CommandError(f"the Django arm must be {LEGACY_ENGINE}, this code runs "
                                f"{NEW_RUN_ENGINE}")
@@ -335,18 +389,17 @@ class Command(BaseCommand):
         watermark = CampaignAttempts(limits.campaign_key).snapshot()
         caps = {"case_attempts": 10 ** 6}
         readers = {r: _Reader(users[r]) for r in aq.READERS}
-        seams = {r: RuntimeSeam(httpx.Client(base_url=options["runtime_url"],
-                                             timeout=options["run_deadline_seconds"]),
-                                headers=_bearer(users[r])) for r in aq.READERS}
+        seam_for = self._seams(options, users, readers)
+        if options["preflight"]:
+            self._preflight(data, options, limits, answer_model, seam_for, access)
+            return
 
         def django(case):
             return collect_case(readers[case["reader"]], _scope(case, access),
                                 attempts=django_attempts, limits=caps)
 
         def agent(case):
-            seam = seams[case["reader"]]
-            if case.get("scope"):
-                seam = seam.scoped(access.title_to_id[case["scope"]])
+            seam = seam_for(case["reader"], access.title_to_id.get(case.get("scope")))
             return collect_case_runtime(seam, _scope(case, access),
                                         attempts=runtime_attempts, limits=caps,
                                         depth=options["depth"],
@@ -392,6 +445,57 @@ class Command(BaseCommand):
         write_json(path, record)
         self.stdout.write(f"collected -> {path} ({len(not_run)} not run)")
         self._score(data, record, path, options, budget.fits_grade)
+
+    def _preflight(self, data, options, limits, answer_model, seam_for, access):
+        """Every check a paid run makes before sending, and nothing sent."""
+        problems = [f"no admission price for {m}" for m in
+                    (answer_model, options["runtime_model"], options["grader_model"])
+                    if normalize_model(m) not in {normalize_model(k) for k in limits.prices}]
+        if options["runtime_gateway"]:
+            private = data["corpus"].get("private") or {}
+            for reader in aq.READERS:
+                expected = {None: True}
+                if private.get("title") in access.title_to_id:
+                    expected[access.title_to_id[private["title"]]] = (
+                        reader == private["readable_by"])
+                for record_id, granted in expected.items():
+                    try:
+                        seam_for(reader, record_id).headers()
+                        got = True
+                    except CommandError:
+                        got = False
+                    if got != granted:
+                        problems.append(f"reader {reader} {'got' if got else 'was refused'} a "
+                                        f"runtime grant for record {record_id}")
+        try:
+            probe = httpx.get(f"{options['runtime_gateway'] or options['runtime_url']}/health",
+                              timeout=10)
+            if probe.status_code >= 500:
+                problems.append(f"the runtime answered {probe.status_code}")
+        except httpx.HTTPError as exc:
+            problems.append(f"the runtime is unreachable: {exc}")
+        budget = aq.Budget(run_ceiling_micros=limits.run.cost_micros,
+                           remaining=self._remaining(limits), arms=2)
+        worst = sum(budget.worst_case_micros(c) for c in data["cases"]) / 1e6
+        self.stdout.write(f"campaign {limits.campaign_key}: ${budget.remaining() / 1e6:.2f} left; "
+                          f"all {len(data['cases'])} cases at their worst ${worst:.2f}")
+        if problems:
+            raise CommandError("preflight failed:\n  " + "\n  ".join(problems))
+        self.stdout.write("preflight passed: nothing was sent")
+
+    def _seams(self, options, users, readers):
+        """A seam per (reader, scope): through the reader edge, or straight to the gateway."""
+        client = httpx.Client(base_url=options["runtime_gateway"] or options["runtime_url"],
+                              timeout=options["run_deadline_seconds"])
+        if options["runtime_gateway"]:
+            secret = _service_secret()
+            return lambda r, record_id: RuntimeSeam(
+                client, prefix="/api/v1/ai",
+                headers=_edge_headers(_grant_fetcher(readers[r]), secret=secret,
+                                      record_id=record_id))
+        seams = {r: RuntimeSeam(client, headers=_bearer(users[r])) for r in aq.READERS}
+        return lambda r, record_id: (seams[r].scoped(record_id) if record_id is not None
+                                     else seams[r])
 
     def _rescore(self, data, options):
         limits = self._admission()

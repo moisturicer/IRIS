@@ -82,6 +82,8 @@ The run checks each of these and refuses to send anything until all hold:
 python manage.py eval_answer_quality --set ../docs/evaluation/answer-quality/answer-quality-v2.json --lock ../docs/evaluation/answer-quality/answer-quality-v2.lock.json --grader-model <model> --run --reader-a <email> --reader-b <email> --runtime-url <reader origin> --runtime-model <model>
 ```
 
+Add `--preflight` to make every one of these checks and send nothing. In development, `--runtime-gateway <gateway URL>` in place of `--runtime-url` reaches the runtime without the nginx edge: the command asks Django for each reader's grant in-process, as the edge would, and needs `AI_RUNTIME_READER` on and `AI_GATEWAY_SERVICE_SECRET`. Each reader must have answered the current data notice (ADR-054); until then Django refuses their requests.
+
 **Collection.** Each case goes through Django and then through the runtime before the next case starts, so a stop affects both engines alike. Before a case starts, its worst case is compared with what is left of the campaign. That worst case is every turn of both engines plus two grading calls, each at the per-run ceiling. A case that might not fit is not sent, and it and every later case are reported as not run and scored as failures.
 
 **Grading.** The pinned grader sees:

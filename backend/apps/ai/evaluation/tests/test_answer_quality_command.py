@@ -110,17 +110,30 @@ def test_the_committed_lock_freezes_the_committed_set_with_its_pinned_grader():
     assert aq.check_lock(data, lock, grader_model=lock["grader_model"]) == []
 
 
-def test_every_request_carries_a_freshly_minted_reader_token():
+def test_every_request_carries_a_fresh_token_from_a_tracked_session():
     from types import SimpleNamespace
 
-    from rest_framework_simplejwt.tokens import AccessToken
+    from rest_framework_simplejwt.tokens import AccessToken, RefreshToken
 
     from apps.ai.management.commands.eval_answer_quality import _bearer
 
-    headers = _bearer(SimpleNamespace(id=7, pk=7))
+    started, now = [], [0.0]
+
+    def start(user):
+        refresh = RefreshToken()
+        refresh["user_id"] = user.id
+        refresh["sid"] = f"s{len(started)}"
+        started.append(refresh)
+        return refresh
+
+    headers = _bearer(SimpleNamespace(id=7, pk=7), start=start, clock=lambda: now[0],
+                      idle_seconds=60)
     first, second = headers()["Authorization"], headers()["Authorization"]
-    assert first.startswith("Bearer ") and first != second
-    assert str(AccessToken(second.removeprefix("Bearer "))["user_id"]) == "7"
+    assert first.startswith("Bearer ") and first != second and len(started) == 1
+    token = AccessToken(second.removeprefix("Bearer "))
+    assert str(token["user_id"]) == "7" and token["sid"] == "s0"
+    now[0] = 61.0
+    assert AccessToken(headers()["Authorization"].removeprefix("Bearer "))["sid"] == "s1"
 
 
 def test_a_campaign_attempt_no_case_accounts_for_is_a_condition_problem():
@@ -130,3 +143,37 @@ def test_a_campaign_attempt_no_case_accounts_for_is_a_condition_problem():
             "agent": {"F01-01": {"turns": [{"physical_attempts": [{"id": 12}]}]}}}
     assert _stray_attempts([{"id": 11}, {"id": 12}], rows) == []
     assert "13" in _stray_attempts([{"id": 11}, {"id": 13}], rows)[0]
+
+
+def test_gateway_requests_carry_what_the_edge_would_and_no_reader_token():
+    from apps.ai.management.commands.eval_answer_quality import _edge_headers
+
+    asked = []
+
+    def fetch(record_id):
+        asked.append(record_id)
+        return f"grant-{len(asked)}"
+
+    headers = _edge_headers(fetch, secret="s3cret", record_id=71)
+    first, second = headers(), headers()
+    assert first == {"X-IRIS-Reader-Grant": "grant-1", "X-IRIS-Protocol": "runs-reader-1",
+                     "X-IRIS-Service-Secret": "s3cret", "X-IRIS-Record": "71"}
+    assert second["X-IRIS-Reader-Grant"] == "grant-2" and asked == [71, 71]
+    assert "X-IRIS-Record" not in _edge_headers(fetch, secret="s", record_id=None)()
+
+
+def test_a_refused_edge_grant_stops_the_request():
+    from apps.ai.management.commands.eval_answer_quality import _edge_headers
+
+    with pytest.raises(CommandError, match="grant"):
+        _edge_headers(lambda record_id: None, secret="s", record_id=None)()
+
+
+def test_in_process_requests_use_a_host_django_allows(settings):
+    from types import SimpleNamespace
+
+    from apps.ai.management.commands.eval_answer_quality import _Reader
+
+    settings.ALLOWED_HOSTS = ["iris.example", "*.example"]
+    reader = _Reader(SimpleNamespace(id=7, pk=7))
+    assert reader.client.defaults["HTTP_HOST"] == "iris.example"
