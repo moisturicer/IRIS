@@ -56,6 +56,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-637** | An Excel import row is all-or-nothing: its Record, primary owner and authors are saved together or not at all | [details](traceability/IR-637.md) | **IMPLEMENTED** |
 | **IR-638** | A cell value the system cannot accept skips its import row and says why | [details](traceability/IR-638.md) | **IMPLEMENTED** |
 | **IR-667** | System settings are readable and writable by RDCO only; a PATCH cannot create a key; every change is audited | [details](traceability/IR-667.md) | **IMPLEMENTED** |
+| **IR-794** | A daily job erases personal data past the retention period the System Admin sets; a blank period erases nothing, and audit rows are never touched. Subtask 15 of IR-779 (ADR-051 decision 19) | [details](traceability/IR-794.md) | **PARTIAL** |
 | FR-M3-02 | Semantic indexing | [details](traceability/FR-M3-02.md) | **PARTIAL** |
 | FR-M3-03 | Vector embeddings | [details](traceability/FR-M3-03.md) | **PARTIAL** |
 | FR-M4-01 | RAG chatbot (Ask IRIS) | [details](traceability/FR-M4-01.md) | **PARTIAL** |
@@ -80,6 +81,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-632** | Under `RESTART_ALL` every reset office that had completed reviews the new version again, with the same reviewer — ADR-004's control arm … | [details](traceability/IR-632.md) | **IMPLEMENTED** |
 | **IR-268** | My Reviews: a reviewer's own seats plus their office's pool, as To review · In review · Done — touches FR-M5-01 (stable label only) | [details](traceability/IR-268.md) | **IMPLEMENTED** |
 | **IR-478** | RDCO grants and removes office coordinators on the Users page; demo coordinators — ADR-032 §4, after IR-415; touches FR-M5-01 (stable label … | [details](traceability/IR-478.md) | **IMPLEMENTED** |
+| **IR-797** | RDCO replaces a paper's Adviser, adds an owner and withdraws a paper in review — ADR-051 decision 10; touches FR-M5-01 (stable label only) | [details](traceability/IR-797.md) | **PARTIAL** |
 | **IR-413** | The sidebar: one short list, My Reviews only for review work, and an account menu — no FR- id; F1's navigation slice. The redirect table, … | [details](traceability/IR-413.md) | **IMPLEMENTED** |
 | **IR-534** | F1b: the redirect table, Discover home for everyone, the post-login landing on `review_access`, and the My Library needs-action dot (B2) — … | [details](traceability/IR-534.md) | **IMPLEMENTED** |
 | **IR-537** | A declined applicant is told so: `role_request` on `/users/me/`, and the pending screen in the entry frame — no FR- id; subtask 3 of IR-533 … | [details](traceability/IR-537.md) | **IMPLEMENTED** |
@@ -168,6 +170,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-442** | A retrieval miss is detectable rather than silent — no FR- id; the checker for the failure class ADR-023 measures in aggregate but cannot … | [details](traceability/IR-442.md) | **IMPLEMENTED** |
 | **IR-568** | Related works says why it is empty (ready, no matches, not indexed, incompatible, unavailable) without revealing hidden Records — no FR- id; user story 14 of IR-557's spec | [details](traceability/IR-568.md) | **IMPLEMENTED** |
 | **IR-312** | A proposer sees when their idea was already done here — the Novelty check; FR-M4 (stable label only) | [details](traceability/IR-312.md) | **IMPLEMENTED** |
+| **IR-786** | A person downloads a copy of their own data from one owner-only, audited, rate-limited endpoint — ADR-051 decision 13; FR-M6-06 (stable label only) | [details](traceability/IR-786.md) | **PARTIAL** |
 | **IR-826** | The AI gateway gets no Django database login; ADR-014's accepted amendment allows its runs login only | [details](traceability/IR-826.md) | **VERIFIED** |
 | **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
 | **IR-833** | Publish fills in a reliable title and abstract from the PDF and never overwrites the author's edits — no FR- id; IR-830 decisions 14–18 | [details](traceability/IR-833.md) | **IMPLEMENTED** |

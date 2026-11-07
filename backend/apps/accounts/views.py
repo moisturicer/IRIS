@@ -2,6 +2,8 @@ from django.db import transaction
 from django.http import FileResponse, Http404
 from django.utils import timezone
 from rest_framework import generics, status
+from django.utils.cache import add_never_cache_headers
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -17,14 +19,17 @@ from core.permissions import (
 )
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
+from apps.audit import retention
 from apps.audit.models import AuditEvent
 from . import profile, public_profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
-    RoleRequestSerializer, SystemSettingSerializer,
+    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer,
 )
+from .models import DataNotice
+from .notice import answer_notice, answer_payload, notice_payload, requires_answer
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
 
 #: RDCO's account acts leave a System Admin's account alone (ADR-051 §5).
@@ -44,7 +49,8 @@ from .sessions import (
     revoke_token,
 )
 from .lockout import LOCKED_BY_ADMIN
-from .throttles import LoginThrottle, RegisterThrottle
+from .throttles import LoginThrottle, PersonalDataExportThrottle, RegisterThrottle
+from .personal_data import EXPORT_FORMAT, SECTIONS, build_export
 
 
 class RegisterView(generics.CreateAPIView):
@@ -124,7 +130,54 @@ class LoginView(APIView):
             # The signed-in user's own payload, `review_access` included, so
             # the landing after sign-in needs no second request (IR-415).
             "user":    MeSerializer(user).data,
+            # ADR-054 (IR-789): true means every other request will be refused
+            # with `notice_acceptance_required` until the person answers, so the
+            # client shows the notice instead of loading the app.
+            "notice_answer_required": requires_answer(user),
         })
+
+
+class CurrentNoticeView(APIView):
+    """
+    GET /auth/notice/
+    The current data notice (ADR-054, IR-789). Public, because registration
+    shows it before there is an account. A signed-in caller also gets `answer`
+    (their last answer, or null) and `answer_required`, which is what the
+    frontend reads to decide whether to show the pop-up. Reachable while the
+    notice is unanswered: it is what the person must read.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        notice = DataNotice.current()
+        if notice is None:
+            return Response({"detail": "No data notice has been published."}, status=status.HTTP_404_NOT_FOUND)
+        data = notice_payload(notice)
+        user = request.user
+        if user and user.is_authenticated:
+            data["answer"] = answer_payload(user)
+            data["answer_required"] = requires_answer(user)
+        return Response(data)
+
+
+class AnswerNoticeView(APIView):
+    """
+    POST /auth/notice/answer/   {notice_version, agree_dpa, ai_consent}
+    Answer the current notice (ADR-054 decisions 1-4). Everyone answers, office
+    staff and the System Admin included. 409 `notice_stale` with the current
+    notice when `notice_version` is not it. Saying No to AI is a complete answer.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = NoticeAnswerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        answer_notice(request.user, notice_version=data["notice_version"], ai_consent=data["ai_consent"])
+        return Response(
+            {"answer": answer_payload(request.user), "answer_required": requires_answer(request.user)},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class LogoutView(APIView):
@@ -223,6 +276,32 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class PersonalDataExportView(APIView):
+    """One JSON file of the signed-in person's own data (ADR-051 decision 13, IR-786).
+
+    There is no id in the address and none to guess: the data is always the
+    caller's, so no role can read another person's through it (the System Admin
+    and RDCO included). Each download is audited, counts against a budget of its
+    own, and is never cached -- by the browser or by a proxy on the way.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle, PersonalDataExportThrottle]
+
+    def get(self, request):
+        payload = build_export(request.user)
+        create_audit_event(
+            AuditEvent.PERSONAL_DATA_EXPORTED,
+            request.user,
+            metadata={"format": EXPORT_FORMAT, "sections": sorted(SECTIONS)},
+        )
+        response = Response(payload)
+        response["Content-Disposition"] = 'attachment; filename="iris-my-data.json"'
+        add_never_cache_headers(response)
+        response["Cache-Control"] = "no-store, private"
+        return response
 
 
 class MePhotoView(APIView):
@@ -710,6 +789,9 @@ class SystemSettingView(APIView):
         value = request.data.get("value")
         if not isinstance(value, str):
             return Response({"value": ["A text value is required."]}, status=400)
+        # A retention period is whole days, or blank to erase nothing (IR-794).
+        if key in retention.setting_keys() and (error := retention.period_error(value)):
+            return Response({"value": [error]}, status=400)
         with transaction.atomic():
             setting = SystemSetting.objects.select_for_update().filter(key=key).first()
             if not setting:

@@ -151,6 +151,12 @@ RECORDS: dict[str, Entry | Shadowed] = {
     )}),
     "record-embargo-release": Entry({"POST": _case(RELEASES_EMBARGO, kwargs=RECORD)}),
     "record-ip-release": Entry({"POST": _case(RELEASES_IP, kwargs=RECORD)}),
+    # ADR-051 §10 (IR-797): RDCO alone replaces an Adviser, adds an owner to,
+    # or withdraws a paper in review. A role gate before the lookup; an empty
+    # body is refused with a 400 for RDCO, so the call changes nothing.
+    "record-replace-adviser": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
+    "record-add-owner": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
+    "record-withdraw": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
@@ -486,6 +492,11 @@ ACCOUNTS = {
     # Missing credentials are rejected for every caller, including signed-in users.
     "auth-login": Entry({"POST": _case(row(*([ANON]*10)), data={})}),
     "auth-logout": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # ADR-054 (IR-789): the notice is public (registration shows it) and answering
+    # is every signed-in account's own act, office staff and System Admin included.
+    # An empty body is refused as invalid, which is not an access denial.
+    "notice-current": Entry({"GET": _case(PUBLIC)}),
+    "notice-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),
@@ -500,6 +511,9 @@ ACCOUNTS = {
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                       for m in ("GET", "PUT", "PATCH")}),
+    # IR-786: the caller's own data, whoever they are. No id to name, so there is
+    # no other person's copy for any role to reach.
+    "user-me-data": Entry({"GET": _case(SIGNED_IN)}),
     # IR-695: a person's optional profile. Both writes act on `request.user` and
     # name nobody else; the photo is read by any signed-in user, through Django
     # only (MEDIA_URL is not routed). `photo_user` is an account that has one --

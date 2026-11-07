@@ -96,7 +96,13 @@ Decisions these features add:
   per-account view records, download notes and download audit events. None is
   set yet. Under ADR-051 the System Admin enters each approved period, and a
   blank period erases nothing. Audit events can't be erased, so their period
-  needs a different answer.
+  needs a different answer. **Built (IR-794):** one daily job erases each type
+  past the period in its system setting, in whole days, and writes an audit
+  event with counts only. Download notes are the only type registered so far, so
+  the DPO's answer is needed for that one now and for the others as they ship.
+  A declined or revoked request's RDCO note is also copied into the reader's
+  notification text, which the job doesn't erase: notification retention needs
+  its own answer.
 - [ ] Confirm that an account deletion may keep a person's name on published
   papers and in audit events, and that a deleted person's notice says so
   (ADR-051).

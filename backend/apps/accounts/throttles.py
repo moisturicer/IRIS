@@ -6,7 +6,7 @@ DRF's own identification trusts the whole `X-Forwarded-For` header unless told
 how many proxies there are, so a client could buy a fresh budget per request by
 sending a new value.
 """
-from rest_framework.throttling import SimpleRateThrottle
+from rest_framework.throttling import SimpleRateThrottle, UserRateThrottle
 
 from .client_address import client_address
 
@@ -14,6 +14,12 @@ from .client_address import client_address
 class ClientAddressThrottle(SimpleRateThrottle):
     def get_cache_key(self, request, view):
         return self.cache_format % {"scope": self.scope, "ident": client_address(request)}
+
+
+class PersonalDataExportThrottle(UserRateThrottle):
+    """A person's own data download (IR-786): a budget of its own, per signed-in person."""
+
+    scope = "personal_data_export"
 
 
 class LoginThrottle(ClientAddressThrottle):

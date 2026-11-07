@@ -480,6 +480,16 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         if may_release_ip(user, record) and why_not_releasable(record) is None:
             offered.append("release_ip")
 
+    # RDCO's three acts on a paper in review (ADR-051 §10, IR-797): `add-owner/`
+    # and `withdraw/`, and `replace-adviser/` while an Adviser review is open.
+    # The same predicates `rdco_acts` checks, so the hint cannot offer more.
+    from apps.records import rdco_acts
+
+    if rdco_acts.is_rdco(user) and record.pipeline_status == PipelineStatus.IN_REVIEW:
+        if rdco_acts.adviser_review(record) is not None:
+            offered.append("replace_adviser")
+        offered.extend(["add_owner", "withdraw_paper"])
+
     # `review-comments/`: the record's participants, once it is submitted
     # (ADR-032 §7, IR-419). A pool member reads the discussion but is not
     # offered a place in it.
