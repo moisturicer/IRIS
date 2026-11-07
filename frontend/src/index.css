@@ -180,6 +180,33 @@
   outline-offset: 1px;
 }
 
+/* Review threads' passages (IR-875): the prototype's wash with a thread
+   underline; a draft is the wash alone, dashed. Drawn over the text layer
+   without taking its pointer, so the words stay selectable. */
+.thread-mark {
+  background-color: rgb(253 242 242 / 0.55);
+  box-shadow: inset 0 -2px 0 #f9b8b9;
+  mix-blend-mode: multiply;
+}
+
+.thread-mark-pending {
+  background-color: rgb(253 242 242 / 0.45);
+  box-shadow: inset 0 -2px 0 rgb(249 184 185 / 0.7);
+  border-bottom: 1px dashed #8b1d22;
+  mix-blend-mode: multiply;
+}
+
+/* A thread's pin grows and shrinks with the page, so at a low zoom it no
+   longer covers the words it marks; 12px is the least it shrinks to, the
+   smallest a pointer can still hit (the page box sets the factor). */
+.thread-pin {
+  --pin: max(12px, calc(20px * var(--total-scale-factor, 1)));
+  min-width: var(--pin);
+  height: var(--pin);
+  padding: 0 calc(var(--pin) / 4);
+  font-size: calc(var(--pin) * 0.55);
+}
+
 /* ── Folio Ribbon motion (IR-744) ────────────────────────────────────────
    The loader plays the concept board's storyboard: one leaf, its partner,
    then the two ribbons unspool from the spine, leaving the I standing in the

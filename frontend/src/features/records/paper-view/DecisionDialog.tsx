@@ -85,7 +85,7 @@ function wording(outcome: DecisionOutcome, kind: string) {
 }
 
 /** Each piece of open work deciding would end, as one line. */
-function closingLines(closes: DecisionCloses | null): string[] {
+export function closingLines(closes: DecisionCloses | null): string[] {
   if (!closes) return [];
   const lines = closes.assignments.map((a) =>
     a.holders.length > 0

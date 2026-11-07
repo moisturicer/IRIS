@@ -236,6 +236,8 @@ export const DIALOGS: DialogCase[] = [
   consoleAction("extend a due date", "Extend due date", "seat", "features/review/ExtendDueDateDialog.tsx"),
   reviewAction("accept and publish a paper", "accept_publish", "Accept & publish…", "features/records/paper-view/DecisionDialog.tsx"),
   reviewAction("reject a paper", "reject", "Reject…", "features/records/paper-view/DecisionDialog.tsx"),
+  // Finish review (IR-875): the footer's one way to finish where `finish_review` is granted.
+  reviewAction("finish a review", "finish_review", "Finish review…", "features/records/paper-view/threads/FinishReviewDialog.tsx"),
   reviewAction("request a revision", "request_revision", "Request Revision…", "features/records/paper-view/RequestRevisionDialog.tsx"),
   reviewAction("clear a paper at an office", "office_review", "Clear…", "features/records/paper-view/OfficeReviewDialog.tsx"),
   reviewAction("record an office finding", "office_review", "Record finding…", "features/records/paper-view/OfficeReviewDialog.tsx"),

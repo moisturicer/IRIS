@@ -4,6 +4,7 @@ import type {
   IpReleaseResult,
   Classification, PSCEDClassification, RecordType,
   DownloadRequest, ReaderDownloadRequest, DeleteRequest, RecordTracker, ReviewComment,
+  ThreadSeverity, ThreadAnchor, FinishReviewRequest,
   DocumentRequest, DocumentRequestItemDecision, DocumentRequestItemInput,
   DocumentRequestSlot, DecisionOutcome, OfficeReviewOutcome, Party, RouteOptions, RouteRequest,
   DiscoverInterests, ForYouPage, MetadataSuggestions,
@@ -60,11 +61,39 @@ export const recordsApi = {
    * A participant comments in the review discussion, or replies to a comment
    * (ADR-032 §7, IR-419). The timeline reads it back from the tracker.
    */
-  postReviewComment: (id: number, body: { body: string; reply_to?: number }) =>
-    apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
+  postReviewComment: (
+    id: number,
+    body: { body: string; reply_to?: number; severity?: ThreadSeverity; anchor?: ThreadAnchor },
+  ) => apiClient.post<ReviewComment>(`/records/${id}/review-comments/`, body),
   /** Its author edits a comment; a changed body is marked edited. */
   editReviewComment: (id: number, commentId: number, body: { body: string }) =>
     apiClient.patch<ReviewComment>(`/records/${id}/review-comments/${commentId}/`, body),
+  /**
+   * Every comment the viewer may see, oldest first: every sent one and their
+   * own drafts (ADR-032 §7, IR-874). A 404 to anyone who may not read the review.
+   */
+  reviewComments: (id: number) =>
+    apiClient.get<ReviewComment[]>(`/records/${id}/review-comments/`),
+  /** Its writer discards a draft (*Discard*). A sent comment stays. */
+  deleteReviewComment: (id: number, commentId: number) =>
+    apiClient.delete<void>(`/records/${id}/review-comments/${commentId}/`),
+  /** A thread's acts (IR-874); each answers with the thread as the viewer now sees it. */
+  changeThreadSeverity: (id: number, threadId: number, severity: ThreadSeverity) =>
+    apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/severity/`, { severity }),
+  resolveThread: (id: number, threadId: number) =>
+    apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/resolve/`, {}),
+  reopenThread: (id: number, threadId: number) =>
+    apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/reopen/`, {}),
+  /** An owner answers a reviewer's thread: Addressed, saying where, or Declined, with a reason. */
+  answerThread: (id: number, threadId: number, body: { answer: "addressed" | "declined"; note: string }) =>
+    apiClient.post<ReviewComment>(`/records/${id}/review-comments/${threadId}/answer/`, body),
+  /**
+   * A Seat holder sends their drafts with a summary and a verdict, in one act
+   * (ADR-032 §7, IR-874). Each verdict keeps its own service's refusals; a
+   * Decision's stale token is a 409. Answers with the tracker.
+   */
+  finishReview: (id: number, body: FinishReviewRequest) =>
+    apiClient.post<RecordTracker>(`/records/${id}/finish-review/`, body),
 
   /** Document requests on a record, oldest first (ADR-022 §5, IR-262). */
   documentRequests: (id: number) =>

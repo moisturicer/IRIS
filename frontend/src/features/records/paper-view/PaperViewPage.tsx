@@ -719,7 +719,7 @@ export default function PaperViewPage() {
       ? "elsewhere"
       : can.has("open_review") && section !== "review"
         ? "open_review"
-        : section === "review" && REVIEW_ACTIONS.some((action) => can.has(action.capability))
+        : section === "review" && (can.has("finish_review") || REVIEW_ACTIONS.some((action) => can.has(action.capability)))
           ? "elsewhere"
           : hasPaper
             ? "view"
