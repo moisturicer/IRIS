@@ -192,6 +192,18 @@ class UserInterest(models.Model):
         ordering = ["position"]
 
 
+def delete_photo_file(name):
+    """Remove one stored account photo, by the name its row held.
+
+    Goes through the model's own file field (`FieldFile.delete`), which is how
+    Django removes a model's file, so it can only ever reach `User.photo`'s
+    storage and not any other. `records/test_record_versions.py` forbids a
+    direct delete on a storage object anywhere in the app code, so that no
+    manuscript file is ever deleted by accident; a photo is not one.
+    """
+    User(photo=name).photo.delete(save=False)
+
+
 @receiver(post_delete, sender=User)
 def delete_photo_with_account(sender, instance, using, **kwargs):
     """Deleting an account deletes its stored photo, and any tag only it used (IR-695).
@@ -203,8 +215,7 @@ def delete_photo_with_account(sender, instance, using, **kwargs):
     """
     name = instance.photo.name if instance.photo else None
     if name:
-        storage = instance.photo.storage
-        transaction.on_commit(lambda: storage.delete(name), using=using, robust=True)
+        transaction.on_commit(lambda: delete_photo_file(name), using=using, robust=True)
     ResearchInterest.objects.using(using).filter(user_links__isnull=True).delete()
 
 

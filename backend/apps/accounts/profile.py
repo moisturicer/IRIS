@@ -24,7 +24,7 @@ from django.db.models.functions import Lower
 from PIL import Image, ImageOps
 from rest_framework.exceptions import ValidationError
 
-from .models import ResearchInterest, User, UserInterest
+from .models import ResearchInterest, User, UserInterest, delete_photo_file
 
 BIO_MAX_LENGTH = 500
 INTERESTS_MAX = 10
@@ -196,16 +196,16 @@ def set_photo(user: User, upload, crop: tuple[int, int, int] | None) -> None:
     data = prepare_photo(upload, crop)  # before the row lock: decoding is the slow part
     with transaction.atomic():
         locked = User.objects.select_for_update().get(pk=user.pk)
-        storage, old = locked.photo.storage, locked.photo.name or None
+        old = locked.photo.name or None
         locked.photo.save("photo.jpg", ContentFile(data), save=False)
         locked.photo_version += 1
         try:
             locked.save(update_fields=["photo", "photo_version"])
         except Exception:
-            storage.delete(locked.photo.name)  # the row did not take it: do not orphan the file
+            delete_photo_file(locked.photo.name)  # the row did not take it: do not orphan the file
             raise
         if old:  # after commit, so a failed request cannot leave a row naming a deleted file
-            transaction.on_commit(lambda: storage.delete(old), robust=True)
+            transaction.on_commit(lambda: delete_photo_file(old), robust=True)
     user.photo, user.photo_version = locked.photo, locked.photo_version
 
 
@@ -215,11 +215,11 @@ def remove_photo(user: User) -> None:
         locked = User.objects.select_for_update().get(pk=user.pk)
         if not locked.photo:
             return
-        storage, old = locked.photo.storage, locked.photo.name
+        old = locked.photo.name
         locked.photo = None
         locked.photo_version += 1
         locked.save(update_fields=["photo", "photo_version"])
-        transaction.on_commit(lambda: storage.delete(old), robust=True)
+        transaction.on_commit(lambda: delete_photo_file(old), robust=True)
     user.photo, user.photo_version = locked.photo, locked.photo_version
 
 
