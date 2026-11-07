@@ -42,6 +42,20 @@ class AdmittedAgentProvider(LLMProvider):
         self.lane = lane
         self.purpose = purpose
 
+    def _policy(self, pin) -> dict:
+        limits = self.ledger.limits
+        return {"account": self.provider.account,
+                "campaign": limits.campaign_key if limits else None,
+                "routing": getattr(self.provider, "routing", None),
+                "price": getattr(limits, "prices", {}).get(pin.model) if limits else None}
+
+    async def eligible(self, pin, sources: frozenset) -> frozenset:
+        """Which of `sources` a send for this run may carry now; nothing outside a run."""
+        binding = scope.current()
+        if binding is None or not sources:
+            return frozenset()
+        return await self.guard.eligible(binding, pin, frozenset(sources), **self._policy(pin))
+
     def accepts(self, pin) -> bool:
         return self.provider.accepts(pin)
 
@@ -88,12 +102,7 @@ class AdmittedAgentProvider(LLMProvider):
                         or getattr(e, "unverified_provenance", False)]
             # A previous model turn may carry derived text or opaque state even
             # when the original tool result has left the fitted context.
-            await self.guard.check(binding, request.pin, evidence,
-                                   account=self.provider.account,
-                                   campaign=self.ledger.limits.campaign_key if self.ledger.limits else None,
-                                   routing=getattr(self.provider, "routing", None),
-                                   price=(getattr(self.ledger.limits, "prices", {}).get(request.pin.model)
-                                          if self.ledger.limits else None))
+            await self.guard.check(binding, request.pin, evidence, **self._policy(request.pin))
             # From here the vendor may bill it, whatever happens next.
             usage.sent = True
             with scope.admitted_send():

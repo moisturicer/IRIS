@@ -291,6 +291,18 @@ def _final(turn: ModelTurn) -> str:
         raise Unavailable(refused.code) from None
 
 
+def _screen(provider, pin):
+    """The admitted transport's source check, so results leave out what a send could not carry (IR-889)."""
+    eligible = getattr(provider, "eligible", None)
+    if eligible is None:
+        return None
+
+    async def screen(sources):
+        return await eligible(pin, sources)
+
+    return screen
+
+
 class _Run:
     """One run's investigation; nothing here outlives it."""
 
@@ -310,7 +322,8 @@ class _Run:
             tools, clarify=not asked,
             metadata=version in (METADATA_TOOL_VERSION, MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION),
             manuscripts=version in (MANUSCRIPT_TOOL_VERSION, RECOVERY_TOOL_VERSION),
-            recovery=version == RECOVERY_TOOL_VERSION)
+            recovery=version == RECOVERY_TOOL_VERSION,
+            screen=_screen(agent.provider, agent.pin))
         self.prior = context.prior[-self.bounds.history_turns:] if self.bounds.history_turns else ()
         self.steps = 0
         # Whatever an earlier fence spent stays spent, the attempt it left uncertain included (IR-724).

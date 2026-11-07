@@ -157,18 +157,42 @@ class SendGuard:
         self.proxy_approval = proxy_approval
         self.stage = stage
 
+    def _pilot(self, pin) -> bool:
+        return (getattr(pin, "adapter", None) == "openai-compatible"
+                and getattr(pin, "endpoint", None) == OPENROUTER)
+
+    def _approved(self, pin, sources, account, campaign, routing, price) -> bool:
+        return (self.stage == "development" and self.proxy_approval is not None
+                and self.proxy_approval.permits(pin, account, campaign, sources, routing, price))
+
     async def check(self, binding: RunBinding, pin, dependencies: Iterable = (), *,
                     account: str | None = None, campaign: str | None = None,
                     routing=None, price=None) -> None:
         if pin.data_policy != NO_TRAINING:
             raise AdmissionDenied(errors.PROVIDER_REFUSED)
         sources = _sources(dependencies)
-        pilot = (getattr(pin, "adapter", None) == "openai-compatible"
-                 and getattr(pin, "endpoint", None) == OPENROUTER)
-        if (sources or pilot) and (self.stage != "development" or self.proxy_approval is None
-                                   or not self.proxy_approval.permits(pin, account, campaign, sources,
-                                                                      routing, price)):
+        if (sources or self._pilot(pin)) and not self._approved(pin, sources, account, campaign,
+                                                                routing, price):
             raise AdmissionDenied(errors.WITHHELD)
+        if (await self._run_checked(binding, sources)) != sources:
+            raise AdmissionDenied(errors.WITHHELD)
+
+    async def eligible(self, binding: RunBinding, pin, sources: frozenset[Source], *,
+                       account: str | None = None, campaign: str | None = None,
+                       routing=None, price=None) -> frozenset[Source]:
+        """The subset of `sources` a send could carry now; the rest is left out, not refused.
+
+        Run-level failures (fence, deadline, revoked reader) still raise.
+        """
+        if not sources or pin.data_policy != NO_TRAINING:
+            return frozenset()
+        approved = frozenset(s for s in sources
+                             if self._approved(pin, frozenset({s}), account, campaign, routing, price))
+        if not approved:
+            return approved
+        return await self._run_checked(binding, approved)
+
+    async def _run_checked(self, binding: RunBinding, sources: frozenset[Source]) -> frozenset[Source]:
         try:
             conn = await asyncpg.connect(self.dsn)
             try:
@@ -189,8 +213,7 @@ class SendGuard:
                         raise AdmissionDenied(errors.DEADLINE)
                     if row["reader"] != "active" or not row["granted"]:
                         raise AdmissionDenied(errors.ACCESS_REVOKED)
-                    if sources:
-                        await self._check_sources(conn, row, sources)
+                    return await self._current(conn, row, sources) if sources else frozenset()
             finally:
                 await conn.close()
         except asyncpg.InsufficientPrivilegeError:
@@ -198,7 +221,8 @@ class SendGuard:
         except (asyncpg.PostgresError, asyncpg.InterfaceError, OSError):
             raise AdmissionDenied(errors.STORE_UNAVAILABLE) from None
 
-    async def _check_sources(self, conn, run, sources: frozenset[Source]) -> None:
+    async def _current(self, conn, run, sources: frozenset[Source]) -> frozenset[Source]:
+        """The sources still readable by the run's reader at their exact revision."""
         grant = run["reader_grant"]
         if not grant:
             raise AdmissionDenied(errors.ACCESS_REVOKED)
@@ -220,11 +244,12 @@ class SendGuard:
             ids, run["scope_record_id"],
         )
         current = {row["id"]: row for row in rows}
-        for source in sources:
+
+        def ok(source):
             row = current.get(source.record_id)
-            if (row is None or row["chunk_set_id"] != source.chunk_set_id
-                    or row["extraction_hash"] != source.extraction_hash
-                    or row["origin"] not in PROXY_ORIGINS or row["is_ip"] is not False
-                    or row["is_embargoed"] is not False
-                    or row["embargo_released_at"] is None):
-                raise AdmissionDenied(errors.WITHHELD)
+            return (row is not None and row["chunk_set_id"] == source.chunk_set_id
+                    and row["extraction_hash"] == source.extraction_hash
+                    and row["origin"] in PROXY_ORIGINS and row["is_ip"] is False
+                    and row["is_embargoed"] is False and row["embargo_released_at"] is not None)
+
+        return frozenset(s for s in sources if ok(s))

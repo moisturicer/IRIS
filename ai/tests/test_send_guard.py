@@ -270,3 +270,86 @@ def test_real_proxy_requires_account_evidence_routing_and_covering_price(monkeyp
     conn.record["embargo_released_at"] = None
     with pytest.raises(AdmissionDenied):
         check()
+
+
+# --- Screening: ineligible sources are left out, not fatal --------------------
+
+OTHER = Source(8, 32, "source-b")
+
+
+def test_eligible_returns_only_the_approved_current_sources(monkeypatch):
+    conn = Connection()
+
+    async def connect(*_):
+        return conn
+
+    monkeypatch.setattr("ai.admission.guard.asyncpg.connect", connect)
+    provider = RecordingAgentProvider(responses=[])
+    guard = SendGuard("unused", approval(provider), stage="development")
+    found = asyncio.run(guard.eligible(BINDING, PIN, frozenset({SOURCE, OTHER}),
+                                       account=provider.account, campaign="pilot"))
+    assert found == frozenset({SOURCE})
+    assert asyncio.run(SendGuard("unused", stage="development").eligible(
+        BINDING, PIN, frozenset({SOURCE}), account=provider.account, campaign="pilot")) == frozenset()
+    conn.record["is_ip"] = True
+    assert asyncio.run(guard.eligible(BINDING, PIN, frozenset({SOURCE}),
+                                      account=provider.account, campaign="pilot")) == frozenset()
+
+
+def test_eligible_still_ends_a_revoked_run(monkeypatch):
+    async def connect(*_):
+        return Connection(reader="inactive")
+
+    monkeypatch.setattr("ai.admission.guard.asyncpg.connect", connect)
+    provider = RecordingAgentProvider(responses=[])
+    with pytest.raises(AdmissionDenied):
+        asyncio.run(SendGuard("unused", approval(provider), stage="development").eligible(
+            BINDING, PIN, frozenset({SOURCE}), account=provider.account, campaign="pilot"))
+
+
+def _search_result():
+    from ai.research.tools import Coverage, PassageRef, RecordRef, ToolResult as Evidence
+    return Evidence("ok", records=(RecordRef("R1", 7, "Approved", SOURCE), RecordRef("R2", 8, "Other", OTHER)),
+                    passages=(PassageRef("P1", 7, 1, "Methods", "Approved text.", SOURCE),
+                              PassageRef("P2", 8, 2, "Methods", "Institutional text.", OTHER)),
+                    coverage=Coverage(returned=2, total=2), dependencies=frozenset({SOURCE, OTHER}))
+
+
+def _investigation(screen):
+    from ai.agent.tools import Investigation
+    return Investigation(research=None, screen=screen)
+
+
+def test_a_result_keeps_only_what_a_send_may_carry():
+    async def screen(sources):
+        return sources & {SOURCE}
+
+    investigation = _investigation(screen)
+    result = asyncio.run(investigation._screened(_search_result()))
+    body = json.loads(investigation._evidence(result).content)
+    assert [p["passage"] for p in body["passages"]] == ["P1"]
+    assert "Institutional text." not in json.dumps(body)
+    assert result.dependencies == frozenset({SOURCE})
+    assert body["coverage"]["returned"] == 1
+    assert investigation.withheld == 1
+
+
+def test_a_result_with_nothing_eligible_is_a_withheld_no_match():
+    async def screen(sources):
+        return frozenset()
+
+    result = asyncio.run(_investigation(screen)._screened(_search_result()))
+    assert (result.status, result.reason, result.passages, result.dependencies) == ("no_match", "withheld", (), frozenset())
+
+
+def test_a_failing_screen_shows_nothing():
+    async def screen(sources):
+        raise RuntimeError("store down")
+
+    result = asyncio.run(_investigation(screen)._screened(_search_result()))
+    assert (result.status, result.passages, result.dependencies) == ("no_match", (), frozenset())
+
+
+def test_without_a_screen_results_are_unchanged():
+    original = _search_result()
+    assert asyncio.run(_investigation(None)._screened(original)) is original
