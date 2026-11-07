@@ -50,20 +50,37 @@ COUNTED_UNREADABLE = """EXISTS (
 REBUILT = "rebuilt"
 # Every source used by research, including uncited and legacy revisions, must
 # still be current before its derived answer can be replayed or recalled.
-CURRENT_SOURCE_TURN = """NOT EXISTS (
+# Correlated on Turn `{t}`.
+_OWN_SOURCES_CURRENT = """NOT EXISTS (
     SELECT 1 FROM (
-      SELECT ci.revision FROM iris_ai.citation ci WHERE ci.turn_id=t.id
+      SELECT ci.revision FROM iris_ai.citation ci WHERE ci.turn_id={t}.id
       UNION
       SELECT jsonb_array_elements_text(ev.data->'sources') AS revision
-        FROM iris_ai.run_event ev WHERE ev.run_id=t.run_id AND ev.name='tool'
+        FROM iris_ai.run_event ev WHERE ev.run_id={t}.run_id AND ev.name='tool'
          AND ev.sequence > coalesce((
              SELECT max(rb.sequence) FROM iris_ai.run_event rb
               WHERE rb.run_id=ev.run_id AND rb.name='recovery' AND rb.data->>'outcome'='""" + REBUILT + """'), 0)
     ) dependency WHERE dependency.revision IS NOT NULL AND NOT EXISTS (
       SELECT 1 FROM iris_ai.research_chunksets() cs WHERE cs.is_active
         AND cs.id::text || ':' || cs.extraction_hash=dependency.revision))
-  AND NOT """ + COUNTED_UNREADABLE
+  AND NOT """ + COUNTED_UNREADABLE.replace("t.facts", "{t}.facts")
 
+#: Journal event naming the earlier Turns a claim carried as history or compacted (IR-721).
+CARRIED = "carried"
+# A Turn's answer may restate any earlier Turn it was given as history, so it
+# stands only while that Turn does, and so on back through what that Turn
+# carried. Recorded at claim, never inferred: a run claimed before IR-721 has no
+# `carried` event and is judged by its own sources alone.
+CURRENT_SOURCE_TURN = """NOT EXISTS (
+    WITH RECURSIVE carried(id, run_id) AS (
+      SELECT t.id, t.run_id
+      UNION
+      SELECT p.id, p.run_id FROM carried c
+        JOIN iris_ai.run_event ce ON ce.run_id=c.run_id AND ce.name='""" + CARRIED + """'
+        CROSS JOIN LATERAL jsonb_array_elements_text(ce.data->'turns') o(ordinal)
+        JOIN iris_ai.turn p ON p.conversation_id=t.conversation_id AND p.ordinal=o.ordinal::int)
+    SELECT 1 FROM carried c JOIN iris_ai.turn d ON d.id=c.id
+     WHERE NOT (""" + _OWN_SOURCES_CURRENT.replace("{t}", "d") + "))"
 
 # A handoff stands only while every Turn it compacts would still be carried and
 # every source its findings name is still current; correlated on handoff `h` (IR-734).
@@ -508,7 +525,7 @@ class RunStore:
         await self._journal(conn, run_id, "started", {"attempt": used + 1})
         # Only a handoff a completed run left opens later runs; a failed run's never does (IR-734).
         handoff = await conn.fetchrow(
-            f"""SELECT h.revision, h.through_ordinal, h.body FROM iris_ai.conversation_handoff h
+            f"""SELECT h.revision, h.through_ordinal, h.body, h.turns FROM iris_ai.conversation_handoff h
                   JOIN iris_ai.ask_run hr ON hr.id = h.run_id
                  WHERE h.conversation_id = $1 AND hr.state = 'completed' AND h.through_ordinal >= 1
                    AND {CURRENT_HANDOFF}
@@ -521,6 +538,9 @@ class RunStore:
                 ORDER BY ordinal DESC LIMIT $2""",
             row["conversation_id"], PRIOR_TURNS, handoff["through_ordinal"] if handoff else 0,
         )
+        carried = sorted({t["ordinal"] for t in prior} | set(handoff["turns"] if handoff else ()))
+        if carried:
+            await self._journal(conn, run_id, CARRIED, {"turns": carried})
         compactions = await conn.fetchval(
             """SELECT count(*) FROM iris_ai.run_event
                 WHERE run_id = $1 AND name = 'model' AND data->>'phase' = 'compact'""", run_id,

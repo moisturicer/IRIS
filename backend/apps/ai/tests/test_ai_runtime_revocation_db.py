@@ -58,6 +58,7 @@ def surfaces(client, headers, delivered):
         "reopen": client.get(f"/api/v1/ai/conversations/{conversation}", headers=headers),
         "status": client.get(f"/api/v1/ai/runs/{run_id}", headers=headers),
         "replay": client.get(f"/api/v1/ai/runs/{run_id}?after=0", headers=headers),
+        "replay_cursor": client.get(f"/api/v1/ai/runs/{run_id}?after=1", headers=headers),
     }
 
 
@@ -106,7 +107,8 @@ def test_revoked_evidence_leaves_every_saved_surface_for_the_owner_and_everyone_
     stranger, other = reader(f"rev-stranger-{cause}@cit.edu")
     resolver = client_for(stranger)
     before = surfaces(client, headers, delivered)
-    assert {name: r.status_code for name, r in before.items()} == {"reopen": 200, "status": 200, "replay": 200}
+    assert {name: r.status_code for name, r in before.items()} == {
+        "reopen": 200, "status": 200, "replay": 200, "replay_cursor": 200}
     assert SECRET in before["reopen"].text.lower()
     assert before["replay"].json()["journal"]
     # The citation opens the paper for any reader of the public catalogue, today.
@@ -121,7 +123,7 @@ def test_revoked_evidence_leaves_every_saved_surface_for_the_owner_and_everyone_
     [turn] = after["reopen"].json()["turns"]
     assert turn["citations"] == [] and turn["facts"] == [] and UNAVAILABLE in turn["answer"]
     assert after["status"].json()["sources_available"] is False
-    assert after["replay"].json()["journal"] == []
+    assert after["replay"].json()["journal"] == [] and after["replay_cursor"].json()["journal"] == []
 
     # Another reader never reached the Conversation at all, before or after: a missing id, exactly.
     missing = surfaces(client, other, {"conversation_id": uuid.uuid4(), "id": uuid.uuid4()})
@@ -179,6 +181,48 @@ def test_an_unrelated_finding_survives_in_its_own_conversation_and_a_dependent_f
     for turn in withheld.json()["turns"]:
         assert UNAVAILABLE in turn["answer"] and turn["citations"] == [] and turn["facts"] == []
     assert "rainfall" not in withheld.text.lower() and "flood forecasting" not in withheld.text.lower()
+
+
+def test_a_later_turn_that_carried_a_revoked_turn_as_history_is_withheld_too(api, runtime):
+    # Turn 1 cites the flood paper; Turns 2 and 3 cite only the pond paper. Turn 3's own
+    # research never touched the flood paper, but it was given Turn 1's answer as history.
+    client, holder = api
+    flood = paper("Flood forecasting", {1: [("Methods", FLOOD)]})
+    paper("Pond sampling", {1: [("Methods", POND)]})
+
+    def cite_flood(payload):
+        return reply(f"Rainfall gauges forecast floods [{last_result(payload)['passages'][0]['passage']}].")
+
+    def cite_pond(payload):
+        return reply(f"Tilapia ponds were sampled [{last_result(payload)['passages'][0]['passage']}].")
+
+    provider = recording(search("rainfall"), cite_flood, search("tilapia"), cite_pond,
+                         search("tilapia"), cite_pond)
+    holder["service"] = agent_service(runtime, provider)
+    _, headers = reader("rev-three@cit.edu")
+    first = ask(client, headers, "rev-three-0001", "Which paper forecasts floods?").json()
+    path = f"/api/v1/ai/conversations/{first['conversation_id']}"
+    runs = [first]
+    for n, question in ((2, "Which paper samples ponds?"), (3, "Anything more on ponds?")):
+        revision = client.get(path, headers=headers).json()["revision"]
+        runs.append(ask(client, headers, f"rev-three-000{n}", question,
+                        conversation_id=first["conversation_id"], base_revision=revision).json())
+    assert [r["state"] for r in runs] == ["completed"] * 3
+    # Positive control: the flood answer really was carried into Turn 3's request.
+    assert "rainfall gauges" in json.dumps(provider.requests[-2:], default=str).lower()
+    assert rows("SELECT data->'turns' FROM iris_ai.run_event WHERE run_id = %s AND name = 'carried'",
+                runs[2]["id"]) == [([1, 2],)]
+    before = client.get(path, headers=headers).json()["turns"]
+    assert [len(t["citations"]) for t in before] == [1, 1, 1]
+
+    unpublish(flood)
+
+    after = client.get(path, headers=headers)
+    for turn in after.json()["turns"]:
+        assert UNAVAILABLE in turn["answer"] and turn["citations"] == [], turn.get("ordinal")
+    assert "rainfall" not in after.text.lower()
+    status = client.get(f"/api/v1/ai/runs/{runs[2]['id']}", headers=headers)
+    assert status.json()["sources_available"] is False and "rainfall" not in status.text.lower()
 
 
 def test_a_follow_up_after_revocation_sends_nothing_derived_from_the_revoked_turn(api, runtime):
@@ -254,8 +298,12 @@ def test_a_source_revoked_after_the_send_is_not_committed_as_a_cited_turn(api, r
     client, holder = api
     source = paper(TITLE, {1: [("Methods", SECRET)]})
 
+    fired = []
+
     def revoke_then_cite(payload):
         # The provider has been sent the permitted passage; access ends before the answer returns.
+        fired.append(True)
+
         def revoke():
             try:
                 unpublish(source)
@@ -271,6 +319,12 @@ def test_a_source_revoked_after_the_send_is_not_committed_as_a_cited_turn(api, r
     holder["service"] = agent_service(runtime, recording(search("water"), revoke_then_cite))
     _, headers = reader("rev-race@cit.edu")
     delivered = ask(client, headers, "rev-race-0001", "Find methods").json()
+    # The revocation really ran between the send and the commit, and the run ended.
+    assert fired == [True]
+    assert Record.objects.get(pk=source.pk).pipeline_status == PipelineStatus.DRAFT
+    assert delivered["state"] not in ("queued", "running")
+    assert rows("SELECT count(*) FROM iris_ai.run_event WHERE run_id = %s AND name = 'model'",
+                delivered["id"]) != [(0,)]
 
     # No Turn carries the revoked text or a citation to it, and no reader surface shows it.
     assert rows("SELECT count(*) FROM iris_ai.turn WHERE conversation_id = %s AND answer ILIKE %s",

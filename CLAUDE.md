@@ -368,6 +368,10 @@ python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewe
                                    # checked by Record.visible_to(reviewer); a turn citing an
                                    # unreadable record is withheld whole; no diagnostics or usage.
                                    # Held-out output needs --lock and a run newer than it.
+                                   # --reopen packets.json --reviewer EMAIL --reviewer-name NAME
+                                   # --out F (IR-721) re-checks a written packet by that account's
+                                   # access and source revisions. A packet is plaintext, not access
+                                   # control.
                                    # Test-only so far (test_review_packets.py, test Postgres);
                                    # not yet run against the dev database
 python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (IR-133/IR-394)
