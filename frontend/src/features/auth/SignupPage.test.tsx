@@ -308,25 +308,26 @@ describe("the register steps", { timeout: 30_000 }, () => {
     expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity");
   });
 
-  it("marks each step's required fields, in words and as a state, and omits M.I.", async () => {
+  it("marks each step's required fields as a state only, with no visible marker, and omits M.I.", async () => {
     const user = userEvent.setup();
     renderSignup();
 
     for (const field of [firstName(), lastName(), email()]) expect(field).toBeRequired();
     expect(screen.queryByRole("textbox", { name: "M.I." })).not.toBeInTheDocument();
-    // The word is on screen once per required field, not only a colour.
-    expect(screen.getAllByText("(required)")).toHaveLength(3);
+    // IR-585: the app marks the optional field, never the required one, and
+    // register has no optional field, so nothing is written beside any label.
+    expect(screen.queryByText(/\((required|optional)\)/)).not.toBeInTheDocument();
 
     await fillIdentity(user);
     await optionsLoaded();
     expect(college()).toBeRequired();
     expect(program()).toBeRequired();
-    expect(screen.getAllByText("(required)")).toHaveLength(2);
+    expect(screen.queryByText(/\((required|optional)\)/)).not.toBeInTheDocument();
 
     await fillAffiliation(user);
     expect(screen.getByLabelText("Password")).toBeRequired();
     expect(screen.getByLabelText("Confirm Password")).toBeRequired();
-    expect(screen.getAllByText("(required)")).toHaveLength(2);
+    expect(screen.queryByText(/\((required|optional)\)/)).not.toBeInTheDocument();
   });
 
   it("keeps each step's fields in their order, the forward action after them", async () => {

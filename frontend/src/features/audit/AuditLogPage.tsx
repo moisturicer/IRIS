@@ -1,12 +1,14 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { auditApi, type AuditListParams } from "@/api/audit";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { DataTable } from "@/components/shared/DataTable";
 import { Input } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
+import { Select } from "@/components/ui/Select";
 import type { ColumnDef } from "@tanstack/react-table";
-import { AUDIT_EVENT_GROUPS, AUDIT_EVENT_LABELS, type AuditEvent, type AuditEventType } from "@/types/audit";
+import { AUDIT_EVENT_LABELS, type AuditEvent } from "@/types/audit";
+import { groupAuditEventTypes, type AuditEventTypeOption } from "@/lib/auditEventGroups";
 
 const WORDS: Record<string, string> = {
   adviser: "Adviser", itso: "ITSO", ierc: "IERC", ktto: "KTTO", rdco: "RDCO",
@@ -25,20 +27,36 @@ function readable(value: unknown): ReactNode {
   return typeof value === "string" ? WORDS[value] ?? value : String(value);
 }
 
-const COLUMNS: ColumnDef<AuditEvent, unknown>[] = [
+/**
+ * The Event column's name for a type: the frontend's own wording where it has
+ * one, else the server's label (a type added since this page was last edited,
+ * IR-913), else the code made readable.
+ */
+function eventName(type: string, serverLabels: ReadonlyMap<string, string>): string {
+  return (AUDIT_EVENT_LABELS as Record<string, string>)[type] ?? serverLabels.get(type) ?? label(type);
+}
+
+function columnsFor(serverLabels: ReadonlyMap<string, string>): ColumnDef<AuditEvent, unknown>[] {
+  return [
   { header: "Time", accessorKey: "created_at", cell: ({ row }) => <time dateTime={row.original.created_at}>{new Date(row.original.created_at).toLocaleString()}</time> },
-  { header: "Event", accessorKey: "event_type", cell: ({ row }) => AUDIT_EVENT_LABELS[row.original.event_type] ?? label(row.original.event_type) },
+  { header: "Event", accessorKey: "event_type", cell: ({ row }) => eventName(row.original.event_type, serverLabels) },
   { header: "Actor", cell: ({ row: { original: e } }) => e.user_name || (e.user ? `Account #${e.user} (unavailable)` : "System / anonymous") },
   { header: "Record", cell: ({ row: { original: e } }) => e.record_title ? <Link className="underline" to={`/records/${e.record}`}>{e.record_title}</Link> : e.record ? `Record #${e.record} (unavailable)` : "—" },
   { header: "Details", cell: ({ row }) => Object.keys(row.original.metadata).length ? <dl className="min-w-48 text-sm break-words">{Object.entries(row.original.metadata).map(([k, v]) => <div key={k} className="mb-2"><dt className="font-medium">{label(k)}</dt><dd>{readable(v)}</dd></div>)}</dl> : "No details recorded" },
-];
+  ];
+}
 
 export default function AuditLogPage() {
   const [events, setEvents] = useState<AuditEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
-  const [eventType, setEventType] = useState<AuditEventType | "">("");
+  const [eventType, setEventType] = useState("");
+  // The filter's options come from the server (IR-913), so a new backend event
+  // type is filterable with no frontend change. Until they arrive, or if they
+  // never do, the select offers only "All events" and the log still works.
+  const [typeOptions, setTypeOptions] = useState<AuditEventTypeOption[]>([]);
+  const [typesFailed, setTypesFailed] = useState(false);
   const [record, setRecord] = useState("");
   const [user, setUser] = useState("");
   const [from, setFrom] = useState("");
@@ -46,6 +64,26 @@ export default function AuditLogPage() {
   const [filters, setFilters] = useState<AuditListParams>({});
   const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    auditApi.eventTypes().then(({ data }) => {
+      if (!active) return;
+      // An answer that is not a list is a failed request, not a reason to crash the
+      // page: the shape is the server's to keep, and the log works without it.
+      if (Array.isArray(data)) { setTypeOptions(data); setTypesFailed(false); }
+      else { setTypeOptions([]); setTypesFailed(true); }
+    }).catch(() => {
+      if (active) { setTypeOptions([]); setTypesFailed(true); }
+    });
+    return () => { active = false; };
+  }, []);
+
+  const typeGroups = useMemo(() => groupAuditEventTypes(typeOptions), [typeOptions]);
+  const columns = useMemo(
+    () => columnsFor(new Map(typeOptions.map((option) => [option.type, option.label]))),
+    [typeOptions],
+  );
 
   useEffect(() => {
     let active = true;
@@ -83,12 +121,10 @@ export default function AuditLogPage() {
       setPage(1);
       setFilters({ event_type: eventType || undefined, record: record ? Number(record) : undefined, user: user ? Number(user) : undefined, from: from || undefined, to: to || undefined });
     }}>
-      <label className="flex flex-col gap-1 text-sm">Event type
-        <select className="border border-stone-300 rounded-lg px-3 py-2" value={eventType} onChange={(e) => setEventType(e.target.value as AuditEventType | "")}>
-          <option value="">All events</option>
-          {Object.entries(AUDIT_EVENT_GROUPS).map(([group, types]) => <optgroup key={group} label={group}>{Object.entries(types).map(([type, text]) => <option key={type} value={type}>{text}</option>)}</optgroup>)}
-        </select>
-      </label>
+      <Select label="Event type" value={eventType} onChange={(e) => setEventType(e.target.value)} aria-describedby={typesFailed ? "audit-event-types-note" : undefined}>
+        <option value="">All events</option>
+        {typeGroups.map(({ group, types }) => <optgroup key={group} label={group}>{types.map(({ type, label: text }) => <option key={type} value={type}>{text}</option>)}</optgroup>)}
+      </Select>
       <Input label="Record ID" type="number" min="1" step="1" value={record} onChange={(e) => setRecord(e.target.value)} />
       <Input label="Actor ID" type="number" min="1" step="1" value={user} onChange={(e) => setUser(e.target.value)} />
       <Input label="From date" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
@@ -96,8 +132,9 @@ export default function AuditLogPage() {
       <Button type="submit" variant="secondary">Filter</Button>
       <Button type="button" variant="secondary" disabled={exporting || loading} onClick={exportCsv}>{exporting ? "Exporting…" : "Export CSV"}</Button>
     </form>
+    {typesFailed && <p id="audit-event-types-note" className="mb-3 text-sm text-stone-600">Event types could not be loaded, so the log cannot be filtered by type. Reload the page to try again.</p>}
     <p className="mb-3 text-sm text-stone-600">Filter applies the fields above. CSV exports every row matching the applied filters, across all pages.</p>
     {error && <p role="alert" className="mb-4 text-danger">{error}</p>}
-    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden"><DataTable caption="Audit log events" data={events} columns={COLUMNS} loading={loading} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
+    <div className="bg-white rounded-xl border border-stone-200 overflow-hidden"><DataTable caption="Audit log events" data={events} columns={columns} loading={loading} page={page} pageSize={20} totalCount={total} onPageChange={setPage} /></div>
   </div>;
 }

@@ -73,12 +73,13 @@ const SCREENS: EntryScreen[] = [
     name: "email verification",
     render: () => {
       vi.spyOn(authApi, "activate").mockResolvedValue({ data: {} } as never);
-      // The screen reads its token from the route, so it is mounted on the real one.
+      // The screen reads its secret from the fragment (IR-928), so it is mounted on the real route.
+      window.history.replaceState(null, "", "/activate#uid=abc&token=def");
       renderScreen(
         <Routes>
-          <Route path="/activate/:uidb64/:token" element={<EmailVerifyPage />} />
+          <Route path="/activate" element={<EmailVerifyPage />} />
         </Routes>,
-        { route: "/activate/abc/def" },
+        { route: "/activate#uid=abc&token=def" },
       );
     },
     title: "Email Verified",

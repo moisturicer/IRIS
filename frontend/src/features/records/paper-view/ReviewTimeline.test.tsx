@@ -7,6 +7,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { renderScreen, screen, userEvent, within } from "@/test/render";
 import type { RecordTracker, ReviewComment } from "@/types/records";
 
@@ -157,6 +158,18 @@ describe("ReviewTimeline", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent("Could not load the review timeline.");
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("list", { name: "Review timeline" })).toBeInTheDocument();
+    expect(tracker).toHaveBeenCalledTimes(2);
+  });
+
+  it("says a timed-out tracker took too long, and Retry reads it again (IR-906)", async () => {
+    tracker.mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/records/7/tracker/"));
+    respond(payload);
+    renderScreen(<ReviewTimeline recordId={7} />);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The review timeline took too long to load.");
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
 
     expect(await screen.findByRole("list", { name: "Review timeline" })).toBeInTheDocument();
     expect(tracker).toHaveBeenCalledTimes(2);

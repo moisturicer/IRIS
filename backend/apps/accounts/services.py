@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from django.contrib.auth.tokens import default_token_generator
@@ -11,10 +12,15 @@ def send_verification_email(user: User, request):
     """
     Build and send an email verification link via Celery (send_email_async dispatches
     to the send_email_task Celery task so registration never blocks on mail delivery).
+
+    The secret rides in the URL fragment, like a reset link's (IR-928, ASVS 8.3.1):
+    the browser never sends a fragment, so the token stays out of server logs,
+    `Referer` and proxies, and the page posts it in a body. Links emailed before
+    IR-928 carry it in the path and are still honoured (`ActivateView`).
     """
     uid   = urlsafe_base64_encode(force_bytes(user.pk))
     token = default_token_generator.make_token(user)
-    link  = f"{settings.FRONTEND_URL}/activate/{uid}/{token}"
+    link  = f"{settings.FRONTEND_URL}/activate#uid={uid}&token={token}"
 
     send_email_async(
         subject="Verify your IRIS account",
@@ -24,20 +30,41 @@ def send_verification_email(user: User, request):
 
 
 def activate_user(uidb64: str, token: str) -> User | None:
-    """Verify the activation token and mark the user as verified. Returns user or None."""
+    """
+    Verify the activation token and mark the user as verified. Returns user or None.
+
+    RDCO hears of the person's role request here and nowhere earlier, so a
+    mistyped address that is never verified alerts nobody (ADR-051 decision 20,
+    IR-784). The token stays valid after use -- Django's generator hashes the
+    password and last login, not `is_verified` -- so the link can be followed
+    again. The flip is therefore one conditional UPDATE, and only the request
+    that changed the row notifies: a repeated or concurrent click does not.
+    """
     from django.utils.http import urlsafe_base64_decode
     from django.utils.encoding import force_str
+    from apps.notifications.services import notify_role_request
     try:
         uid  = force_str(urlsafe_base64_decode(uidb64))
         user = User.objects.get(pk=uid)
-    except (User.DoesNotExist, ValueError):
+    except (User.DoesNotExist, ValueError, OverflowError):
         return None
 
-    if default_token_generator.check_token(user, token):
-        user.is_verified = True
-        user.save(update_fields=["is_verified"])
-        return user
-    return None
+    if not default_token_generator.check_token(user, token):
+        return None
+
+    with transaction.atomic():
+        newly_verified = User.objects.filter(pk=user.pk, is_verified=False).update(is_verified=True)
+        if newly_verified:
+            pending = (
+                user.role_requests.filter(status=RequestStatus.PENDING)
+                .select_related("requested_role")
+                .order_by("-created_at")
+                .first()
+            )
+            if pending:
+                notify_role_request(user, pending.requested_role)
+    user.is_verified = True
+    return user
 
 
 def approve_role_request(role_request: RoleRequest, reviewed_by: User):

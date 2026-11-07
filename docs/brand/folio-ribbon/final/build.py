@@ -57,6 +57,17 @@ def mark_paths(fill, cls=False):
             + p(TL, "tl") + p(BR, "br") + p(TR, "tr") + p(BL, "bl") + "</g>")
 
 
+# Ask IRIS (replaces the traced brackets-and-lines icon): a speech bubble
+# with the serif I of the mark cut out of it. Drawn by hand on a 24 unit grid,
+# not traced, so its edges are exact at any size. The I is also given as three
+# rectangles (serifs and stem) because the answering loop sets it in type
+# through a mask, and a hole in one path cannot be animated.
+ASK_VIEW = (1.6, 1.7, 20.8, 20.8)
+ASK_BUBBLE = ("M7.5 2.5H16.5A5.5 5.5 0 0 1 22 8V12A5.5 5.5 0 0 1 16.5 17.5H11.5L7.2 21.4"
+              "C6.6 21.9 5.6 21.5 5.6 20.7V17.2A5.5 5.5 0 0 1 2 12V8A5.5 5.5 0 0 1 7.5 2.5Z")
+ASK_LETTER = "M8.3 5.3H15.7V7H13V13H15.7V14.7H8.3V13H11V7H8.3Z"
+ASK_PARTS = ((8.3, 5.3, 7.4, 1.7), (11, 6.9, 2, 6.2), (8.3, 13, 7.4, 1.7))  # x, y, w, h
+
 MARK_BOX = bbox(TL, BR, TR, BL)
 MARK_VIEW = square(MARK_BOX, 6)
 WORD_BOX = bbox(WORD)
@@ -143,15 +154,16 @@ def banner():
 out["banner-reversed.svg"] = banner()
 
 # ── icons ──────────────────────────────────────────────────────────────
-for name, label in (("search", "Search"), ("ask", "Ask IRIS")):
-    m, k = P[f"{name}-maroon"], P[f"{name}-ink"]
-    v = square(bbox(m, k), 3)
-    fname = "icon-search" if name == "search" else "icon-ask-iris"
-    two = f'<path fill="{MAROON}" fill-rule="evenodd" d="{m}"/><path fill="{INK}" fill-rule="evenodd" d="{k}"/>'
-    out[f"{fname}.svg"] = svg(v, two, label)
-    mono = f'<g fill="{{c}}" fill-rule="evenodd"><path d="{m}"/><path d="{k}"/></g>'
-    out[f"{fname}-maroon.svg"] = svg(v, mono.replace("{c}", MAROON), label)
-    out[f"{fname}-reversed.svg"] = svg(v, mono.replace("{c}", WHITE), label)
+m, k = P["search-maroon"], P["search-ink"]
+v = square(bbox(m, k), 3)
+out["icon-search.svg"] = svg(v, f'<path fill="{MAROON}" fill-rule="evenodd" d="{m}"/><path fill="{INK}" fill-rule="evenodd" d="{k}"/>', "Search")
+mono = f'<g fill="{{c}}" fill-rule="evenodd"><path d="{m}"/><path d="{k}"/></g>'
+out["icon-search-maroon.svg"] = svg(v, mono.replace("{c}", MAROON), "Search")
+out["icon-search-reversed.svg"] = svg(v, mono.replace("{c}", WHITE), "Search")
+
+# Ask IRIS is one colour: the I is a hole, so the tile or page shows through.
+for fname, fill in (("icon-ask-iris", MAROON), ("icon-ask-iris-reversed", WHITE)):
+    out[f"{fname}.svg"] = svg(ASK_VIEW, f'<path fill="{fill}" fill-rule="evenodd" d="{ASK_BUBBLE} {ASK_LETTER}"/>', "Ask IRIS")
 
 # ── motion ─────────────────────────────────────────────────────────────
 REDUCED = "@media (prefers-reduced-motion: reduce){*{animation:none!important}.fade{animation:pulse 2s ease-in-out infinite!important}@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}}"
@@ -210,34 +222,30 @@ out["loading-reversed.svg"] = motion_mark(WHITE, LOADING, "Loading")
 out["opening.svg"] = motion_mark(MAROON, OPENING, "IRIS")
 out["opening-reversed.svg"] = motion_mark(WHITE, OPENING, "IRIS")
 
-# Ask IRIS answering: the brackets hold still and the three lines are
-# written one after another, the same rhythm as the loading loop.
-ask_m, ask_k = P["ask-maroon"], P["ask-ink"]
-ask_v = square(bbox(ask_m, ask_k), 3)
-lines_box = bbox(ask_k)
-ly0, ly1 = lines_box[1], lines_box[3]
-band = (ly1 - ly0) / 3
-clips = "".join(
-    f'<clipPath id="al{i}"><rect class="line l{i}" x="{lines_box[0] - 1:.2f}" y="{ly0 + i * band - 1:.2f}" '
-    f'width="{lines_box[2] - lines_box[0] + 2:.2f}" height="{band + 2:.2f}"/></clipPath>'
-    for i in range(3)
-)
-lines = "".join(f'<g clip-path="url(#al{i})"><path d="{ask_k}"/></g>' for i in range(3))
-ask_css = (
-    ".line{transform-box:fill-box;transform-origin:0 50%;animation:aw 1.8s cubic-bezier(.16,1,.3,1) infinite}"
-    ".l1{animation-delay:.18s}.l2{animation-delay:.36s}"
-    "@keyframes aw{0%{transform:scaleX(0)}35%,78%{transform:none}100%{transform:none;opacity:0}}"
-)
+# Ask IRIS answering: the bubble holds still and the I is set in type, the
+# top serif, the stem dropping, the bottom serif, then it clears and repeats.
+def ask_answering(fill):
+    rects = "".join(
+        f'<rect class="p p{i}" x="{x}" y="{y}" width="{w}" height="{h}"/>'
+        for i, (x, y, w, h) in enumerate(ASK_PARTS)
+    )
+    css = (
+        ".p{transform-box:fill-box;animation:ap 1.8s cubic-bezier(.16,1,.3,1) infinite backwards}"
+        ".p0,.p2{transform-origin:50% 50%}.p1{transform-origin:50% 0;animation-delay:.18s}.p2{animation-delay:.36s}"
+        "@keyframes ap{0%{transform:scale(0,1)}35%,78%{transform:none}100%{transform:none;opacity:0}}"
+        ".p1{animation-name:as}@keyframes as{0%{transform:scale(1,0)}35%,78%{transform:none}100%{transform:none;opacity:0}}"
+    )
+    body = (
+        f"<style>{css}{REDUCED.replace('.fade', '.p')}</style>"
+        f'<defs><mask id="m" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">'
+        f'<rect width="24" height="24" fill="#fff"/><g fill="#000">{rects}</g></mask></defs>'
+        f'<path fill="{fill}" mask="url(#m)" d="{ASK_BUBBLE}"/>'
+    )
+    return svg(ASK_VIEW, body, "Ask IRIS is answering")
 
 
-def ask_answering(fill_m, fill_k):
-    return svg(ask_v, f"<style>{ask_css}{REDUCED}</style><defs>{clips}</defs>"
-                      f'<path fill="{fill_m}" fill-rule="evenodd" d="{ask_m}"/>'
-                      f'<g class="fade" fill="{fill_k}" fill-rule="evenodd">{lines}</g>', "Ask IRIS is answering")
-
-
-out["ask-iris-answering.svg"] = ask_answering(MAROON, INK)
-out["ask-iris-answering-reversed.svg"] = ask_answering(WHITE, WHITE)
+out["ask-iris-answering.svg"] = ask_answering(MAROON)
+out["ask-iris-answering-reversed.svg"] = ask_answering(WHITE)
 
 for name, text in out.items():
     (HERE / name).write_text(text, encoding="utf-8", newline="\n")
@@ -269,8 +277,12 @@ export const WORDMARK = "{short(WORD)}";
 export const SEARCH_VIEWBOX = "{vb(search_v)}";
 export const SEARCH = {{ lens: "{short(P["search-maroon"])}", handle: "{short(P["search-ink"])}" }} as const;
 
-export const ASK_VIEWBOX = "{vb(ask_v)}";
-export const ASK = {{ brackets: "{short(ask_m)}", lines: "{short(ask_k)}" }} as const;
+export const ASK_VIEWBOX = "{vb(ASK_VIEW)}";
+export const ASK = {{
+  bubble: "{ASK_BUBBLE}",
+  letter: "{ASK_LETTER}",
+  letterParts: {json.dumps([list(p) for p in ASK_PARTS])} as ReadonlyArray<readonly [number, number, number, number]>,
+}} as const;
 '''
 TS_OUT = HERE.parents[3] / "frontend" / "src" / "components" / "brand" / "brandPaths.ts"
 TS_OUT.parent.mkdir(parents=True, exist_ok=True)

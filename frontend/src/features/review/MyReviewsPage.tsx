@@ -4,11 +4,13 @@ import { Link, useSearchParams } from "react-router-dom";
 import { reviewsApi, seatsApi } from "@/api/reviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { InterruptedState } from "@/components/shared/InterruptedState";
 import { ResearchCard } from "@/components/shared/ResearchCard";
 import { Badge, Button, Skeleton } from "@/components/ui";
 import { LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { errorDetail } from "@/lib/errorDetail";
+import { readFailureKind, type ReadFailureKind } from "@/lib/readFailure";
 import { canAccess, pathFor } from "@/lib/access";
 import type { RoleName } from "@/lib/constants";
 import { cn, formatDate } from "@/lib/utils";
@@ -57,6 +59,8 @@ export default function MyReviewsPage() {
   const [page, setPage] = useState<Page | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  /** Why `loadError` is set (IR-906): a timeout offers Retry, a refusal offers none. */
+  const [loadKind, setLoadKind] = useState<ReadFailureKind>("failed");
   const [loadingMore, setLoadingMore] = useState(false);
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState<string | null>(null);
@@ -83,6 +87,7 @@ export default function MyReviewsPage() {
       return true;
     } catch (error) {
       // An empty tab and a failed request must not look alike.
+      setLoadKind(readFailureKind(error));
       setLoadError(errorDetail(error, "My Reviews could not be loaded."));
       return false;
     }
@@ -99,6 +104,13 @@ export default function MyReviewsPage() {
       cancelled = true;
     };
   }, [load]);
+
+  /** Read the tab again, from the top, at the reader's request. */
+  const retry = () => {
+    setLoading(true);
+    setRowErrors({});
+    void load().finally(() => setLoading(false));
+  };
 
   const go = (next: Partial<MyReviewsView>) => {
     const merged: MyReviewsView = { ...view, ...next };
@@ -303,7 +315,25 @@ export default function MyReviewsPage() {
         {loading ? (
           <Skeleton rows={3} label="Loading My Reviews…" />
         ) : loadError && !page ? (
-          <EmptyState icon="fa-triangle-exclamation" tone="error" title="Could not load My Reviews" message={loadError} />
+          loadKind === "interrupted" ? (
+            <InterruptedState what="My Reviews" onRetry={retry} />
+          ) : loadKind === "unavailable" ? (
+            // A refusal: access may have changed since the page opened. There is
+            // nothing to retry, so none is offered.
+            <EmptyState
+              icon="fa-lock"
+              title="My Reviews isn't available to you"
+              message="Your access to reviews may have changed. Ask the Research and Development Coordinating Office if this is unexpected."
+            />
+          ) : (
+            <EmptyState
+              icon="fa-triangle-exclamation"
+              tone="error"
+              title="Could not load My Reviews"
+              message={loadError}
+              action={<Button type="button" variant="secondary" onClick={retry}>Try again</Button>}
+            />
+          )
         ) : rows.length === 0 ? (
           <EmptyState icon={EMPTY_ICON[tab]} {...emptyCopy(tab, outcome, overdue, office ? officeLabel : access?.offices[0]?.toUpperCase())} />
         ) : (

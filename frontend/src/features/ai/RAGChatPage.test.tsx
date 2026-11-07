@@ -15,6 +15,7 @@ import { Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { act, renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { AIAnswer, AIStatus, Citation, ConversationDetail, ConversationSummary, LatestAskRun } from "@/types/ai";
 
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import RAGChatPage from "./RAGChatPage";
 import { ToastContainer } from "@/components/ui/Toast";
 import { useUIStore } from "@/store/ui.store";
@@ -701,6 +702,78 @@ describe("owned conversation URLs (IR-548)", () => {
     expect(create).not.toHaveBeenCalled();
     expect(askStream).not.toHaveBeenCalled();
     expect((screen.getByRole("textbox", { name: /ask a follow-up/i }) as HTMLTextAreaElement).disabled).toBe(true);
+  });
+
+  it("shows a conversation that is still loading, then the conversation (IR-906)", async () => {
+    let release: (value: unknown) => void = () => {};
+    get.mockImplementation(() => new Promise((resolve) => { release = resolve; }));
+
+    renderRoutes("/ai/conversations/9");
+
+    expect(await screen.findByText("Loading this conversation…")).toBeTruthy();
+    release({ data: detail({ id: 9, title: "Flooding", turns: [{
+      id: 90, question: "Question in 9", resolved_question: null, answer: "An answer",
+      message: null, state: "generative", degraded: false, widened: false,
+      created_at: "2026-10-14", citations: [],
+    }] }) });
+    expect(await screen.findByText("Question in 9")).toBeTruthy();
+    expect(screen.queryByText("Loading this conversation…")).toBeNull();
+  });
+
+  it("keeps a failed conversation list on screen, and Try again loads it (IR-906)", async () => {
+    list.mockRejectedValueOnce(new Error("Network Error"));
+    list.mockResolvedValue({ data: [summary({ id: 9 })] });
+    get.mockResolvedValue({ data: detail({ id: 9 }) });
+
+    renderRoutes("/ai");
+
+    expect(await screen.findByRole("heading", { name: "Could not load your conversations" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(address()).toBe("/ai/conversations/9"));
+  });
+
+  it("treats a refused conversation (403) exactly like a missing one (IR-906)", async () => {
+    get.mockRejectedValue({ response: { status: 403 } });
+
+    renderRoutes("/ai/conversations/404");
+
+    expect(await screen.findByText(/this conversation is not available/i)).toBeTruthy();
+    expect(screen.queryByText(/did not load/i)).toBeNull();
+  });
+
+  it("shows a conversation that timed out as interrupted, and Retry opens it again (IR-906)", async () => {
+    get
+      .mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/ai/conversations/9/"))
+      .mockResolvedValue({ data: detail({ id: 9, title: "Flooding", turns: [{
+        id: 90, question: "Question in 9", resolved_question: null, answer: "An answer",
+        message: null, state: "generative", degraded: false, widened: false,
+        created_at: "2026-10-14", citations: [],
+      }] }) });
+
+    renderRoutes("/ai/conversations/9");
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeTruthy();
+    expect(screen.queryByText(/this conversation is not available/i)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Question in 9")).toBeTruthy();
+    expect(screen.queryByRole("heading", { name: "This took too long" })).toBeNull();
+  });
+
+  it("says a conversation that failed to load failed, and Try again opens it (IR-906)", async () => {
+    get
+      .mockRejectedValueOnce(new Error("Network Error"))
+      .mockResolvedValue({ data: detail({ id: 9, title: "Flooding", turns: [{
+        id: 90, question: "Question in 9", resolved_question: null, answer: "An answer",
+        message: null, state: "generative", degraded: false, widened: false,
+        created_at: "2026-10-14", citations: [],
+      }] }) });
+
+    renderRoutes("/ai/conversations/9");
+
+    expect(await screen.findByRole("heading", { name: "Could not load this conversation" })).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByText("Question in 9")).toBeTruthy();
   });
 
   it("follows a run still answering when the conversation is opened", async () => {

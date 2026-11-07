@@ -53,8 +53,9 @@ OFFICE_ONLY = row(ANON, DENY, DENY, DENY, OK, OK, OK, OK, DENY, DENY)
 READS_RECORD = row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE)
 #: `record`, an owner's act: visible non-owners are refused, others hidden.
 OWNER_ACTS = row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
-# ADR-052 §5: owners or the Adviser set an embargo, and no office does.
-SETS_EMBARGO = row(ANON, HIDE, OK, OK, DENY, DENY, DENY, DENY, HIDE, HIDE)
+# ADR-052 §5 as amended for IR-882: the Adviser or RDCO date an embargo, and no
+# owner or other office does. The same people as a release.
+SETS_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
 # ADR-052 §6: the Adviser or RDCO release one, and never a student owner.
 RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
 # ADR-052 §11: KTTO alone releases an IP mark. The world seats no KTTO member,
@@ -62,6 +63,9 @@ RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
 RELEASES_IP = row(ANON, HIDE, DENY, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
 #: `record`, the seated ITSO reviewer's act alone.
 SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE)
+#: `feed`, a reader's private saved feed (IR-577): its owner alone; everyone
+#: else cannot know it exists.
+OWNS_FEED = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY, DENY)
 
@@ -142,10 +146,6 @@ RECORDS: dict[str, Entry | Shadowed] = {
         "DELETE": _case(OWNER_ACTS, kwargs=RECORD),
     }),
     "record-submit": Entry({"POST": _case(OWNER_ACTS, kwargs=RECORD, data={})}),
-    # A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
-    "record-embargo-answer": Entry({"POST": _case(
-        OWNER_ACTS, kwargs=RECORD, data={"embargoed": False},
-    )}),
     "record-embargo-set": Entry({"POST": _case(
         SETS_EMBARGO, kwargs=RECORD, data={"embargoed_until": "2099-01-01"},
     )}),
@@ -162,6 +162,13 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # Earlier versions are review material: participants, or the pool of a
     # party with an active assignment (IR-479). ADR-047 makes RDCO active on `record`.
     "record-version-manuscript": Entry({
+        "GET": _case(
+            row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
+        ),
+    }),
+    # A Version's review text is review material too (ADR-058 §4, IR-871).
+    "record-version-text": Entry({
         "GET": _case(
             row(ANON, HIDE, OK, OK, OK, OK, OK, OK, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "number": Ref("version", "number")},
@@ -260,6 +267,46 @@ RECORDS: dict[str, Entry | Shadowed] = {
             row(ANON, HIDE, OK, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE),
             kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
             data={"body": "Is the signed endorsement enough?"},
+        ),
+        # A writer deletes only their own draft (IR-874). The owner's comment
+        # is sent, so the owner is authorized and then told so (400).
+        "DELETE": _case(
+            OWNER_ACTS, kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment")},
+        ),
+    }),
+    # Review threads (ADR-032 §7, IR-874): read under `may_read_review`, acted on
+    # by participants. On ITSO's sent Must fix: its seated reviewer alone changes
+    # its severity, the owner answers it but may not resolve it, and a
+    # participant resolves it. On the owner's own thread any participant resolves.
+    "record-review-thread-act": Entry({"POST": [
+        _case(
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_comment"), "act": "resolve"},
+        ),
+        _case(
+            row(ANON, HIDE, DENY, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "resolve"},
+        ),
+        _case(
+            row(ANON, HIDE, OK, OK, OK, DENY, DENY, DENY, HIDE, HIDE),
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "reopen"},
+        ),
+        _case(
+            SEAT_ACTS,
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "severity"},
+            data={"severity": "suggestion"},
+        ),
+        _case(
+            OWNER_ACTS,
+            kwargs={"pk": Ref("record"), "comment_id": Ref("review_thread"), "act": "answer"},
+            data={"answer": "addressed", "note": "Section 4."},
+        ),
+    ]}),
+    # Finish review (IR-874): an open Seat holder alone. The Adviser's part on
+    # `record` is over and RDCO holds no seat there, so both are refused.
+    "record-finish-review": Entry({
+        "POST": _case(
+            SEAT_ACTS, kwargs=RECORD, data={"verdict": "comment_only", "summary": "Read it through."},
         ),
     }),
 
@@ -446,6 +493,7 @@ ACCOUNTS = {
     "notice-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
+    "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),
     "password-change": Entry({"POST": _case(SIGNED_IN, data={})}),
     # ADR-045: both recovery endpoints are anonymous and ignore incidental
     # credentials. Confirmation checks the link, not the caller's role.
@@ -457,6 +505,16 @@ ACCOUNTS = {
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                       for m in ("GET", "PUT", "PATCH")}),
+    # IR-695: a person's optional profile. Both writes act on `request.user` and
+    # name nobody else; the photo is read by any signed-in user, through Django
+    # only (MEDIA_URL is not routed). `photo_user` is an account that has one --
+    # a person with none answers 404 to everyone, which is not an access outcome.
+    "user-me-photo": Entry({
+        "PUT": _case(SIGNED_IN, data={}, format="multipart"),
+        "DELETE": _case(SIGNED_IN),
+    }),
+    "user-photo": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
+    "user-interest-suggestions": Entry({"GET": _case(SIGNED_IN, query={"q": "mach"})}),
     "user-detail": Entry({m: _case(ACCOUNT_ADMINS, kwargs={"pk": Ref("target_user")},
                                  **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                           for m in ("GET", "PUT", "PATCH")}),
@@ -562,6 +620,16 @@ LIBRARY = {
         "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),
         "DELETE": _case(SIGNED_IN, kwargs={"record_id": Ref("record")}),
     }),
+    # IR-577: a saved feed is the caller's own, so listing and saving are
+    # anyone's, and another account's feed is the same 404 as a missing one.
+    "library-feeds": Entry({
+        "GET": _case(SIGNED_IN),
+        "POST": _case(SIGNED_IN, data={"name": "Matrix feed", "query": {"q": "flood"}}),
+    }),
+    "library-feed": Entry({
+        "PATCH": _case(OWNS_FEED, kwargs={"feed_id": Ref("feed")}, data={"name": "Renamed feed"}),
+        "DELETE": _case(OWNS_FEED, kwargs={"feed_id": Ref("feed")}),
+    }),
 }
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "records": RECORDS, "documents": DOCUMENTS_APP, "accounts": ACCOUNTS,
@@ -569,6 +637,7 @@ TABLE: dict[str, dict[str, Entry | Shadowed]] = {
     "audit": {
         "audit-list": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
         "audit-export": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
+        "audit-event-types": Entry({"GET": _case(SYSTEM_ADMIN_ONLY)}),
     },
     "opportunities": OPPORTUNITIES,
     "library": LIBRARY,

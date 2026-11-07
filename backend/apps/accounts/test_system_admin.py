@@ -84,7 +84,7 @@ class AuditLogAndSettingsTests(SystemAdminBase):
         cls.setting = SystemSetting.objects.create(key="announcement", value="old text")
 
     def test_only_the_system_admin_reads_the_audit_log_and_its_export(self):
-        for name in ("audit-list", "audit-export"):
+        for name in ("audit-list", "audit-export", "audit-event-types"):
             with self.subTest(route=name):
                 self.assertEqual(self.as_(self.sysadmin).get(reverse(name)).status_code, status.HTTP_200_OK)
                 for user in (self.rdco, self.superuser, self.itso, self.student):

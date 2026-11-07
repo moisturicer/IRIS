@@ -14,6 +14,7 @@ export function useLibrary() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const sessionEpoch = useAuthStore((s) => s.sessionEpoch);
   const load = useLibraryStore((s) => s.load);
+  const interrupted = useLibraryStore((s) => s.interrupted);
   const ensureLoaded = useLibraryStore((s) => s.ensureLoaded);
 
   useEffect(() => {
@@ -21,5 +22,5 @@ export function useLibrary() {
   }, [isAuthenticated, sessionEpoch, ensureLoaded]);
 
   const retry = useCallback(() => void ensureLoaded(true), [ensureLoaded]);
-  return { load, retry };
+  return { load, interrupted, retry };
 }

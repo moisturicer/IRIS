@@ -223,7 +223,7 @@ The Publish dialog replaces Submit Disclosure ([`frontend_redesign_spec.md`](../
 
 | Component | What it is |
 |---|---|
-| `components/brand/IrisBrand.tsx` | The Folio Ribbon identity: `IrisMark`, `IrisWordmark`, `IrisLoader` (storyboard loop, `role="status"` when labelled), `SearchGlyph` and `AskIrisGlyph` (`answering` writes its lines). All `currentColor` |
+| `components/brand/IrisBrand.tsx` | The Folio Ribbon identity: `IrisMark`, `IrisWordmark`, `IrisLoader` (storyboard loop, `role="status"` when labelled), `SearchGlyph` and `AskIrisGlyph` (a speech bubble with the I cut out; `answering` sets the I in type). All `currentColor` |
 | `components/brand/brandPaths.ts` | Generated path data, written by `docs/brand/folio-ribbon/final/build.py`; never edited by hand |
 | `Spinner` | `md`/`lg` render `IrisLoader` (28 / 40 px) and take a `label`; `sm` stays the button ring |
 

@@ -10,8 +10,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, within } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { RecordTracker, TrackerPartyRow } from "@/types/records";
 
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
@@ -174,33 +175,51 @@ async function partyRow(name: RegExp) {
 }
 
 describe("ReviewRoutingTracker", () => {
-  it("shows a Thesis at intake: Intake active, offices not requested, RDCO awaiting", async () => {
+  it("never shows the retired Intake as a party or as who holds the record (ADR-032 §13)", async () => {
+    // A legacy record still stored at Intake: the server sends an active Intake
+    // row and an Intake holder. Intake is history, never a step (spec §0, inv. 1).
     tracker.mockResolvedValue({ data: thesisAtIntake });
     const { container } = renderTracker();
 
-    expect(await partyRow(/intake & triage/i)).toHaveTextContent(/active/i);
+    const table = await screen.findByRole("table", { name: /parties/i });
+    expect(within(table).queryByRole("row", { name: /intake/i })).not.toBeInTheDocument();
     for (const office of [/^itso/i, /^ierc/i, /^ktto/i]) {
       expect(await partyRow(office)).toHaveTextContent(/not requested/i);
     }
     expect(await partyRow(/rdco/i)).toHaveTextContent(/awaiting/i);
     expect(tracker).toHaveBeenCalledWith(RECORD_ID);
-
-    // The overall state is stated once, as the server words it.
-    const region = screen.getByRole("region", { name: /review & routing/i });
-    expect(within(region).getByText("Submitted")).toBeInTheDocument();
+    // Nobody but the retired Intake holds it, so no "Currently with" list.
+    expect(screen.queryByRole("list", { name: /currently with/i })).not.toBeInTheDocument();
 
     await expectNoBlockingA11yViolations(container);
   });
 
-  it("shows a new Proposal as submitted, with RDCO not requested", async () => {
+  it("keeps a retired Intake out of the party table once it has completed, but not out of the history", async () => {
+    tracker.mockResolvedValue({ data: afterResubmission });
+    renderTracker();
+
+    const table = await screen.findByRole("table", { name: /parties/i });
+    expect(within(table).queryByRole("row", { name: /intake/i })).not.toBeInTheDocument();
+    // The routing history is history: it keeps the server's words for it.
+    const history = screen.getByRole("list", { name: /routing history/i });
+    expect(history).toHaveTextContent("Intake → ITSO + IERC + KTTO");
+  });
+
+  it("does not repeat the record's status; the page states it once", async () => {
+    tracker.mockResolvedValue({ data: newProposal });
+    renderTracker();
+
+    await partyRow(/adviser/i);
+    const region = screen.getByRole("region", { name: /review & routing/i });
+    expect(within(region).queryByText("Submitted")).not.toBeInTheDocument();
+  });
+
+  it("shows a new Proposal with the Adviser active and RDCO not requested", async () => {
     tracker.mockResolvedValue({ data: newProposal });
     renderTracker();
 
     expect(await partyRow(/adviser/i)).toHaveTextContent(/active/i);
     expect(await partyRow(/rdco/i)).toHaveTextContent(/not requested/i);
-    const region = screen.getByRole("region", { name: /review & routing/i });
-    expect(within(region).getByText("Submitted")).toBeInTheDocument();
-    expect(within(region).queryByText("Final review")).not.toBeInTheDocument();
   });
 
   it("shows who holds the record now", async () => {
@@ -428,10 +447,26 @@ describe("ReviewRoutingTracker", () => {
   });
 
   it("says when routing history begins", async () => {
-    tracker.mockResolvedValue({ data: thesisAtIntake });
+    tracker.mockResolvedValue({ data: afterResubmission });
     renderTracker();
 
     expect(await screen.findByText(/routing recorded from sep 19, 2026/i)).toBeInTheDocument();
+  });
+
+  it("gives an empty routing history one coherent line, not two that contradict (IR-525)", async () => {
+    tracker.mockResolvedValue({ data: payload({ routing_history: [] }) });
+    renderTracker();
+
+    expect(await screen.findByText("Routing is recorded from Sep 19, 2026; none recorded yet.")).toBeInTheDocument();
+    expect(screen.queryByText(/no routing recorded yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^routing recorded from/i)).not.toBeInTheDocument();
+  });
+
+  it("says plainly that nothing is recorded when history has no start date either", async () => {
+    tracker.mockResolvedValue({ data: payload({ routing_history: [], routing_recorded_from: null }) });
+    renderTracker();
+
+    expect(await screen.findByText("No routing recorded yet.")).toBeInTheDocument();
   });
 
   it("says so when the tracker cannot be loaded", async () => {
@@ -439,5 +474,24 @@ describe("ReviewRoutingTracker", () => {
     renderTracker();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not load/i);
+  });
+
+  it("offers Try again rather than telling the reader to reload (IR-906)", async () => {
+    tracker.mockRejectedValueOnce(new Error("network")).mockResolvedValue({ data: payload({}) });
+    renderTracker();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(tracker).toHaveBeenCalledTimes(2);
+  });
+
+  it("says a timed-out tracker took too long, and Retry reads it again (IR-906)", async () => {
+    tracker.mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/records/12/tracker/")).mockResolvedValue({ data: payload({}) });
+    renderTracker();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The review tracker took too long to load.");
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(tracker).toHaveBeenCalledTimes(2));
   });
 });

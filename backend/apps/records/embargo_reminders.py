@@ -71,7 +71,7 @@ def _send(record_id, set_at, until, step, waited):
               .filter(pk=record_id).first())
     if (record is None or record.pipeline_status == PipelineStatus.DRAFT
             or record.embargo_state != EmbargoState.ACTIVE
-            or record.embargo_answered_at != set_at or record.embargoed_until != until):
+            or record.embargo_date_set_at != set_at or record.embargoed_until != until):
         return 0
     try:
         with transaction.atomic():
@@ -92,9 +92,9 @@ def run_embargo_reminders(now=None):
     candidates = (
         Record.objects
         .exclude(pipeline_status=PipelineStatus.DRAFT)
-        .filter(embargo_answered_at__isnull=False, embargoed_until__isnull=False,
-                embargo_released_at__isnull=True, embargoed_until__lte=today)
-        .values_list("pk", "embargo_answered_at", "embargoed_until")
+        .filter(is_embargoed=True, embargoed_until__isnull=False,
+                embargoed_until__lte=today)
+        .values_list("pk", "embargo_date_set_at", "embargoed_until")
     )
     sent = 0
     for pk, set_at, until in candidates:

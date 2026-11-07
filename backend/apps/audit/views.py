@@ -4,6 +4,8 @@ import json
 from django.http import StreamingHttpResponse
 from rest_framework import generics, serializers
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from core.permissions import IsSystemAdmin
 from .models import AuditEvent
@@ -66,6 +68,27 @@ class AuditEventListView(generics.ListAPIView):
             qs = qs.filter(created_at__date__lte=to_date)
 
         return qs
+
+
+class AuditEventTypeListView(APIView):
+    """
+    GET /audit/event-types/
+    Every event type the log can hold, as `{"type", "label"}`, in the order of
+    `AuditEvent.EVENT_TYPE_CHOICES`. The Audit Log's filter builds its options
+    from this, so a type added here appears there with no frontend change
+    (IR-913). The frontend used to carry its own list, checked against this
+    file by a test, and a backend PR adding a type failed the Frontend job.
+
+    Not paginated: the list is the fixed choices, not rows. Same reader as the
+    log itself, the System Admin alone.
+    """
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
+
+    def get(self, request):
+        return Response([
+            {"type": value, "label": str(label)}
+            for value, label in AuditEvent.EVENT_TYPE_CHOICES
+        ])
 
 
 CSV_COLUMNS = (

@@ -45,14 +45,15 @@ describe("Help", () => {
     expect(section("Administration")).not.toBeInTheDocument();
   });
 
-  it("tells an author what the embargo question means (ADR-052)", () => {
+  it("tells an author every paper starts embargoed, and who ends it (ADR-052, IR-882)", () => {
     renderAs({ role_name: ROLES.STUDENT });
 
     const publishing = section("Publishing your research")!;
-    expect(within(publishing).getByText(/IRIS asks first whether the\s+paper is under an embargo/)).toBeInTheDocument();
+    expect(within(publishing).queryByText(/asks first whether/)).not.toBeInTheDocument();
+    expect(within(publishing).getByText(/Every paper starts under an embargo/)).toBeInTheDocument();
     expect(within(publishing).getByText(/outside AI companies/)).toBeInTheDocument();
     expect(within(publishing).getByText(/doesn.t end the embargo/)).toBeInTheDocument();
-    expect(within(publishing).getByText(/only your Adviser or RDCO can/)).toBeInTheDocument();
+    expect(within(publishing).getByText(/Only your Adviser or RDCO can release it/)).toBeInTheDocument();
   });
 
   it("always explains the review workflow and who to contact", () => {

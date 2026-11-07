@@ -26,4 +26,19 @@ describe("Input", () => {
 
     expect(screen.getByText("Use your school address.").querySelector("i")).toBeNull();
   });
+
+  it("announces required as a state and shows nothing (IR-585)", () => {
+    renderScreen(<Input label="Email" required />);
+
+    const field = screen.getByRole("textbox", { name: "Email" });
+    expect(field).toBeRequired();
+    expect(screen.queryByText(/required/i)).not.toBeInTheDocument();
+  });
+
+  it("says optional inside the label, so it is part of the name (IR-585)", () => {
+    renderScreen(<Input label="Middle initial" optional />);
+
+    const field = screen.getByRole("textbox", { name: "Middle initial (optional)" });
+    expect(field).not.toBeRequired();
+  });
 });

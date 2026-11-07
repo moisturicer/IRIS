@@ -5,8 +5,8 @@ import { cn } from "@/lib/utils";
  * Ask IRIS icon set.
  *
  * The emblem, the assistant mark and the synthesis state are the Folio Ribbon
- * Ask IRIS icon (IR-744): the folio's leaves as brackets around three lines of
- * a passage, drawn in `currentColor`.
+ * Ask IRIS icon (IR-744): a speech bubble with the mark's serif I cut out of
+ * it, drawn in `currentColor`.
  *
  * The line icons that remain (the grounded citation) stroke with
  * `currentColor` instead of a baked `#6B0F12`, so they stay legible on maroon
@@ -70,8 +70,8 @@ export function GroundedCitationIcon({ className = "w-4 h-4", title }: IconProps
 /* ── 4. Synthesis — shown while a query is being answered ────────────────── */
 
 /**
- * While an answer is being written, the Ask IRIS icon writes its three lines
- * one after another (IR-744); it fades instead under reduced motion.
+ * While an answer is being written, the Ask IRIS icon sets the I of its bubble
+ * in type (IR-744); it fades instead under reduced motion.
  */
 export function SynthesisIcon({
   className = "w-4 h-4",

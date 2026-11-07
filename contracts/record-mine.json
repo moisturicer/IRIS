@@ -1,0 +1,80 @@
+{
+  "route": "record-mine",
+  "method": "GET",
+  "as": "owner",
+  "sample": [
+    {
+      "id": 5,
+      "title": "Matrix: a Thesis its owner asked to delete",
+      "record_type_name": "Thesis / Research",
+      "authors": [],
+      "adviser_name": "Ana Adviser",
+      "pipeline_status": "pending_delete",
+      "workflow_state": "pending_delete",
+      "workflow_state_label": "Pending Deletion",
+      "holders": [],
+      "cleared_offices": [],
+      "submitter_status": {
+        "line": "Pending Deletion",
+        "waiting_on_you": []
+      },
+      "created_at": "2026-11-06T22:34:53.581494+08:00",
+      "updated_at": "2026-11-06T22:34:53.581504+08:00",
+      "can_continue": false
+    },
+    {
+      "id": 4,
+      "title": "Matrix: a published Thesis",
+      "record_type_name": "Thesis / Research",
+      "authors": [],
+      "adviser_name": "Ana Adviser",
+      "pipeline_status": "published",
+      "workflow_state": "published",
+      "workflow_state_label": "Published",
+      "holders": [],
+      "cleared_offices": [],
+      "submitter_status": {
+        "line": "Published",
+        "waiting_on_you": []
+      },
+      "created_at": "2026-11-06T22:34:53.570737+08:00",
+      "updated_at": "2026-11-06T22:34:53.570747+08:00",
+      "can_continue": false
+    },
+    {
+      "id": 3,
+      "title": "Matrix: a Thesis awaiting revision",
+      "record_type_name": "Thesis / Research",
+      "authors": [],
+      "adviser_name": "Ana Adviser",
+      "pipeline_status": "in_review",
+      "workflow_state": "awaiting_resubmission",
+      "workflow_state_label": "Awaiting resubmission",
+      "holders": [
+        {
+          "party": "itso",
+          "label": "ITSO"
+        },
+        {
+          "party": "rdco",
+          "label": "RDCO Final"
+        }
+      ],
+      "cleared_offices": [],
+      "submitter_status": {
+        "line": "Revision requested by ITSO: action needed",
+        "waiting_on_you": [
+          {
+            "kind": "revision",
+            "party": "itso",
+            "label": "Revision requested by ITSO",
+            "action_label": "Submit a new version"
+          }
+        ]
+      },
+      "created_at": "2026-11-06T22:34:53.430258+08:00",
+      "updated_at": "2026-11-06T22:34:53.437617+08:00",
+      "can_continue": false
+    }
+  ]
+}

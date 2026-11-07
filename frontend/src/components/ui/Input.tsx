@@ -1,6 +1,6 @@
 import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from "react";
 
-import { FieldLabel } from "./FieldLabel";
+import { FieldLabel, type FieldMarker } from "./FieldLabel";
 
 // "lg" is the entry-screen step: a 44px-tall control, per 12-accessibility.md
 // section 4, which adopts 2.5.5 because the product is used on phones. Like
@@ -17,18 +17,12 @@ const SIZE_CLASSES: Record<Size, string> = {
 // `size` is omitted from the native attributes deliberately: HTML's own `size`
 // is a character-count number, and letting it through would make `size="lg"`
 // silently mean two different things.
-interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size"> {
+type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "size" | "required"> & FieldMarker & {
   label?:   string;
   error?:   string;
   /** Text, or text with a decorative glyph -- "At least 8 characters" with a check. */
   hint?:    ReactNode;
   size?:    Size;
-  /**
-   * Marks the field required in words beside its label and as `aria-required`
-   * (IR-539). Not the native `required`: that would make an empty field
-   * `:invalid`, and announced invalid, before anyone has typed in it.
-   */
-  required?: boolean;
   leading?: React.ReactNode;
   /**
    * Interactive affordance pinned inside the field's trailing edge -- a
@@ -37,7 +31,7 @@ interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "size">
    * own accessible name.
    */
   trailing?: React.ReactNode;
-}
+};
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
   (
@@ -49,6 +43,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
       leading,
       trailing,
       required,
+      optional,
       className = "",
       id,
       "aria-describedby": describedBy,
@@ -84,7 +79,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
 
     return (
       <div className="flex flex-col gap-1">
-        {label && <FieldLabel htmlFor={inputId} label={label} required={required} />}
+        {label && <FieldLabel htmlFor={inputId} label={label} optional={optional} />}
         <div className="relative">
           {leading && (
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-stone-500">

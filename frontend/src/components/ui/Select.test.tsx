@@ -52,12 +52,25 @@ describe("Select", () => {
     expect(screen.queryByText("Where your program is offered.")).not.toBeInTheDocument();
   });
 
-  it("says it is required in words, without putting the word in its name", () => {
+  it("announces required as a state and shows nothing, so the name stays the label alone", () => {
     renderScreen(<Colleges required />);
 
-    // The name stays "College"; the requirement is announced as a state.
     const field = screen.getByRole("combobox", { name: "College" });
     expect(field).toBeRequired();
-    expect(screen.getByText("(required)")).toBeInTheDocument();
+    expect(screen.queryByText(/required/i)).not.toBeInTheDocument();
+  });
+
+  it("says optional inside the label, so it is part of the name", () => {
+    renderScreen(<Colleges optional />);
+
+    const field = screen.getByRole("combobox", { name: "College (optional)" });
+    expect(field).not.toBeRequired();
+  });
+
+  it("marks nothing when it is neither required nor optional", () => {
+    renderScreen(<Colleges />);
+
+    expect(screen.getByRole("combobox", { name: "College" })).not.toBeRequired();
+    expect(screen.queryByText(/optional|required/i)).not.toBeInTheDocument();
   });
 });

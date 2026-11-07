@@ -8,7 +8,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { useAuthStore } from "@/store/auth.store";
 import { renderScreen, screen, waitFor } from "@/test/render";
+import type { User } from "@/types/auth";
 import type { OfficeReviewOutcome, RecordDetail } from "@/types/records";
 
 import { OfficeReviewDialog } from "./OfficeReviewDialog";
@@ -36,8 +38,14 @@ function open(outcome: OfficeReviewOutcome) {
   return { onClose, onDone, view };
 }
 
+/** The signed-in user; null is nobody signed in. */
+function signInAs(id: number | null) {
+  useAuthStore.setState({ user: id === null ? null : ({ id } as User) });
+}
+
 beforeEach(() => {
   sessionStorage.clear();
+  signInAs(1);
   officeReview.mockReset().mockResolvedValue({ data: {} });
 });
 
@@ -104,7 +112,7 @@ describe("OfficeReviewDialog", () => {
     await waitFor(() => expect(officeReview).toHaveBeenCalled());
 
     // Recorded: the next dialog on this record starts empty.
-    expect(readOfficeReviewDraft(7, "finding")).toBe("");
+    expect(readOfficeReviewDraft(1, 7, "finding")).toBe("");
   });
 
   it("never offers a finding's draft as a clearance's note", async () => {
@@ -114,5 +122,60 @@ describe("OfficeReviewDialog", () => {
 
     open("cleared");
     expect(screen.getByRole("textbox", { name: "Comment (optional)" })).toHaveValue("");
+  });
+
+  describe("drafts belong to the signed-in user (IR-931)", () => {
+    const finding = () => screen.getByRole("textbox", { name: "What is the finding?" });
+
+    it("does not show A's unsent finding to B on the same tab, and gives it back to A", async () => {
+      signInAs(1);
+      const first = open("finding");
+      await userEvent.type(finding(), "A's unsent finding.");
+      first.view.unmount();
+
+      signInAs(2);
+      const asB = open("finding");
+      expect(finding()).toHaveValue("");
+      asB.view.unmount();
+
+      // Back after an idle expiry: nothing was cleared on the way out.
+      signInAs(1);
+      open("finding");
+      expect(finding()).toHaveValue("A's unsent finding.");
+    });
+
+    it("keeps B's record of a finding from touching A's draft", async () => {
+      signInAs(1);
+      const first = open("finding");
+      await userEvent.type(finding(), "A's unsent finding.");
+      first.view.unmount();
+
+      signInAs(2);
+      open("finding");
+      expect(finding()).toHaveValue("");
+      await userEvent.type(finding(), "B's finding.");
+      await userEvent.click(screen.getByRole("button", { name: "Record finding" }));
+      await waitFor(() => expect(officeReview).toHaveBeenCalled());
+
+      expect(readOfficeReviewDraft(2, 7, "finding")).toBe("");
+      expect(readOfficeReviewDraft(1, 7, "finding")).toBe("A's unsent finding.");
+    });
+
+    it("reads and writes nothing with nobody signed in, and ignores the old unkeyed key", async () => {
+      sessionStorage.setItem("iris_office_review_draft:7:finding", "From before the change.");
+      signInAs(null);
+      const none = open("finding");
+      expect(finding()).toHaveValue("");
+
+      await userEvent.type(finding(), "Nobody's draft.");
+      expect(Object.keys(sessionStorage)).toEqual(["iris_office_review_draft:7:finding"]);
+      expect(sessionStorage.getItem("iris_office_review_draft:7:finding")).toBe("From before the change.");
+      none.view.unmount();
+
+      // Signed in, the old key is not picked up either.
+      signInAs(1);
+      open("finding");
+      expect(finding()).toHaveValue("");
+    });
   });
 });

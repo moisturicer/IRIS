@@ -57,7 +57,7 @@ Every MVP screen sits on that spine. Anything that does not is a candidate for r
 
 ```
 PUBLIC
-  /login · /signup · /activate/:uid/:token · /pending-approval
+  /login · /signup · /activate (secret in the fragment; deprecated path form /activate/:uid/:token) · /pending-approval
 
 AUTHENTICATED
   /                       Home — role-aware landing

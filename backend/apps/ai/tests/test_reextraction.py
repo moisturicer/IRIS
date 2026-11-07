@@ -33,13 +33,16 @@ def priced(settings):
         setattr(settings, name, value)
 
 
-def _record(title="A thesis", *, consent=True, embargo=None, answered=True, extractor="docling"):
+def _record(title="A thesis", *, consent=True, embargo=None, released=True, extractor="docling"):
     record = Record.objects.create(
         title=title,
         record_type=RecordType.objects.get_or_create(name="Thesis")[0],
         abstract_file=SimpleUploadedFile("thesis.pdf", PDF),
-        embargo_answered_at=timezone.now() if answered else None,
+        # Embargoed by default (IR-882): released only when asked, and never with a date.
+        is_embargoed=not (released and embargo is None),
+        embargo_released_at=timezone.now() if released and embargo is None else None,
         embargoed_until=embargo,
+        embargo_date_set_at=timezone.now() if embargo is not None else None,
         dpa_accepted_at=timezone.now() if consent else None,
         manuscript_revision=uuid.uuid4(),
     )
@@ -54,7 +57,7 @@ def test_the_plan_prices_permitted_papers_and_names_why_the_rest_are_skipped(pri
     permitted = _record("Permitted")
     _record("No consent", consent=False)
     _record("Embargoed", embargo=date(2030, 1, 1))
-    _record("Unanswered", answered=False)
+    _record("Never released", released=False)
     _record("Already read", extractor="llamaparse")
 
     plan = plan_cutover()

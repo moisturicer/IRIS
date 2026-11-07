@@ -143,7 +143,7 @@ def create_version_one(apps, schema_editor):
 
 
 class Migration(migrations.Migration):
-    dependencies = [("accounts", "0018_seed_system_admin_role")]
+    dependencies = [("accounts", "0019_profile_photo_bio_interests")]
 
     operations = [
         migrations.CreateModel(
