@@ -8,7 +8,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { useAuthStore } from "@/store/auth.store";
 import { renderScreen, screen, waitFor } from "@/test/render";
+import type { User } from "@/types/auth";
 import type { RecordDetail } from "@/types/records";
 
 import { RequestRevisionDialog } from "./RequestRevisionDialog";
@@ -37,8 +39,14 @@ function open() {
 
 const reasonBox = () => screen.getByRole("textbox", { name: "What needs revising?" });
 
+/** The signed-in user; null is nobody signed in. */
+function signInAs(id: number | null) {
+  useAuthStore.setState({ user: id === null ? null : ({ id } as User) });
+}
+
 beforeEach(() => {
   sessionStorage.clear();
+  signInAs(1);
   requestRevision.mockReset().mockResolvedValue({ data: {} });
 });
 
@@ -92,6 +100,59 @@ describe("RequestRevisionDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Request Revision" }));
     await waitFor(() => expect(requestRevision).toHaveBeenCalled());
 
-    expect(readRevisionDraft(7)).toBe("");
+    expect(readRevisionDraft(1, 7)).toBe("");
+  });
+
+  describe("drafts belong to the signed-in user (IR-931)", () => {
+    it("does not show A's unsent reason to B on the same tab, and gives it back to A", async () => {
+      signInAs(1);
+      const first = open();
+      await userEvent.type(reasonBox(), "A's unsent reason.");
+      first.view.unmount();
+
+      signInAs(2);
+      const asB = open();
+      expect(reasonBox()).toHaveValue("");
+      asB.view.unmount();
+
+      // Back after an idle expiry: nothing was cleared on the way out.
+      signInAs(1);
+      open();
+      expect(reasonBox()).toHaveValue("A's unsent reason.");
+    });
+
+    it("keeps B's request from touching A's draft", async () => {
+      signInAs(1);
+      const first = open();
+      await userEvent.type(reasonBox(), "A's unsent reason.");
+      first.view.unmount();
+
+      signInAs(2);
+      open();
+      expect(reasonBox()).toHaveValue("");
+      await userEvent.type(reasonBox(), "B's reason.");
+      await userEvent.click(screen.getByRole("button", { name: "Request Revision" }));
+      await waitFor(() => expect(requestRevision).toHaveBeenCalled());
+
+      expect(readRevisionDraft(2, 7)).toBe("");
+      expect(readRevisionDraft(1, 7)).toBe("A's unsent reason.");
+    });
+
+    it("reads and writes nothing with nobody signed in, and ignores the old unkeyed key", async () => {
+      sessionStorage.setItem("iris_revision_draft:7", "From before the change.");
+      signInAs(null);
+      const none = open();
+      expect(reasonBox()).toHaveValue("");
+
+      await userEvent.type(reasonBox(), "Nobody's draft.");
+      expect(Object.keys(sessionStorage)).toEqual(["iris_revision_draft:7"]);
+      expect(sessionStorage.getItem("iris_revision_draft:7")).toBe("From before the change.");
+      none.view.unmount();
+
+      // Signed in, the old key is not picked up either.
+      signInAs(1);
+      open();
+      expect(reasonBox()).toHaveValue("");
+    });
   });
 });

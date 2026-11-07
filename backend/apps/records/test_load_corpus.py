@@ -293,11 +293,11 @@ class LoadCorpusClearingTests(_LoadsCorpus):
         self.root = Path(self.tmp.name)
         _write(self.root, "econometrics", "Paper.pdf")
 
-    def test_a_paper_loaded_without_the_option_stays_unknown(self):
+    def test_a_paper_loaded_without_the_option_stays_embargoed(self):
         self.load(str(self.root))
 
         record = Record.objects.get(title="Paper")
-        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
         self.assertFalse(decision_for_record(record).allowed)
 
     @override_settings(DEBUG=True)
@@ -305,9 +305,9 @@ class LoadCorpusClearingTests(_LoadsCorpus):
         self.load(str(self.root), clear_for_ai=True)
 
         record = Record.objects.get(title="Paper")
-        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
         self.assertTrue(decision_for_record(record).allowed)
-        self.assertEqual(record.embargo_answered_by.email, DEFAULT_OWNER_EMAIL)
+        self.assertEqual(record.embargo_released_by.email, DEFAULT_OWNER_EMAIL)
         self.assertEqual(record.dpa_accepted_by.email, DEFAULT_OWNER_EMAIL)
 
     @override_settings(DEBUG=True)
@@ -339,7 +339,7 @@ class LoadCorpusClearingTests(_LoadsCorpus):
         self.load(str(self.root), clear_for_ai=True)
 
         record = Record.objects.get(title="Paper")
-        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
 
     def test_force_does_not_get_past_the_refusal_with_debug_off(self):
         """`--force` loads on any machine. Clearing never does: it would answer

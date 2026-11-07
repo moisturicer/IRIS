@@ -2,7 +2,7 @@
 
 ## Status
 
-**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 and §3 are not built.
+**Accepted** — 2026-11-04. Decided by Hermoine Zozobrado in a design session reviewing the review-workspace prototype against the code, and transcribed by an agent. §2 is built by IR-872, and §2's amendment below records the decisions made while building it. §1 is amended 2026-11-05 (IR-871): a Version's text for review is read on campus without AI, apart from the LlamaParse Extraction. §1 as amended is built by IR-871, and the build notes under it record the decisions made while building it. §3 is not built.
 
 **Amends:**
 
@@ -36,6 +36,53 @@ So "what exactly did the reviewers see at v2?" has no answer today. That is the 
 - **Withdrawing a revision deletes no Version's text.** `restore_submitted_manuscript` may still delete an *unsubmitted* upload's extraction, which belongs to no Version, and nothing else.
 - **Versions from before this change aren't reconstructed.** Their text was overwritten, so they read *"vN's text was not kept"*, and comparing with them is unavailable. Nothing is guessed.
 - **Scanned or failed extractions say so.** A Version with no usable text shows *"No text for vN, so it can't be compared"*, never an empty comparison.
+
+**Amendment, 2026-11-05 (IR-871; decided by Hermoine Zozobrado, Accepted). Review text is read on campus, without AI.**
+
+§1 assumed a Version's text was its LlamaParse Extraction. Since IR-882 (ADR-052 as amended 2026-11-04), every paper starts embargoed and LlamaParse waits until the Adviser or RDCO releases it, so a paper under review has no Extraction at all. IR-882's build notes in ADR-052 left this open for this ADR. It is settled here:
+
+1. **Review text is not the Extraction.** Each Version that changes the manuscript gets its own **review text**: its sections (heading and page) and passages (text, page and regions in ADR-031's shape). It is read from that Version's own manuscript PDF with pdfplumber and plain rules. This replaces §1's "the extraction belongs to the Version it was made from". Everything else §1 says about a Version's text applies to the review text: a metadata-only Version shares the previous one's, it is kept for the Record's life, withdrawing a revision deletes no Version's, and a scanned or unreadable PDF reads *"No text for vN"*.
+2. **It is read at submission, whatever the embargo or AI consent says.** Nothing leaves the server and no model is called, so neither ADR-052's gate nor ADR-054's consent concerns it. The extraction gate already applies only to Extractors that leave campus. It runs in the same bounded worker sandbox as upload checks (IR-830), never in a web worker.
+3. **The Extraction and the AI path don't change.** `PdfExtraction` stays one per Record. LlamaParse reads the latest submitted Version once it is released, and only that is chunked, embedded and retrieved (ADR-013, ADR-056). Review text is never chunked, embedded or retrieved, and it is served only under `may_read_review` (§4). Review never reads the Extraction, and the AI never reads review text.
+4. **Versions from before this change are read from their own files.** This supersedes §1's "Versions from before this change aren't reconstructed" and the Consequence "Earlier Versions on existing data can't be compared". Each existing Version still has its manuscript file (ADR-032 §5), and no file a Version names can be deleted (§2's amendment, point 3). A one-time command reads them as if they had been read at submission. That re-reads the file the reviewers saw, so nothing is guessed. The reason for "not reconstructed" was a paid, off-campus Extractor, and it no longer applies. A Version whose file is missing still reads *"vN's text was not kept"*.
+5. **The reader is recorded.** Each review text names the reader's version. Text already stored is never re-read in place, so a Thread's anchor keeps resolving against the text it was checked against. Re-reading with a newer reader is a deliberate command.
+
+**Evidence.** A throwaway prototype (`prototype/pdf-version-comparison`, `backend/apps/reviews/prototype_pdf_comparison/`, 2026-11-05) wrote two Versions of a seeded paper with seven known edits: a changed figure, an added section, a removed paragraph, swapped sections, a renamed section, a corrected table value and an added sentence. It produced them twice, once drawn by a script and once built in Microsoft Word and exported by Word, and it ran the repo's two-column and multi-page table fixtures as well. All 59 checks passed:
+- running heads and page numbers removed
+- every word and sentence whole
+- every sentence's page matching Word's own pagination
+- every section's change found, sections pushed onto a later page still unchanged
+- Threads found again, or Outdated where their words changed
+
+It was **not** run on a real CIT-U thesis, and it didn't test figures, equations, footnotes, citations, tables without borders, headings that aren't bold or PDFs from other programs. IR-871 runs it on two Versions of a real thesis before merging.
+
+**Alternatives considered:**
+
+- **Upload `.docx` instead of PDF, and make a PDF at the final Decision.** A Word file gives cleaner text and real headings. Rejected:
+  - Before conversion there are no pages, so ADR-031's regions, page citations, ADR-048's watermark and §3's "found on p. N" all break.
+  - It needs a document converter service.
+  - Signed and scanned forms have no Word file.
+  - Existing PDFs would need a second path anyway.
+  - The prototype found a PDF's text enough on a thesis-shaped paper.
+- **Let LlamaParse read Versions under review.** Rejected: it sends an embargoed paper off campus, which ADR-052 forbids until release.
+- **Compare in the browser from the PDF viewer's text layer.** It needs no server reading. Rejected: Outdated threads and the suggested-wording check (§3) must run when a Version is submitted, not only when someone opens it.
+
+**Build notes, 2026-11-05 (IR-871; decided by Hermoine Zozobrado while building it, Accepted).** Seven points the amendment left open:
+
+1. **A passage is one sentence**, or one row of a ruled table, with its page, its paragraph number and one region per line. This is the shape the prototype checked, and §3 and ADR-032 §7's anchors work sentence by sentence. *Rejected:* a paragraph with every word's box (about 1 MB per thesis, and §3 rebuilds sentences on every comparison), and a paragraph with line boxes only (a sentence starting mid-line would be highlighted from the line's start). A later change to the sentence rules is a new reader, under point 5 above.
+2. **Stored as section rows with their sentences as JSON.** `ReviewText` holds one manuscript file's reading: its state, reason, reader, page count and warnings. `ReviewTextSection` holds one row per section: heading, page, `key` and `text_hash`, with the passages as JSON. No card under IR-870 queries a passage in SQL, while a Viewed mark (IR-877) needs a section the database checks. Each `key` is the heading without numbering (`#2` and on for a repeat, `front-matter` before the first heading). Each `text_hash` hashes the normalised passages, so a later reading can match an unchanged section exactly.
+3. **A Version points at its text** (`RecordVersion.review_text`, `RESTRICT`). A metadata-only Version points at the previous Version's, so nothing walks back through Versions and nothing is copied. A Version with no manuscript has none.
+4. **Headings are found by numbering and capitals as well as bold**, because headings that aren't bold were never tested. Table-of-contents lines (dot leaders, a trailing page number) and captions are never headings, and a numbered line, a change of case, or a change of font or size starts a new heading rather than continuing one. Running heads and footers are found by repetition across the page's whole width, before columns are split. Both rules were changed after the first real paper (IR-871's traceability file).
+5. **A layout the rules don't know never gives a misleading text** (amended 2026-11-06, after the first real paper; decided by Hermoine Zozobrado, Accepted). The university's fields use many formats, and no reader can promise all of them, so the reader fails safe instead:
+   - When its sections take a shape no real paper's headings take, the paper is stored as **one `document` section**, and every sentence keeps its page and regions. The warning `sections_unreliable` names the shape: no headings, about as many headings as sentences, one heading repeated, or headings over mostly nothing. Comparing sentences and finding a Thread's quote don't depend on headings, so an unknown layout gets a coarser view, never a wrong one.
+   - A heading wraps onto at most three lines.
+   - A change of font size starts a new paragraph, so a footnote, caption or block quote is never glued into a body sentence.
+   - When more than a fifth of the words have no character behind them (U+FFFD, or pdfminer's `(cid:N)`), nothing is stored and the Version reads *"No text for vN"*. A smaller share is kept and counted (`unmapped_characters`).
+   - The other warnings remain: a section over 15 pages, and pages with no text. IR-873 reads them all to say how far a comparison can be trusted.
+
+   Real papers from each college are being collected to grow the rules (IR-871's traceability file); each failure they show becomes a rule and a test, under a new `RULES_VERSION` once any text is stored.
+6. **The sandbox has its own limits**, `REVIEW_TEXT_WALL_SECONDS`, `_MEMORY_MIB` and `_MAX_PAGES`, because a layout read does more work than the upload check. Like IR-830's, they are required: with any unset, nothing is read and the text waits as *not read yet*, for `read_review_texts` to retry. `GET /records/<id>/versions/<n>/text/` serves a text under `may_read_review` and is audited as the Version's manuscript is. `versions_payload` carries each Version's text state.
+7. **The reader's text is the one sandbox output that crosses back**, against IR-830's "only fixed exit codes cross back" (`docs/engineering/PDF_INTAKE.md`). It has to: the text is the result. To narrow the risk that a parser taken over by a crafted PDF copies something into it, the child opens its input and output first and then caps its own open-file limit, so it can open nothing else: not the worker's environment, not another paper. The parent checks that the bytes it read are the Version's recorded SHA-256 before storing anything. The child still runs as the worker's OS user; a separate unprivileged user would close the rest and is a deployment change left for later.
 
 ### 2. A Version names its documents
 
@@ -92,7 +139,8 @@ A Version is meant to be the snapshot a review was made against. A snapshot that
 
 - Storage grows by one extraction for each manuscript-changing Version.
 - A migration: the extraction's link moves from Record to Version, and the new link table needs a reconstruction pass over existing Versions.
-- **Earlier Versions on existing data can't be compared.** Only Versions submitted after this change have text.
+- ~~**Earlier Versions on existing data can't be compared.** Only Versions submitted after this change have text.~~ Superseded by §1's 2026-11-05 amendment, point 4: earlier Versions are read from their own files, and only a Version whose file is missing can't be compared.
+- **Two texts per paper** (§1's 2026-11-05 amendment): review text for every Version, read on campus, and the LlamaParse Extraction for the latest released one. They can disagree about the same page, because they come from two readers.
 - Comparison of two typesettings of the same text produces noise. Normalisation reduces it and doesn't remove it.
 
 ## MVP Impact
@@ -121,4 +169,4 @@ None by `FR-` label.
 
 ## Related Tasks
 
-IR-868 (records this decision). Implementation needs its own issues.
+IR-868 (records this decision). IR-872 builds §2. IR-871 builds §1 as amended 2026-11-05 (review text, read on campus). IR-873 builds §3.

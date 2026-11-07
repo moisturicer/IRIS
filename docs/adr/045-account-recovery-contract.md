@@ -304,6 +304,12 @@ keep a default-generator compatibility bypass. Registration and resend must
 switch atomically to the new verification format. Inform users to request new
 links. This trades old-link convenience for purpose separation and single use.
 
+> **Note, 2026-11-06 (IR-928).** Until that rollout, verification still uses Django's
+> default token generator. IR-928 moved the link's secret out of the path into the
+> fragment, `/activate#uid=…&token=…`, posted to `POST /auth/activate/` in a body,
+> and keeps the old `GET /activate/<uid>/<token>/` route as deprecated for the 3 days
+> the old tokens live. IR-643's rollout supersedes both and retires them at once.
+
 ### 9. Required automated evidence at implementation seams
 
 These are a test plan, **not executed tests or coverage claims**. Agree seams

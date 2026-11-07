@@ -39,6 +39,18 @@ class ReviewCommentTestBase(NewVersionTestBase, DecisionTestBase):
         self.client.force_authenticate(as_user)
         return self.client.get(comments_url(record))
 
+    def finished(self, record, as_user, verdict="comment_only", **extra):
+        """
+        `as_user` finishes their review, sending their drafts (IR-874): a
+        reviewer holding an open seat writes drafts nobody else sees until then.
+        """
+        response = self.post(
+            reverse("record-finish-review", args=[record.pk]), as_user,
+            {"verdict": verdict, **extra},
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        return response.data
+
     def edit(self, record, as_user, comment_id, body):
         self.client.force_authenticate(as_user)
         return self.client.patch(comment_url(record, comment_id), {"body": body}, format="json")
@@ -146,11 +158,13 @@ class CommentRecordsItsVersionTests(ReviewCommentTestBase):
         record = self.routed(Party.ITSO, Party.IERC)
         self.opened_seat(record, Party.IERC, self.ierc)
         self.commented(record, self.ierc, "Before the revision.")
+        self.finished(record, self.ierc)
         self.asked(record, self.ierc)
         self.edit_title(record)
         self.submitted(record)
 
         self.commented(record, self.ierc, "After the revision.")
+        self.finished(record, self.ierc)
 
         response = self.listed(record, self.owner)
         self.assertEqual(
@@ -194,6 +208,7 @@ class RepliesAndEditsTests(ReviewCommentTestBase):
     def test_a_reply_threads_under_the_comment_it_answers(self):
         record = self.at_adviser_open()
         question = self.commented(record, self.adviser, "Which sample size?")
+        self.finished(record, self.adviser)
 
         answer = self.commented(record, self.owner, "Forty respondents.", reply_to=question["id"])
 
@@ -202,6 +217,7 @@ class RepliesAndEditsTests(ReviewCommentTestBase):
     def test_a_reply_to_a_reply_joins_its_thread(self):
         record = self.at_adviser_open()
         question = self.commented(record, self.adviser, "Which sample size?")
+        self.finished(record, self.adviser)
         answer = self.commented(record, self.owner, "Forty.", reply_to=question["id"])
 
         follow_up = self.commented(record, self.adviser, "Why forty?", reply_to=answer["id"])
@@ -301,6 +317,7 @@ class TrackerCarriesCommentsTests(ReviewCommentTestBase):
         record = self.at_adviser_open()
         mine = self.commented(record, self.owner, "Mine.")
         theirs = self.commented(record, self.adviser, "Theirs.")
+        self.finished(record, self.adviser)
 
         # Each author is told, as they post it, that the comment is theirs.
         self.assertTrue(mine["can_edit"])

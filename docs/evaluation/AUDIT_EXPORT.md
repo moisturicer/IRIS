@@ -113,6 +113,19 @@ and a Proposal's accept write no `PUBLISHED`.
 | `RESUBMITTED` | The owner submits a new version answering every open request | `version`, `policy` (`clearance_aware` or `restart_all`, the active ADR-004 arm), `requests` (the request ids it answered), `rereview_parties` (the parties that review the new version: those that asked, and under `restart_all` the offices it reopens, IR-632), `reset_parties` (the offices whose clearance the policy reset), `preserved_parties` (the offices whose `cleared` clearance it kept) |
 | `CLEARANCE_PRESERVED` | One row per office in `preserved_parties`, right after its `RESUBMITTED` | `party`, `version`, `policy` |
 
+### Review threads (ADR-032 §7, 2026-11-04; IR-874)
+
+No thread text is copied: never a body, an answer's note, a finished review's summary or a closing reason. `party` is the thread's party, or `null` for an owner's thread.
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `REVIEW_FINISHED` | A Seat holder finishes a review, *Comment only* included, which writes no `DECISION_RECORDED`. Any other verdict's own events sit beside it | `party`, `verdict` (`comment_only`, `request_revision`, `send_to_rdco`, `cleared`, `finding`, `accept`, `publish`, `keep_unlisted`, `reject`), `round` (the `ReviewRound` id), `review` (the verdict's Review id, or `null` for *Comment only*), `threads` (the ids it sent), `must_fix` (how many of them), `version` |
+| `REVIEW_THREAD_RESOLVED` | A participant resolves an open thread | `thread`, `party`, `severity` |
+| `REVIEW_THREAD_REOPENED` | A participant reopens a resolved thread | `thread`, `party`, `severity` |
+| `REVIEW_THREAD_SEVERITY_CHANGED` | A Seat holder of the thread's party changes a sent thread's severity. A draft's changes aren't logged: nobody else has seen it | `thread`, `party`, `severity` (the new one), `previous` |
+| `REVIEW_THREAD_ANSWERED` | An owner marks a reviewer's thread Addressed or Declined, each time | `thread`, `party`, `severity`, `answer` (`addressed` or `declined`) |
+| `REVIEW_THREADS_CLOSED` | A Decision closes the open threads, right after its `DECISION_RECORDED` | `decision` (the deciding Review's id), `threads`, `must_fix` |
+
 ### Reviewer seats (ADR-032 §4)
 
 Every seat event carries `party`, `assignment`, `seat`, `reviewer` (user id) and `source`.

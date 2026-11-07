@@ -9,7 +9,7 @@ The approved Folio Ribbon direction (01), traced to vectors from the concept boa
 | Name | Hex | Use |
 |---|---|---|
 | Binding Maroon | `#6B0F12` | the mark, wordmark and the maroon half of the icons |
-| Ink | `#1C1917` | the Search handle and the Ask IRIS lines (two-tone icons only) |
+| Ink | `#1C1917` | the Search handle (the two-tone Search icon only) |
 | White | `#FFFFFF` | every `-reversed` file, for use on maroon |
 
 ## Files
@@ -24,10 +24,10 @@ The approved Folio Ribbon direction (01), traced to vectors from the concept boa
 | `app-icon.svg` | white mark on a square maroon tile; platforms round the corners |
 | `favicon.svg`, `favicon.ico` | browser tab (the `.ico` holds 16, 32 and 48 px) |
 | `icon-search.svg`, `-maroon.svg`, `-reversed.svg` | Search: two-tone, all maroon, white |
-| `icon-ask-iris.svg`, `-maroon.svg`, `-reversed.svg` | Ask IRIS: two-tone, all maroon, white |
+| `icon-ask-iris.svg`, `-reversed.svg` | Ask IRIS: a speech bubble with the serif I cut out of it; maroon, white |
 | `opening.svg`, `-reversed.svg` | the mark assembling once (1.1 s): splash and sign-in |
 | `loading.svg`, `-reversed.svg` | loading loop (2 s), the concept board's storyboard |
-| `ask-iris-answering.svg`, `-reversed.svg` | Ask IRIS writing an answer (1.8 s loop) |
+| `ask-iris-answering.svg`, `-reversed.svg` | Ask IRIS answering: the I is set in type inside the bubble (1.8 s loop) |
 | `png/` | rasters: favicons 16/32/48, `apple-touch-icon-180`, `icon-192`, `icon-512`, the mark at 512, the lockups at 800–1200 px, the icons at 256 |
 
 The animated SVGs carry their own CSS and run inside an `<img>` tag. Under `prefers-reduced-motion` the loops become a slow fade and the opening shows the finished mark.
@@ -36,7 +36,7 @@ The animated SVGs carry their own CSS and run inside an `<img>` tag. Under `pref
 
 - **Opening:** the upper-left leaf unfolds from the spine (0 ms), the lower-right leaf follows (120 ms), then both ribbons unspool outward from the gutter (380 and 440 ms). The I is never drawn: it is the space the four pieces leave.
 - **Loading:** one leaf, then its partner, then the ribbons close and the I appears; hold; fade; repeat.
-- **Ask IRIS answering:** the brackets hold still while the three lines are written one after another, 180 ms apart.
+- **Ask IRIS answering:** the bubble holds still while the I is set in type, 180 ms apart: the top serif, the stem dropping from it, then the bottom serif.
 
 The interactive versions (hover, replay, quarter speed) are in `../animation.html`.
 
@@ -52,5 +52,5 @@ python docs/brand/folio-ribbon/final/build.py
 
 ## Known limits
 
-- The source artwork was a raster concept board, so the shapes are traces, not hand-drawn curves. The mark and wordmark came from about 230 px of artwork and hold up well. The Search and Ask IRIS icons came from tiles of about 85 px, so their edges show slight unevenness above 128 px. A designer redrawing those two curves by hand would fix it.
+- The source artwork was a raster concept board, so the shapes are traces, not hand-drawn curves. The mark and wordmark came from about 230 px of artwork and hold up well. The Search icon came from a tile of about 85 px, so its edges show slight unevenness above 128 px; a designer redrawing those curves by hand would fix it. The Ask IRIS icon is not traced: it is drawn by hand on a 24 unit grid in `build.py` (`ASK_BUBBLE`, `ASK_LETTER`), so it is exact at any size. The I has to be a hole, so the icon is one colour and shows whatever is behind it.
 - The two-tone icons put Ink beside maroon; inside the app they should normally be used as `-maroon` or `-reversed`, which keeps to one colour.

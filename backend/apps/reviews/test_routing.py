@@ -401,7 +401,7 @@ class RoutingOptionsTests(RoutingTestBase):
         self.client.force_authenticate(self.adviser)
         self.assertEqual(
             self.client.get(detail).data["routing"],
-            {"send_to_rdco": True, "route_as": None, "targets": []},
+            {"send_to_rdco": True, "send_to_rdco_blocked": None, "route_as": None, "targets": []},
         )
 
         self.accepted_to(record, Party.ITSO)

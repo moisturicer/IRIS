@@ -103,8 +103,14 @@ export const SCREEN_ACCESS = {
   // The bell at the top of the sidebar is the entry; its "View all" opens the
   // page, so a sidebar link would say the same thing twice (IR-519).
   notifications: { path: "/notifications", roles: EVERYONE },
-  // Settings and Help live in the account menu in the sidebar's user block
-  // (IR-413, spec §4.2), not in the nav list.
+  // Profile, Settings and Help live in the account menu in the sidebar's user
+  // block (IR-413, spec §4.2), not in the nav list. Profile (who you are) and
+  // Settings (your account) are separate pages since IR-933.
+  profile:       { path: "/profile",       roles: EVERYONE },
+  profileEdit:   { path: "/profile/edit",  roles: EVERYONE },
+  // Another person's Profile (IR-700), opened by clicking their name. Who may be
+  // opened is the server's decision: a hidden account answers 404.
+  person:        { path: "/people/:id",    roles: EVERYONE },
   settings:      { path: "/settings",      roles: EVERYONE },
   help:          { path: "/help",          roles: EVERYONE },
   // Reached from Discover and the queues, never from the nav. Which *records*
@@ -182,6 +188,11 @@ export function rolesFor(key: ScreenKey): RoleName[] {
  */
 export function pathFor(key: ScreenKey): string {
   return SCREEN_ACCESS[key].path;
+}
+
+/** `/people/<id>`: where a person's name leads. */
+export function personPath(id: number): string {
+  return SCREEN_ACCESS.person.path.replace(":id", String(id));
 }
 
 export function canAccess(role: RoleName | null | undefined, key: ScreenKey): boolean {

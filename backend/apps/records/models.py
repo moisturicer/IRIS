@@ -18,6 +18,7 @@ from core.enums import (  # noqa: F401
     IPType,
     PipelineStatus,
     RequestStatus,
+    ReviewTextState,
     VersionCause,
 )
 
@@ -301,29 +302,37 @@ class Record(models.Model):
         """
         return self.dpa_accepted_at is not None
 
-    # The paper's embargo answer (ADR-052). Its own fact: separate from status,
-    # IP and consent, because a published paper can still be under an agreement.
-    # Stamped by `apps.records.embargo` and by nothing else; none of these is
-    # writable through a serializer.
+    # The paper's embargo (ADR-052, embargoed by default as amended for IR-882).
+    # Its own fact: separate from status, IP and consent, because a published
+    # paper can still be under an agreement. Stamped by `apps.records.embargo`
+    # and by nothing else; none of these is writable through a serializer.
     #
-    # **The answer's timestamp is what makes a blank date mean "no embargo".**
-    # An unanswered paper stores a blank date too, and it must stay refused.
+    # **Every paper starts embargoed.** Only a release by the Adviser or RDCO
+    # clears `is_embargoed`, so a code path that forgets to stamp anything
+    # leaves the paper blocked, never open.
+    is_embargoed = models.BooleanField(
+        default=True,
+        help_text="True until the Adviser or RDCO releases it. Only a released paper reaches the AI or can be published.",
+    )
     embargoed_until = models.DateField(
         null=True, blank=True,
         help_text="The date to review the embargo. A reminder: it never ends the embargo.",
     )
-    embargo_answered_at = models.DateTimeField(
-        null=True, blank=True,
-        help_text="When the embargo question was answered. Null means never, so the paper stays blocked.",
+    # Renamed from the answer stamps by `records/0032` in Django only: the columns
+    # keep their old names, which `publication`'s SQL functions read.
+    embargo_date_set_at = models.DateTimeField(
+        null=True, blank=True, db_column="embargo_answered_at",
+        help_text="When the review date was last set. Null when no date was ever set.",
     )
-    embargo_answered_by = models.ForeignKey(
+    embargo_date_set_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
-        related_name="embargo_answered_records",
-        help_text="Who answered. SET_NULL so a deleted account cannot erase the timestamp.",
+        db_column="embargo_answered_by_id",
+        related_name="embargo_dated_records",
+        help_text="Who set the date. SET_NULL so a deleted account cannot erase the timestamp.",
     )
     embargo_released_at = models.DateTimeField(
         null=True, blank=True,
-        help_text="When a person ended the embargo. Null means it has not been released.",
+        help_text="When a person released the embargo. Null while it is embargoed.",
     )
     embargo_released_by = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
@@ -333,18 +342,12 @@ class Record(models.Model):
 
     @property
     def embargo_state(self) -> EmbargoState:
-        """Where the embargo stands (ADR-052 §3).
+        """Where the embargo stands (ADR-052 §3 as amended for IR-882).
 
-        Derived, never stored, so it cannot drift from the stamps it describes,
-        and it reads no clock: a passed date stays `ACTIVE` until a person acts.
+        Derived from `is_embargoed`, and it reads no clock: a passed date stays
+        `ACTIVE` until a person releases it (§9).
         """
-        if self.embargo_answered_at is None:
-            return EmbargoState.UNKNOWN
-        if self.embargo_released_at is not None:
-            return EmbargoState.RELEASED
-        if self.embargoed_until is not None:
-            return EmbargoState.ACTIVE
-        return EmbargoState.NONE
+        return EmbargoState.ACTIVE if self.is_embargoed else EmbargoState.RELEASED
 
     # KTTO's release of an IP mark (ADR-052 §11-13, IR-813). The mark stays on
     # the paper, and this is what opens the disclosure check for it. Stamped by
@@ -399,20 +402,21 @@ class Record(models.Model):
                 fields=["derived_from"],
                 name="record_one_continuation",
             ),
-            # Rows that would read as something nobody said (ADR-052 §3).
+            # A release is stamped exactly when the paper is not embargoed, and a
+            # date always says who set it (ADR-052, IR-882).
             models.CheckConstraint(
                 condition=(
-                    models.Q(embargoed_until__isnull=True)
-                    | models.Q(embargo_answered_at__isnull=False)
+                    models.Q(is_embargoed=True, embargo_released_at__isnull=True)
+                    | models.Q(is_embargoed=False, embargo_released_at__isnull=False)
                 ),
-                name="record_embargo_date_needs_answer",
+                name="record_embargo_release_matches_state",
             ),
             models.CheckConstraint(
                 condition=(
-                    models.Q(embargo_released_at__isnull=True)
-                    | models.Q(embargoed_until__isnull=False)
+                    models.Q(embargoed_until__isnull=True)
+                    | models.Q(embargo_date_set_at__isnull=False)
                 ),
-                name="record_embargo_release_needs_date",
+                name="record_embargo_date_says_when_set",
             ),
             models.CheckConstraint(
                 condition=models.Q(ip_released_at__isnull=True) | models.Q(is_ip=True),
@@ -465,6 +469,14 @@ class RecordVersion(models.Model):
     #: times rather than recorded at submission (ADR-058 §2, IR-872): every
     #: version written before IR-872. Shown, so a guess is never read as a record.
     documents_reconstructed = models.BooleanField(default=False)
+    #: The text reviewers compare and anchor threads to (ADR-058 §1 as
+    #: amended, IR-871). A Version that changes the manuscript gets its own;
+    #: a metadata-only one points at the one before it. Null where there is no
+    #: manuscript, or for a Version from before IR-871 that `read_review_texts`
+    #: hasn't reached yet. `RESTRICT`: no code deletes a text a Version names.
+    review_text = models.ForeignKey(
+        "ReviewText", on_delete=models.RESTRICT, null=True, blank=True, related_name="versions",
+    )
 
     class Meta:
         ordering = ["record", "number"]
@@ -506,13 +518,89 @@ class RecordVersionDocument(models.Model):
         return f"{self.version} · upload {self.upload_id}"
 
 
+class ReviewText(models.Model):
+    """
+    One manuscript file's text for review, read on campus with no AI (ADR-058
+    §1 as amended 2026-11-05, IR-871). It is not the LlamaParse Extraction:
+    it is read at submission whatever the embargo or AI consent says, and it
+    is never chunked, embedded or retrieved. Served only under
+    `may_read_review`.
+
+    **Never re-read in place.** Once a reading is stored it stays what it
+    was, so a Thread's anchor keeps resolving against the text it was checked
+    against; `reader` names the reader that produced it. Only `pending` and
+    `unavailable` texts are ever read (`store.read_text`).
+    """
+
+    record = models.ForeignKey(Record, on_delete=models.CASCADE, related_name="review_texts")
+    #: The manuscript file it reads, as the Version names it.
+    source_file = models.CharField(max_length=255)
+    manuscript_sha256 = models.CharField(max_length=64, blank=True)
+    state = models.CharField(max_length=16, choices=ReviewTextState.choices,
+                             default=ReviewTextState.PENDING)
+    #: Why there is no text: a `sandbox` reason code. Blank when read.
+    reason = models.CharField(max_length=32, blank=True)
+    reader = models.CharField(max_length=64, blank=True)
+    page_count = models.PositiveIntegerField(null=True, blank=True)
+    #: What may be wrong with the sections found (`reader._finish`), e.g. no headings.
+    warnings = models.JSONField(default=list, blank=True)
+    #: Read later by `read_review_texts` from the Version's own file, not at submission.
+    read_after_submission = models.BooleanField(default=False)
+    created_at = models.DateTimeField(default=timezone.now)
+    read_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["record", "created_at", "pk"]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(state=ReviewTextState.READ) | (
+                    ~models.Q(reader="") & models.Q(read_at__isnull=False)
+                ),
+                name="review_text_read_names_its_reader",
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.record_id} · {self.source_file} · {self.state}"
+
+
+class ReviewTextSection(models.Model):
+    """
+    One section of a review text: its heading, the page it starts on, and its
+    passages (IR-871). A passage is a sentence or a ruled table's row, stored
+    as JSON `{text, page, paragraph, kind, regions}`, with `regions` in
+    ADR-031's page-fraction shape. `key` is the heading without its numbering,
+    with `#2` and on for a repeated heading, or `front-matter`; `text_hash`
+    hashes the normalised passages, so a later reading can tell an unchanged
+    section from a changed one exactly.
+    """
+
+    text = models.ForeignKey(ReviewText, on_delete=models.CASCADE, related_name="sections")
+    ordinal = models.PositiveIntegerField()
+    key = models.CharField(max_length=255)
+    heading = models.TextField(blank=True)
+    page = models.PositiveIntegerField()
+    text_hash = models.CharField(max_length=64)
+    passages = models.JSONField(default=list)
+
+    class Meta:
+        ordering = ["text", "ordinal"]
+        constraints = [
+            models.UniqueConstraint(fields=["text", "ordinal"], name="review_section_ordinal_unique"),
+            models.UniqueConstraint(fields=["text", "key"], name="review_section_key_unique"),
+        ]
+
+    def __str__(self):
+        return f"{self.text_id} §{self.ordinal} {self.key[:40]}"
+
+
 class EmbargoReminder(models.Model):
     """
     A reminder already sent about one embargo's review date (ADR-052 §9).
 
     The unique key is the idempotency, as with `DeadlineMoment`: a re-run, a
     missed tick or two beat instances insert the same row, and only one wins.
-    `embargo_set_at` is the paper's `embargo_answered_at`, which every set and
+    `embargo_set_at` is the paper's `embargo_date_set_at`, which every set and
     extend restamps, so a new date, or a released paper held again, starts the
     reminders over. `step` is 0 on the date, then one more per 5 working days.
     """

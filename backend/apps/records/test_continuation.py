@@ -19,7 +19,7 @@ from rest_framework.test import APITransactionTestCase, APIClient
 
 from apps.documents.testing import real_pdf_bytes
 from apps.records.models import Classification, Record, RecordOwner, RecordType
-from apps.records.testing import answered_no_embargo
+from apps.records.testing import released_embargo
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import EmbargoState, PipelineStatus, RecordTypeName
 
@@ -159,18 +159,24 @@ class ContinueCreatesALinkedDraftTests(ContinuationTestBase):
 
         self.assertEqual(self.snapshot(proposal), before)
 
-    def test_the_child_answers_the_embargo_question_for_itself(self):
-        """ADR-052's Amendment: a Continuation is its own paper, so an embargo on
-        its Proposal is not carried over, and Publish asks again."""
-        proposal = self.accepted_proposal()
-        Record.objects.filter(pk=proposal.pk).update(
-            embargo_answered_at=timezone.now(),
-            embargoed_until=timezone.localdate() + timedelta(days=30),
-        )
+    def test_the_child_starts_embargoed_whatever_its_proposal_holds(self):
+        """ADR-052's Amendment: a Continuation is its own paper, so nothing about
+        its Proposal's embargo is carried over: not its date, and not a release.
+        Like every paper, it starts embargoed with no date (IR-882)."""
+        for name, stamps in {
+            "dated": {"embargo_date_set_at": timezone.now(),
+                      "embargoed_until": timezone.localdate() + timedelta(days=30)},
+            "released": {"is_embargoed": False, "embargo_released_at": timezone.now()},
+        }.items():
+            with self.subTest(name):
+                proposal = self.accepted_proposal()
+                Record.objects.filter(pk=proposal.pk).update(**stamps)
 
-        child_id = self.continue_as(proposal, self.owner).data["id"]
+                child = Record.objects.get(pk=self.continue_as(proposal, self.owner).data["id"])
 
-        self.assertEqual(Record.objects.get(pk=child_id).embargo_state, EmbargoState.UNKNOWN)
+                self.assertEqual(child.embargo_state, EmbargoState.ACTIVE)
+                self.assertIsNone(child.embargoed_until)
+                self.assertIsNone(child.embargo_released_at)
 
     @override_settings(STORAGES={"default": {"BACKEND": "django.core.files.storage.InMemoryStorage"}})
     def test_the_child_requires_its_own_manuscript_then_enters_at_its_adviser(self):
@@ -178,7 +184,7 @@ class ContinueCreatesALinkedDraftTests(ContinuationTestBase):
 
         proposal = self.accepted_proposal()
         child_id = self.continue_as(proposal, self.owner).data["id"]
-        answered_no_embargo(child_id)
+        released_embargo(child_id)
         submit = reverse("record-submit", args=[child_id])
         response = self.post(submit, self.owner, {"dpa_accepted": True})
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)

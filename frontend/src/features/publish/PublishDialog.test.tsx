@@ -23,7 +23,6 @@ vi.mock("@/api/records", () => ({
     classifications: vi.fn(),
     pscedList: vi.fn(),
     create: vi.fn(),
-    answerEmbargo: vi.fn(),
     update: vi.fn(),
     uploadManuscript: vi.fn(),
     submit: vi.fn(),
@@ -105,7 +104,8 @@ function draftDetail(overrides: Record<string, unknown> = {}) {
     for_commercialization: false,
     pipeline_status: "draft",
     current_holders: [],
-    embargo: { state: "none", until: null },
+    // Every paper starts embargoed with no date (IR-882).
+    embargo: { state: "active", until: null },
     ...overrides,
   };
 }
@@ -135,7 +135,6 @@ beforeEach(() => {
   vi.mocked(recordsApi.pscedList).mockResolvedValue(page([{ id: 9, name: "Information Technology" }]) as never);
   vi.mocked(accountsApi.listAdvisers).mockResolvedValue(page(ADVISERS) as never);
   vi.mocked(recordsApi.create).mockResolvedValue({ data: { id: 42 } } as never);
-  vi.mocked(recordsApi.answerEmbargo).mockResolvedValue({ data: { state: "none", until: null } } as never);
   vi.mocked(recordsApi.update).mockResolvedValue({ data: { id: 42 } } as never);
   vi.mocked(recordsApi.uploadManuscript).mockResolvedValue({ data: { id: 42 } } as never);
   vi.mocked(recordsApi.submit).mockResolvedValue({ data: { detail: "Submitted." } } as never);
@@ -155,15 +154,13 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function openAtQuestion() {
+function openPublish() {
   return renderScreen(<PublishDialog />, { route: "/?publish=new" });
 }
 
-/** A new submission past its first question, answered No: at the manuscript step. */
+/** A new submission, at the manuscript step it opens on. */
 async function openNew() {
-  const view = openAtQuestion();
-  fireEvent.click(await screen.findByRole("radio", { name: /^No/ }));
-  fireEvent.click(screen.getByRole("button", { name: "Continue" }));
+  const view = openPublish();
   await screen.findByRole("radio", { name: /Proposal/ });
   return view;
 }
@@ -184,7 +181,7 @@ it("opens a continuation in Publish, requires its manuscript, and keeps copied d
   }) } as never);
   const user = userEvent.setup();
   renderScreen(<PublishDialog />, { route: "/?publish=42" });
-  await screen.findByRole("button", { name: "Upload manuscript" });
+  await screen.findByRole("button", { name: /^Upload manuscript/ });
   expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   dropFile(pdf("full-thesis.pdf"));
   await screen.findByText(/uploaded/i, { selector: "p" });
@@ -209,7 +206,7 @@ async function chooseType(user: ReturnType<typeof userEvent.setup>, name: RegExp
 }
 
 function dropFile(file: File) {
-  fireEvent.drop(screen.getByRole("button", { name: "Upload manuscript" }), {
+  fireEvent.drop(screen.getByRole("button", { name: /^Upload manuscript/ }), {
     dataTransfer: { files: [file] },
   });
 }
@@ -242,17 +239,19 @@ async function completeDetails(user: ReturnType<typeof userEvent.setup>) {
 }
 
 describe("opening", () => {
-  it("is a labelled dialog, and step 1 of 3 follows the embargo question", async () => {
+  it("is a labelled dialog that opens on step 1 of 3, asking nothing about an embargo", async () => {
     await openNew();
 
     const dialog = await screen.findByRole("dialog", { name: "Publish your research" });
     expect(await within(dialog).findByRole("list", { name: "Publish steps" })).toBeInTheDocument();
     expect(await screen.findByRole("radio", { name: /Proposal/ })).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: /embargo/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Back" })).not.toBeInTheDocument();
   });
 
   it("does not open for someone who cannot author a record", async () => {
     useAuthStore.setState({ user: makeUser({ role_name: ROLES.KTTO }) });
-    openAtQuestion();
+    openPublish();
 
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
@@ -297,7 +296,7 @@ describe("a file drop", () => {
 
   it("is not possible before a type is chosen", async () => {
     await openNew();
-    const zone = await screen.findByRole("button", { name: "Upload manuscript" });
+    const zone = await screen.findByRole("button", { name: /^Upload manuscript/ });
 
     expect(zone).toHaveAttribute("aria-disabled", "true");
     dropFile(pdf());
@@ -813,10 +812,7 @@ describe("success", () => {
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
     await user.click(await screen.findByRole("button", { name: "Publish another" }));
 
-    // From nothing, so the new paper is asked its own embargo question.
-    expect(await screen.findByRole("radio", { name: /^No/ })).not.toBeChecked();
-    await user.click(screen.getByRole("radio", { name: /^No/ }));
-    await user.click(screen.getByRole("button", { name: "Continue" }));
+    // From nothing: back at the manuscript step, with no type chosen.
     expect(await screen.findByRole("radio", { name: /Proposal/ })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Continue" })).toBeDisabled();
   });
@@ -1565,281 +1561,39 @@ describe("saving Details as the author works (IR-833)", () => {
   });
 });
 
-describe("the embargo question (ADR-052 decision 2)", () => {
-  afterEach(() => vi.useRealTimers());
-
-  const inDays = (days: number) => {
-    // The form validates Manila's calendar date, regardless of the runner's timezone.
-    const day = new Date(Date.now() + 8 * 60 * 60 * 1000);
-    day.setUTCDate(day.getUTCDate() + days);
-    return day.toISOString().slice(0, 10);
-  };
-  const question = () => screen.findByRole("radiogroup", { name: /Is this paper under an embargo/ });
-  const continueButton = () => screen.getByRole("button", { name: "Continue" });
-  const dateField = () => screen.getByLabelText(/Date to review the embargo/);
-
-  /** Answer Yes with this date and continue to the manuscript step. */
-  async function answerYes(user: ReturnType<typeof userEvent.setup>, until: string) {
-    await question();
-    await user.click(screen.getByRole("radio", { name: /^Yes/ }));
-    fireEvent.change(dateField(), { target: { value: until } });
-    await user.click(continueButton());
-    await screen.findByRole("radio", { name: /Proposal/ });
-  }
-
-  it("is asked first and alone: no type, no file and no steps until it is answered", async () => {
-    const { container } = openAtQuestion();
-
-    await question();
-    expect(screen.queryByRole("radio", { name: /Proposal/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Upload manuscript" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Publish steps" })).not.toBeInTheDocument();
-    await expectNoBlockingA11yViolations(container);
-  });
-
-  it("starts unanswered, says what an embargo does, and has no default", async () => {
-    openAtQuestion();
-
-    const group = await question();
-    expect(screen.getByRole("radio", { name: /^No/ })).not.toBeChecked();
-    expect(screen.getByRole("radio", { name: /^Yes/ })).not.toBeChecked();
-    expect(group).toHaveTextContent(/outside AI companies/);
-    expect(group).toHaveTextContent(/doesn't hide the paper/);
-    expect(group).toHaveTextContent(/can't be recalled/);
-    // The author protects possible IP by answering Yes, so Yes has to say it covers that.
-    expect(screen.getByRole("radio", { name: /may want to patent or protect/ })).not.toBeChecked();
-  });
-
-  it("refuses to continue with no answer, in words, and moves focus to it", async () => {
+describe("every paper starts embargoed (ADR-052 as amended for IR-882)", () => {
+  it("says so at Review, with nothing to answer or edit", async () => {
     const user = userEvent.setup();
-    const { container } = openAtQuestion();
-    await question();
+    const { container } = await openNew();
+    await completeManuscript(user);
+    await completeDetails(user);
 
-    await user.click(continueButton());
-
-    expect(await screen.findByText("Say whether this paper is under embargo.")).toBeInTheDocument();
-    expect(screen.queryByRole("radio", { name: /Proposal/ })).not.toBeInTheDocument();
-    await waitFor(() => expect(screen.getByRole("radio", { name: /^No/ })).toHaveFocus());
-    await expectNoBlockingA11yViolations(container);
-  });
-
-  it("says under Yes who ends an embargo, because its date doesn't", async () => {
-    const user = userEvent.setup();
-    openAtQuestion();
-    await question();
-
-    await user.click(screen.getByRole("radio", { name: /^Yes/ }));
-
-    expect(dateField()).toHaveAccessibleDescription(/doesn't end the embargo/);
-    expect(dateField()).toHaveAccessibleDescription(/only your Adviser or RDCO can/);
-  });
-
-  it.each([
-    { now: "2026-11-02T15:59:00Z", yesterday: "2026-11-01", today: "2026-11-02" },
-    { now: "2026-11-02T16:01:00Z", yesterday: "2026-11-02", today: "2026-11-03" },
-  ])("asks for a date only under Yes, and requires one that has not passed at $now", async ({ now, yesterday, today }) => {
-    vi.setSystemTime(new Date(now));
-    expect(inDays(-1)).toBe(yesterday);
-    expect(inDays(0)).toBe(today);
-    const user = userEvent.setup();
-    const { container } = openAtQuestion();
-    await question();
-    expect(screen.queryByLabelText(/Date to review the embargo/)).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("radio", { name: /^Yes/ }));
-    await user.click(continueButton());
-    expect(await screen.findByText("Choose the date to review this embargo.")).toBeInTheDocument();
-    expect(dateField()).toHaveAttribute("aria-invalid", "true");
-
-    fireEvent.change(dateField(), { target: { value: inDays(-1) } });
-    await user.click(continueButton());
-    expect(await screen.findByText("The date to review this embargo cannot be in the past.")).toBeInTheDocument();
-    await expectNoBlockingA11yViolations(container);
-
-    fireEvent.change(dateField(), { target: { value: inDays(0) } });
-    await user.click(continueButton());
-    expect(await screen.findByRole("radio", { name: /Proposal/ })).toBeInTheDocument();
-  });
-
-  it("saves the answer before the file is sent, on the draft it creates", async () => {
-    const user = userEvent.setup();
-    await openNew();
-
-    await chooseType(user, /Thesis \/ Research/);
-    dropFile(pdf());
-    await screen.findByText(/uploaded/i, { selector: "p" });
-
-    expect(recordsApi.answerEmbargo).toHaveBeenCalledWith(42, { embargoed: false, embargoed_until: null });
-    const [created] = vi.mocked(recordsApi.create).mock.invocationCallOrder;
-    const [answered] = vi.mocked(recordsApi.answerEmbargo).mock.invocationCallOrder;
-    const [uploaded] = vi.mocked(recordsApi.uploadManuscript).mock.invocationCallOrder;
-    expect(created).toBeLessThan(answered);
-    expect(answered).toBeLessThan(uploaded);
-  });
-
-  it("sends a Yes with its date", async () => {
-    const user = userEvent.setup();
-    const until = inDays(90);
-    openAtQuestion();
-    await answerYes(user, until);
-
-    await chooseType(user, /Thesis \/ Research/);
-    dropFile(pdf());
-    await screen.findByText(/uploaded/i, { selector: "p" });
-
-    expect(recordsApi.answerEmbargo).toHaveBeenCalledWith(42, { embargoed: true, embargoed_until: until });
-  });
-
-  it("does not send the file when the answer could not be saved, and a retry saves it first", async () => {
-    const user = userEvent.setup();
-    vi.mocked(recordsApi.answerEmbargo).mockRejectedValueOnce(new Error("Network Error"));
-    await openNew();
-
-    await chooseType(user, /Thesis \/ Research/);
-    dropFile(pdf());
-
-    await screen.findByText(/couldn't reach IRIS/i);
-    expect(recordsApi.uploadManuscript).not.toHaveBeenCalled();
-    expect(recordsApi.create).toHaveBeenCalledTimes(1);
-
-    await user.click(screen.getByRole("button", { name: "Retry upload" }));
-    await screen.findByText(/uploaded/i, { selector: "p" });
-    expect(recordsApi.answerEmbargo).toHaveBeenCalledTimes(2);
-    expect(recordsApi.create).toHaveBeenCalledTimes(1);
-    expect(recordsApi.uploadManuscript).toHaveBeenCalledTimes(1);
-  });
-
-  it("is not asked again on a draft that has an answer", async () => {
-    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE }) } as never);
-    renderScreen(<PublishDialog />, { route: "/?publish=42" });
-
-    await screen.findByRole("heading", { name: "Manuscript" });
-    expect(screen.queryByRole("radiogroup", { name: /embargo/ })).not.toBeInTheDocument();
-  });
-
-  it.each([
-    ["no answer yet", { state: "unknown", until: null }],
-    ["a release to answer again", { state: "released", until: "2027-01-01" }],
-    ["nothing the API disclosed", null],
-  ])("asks first on a draft with %s, and saves the answer at once", async (_label, embargo) => {
-    const user = userEvent.setup();
-    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE, embargo }) } as never);
-    renderScreen(<PublishDialog />, { route: "/?publish=42" });
-
-    await question();
-    await user.click(screen.getByRole("radio", { name: /^No/ }));
-    await user.click(continueButton());
-
-    await waitFor(() =>
-      expect(recordsApi.answerEmbargo).toHaveBeenCalledWith(42, { embargoed: false, embargoed_until: null }),
+    expect(screen.getByText(/Your paper starts under embargo/)).toHaveTextContent(
+      "can't be published until your Adviser or RDCO releases it",
     );
-    await screen.findByRole("radio", { name: /Proposal/ });
+    expect(screen.queryByRole("heading", { name: "Embargo" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /embargo/i })).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 
-  it("shows the answer on the review, and Edit goes back to the question", async () => {
-    const user = userEvent.setup();
-    vi.mocked(recordsApi.detail).mockResolvedValue({
-      data: draftDetail({ ...COMPLETE, embargo: { state: "active", until: "2099-03-01" } }),
-    } as never);
-    renderScreen(<PublishDialog />, { route: "/?publish=42" });
-
-    const group = await screen.findByRole("region", { name: "Embargo" });
-    expect(group).toHaveTextContent("Mar 1, 2099");
-    await user.click(screen.getByRole("button", { name: "Edit embargo answer" }));
-
-    await question();
-    expect(screen.getByRole("radio", { name: /^Yes/ })).toBeChecked();
-    expect(dateField()).toHaveValue("2099-03-01");
-  });
-
-  it("lets a draft whose date has since passed through unchanged, not stuck on the question", async () => {
-    const user = userEvent.setup();
-    vi.mocked(recordsApi.detail).mockResolvedValue({
-      data: draftDetail({ ...COMPLETE, embargo: { state: "active", until: "2020-01-01" } }),
-    } as never);
-    renderScreen(<PublishDialog />, { route: "/?publish=42" });
-
-    await screen.findByRole("region", { name: "Embargo" });
-    await user.click(screen.getByRole("button", { name: "Edit embargo answer" }));
-    await question();
-    await user.click(continueButton());
-
-    await screen.findByRole("radio", { name: /Proposal/ });
-    expect(recordsApi.answerEmbargo).not.toHaveBeenCalled();
-  });
-
-  it("says No on the review when the answer is no", async () => {
+  it("resumes a draft at its first incomplete step, never at a question", async () => {
     vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE }) } as never);
     renderScreen(<PublishDialog />, { route: "/?publish=42" });
 
-    expect(await screen.findByRole("region", { name: "Embargo" })).toHaveTextContent(/No/);
+    expect(await screen.findByRole("heading", { name: "Manuscript" })).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: /embargo/i })).not.toBeInTheDocument();
   });
 
-  it("saves a changed answer once, and saves nothing when it did not change", async () => {
+  it("offers the PDF's suggestions, which are read inside IRIS", async () => {
     const user = userEvent.setup();
-    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE }) } as never);
-    renderScreen(<PublishDialog />, { route: "/?publish=42" });
-    await screen.findByRole("region", { name: "Embargo" });
+    vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(
+      suggestions("ready", { title: "A found title that is long enough" }) as never,
+    );
+    await openNew();
 
-    await user.click(screen.getByRole("button", { name: "Edit embargo answer" }));
-    await question();
-    await user.click(continueButton());
-    await screen.findByRole("radio", { name: /Proposal/ });
-    expect(recordsApi.answerEmbargo).not.toHaveBeenCalled();
+    await completeManuscript(user);
 
-    await user.click(screen.getByRole("button", { name: "Back" }));
-    await question();
-    const until = inDays(30);
-    await answerYes(user, until);
-    expect(recordsApi.answerEmbargo).toHaveBeenCalledTimes(1);
-    expect(recordsApi.answerEmbargo).toHaveBeenCalledWith(42, { embargoed: true, embargoed_until: until });
-  });
-
-  it("puts the server's refusal on the date and stays on the question", async () => {
-    const user = userEvent.setup();
-    vi.mocked(recordsApi.detail).mockResolvedValue({ data: draftDetail({ ...COMPLETE, embargo: null }) } as never);
-    vi.mocked(recordsApi.answerEmbargo).mockRejectedValueOnce({
-      response: { status: 400, data: { embargoed_until: ["That date has already passed."] } },
-    });
-    renderScreen(<PublishDialog />, { route: "/?publish=42" });
-    await question();
-
-    await user.click(screen.getByRole("radio", { name: /^Yes/ }));
-    fireEvent.change(dateField(), { target: { value: inDays(5) } });
-    await user.click(continueButton());
-
-    expect(await screen.findByText("That date has already passed.")).toBeInTheDocument();
-    expect(dateField()).toHaveAttribute("aria-invalid", "true");
-    expect(screen.queryByRole("radio", { name: /Proposal/ })).not.toBeInTheDocument();
-  });
-
-  describe("suggestions from the PDF", () => {
-    it("are not offered under an embargo, and the author fills the fields in", async () => {
-      const user = userEvent.setup();
-      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(
-        suggestions("ready", { title: "A found title that is long enough" }) as never,
-      );
-      openAtQuestion();
-      await answerYes(user, inDays(30));
-
-      await completeManuscript(user);
-
-      expect(recordsApi.metadataSuggestions).not.toHaveBeenCalled();
-      expect(screen.queryByText(/A found title/)).not.toBeInTheDocument();
-      expect(screen.queryByText(/couldn't read details/)).not.toBeInTheDocument();
-    });
-
-    it("are offered with no embargo", async () => {
-      const user = userEvent.setup();
-      vi.mocked(recordsApi.metadataSuggestions).mockResolvedValue(
-        suggestions("ready", { title: "A found title that is long enough" }) as never,
-      );
-      await openNew();
-
-      await completeManuscript(user);
-
-      await waitFor(() => expect(recordsApi.metadataSuggestions).toHaveBeenCalled());
-      await waitFor(() => expect(screen.getByRole("textbox", { name: /^Title/ })).toHaveValue("A found title that is long enough"));
-    });
+    await waitFor(() => expect(recordsApi.metadataSuggestions).toHaveBeenCalled());
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /^Title/ })).toHaveValue("A found title that is long enough"));
   });
 });

@@ -27,6 +27,8 @@ interface AdviserComboboxProps {
   onBlur?:     () => void;
   selfId:      number | null;
   invalid?:    boolean;
+  /** `aria-required`, nothing visible: the app marks the optional field (IR-585). */
+  required?:   boolean;
   describedBy?: string;
 }
 
@@ -38,6 +40,7 @@ export function AdviserCombobox({
   onBlur,
   selfId,
   invalid = false,
+  required = false,
   describedBy,
 }: AdviserComboboxProps) {
   const listId = useId();
@@ -115,6 +118,7 @@ export function AdviserCombobox({
         aria-controls={listId}
         aria-activedescendant={listShown && active != null ? optionId(active) : undefined}
         aria-invalid={invalid || undefined}
+        aria-required={required || undefined}
         aria-describedby={describedBy}
         placeholder="Type a name to search"
         value={shown}

@@ -45,8 +45,11 @@ export function VersionPicker({
   const currentValue = unsubmitted ? "" : String(latest.number);
 
   return (
-    <div className={cn("flex items-center gap-2 text-sm", compact && "shrink-0")}>
-      <label htmlFor={id} className={cn("font-semibold text-stone-700", compact && "sr-only")}>
+    // `min-w-0` here and on the select: a native select is as wide as its longest
+    // option, so without it a long "v2 · Revision after review · Nov 5, 2026
+    // (current)" pushes the page sideways at 360px (IR-921, WCAG 1.4.10).
+    <div className={cn("flex items-center gap-2 text-sm", compact ? "shrink-0" : "min-w-0")}>
+      <label htmlFor={id} className={cn("font-semibold text-stone-700", compact ? "sr-only" : "shrink-0")}>
         Version
       </label>
       <select
@@ -55,7 +58,7 @@ export function VersionPicker({
         onChange={(e) => onChoose(e.target.value === currentValue ? null : Number(e.target.value))}
         className={cn(
           "min-h-11 reading-split:min-h-9 rounded-lg border border-stone-300 px-2 text-sm text-stone-800",
-          compact ? "w-24 bg-transparent" : "bg-white",
+          compact ? "w-24 bg-transparent" : "min-w-0 max-w-full bg-white",
           FOCUS_RING,
         )}
       >

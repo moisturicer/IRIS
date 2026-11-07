@@ -4,6 +4,8 @@
 
 **IR-97, 2026-11-02:** Moved from NOT STARTED. `reflow360` checks exist in three browser journey specs and IR-414 ran an automated pre-pass. PARTIAL, because no journey run record is committed and no person has checked every screen.
 
+**IR-910, 2026-11-06:** A viewport matrix now opens every routed screen (27) at 360, 768, 1280 and 1745 px on each frontend pull request and records page overflow and primary-action reachability per screen and width ([`IR-910`](IR-910.md)). It found the Users, Role Requests and Admin Users tables widening the page at 360 and 768 px (an `sr-only` cell escaping an unpositioned scroll container) and a cut-off table on Role Requests; both are fixed. Run locally only so far, against mocked API data, so the status stays **PARTIAL**.
+
 ## NFR-U3
 
 **Requirement:** Responsive at 360 px, no horizontal scroll
