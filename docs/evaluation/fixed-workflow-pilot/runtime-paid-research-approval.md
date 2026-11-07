@@ -25,17 +25,19 @@ This decision permits implementation and, once the conditions below are met, act
 
 **Approved for development only by Jive Tyler I. Revalde, 2026-11-07.** Entered by an AI agent on his instruction in chat; not an independent signature.
 
-**Account evidence.** OpenRouter organization *Hackarambolas*. ZDR is required for all models, OpenAI first-party endpoints are disabled, and every training and publishing toggle is off, as observed 2026-11-07 and recorded on IR-827.
+**Account evidence.** OpenRouter organization *Hackarambolas*, workspace **IRIS**, key `iris`. ZDR is required for all models, OpenAI first-party endpoints are disabled, and every training and publishing toggle is off, as observed 2026-11-07 and recorded on IR-827. Safety Retention is not an option for Luna: OpenRouter offers it only for Google and "all other models", and Luna is in the OpenAI group.
 
-**Routing (`AGENT_LLM_ROUTING`).** Two endpoints at the same listed price. `amazon-bedrock/us-east-1` accepts the adapter's `max_tokens`; `azure/us` lists only `max_completion_tokens` and may be skipped under `require_parameters`.
+**Routing (`AGENT_LLM_ROUTING`).** One global endpoint at Luna's base price. `amazon-bedrock/global` accepts the adapter's `max_tokens` and `tools`, and is reachable under ZDR. `azure` is the same price but lists only `max_completion_tokens`, so `require_parameters` would skip it.
 
 ```json
-{"only":["amazon-bedrock/us-east-1","azure/us"],"allow_fallbacks":false,"data_collection":"deny","zdr":true,"require_parameters":true,"max_price":{"prompt":0.22,"completion":0.825}}
+{"only":["amazon-bedrock/global"],"allow_fallbacks":false,"data_collection":"deny","zdr":true,"require_parameters":true,"max_price":{"prompt":0.1,"completion":0.5}}
 ```
 
-Routing digest (`ai.admission.guard.routing_digest`): `4f7c200d54c9388dc4bb4da0a6c4b57b33bc01860c9d4814458e3fa2dee163fd`.
+Routing digest (`ai.admission.guard.routing_digest`): `7f600dc2738b1f80070a0c972c4c0cd2c7c36292c0d0f4eac266048d68c41421`.
 
-**Price (`AI_ADMISSION_PRICES`).** `"openai/gpt-6-luna:floor": {"input": 0.22, "output": 0.825}` US$ per million tokens. This is both endpoints' long-prompt tier (base $0.11 / $0.55), so the ledger never charges below what a request can cost. Listings read from OpenRouter's endpoints API on 2026-11-07.
+**Price (`AI_ADMISSION_PRICES`).** `"openai/gpt-6-luna:floor": {"input": 0.1, "output": 0.5}` US$ per million tokens: the endpoint's price for prompts under 272,000 tokens. The capacity below keeps every request under that size, so the long-prompt price ($0.20 / $0.75) can't apply. Listing read from OpenRouter's endpoints API on 2026-11-07.
+
+*Superseded the same day:* `amazon-bedrock/us-east-1` + `azure/us` at $0.22 / $0.825. Those regional endpoints cost 10% more, and that price assumed the long-prompt tier, which the capacity cap already rules out.
 
 **Capacity (`AGENT_LLM_CAPACITIES`).** Conservative, not measured:
 
@@ -47,7 +49,7 @@ Routing digest (`ai.admission.guard.routing_digest`): `4f7c200d54c9388dc4bb4da0a
 
 **Still required before the first paid send:**
 
-* An OpenRouter API key for IRIS, created by the signer with a credit limit of at most US$30. Its digest goes into the approval's `account`.
+* The `iris` key in `ai/.env` (`AGENT_LLM_API_KEY`), entered by the signer. Its digest goes into the approval's `account`. The key's $50 limit is above the approved $30, and the workspace's $3 monthly budget will stop the pilot early unless raised.
 * `RUNS_PROXY_SEND_APPROVAL` naming the exact proxy sources, with an expiry.
 
 Both are local `ai/.env` values and are never committed.
