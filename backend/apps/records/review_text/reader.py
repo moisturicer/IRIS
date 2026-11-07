@@ -267,6 +267,12 @@ def _visible(obj) -> bool:
 
 def _read_page(page) -> dict:
     number, width, height = page.page_number, float(page.width), float(page.height)
+    # A character drawn twice in one place, same font and size, is read once:
+    # sample12 v3 prints a table twice over itself ("CONTROL CONTROL").
+    page = page.dedupe_chars()
+    # Nothing drawn wholly outside the page shows: sample12 left a chart's
+    # labels and a table below its bottom edge.
+    page = page.crop(page.bbox)
     words = page.extract_words(extra_attrs=["fontname", "size"], keep_blank_chars=False,
                                x_tolerance=X_TOLERANCE)
     for w in words:

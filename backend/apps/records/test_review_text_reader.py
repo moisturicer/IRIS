@@ -5,8 +5,9 @@ import socket
 import pytest
 
 from apps.records.review_text import reader, sandbox
-from apps.records.review_text.testing import (BODY, THESIS, blank, mixed_font_words, pdf, placed, raised_bullets,
-                                               sized_headings, two_columns, unruled_table, white_boxed_columns)
+from apps.records.review_text.testing import (BODY, THESIS, below_the_page, blank, drawn_twice, mixed_font_words,
+                                               pdf, placed, raised_bullets, sized_headings, two_columns,
+                                               unruled_table, white_boxed_columns)
 
 
 @pytest.fixture
@@ -146,6 +147,20 @@ def test_words_second_level_o_bullet_leads_its_item(read):
     found = texts(read(raised_bullets("The parts were chosen as follows:", items)))
     assert "o" not in found
     assert [t for t in found if t.endswith(tuple(i[-12:] for i in items))] == [f"o {i}" for i in items]
+
+
+def test_text_drawn_twice_in_one_place_is_read_once(read):
+    # sample12 v3 prints a table twice over itself: "CONTROL CONTROL", "43 43".
+    reading = read(drawn_twice("SUMMARY", [["Dimension", "Score"], ["Control", "43"], ["Reach", "41"]]))
+    assert keys(reading) == ["summary"]
+    assert texts(reading) == ["Dimension | Score", "Control | 43", "Reach | 41"]
+
+
+def test_text_drawn_off_the_page_is_not_read(read):
+    # sample12: a chart's labels and a table sit below the page's bottom edge.
+    reading = read(below_the_page("The only paragraph a reader of this page can see.",
+                                  ["30 33 25 26 31 38", "CONTROL ORIGIN REACH"]))
+    assert texts(reading) == ["The only paragraph a reader of this page can see."]
 
 
 def test_an_unruled_tables_number_columns_are_not_a_page_column(read):

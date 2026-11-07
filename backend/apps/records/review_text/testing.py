@@ -319,6 +319,38 @@ def raised_bullets(intro, items, mark="o", font="Courier", rise=3, size=letter) 
     return out.getvalue()
 
 
+def drawn_twice(heading, rows, size=letter) -> bytes:
+    """A bold heading over a ruled table, every character drawn twice in the
+    same place, as some exporters print a table."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    for _ in range(2):
+        c.setFont(BOLD, 12)
+        c.drawString(LEFT, size[1] - 90, heading)
+        _table(c, rows, size[1] - 120)
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
+def below_the_page(paragraph, hidden, size=letter) -> bytes:
+    """A paragraph on the page, then ``hidden`` lines and a ruled table drawn
+    below its bottom edge, where nothing shows, as Word left a chart's labels
+    in sample12."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    c.setFont(BODY, 12)
+    c.drawString(LEFT, size[1] - 100, paragraph)
+    y = -40
+    for line in hidden:
+        c.drawString(LEFT, y, line)
+        y -= 16
+    _table(c, [["CONTROL", "REACH"], ["43", "41"]], y)
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
 def white_boxed_columns(left_paragraphs, right_paragraphs, size=letter) -> bytes:
     """Two columns of paragraphs, every line on an invisible box: filled white,
     no border, as wide as its column, and starting at the indent on a
