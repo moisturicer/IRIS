@@ -92,6 +92,12 @@ const DELETE_REQUEST = {
   reason: "Submitted by mistake.", status: "pending", reviewed_by: null, reviewed_at: null, created_at: when("11-04"),
 };
 
+const DELETION_REQUEST = {
+  id: 1, status: "pending", created_at: when("11-04"), decided_at: null, reason: "",
+  user: { id: 11, name: "Maria Cristina Dela Cruz-Santos", email: "maria.cristina@students.cit.edu", role: "Student" },
+  blockers: [], capabilities: { can_confirm: true, can_reject: true },
+};
+
 const AUDIT_EVENT = {
   id: 1, event_type: "LOGIN", user: 11, user_name: "Maria Cristina Dela Cruz-Santos",
   record: 101, record_title: LONG_TITLE, metadata: {}, created_at: when("11-05"),
@@ -350,6 +356,13 @@ export const SCREENS: Screen[] = [
     heading: "Users",
     primary: (p) => p.getByRole("button", { name: "Filter" }), primaryLabel: "Filter",
     table: (p) => p.getByRole("table").first(),
+  },
+  {
+    id: "account-deletion-requests", path: "/admin/account-deletion-requests",
+    route: "/admin/account-deletion-requests", role: "System Admin",
+    mocks: wrap("System Admin", (api) => api.on("GET", "/users/deletion-requests/", paginated([DELETION_REQUEST]))),
+    heading: "Account Deletion Requests",
+    primary: (p) => p.getByRole("button", { name: "Confirm deletion" }), primaryLabel: "Confirm deletion",
   },
   {
     id: "audit-log", path: "/admin/audit", route: "/admin/audit", role: "System Admin",

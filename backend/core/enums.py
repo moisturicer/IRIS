@@ -503,6 +503,8 @@ class SessionEndReason(models.TextChoices):
     LOCKED = "locked", "Account locked"
     PASSWORD_CHANGED = "password_changed", "Password changed"
     REVOKED = "revoked", "Revoked by an administrator"
+    #: The account was deleted (ADR-051 §11, IR-785).
+    DELETED = "deleted", "Account deleted"
 
 
 class IPType(models.TextChoices):

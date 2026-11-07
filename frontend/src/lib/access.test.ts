@@ -125,10 +125,10 @@ test("RDCO's coordination screens, Import Records included, are one RDCO group",
   ]);
 });
 
-test("the System Admin's nav is Discover, Users and Audit Log (IR-783)", () => {
+test("the System Admin's nav is Discover, Users, Audit Log and Account Deletions (IR-783, IR-788)", () => {
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
     "Main: Discover",
-    "Administration: Users", "Administration: Audit Log",
+    "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
   ]);
 });
 

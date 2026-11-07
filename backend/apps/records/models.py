@@ -205,6 +205,10 @@ class Record(models.Model):
         "accounts.User", on_delete=models.SET_NULL, null=True, blank=True,
         related_name="advised_records"
     )
+    #: The Adviser's name as plain text, kept when their account is deleted
+    #: while this paper is published (ADR-051 §11, IR-785). `adviser` is then
+    #: cleared, so the name links to nobody. Blank on every other paper.
+    adviser_name       = models.CharField(max_length=250, blank=True, default="")
     added_by           = models.ForeignKey(
         "accounts.User", on_delete=models.SET_NULL, null=True,
         related_name="created_records"

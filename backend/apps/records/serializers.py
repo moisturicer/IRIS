@@ -104,7 +104,8 @@ class MyResearchSerializer(serializers.ModelSerializer):
     def get_adviser_name(self, obj):
         if obj.adviser:
             return obj.adviser.get_full_name() or obj.adviser.email
-        return None
+        # A deleted Adviser's name, kept as plain text (IR-785).
+        return obj.adviser_name or None
 
     def get_workflow_state(self, obj):
         return self._facts(obj)["workflow_state"]
@@ -553,7 +554,8 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     def get_adviser_name(self, obj):
         if obj.adviser:
             return obj.adviser.get_full_name() or obj.adviser.email
-        return None
+        # A deleted Adviser's name, kept as plain text (IR-785).
+        return obj.adviser_name or None
 
     def _open_profile_ids(self, obj) -> set:
         from apps.accounts.public_profile import open_profile_ids

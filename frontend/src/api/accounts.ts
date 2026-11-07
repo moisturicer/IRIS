@@ -15,6 +15,26 @@ export interface ActiveSession {
   expires_at: string;
 }
 
+/** What stops an account deletion being confirmed, in plain words (ADR-051 §9, IR-785). */
+export interface DeletionBlocker {
+  kind:    "sole_owner_in_review" | "open_review";
+  record:  number;
+  title:   string;
+  message: string;
+}
+
+/** A pending account deletion request, as the System Admin sees it (IR-788). */
+export interface AccountDeletionRequest {
+  id:         number;
+  status:     "pending" | "approved" | "declined" | "cancelled";
+  created_at: string;
+  decided_at: string | null;
+  reason:     string;
+  user:       { id: number; name: string; email: string; role: string };
+  blockers:   DeletionBlocker[];
+  capabilities: { can_confirm: boolean; can_reject: boolean };
+}
+
 export const accountsApi = {
   // Users
   listUsers:  (params?: Record<string, unknown>) =>
@@ -49,6 +69,14 @@ export const accountsApi = {
 
   lockedUsers: () => apiClient.get<User[]>("/users/locked/"),
   unlockUser:  (id: number) => apiClient.post(`/users/${id}/unlock/`),
+
+  // Account deletion (ADR-051 §8-§9). The System Admin alone.
+  deletionRequests: (opts?: { signal?: AbortSignal }) =>
+    apiClient.get<PaginatedResponse<AccountDeletionRequest>>("/users/deletion-requests/", { signal: opts?.signal }),
+  confirmDeletion: (id: number) =>
+    apiClient.post<AccountDeletionRequest>(`/users/deletion-requests/${id}/confirm/`, {}),
+  rejectDeletion: (id: number, reason: string) =>
+    apiClient.post<AccountDeletionRequest>(`/users/deletion-requests/${id}/reject/`, { reason }),
 
   // Role requests
   roleRequests:  () => apiClient.get<PaginatedResponse<RoleRequest>>("/users/role-requests/"),
