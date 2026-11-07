@@ -19,7 +19,42 @@ This decision permits implementation and, once the conditions below are met, act
 3. IR-827 links the owner's earlier Voyage confirmation and records the no-training and retention settings on the actual OpenRouter account and eligible endpoints. The owner reconfirmed on 2026-11-05 that Voyage was confirmed long ago; do not ask for a second Voyage approval. The original dated account-specific record was not found in the repository or Jira, so it still needs linking. A configuration label alone is not evidence of the OpenRouter account setting.
 4. Tool results and all text derived from them carry source dependencies through retries, repair, compaction and resume. A dependency that fails removes its dependent content or refuses the send; the guard cannot simply be disabled.
 
-**Current state:** conditions 2–4 are not yet fulfilled in the AI runtime. Its `SendGuard` continues to refuse tool-result evidence. The approval is a decision to enable the pilot when the code and evidence make it safe, not a claim that paid research is running today.
+**Current state (2026-11-07):** conditions 1 and 4 are implemented for public proxy and synthetic papers. Condition 3 is recorded for OpenRouter ([IR-827 evidence](https://citiris.atlassian.net/browse/IR-827?focusedCommentId=11157)); the Voyage link is still missing. Condition 2 holds for proxy papers only: institutional papers stay refused until IR-791. No paid send has run yet.
+
+## Luna declaration — amendment, 2026-11-07
+
+**Approved for development only by Jive Tyler I. Revalde, 2026-11-07.** Entered by an AI agent on his instruction in chat; not an independent signature.
+
+**Account evidence.** OpenRouter organization *Hackarambolas*, workspace **IRIS**, key `iris`. ZDR is required for all models, OpenAI first-party endpoints are disabled, and every training and publishing toggle is off, as observed 2026-11-07 and recorded on IR-827. Safety Retention is not an option for Luna: OpenRouter offers it only for Google and "all other models", and Luna is in the OpenAI group.
+
+**Routing (`AGENT_LLM_ROUTING`).** Global Azure at Luna's base price, zero-retention. The 2026-11-07 smoke showed that `amazon-bedrock/global` is not a zero-retention endpoint for Luna: OpenRouter refused every request with `zdr: true`, failing at "Filter by Data Policy". `azure` accepted the adapter's `max_tokens` and tools. `max_price` excludes the dearer `azure/us` and `azure/eu`.
+
+```json
+{"only":["azure"],"allow_fallbacks":false,"data_collection":"deny","zdr":true,"require_parameters":true,"max_price":{"prompt":0.1,"completion":0.5}}
+```
+
+Routing digest (`ai.admission.guard.routing_digest`): `e601031fde08362611a9d69b332e9a49dd770246878b6a89544ee32e50b5cad5`.
+
+**Price (`AI_ADMISSION_PRICES`).** `"openai/gpt-6-luna:floor": {"input": 0.1, "output": 0.5}` US$ per million tokens: the endpoint's price for prompts under 272,000 tokens. The capacity below keeps every request under that size, so the long-prompt price ($0.20 / $0.75) can't apply. Listing read from OpenRouter's endpoints API on 2026-11-07.
+
+*Superseded the same day:* `amazon-bedrock/global` (not zero-retention for Luna), and before it `amazon-bedrock/us-east-1` + `azure/us` at $0.22 / $0.825. Those regional endpoints cost 10% more, and that price assumed the long-prompt tier, which the capacity cap already rules out.
+
+**Capacity (`AGENT_LLM_CAPACITIES`).** Conservative, not measured:
+
+```json
+{"openai/gpt-6-luna:floor":{"context_tokens":272000,"max_output_tokens":8000,"max_reasoning_tokens":null,"max_request_bytes":1000000,"min_bytes_per_token":1.0,"framing_tokens_per_message":8}}
+```
+
+272,000 keeps a request below the long-prompt tier (listed context: 1,050,000). 8,000 matches `AI_ADMISSION_MAX_OUTPUT_TOKENS`, and reasoning counts as output. A byte floor of 1.0 bounds any tokenizer.
+
+**Still required before the first paid send:**
+
+* The `iris` key in `ai/.env` (`AGENT_LLM_API_KEY`), entered by the signer. Its digest goes into the approval's `account`. The key's $50 limit is above the approved $30, and the workspace's $3 monthly budget will stop the pilot early unless raised.
+* `RUNS_PROXY_SEND_APPROVAL` naming the exact proxy sources, with an expiry.
+
+Both are local `ai/.env` values and are never committed.
+
+**First paid smoke, 2026-11-07.** One ordinary-depth proxy question (`proxy_starter.json` q01), asked as `student@cit.edu`, ran on run `70843937`. It completed `answered` in 92 s and cited the expected paper. It used 4 attempts, all settled with reported usage: 34,083 input and 1,128 output tokens, charged **US$0.0040**. Earlier attempts the same day sent nothing (local configuration was not loaded), and one sent request was refused by OpenRouter's data-policy filter with no reported usage. That request is charged at its reservation, US$0.0047.
 
 ## Fastest useful sequence
 

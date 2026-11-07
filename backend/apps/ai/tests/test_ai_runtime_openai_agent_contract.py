@@ -117,6 +117,25 @@ def test_a_direct_answer_is_a_final_turn_with_reported_usage():
     }
 
 
+def test_openrouter_payload_carries_exact_price_and_privacy_route():
+    routing = {"only": ["azure"], "allow_fallbacks": False,
+               "data_collection": "deny", "zdr": True, "require_parameters": True,
+               "max_price": {"prompt": 0.22, "completion": 0.825}}
+    endpoint = "https://openrouter.ai/api/v1"
+    model = "openai/gpt-6-luna:floor"
+    pin = Pin(**{**PIN.as_dict(), "model": model, "endpoint": endpoint})
+    vendor = Vendor(reply("Public answer"))
+    target = adapter(vendor, AGENT_LLM_ENDPOINT=endpoint, AGENT_LLM_MODELS=model,
+                     AGENT_LLM_CAPACITIES=json.dumps({model: CAPACITY}),
+                     AGENT_LLM_ROUTING=json.dumps(routing))
+    admitted(target.converse(ask(pin=pin)))
+    sent = vendor.bodies[0]
+    assert sent["model"] == model
+    assert sent["provider"] == routing
+    assert sent["messages"][-1] == {"role": "user", "content": "What is IRIS?"}
+    assert target.encode(ask(pin=pin)) == sent
+
+
 def test_a_parallel_tool_group_round_trips_in_order_with_its_ids_and_artifact():
     secret = {"signature": "opaque-SECRET-sig"}
     first = Vendor(reply(finish="tool_calls", reasoning_details=secret, tool_calls=[
