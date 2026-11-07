@@ -217,6 +217,45 @@ def placed(pages, size=letter) -> bytes:
     return out.getvalue()
 
 
+def unruled_table(caption_lines, header, rows, size=letter) -> bytes:
+    """A heading and a paragraph, then a bold caption over ``caption_lines``,
+    a table with no rules (its bold ``header`` row and plain ``rows``, cells
+    at fixed columns far apart), then a second heading and paragraph."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 90
+    columns = (LEFT, LEFT + 160, LEFT + 300)
+
+    def para(heading):
+        nonlocal y
+        c.setFont(BOLD, 12)
+        c.drawString(LEFT, y, heading)
+        y -= 18
+        c.setFont(BODY, 11)
+        for line in ("The results below compare the groups on each concept that the survey",
+                     "asked about, and the table gives the test for each of them in turn."):
+            c.drawString(LEFT, y, line)
+            y -= 14
+        y -= 14
+
+    para("Results")
+    c.setFont(BOLD, 11)
+    for line in caption_lines:
+        c.drawString(LEFT, y, line)
+        y -= 14
+    y -= 6
+    for r, cells in enumerate([header] + rows):
+        c.setFont(BOLD if r == 0 else BODY, 11)
+        for x, cell in zip(columns, cells):
+            c.drawString(x, y, cell)
+        y -= 14
+    y -= 14
+    para("Discussion")
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
 def sized_headings(sections, heading_font=BODY, size=letter) -> bytes:
     """``(heading, [body lines])`` sections whose headings are set 12 pt in
     ``heading_font`` over a 10 pt body, as some journals mark their headings by

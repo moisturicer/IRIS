@@ -5,8 +5,8 @@ import socket
 import pytest
 
 from apps.records.review_text import reader, sandbox
-from apps.records.review_text.testing import (BODY, THESIS, blank, mixed_font_words, pdf, sized_headings,
-                                               two_columns, white_boxed_columns)
+from apps.records.review_text.testing import (BODY, THESIS, blank, mixed_font_words, pdf, placed, sized_headings,
+                                               two_columns, unruled_table, white_boxed_columns)
 
 
 @pytest.fixture
@@ -99,6 +99,38 @@ def test_a_word_set_partly_in_another_font_stays_whole(read):
     assert texts(reading) == ["The use of artificial intelligence in Nursing's care models grows.",
                               "The Human-AI model guides the curriculum.",
                               "The students' perceptions were mixed."]
+
+
+def test_a_captions_second_line_and_an_unruled_tables_header_are_not_headings(read):
+    # sample23: a bold caption ran onto a line of its own ("Sustainability"),
+    # read as a heading. sample14: an unruled table's bold header row, its
+    # cells far apart, read as one.
+    reading = read(unruled_table(
+        ["Table 3. Result of the test on energy as one of the key concepts of", "Sustainability"],
+        ["Cases", "Sum of Squares", "Mean Square"],
+        [["Between groups", "1.204", "0.602"], ["Within groups", "48.310", "0.211"]]))
+    assert keys(reading) == ["results", "discussion"]
+
+
+@pytest.mark.parametrize("number", ["2.", "I.", "1"])
+def test_a_numbered_heading_with_a_wide_gap_after_its_number_is_found(read, number):
+    # sample16, sample30, Sample4: a tab after the number, 19 to 26 pt wide.
+    reading = read(mixed_font_words([[("Times-Bold", number, -22), ("Times-Bold", "RELATED LITERATURE")],
+                                     [(BODY, "Earlier studies of delays in construction are reviewed here.")]]))
+    assert keys(reading) == ["related literature"]
+
+
+def test_a_bold_word_off_to_the_right_is_a_table_cell_not_a_heading(read):
+    # sample13: a stacked header cell, "Standard" over "Deviation", in the
+    # right half of the page, read as two headings.
+    body = "The table shows the mean score of each statement that the students rated."
+    reading = read(placed([[
+        (72, "Times-Bold", 12, "Results"), (72, BODY, 11, body), (72, BODY, 11, body),
+        (400, "Times-Bold", 11, "Standard"), (400, "Times-Bold", 11, "Deviation"),
+        (72, BODY, 11, body), (72, BODY, 11, body),
+        (250, "Times-Bold", 12, "Discussion"), (72, BODY, 11, body),
+    ]]))
+    assert keys(reading) == ["results", "discussion"]
 
 
 BODY_TEXT = ["The study asked how the curriculum prepares nurses for new tools in care.",

@@ -70,6 +70,16 @@ SIZE_BREAK = 1.0
 #: A short line this many points larger than the body is a heading (sample21:
 #: 12 pt headings over a 10 pt body, in fonts not named bold).
 HEADING_SIZE = 1.5
+#: A line whose middle is within this share of its column's width from the
+#: column's middle is centred.
+CENTRED = 0.15
+#: A heading's number on its own: "2.", "2.1", "IV.", "A.".
+HEADING_MARK = re.compile(r"\d{1,2}(\.\d{1,2})*\.?|[IVXLC]{1,6}\.?|[A-Z]\.")
+#: A caption's next line, this many line gaps below it at most, carries it on.
+CAPTION_GAP = 1.6
+#: Words further apart than this many times the font size are a table's
+#: cells, not one heading (sample14's unruled header rows).
+CELL_GAP = 1.5
 
 SENTENCE_END = re.compile(r'(?<=[.!?])["”)]?\s+(?=[A-Z(“"])')
 ABBREVIATIONS = (
@@ -485,6 +495,16 @@ def is_bold(fontname) -> bool:
     return bool(BOLD_NAME.search(fontname or ""))
 
 
+def _has_cells(line) -> bool:
+    """Whether a line's words stand apart as a table's cells do: a gap wider
+    than `CELL_GAP` times the font size, where a heading has only spaces."""
+    size = _size(line) or 10
+    words = sorted(line, key=lambda w: w["x0"])
+    if words and HEADING_MARK.fullmatch(words[0]["text"]):
+        words = words[1:]   # a heading's number may sit a tab away: "2.  RELATED LITERATURE"
+    return any(b["x0"] - a["x1"] > CELL_GAP * size for a, b in zip(words, words[1:]))
+
+
 def _heading_words(text) -> bool:
     """Whether a larger line reads as a heading's words, not a formula (a math
     symbol or a Greek letter) or an author line (an asterisk, three commas, or
@@ -511,6 +531,8 @@ def _is_heading(line, body_size=None):
         return False   # a bold word in mid-sentence, alone on its line
     if DOT_LEADER.search(text) or CAPTION.match(text):
         return False   # a table-of-contents line, or a caption
+    if _has_cells(line):
+        return False   # an unruled table's row, its cells far apart
     if all(is_bold(w.get("fontname")) for w in line):
         return True
     words = text.split()
@@ -590,6 +612,7 @@ def _structure(pages):
     last_body = [None]   # the body margin of the latest paragraph, kept across columns
     first_x = [None]     # where the current paragraph's first line began
     last_top, pending_chapter, prev_heading = None, None, None
+    caption = [None]     # the latest caption line: (page, column, top, font)
 
     def flush():
         if para:
@@ -615,7 +638,21 @@ def _structure(pages):
                        and not para and not sections[-1]["passages"]
                        and sections[-1]["heading"].endswith("-") and text[:1].islower()
                        and _continues(sections[-1], line))
-        if hyphen_wrap or _is_heading(line, body_size):
+        # A caption carried onto the lines below it, in its own font: sample23's
+        # "Table 3. … Key Concepts of" over "Sustainability". No heading.
+        after_caption = (caption[0] is not None and caption[0][:2] == (page, column)
+                         and 0 < top - caption[0][2] <= CAPTION_GAP * line_gap
+                         and _font(line) == caption[0][3])
+        caption[0] = ((page, column, top, _font(line))
+                      if CAPTION.match(text.strip()) or after_caption else None)
+        # A heading starts at its column's left or is centred in it. A short
+        # line off to the right is a table's cell: sample13's stacked
+        # "Standard" over "Deviation".
+        span = max(column_right - column_left, 1)
+        middle = (line[0]["x0"] + line[-1]["x1"]) / 2
+        off_right = (line[0]["x0"] > column_left + span / 2
+                     and abs(middle - (column_left + column_right) / 2) > CENTRED * span)
+        if not after_caption and not off_right and (hyphen_wrap or _is_heading(line, body_size)):
             flush()
             if CHAPTER.fullmatch(text.strip()):
                 pending_chapter = (text.strip(), page)
