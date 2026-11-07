@@ -185,10 +185,11 @@ class HiddenAccountTests(PublicProfileTestCase):
         }
 
     def test_every_hidden_account_answers_the_missing_ids_404_on_every_route(self):
+        hidden = self.hidden_accounts()
         for section in (None, *LISTS):
             missing = self.get(MISSING_ID, section)
             self.assertEqual(missing.status_code, 404)
-            for label, user in self.hidden_accounts().items():
+            for label, user in hidden.items():
                 with self.subTest(account=label, section=section):
                     response = self.get(user.pk, section)
                     self.assertEqual(response.status_code, 404)
