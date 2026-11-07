@@ -380,10 +380,14 @@ python manage.py eval_campaign --report --set <s.json> --lock <lock.json> --runs
                                    # smoke's spend against proposed caps. Writes .json + .md. Test-only so
                                    # far: no campaign has run. Guide: docs/evaluation/general-tools/campaign.md
 python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewer-name NAME --out <packets.json>
-                                   # one reviewer's packet (IR-607): rendered answers and citations
-                                   # checked by Record.visible_to(reviewer); a turn citing an
-                                   # unreadable record is withheld whole; no diagnostics or usage.
-                                   # Held-out output needs --lock and a run newer than it.
+                                   # one reviewer's packet (IR-607). Holds NO text (IR-721): which
+                                   # turns Record.visible_to(reviewer) allows, record ids, source
+                                   # revisions, citation pages and a blank review; a turn resting on
+                                   # an unreadable record is withheld whole. Held-out output needs
+                                   # --lock and a run newer than it. --show packets.json --run run.json
+                                   # --reviewer EMAIL --reviewer-name NAME re-checks access and
+                                   # revisions now and prints the text, writing nothing; --reopen
+                                   # --out F writes the packet again for an account
                                    # Test-only so far (test_review_packets.py, test Postgres);
                                    # not yet run against the dev database
 python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (IR-133/IR-394)
