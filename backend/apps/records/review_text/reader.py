@@ -28,9 +28,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import statistics
 import sys
 import unicodedata
-from collections import Counter
+from collections import Counter, defaultdict
 
 #: Raise on any change that can alter what a stored text says.
 RULES_VERSION = 2
@@ -80,6 +81,8 @@ CAPTION_GAP = 1.6
 #: Words further apart than this many times the font size are a table's
 #: cells, not one heading (sample14's unruled header rows).
 CELL_GAP = 1.5
+# The widest tab after a heading's number, in font sizes: 19 to 26 pt measured.
+TAB_GAP = 4
 
 SENTENCE_END = re.compile(r'(?<=[.!?])["”)]?\s+(?=[A-Z(“"])')
 ABBREVIATIONS = (
@@ -98,6 +101,8 @@ CAPTION = re.compile(r"^(table|figure|fig\.|plate|appendix)\s*[0-9A-Z]", re.I)
 DOT_LEADER = re.compile(r"(\.\s?){4,}|…{2,}")
 TRAILING_PAGE = re.compile(r"\s\d{1,3}$")
 PAGE_NUMBER = re.compile(r"[-–—\s]*\d{1,4}[-–—\s]*")
+# A word, not a number or a mark: two lowercase letters together.
+WORD = re.compile(r"[a-z]{2}")
 CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 
 
@@ -154,7 +159,12 @@ def read(path, max_pages: int | None = None) -> dict:
                 pages.append(_read_page(page))
             _drop_running(pages)
             for p in pages:
-                p["columns"] = _columns(p.pop("words"), p["width"], p["height"], p["margin"])
+                # A counted page number leaves only once the columns are found,
+                # as they were found before it was dropped: sample19's tables
+                # under one read as columns without it.
+                counted = p.pop("counted")
+                p["columns"] = [[w for w in column if id(w) not in counted]
+                                for column in _columns(p.pop("words"), p["width"], p["height"], p["margin"])]
     except (PDFPasswordIncorrect, PDFEncryptionError) as exc:
         raise Encrypted from exc
     except (OverBudget, MemoryError, RecursionError):
@@ -309,12 +319,34 @@ def _drop_running(pages):
     for p in pages:
         counts.update({signature(line) for line in band_lines(p)})
     repeated = {t for t, n in counts.items() if n >= max(3, len(pages) // 2)}
+    counted = _counted_page_numbers(pages)
     for p in pages:
         drop = {id(w) for line in band_lines(p)
                 if not CHAPTER.fullmatch(_line_text(line).strip())
                 and (signature(line) in repeated or PAGE_NUMBER.fullmatch(_line_text(line)))
                 for w in line}
+        p["counted"] = counted.get(p["number"], set())
         p["words"] = [w for w in p["words"] if id(w) not in drop]
+
+
+def _counted_page_numbers(pages):
+    """Bare numbers anywhere on the page that sit at the same height on most
+    pages (at least three) and count up by one with the page, as a journal's
+    827, 828, ... printed above the bottom band. A number in a table or the
+    body does not count up in step, so it is never taken. Returns page number
+    to the ids of its words to drop."""
+    found = defaultdict(list)
+    for index, p in enumerate(pages):
+        for line in _lines(p["words"]):
+            text = _line_text(line).strip(" -–—")
+            if text.isdigit() and len(text) <= 4:
+                found[(round(line[0]["top"] / 4), int(text) - index)].append((p["number"], line))
+    drop = defaultdict(set)
+    for hits in found.values():
+        if len({n for n, _ in hits}) >= max(3, len(pages) // 2):
+            for number, line in hits:
+                drop[number] |= {id(w) for w in line}
+    return drop
 
 
 def _lines(words):
@@ -359,6 +391,9 @@ def _columns(words, width, height, margin):
         left_words = [w for w in body if id(w) not in span and w["x1"] <= x]
         if left_words and all(LIST_NUMBER.fullmatch(w["text"]) or w["text"].isdigit() for w in left_words):
             continue   # a strip of "[18]" labels, or section or line numbers, is no column
+        right_lines = _lines([w for w in body if id(w) not in span and w["x0"] >= x])
+        if statistics.median(sum(1 for w in line if WORD.search(w["text"])) for line in right_lines) < 1:
+            continue   # a table's number columns beside its labels are no page column
         left = len(left_words)
         if left > 10 and len(right_tops) > 10:
             best = (inside, x, span)
@@ -514,7 +549,11 @@ def _has_cells(line) -> bool:
     size = _size(line) or 10
     words = sorted(line, key=lambda w: w["x0"])
     if words and HEADING_MARK.fullmatch(words[0]["text"]):
-        words = words[1:]   # a heading's number may sit a tab away: "2.  RELATED LITERATURE"
+        # A heading's number may sit a tab away, "2.  RELATED LITERATURE",
+        # but no farther: "2.91" and "Effective" 134 pt apart are cells.
+        if len(words) > 1 and words[1]["x0"] - words[0]["x1"] > TAB_GAP * size:
+            return True
+        words = words[1:]
     return any(b["x0"] - a["x1"] > CELL_GAP * size for a, b in zip(words, words[1:]))
 
 

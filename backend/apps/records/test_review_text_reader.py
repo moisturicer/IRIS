@@ -33,6 +33,24 @@ def test_running_heads_and_page_numbers_are_dropped(read):
     assert not any(t.strip().isdigit() for t in texts(reading))
 
 
+def test_a_page_number_above_the_bottom_band_is_dropped(read):
+    # A journal prints its page numbers (827, 828, ...) 120 pt up a page,
+    # above the band a footer is looked for in. In the same place on every
+    # page, one more each page, it is a page number wherever it sits.
+    words = ["first", "second", "third", "fourth"]
+    pages = [[("blank", None), ("para", [f"The {w} paragraph of the discussion runs on here."])] for w in words]
+    joined = " ".join(texts(read(pdf(pages, running_head=None, number_at=120, first_number=827))))
+    assert "The fourth paragraph of the discussion" in joined
+    assert not any(str(n) in joined for n in range(827, 831))
+
+
+def test_a_number_repeated_in_place_but_not_counting_up_is_kept(read):
+    # The same lone "12" in the same spot on each page is not a page count.
+    pages = [[("blank", None), ("para", [f"The {w} paragraph of the discussion."]), ("plain", "12")]
+             for w in ["first", "second", "third", "fourth"]]
+    assert " ".join(texts(read(pdf(pages, running_head=None)))).split().count("12") == 4
+
+
 def test_headings_are_found_by_bold_numbering_and_capitals(read):
     # "INTRODUCTION" is bold; "1.1 ..." numbered and "REVIEW OF ..." in
     # capitals are both in the body font.
@@ -110,6 +128,26 @@ def test_a_captions_second_line_and_an_unruled_tables_header_are_not_headings(re
         ["Cases", "Sum of Squares", "Mean Square"],
         [["Between groups", "1.204", "0.602"], ["Within groups", "48.310", "0.211"]]))
     assert keys(reading) == ["results", "discussion"]
+
+
+def test_a_table_row_led_by_a_number_far_from_its_word_is_no_heading(read):
+    # sample19: "2.91" and "Effective", a mean and its reading 134 pt apart,
+    # were each taken for a numbered heading. A heading's tab is 19 to 26 pt.
+    reading = read(mixed_font_words([[("Times-Bold", "RESULTS")],
+                                     [(BODY, "2.91", -60), (BODY, "Effective")],
+                                     [(BODY, "The respondents rated each of the coping mechanisms as effective.")]]))
+    assert keys(reading) == ["results"]
+
+
+def test_an_unruled_tables_number_columns_are_not_a_page_column(read):
+    # sample19 and a dozen others: on a one-column page, the gap between a
+    # table's labels and its numbers was taken for a gutter, so every label
+    # was read apart from its numbers.
+    rows = [["Firm Alpha", "91", "37.45"], ["Firm Beta", "88", "36.21"], ["Firm Charlie", "64", "26.34"],
+            ["Firm Delta", "52", "21.40"], ["Firm Echo", "33", "13.58"], ["Grand Total", "243", "100.0"]]
+    reading = read(unruled_table(["Table 1. Respondents by firm"], ["Firm", "Count", "Percent"], rows))
+    joined = " ".join(texts(reading))
+    assert all(" ".join(row) in joined for row in rows)
 
 
 @pytest.mark.parametrize("number", ["2.", "I.", "1"])

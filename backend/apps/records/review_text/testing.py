@@ -12,11 +12,12 @@ LEFT, LINE = 72, 16
 
 
 def pdf(pages, *, running_head="Community Waste-to-Energy Feasibility", numbered=True,
-        size=letter) -> bytes:
+        size=letter, number_at=36, first_number=1) -> bytes:
     """A PDF from ``pages``: each a list of ``(kind, text)`` with kind
     ``heading`` (bold), ``plain`` (body font, e.g. a numbered or capitals
     heading), ``para`` (an indented paragraph, one item per line), ``table``
-    (rows of cells, ruled) or ``blank`` (a vertical gap)."""
+    (rows of cells, ruled) or ``blank`` (a vertical gap). Each page's number
+    is drawn ``number_at`` pt above the bottom, counting from ``first_number``."""
     out = BytesIO()
     c = canvas.Canvas(out, pagesize=size)
     width, height = size
@@ -42,7 +43,7 @@ def pdf(pages, *, running_head="Community Waste-to-Energy Feasibility", numbered
                 y -= LINE * 2
         if numbered:
             c.setFont(BODY, 10)
-            c.drawCentredString(width / 2, 36, str(number))
+            c.drawCentredString(width / 2, number_at, str(number + first_number - 1))
         c.showPage()
     c.save()
     return out.getvalue()
