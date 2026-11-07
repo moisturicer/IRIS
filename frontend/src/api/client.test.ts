@@ -22,6 +22,8 @@ describe("refreshSession", () => {
     expect(await refreshSession()).toBe("a2");
     expect(useAuthStore.getState()).toMatchObject({ accessToken: "a2", refreshToken: "r2" });
     expect(post.mock.calls[0][2]).toMatchObject({ headers: { "X-IRIS-Idle-Seconds": expect.any(String) } });
+    // IR-914: a refresh that never answers must not hang every 401'd request.
+    expect(post.mock.calls[0][2]).toMatchObject({ timeout: 30_000 });
   });
 
   it("logs out and redirects when the refresh is refused, as an idle session's is", async () => {

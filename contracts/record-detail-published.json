@@ -1,0 +1,153 @@
+{
+  "route": "record-detail",
+  "method": "GET",
+  "as": "other",
+  "sample": {
+    "id": 4,
+    "title": "Matrix: a published Thesis",
+    "abstract": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "abstract_file": "/api/v1/records/4/manuscript/",
+    "year_accomplished": null,
+    "year_completed": null,
+    "origin": "unknown",
+    "publication_year": null,
+    "classification": null,
+    "psced": null,
+    "record_type": "Thesis / Research",
+    "record_type_name": "Thesis / Research",
+    "file_count": 0,
+    "has_manuscript": true,
+    "download": {
+      "state": "granted",
+      "allowed": true,
+      "message": "RDCO approved your download request. Each copy will carry your name.",
+      "grant_expires_at": "2026-12-06T22:34:53.578197+08:00",
+      "request": 2,
+      "rdco_note": ""
+    },
+    "ai_hook": null,
+    "adviser": 2,
+    "adviser_name": "Ana Adviser",
+    "added_by": 1,
+    "is_ip": false,
+    "ip_type": "",
+    "for_commercialization": false,
+    "community_extension": false,
+    "requires_ethics_review": false,
+    "requested_itso": false,
+    "requested_ierc": false,
+    "requested_ktto": false,
+    "access_count": 0,
+    "pipeline_status": "published",
+    "stage_label": "Published",
+    "is_deleted": false,
+    "workflow_state": "published",
+    "workflow_state_label": "Published",
+    "current_holders": [],
+    "can_request_document": [],
+    "my_seats": [],
+    "review_claim": null,
+    "is_participant": false,
+    "routing": {
+      "send_to_rdco": false,
+      "send_to_rdco_blocked": null,
+      "route_as": null,
+      "targets": []
+    },
+    "office_review": {
+      "party": null,
+      "label": null,
+      "blocked": null,
+      "clear_blocked": null,
+      "assignment": null
+    },
+    "revision": {
+      "party": null,
+      "label": null,
+      "blocked": null,
+      "withdrawable": null,
+      "decision_blocked": null,
+      "open": [],
+      "new_version": null
+    },
+    "decision": {
+      "party": null,
+      "outcomes": [],
+      "blocked": null,
+      "blocked_outcomes": {},
+      "reason_required": false,
+      "closes": null,
+      "token": null,
+      "author_hints": [],
+      "embargo": null
+    },
+    "capabilities": [
+      "cite"
+    ],
+    "readiness": null,
+    "keywords": [],
+    "dpa_accepted": false,
+    "dpa_accepted_at": null,
+    "details_revision": null,
+    "metadata_sources": null,
+    "created_at": "2026-11-06T22:34:53.570737+08:00",
+    "updated_at": "2026-11-06T22:34:53.570747+08:00",
+    "owners": [
+      {
+        "id": 4,
+        "user": 1,
+        "email": "student@cit.edu",
+        "full_name": "Sam Student",
+        "is_primary": true
+      }
+    ],
+    "authors": [],
+    "reviews": null,
+    "clearances": [],
+    "resubmission": {
+      "count": 0,
+      "last_resubmitted_at": null,
+      "declining_office": null,
+      "offices_preserved": []
+    },
+    "files": [],
+    "versions": null,
+    "manuscript_unsubmitted": false,
+    "submitter_status": null,
+    "lineage": {
+      "derived_from": null,
+      "continued_as": null
+    },
+    "paper_details": {
+      "colleges": null,
+      "programs": null,
+      "author_flags": [],
+      "researchers": [
+        {
+          "id": 1,
+          "name": "Sam Student",
+          "role": "Researcher",
+          "office": null,
+          "college": null,
+          "department": null,
+          "program": null,
+          "email": "student@cit.edu"
+        }
+      ],
+      "adviser": {
+        "id": 2,
+        "name": "Ana Adviser",
+        "role": "Adviser",
+        "office": null,
+        "college": null,
+        "department": null,
+        "program": null,
+        "email": "adviser@cit.edu"
+      },
+      "participants": null,
+      "due_dates": null
+    },
+    "embargo": null,
+    "ip_release": null
+  }
+}

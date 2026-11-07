@@ -1,6 +1,6 @@
-"""Marking the papers already loaded on a development database (IR-815).
+"""Marking the papers already loaded on a development database (IR-815, IR-882).
 
-ADR-052 decision 16: the proxy papers are marked once. The gate is what these
+ADR-052 decision 16, as amended: the proxy papers are released once. The gate is what these
 read, because that is what the marking is for.
 """
 
@@ -51,25 +51,25 @@ class MarkCorpusClearedTests(_Papers):
         mark()
 
         record.refresh_from_db()
-        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
         self.assertTrue(decision_for_record(record).allowed)
 
-    def test_the_loader_account_gave_the_answer(self):
+    def test_the_loader_account_released_it_and_consented(self):
         record = self.paper()
 
         mark()
 
         record.refresh_from_db()
-        self.assertEqual(record.embargo_answered_by, self.loader)
+        self.assertEqual(record.embargo_released_by, self.loader)
         self.assertEqual(record.dpa_accepted_by, self.loader)
 
-    def test_another_owners_paper_stays_unknown(self):
+    def test_another_owners_paper_stays_embargoed(self):
         record = self.paper(owner=self.someone_else)
 
         mark()
 
         record.refresh_from_db()
-        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
         self.assertIsNone(record.dpa_accepted_at)
 
     def test_the_owner_can_be_named(self):
@@ -78,17 +78,17 @@ class MarkCorpusClearedTests(_Papers):
         mark(owner_email="someone@cit.edu")
 
         record.refresh_from_db()
-        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
 
-    def test_an_answer_is_never_overwritten(self):
-        answered_at = timezone.now()
-        record = self.paper(embargo_answered_at=answered_at, embargoed_until=date(2099, 1, 1))
+    def test_a_date_someone_set_is_never_overridden(self):
+        set_at = timezone.now()
+        record = self.paper(embargo_date_set_at=set_at, embargoed_until=date(2099, 1, 1))
 
         mark()
 
         record.refresh_from_db()
         self.assertEqual(record.embargoed_until, date(2099, 1, 1))
-        self.assertEqual(record.embargo_answered_at, answered_at)
+        self.assertEqual(record.embargo_date_set_at, set_at)
         self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
 
     def test_consent_someone_already_gave_keeps_their_name(self):
@@ -101,34 +101,34 @@ class MarkCorpusClearedTests(_Papers):
         self.assertEqual(record.dpa_accepted_by, self.someone_else)
         self.assertEqual(record.dpa_accepted_at, given_at)
 
-    def test_a_paper_declared_institutional_stays_unknown_and_is_named(self):
+    def test_a_paper_declared_institutional_stays_embargoed_and_is_named(self):
         record = self.paper(title="A real CIT-U thesis", origin=Record.Origin.INSTITUTIONAL)
 
         report = mark()
 
         record.refresh_from_db()
-        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
         self.assertIn("A real CIT-U thesis", report)
 
-    def test_an_ip_marked_paper_is_answered_and_still_refused(self):
+    def test_an_ip_marked_paper_is_released_and_still_refused(self):
         record = self.paper(is_ip=True)
 
         mark()
 
         record.refresh_from_db()
-        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
         self.assertFalse(decision_for_record(record).allowed)
 
     def test_a_second_run_changes_nothing(self):
         record = self.paper()
         mark()
         record.refresh_from_db()
-        first_answer = record.embargo_answered_at
+        first_release = record.embargo_released_at
 
         report = mark()
 
         record.refresh_from_db()
-        self.assertEqual(record.embargo_answered_at, first_answer)
+        self.assertEqual(record.embargo_released_at, first_release)
         self.assertIn("Marked 0 paper(s)", report)
 
     def test_dry_run_writes_nothing_and_says_what_it_would_do(self):
@@ -137,18 +137,18 @@ class MarkCorpusClearedTests(_Papers):
         report = mark(dry_run=True)
 
         record.refresh_from_db()
-        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
         self.assertIsNone(record.dpa_accepted_at)
         self.assertIn("Would mark 1 paper(s)", report)
 
-    def test_a_draft_is_left_for_publish_to_ask(self):
-        """`--owner-email` can name anyone, and a draft's answer is its owners'."""
+    def test_a_draft_is_left_alone(self):
+        """`--owner-email` can name anyone, and a draft hasn't been submitted."""
         draft = self.paper(pipeline_status=PipelineStatus.DRAFT)
 
         mark()
 
         draft.refresh_from_db()
-        self.assertEqual(draft.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(draft.embargo_state, EmbargoState.ACTIVE)
         self.assertIsNone(draft.dpa_accepted_at)
 
     def test_it_sends_nothing_to_anyone(self):
@@ -200,7 +200,7 @@ class MarkCorpusClearedGuardTests(_Papers):
 
         self.assertIn("DEBUG", str(caught.exception))
         record.refresh_from_db()
-        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
 
     def test_there_is_no_way_past_the_refusal(self):
         with self.assertRaises(TypeError):

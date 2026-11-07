@@ -64,8 +64,9 @@ def factory(model):
     return embedder(model)
 
 
-def record(title, chunks=("alpha", "beta"), abstract="An abstract.", answered=True):
-    stamps = {"embargo_answered_at": timezone.now()} if answered else {}
+def record(title, chunks=("alpha", "beta"), abstract="An abstract.", released=True):
+    # Every paper starts embargoed (IR-882); released, so only what a test asks holds it.
+    stamps = {"is_embargoed": False, "embargo_released_at": timezone.now()} if released else {}
     rec = Record.objects.create(
         title=title, abstract=abstract, is_ip=False, dpa_accepted_at=timezone.now(),
         pipeline_status=PipelineStatus.PUBLISHED, **stamps)
@@ -248,7 +249,7 @@ class RefusalTests:
     def test_records_no_reader_can_use_are_not_owed_a_vector(self, active, pending):
         kept = record("Kept")
         index_active(kept)
-        gated = record("No embargo answer", answered=False)
+        gated = record("Never released", released=False)
         deleted = record("Deleted")
         Record.objects.filter(pk=deleted.pk).update(is_deleted=True)
         build(pending, NEW)

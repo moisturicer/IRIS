@@ -114,7 +114,7 @@ def pending(active):
 def _record(title="A thesis", chunks=("alpha", "beta"), abstract="An abstract."):
     record = Record.objects.create(
         title=title, abstract=abstract, is_ip=False,
-        dpa_accepted_at=timezone.now(), embargo_answered_at=timezone.now(),
+        dpa_accepted_at=timezone.now(), is_embargoed=False, embargo_released_at=timezone.now(),
         pipeline_status=PipelineStatus.PUBLISHED,
     )
     if chunks:
@@ -267,7 +267,7 @@ class ReadersStayOnTheActiveSpaceTests:
                         embedder=embedder, space=space),
         ]
         Record.objects.filter(pk__in=[r.pk for r in records]).update(
-            is_ip=False, dpa_accepted_at=timezone.now(), embargo_answered_at=timezone.now())
+            is_ip=False, dpa_accepted_at=timezone.now(), is_embargoed=False, embargo_released_at=timezone.now())
         return reader, records
 
     def _read(self, reader, records, embedder):
@@ -308,7 +308,7 @@ class ReadersStayOnTheActiveSpaceTests:
             model_id=NEW, dimensions=DIMENSIONS, metric="cosine",
             state=EmbeddingSpaceState.PENDING)
         Record.objects.update(is_ip=False, dpa_accepted_at=timezone.now(),
-                              embargo_answered_at=timezone.now())
+                              is_embargoed=False, embargo_released_at=timezone.now())
         client = APIClient()
         client.force_authenticate(user=reader)
 
@@ -434,7 +434,7 @@ class EveryAttemptIsCheckedTests:
 
     def test_a_record_the_gate_refuses_is_never_sent(self, active, pending):
         record = _record()
-        Record.objects.filter(pk=record.pk).update(embargo_answered_at=None)
+        Record.objects.filter(pk=record.pk).update(is_embargoed=True, embargo_released_at=None)
         provider = Embedder(NEW)
 
         report = build_pending_space(pending.id, provider=provider)

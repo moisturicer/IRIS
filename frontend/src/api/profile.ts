@@ -1,5 +1,5 @@
 /**
- * The profile fields a person edits in Settings (IR-699).
+ * The profile fields a person edits on the Edit profile page (IR-699, IR-933).
  *
  * This is the only module that speaks IR-695's API contract (the comment on
  * IR-695 in Jira), so if a field or path changes there, it changes here and
@@ -12,7 +12,6 @@ import type { CropRect } from "@/lib/photoCrop";
 export interface ProfileFields {
   bio:                string;
   research_interests: string[];
-  orcid:              string | null;
 }
 
 export const BIO_MAX_LENGTH = 500;
@@ -46,8 +45,3 @@ export const profileApi = {
   suggestInterests: (q: string) =>
     apiClient.get<string[]>("/users/interests/", { params: { q } }),
 };
-
-/** Where a person's Profile lives (IR-700 builds the page). */
-export function profilePath(userId: number): string {
-  return `/people/${userId}`;
-}

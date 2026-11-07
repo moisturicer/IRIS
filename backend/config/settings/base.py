@@ -1323,3 +1323,10 @@ PDF_VALIDATION_MEMORY_MIB = config("PDF_VALIDATION_MEMORY_MIB", default="", cast
 PDF_VALIDATION_MAX_PAGES = config("PDF_VALIDATION_MAX_PAGES", default="", cast=lambda v: int(v) if v else None)
 PDF_VALIDATION_MAX_OBJECTS = config("PDF_VALIDATION_MAX_OBJECTS", default="", cast=lambda v: int(v) if v else None)
 PDF_VALIDATION_MAX_DEPTH = config("PDF_VALIDATION_MAX_DEPTH", default="", cast=lambda v: int(v) if v else None)
+# IR-871: the review text reader's own sandbox limits (ADR-058 §1 as amended).
+# A layout read does more work than the upload check, so it doesn't borrow those.
+# All unset: nothing is read and each text waits `unavailable` for
+# `read_review_texts`. Partly set, or not finite and positive: startup fails.
+REVIEW_TEXT_WALL_SECONDS = config("REVIEW_TEXT_WALL_SECONDS", default="", cast=lambda v: float(v) if v else None)
+REVIEW_TEXT_MEMORY_MIB = config("REVIEW_TEXT_MEMORY_MIB", default="", cast=lambda v: int(v) if v else None)
+REVIEW_TEXT_MAX_PAGES = config("REVIEW_TEXT_MAX_PAGES", default="", cast=lambda v: int(v) if v else None)

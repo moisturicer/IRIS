@@ -1,0 +1,36 @@
+{
+  "route": "library-saves",
+  "method": "GET",
+  "as": "owner",
+  "sample": {
+    "results": [
+      {
+        "record_id": 4,
+        "available": true,
+        "reading_status": "reading",
+        "saved_at": "2026-11-06T14:34:53.733017Z",
+        "updated_at": "2026-11-06T14:34:53.733026Z",
+        "record": {
+          "id": 4,
+          "title": "Matrix: a published Thesis",
+          "abstract": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+          "year_accomplished": null,
+          "origin": "unknown",
+          "publication_year": null,
+          "record_type_name": "Thesis / Research",
+          "pipeline_status": "published",
+          "is_ip": false,
+          "ip_type": "",
+          "for_commercialization": false,
+          "community_extension": false,
+          "access_count": 0,
+          "file_count": 0,
+          "has_manuscript": true,
+          "created_at": "2026-11-06T22:34:53.570737+08:00",
+          "authors": [],
+          "ai_hook": null
+        }
+      }
+    ]
+  }
+}

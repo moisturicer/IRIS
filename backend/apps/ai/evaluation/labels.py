@@ -126,6 +126,18 @@ class Question:
     def expects_decline(self) -> bool:
         return self.expected_outcome in _DECLINES
 
+    @property
+    def unanswerable(self) -> bool:
+        """The corpus does not hold the answer, so retrieval should give the
+        model nothing (IR-454). Not a general-knowledge question, which has no
+        passages either and must be answered, and not `decline-restricted`,
+        which is about who may read a Record rather than what the corpus holds."""
+        return (
+            not self.expected
+            and self.evidence_required in ("corpus", "corpus_multi")
+            and self.expected_outcome == "decline-no-evidence"
+        )
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
@@ -170,6 +182,12 @@ class QuestionSet:
         every recall figure down for a reason that is not retrieval."""
         return tuple(q for q in self.questions if q.expected)
 
+    @property
+    def unanswerable(self) -> tuple[Question, ...]:
+        """The questions the correct-refusal measure scores (IR-454). Disjoint
+        from `scored`, so neither measure can leak into the other."""
+        return tuple(q for q in self.questions if q.unanswerable)
+
     def as_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
@@ -178,6 +196,7 @@ class QuestionSet:
             "tier": self.tier,
             "questions": len(self.questions),
             "without_passages": len(self.questions) - len(self.scored),
+            "unanswerable": len(self.unanswerable),
             "with_resolved_question": len(self.resolved),
             "labels": self.label_count,
             "skipped_questions": list(self.skipped),

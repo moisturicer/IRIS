@@ -32,6 +32,8 @@ The file carries **no credentials**. Each team member authenticates separately t
 
 > **Reading labels requires `view: "evidence"`.** The default `compact` view silently omits the `labels` field — asking for it in `fields` is not enough, and an issue with a full label set comes back looking unlabelled. Every label-dependent query must set the view explicitly.
 
+> **`editJiraIssue` echoes the whole issue.** It has no `responseFields`, so every edit returns the full description, and moving 19 issues to a new parent returned 19 full descriptions. Batch changes into fewer edits where you can. No slimmer edit and no bulk-edit operation turned up in `discover` (checked 2026-11-05, IR-927); if one appears later, replace this note.
+
 **If the MCP server is unavailable**, fall back to drafting: write the ticket as markdown under `docs/jira-sync/drafts/<effort-slug>/`, following the precedent in `docs/jira-sync/`, and tell the user a human must transfer it. **Never claim an issue was created when it was only drafted.**
 
 ---

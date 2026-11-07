@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 
 import { recordsApi } from "@/api/records";
+import { isRequestTimeout } from "@/api/requestPolicy";
+import { FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
 import type {
   RecordTracker,
@@ -18,8 +20,8 @@ interface ReviewRoutingTrackerProps {
 /**
  * Presentation only: glyph and colour per state (workflow_routing_architecture.md
  * §9.1). Every *word* on this panel -- party names, states, outcomes -- comes
- * from the server, so an institution can rename one without a release and the
- * student/staff wording of Intake stays the server's call.
+ * from the server, so an institution can rename one without a release. The one
+ * decision made here is that the retired Intake is never a step (`RETIRED_PARTY`).
  */
 const STATE_META: Record<TrackerPartyState, { glyph: string; tone: string; muted: boolean }> = {
   completed:     { glyph: "✓", tone: "text-stone-900", muted: false },
@@ -58,43 +60,51 @@ const HEADING_ID = "review-routing-tracker-heading";
  */
 export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
   const [data, setData] = useState<RecordTracker | null>(null);
-  const [failed, setFailed] = useState(false);
+  /** Why the read failed (IR-906): a timeout is worded as one, and both offer a retry. */
+  const [failed, setFailed] = useState<"failed" | "interrupted" | null>(null);
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setData(null);
-    setFailed(false);
+    setFailed(null);
     recordsApi
       .tracker(recordId)
       .then(({ data: payload }) => {
         if (!cancelled) setData(payload);
       })
-      .catch(() => {
-        if (!cancelled) setFailed(true);
+      .catch((error: unknown) => {
+        if (!cancelled) setFailed(isRequestTimeout(error) ? "interrupted" : "failed");
       });
     return () => {
       cancelled = true;
     };
-  }, [recordId]);
+  }, [recordId, attempt]);
 
   return (
     <section
       aria-labelledby={HEADING_ID}
       className="bg-white ring-1 ring-stone-200 rounded-2xl p-5 shadow-card"
     >
-      <div className="flex items-center justify-between gap-3 mb-3">
-        <RailHeading id={HEADING_ID}>Review &amp; Routing</RailHeading>
-        {data && (
-          <span className="px-2 py-0.5 rounded-md bg-stone-100 text-2xs font-bold text-stone-700">
-            {data.workflow_state_label}
-          </span>
-        )}
-      </div>
+      {/* No status chip here: the title badge states where the record stands,
+          once (IR-525). This panel says who holds it and what each party did. */}
+      <RailHeading id={HEADING_ID} className="mb-3">Review &amp; Routing</RailHeading>
 
       {failed ? (
-        <p role="alert" className="text-xs text-stone-600">
-          Could not load the review tracker. Reload the page to try again.
-        </p>
+        <div role="alert" className="space-y-2 text-xs text-stone-600">
+          <p>
+            {failed === "interrupted"
+              ? "The review tracker took too long to load."
+              : "Could not load the review tracker."}
+          </p>
+          <button
+            type="button"
+            onClick={() => setAttempt((n) => n + 1)}
+            className={cn("font-semibold text-brand hover:underline min-h-11", FOCUS_RING)}
+          >
+            {failed === "interrupted" ? "Retry" : "Try again"}
+          </button>
+        </div>
       ) : !data ? (
         <div aria-hidden className="space-y-2">
           {[0, 1, 2, 3].map((i) => (
@@ -108,16 +118,26 @@ export function ReviewRoutingTracker({ recordId }: ReviewRoutingTrackerProps) {
   );
 }
 
+/**
+ * Intake is retired (ADR-032 §1, §13): stored rows that hold it are history,
+ * never a step, so it is neither a party row nor someone the record is "with"
+ * (frontend_redesign_spec §0, invariant 1). The routing history below still
+ * names it, in the server's words, as the record's past.
+ */
+const RETIRED_PARTY = "intake";
+
 function TrackerBody({ data }: { data: RecordTracker }) {
+  const holders = data.current_holders.filter((h) => h.party !== RETIRED_PARTY);
+  const parties = data.parties.filter((p) => p.party !== RETIRED_PARTY);
   return (
     <div className="space-y-4">
-      {data.current_holders.length > 0 && (
+      {holders.length > 0 && (
         <div>
           <p id="tracker-holders-label" className="text-2xs font-semibold text-stone-500 mb-1">
             Currently with
           </p>
           <ul aria-labelledby="tracker-holders-label" className="flex flex-wrap gap-1.5">
-            {data.current_holders.map((h) => (
+            {holders.map((h) => (
               <li
                 key={h.party}
                 className="px-2 py-0.5 rounded-md bg-brand-50 text-brand text-xs font-bold"
@@ -139,7 +159,7 @@ function TrackerBody({ data }: { data: RecordTracker }) {
           </tr>
         </thead>
         <tbody>
-          {data.parties.map((row) => (
+          {parties.map((row) => (
             <PartyRow key={row.party} row={row} />
           ))}
         </tbody>
@@ -286,7 +306,11 @@ function PartyRow({ row }: { row: TrackerPartyRow }) {
             for anyone else and nothing is drawn (ADR-032 §10, IR-269). Always
             shown rather than on hover, so touch and keyboard read it too. */}
         {row.seats && row.seats.length > 0 && (
-          <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-0.5 text-2xs text-stone-600">
+          // A reviewer's name is free text: wrapping anywhere in the seat list keeps
+          // one long name from holding the table wider than the card at 360px
+          // (IR-921). Scoped here, not to the table, so the party and status
+          // columns keep their widths and never break inside a word.
+          <ul aria-label={`Reviewing for ${row.label}`} className="mt-1 space-y-0.5 text-2xs text-stone-600 [overflow-wrap:anywhere]">
             {row.seats.map((seat, i) => (
               <li key={i}>
                 {seat.reviewer_name ?? "A reviewer"} — {seat.state_label.toLowerCase()}
@@ -329,7 +353,13 @@ function RoutingHistory({
         Routing history
       </h3>
       {groups.length === 0 ? (
-        <p className="text-xs text-stone-500">No routing recorded yet.</p>
+        // One line. The date is when the system began recording routing, not
+        // when this record did, so it is stated as that and not as "since".
+        <p className="text-xs text-stone-500">
+          {recordedFrom
+            ? `Routing is recorded from ${formatDate(recordedFrom)}; none recorded yet.`
+            : "No routing recorded yet."}
+        </p>
       ) : (
         <ol aria-labelledby="tracker-routing-label" className="space-y-2">
           {groups.map((g) => (
@@ -351,7 +381,7 @@ function RoutingHistory({
           ))}
         </ol>
       )}
-      {recordedFrom && (
+      {groups.length > 0 && recordedFrom && (
         <p className="text-2xs text-stone-500 mt-2">
           Routing recorded from {formatDate(recordedFrom)}.
         </p>

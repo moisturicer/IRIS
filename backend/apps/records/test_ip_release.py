@@ -45,13 +45,16 @@ class IpReleaseFixtures:
                embargo_released=False, consent=True, ip_released=False):
         """A paper that would reach the AI but for what a test asks for."""
         now = timezone.now()
-        stamps = {"embargo_answered_at": now, "embargo_answered_by": self.owner}
+        stamps = {}
         if consent:
             stamps.update(dpa_accepted_at=now, dpa_accepted_by=self.owner)
         if until is not None:
-            stamps["embargoed_until"] = until
-        if embargo_released:
-            stamps.update(embargo_released_at=now, embargo_released_by=self.adviser)
+            stamps.update(embargoed_until=until, embargo_date_set_at=now,
+                          embargo_date_set_by=self.adviser)
+        # Released unless a test dates an embargo and doesn't release it (IR-882).
+        if embargo_released or until is None:
+            stamps.update(is_embargoed=False, embargo_released_at=now,
+                          embargo_released_by=self.adviser)
         if ip_released:
             stamps.update(ip_released_at=now, ip_released_by=self.ktto)
         record = Record.objects.create(

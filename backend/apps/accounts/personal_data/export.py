@@ -27,6 +27,8 @@ from typing import Callable, Iterable
 
 from django.utils import timezone
 
+from core.enums import Office
+
 EXPORT_FORMAT = "iris-personal-data-1"
 
 
@@ -188,9 +190,9 @@ def papers_owned(user) -> list[dict]:
             "community_extension": record.community_extension,
             "requires_ethics_review": record.requires_ethics_review,
             "requested_offices": {
-                "itso": record.requested_itso,
-                "ierc": record.requested_ierc,
-                "ktto": record.requested_ktto,
+                Office.ITSO.value: record.requested_itso,
+                Office.IERC.value: record.requested_ierc,
+                Office.KTTO.value: record.requested_ktto,
             },
             "pipeline_status": record.pipeline_status,
             "resubmission_count": record.resubmission_count,
