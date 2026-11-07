@@ -61,6 +61,10 @@ class ModelTurn:
     reasoned: bool = False
     input_tokens: int | None = None
     output_tokens: int | None = None
+    #: Sources carried by text or opaque state derived from earlier evidence.
+    dependencies: frozenset = frozenset()
+    #: A persisted turn whose source manifest does not exist cannot be resent.
+    unverified_provenance: bool = False
 
     @property
     def text(self) -> str:
@@ -70,12 +74,21 @@ class ModelTurn:
 @dataclass(frozen=True)
 class User:
     text: str
+    #: Sources in application-supplied context, not the reader's own words.
+    dependencies: frozenset = frozenset()
+    #: Older derived context without a complete source manifest cannot be resent.
+    unverified_provenance: bool = False
 
 
 @dataclass(frozen=True)
 class ToolResult:
     call_id: str
     content: str
+    #: Original source revisions, kept outside the provider wire payload.
+    #: Empty is not proof that arbitrary content is safe to send.
+    dependencies: frozenset = frozenset()
+    #: Set only by local tool/control paths that emit no Record content.
+    control_only: bool = False
 
 
 Entry = Union[User, ModelTurn, ToolResult]

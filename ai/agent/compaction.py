@@ -17,11 +17,12 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, fields
+from dataclasses import asdict, dataclass, fields
 from typing import Optional
 
 from ai.agent.context import Capacity, Reserves
 from ai.agent.protocol import ModelTurn, ToolResult, User
+from ai.research.tools import Source
 
 FORMAT = "agent-handoff-1"
 PREFIX = "[IRIS compacted context] "
@@ -199,7 +200,8 @@ def _texts(value) -> list[str]:
     return [v.strip() for v in value if _text(v)][:ITEMS] if isinstance(value, list) else []
 
 
-def build(summary: dict, *, previous: Optional[dict], compacted: list[int], passages, plan, state: dict) -> dict:
+def build(summary: dict, *, previous: Optional[dict], compacted: list[int], passages, plan, state: dict,
+          entries=()) -> dict:
     """The handoff body: the model's description, bounded and checked, beside the application's record.
 
     `passages` maps each handle this run read to its source; `state` holds
@@ -220,23 +222,40 @@ def build(summary: dict, *, previous: Optional[dict], compacted: list[int], pass
                              "turns": sorted(set(came_from))})
     # Every passage read, not only those a finding cites: the goal and limitations may draw on any.
     sources = {*(previous or {}).get("sources", ()), *(p.source.revision for p in passages.values())}
+    source_refs = {p.source for p in passages.values()}
+    source_refs.update(source for entry in entries for source in entry.dependencies)
+    if previous:
+        source_refs.update(Source(**source) for source in previous.get("source_refs", ()))
+    unverified = (any(getattr(entry, "unverified_provenance", False) for entry in entries)
+                  or any(isinstance(entry, ToolResult) and not entry.dependencies and not entry.control_only
+                         for entry in entries)
+                  or bool(previous and (previous.get("unverified", True) or "source_refs" not in previous)))
     return {
         "format": FORMAT, "derived": True, "goal": summary["goal"].strip(),
         "preferences": _texts(summary.get("preferences")), "findings": findings,
         "limitations": _texts(summary.get("limitations")), "plan": [dict(s) for s in plan],
         "shown": list(state.get("shown", ())), "selected": list(state.get("selected", ())),
         "excluded": list(state.get("excluded", ())), "turns": turns, "sources": sorted(sources),
+        "source_refs": [asdict(source) for source in sorted(
+            source_refs, key=lambda source: (source.record_id, source.chunk_set_id, source.extraction_hash))],
+        "unverified": unverified,
     }
 
 
 #: What every handoff body carries; a saved body missing any is not one.
 BODY_KEYS = frozenset({"format", "derived", "goal", "preferences", "findings", "limitations", "plan", "shown",
-                       "selected", "excluded", "turns", "sources"})
+                       "selected", "excluded", "turns", "sources", "source_refs", "unverified"})
 
 
 def well_formed(body) -> bool:
     return (isinstance(body, dict) and BODY_KEYS <= set(body) and body["format"] == FORMAT
-            and all(isinstance(body[k], list) for k in BODY_KEYS - {"format", "derived", "goal"}))
+            and type(body["unverified"]) is bool
+            and all(isinstance(body[k], list) for k in BODY_KEYS - {"format", "derived", "goal", "unverified"})
+            and all(isinstance(source, dict) and set(source) == {"record_id", "chunk_set_id", "extraction_hash"}
+                    and type(source["record_id"]) is int and source["record_id"] > 0
+                    and type(source["chunk_set_id"]) is int and source["chunk_set_id"] > 0
+                    and isinstance(source["extraction_hash"], str) and source["extraction_hash"]
+                    for source in body["source_refs"]))
 
 
 def render(body: dict, papers: dict, *, passages: bool) -> User:
@@ -257,4 +276,6 @@ def render(body: dict, papers: dict, *, passages: bool) -> User:
                      for f in body["findings"]],
         "limitations": body["limitations"], "turns": body["turns"],
     }
-    return User(PREFIX + json.dumps(view, ensure_ascii=False))
+    return User(PREFIX + json.dumps(view, ensure_ascii=False),
+                frozenset(Source(**source) for source in body.get("source_refs", ())),
+                body.get("unverified") is not False)

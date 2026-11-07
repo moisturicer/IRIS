@@ -73,6 +73,16 @@ class OpenAICompatibleAgentProvider(LLMProvider):
         return self.config.capacities.get(pin.model) if self.accepts(pin) else None
 
     @property
+    def routing(self):
+        return self.config.routing
+
+    def encode(self, request):
+        payload = self.dialect.encode(request)
+        if self.config.routing is not None:
+            payload["provider"] = self.config.routing
+        return payload
+
+    @property
     def account(self) -> str:
         """A digest naming the vendor account: endpoint and key, never the key itself."""
         return hashlib.sha256(f"{self.config.endpoint}\0{self.config.api_key}".encode()).hexdigest()[:32]
@@ -85,7 +95,7 @@ class OpenAICompatibleAgentProvider(LLMProvider):
             raise AdmissionDenied(NOT_ADMITTED)
         if not self.accepts(request.pin):
             raise UnsupportedCapability("pin")
-        payload = self.dialect.encode(request)
+        payload = self.encode(request)
         response = await self._post(payload)
         try:
             body = response.json()
