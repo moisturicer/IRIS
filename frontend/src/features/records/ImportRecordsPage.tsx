@@ -84,6 +84,7 @@ export default function ImportRecordsPage() {
         </p>
         <textarea
           readOnly
+          aria-label="Import log"
           rows={8}
           value={log}
           className="w-full font-mono text-[13px] bg-stone-50 border border-stone-200 rounded-lg p-3 text-stone-600 resize-y"

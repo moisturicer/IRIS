@@ -1,0 +1,389 @@
+{
+  "route": "record-tracker",
+  "method": "GET",
+  "as": "owner",
+  "sample": {
+    "record_id": 1,
+    "record_type": "Thesis / Research",
+    "workflow_state": "awaiting_document",
+    "workflow_state_label": "Awaiting document",
+    "current_holders": [
+      {
+        "party": "rdco",
+        "label": "RDCO Final",
+        "opened_at": "2026-11-06T14:34:53.035792+00:00",
+        "opened_by": "Ana Adviser"
+      },
+      {
+        "party": "itso",
+        "label": "ITSO",
+        "opened_at": "2026-11-06T14:34:53.072654+00:00",
+        "opened_by": "Test User"
+      }
+    ],
+    "can_request_document": [],
+    "assignment_deadlines": [
+      {
+        "assignment": 2,
+        "party": "rdco",
+        "due_at": null,
+        "original_due_at": null,
+        "is_overdue": false,
+        "clock_paused": false,
+        "can_extend": false,
+        "extensions": []
+      },
+      {
+        "assignment": 3,
+        "party": "itso",
+        "due_at": null,
+        "original_due_at": null,
+        "is_overdue": false,
+        "clock_paused": false,
+        "can_extend": false,
+        "extensions": []
+      }
+    ],
+    "assignment_deadline_history": [
+      {
+        "assignment": 1,
+        "party": "adviser",
+        "label": "Adviser",
+        "state": "completed",
+        "opened_at": "2026-11-06T14:34:52.617208+00:00",
+        "clock_started_at": "2026-11-06T14:34:52.617208+00:00",
+        "due_at": null,
+        "original_due_at": null,
+        "is_overdue": false,
+        "clock_paused": false,
+        "can_extend": false,
+        "extensions": []
+      },
+      {
+        "assignment": 2,
+        "party": "rdco",
+        "label": "RDCO Final",
+        "state": "active",
+        "opened_at": "2026-11-06T14:34:53.035792+00:00",
+        "clock_started_at": "2026-11-06T14:34:53.035792+00:00",
+        "due_at": null,
+        "original_due_at": null,
+        "is_overdue": false,
+        "clock_paused": false,
+        "can_extend": false,
+        "extensions": []
+      },
+      {
+        "assignment": 3,
+        "party": "itso",
+        "label": "ITSO",
+        "state": "active",
+        "opened_at": "2026-11-06T14:34:53.072654+00:00",
+        "clock_started_at": "2026-11-06T14:34:53.072654+00:00",
+        "due_at": null,
+        "original_due_at": null,
+        "is_overdue": false,
+        "clock_paused": false,
+        "can_extend": false,
+        "extensions": []
+      }
+    ],
+    "parties": [
+      {
+        "party": "adviser",
+        "label": "Adviser",
+        "state": "completed",
+        "state_label": "Completed",
+        "started": false,
+        "awaiting_document": false,
+        "outcome": "approved",
+        "outcome_label": "Approved",
+        "changes_requested": false,
+        "due_at": null,
+        "original_due_at": null,
+        "is_overdue": false,
+        "clock_paused": false,
+        "can_extend": false,
+        "extensions": [],
+        "outcome_earlier": false,
+        "in_pool": false,
+        "seats": [
+          {
+            "reviewer": 2,
+            "reviewer_name": "Ana Adviser",
+            "state": "done",
+            "state_label": "Done",
+            "verdict": "approved",
+            "verdict_label": "Approved"
+          }
+        ],
+        "at": "2026-11-06T14:34:52.983006+00:00",
+        "withdrawn_by_decision": null,
+        "preserved": false,
+        "carryover": null,
+        "carryover_version": null,
+        "carryover_label": null
+      },
+      {
+        "party": "itso",
+        "label": "ITSO",
+        "state": "active",
+        "state_label": "Active",
+        "started": false,
+        "awaiting_document": true,
+        "outcome": "pending",
+        "outcome_label": "Pending",
+        "changes_requested": false,
+        "due_at": null,
+        "original_due_at": null,
+        "is_overdue": false,
+        "clock_paused": false,
+        "can_extend": false,
+        "extensions": [],
+        "outcome_earlier": false,
+        "in_pool": false,
+        "seats": [
+          {
+            "reviewer": 4,
+            "reviewer_name": "Ivan Santos",
+            "state": "in_review",
+            "state_label": "In review",
+            "verdict": null,
+            "verdict_label": null
+          }
+        ],
+        "at": "2026-11-06T14:34:53.072654+00:00",
+        "withdrawn_by_decision": null,
+        "preserved": false,
+        "carryover": null,
+        "carryover_version": null,
+        "carryover_label": null
+      },
+      {
+        "party": "ierc",
+        "label": "IERC",
+        "state": "not_requested",
+        "state_label": "Not requested",
+        "started": false,
+        "awaiting_document": false,
+        "outcome": null,
+        "outcome_label": null,
+        "changes_requested": false,
+        "due_at": null,
+        "original_due_at": null,
+        "is_overdue": false,
+        "clock_paused": false,
+        "extensions": [],
+        "can_extend": false,
+        "outcome_earlier": false,
+        "in_pool": false,
+        "seats": null,
+        "at": null,
+        "withdrawn_by_decision": null,
+        "preserved": false,
+        "carryover": null,
+        "carryover_version": null,
+        "carryover_label": null
+      }
+    ],
+    "routing_history": [
+      {
+        "group_id": "83a0ea29-5896-46e8-87fc-82ea1407bda7",
+        "from": null,
+        "from_label": null,
+        "to": [
+          "adviser"
+        ],
+        "to_labels": [
+          "Adviser"
+        ],
+        "actor": "Sam Student",
+        "reason": "",
+        "suggested_offices": [],
+        "at": "2026-11-06T14:34:52.617208+00:00"
+      },
+      {
+        "group_id": "7a0930fd-0a19-4739-8862-2de53125aa54",
+        "from": "adviser",
+        "from_label": "Adviser",
+        "to": [
+          "rdco"
+        ],
+        "to_labels": [
+          "RDCO Final"
+        ],
+        "actor": "Ana Adviser",
+        "reason": "Institutional review.",
+        "suggested_offices": [],
+        "at": "2026-11-06T14:34:53.035792+00:00"
+      },
+      {
+        "group_id": "89437d2c-8b6f-4d02-b5f4-74dfe1869ed9",
+        "from": "rdco",
+        "from_label": "RDCO Final",
+        "to": [
+          "itso"
+        ],
+        "to_labels": [
+          "ITSO"
+        ],
+        "actor": "Test User",
+        "reason": "The method may be patentable.",
+        "suggested_offices": [],
+        "at": "2026-11-06T14:34:53.072654+00:00"
+      }
+    ],
+    "routing_recorded_from": "2026-11-06T14:34:28.309098+00:00",
+    "reviews": [
+      {
+        "id": 1,
+        "party": "adviser",
+        "label": "Adviser",
+        "status": "approved",
+        "status_label": "Approved",
+        "comment": "Institutional review.",
+        "reviewed_by_name": "Ana Adviser",
+        "created_at": "2026-11-06T14:34:52.966941+00:00",
+        "version": 1
+      }
+    ],
+    "versions": [
+      {
+        "number": 1,
+        "cause": "submission",
+        "cause_label": "Submission",
+        "created_at": "2026-11-06T14:34:52.683035+00:00",
+        "created_by_name": "Sam Student",
+        "manuscript_url": "/api/v1/records/1/versions/1/manuscript/",
+        "documents": [],
+        "documents_added": [
+          {
+            "upload_id": 1,
+            "slot": "Endorsement",
+            "version": 1,
+            "uploaded_at": "2026-11-06T14:34:53.107527+00:00",
+            "download_url": "/api/v1/documents/uploads/1/download/"
+          }
+        ],
+        "documents_reconstructed": false,
+        "review_text": {
+          "state": "pending",
+          "message": "v1's text is being read.",
+          "warnings": [],
+          "url": null
+        }
+      }
+    ],
+    "review_comments": [
+      {
+        "id": 1,
+        "author": 1,
+        "author_name": "Sam Student",
+        "body": "Is the endorsement enough?",
+        "version": 1,
+        "reply_to": null,
+        "created_at": "2026-11-06T14:34:53.381062+00:00",
+        "edited_at": null,
+        "can_edit": true,
+        "party": null,
+        "party_label": "The authors",
+        "severity": null,
+        "is_draft": false,
+        "round": null,
+        "anchor": null,
+        "state": "open",
+        "resolved_by": null,
+        "resolved_at": null,
+        "closed_by_decision": null,
+        "closed_reason": null,
+        "answer": null,
+        "events": [],
+        "can_delete": false,
+        "can_change_severity": false,
+        "can_resolve": true,
+        "can_reopen": false,
+        "can_answer": false
+      },
+      {
+        "id": 2,
+        "author": 4,
+        "author_name": "Ivan Santos",
+        "body": "Cite the prior-art search.",
+        "version": 1,
+        "reply_to": null,
+        "created_at": "2026-11-06T14:34:53.389412+00:00",
+        "edited_at": null,
+        "can_edit": false,
+        "party": "itso",
+        "party_label": "ITSO",
+        "severity": "must_fix",
+        "is_draft": false,
+        "round": null,
+        "anchor": null,
+        "state": "open",
+        "resolved_by": null,
+        "resolved_at": null,
+        "closed_by_decision": null,
+        "closed_reason": null,
+        "answer": null,
+        "events": [],
+        "can_delete": false,
+        "can_change_severity": false,
+        "can_resolve": false,
+        "can_reopen": false,
+        "can_answer": true
+      }
+    ],
+    "review_rounds": [],
+    "resubmissions": [],
+    "reassignments": [],
+    "document_requests": [
+      {
+        "id": 1,
+        "party": "itso",
+        "label": "ITSO",
+        "state": "open",
+        "state_label": "Open",
+        "message": "Please attach the signed endorsement.",
+        "requested_by": "Ivan Santos",
+        "created_at": "2026-11-06T14:34:53.341437+00:00",
+        "closed_at": null,
+        "can_manage": false,
+        "items": [
+          {
+            "id": 1,
+            "slot": 42,
+            "label": "",
+            "state": "missing",
+            "state_label": "Missing",
+            "upload": null,
+            "uploaded_at": null,
+            "rejection_reason": null,
+            "decided_at": null
+          }
+        ]
+      }
+    ],
+    "clearances": [
+      {
+        "office": "itso",
+        "office_label": "ITSO",
+        "status": "pending",
+        "status_label": "Pending",
+        "comment": "",
+        "reviewed_by_name": null,
+        "updated_at": "2026-11-06T14:34:53.077679+00:00",
+        "preserved": false,
+        "carryover": null,
+        "carryover_version": null,
+        "carryover_label": null
+      }
+    ],
+    "resubmission": {
+      "count": 0,
+      "last_resubmitted_at": null,
+      "declining_office": null,
+      "offices_preserved": []
+    }
+  }
+}

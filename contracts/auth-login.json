@@ -1,0 +1,35 @@
+{
+  "route": "auth-login",
+  "method": "POST",
+  "as": "anon",
+  "sample": {
+    "access": "<redacted>",
+    "refresh": "<redacted>",
+    "user": {
+      "id": 1,
+      "email": "student@cit.edu",
+      "first_name": "Sam",
+      "middle_initial": "",
+      "last_name": "Student",
+      "role": 1,
+      "role_name": "Student",
+      "is_staff": false,
+      "is_superuser": false,
+      "is_verified": true,
+      "is_locked": false,
+      "is_active": true,
+      "consent_given": true,
+      "date_joined": "2026-11-06T22:34:51.988280+08:00",
+      "is_office_coordinator": false,
+      "college_name": "",
+      "department_name": "",
+      "course_name": "",
+      "review_access": {
+        "my_reviews": false,
+        "offices": [],
+        "is_coordinator": false
+      },
+      "role_request": null
+    }
+  }
+}
