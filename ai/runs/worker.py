@@ -62,7 +62,33 @@ def build(settings, *, agent_provider=None) -> RunService:
         pinned_to = agent_profile.executor(profile, cfg.database_url, provider=agent_provider)
         also = (deterministic,)
     return RunService(RunStore(cfg.database_url), cfg, pinned_to, notifier_for(cfg.redis_url),
-                      serves=also)
+                      serves=also, **search_providers(settings, cfg.database_url, profile))
+
+
+def search_providers(settings, dsn: str, profile) -> dict:
+    """Search-by-meaning providers, only when configured (IR-886).
+
+    Without the AGENT profile there is no admission ledger to charge, and
+    without a Voyage key no query embedding: search then answers by keyword
+    and says so. Reranking is off unless RUNS_RERANK_MODEL names a model.
+    """
+    key = str(getattr(settings, "VOYAGE_API_KEY", "") or "").strip()
+    if profile is None or not key:
+        return {}
+    from ai.admission.guard import ProxyApproval, SendGuard
+    from ai.admission.ledger import Ledger
+    from ai.ingestion.embeddings import VoyageContextEmbeddings
+    from ai.research.rerank import VoyageReranker
+
+    rerank_model = str(getattr(settings, "RUNS_RERANK_MODEL", "") or "").strip()
+    return {
+        "embedding_provider": VoyageContextEmbeddings(
+            key, model="voyage-context-4", dimensions=1024, data_policy="no-training"),
+        "embedding_ledger": Ledger(dsn, profile.limits),
+        "reranker": VoyageReranker(key, model=rerank_model) if rerank_model else None,
+        "send_guard": SendGuard(dsn, ProxyApproval.from_json(settings.RUNS_PROXY_SEND_APPROVAL),
+                                stage=settings.RUNS_DEPLOYMENT_STAGE),
+    }
 
 
 async def _main() -> None:
