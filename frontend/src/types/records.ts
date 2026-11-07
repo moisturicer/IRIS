@@ -177,6 +177,15 @@ export interface RecordClearance {
  */
 export type Carryover = "preserved" | "reset";
 
+/** RDCO's later publish of an Unlisted paper (ADR-047 §10, IR-878). */
+export interface TrackerPublishedLater {
+  /** RDCO's party, in the server's words ("RDCO Final"). */
+  label:             string;
+  published_at:      string;
+  published_by_name: string | null;
+  note:              string | null;
+}
+
 /** What happened across resubmissions, and which offices survived them. */
 export interface RecordResubmission {
   count:               number;
@@ -236,6 +245,7 @@ export type Capability =
   | "set_embargo"
   | "release_embargo"
   | "release_ip"
+  | "publish_unlisted"
   | "set_visibility"
   | "tag_ip"
   | "attach_file"
@@ -478,6 +488,12 @@ export interface RecordDetail extends RecordListItem {
    * endpoint re-checks it.
    */
   decision:             DecisionFlags;
+  /**
+   * RDCO's later publish of an Unlisted paper (ADR-047 §10, IR-878): what
+   * holds it back -- its embargo -- or null. Null to everyone but an RDCO
+   * member on an Unlisted paper. Optional: a fixture may leave it out.
+   */
+  publish_unlisted?:    { blocked: string | null } | null;
   /**
    * The record's versions, oldest first (ADR-032 §5, IR-416). Review
    * material: null to a viewer who may not read the review (IR-479), and
@@ -975,6 +991,12 @@ export interface RecordTracker {
   /** The review discussion, oldest first (IR-419). Null as `reviews` is. */
   review_comments:       ReviewComment[] | null;
   resubmissions:         TrackerResubmission[];
+  /**
+   * RDCO published the paper from Unlisted after its Decision (IR-878), or
+   * null. Who and the note are null to a viewer who may not read the review.
+   * Optional: a fixture may leave it out.
+   */
+  published_later?:      TrackerPublishedLater | null;
   /** Null when the viewer may not read them (IR-349) -- not "there are none". */
   document_requests:     DocumentRequest[] | null;
   clearances:            RecordClearance[];

@@ -223,6 +223,7 @@ vi.mock("@/api/records", () => ({
     // The embargo card's acts (IR-817); its own behaviour is `EmbargoCard.test.tsx`'s.
     setEmbargo:       vi.fn(),
     releaseEmbargo:   vi.fn(() => Promise.resolve({ data: { state: "released", until: "2099-01-01" } })),
+    publishUnlisted:  vi.fn(() => Promise.resolve({ data: { pipeline_status: "published" } })),
     releaseIp:        vi.fn(),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
@@ -3291,5 +3292,49 @@ describe("the embargo in Record details (IR-817)", () => {
 
     const governance = screen.getByRole("region", { name: "Institutional Governance" });
     expect(within(governance).getByText("Released for the AI by KTTO")).toBeInTheDocument();
+  });
+});
+
+
+// RDCO publishes an Unlisted paper from Record details, beside its embargo
+// (ADR-047 §10, IR-878). What the card offers is `UnlistedCard.test.tsx`'s.
+describe("publishing an Unlisted paper from Record details (IR-878)", () => {
+  const unlisted: RecordDetail = {
+    ...record,
+    pipeline_status: "completed",
+    embargo: { state: "released", until: null },
+    publish_unlisted: { blocked: null },
+    capabilities: [...record.capabilities, "publish_unlisted"],
+  };
+
+  beforeEach(() => {
+    shownRecord = unlisted;
+    signInAs(99, "RDCO");
+  });
+
+  it("shows the card in the rail, and publishing reloads the record", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    const rail = screen.getByRole("complementary", { name: "Record details" });
+    const card = within(rail).getByRole("region", { name: "Unlisted" });
+
+    shownRecord = { ...unlisted, pipeline_status: "published", publish_unlisted: null, capabilities: record.capabilities };
+    await userEvent.click(within(card).getByRole("button", { name: "Publish to Discover" }));
+    await userEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Publish" }));
+
+    expect(recordsApi.publishUnlisted).toHaveBeenCalledWith(RECORD_ID, "");
+    expect(await within(rail).findByRole("status")).toHaveTextContent("Published. It is now in Discover.");
+    expect(within(rail).queryByRole("region", { name: "Unlisted" })).not.toBeInTheDocument();
+  });
+
+  it("works on a phone, dialog included", async () => {
+    workspaceAt(360);
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+    await expectNoBlockingA11yViolations(container);
+    await userEvent.click(screen.getByRole("button", { name: "Publish to Discover" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(document.body);
   });
 });

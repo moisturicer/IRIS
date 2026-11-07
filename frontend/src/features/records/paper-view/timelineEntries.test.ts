@@ -325,6 +325,27 @@ describe("timelineEntries", () => {
     });
   });
 
+  it("shows RDCO's later publish of an Unlisted paper, with its note (IR-878)", () => {
+    const entries = timelineEntries(
+      tracker({
+        published_later: {
+          label: "RDCO Final", published_at: "2026-12-20T08:00:00Z", published_by_name: "Rosa Dela Cruz",
+          note: "The patent was filed on 18 December.",
+        },
+      }),
+    );
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]).toMatchObject({
+      kind: "published",
+      act: "Published it to Discover from Unlisted",
+      actor: "Rosa Dela Cruz",
+      party: "RDCO Final",
+      note: "The patent was filed on 18 December.",
+      at: "2026-12-20T08:00:00Z",
+    });
+  });
+
   it("shows each due-date extension, by hand or by a document pause, in time order", () => {
     const entries = timelineEntries(
       tracker({

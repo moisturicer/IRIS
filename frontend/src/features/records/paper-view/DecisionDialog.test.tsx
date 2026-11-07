@@ -109,12 +109,15 @@ describe("DecisionDialog", () => {
     expect(within(dialog).queryByRole("list", { name: "The author flagged" })).not.toBeInTheDocument();
   });
 
-  it("says keeping a record unlisted cannot yet be undone", async () => {
+  // IR-878 (ADR-047 §10): Unlisted is no longer terminal, so the dialog says
+  // how it is published later instead of "not yet possible in IRIS".
+  it("says RDCO can publish an unlisted record later, once released", async () => {
     const { onDone } = open("keep_unlisted", RDCO);
 
     const dialog = screen.getByRole("dialog", { name: "Accept and keep unlisted?" });
     expect(dialog).toHaveTextContent("It stays out of Discover and Ask IRIS");
-    expect(dialog).toHaveTextContent("Publishing it later is not yet possible in IRIS.");
+    expect(dialog).toHaveTextContent("RDCO can publish it to Discover later, once its embargo is released.");
+    expect(dialog).not.toHaveTextContent("not yet possible");
     await userEvent.click(screen.getByRole("button", { name: "Keep unlisted" }));
 
     await waitFor(() => expect(onDone).toHaveBeenCalledWith("Accepted and kept unlisted."));

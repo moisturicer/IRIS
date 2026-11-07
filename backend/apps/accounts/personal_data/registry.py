@@ -143,6 +143,11 @@ EXCLUDED: dict[str, str] = {
         "choices are exported as Discovery interests and dismissals."
     ),
     "records.EmbargoReminder": "A scheduler's bookkeeping for reminder emails; it holds no content.",
+    "records.UnlistedPublication": (
+        "RDCO's later publish of an Unlisted paper (IR-878). The person appears only as the RDCO "
+        "member who published someone else's paper, a fact about the paper; its note was sent "
+        "to the paper's owners and Adviser, and the paper itself is exported to its owners."
+    ),
     "reviews.RecordAssignment": _WORKFLOW_MECHANICS,
     "reviews.ReviewerSeat": _WORKFLOW_MECHANICS,
     "reviews.Extension": _WORKFLOW_MECHANICS,

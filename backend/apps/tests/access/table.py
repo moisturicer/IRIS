@@ -157,6 +157,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     "record-replace-adviser": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
     "record-add-owner": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
     "record-withdraw": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
+    # ADR-047 §10 (IR-878): RDCO alone publishes an Unlisted paper later. A role
+    # gate before the lookup; `record` is in review, not Unlisted, so RDCO gets
+    # a 400 and the call changes nothing.
+    "record-publish-unlisted": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
