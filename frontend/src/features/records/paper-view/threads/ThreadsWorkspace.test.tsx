@@ -148,6 +148,27 @@ describe("threads in the review workspace", () => {
     );
   });
 
+  // The server offers `open_review` for every open seat, an opened one included
+  // (core/permissions.py); found by hand on #595.
+  it("offers Finish review to an opened seat even while open_review is offered", async () => {
+    openWorkspace(["open_review", "comment_review", "finish_review", "office_review"]);
+    const footer = within(await screen.findByRole("contentinfo", { name: "Your review" }));
+    expect(footer.getByRole("button", { name: "Finish review…" })).toBeInTheDocument();
+    expect(footer.queryByRole("button", { name: "Open review" })).toBeNull();
+  });
+
+  it("asks a seat not yet opened to open it, and offers no Finish review", async () => {
+    const assigned = { ...record, my_seats: [{ ...record.my_seats[0], state: "assigned" }] } as RecordDetail;
+    renderScreen(
+      <ReviewWorkspace record={assigned} can={new Set<Capability>(["open_review", "finish_review", "office_review"])}
+        reader={<StandInReader />} timelineVersion={0} onChanged={() => {}} documents={null} documentsOpen={false}
+        onDocuments={() => {}} />,
+    );
+    const footer = within(await screen.findByRole("contentinfo", { name: "Your review" }));
+    expect(footer.getByRole("button", { name: "Open review" })).toBeInTheDocument();
+    expect(footer.queryByRole("button", { name: "Finish review…" })).toBeNull();
+  });
+
   it("keeps the verdict buttons where finish_review is not granted", async () => {
     openWorkspace(["office_review"]);
     expect(await screen.findByRole("button", { name: "Clear…" })).toBeInTheDocument();

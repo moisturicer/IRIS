@@ -640,11 +640,17 @@ class ReadinessMatchesTheRefusalsTests(ThreadTestBase):
         [item] = self.thread_items(record, self.owner)
         self.assertEqual(item["severity"], "blocker")
         self.assertEqual(item["label"], "Answer ITSO's 1 open Must fix thread before you submit v2.")
+        # The headline agrees with its blocker (ADR-032 §10; found by hand on IR-875).
+        said = self.readiness(record, self.owner)
+        self.assertEqual(said["verdict"], "waiting_on_you")
+        self.assertEqual(said["headline"], "Answer the open Must fix threads before you submit your next version.")
         self.assertEqual(self.submit_version(record).status_code, 400)
 
         self.answer(record, made["id"])
         [item] = self.thread_items(record, self.owner)
         self.assertEqual(item["severity"], "info")
+        self.assertNotEqual(self.readiness(record, self.owner)["headline"],
+                            "Answer the open Must fix threads before you submit your next version.")
 
     def test_the_adviser_s_must_fix_blocks_its_send_and_says_so(self):
         record = self.at_adviser_open()

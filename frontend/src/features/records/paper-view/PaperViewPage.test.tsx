@@ -558,9 +558,11 @@ describe("the review control follows the server's capabilities", () => {
 
     expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Record a decision (current form)" })).not.toBeInTheDocument();
-    // IR-681 keeps the server's offered action in the review footer, even
-    // when this fixture's re-read still offers it after navigation.
-    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).getByRole("button", OPEN_REVIEW)).toBeInTheDocument();
+    // The server still offers `open_review` for the opened seat, but the
+    // footer asks it only of a seat not yet opened (IR-875): this one is open.
+    // Changed deliberately: IR-681 expected the footer to keep offering it,
+    // which hid Finish review from every opened seat.
+    expect(within(screen.getByRole("contentinfo", { name: "Your review" })).queryByRole("button", OPEN_REVIEW)).not.toBeInTheDocument();
   });
 
   // ADR-032 §4, IR-415: opening the review records when this reviewer started.
@@ -2088,7 +2090,10 @@ describe("the Review section (IR-412)", () => {
     const foot = await screen.findByRole("contentinfo", { name: "Your review" });
     const claim = within(foot).getByRole("button", { name: "Claim review" });
     expect(within(foot).getAllByRole("button").filter((b) => b.classList.contains("bg-brand"))).toEqual([claim]);
-    shownRecord = { ...inReview, ...reviewing, capabilities: ["open_review"] };
+    // Claimed, not yet opened, as the server leaves it (changed for IR-875:
+    // the footer offers Open review only to a seat still to open).
+    shownRecord = { ...inReview, ...reviewing, capabilities: ["open_review"],
+      my_seats: [{ ...reviewingSeat, state: "assigned", state_label: "Assigned", opened_at: null }] };
     await userEvent.click(claim);
     expect(seatsApi.claim).toHaveBeenCalledWith(55);
     expect(await within(foot).findByRole("button", { name: "Open review" })).toBeInTheDocument();
@@ -2181,9 +2186,13 @@ describe("the Review section (IR-412)", () => {
     await userEvent.click(screen.getByRole("tab", { name: "Conversation" }));
     expect(screen.getByRole("textbox", { name: "Comment" })).toHaveValue("Keep this draft");
     act(() => workspace.resizeTo(899));
+    // Narrow, it starts on the paper (IR-875); the launcher opens the drawer.
+    // Changed deliberately: IR-681 opened the drawer over the paper at once.
+    expect(screen.queryByRole("dialog", { name: "Review pane" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Open review pane" }));
     const drawer = screen.getByRole("dialog", { name: "Review pane" });
     expect(drawer).toHaveAttribute("aria-modal", "true");
-    expect(drawer).toHaveFocus();
+    await waitFor(() => expect(drawer).toHaveFocus());
     expect(screen.queryByRole("separator")).not.toBeInTheDocument();
     await userEvent.click(within(drawer).getByRole("button", { name: "Back to paper" }));
     await userEvent.click(screen.getByRole("button", { name: "Open review pane" }));

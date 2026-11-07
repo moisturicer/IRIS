@@ -6,6 +6,7 @@ import { PILL_PRIMARY } from "@/components/ui/pillStyles";
 import { seatsApi } from "@/api/reviews";
 import { errorDetail } from "@/lib/errorDetail";
 import { useElementWidth } from "@/hooks/useElementWidth";
+import { seatToOpen } from "@/features/records/capabilities";
 import { cn } from "@/lib/utils";
 import type { RecordTracker } from "@/types/records";
 
@@ -65,7 +66,9 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
   const sizes = fitWidths(width, wanted);
   const [statusTarget, setStatusTarget] = useState<HTMLDivElement | null>(null);
   const [tab, setTab] = useState<Tab>("conversation");
-  const [open, setOpen] = useState(true);
+  // Narrow, the workspace starts on the paper, its pins in view; the pane
+  // opens from its launcher, a pin, Comment or Readiness (IR-875).
+  const [open, setOpen] = useState(false);
   const [claiming, setClaiming] = useState(false);
   const [claimError, setClaimError] = useState<string | null>(null);
   const [requesting, setRequesting] = useState(false);
@@ -99,6 +102,10 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
     announce: setRouted,
   });
   const finishing = can.has("finish_review");
+  // The server offers `open_review` for every seat still being worked on, an
+  // opened one included, so only a seat not yet opened asks for it here: an
+  // opened one finishes instead (IR-875).
+  const unopened = can.has("open_review") && seatToOpen(record) !== null;
   const tabs: Tab[] = folded ? ["conversation", "threads", "details"] : ["conversation", "threads"];
 
   useEffect(() => {
@@ -281,13 +288,13 @@ export function ReviewWorkspaceLayout({ record, can, reader, timelineVersion, on
             )}
             {record.review_claim
               ? <button type="button" disabled={claiming} onClick={() => void claim()} className={cn(PILL_PRIMARY, FOCUS_RING)}>{claiming ? "Claiming…" : record.review_claim.label}</button>
-              : can.has("open_review") && <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button>}
-            {finishing && !record.review_claim && !can.has("open_review") && (
+              : unopened && <button type="button" onClick={() => void onOpenReview?.()} className={cn(PILL_PRIMARY, FOCUS_RING)}>Open review</button>}
+            {finishing && !record.review_claim && !unopened && (
               <button type="button" onClick={tw.finish} className={cn(PILL_PRIMARY, FOCUS_RING)}>Finish review…</button>
             )}
             {claimError && <p role="alert" className="text-small text-brand">{claimError}</p>}
             <ReviewActionBar record={record} can={can} actions={finishing ? FINISH_FOOTER_ACTIONS : FOOTER_ACTIONS} onChanged={onChanged}
-              primary={!finishing && !can.has("open_review") && !record.review_claim} />
+              primary={!finishing && !unopened && !record.review_claim} />
           </footer>
         </section>
         {!folded && <aside id={`${ids}-side`} aria-label="Review details" className="review-details">

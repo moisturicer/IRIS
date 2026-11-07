@@ -173,6 +173,9 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
   const [error, setError] = useState<string | null>(null);
   const [form, setForm] = useState<null | "reply" | "addressed" | "declined">(null);
   const status = threadStatus(root);
+  // Replies and what happened to the thread, in the order they happened. The
+  // answer is shown on its own above, so its event is not repeated.
+  const history = threadHistory(root, replies);
   const canReply = props.can.has("comment_review") && !root.is_draft && root.state === "open";
 
   const act = async (run: () => Promise<unknown>, failure: string) => {
@@ -247,17 +250,12 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       {root.state === "closed" && root.closed_reason && (
         <p className="text-small text-stone-700">Closed by the Decision: {root.closed_reason}</p>
       )}
-      {(root.events ?? []).filter((e) => e.kind !== "answered").length > 0 && (
-        <ul aria-label="What happened to it" className="space-y-0.5 text-2xs text-stone-600">
-          {(root.events ?? []).filter((e) => e.kind !== "answered").map((e, i) => (
-            <li key={i}>{eventWords(e)} · {formatDate(e.at)}</li>
-          ))}
-        </ul>
-      )}
-      {replies.length > 0 && (
-        <ul aria-label="Replies" className="space-y-1.5 border-l border-stone-200 pl-3">
-          {replies.map((r) => <Reply key={r.id} reply={r} />)}
-        </ul>
+      {history.length > 0 && (
+        <ol aria-label="Replies and history" className="space-y-1.5 border-l border-stone-200 pl-3">
+          {history.map((h) => h.reply
+            ? <Reply key={`r${h.reply.id}`} reply={h.reply} />
+            : <li key={h.key} className="text-2xs text-stone-600">{eventWords(h.event!)} · {formatDate(h.at)}</li>)}
+        </ol>
       )}
 
       {form === "reply" && (
@@ -315,6 +313,18 @@ function ThreadItem({ thread, ...props }: ReviewThreadsProps & { thread: Thread 
       {error && <p role="alert" className="text-small text-brand">{error}</p>}
     </article>
   );
+}
+
+type HistoryItem = { key: string; at: string; reply?: ReviewComment; event?: NonNullable<ReviewComment["events"]>[number] };
+
+/** A thread's replies and events, oldest first; a tie keeps a reply before an event. */
+export function threadHistory(root: ReviewComment, replies: ReviewComment[]): HistoryItem[] {
+  const items: HistoryItem[] = [
+    ...replies.map((r) => ({ key: `r${r.id}`, at: r.created_at, reply: r })),
+    ...(root.events ?? []).filter((e) => e.kind !== "answered").map((e, i) => ({ key: `e${i}`, at: e.at, event: e })),
+  ];
+  const time = (h: HistoryItem) => Date.parse(h.at) || 0;
+  return items.sort((a, b) => time(a) - time(b) || (a.reply ? -1 : 0) - (b.reply ? -1 : 0));
 }
 
 function eventWords(e: NonNullable<ReviewComment["events"]>[number]): string {

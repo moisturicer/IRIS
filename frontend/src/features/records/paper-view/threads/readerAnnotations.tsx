@@ -52,7 +52,8 @@ export function ThreadMarks({ marks, page }: { marks: ReaderMark[]; page: number
       {marks.map((mark) => {
         const regions = mark.regions.filter((r) => r.page === page);
         if (regions.length === 0) return null;
-        const first = regions[0];
+        // The end of the passage on this page: its last line, read top to bottom.
+        const last = [...regions].sort((a, b) => a.top - b.top || a.left - b.left)[regions.length - 1];
         return (
           <div key={mark.key}>
             {regions.map((r, i) => (
@@ -71,11 +72,14 @@ export function ThreadMarks({ marks, page }: { marks: ReaderMark[]; page: number
               onClick={mark.onActivate}
               aria-label={mark.label}
               className={cn(
-                "absolute pointer-events-auto -translate-y-1/2 inline-grid place-items-center min-w-5 h-5 px-1 rounded-full text-[11px] font-semibold leading-none",
+                "thread-pin absolute pointer-events-auto -translate-y-1/2 inline-grid place-items-center rounded-full font-semibold leading-none",
                 mark.pending ? "bg-white text-brand ring-1 ring-brand/40" : "bg-brand text-white",
                 FOCUS_RING,
               )}
-              style={{ left: `calc(${Math.min(first.right, 0.97) * 100}% + 2px)`, top: `${first.top * 100}%` }}
+              style={{
+                left: `calc(${Math.min(last.right, 0.97) * 100}% + 2px)`,
+                top: `${((last.top + last.bottom) / 2) * 100}%`,
+              }}
             >
               {mark.pin}
             </button>

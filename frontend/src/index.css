@@ -196,6 +196,17 @@
   mix-blend-mode: multiply;
 }
 
+/* A thread's pin grows and shrinks with the page, so at a low zoom it no
+   longer covers the words it marks; 12px is the least it shrinks to, the
+   smallest a pointer can still hit (the page box sets the factor). */
+.thread-pin {
+  --pin: max(12px, calc(20px * var(--total-scale-factor, 1)));
+  min-width: var(--pin);
+  height: var(--pin);
+  padding: 0 calc(var(--pin) / 4);
+  font-size: calc(var(--pin) * 0.55);
+}
+
 /* ── Folio Ribbon motion (IR-744) ────────────────────────────────────────
    The loader plays the concept board's storyboard: one leaf, its partner,
    then the two ribbons unspool from the spine, leaving the I standing in the

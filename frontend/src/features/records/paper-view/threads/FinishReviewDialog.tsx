@@ -144,6 +144,7 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, on
           <legend className="text-[14px] font-medium text-stone-700 mb-1">Verdict</legend>
           {options.map((o) => {
             const descId = `${ids}-${o.verdict}-desc`;
+            const nameId = `${ids}-${o.verdict}-name`;
             return (
               <label key={o.verdict} className={cn(
                 "flex items-start gap-2.5 rounded-lg border px-3 py-2",
@@ -152,9 +153,9 @@ export function FinishReviewDialog({ record, can, drafts, sent = [], onClose, on
               )}>
                 <input type="radio" name={`${ids}-verdict`} value={o.verdict} checked={verdict === o.verdict}
                   disabled={o.unavailable !== null} onChange={() => setVerdict(o.verdict)}
-                  aria-describedby={descId} className="mt-1 accent-brand" />
+                  aria-labelledby={nameId} aria-describedby={descId} className="mt-1 accent-brand" />
                 <span>
-                  <span className="block text-small font-semibold text-stone-900">{o.label}</span>
+                  <span id={nameId} className="block text-small font-semibold text-stone-900">{o.label}</span>
                   <span id={descId} className="block text-2xs text-stone-600">
                     {o.unavailable ? `Unavailable: ${o.unavailable}` : o.description}
                   </span>

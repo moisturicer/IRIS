@@ -274,6 +274,11 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
     elif review_claim:
         verdict = "waiting_on_you"
         headline = f"{review_claim['party_label']} has not claimed this review yet."
+    elif any(i["kind"] == "open_thread" and i["severity"] == BLOCKER for i in items):
+        # The owner's own blocker: an unanswered Must fix holds their next
+        # Version, so the headline can't say nothing waits on them (IR-875).
+        verdict = "waiting_on_you"
+        headline = "Answer the open Must fix threads before you submit your next version."
     else:
         verdict, headline = "none", "Nothing here waits on you."
     return {"verdict": verdict, "headline": headline, "items": items}

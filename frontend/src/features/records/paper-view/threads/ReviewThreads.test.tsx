@@ -122,6 +122,26 @@ describe("an owner answers a reviewer's thread", () => {
   });
 });
 
+describe("a thread's history", () => {
+  it("lists replies and events together, oldest first (found by hand on #595)", async () => {
+    const user = userEvent.setup();
+    setup([
+      comment({ id: 1, state: "closed", events: [
+        { kind: "closed_by_decision", actor_name: "RDCO", from: null, to: null, at: "2026-11-05T00:00:00Z" },
+        { kind: "severity_changed", actor_name: "Ana Cruz", from: "must_fix", to: "suggestion", at: "2026-11-02T00:00:00Z" },
+      ] }),
+      comment({ id: 2, reply_to: 1, party: null, severity: null, state: null, body: "Done in §4.", created_at: "2026-11-03T00:00:00Z" }),
+    ]);
+    await user.click(screen.getByRole("button", { name: "Resolved 1" }));
+    const items = within(screen.getByRole("list", { name: "Replies and history" })).getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual([
+      expect.stringContaining("Ana Cruz changed it to Suggestion"),
+      expect.stringContaining("Done in §4."),
+      expect.stringContaining("Closed by the Decision"),
+    ]);
+  });
+});
+
 describe("drafts", () => {
   it("lists the viewer's drafts apart, each with Discard where the server allows it", async () => {
     const user = userEvent.setup();

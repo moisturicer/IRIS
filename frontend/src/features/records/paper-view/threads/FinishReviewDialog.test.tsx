@@ -75,9 +75,11 @@ describe("Finish review", () => {
     } as Partial<RecordDetail>));
     const radios = screen.getAllByRole("radio");
     expect(radios).toHaveLength(3);
-    expect(radios[0]).toHaveAccessibleName(/^Comment only/);
-    expect(radios[1]).toHaveAccessibleName(/^Clear for ITSO/);
-    expect(radios[2]).toHaveAccessibleName(/^Record a finding/);
+    // Named by the verdict alone; what it does is its description (found by hand on #595).
+    expect(radios[0]).toHaveAccessibleName("Comment only");
+    expect(radios[1]).toHaveAccessibleName("Clear for ITSO");
+    expect(radios[2]).toHaveAccessibleName("Record a finding");
+    expect(radios[2]).toHaveAccessibleDescription("A reasoned concern. It goes to RDCO, which decides.");
     const clear = screen.getByRole("radio", { name: /Clear for ITSO/ });
     expect(clear).toBeDisabled();
     expect(clear).toHaveAccessibleDescription("Unavailable: ITSO has 1 open Must fix thread.");
