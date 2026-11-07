@@ -63,7 +63,7 @@ export interface DiscoverInterests {
   psced: DiscoverInterestOption[];
 }
 export interface ForYouItem extends RecordListItem {
-  reason: { kind: "selected_area" | "latest"; area?: string };
+  reason: { kind: "selected_area" | "saved_area" | "latest"; area?: string };
 }
 export interface ForYouPage {
   mode: "for_you" | "latest";
