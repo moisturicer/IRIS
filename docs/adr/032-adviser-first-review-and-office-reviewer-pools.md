@@ -4,7 +4,7 @@
 
 **Accepted** — 2026-09-26, by **Lee Jasmin Adolfo** (project lead), after [PR #133](https://github.com/moisturicer/IRIS/pull/133) merged. Tracked on [IR-373](https://citiris.atlassian.net/browse/IR-373).
 
-"System administrator" names no role in the code today. [ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01 and not built yet, makes it the System Admin role, and also lets RDCO replace an Adviser, add an owner to a paper in review and withdraw one.
+[ADR-051](051-system-admin-account-deletion-and-consent.md), Accepted 2026-11-01, makes "system administrator" the System Admin role, and also lets RDCO replace an Adviser, add an owner to a paper in review and withdraw one. **Partly built (corrected 2026-11-07, IR-968):** the System Admin role by IR-781, and RDCO's acts that clear what blocks an account deletion by IR-797. RDCO's controls on any paper are IR-798, in progress.
 
 [ADR-047](047-rdco-routes-and-decides-at-any-time.md), Accepted and amended 2026-11-01 and built by IR-767, partly supersedes §3, §4, §5 and §12: only RDCO publishes a Thesis/Research or Project, the Adviser sends to RDCO, which picks the offices, there is no hand-back, and RDCO may decide at any time. The Adviser's Accept & publish goes.
 
