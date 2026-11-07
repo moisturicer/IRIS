@@ -9,7 +9,7 @@ from django.core.management import CommandError, call_command
 
 from apps.ai.evaluation import answer_quality as aq
 
-SET = Path(__file__).resolve().parents[5] / "docs/evaluation/answer-quality/answer-quality-v1.json"
+SET = Path(__file__).resolve().parents[5] / "docs/evaluation/answer-quality/answer-quality-v2.json"
 GRADER = "vendor/grader"
 
 
@@ -104,7 +104,7 @@ def test_a_runtime_that_charged_nothing_here_or_used_another_model_is_a_conditio
 
 
 def test_the_committed_lock_freezes_the_committed_set_with_its_pinned_grader():
-    lock = json.loads(SET.with_name("answer-quality-v1.lock.json").read_text(encoding="utf-8"))
+    lock = json.loads(SET.with_name("answer-quality-v2.lock.json").read_text(encoding="utf-8"))
     data = json.loads(SET.read_text(encoding="utf-8"))
     assert lock["grader_model"] == "anthropic/claude-haiku-5.5"
     assert aq.check_lock(data, lock, grader_model=lock["grader_model"]) == []

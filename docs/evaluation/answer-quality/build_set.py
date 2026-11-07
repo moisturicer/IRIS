@@ -20,8 +20,9 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 EVAL = HERE.parent
-SET_ID, VERSION = "answer-quality-v1", 1
-PRIVATE = "Proving and Improving the Platonic Representation Hypothesis with JEPAs"
+SET_ID, VERSION = "answer-quality-v2", 2
+# v2: F12 moves to ClusterCAD (record 71), an unpublished draft; v1's private paper was removed.
+PRIVATE = "ClusterCAD: a computational platform for type I modular polyketide synthase design"
 
 
 def norm(text):
@@ -310,19 +311,18 @@ for qid in ("q02", "q06", "q11", "q12", "q36", "q38", "q43", "q50"):
 
 # F12 two readers: reader a owns an unpublished paper reader b cannot read.
 PAIRS = [
-    ("What CIDEr score on COCO does the captioning approach reach that joins frozen DINOv2 and "
-     "DINOv3 image encoders to a text-only language model?",
-     [(PRIVATE, 2, "reaching CIDEr .838 on COCO")], "CIDEr .838 on COCO."),
-    ("Is there work showing that good views make representation alignment many times more "
-     "sample-efficient? By how much?",
-     [(PRIVATE, 1, "alignment 42 times more sample-efficient")],
-     "Yes: good views make alignment 42 times more sample-efficient."),
-    ("Which paper turns the Platonic Representation Hypothesis into a theorem, and what does it "
-     "prove?",
-     [(PRIVATE, 2, "any number of JEPAs trained separately on renderings of one world learn the "
-                   "same embedding up to one rotation each")],
-     "JEPAs trained separately on renderings of one world learn the same embedding up to one "
-     "rotation each, when their positive pairs relate the same world states."),
+    ("Which MIBiG database version were ClusterCAD's type I modular PKS gene clusters drawn "
+     "from?",
+     [(PRIVATE, 3, "version 1.3 (3 September 2016) of the MIBiG database")],
+     "MIBiG version 1.3, of 3 September 2016."),
+    ("When a chemical structure search for adipic acid was run to pick a starting PKS module, "
+     "which module came back on top, and with what Tanimoto similarity?",
+     [(PRIVATE, 5, "returned BorMod1 as the highest-scoring result")],
+     "BorMod1, the first module of the borrelidin PKS, with an AP Tanimoto similarity of 0.32."),
+    ("Is there a web toolkit for designing chimeric polyketide synthases? Where can it be "
+     "accessed?",
+     [(PRIVATE, 1, "ClusterCAD can be accessed at https://clustercad.jbei.org")],
+     "Yes: ClusterCAD, at https://clustercad.jbei.org and http://clustercad.igb.uci.edu."),
 ]
 for n, (question, ev, reference) in enumerate(PAIRS, 1):
     add("F12", [question], answer(ev, reference), ["new:private-paper-chunk"], reader="a",

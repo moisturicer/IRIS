@@ -399,9 +399,9 @@ python manage.py eval_answer_quality --set ../docs/evaluation/answer-quality/ans
                                    # lock, enforced admission on the runtime's campaign, both readers
                                    # by email (--reader-a, --reader-b), --runtime-url and
                                    # --runtime-model; --rescore and --reuse-django finish or redo a
-                                   # run. --validate verified 2026-11-07; frozen 2026-11-08 with grader
+                                   # run. --validate verified 2026-11-07; v2 frozen 2026-11-08 with grader
                                    # anthropic/claude-haiku-5.5 (owner's choice) in
-                                   # answer-quality-v1.lock.json. NO PAID RUN YET. Guide:
+                                   # answer-quality-v2.lock.json (F12 on ClusterCAD, record 71). NO PAID RUN YET. Guide:
                                    # docs/evaluation/answer-quality/README.md
 python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewer-name NAME --out <packets.json>
                                    # one reviewer's packet (IR-607). Holds NO text (IR-721): which
