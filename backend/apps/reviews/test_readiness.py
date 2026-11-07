@@ -191,10 +191,16 @@ class PartiesReviewingAndUnclaimedPoolsTests(ReadinessTestBase):
         # IR-875: the seat stays open after a revision request, so the owner's
         # card says what it waits for. Other viewers keep the plain wording.
         record, _request = self.rdco_with_ierc_asking()
-        [owner_card] = self.of_kind(self.readiness(record, self.owner), "party_reviewing")
-        self.assertEqual(owner_card["label"], "IERC is reviewing, waiting for your revision.")
-        [rdco_card] = self.of_kind(self.readiness(record, self.rdco), "party_reviewing")
-        self.assertEqual(rdco_card["label"], "IERC is reviewing.")
+        owner_cards = {i["party"]: i["label"]
+                       for i in self.of_kind(self.readiness(record, self.owner), "party_reviewing")}
+        # IERC asked for the revision; RDCO, also reviewing, did not.
+        self.assertEqual(owner_cards[Party.IERC], "IERC is reviewing, waiting for your revision.")
+        self.assertEqual(owner_cards[Party.RDCO], "RDCO Final is reviewing.")
+        rdco_cards = {i["party"]: i["label"]
+                      for i in self.of_kind(self.readiness(record, self.rdco), "party_reviewing")}
+        # The decider's own wording, not the owner's.
+        self.assertTrue(rdco_cards[Party.IERC].startswith("IERC is reviewing."))
+        self.assertNotIn("waiting for your revision", rdco_cards[Party.IERC])
 
     def test_claim_is_offered_only_to_an_ierc_member(self):
         # Beside `test_an_unclaimed_pool_is_information_with_claim_for_its_members`,
