@@ -67,7 +67,7 @@ describe("RelatedWorks", () => {
 
     const { container } = renderScreen(<RelatedWorks recordId={7} />);
 
-    const note = await screen.findByText(/This paper has not been indexed yet/);
+    const note = await screen.findByText(/This paper is not indexed/);
     expect(note).not.toHaveTextContent(/No related works found/);
     await expectNoBlockingA11yViolations(container);
   });

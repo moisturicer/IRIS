@@ -122,12 +122,12 @@ def similar_records(
     The seed record is excluded. A record seeded with its own vector matches
     itself perfectly, so leaving it in would fill the panel with the paper the
     reader already has open.
+
+    Just the matches of ``related_works``, which holds the one comparison. A
+    record with nothing to compare *from* has none: not an error, see the
+    module docstring.
     """
-    seed = _seed(record)
-    if seed is None:
-        # Nothing to compare *from*. Not an error — see the module docstring.
-        return []
-    return _nearest(seed, research_records(user), limit=limit)
+    return related_works(record, user, limit).matches
 
 
 def related_published_research(record: Record, user) -> Optional[list[SimilarRecord]]:

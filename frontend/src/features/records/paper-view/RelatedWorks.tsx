@@ -22,7 +22,7 @@ import { SectionHeading } from "./headings";
 // ---------------------------------------------------------------------------
 
 /** What `GET /records/<id>/similar/` says about the list it returned. */
-export type RelatedWorksReason = "no_matches" | "not_indexed" | "incompatible";
+type RelatedWorksReason = "no_matches" | "not_indexed" | "incompatible";
 
 type State =
   | { kind: "loading" }
@@ -30,19 +30,19 @@ type State =
   | { kind: RelatedWorksReason }
   | { kind: "failed" };
 
+type SimilarAnswer = Awaited<ReturnType<typeof recordsApi.similar>>["data"];
+
 const REASON_COPY: Record<RelatedWorksReason, string> = {
   no_matches: "No related works found for this paper.",
-  not_indexed:
-    "This paper has not been indexed yet, so IRIS cannot compare it with others. Related works appear once it has been.",
-  incompatible:
-    "This paper's index is out of date, so IRIS cannot compare it with others yet. Related works appear once it has been updated.",
+  not_indexed: "This paper is not indexed, so IRIS cannot compare it with others.",
+  incompatible: "This paper's index is out of date, so IRIS cannot compare it with others.",
 };
 
 /**
  * Reads the answer defensively: an old or malformed one is a list when it has
  * matches and "no matches" when it does not, never a crash.
  */
-function stateFrom(data: { state?: string; results?: SemanticSearchResult[] } | undefined): State {
+function stateFrom(data: SimilarAnswer | undefined): State {
   const items = data?.results ?? [];
   if (items.length > 0) return { kind: "ready", items };
   if (data?.state === "not_indexed" || data?.state === "incompatible") return { kind: data.state };

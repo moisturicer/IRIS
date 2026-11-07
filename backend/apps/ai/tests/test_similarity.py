@@ -326,6 +326,26 @@ class SimilarEndpointTests:
         assert response.status_code == 200
         assert response.json() == {"state": "incompatible", "results": []}
 
+    def test_a_seed_vector_under_a_non_active_space_is_incompatible(self, embedder, space):
+        reader = make_user("reader@cit.edu")
+        seed = make_record(
+            title="Flood prediction", abstract="rainfall", embedder=embedder, embedded=False
+        )
+        retired = EmbeddingSpace.objects.create(
+            model_id="retired-model", dimensions=DIMENSIONS, metric="cosine", state="retired"
+        )
+        seed_record_vector(
+            record=seed,
+            embedding=embedder.embed_documents(["rainfall"])[0],
+            model_name="retired-model",
+            space=retired,
+        )
+        make_record(title="Rainfall", abstract="catchment", embedder=embedder)
+
+        response = self._get(reader, seed)
+
+        assert response.json() == {"state": "incompatible", "results": []}
+
     def test_a_failure_while_comparing_is_a_temporary_failure(
         self, embedder, space, monkeypatch
     ):
