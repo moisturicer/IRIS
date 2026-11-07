@@ -744,6 +744,26 @@ def _reassignments(record, *, staff: bool, readable: bool) -> list[dict]:
     ]
 
 
+def _published_from_unlisted_entry(record, *, readable: bool) -> Optional[dict]:
+    """
+    RDCO's later publish of an Unlisted paper (ADR-047 §10, IR-878), or None.
+    When is public, as the paper now is; who and the note are review material.
+    """
+    from apps.records.models import UnlistedPublication
+
+    publication = (
+        UnlistedPublication.objects.filter(record=record).select_related("published_by").first()
+    )
+    if publication is None:
+        return None
+    return {
+        "label": party_label(str(Party.RDCO), staff_viewer=False),
+        "published_at": _iso(publication.published_at),
+        "published_by_name": _name(publication.published_by) if readable else None,
+        "note": publication.note if readable else None,
+    }
+
+
 def tracker_payload(record, user) -> dict[str, Any]:
     """`GET /records/<id>/tracker/` -- §8.1 of the architecture doc."""
     from apps.documents.request_serializers import serialize_requests
@@ -804,6 +824,7 @@ def tracker_payload(record, user) -> dict[str, Any]:
         # Finished reviews, Comment only included (ADR-032 §7, IR-874).
         "review_rounds": rounds_payload(record) if readable else None,
         "resubmissions": _resubmissions(record, staff=staff, readable=readable),
+        "published_later": _published_from_unlisted_entry(record, readable=readable),
         "reassignments": _reassignments(record, staff=staff, readable=readable),
         "document_requests": (
             serialize_requests(record, user, requests_for(record)) if disclose_requests else None

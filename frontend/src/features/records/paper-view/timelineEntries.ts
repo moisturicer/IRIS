@@ -29,6 +29,7 @@ export type TimelineKind =
   | "version"
   | "reassignment"
   | "extension"
+  | "published"
   | "comment";
 
 export interface TimelineEntry {
@@ -207,6 +208,24 @@ export function timelineEntries(tracker: RecordTracker): TimelineEntry[] {
       act: r.from_name && r.to_name ? `Reassigned from ${r.from_name} to ${r.to_name}` : "Reassigned a reviewer",
       status: null,
       note: r.reason || null,
+      details: [],
+      version: null,
+    });
+  }
+
+  // RDCO published an Unlisted paper after its Decision (ADR-047 §10, IR-878).
+  // Who and the note are null to a viewer who may not read the review.
+  const later = tracker.published_later;
+  if (later) {
+    entries.push({
+      key: "published-later",
+      kind: "published",
+      at: later.published_at,
+      actor: later.published_by_name,
+      party: later.label,
+      act: "Published it to Discover from Unlisted",
+      status: null,
+      note: later.note || null,
       details: [],
       version: null,
     });
