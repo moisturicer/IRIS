@@ -59,6 +59,8 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted): §5, §7, §10 and §11.** §7 gains review threads: comments anchored to a passage, *Must fix* and *Suggestion*, Resolve and Mark addressed, suggested wording, the response to reviewers, draft comments sent with a finished review, *Comment only* as a recorded verdict, Viewed marks, saved replies and @mentions. IRIS never edits the manuscript. §10 gives participants **Overview · Review** and moves Files into Review. There is still no Ask IRIS in Review: IR-372 stands, as corrected the same day. §5 points at [ADR-058](058-each-version-keeps-its-text-and-its-files.md), where a Version keeps its text and its documents. §11 is corrected to match ADR-047. See the *Amendment, 2026-11-04* notes under each section. Transcribed by an agent.
 
+**Corrected 2026-11-06 (Hermoine Zozobrado, IR-874): §7's review threads.** Only the parties that asked hold a Version with their open *Must fix* threads, every Decision closes open threads with its comment as the reason, and the Adviser's *Accept* of a Proposal is blocked like *Accept & send to RDCO*. See the *Correction, 2026-11-06* note under §7.
+
 **Corrected 2026-11-04: the IR-767 paragraph below.** Its last sentence, "Proposals and the Adviser's direct publication path remain", is wrong about the second half. The Adviser has no publication path. `OUTCOMES_FOR` gives the Adviser `REJECT` only on a Thesis/Research or Project (`apps/reviews/decisions.py:115-118`), as ADR-047's amendment decided. Proposals remain.
 
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
@@ -449,6 +451,15 @@ Moving an anchor never resolves a thread, and a removed passage still needs reso
 **Who reads it.** Threads, drafts (their writer only), answers, the response letter, Viewed marks and mentions are review content under `may_read_review`. They never reach Discover, Ask IRIS or public Comments.
 
 **When it goes live.** It is built and live **before** ADR-004's evaluation runs, so both arms run with it. *Rejected: an on/off setting to hold it back.* Nothing is being evaluated yet, so a setting would add a second behaviour to test and nothing more. If evaluation data collection had begun first, its runs would have to be repeated on the new system.
+
+**Correction, 2026-11-06 (Hermoine Zozobrado, IR-874 design session): which threads hold a Version, and every Decision closes threads.** Transcribed by an agent. Where this note and the amendment above differ, this note wins; the amendment's text is kept.
+
+- **"From the Revision requests it answers" means "of the parties that asked".** *Submit vN* is refused until every open *Must fix* thread **owned by a party with an open Revision request** has an *Addressed* or *Declined* answer. No thread is linked to a request: a *Must fix* the party wrote in an earlier *Comment only* round counts too, and another party's open *Must fix* never holds the Version, which keeps clearance-aware resubmission (ADR-003) intact.
+- **Every Decision closes the open threads, not RDCO's alone.** The Adviser's *Reject*, and its *Accept* or *Reject* of a Proposal, close them the same way, linked by `closed_by_decision`, so no thread stays open on a record whose review has ended.
+- **The reason is the Decision's own comment.** It is required for every outcome while a *Must fix* thread is open (*Reject* already required it), and each thread closes with it. There is no second reason field.
+- **The Adviser accepting a Proposal is an approval,** so the Adviser's own open *Must fix* blocks it, as it blocks *Accept & send to RDCO*. *Reject* stays unblocked.
+- **An approval that would send one of its own *Must fix* drafts is refused** by *Finish review*: the thread would block that approval as soon as it was sent.
+- **A verdict's own notification is the one notification, and it counts the comments.** *Finish review* adds no notice to a verdict; the verdict's notice ends "The review came with 3 comments." *Comment only*, which has no service of its own, sends a new one to the owners and the other open Seat holders. So does an office reviewer's *Clear* or finding that doesn't complete the office: a single reviewer's verdict is still not announced (§4), so that notice says only that comments were sent.
 
 ### 8. Discover: research, and Discoverable Proposals
 

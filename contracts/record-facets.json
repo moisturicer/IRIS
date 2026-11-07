@@ -1,0 +1,8 @@
+{
+  "route": "record-facets",
+  "method": "GET",
+  "as": "other",
+  "sample": {
+    "years": []
+  }
+}

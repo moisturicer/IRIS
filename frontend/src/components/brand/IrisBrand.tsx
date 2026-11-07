@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 import { cn } from "@/lib/utils";
 import {
   ASK,
@@ -101,13 +103,14 @@ export function SearchGlyph({ className = "h-4 w-4", title }: GlyphProps) {
   );
 }
 
-const ASK_LINES = ASK.lines.split(/(?=M)/).map((d) => d.trim());
-
 /**
- * Ask IRIS: the folio's leaves become brackets around three lines of a
- * passage. `answering` writes the lines one after another (1.8 s loop).
+ * Ask IRIS: a speech bubble with the mark's serif I cut out of it, so the
+ * page or the maroon tile shows through the letter. At rest it is one path;
+ * `answering` sets the I in type (top serif, stem, bottom serif; 1.8 s loop)
+ * through a mask, because a hole in a single path cannot be animated.
  */
 export function AskIrisGlyph({ className = "h-5 w-5", title, answering = false }: GlyphProps & { answering?: boolean }) {
+  const maskId = `iris-ask-mask-${useId().replace(/:/g, "")}`;
   return (
     <svg
       viewBox={ASK_VIEWBOX}
@@ -116,10 +119,21 @@ export function AskIrisGlyph({ className = "h-5 w-5", title, answering = false }
       fillRule="evenodd"
       {...a11y(title)}
     >
-      <path d={ASK.brackets} />
-      {ASK_LINES.map((d, line) => (
-        <path key={line} className={`iris-ask-line iris-ask-line-${line + 1}`} d={d} />
-      ))}
+      {answering ? (
+        <>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+            <rect width="24" height="24" fill="#fff" />
+            <g fill="#000">
+              {ASK.letterParts.map(([x, y, width, height], part) => (
+                <rect key={part} className={`iris-ask-part iris-ask-part-${part + 1}`} x={x} y={y} width={width} height={height} />
+              ))}
+            </g>
+          </mask>
+          <path d={ASK.bubble} mask={`url(#${maskId})`} />
+        </>
+      ) : (
+        <path d={`${ASK.bubble} ${ASK.letter}`} />
+      )}
     </svg>
   );
 }

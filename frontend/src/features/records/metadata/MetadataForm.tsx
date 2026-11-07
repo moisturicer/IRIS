@@ -17,6 +17,8 @@ import { INSTITUTION } from "@/config/institution";
 import { Controller, useFormContext, type FieldErrors } from "react-hook-form";
 
 import { FieldError } from "@/components/ui/FieldError";
+import { FieldLabel } from "@/components/ui/FieldLabel";
+import { Select } from "@/components/ui/Select";
 import { CHECKBOX, LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
@@ -134,6 +136,14 @@ export function MetadataForm({
   const flagged = HINTS.filter(({ field }) => watch(field));
   const [authorInput, setAuthorInput] = useState("");
 
+  // `register` also returns a `required` slot, which `Select` refuses beside
+  // `optional`; the field's requiredness is the schema's, not the DOM's.
+  const registerOptionalSelect = (name: "classification" | "psced") => {
+    const props = register(name, { setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)) });
+    delete props.required;
+    return props as Omit<typeof props, "required">;
+  };
+
   const ids = METADATA_FIELD_IDS;
   const errorId = (field: keyof MetadataValues) => `${ids[field]}-error`;
   const describedBy = (field: keyof MetadataValues, hint?: string) =>
@@ -160,10 +170,11 @@ export function MetadataForm({
         </p>
       )}
 
-      <Field label="Title" htmlFor={ids.title} required error={errors.title?.message} errorId={errorId("title")}>
+      <Field label="Title" htmlFor={ids.title} error={errors.title?.message} errorId={errorId("title")}>
         <input
           id={ids.title}
           {...register("title")}
+          aria-required
           aria-invalid={Boolean(errors.title) || undefined}
           aria-describedby={describedBy("title")}
           className={fieldClasses(Boolean(errors.title))}
@@ -189,9 +200,7 @@ export function MetadataForm({
 
       <div>
         <div className="flex items-baseline justify-between gap-3">
-          <label htmlFor={ids.abstract} className={LABEL}>
-            Abstract <RequiredMark />
-          </label>
+          <FieldLabel htmlFor={ids.abstract} label="Abstract" className="mb-1" />
           <span id={`${ids.abstract}-count`} className="text-small text-stone-600 tabular-nums">
             {abstract.length} / {MAX_ABSTRACT}
           </span>
@@ -199,6 +208,7 @@ export function MetadataForm({
         <textarea
           id={ids.abstract}
           {...register("abstract")}
+          aria-required
           rows={4}
           maxLength={MAX_ABSTRACT}
           aria-invalid={Boolean(errors.abstract) || undefined}
@@ -222,9 +232,7 @@ export function MetadataForm({
           </div>
         ) : (
         <div>
-          <label htmlFor={ids.adviser} className={LABEL}>
-            Adviser <RequiredMark />
-          </label>
+          <FieldLabel htmlFor={ids.adviser} label="Adviser" className="mb-1" />
           <Controller
             control={control}
             name="adviser"
@@ -237,6 +245,7 @@ export function MetadataForm({
                 onBlur={field.onBlur}
                 selfId={selfId}
                 invalid={Boolean(errors.adviser)}
+                required
                 describedBy={describedBy("adviser", `${ids.adviser}-hint`)}
               />
             )}
@@ -250,9 +259,10 @@ export function MetadataForm({
         </div>
         )}
 
-        <Field label="Year (completed)" htmlFor={ids.year} required error={errors.year?.message} errorId={errorId("year")}>
+        <Field label="Year (completed)" htmlFor={ids.year} error={errors.year?.message} errorId={errorId("year")}>
           <input
             id={ids.year}
+            aria-required
             type="number"
             inputMode="numeric"
             {...register("year", { valueAsNumber: true })}
@@ -261,15 +271,18 @@ export function MetadataForm({
             className={fieldClasses(Boolean(errors.year))}
           />
         </Field>
-        <Field label="Research origin" htmlFor={ids.origin} error={errors.origin?.message} errorId={errorId("origin")}>
-          <select id={ids.origin} {...register("origin")} className={fieldClasses(Boolean(errors.origin))}
-            aria-invalid={Boolean(errors.origin) || undefined} aria-describedby={describedBy("origin")}>
-            <option value="unknown">Unknown</option>
-            <option value="institutional">Institutional ({INSTITUTION.shortName} research)</option>
-            <option value="imported_reference">Imported reference</option>
-            <option value="synthetic">Synthetic (demonstration or test)</option>
-          </select>
-        </Field>
+        <Select
+          id={ids.origin}
+          label="Research origin"
+          {...register("origin")}
+          error={errors.origin?.message}
+          aria-describedby={describedBy("origin")}
+        >
+          <option value="unknown">Unknown</option>
+          <option value="institutional">Institutional ({INSTITUTION.shortName} research)</option>
+          <option value="imported_reference">Imported reference</option>
+          <option value="synthetic">Synthetic (demonstration or test)</option>
+        </Select>
         <Field label="Publication year" htmlFor={ids.publication_year} error={errors.publication_year?.message} errorId={errorId("publication_year")}>
           <input id={ids.publication_year} type="number" inputMode="numeric" min={1} max={9999}
             {...register("publication_year", { setValueAs: (value) => value == null || value === "" ? null : Number(value) })}
@@ -281,12 +294,11 @@ export function MetadataForm({
       </div>
 
       <div>
-        <label htmlFor={ids.authors} className={LABEL}>
-          Authors <RequiredMark />
-        </label>
+        <FieldLabel htmlFor={ids.authors} label="Authors" className="mb-1" />
         <div className="flex gap-2">
           <input
             id={ids.authors}
+            aria-required
             value={authorInput}
             onChange={(e) => setAuthorInput(e.target.value)}
             onKeyDown={(e) => {
@@ -346,32 +358,28 @@ export function MetadataForm({
         </summary>
         <div className="flex flex-col gap-section border-t border-stone-200 px-4 py-4">
           <div className="grid gap-section sm:grid-cols-2">
-            <div>
-              <label htmlFor={ids.classification} className={LABEL}>Field of research</label>
-              <select
-                id={ids.classification}
-                {...register("classification", { setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)) })}
-                className={fieldClasses(false)}
-              >
-                <option value="">Not set</option>
-                {classifications.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label htmlFor={ids.psced} className={LABEL}>PSCED classification</label>
-              <select
-                id={ids.psced}
-                {...register("psced", { setValueAs: (v) => (v === "" || v == null ? undefined : Number(v)) })}
-                className={fieldClasses(false)}
-              >
-                <option value="">Not set</option>
-                {psceds.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-            </div>
+            <Select
+              id={ids.classification}
+              label="Field of research"
+              optional
+              {...registerOptionalSelect("classification")}
+            >
+              <option value="">Not set</option>
+              {classifications.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </Select>
+            <Select
+              id={ids.psced}
+              label="PSCED classification"
+              optional
+              {...registerOptionalSelect("psced")}
+            >
+              <option value="">Not set</option>
+              {psceds.map((p) => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </Select>
           </div>
 
           {submitted ? (
@@ -412,35 +420,22 @@ export function MetadataForm({
   );
 }
 
-function RequiredMark() {
-  return (
-    <>
-      <span className="text-brand" aria-hidden>*</span>
-      <span className="sr-only">(required)</span>
-    </>
-  );
-}
-
 function Field({
   label,
   htmlFor,
-  required,
   error,
   errorId,
   children,
 }: {
   label: string;
   htmlFor: string;
-  required?: boolean;
   error?: string;
   errorId: string;
   children: ReactNode;
 }) {
   return (
     <div>
-      <label htmlFor={htmlFor} className={LABEL}>
-        {label} {required && <RequiredMark />}
-      </label>
+      <FieldLabel htmlFor={htmlFor} label={label} className="mb-1" />
       {children}
       {error && <FieldError id={errorId}>{error}</FieldError>}
     </div>

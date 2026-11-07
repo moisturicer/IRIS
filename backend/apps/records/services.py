@@ -28,7 +28,7 @@ def set_primary_owner(record: Record, user):
     )
 
 
-def soft_delete_record(record: Record, deleted_by):
+def soft_delete_record(record: Record, deleted_by, *, reason=None):
     """
     Mark a record as deleted without removing it from the DB.
 
@@ -39,7 +39,7 @@ def soft_delete_record(record: Record, deleted_by):
     from django.utils import timezone
     from . import lifecycle
 
-    lifecycle.apply(record, lifecycle.WorkflowEvent.SOFT_DELETE, deleted_by)
+    lifecycle.apply(record, lifecycle.WorkflowEvent.SOFT_DELETE, deleted_by, reason=reason)
     record.is_deleted = True
     record.deleted_at = timezone.now()
     record.deleted_by = deleted_by

@@ -4,7 +4,9 @@ import { Link } from "react-router-dom";
 import { reviewsApi } from "@/api/reviews";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { InterruptedState } from "@/components/shared/InterruptedState";
 import { ResearchCard } from "@/components/shared/ResearchCard";
+import { readFailureKind } from "@/lib/readFailure";
 import { Badge, Button, Skeleton } from "@/components/ui";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { cn, formatDate } from "@/lib/utils";
@@ -14,7 +16,7 @@ import { AssignReviewerDialog } from "./AssignReviewerDialog";
 import { ExtendDueDateDialog } from "./ExtendDueDateDialog";
 import { ReassignDialog } from "./ReassignDialog";
 
-type Load = "loading" | "ready" | "failed" | "refused";
+type Load = "loading" | "ready" | "interrupted" | "failed" | "refused";
 
 type Acting =
   | { act: "assign"; row: OfficeConsoleRow }
@@ -53,8 +55,8 @@ export default function OfficeConsolePage() {
       setState("ready");
       return true;
     } catch (err) {
-      const status = (err as { response?: { status?: number } })?.response?.status;
-      setState(status === 403 ? "refused" : "failed");
+      const kind = readFailureKind(err);
+      setState(kind === "unavailable" ? "refused" : kind);
       return false;
     }
   }, []);
@@ -99,6 +101,8 @@ export default function OfficeConsolePage() {
           message="Only a coordinator of an office can see its open reviews and move them."
           action={<Link to="/review" className={BACK_LINK}>Back to My Reviews</Link>}
         />
+      ) : state === "interrupted" ? (
+        <InterruptedState what="console" onRetry={retry} />
       ) : state === "failed" ? (
         <EmptyState
           icon="fa-triangle-exclamation"

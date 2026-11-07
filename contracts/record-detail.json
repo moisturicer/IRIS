@@ -1,0 +1,332 @@
+{
+  "route": "record-detail",
+  "method": "GET",
+  "as": "owner",
+  "sample": {
+    "id": 1,
+    "title": "Matrix: a Thesis at ITSO",
+    "abstract": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+    "abstract_file": "/api/v1/records/1/manuscript/",
+    "year_accomplished": null,
+    "year_completed": null,
+    "origin": "unknown",
+    "publication_year": null,
+    "classification": null,
+    "psced": null,
+    "record_type": "Thesis / Research",
+    "record_type_name": "Thesis / Research",
+    "file_count": 1,
+    "has_manuscript": true,
+    "download": {
+      "state": "exempt",
+      "allowed": true,
+      "message": "You may download a copy of this paper. It will carry your name.",
+      "grant_expires_at": null,
+      "request": null,
+      "rdco_note": ""
+    },
+    "ai_hook": null,
+    "adviser": 2,
+    "adviser_name": "Ana Adviser",
+    "adviser_has_profile": false,
+    "added_by": 1,
+    "is_ip": false,
+    "ip_type": "",
+    "for_commercialization": false,
+    "community_extension": false,
+    "requires_ethics_review": false,
+    "requested_itso": true,
+    "requested_ierc": false,
+    "requested_ktto": false,
+    "access_count": 0,
+    "pipeline_status": "in_review",
+    "stage_label": "In Review",
+    "is_deleted": false,
+    "workflow_state": "awaiting_document",
+    "workflow_state_label": "Awaiting document",
+    "current_holders": [
+      {
+        "party": "rdco",
+        "label": "RDCO Final",
+        "opened_at": "2026-11-06T14:34:53.035792+00:00",
+        "opened_by": "Ana Adviser"
+      },
+      {
+        "party": "itso",
+        "label": "ITSO",
+        "opened_at": "2026-11-06T14:34:53.072654+00:00",
+        "opened_by": "Test User"
+      }
+    ],
+    "can_request_document": [],
+    "my_seats": [],
+    "review_claim": null,
+    "is_participant": true,
+    "routing": {
+      "send_to_rdco": false,
+      "send_to_rdco_blocked": null,
+      "route_as": null,
+      "targets": []
+    },
+    "office_review": {
+      "party": null,
+      "label": null,
+      "blocked": null,
+      "clear_blocked": null,
+      "assignment": null
+    },
+    "revision": {
+      "party": null,
+      "label": null,
+      "blocked": null,
+      "withdrawable": null,
+      "decision_blocked": null,
+      "open": [],
+      "new_version": null
+    },
+    "decision": {
+      "party": null,
+      "outcomes": [],
+      "blocked": null,
+      "blocked_outcomes": {},
+      "reason_required": false,
+      "closes": null,
+      "token": null,
+      "author_hints": [],
+      "embargo": null
+    },
+    "capabilities": [
+      "cite",
+      "withdraw_submission",
+      "comment_review"
+    ],
+    "readiness": {
+      "verdict": "none",
+      "headline": "Nothing here waits on you.",
+      "items": [
+        {
+          "kind": "open_thread",
+          "severity": "info",
+          "label": "The authors have 1 open suggestion.",
+          "party": null,
+          "actor_name": null,
+          "since": null,
+          "paused": null,
+          "action": {
+            "kind": "show_threads",
+            "target": "owner"
+          }
+        },
+        {
+          "kind": "open_thread",
+          "severity": "info",
+          "label": "ITSO has 1 open Must fix thread.",
+          "party": "itso",
+          "actor_name": null,
+          "since": null,
+          "paused": null,
+          "action": {
+            "kind": "show_threads",
+            "target": "itso"
+          }
+        },
+        {
+          "kind": "document_request",
+          "severity": "info",
+          "label": "ITSO asked the author for a document.",
+          "party": "itso",
+          "actor_name": "Ivan Santos",
+          "since": "2026-11-06T14:34:53.341437+00:00",
+          "paused": null,
+          "action": {
+            "kind": "open_documents",
+            "target": "1"
+          }
+        }
+      ]
+    },
+    "keywords": [],
+    "dpa_accepted": true,
+    "dpa_accepted_at": "2026-11-06T22:34:52.025773+08:00",
+    "details_revision": 0,
+    "metadata_sources": {},
+    "created_at": "2026-11-06T22:34:52.034848+08:00",
+    "updated_at": "2026-11-06T22:34:52.611173+08:00",
+    "owners": [
+      {
+        "id": 1,
+        "user": 1,
+        "email": "student@cit.edu",
+        "full_name": "Sam Student",
+        "is_primary": true,
+        "has_profile": false
+      }
+    ],
+    "authors": [],
+    "reviews": [
+      {
+        "id": 1,
+        "stage": "adviser",
+        "status": "approved",
+        "comment": "Institutional review.",
+        "reviewed_by_name": "Ana Adviser",
+        "created_at": "2026-11-06T14:34:52.966941+00:00",
+        "version": 1
+      }
+    ],
+    "clearances": [
+      {
+        "office": "itso",
+        "office_label": "ITSO",
+        "status": "pending",
+        "status_label": "Pending",
+        "comment": "",
+        "reviewed_by_name": null,
+        "updated_at": "2026-11-06T14:34:53.077679+00:00",
+        "preserved": false,
+        "carryover": null,
+        "carryover_version": null,
+        "carryover_label": null
+      }
+    ],
+    "resubmission": {
+      "count": 0,
+      "last_resubmitted_at": null,
+      "declining_office": null,
+      "offices_preserved": []
+    },
+    "files": [
+      {
+        "id": 1,
+        "filename": "itso-note.pdf",
+        "url": "/api/v1/documents/files/1/download/",
+        "size_bytes": 431,
+        "created_at": "2026-11-06T14:34:53.116366+00:00",
+        "can_remove": false
+      }
+    ],
+    "versions": [
+      {
+        "number": 1,
+        "cause": "submission",
+        "cause_label": "Submission",
+        "created_at": "2026-11-06T14:34:52.683035+00:00",
+        "created_by_name": "Sam Student",
+        "manuscript_url": "/api/v1/records/1/versions/1/manuscript/",
+        "documents": [],
+        "documents_added": [
+          {
+            "upload_id": 1,
+            "slot": "Endorsement",
+            "version": 1,
+            "uploaded_at": "2026-11-06T14:34:53.107527+00:00",
+            "download_url": "/api/v1/documents/uploads/1/download/"
+          }
+        ],
+        "documents_reconstructed": false,
+        "review_text": {
+          "state": "pending",
+          "message": "v1's text is being read.",
+          "warnings": [],
+          "url": null
+        }
+      }
+    ],
+    "manuscript_unsubmitted": false,
+    "submitter_status": {
+      "line": "Documents requested by ITSO: action needed",
+      "waiting_on_you": [
+        {
+          "kind": "document",
+          "party": "itso",
+          "label": "Documents requested by ITSO",
+          "action_label": "Upload the documents"
+        }
+      ],
+      "history": [
+        {
+          "number": 1,
+          "cause_label": "Submission",
+          "submitted_at": "2026-11-06T14:34:52.683035+00:00",
+          "decisions": [
+            {
+              "party": "adviser",
+              "label": "Adviser",
+              "verdict": "approved",
+              "verdict_label": "Approved"
+            }
+          ]
+        }
+      ]
+    },
+    "lineage": {
+      "derived_from": null,
+      "continued_as": null
+    },
+    "paper_details": {
+      "colleges": [],
+      "programs": [],
+      "author_flags": [],
+      "researchers": [
+        {
+          "id": 1,
+          "name": "Sam Student",
+          "role": "Researcher",
+          "office": null,
+          "college": null,
+          "department": null,
+          "program": null,
+          "email": "student@cit.edu"
+        }
+      ],
+      "adviser": {
+        "id": 2,
+        "name": "Ana Adviser",
+        "role": "Adviser",
+        "office": null,
+        "college": null,
+        "department": null,
+        "program": null,
+        "email": "adviser@cit.edu"
+      },
+      "participants": [
+        {
+          "id": 1,
+          "name": "Sam Student",
+          "role": "Researcher",
+          "office": null,
+          "college": null,
+          "department": null,
+          "program": null,
+          "email": "student@cit.edu"
+        },
+        {
+          "id": 2,
+          "name": "Ana Adviser",
+          "role": "Adviser",
+          "office": null,
+          "college": null,
+          "department": null,
+          "program": null,
+          "email": "adviser@cit.edu"
+        },
+        {
+          "id": 11,
+          "name": "Test User",
+          "role": "RDCO Final reviewer",
+          "office": "RDCO Final",
+          "college": null,
+          "department": null,
+          "program": null,
+          "email": null
+        }
+      ],
+      "due_dates": []
+    },
+    "embargo": {
+      "state": "active",
+      "until": null
+    },
+    "ip_release": null
+  }
+}

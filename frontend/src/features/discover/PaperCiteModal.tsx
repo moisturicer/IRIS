@@ -68,7 +68,7 @@ export function PaperCiteModal({ record, isOpen, onClose }: PaperCiteModalProps)
         </pre>
 
         <div className="flex items-center justify-between gap-3">
-          <p className="text-[12px] text-stone-400">
+          <p className="text-[12px] text-stone-600">
             Generated from the record&apos;s authors, title and year.
           </p>
           <button

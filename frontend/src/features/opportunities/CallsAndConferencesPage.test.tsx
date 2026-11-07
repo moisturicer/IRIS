@@ -273,6 +273,23 @@ describe("posting and changing calls", () => {
     expect(within(theirs).queryByRole("button", { name: /^Delete/ })).toBeNull();
   });
 
+  it("marks the optional fields in their names and announces the four required ones (IR-585)", async () => {
+    serve([month()], true);
+    await renderBoard();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Post a call" }));
+    const dialog = await screen.findByRole("dialog", { name: "Post a call" });
+
+    for (const name of ["Title", "Posting office", "Deadline"]) {
+      expect(within(dialog).getByLabelText(name)).toBeRequired();
+    }
+    expect(within(dialog).getByRole("combobox", { name: "Type" })).toBeRequired();
+    for (const name of ["Who can apply (optional)", "Description (optional)", "Link (optional)"]) {
+      expect(within(dialog).getByLabelText(name)).not.toBeRequired();
+    }
+    expect(within(dialog).queryByText(/\(required\)/)).not.toBeInTheDocument();
+  });
+
   it("posts a call and puts it on the board where a reload would", async () => {
     serve([month()], true);
     create.mockImplementation(async (input: Record<string, unknown>) => ({

@@ -4,29 +4,39 @@
  *
  * The same reasoning as `officeReviewDraft.ts`: the dialog is modal, closing
  * it to read the paper unmounts the form, and `sessionStorage` keeps the
- * reason for this tab only. One draft per record. Every access is guarded.
+ * reason for this tab only. One draft per user and record (IR-931). Every
+ * access is guarded.
  */
 const KEY_PREFIX = "iris_revision_draft:";
 
-export function readRevisionDraft(recordId: number): string {
+/** Who is signed in; none means nothing is read, written or cleared. */
+type UserId = number | null | undefined;
+
+function keyFor(userId: number, recordId: number): string {
+  return `${KEY_PREFIX}${userId}:${recordId}`;
+}
+
+export function readRevisionDraft(userId: UserId, recordId: number): string {
+  if (userId == null) return "";
   try {
-    return sessionStorage.getItem(`${KEY_PREFIX}${recordId}`) ?? "";
+    return sessionStorage.getItem(keyFor(userId, recordId)) ?? "";
   } catch {
     return "";
   }
 }
 
 /** Keep this reason, or forget it once it is blank again. */
-export function writeRevisionDraft(recordId: number, reason: string): void {
+export function writeRevisionDraft(userId: UserId, recordId: number, reason: string): void {
+  if (userId == null) return;
   try {
-    if (reason.trim() === "") sessionStorage.removeItem(`${KEY_PREFIX}${recordId}`);
-    else sessionStorage.setItem(`${KEY_PREFIX}${recordId}`, reason);
+    if (reason.trim() === "") sessionStorage.removeItem(keyFor(userId, recordId));
+    else sessionStorage.setItem(keyFor(userId, recordId), reason);
   } catch {
     // Storage refused or full: the reviewer keeps typing either way.
   }
 }
 
 /** Forget it -- once the request is actually made. */
-export function clearRevisionDraft(recordId: number): void {
-  writeRevisionDraft(recordId, "");
+export function clearRevisionDraft(userId: UserId, recordId: number): void {
+  writeRevisionDraft(userId, recordId, "");
 }

@@ -1,6 +1,9 @@
 import uuid
 
 from django.db import models, transaction
+from django.db.models.functions import Lower
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
@@ -59,6 +62,11 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
+def profile_photo_path(instance, filename):
+    """One unguessable name per stored photo; the uploaded filename is never used."""
+    return f"profile_photos/{uuid.uuid4().hex}.jpg"
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     """
     Custom user model. Email is the login identifier.
@@ -76,7 +84,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff       = models.BooleanField(default=False)
     is_active      = models.BooleanField(default=True)
     date_joined    = models.DateTimeField(auto_now_add=True)
-    consent_given  = models.BooleanField(default=False)   # FR-M6-06: Data Privacy Act (RA 10173) consent recorded at signup
+    #: Legacy (FR-M6-06): the one boolean the old signup box set. ADR-054
+    #: replaces it with a versioned answer -- see `answered_notice_version`
+    #: and `ai_consent` -- and nothing reads it for a decision. It is still set
+    #: to True whenever the person answers, so an old reader is never wrong in
+    #: the unsafe direction, and an unanswered account keeps what it had.
+    consent_given  = models.BooleanField(default=False)
+    #: ADR-054 decisions 1-4, 17 (IR-789): the person's *last* answer to the
+    #: data notice, copied here from `NoticeAnswer` so the sign-in block is one
+    #: comparison per request. `None` is unanswered, which is what every
+    #: account that existed before IR-789 starts as. Change these only through
+    #: `apps.accounts.notice.record_answer`, which writes the history row too.
+    answered_notice_version = models.PositiveIntegerField(null=True, blank=True)
+    #: The Yes or No on AI using this person's papers. `None` until they answer;
+    #: never defaulted, because a default would be an answer nobody gave.
+    ai_consent = models.BooleanField(null=True, blank=True)
+    notice_answered_at = models.DateTimeField(null=True, blank=True)
     #: ADR-032 §4: may assign, reassign and withdraw reviewer seats in the
     #: office their role staffs, and nowhere else. Granted by an administrator
     #: (`PATCH /users/<id>/coordinator/`), never by the user. Meaningless
@@ -88,6 +111,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     #: sign-in on every device at once. Change it only through
     #: `apps.accounts.credentials.set_password_and_invalidate`.
     credential_version = models.PositiveIntegerField(default=0)
+
+    # -- Profile (IR-695, spec IR-694). Every one of these is optional and the
+    # person's alone to edit; `apps.accounts.profile` holds the rules.
+    #: Plain text, at most `profile.BIO_MAX_LENGTH` characters. Empty means none.
+    bio = models.TextField(blank=True, default="")
+    #: A square JPEG that `profile.set_photo` re-encodes from the upload. It is
+    #: stored under MEDIA_ROOT, which is never routed: the file is read only
+    #: through `GET /users/<id>/photo/`, behind sign-in.
+    photo = models.ImageField(upload_to=profile_photo_path, null=True, blank=True)
+    #: Bumped whenever the photo is set or removed. It is the `?v=` of
+    #: `photo_url`, so a cached copy of an old photo is never shown for a new one.
+    photo_version = models.PositiveIntegerField(default=0)
+    #: In the order the person gave them. See `UserInterest`.
+    research_interests = models.ManyToManyField(
+        "ResearchInterest", through="UserInterest", related_name="users", blank=True,
+    )
 
     objects = UserManager()
 
@@ -133,6 +172,143 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.role = role
         self.is_office_coordinator = False
         self.save(update_fields=["role", "is_office_coordinator"])
+
+
+class DataNotice(models.Model):
+    """
+    One numbered version of the data notice (ADR-054 decision 1, IR-789).
+
+    There is one notice for the whole system, in the database, so IRIS never
+    runs without one: migration 0019 creates version 1 from the text the
+    frontend carried before. The wording is the data protection officer's to
+    approve (IR-123); this model is the mechanism and works for any text.
+
+    A published version is never edited -- a person's answer names the version
+    they read, so changing its text afterwards would change what they agreed
+    to. A change is a new, higher number. The **current** notice is the highest
+    number. Publishing one (IR-790) is a separate act and a separate ticket.
+    """
+
+    number       = models.PositiveIntegerField(unique=True)
+    title        = models.CharField(max_length=200)
+    subtitle     = models.CharField(max_length=300, blank=True)
+    #: The notice body: a list of ``{"title": str, "body"?: str, "list"?: [str]}``
+    #: in reading order -- the shape the frontend already renders.
+    sections     = models.JSONField()
+    published_at = models.DateTimeField(default=timezone.now)
+    published_by = models.ForeignKey(
+        "accounts.User", null=True, blank=True, on_delete=models.SET_NULL, related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-number"]
+
+    def __str__(self):
+        return f"Data notice v{self.number}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("A published data notice is never edited; publish a new version.")
+        return super().save(*args, **kwargs)
+
+    @classmethod
+    def current(cls) -> "DataNotice | None":
+        """The highest-numbered notice, or None before migration 0019 has run."""
+        return cls.objects.order_by("-number").first()
+
+
+class NoticeAnswer(models.Model):
+    """
+    One answer to one notice version (ADR-054 decision 3). Append-only.
+
+    The history keeps every answer, including a later one for the same version
+    (Settings can change the answer, IR-791), so what a person had said at any
+    moment can be reconstructed. `User.ai_consent` and `answered_notice_version`
+    mirror the latest row.
+    """
+
+    user         = models.ForeignKey("accounts.User", on_delete=models.CASCADE, related_name="notice_answers")
+    notice       = models.ForeignKey(DataNotice, on_delete=models.PROTECT, related_name="answers")
+    #: The data-privacy agreement, which having an account requires. Stored so
+    #: the row records both halves of the answer; the constraint says a stored
+    #: answer is always an agreement, because No here would be no account.
+    agreed_dpa   = models.BooleanField()
+    #: Yes or No on AI using the person's papers. No default.
+    ai_consent   = models.BooleanField()
+    answered_at  = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        ordering = ["-answered_at", "-id"]
+        constraints = [
+            models.CheckConstraint(condition=models.Q(agreed_dpa=True), name="notice_answer_agreed_dpa"),
+        ]
+        indexes = [models.Index(fields=["user", "-answered_at"], name="notice_answer_user_at_idx")]
+
+    def __str__(self):
+        return f"{self.user_id} v{self.notice_id} ai={'yes' if self.ai_consent else 'no'}"
+
+    def save(self, *args, **kwargs):
+        if not self._state.adding:
+            raise ValueError("A notice answer is history and is never edited.")
+        return super().save(*args, **kwargs)
+class ResearchInterest(models.Model):
+    """
+    One research-interest tag, shared by everyone who uses it (IR-695).
+
+    Matched case-insensitively -- "Machine Learning" and "machine learning" are
+    one row -- and the spelling of whoever added it first is the one everybody
+    sees. A tag nobody uses any more is deleted (`profile.set_interests`), so
+    suggestions only ever offer what a current account carries.
+    """
+    name = models.CharField(max_length=40)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("name"), name="researchinterest_name_ci_unique"),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class UserInterest(models.Model):
+    """A person's use of a `ResearchInterest`, with its place in their list."""
+    user     = models.ForeignKey(User, on_delete=models.CASCADE, related_name="interest_links")
+    interest = models.ForeignKey(ResearchInterest, on_delete=models.CASCADE, related_name="user_links")
+    position = models.PositiveSmallIntegerField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "interest"], name="userinterest_once_per_user"),
+        ]
+        ordering = ["position"]
+
+
+def delete_photo_file(name):
+    """Remove one stored account photo, by the name its row held.
+
+    Goes through the model's own file field (`FieldFile.delete`), which is how
+    Django removes a model's file, so it can only ever reach `User.photo`'s
+    storage and not any other. `records/test_record_versions.py` forbids a
+    direct delete on a storage object anywhere in the app code, so that no
+    manuscript file is ever deleted by accident; a photo is not one.
+    """
+    User(photo=name).photo.delete(save=False)
+
+
+@receiver(post_delete, sender=User)
+def delete_photo_with_account(sender, instance, using, **kwargs):
+    """Deleting an account deletes its stored photo, and any tag only it used (IR-695).
+
+    The file goes once the deletion commits: a rolled-back deletion keeps it.
+    Django does not remove an ImageField's file with its row, so without this
+    the file would outlive the person it shows. The cascade has already removed
+    the account's `UserInterest` rows, which may leave a tag nobody uses.
+    """
+    name = instance.photo.name if instance.photo else None
+    if name:
+        transaction.on_commit(lambda: delete_photo_file(name), using=using, robust=True)
+    ResearchInterest.objects.using(using).filter(user_links__isnull=True).delete()
 
 
 class StudentProfile(models.Model):

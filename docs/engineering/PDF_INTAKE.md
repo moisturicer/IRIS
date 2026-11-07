@@ -24,6 +24,22 @@ All limits must be positive and finite; integer limits must be integers. Partial
 
 Apply the additive migrations before starting this release's web/worker processes. Drain or stop old unfenced extraction/chunk workers before admitting revisioned uploads; mixed old-worker/new-writer operation is unsupported. Restart workers on the same release. Existing legacy queue messages handled by the new worker cannot process a revisioned source without its pin. No rollout was performed for this ticket.
 
+## Review text: the one sandbox child that returns data (IR-871)
+
+Each Version's review text (ADR-058 §1 as amended) is read by `apps/records/review_text/reader.py`, in a subprocess shaped like the one above: an isolated interpreter, an environment of only `PATH` and `LANG`, a private temporary directory as its working directory, standard output and error to the null device, and a hard address-space, page and wall limit of its own (`REVIEW_TEXT_WALL_SECONDS`, `_MEMORY_MIB`, `_MAX_PAGES`). It runs in a Celery worker, never in the web process.
+
+**Unlike the upload check, its output crosses back,** so the rule above, "only fixed exit codes cross back", doesn't hold for it. It writes the text as JSON in its temporary directory. The parent reads that only after a clean exit, caps it at 32 MiB, checks its shape and stores it. The parent also checks that the bytes it handed over hash to the Version's recorded SHA-256. This was decided in IR-871's review (Hermoine Zozobrado, 2026-11-05).
+
+The risk is a parser taken over by a crafted PDF copying something it can read into the text reviewers see. The child closes that path itself before it parses anything (`reader.confine`):
+
+1. It opens its input and output first.
+2. It imports every module a read loads.
+3. It caps `RLIMIT_NOFILE` at its lowest free descriptor.
+
+From then on every open, socket or pipe fails with `EMFILE`. That covers the worker's environment under `/proc` and every other paper's file. `test_review_text_sandbox.py` proves both on Linux.
+
+**What is left:** the child still runs as the worker's OS user, so a flaw that reached an already open descriptor, or a kernel interface that needs none, isn't covered. Running it as a separate unprivileged user would close that, and is a deployment change not made here. A CMap file pdfminer would load from disk, which a few non-Latin fonts need, now fails closed as *no text*.
+
 ## Persistent identity and handoff
 
 The existing Record writer commits `abstract_file`, a fresh opaque `manuscript_revision` UUID, `manuscript_sha256` and the display name in one database transaction. The digest attests the original upload, separately from `PdfExtraction.content_hash`, which hashes normalized extraction output. Clients cannot set the digest or revision. An unchanged same-Record upload retains its file/revision and queues nothing. A refused replacement changes nothing.

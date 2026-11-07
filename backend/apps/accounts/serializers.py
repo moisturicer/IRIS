@@ -2,9 +2,12 @@ import unicodedata
 
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from rest_framework import serializers
 from core.enums import RequestStatus, RoleName
+from . import profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
+from .notice import answer_notice, require_current
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -46,31 +49,14 @@ class UserSerializer(serializers.ModelSerializer):
             "is_office_coordinator",
         ]
 
-    def _profile_college(self, obj):
-        adviser = getattr(obj, "adviser_profile", None)
-        if adviser and adviser.college:
-            return adviser.college
-        student = getattr(obj, "student_profile", None)
-        if student and student.course and student.course.department:
-            return student.course.department.college
-        return None
-
     def get_college_name(self, obj):
-        college = self._profile_college(obj)
-        return college.name if college else ""
+        return profile.affiliation(obj).college
 
     def get_department_name(self, obj):
-        adviser = getattr(obj, "adviser_profile", None)
-        if adviser and adviser.department:
-            return adviser.department.name
-        student = getattr(obj, "student_profile", None)
-        if student and student.course and student.course.department:
-            return student.course.department.name
-        return ""
+        return profile.affiliation(obj).department
 
     def get_course_name(self, obj):
-        student = getattr(obj, "student_profile", None)
-        return student.course.name if student and student.course else ""
+        return profile.affiliation(obj).course
 
 
 class AdviserOptionSerializer(UserSerializer):
@@ -94,6 +80,24 @@ class AdviserOptionSerializer(UserSerializer):
         read_only_fields = fields
 
 
+class ResearchInterestsField(serializers.ListField):
+    """
+    The tags on a profile, as a list of strings (IR-695).
+
+    Read as the person's own tags in the order they gave them. Written as a
+    whole list: it is tidied and checked by `profile.clean_interests`, and the
+    spelling of an existing tag wins over the one typed (that happens when it
+    is stored, in `profile.set_interests`).
+    """
+    child = serializers.CharField(allow_blank=True, trim_whitespace=False)
+
+    def get_attribute(self, instance):
+        return profile.interest_names(instance)
+
+    def to_internal_value(self, data):
+        return profile.clean_interests(super().to_internal_value(data))
+
+
 class MeSerializer(UserSerializer):
     """
     `GET /users/me/`: the signed-in user, plus what only they may read about
@@ -115,8 +119,34 @@ class MeSerializer(UserSerializer):
     review_access = serializers.SerializerMethodField()
     role_request  = serializers.SerializerMethodField()
 
+    # The person's own optional profile (IR-695). Editable here and nowhere
+    # else, so "only the person edits their own fields" holds by construction:
+    # `/users/me/` acts on the signed-in user, and `UserSerializer`, which the
+    # administrators' endpoints use, does not carry them. The photo is not a
+    # field you PATCH: it is uploaded to `/users/me/photo/`, read as `photo_url`.
+    bio = serializers.CharField(
+        max_length=profile.BIO_MAX_LENGTH, allow_blank=True, required=False,
+        error_messages={"max_length": profile.BIO_TOO_LONG},
+    )
+    research_interests = ResearchInterestsField(required=False)
+    photo_url = serializers.SerializerMethodField()
+
     class Meta(UserSerializer.Meta):
-        fields = [*UserSerializer.Meta.fields, "review_access", "role_request"]
+        fields = [
+            *UserSerializer.Meta.fields, "review_access", "role_request",
+            "bio", "research_interests", "photo_url",
+        ]
+
+    def get_photo_url(self, obj):
+        return profile.photo_url(obj)
+
+    def update(self, instance, validated_data):
+        interests = validated_data.pop("research_interests", None)
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            if interests is not None:
+                profile.set_interests(instance, interests)
+        return instance
 
     def get_review_access(self, obj):
         from apps.reviews.seats import review_access
@@ -179,12 +209,34 @@ class RegistrationNameField(serializers.CharField):
         return value
 
 
+class NoDefaultBoolean(serializers.BooleanField):
+    """A required Yes or No that is never filled in for the person.
+
+    DRF reads a *missing* value in form-encoded input as False, which for a
+    consent answer would turn "didn't answer" into "No". Declaring it empty
+    makes `required=True` hold for every encoding.
+    """
+
+    default_empty_html = serializers.empty
+
+    def __init__(self, **kwargs):
+        kwargs.setdefault("required", True)
+        super().__init__(**kwargs)
+
+
 class RegisterSerializer(serializers.ModelSerializer):
     first_name = RegistrationNameField("First name")
     last_name = RegistrationNameField("Last name")
     password         = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
-    consent_given    = serializers.BooleanField(write_only=True)
+    # ADR-054 decisions 1-3 (IR-789), replacing the single `consent_given`
+    # box: agreeing to the data-privacy agreement is what having an account
+    # requires; the Yes or No on AI is its own required answer, with no default
+    # on either side (`NoDefaultBoolean`), and No still gives a normal account.
+    # `notice_version` is the version the person was shown.
+    agree_dpa        = NoDefaultBoolean(write_only=True)
+    ai_consent       = NoDefaultBoolean(write_only=True)
+    notice_version   = serializers.IntegerField(write_only=True, min_value=1)
 
     # Role-selection fields (not model fields — popped before user creation)
     role_name     = serializers.CharField(write_only=True, required=False, allow_blank=True)
@@ -197,7 +249,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         fields = [
             "email", "first_name", "middle_initial", "last_name",
             "password", "confirm_password",
-            "consent_given",
+            "agree_dpa", "ai_consent", "notice_version",
             "role_name", "course_id", "college_id", "department_id",
         ]
 
@@ -206,9 +258,15 @@ class RegisterSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("This email address is already registered.")
         return value
 
-    def validate_consent_given(self, value):
+    def validate_agree_dpa(self, value):
         if not value:
-            raise serializers.ValidationError("You must agree to the Data Privacy Notice to register.")
+            raise serializers.ValidationError("You must agree to the data-privacy agreement to register.")
+        return value
+
+    def validate_notice_version(self, value):
+        # A newer notice published since the form loaded: refuse with it (409),
+        # so the person reads it before agreeing to anything.
+        require_current(value)
         return value
 
     def validate(self, data):
@@ -248,9 +306,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         department_id = validated_data.pop("department_id", None)
 
         password = validated_data.pop("password")
-        user = User(**validated_data)   # consent_given stays in validated_data → persisted to model
+        validated_data.pop("agree_dpa")
+        ai_consent     = validated_data.pop("ai_consent")
+        notice_version = validated_data.pop("notice_version")
+        user = User(**validated_data)
         user.set_password(password)
         user.save()
+        # The first answer, in the same transaction as the account (the view's).
+        answer_notice(user, notice_version=notice_version, ai_consent=ai_consent)
 
         # Create role-specific profile rows immediately so data is not lost
         if role_name == RoleName.STUDENT and course_id:
@@ -267,6 +330,42 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Stash for the view's perform_create to pick up
         self._role_name = role_name
         return user
+
+
+class PhotoUploadSerializer(serializers.Serializer):
+    """`PUT /users/me/photo/`: the file, and optionally the square to keep (IR-695)."""
+
+    photo = serializers.FileField(
+        allow_empty_file=False,
+        error_messages={key: profile.NOT_AN_IMAGE for key in ("required", "invalid", "empty", "no_name")},
+    )
+    #: Pixels of the image as the person sees it, from its top-left corner.
+    #: A negative or zero value is a square that is not inside the image, so it
+    #: says what the contract says for one that runs past the edge.
+    crop_x    = serializers.IntegerField(required=False, min_value=0,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
+    crop_y    = serializers.IntegerField(required=False, min_value=0,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
+    crop_size = serializers.IntegerField(required=False, min_value=1,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
+
+    CROP_FIELDS = ("crop_x", "crop_y", "crop_size")
+
+    def validate(self, attrs):
+        given = [name for name in self.CROP_FIELDS if name in attrs]
+        if given and len(given) != len(self.CROP_FIELDS):
+            raise serializers.ValidationError({
+                name: [profile.CROP_INCOMPLETE] for name in self.CROP_FIELDS if name not in attrs
+            })
+        return attrs
+
+    @property
+    def crop(self):
+        """`(x, y, side)`, or None when the person sent none."""
+        data = self.validated_data
+        if "crop_size" not in data:
+            return None
+        return data["crop_x"], data["crop_y"], data["crop_size"]
 
 
 class ChangePasswordSerializer(serializers.Serializer):
@@ -319,3 +418,27 @@ class SystemSettingSerializer(serializers.ModelSerializer):
         model  = SystemSetting
         fields = ["key", "value", "updated_by", "updated_at"]
         read_only_fields = ["updated_by", "updated_at"]
+
+
+class NoticeAnswerSerializer(serializers.Serializer):
+    """The body of ``POST /auth/notice/answer/`` (ADR-054, IR-789).
+
+    Both answers are required with no default: agreeing to the data-privacy
+    agreement (which having an account requires, so it must be true) and a
+    Yes or No on AI. `notice_version` is the version the person was shown; a
+    stale one is refused with the current notice by `require_current`, which
+    runs again under the lock in `answer_notice`.
+    """
+
+    notice_version = serializers.IntegerField(min_value=1)
+    agree_dpa      = NoDefaultBoolean()
+    ai_consent     = NoDefaultBoolean()
+
+    def validate_agree_dpa(self, value):
+        if not value:
+            raise serializers.ValidationError("You must agree to the data-privacy agreement to use IRIS.")
+        return value
+
+    def validate_notice_version(self, value):
+        require_current(value)
+        return value

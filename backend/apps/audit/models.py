@@ -56,13 +56,24 @@ class AuditEvent(models.Model):
     REVIEWER_ADDED             = "REVIEWER_ADDED"
     SEAT_OPENED                = "SEAT_OPENED"
     RECORD_WITHDRAWN           = "RECORD_WITHDRAWN"
+    # RDCO's two other acts on a paper in review (ADR-051 §10, IR-797).
+    ADVISER_REPLACED           = "ADVISER_REPLACED"
+    OWNER_ADDED                = "OWNER_ADDED"
     DOCUMENT_REQUESTED         = "DOCUMENT_REQUESTED"
     DOCUMENT_REQUEST_FULFILLED = "DOCUMENT_REQUEST_FULFILLED"
     DOCUMENT_REQUEST_ACCEPTED  = "DOCUMENT_REQUEST_ACCEPTED"
     DOCUMENT_REQUEST_REJECTED  = "DOCUMENT_REQUEST_REJECTED"
     DOCUMENT_REQUEST_WITHDRAWN = "DOCUMENT_REQUEST_WITHDRAWN"
+    # Review threads (ADR-032 §7, 2026-11-04; IR-874). No thread text is copied.
+    REVIEW_FINISHED                = "REVIEW_FINISHED"
+    REVIEW_THREAD_RESOLVED         = "REVIEW_THREAD_RESOLVED"
+    REVIEW_THREAD_REOPENED         = "REVIEW_THREAD_REOPENED"
+    REVIEW_THREAD_SEVERITY_CHANGED = "REVIEW_THREAD_SEVERITY_CHANGED"
+    REVIEW_THREAD_ANSWERED         = "REVIEW_THREAD_ANSWERED"
+    REVIEW_THREADS_CLOSED          = "REVIEW_THREADS_CLOSED"
 
-    # A paper's embargo (ADR-052 §8, IR-812).
+    # A paper's embargo (ADR-052 §8, IR-812). Nothing writes EMBARGO_ANSWERED
+    # since IR-882 removed Publish's question; it names the rows written before.
     EMBARGO_ANSWERED = "EMBARGO_ANSWERED"
     EMBARGO_SET      = "EMBARGO_SET"
     EMBARGO_EXTENDED = "EMBARGO_EXTENDED"
@@ -80,6 +91,18 @@ class AuditEvent(models.Model):
     RECOVERY_EMAIL_FAILED        = "RECOVERY_EMAIL_FAILED"
     PASSWORD_RESET_COMPLETED     = "PASSWORD_RESET_COMPLETED"
     EMAIL_VERIFICATION_COMPLETED = "EMAIL_VERIFICATION_COMPLETED"
+    # The daily retention cleanup (ADR-051 decision 19, IR-794). No actor and no
+    # record. Metadata: `counts`, the rows erased per data type -- never a name,
+    # an email or any erased text.
+    RETENTION_CLEANUP_RUN = "RETENTION_CLEANUP_RUN"
+
+    # A person's answer to the data notice (ADR-054, IR-789). Metadata:
+    # `notice_version`, `ai_consent`, and the `previous_*` pair (None when it was
+    # their first answer). Written by `apps.accounts.notice.answer_notice`.
+    NOTICE_ANSWERED = "NOTICE_ANSWERED"
+    # A person downloaded their own data (ADR-051 decision 13, IR-786). Metadata
+    # is `sections` and `format` only: never a byte of what was downloaded.
+    PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
 
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
@@ -121,6 +144,8 @@ class AuditEvent(models.Model):
         (REVIEWER_ADDED,             "Reviewer Added"),
         (SEAT_OPENED,                "Seat Opened"),
         (RECORD_WITHDRAWN,           "Record Withdrawn"),
+        (ADVISER_REPLACED,           "Adviser Replaced"),
+        (OWNER_ADDED,                "Owner Added"),
         (EMBARGO_ANSWERED,           "Embargo Question Answered"),
         (EMBARGO_SET,                "Embargo Set"),
         (EMBARGO_EXTENDED,           "Embargo Date Moved"),
@@ -131,6 +156,12 @@ class AuditEvent(models.Model):
         (DOCUMENT_REQUEST_ACCEPTED,  "Requested Document Accepted"),
         (DOCUMENT_REQUEST_REJECTED,  "Requested Document Rejected"),
         (DOCUMENT_REQUEST_WITHDRAWN, "Document Request Withdrawn"),
+        (REVIEW_FINISHED,                "Review Finished"),
+        (REVIEW_THREAD_RESOLVED,         "Review Thread Resolved"),
+        (REVIEW_THREAD_REOPENED,         "Review Thread Reopened"),
+        (REVIEW_THREAD_SEVERITY_CHANGED, "Review Thread Severity Changed"),
+        (REVIEW_THREAD_ANSWERED,         "Review Thread Answered"),
+        (REVIEW_THREADS_CLOSED,          "Review Threads Closed by Decision"),
         (RECOVERY_REQUESTED,           "Recovery Requested"),
         (RECOVERY_SUPPRESSED,          "Recovery Suppressed"),
         (RECOVERY_TOKEN_REJECTED,      "Recovery Link Rejected"),
@@ -138,6 +169,9 @@ class AuditEvent(models.Model):
         (RECOVERY_EMAIL_FAILED,        "Recovery Email Failed"),
         (PASSWORD_RESET_COMPLETED,     "Password Reset Completed"),
         (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
+        (RETENTION_CLEANUP_RUN,        "Retention Cleanup Run"),
+        (NOTICE_ANSWERED,              "Data Notice Answered"),
+        (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

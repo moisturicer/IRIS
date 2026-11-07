@@ -114,6 +114,19 @@ purpose is invisible to the instrument meant to justify it.
    for §4's selection. Until then the gap above is the honest state of the
    evidence.
 
+   **Closed 2026-11-05 (IR-454).** The harness now runs every unanswerable
+   question (a `corpus` or `corpus_multi` question whose `expected_outcome` is
+   `decline-no-evidence`, IR-463's schema) through the same retriever as the
+   answerable ones, and reports **correct refusal** (the share given no passage
+   in the final set) beside both recall measures, never blended into them. Every
+   answerable question given no passage is named by id as a **false refusal**.
+   `proxy_starter.json` holds ten such questions (q55, q56, q66–q68, q83–q87),
+   so a run of §3 or §4 can now show what a floor buys as well as what it costs.
+   The rule in §5 is unchanged, and the instrument it needs now exists. It has
+   not yet been run on the proxy set, and until §3's cut-off is built (IR-396)
+   it will read 0 there by construction. No default moves here: that is still
+   IR-402.
+
 **Why not simply tune the floor by taste in the meantime.** Because that is the
 failure `026` §3 named, and a cut-off set too high is this ADR's own recorded
 risk — *"a silent, reader-invisible regression, since the score is never

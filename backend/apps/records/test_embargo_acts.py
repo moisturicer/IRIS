@@ -1,13 +1,12 @@
 """
-Changing an embargo after submission (ADR-052 decisions 5, 6 and 10, IR-812).
+Changing an embargo after submission (ADR-052 decisions 5, 6 and 10, IR-812, IR-882).
 
-Owners or the Adviser set or extend one. Only the Adviser or RDCO release one.
-A draft isn't here: its owners change their answer through `embargo-answer/`.
+Every paper starts embargoed with no date. Only the Adviser or RDCO set or move a
+date, and only they release one (§5 as amended for IR-882, §6). Owners do neither.
 
-Three things are pinned hardest. A student owner can't release, even on their own
-paper. No act blanks an Active embargo's date, because an answered paper with a
-blank date reads as "no embargo" and that would open the check with no release.
-And a refusal says nothing about where someone else's embargo stands.
+Three things are pinned hardest. No owner, student or otherwise, changes an
+embargo. No act blanks a date or releases a paper without the release route. And a
+refusal says nothing about where someone else's embargo stands.
 """
 
 from datetime import date, timedelta
@@ -48,16 +47,16 @@ class ActsBase(APITestCase):
         cls.ktto = make_user("acts-ktto@cit.edu", RoleName.KTTO)
         cls.reader = make_user("acts-reader@cit.edu", RoleName.STUDENT)
 
-    def _paper(self, status_=PipelineStatus.PUBLISHED, *, until=None, answered=True, released=False,
-               **fields):
+    def _paper(self, status_=PipelineStatus.PUBLISHED, *, until=None, released=False, **fields):
+        """A consented paper. Embargoed with no date unless a test asks otherwise."""
         now = timezone.now()
         stamps = {"dpa_accepted_at": now, "dpa_accepted_by": self.owner}
-        if answered:
-            stamps.update(embargo_answered_at=now, embargo_answered_by=self.owner)
         if until is not None:
-            stamps["embargoed_until"] = until
+            stamps.update(embargoed_until=until, embargo_date_set_at=now,
+                          embargo_date_set_by=self.adviser)
         if released:
-            stamps.update(embargo_released_at=now, embargo_released_by=self.adviser)
+            stamps.update(is_embargoed=False, embargo_released_at=now,
+                          embargo_released_by=self.adviser)
         record = Record.objects.create(
             title="Acts paper", abstract="An abstract long enough to read.",
             record_type=self.record_type, added_by=self.owner, adviser=self.adviser,
@@ -80,41 +79,48 @@ class ActsBase(APITestCase):
         return record.embargo_state
 
 
-class SettingAnEmbargoTests(ActsBase):
-    def test_an_owner_sets_one_with_who_and_when(self):
-        record = self._paper()
-        until = _in_days(90)
-
-        response = self._set(record, self.owner, embargoed_until=until.isoformat())
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(response.data["state"], "active")
-        self.assertEqual(response.data["until"], until.isoformat())
-        self.assertEqual(self._state(record), EmbargoState.ACTIVE)
-        self.assertEqual(record.embargoed_until, until)
-        self.assertEqual(record.embargo_answered_by, self.owner)
-        self.assertFalse(decision_for_record(record).allowed)
-
-    def test_a_co_owner_and_the_adviser_set_one_too(self):
-        for user in (self.co_owner, self.adviser):
+class SettingADateTests(ActsBase):
+    def test_the_adviser_and_rdco_set_one_with_who_and_when(self):
+        for user in (self.adviser, self.rdco):
             with self.subTest(user=user.email):
-                record = self._paper()
+                record = self._paper(PipelineStatus.IN_REVIEW)
+                until = _in_days(90)
 
-                response = self._set(record, user, embargoed_until=_in_days(90).isoformat())
+                response = self._set(record, user, embargoed_until=until.isoformat())
 
                 self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                self.assertEqual(response.data["state"], "active")
+                self.assertEqual(response.data["until"], until.isoformat())
                 self.assertEqual(self._state(record), EmbargoState.ACTIVE)
-                self.assertEqual(record.embargo_answered_by, user)
+                self.assertEqual(record.embargoed_until, until)
+                self.assertEqual(record.embargo_date_set_by, user)
+                self.assertIsNotNone(record.embargo_date_set_at)
+                self.assertFalse(decision_for_record(record).allowed)
 
-    def test_no_office_sets_one_not_even_rdco(self):
-        for user in (self.rdco, self.itso, self.ktto):
+    def test_no_owner_sets_or_extends_one(self):
+        """IR-882: owners no longer judge IP or patent potential; they tell the Adviser."""
+        for name, fields in {"undated": {}, "dated": {"until": _in_days(30)}}.items():
+            for owner in (self.owner, self.co_owner):
+                with self.subTest(paper=name, user=owner.email):
+                    record = self._paper(**fields)
+                    before = record.embargoed_until
+
+                    response = self._set(record, owner, embargoed_until=_in_days(90).isoformat())
+
+                    self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+                    record.refresh_from_db()
+                    self.assertEqual(record.embargoed_until, before)
+
+    def test_no_other_office_sets_one(self):
+        for user in (self.itso, self.ktto):
             with self.subTest(user=user.email):
                 record = self._paper(PipelineStatus.IN_REVIEW)
 
                 response = self._set(record, user, embargoed_until=_in_days(90).isoformat())
 
                 self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-                self.assertEqual(self._state(record), EmbargoState.NONE)
+                record.refresh_from_db()
+                self.assertIsNone(record.embargoed_until)
 
     def test_someone_who_only_reads_the_published_paper_cannot(self):
         record = self._paper()
@@ -122,7 +128,6 @@ class SettingAnEmbargoTests(ActsBase):
         response = self._set(record, self.reader, embargoed_until=_in_days(90).isoformat())
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(self._state(record), EmbargoState.NONE)
 
     def test_a_paper_they_cannot_see_reads_as_missing(self):
         record = self._paper(PipelineStatus.IN_REVIEW)
@@ -137,39 +142,32 @@ class SettingAnEmbargoTests(ActsBase):
                     {"embargoed_until": "soon"},
                     {"embargoed_until": _in_days(-1).isoformat()}):
             with self.subTest(body=bad):
-                response = self._set(record, self.owner, **bad)
+                response = self._set(record, self.adviser, **bad)
 
                 self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
                 self.assertIn("embargoed_until", response.data)
-                self.assertEqual(self._state(record), EmbargoState.NONE)
+                record.refresh_from_db()
+                self.assertIsNone(record.embargoed_until)
 
     def test_todays_date_is_accepted_because_it_has_not_passed(self):
         record = self._paper()
 
-        response = self._set(record, self.owner, embargoed_until=_in_days(0).isoformat())
+        response = self._set(record, self.adviser, embargoed_until=_in_days(0).isoformat())
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
 
-    def test_a_draft_uses_its_answer_instead(self):
-        record = self._paper(PipelineStatus.DRAFT, answered=False)
+    def test_a_draft_has_nothing_to_change(self):
+        record = self._paper(PipelineStatus.DRAFT)
 
-        response = self._set(record, self.owner, embargoed_until=_in_days(90).isoformat())
+        response = self._set(record, self.adviser, embargoed_until=_in_days(90).isoformat())
 
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(self._state(record), EmbargoState.UNKNOWN)
-
-    def test_a_submitted_paper_nobody_answered_for_can_be_set(self):
-        """A loaded paper reaches here unanswered, and an embargo is the safe way."""
-        record = self._paper(answered=False)
-
-        response = self._set(record, self.owner, embargoed_until=_in_days(90).isoformat())
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(self._state(record), EmbargoState.ACTIVE)
+        self.assertIn(response.status_code, (status.HTTP_400_BAD_REQUEST, status.HTTP_404_NOT_FOUND))
+        record.refresh_from_db()
+        self.assertIsNone(record.embargoed_until)
 
 
-class ExtendingAnEmbargoTests(ActsBase):
-    def test_extending_moves_the_date_and_it_stays_active(self):
+class MovingADateTests(ActsBase):
+    def test_moving_it_later_keeps_it_active(self):
         record = self._paper(until=_in_days(10))
         later = _in_days(200)
 
@@ -182,7 +180,7 @@ class ExtendingAnEmbargoTests(ActsBase):
     def test_a_passed_date_can_be_moved_on(self):
         record = self._paper(until=_in_days(-30))
 
-        response = self._set(record, self.owner, embargoed_until=_in_days(30).isoformat())
+        response = self._set(record, self.rdco, embargoed_until=_in_days(30).isoformat())
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(self._state(record), EmbargoState.ACTIVE)
@@ -191,19 +189,14 @@ class ExtendingAnEmbargoTests(ActsBase):
         record = self._paper(until=_in_days(200))
         sooner = _in_days(5)
 
-        response = self._set(record, self.owner, embargoed_until=sooner.isoformat())
+        response = self._set(record, self.adviser, embargoed_until=sooner.isoformat())
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(self._state(record), EmbargoState.ACTIVE)
         self.assertEqual(record.embargoed_until, sooner)
 
 
-class NoActBlanksTheDateTests(ActsBase):
-    """
-    An answered paper with a blank date reads as "no embargo", so clearing the date
-    would open the check with no release, and no database rule can stop it.
-    """
-
+class NothingButAReleaseOpensItTests(ActsBase):
     def _assert_still_held(self, record, until):
         self.assertEqual(self._state(record), EmbargoState.ACTIVE)
         self.assertEqual(record.embargoed_until, until)
@@ -213,19 +206,7 @@ class NoActBlanksTheDateTests(ActsBase):
         until = _in_days(60)
         record = self._paper(until=until)
 
-        response = self._set(record, self.owner, embargoed_until=None)
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-        self._assert_still_held(record, until)
-
-    def test_answering_no_is_refused_once_submitted(self):
-        until = _in_days(60)
-        record = self._paper(until=until)
-        self.client.force_authenticate(self.owner)
-
-        response = self.client.post(
-            reverse("record-embargo-answer", args=[record.pk]), {"embargoed": False}, format="json",
-        )
+        response = self._set(record, self.adviser, embargoed_until=None)
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self._assert_still_held(record, until)
@@ -237,7 +218,8 @@ class NoActBlanksTheDateTests(ActsBase):
 
         self.client.patch(
             reverse("record-detail", args=[record.pk]),
-            {"embargoed_until": None, "embargo_released_at": timezone.now().isoformat()},
+            {"embargoed_until": None, "is_embargoed": False,
+             "embargo_released_at": timezone.now().isoformat()},
             format="json",
         )
 
@@ -246,20 +228,21 @@ class NoActBlanksTheDateTests(ActsBase):
 
 class ReleasingAnEmbargoTests(ActsBase):
     def test_the_adviser_and_rdco_release_it_with_who_and_when(self):
-        for user in (self.adviser, self.rdco):
-            with self.subTest(user=user.email):
-                until = _in_days(60)
-                record = self._paper(until=until)
+        for name, fields in {"undated": {}, "dated": {"until": _in_days(60)}}.items():
+            for user in (self.adviser, self.rdco):
+                with self.subTest(paper=name, user=user.email):
+                    record = self._paper(**fields)
 
-                response = self._release(record, user)
+                    response = self._release(record, user)
 
-                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-                self.assertEqual(response.data["state"], "released")
-                self.assertEqual(self._state(record), EmbargoState.RELEASED)
-                self.assertEqual(record.embargo_released_by, user)
-                self.assertIsNotNone(record.embargo_released_at)
-                self.assertEqual(record.embargoed_until, until)
-                self.assertTrue(decision_for_record(record).allowed)
+                    self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+                    self.assertEqual(response.data["state"], "released")
+                    self.assertEqual(self._state(record), EmbargoState.RELEASED)
+                    self.assertFalse(record.is_embargoed)
+                    self.assertEqual(record.embargo_released_by, user)
+                    self.assertIsNotNone(record.embargo_released_at)
+                    self.assertEqual(record.embargoed_until, fields.get("until"))
+                    self.assertTrue(decision_for_record(record).allowed)
 
     def test_a_student_owner_cannot_even_on_their_own_paper(self):
         record = self._paper(until=_in_days(60))
@@ -284,7 +267,7 @@ class ReleasingAnEmbargoTests(ActsBase):
     def test_a_refusal_says_nothing_about_where_the_embargo_stands(self):
         """A reader may open a published paper, and may not learn it's under an agreement."""
         held = self._paper(until=_in_days(60))
-        clear = self._paper()
+        clear = self._paper(released=True)
 
         first = self._release(held, self.reader)
         second = self._release(clear, self.reader)
@@ -298,21 +281,13 @@ class ReleasingAnEmbargoTests(ActsBase):
 
         self.assertEqual(self._release(record, self.reader).status_code, status.HTTP_404_NOT_FOUND)
 
-    def test_only_an_active_embargo_can_be_released(self):
-        cases = {
-            "no embargo": {},
-            "nobody answered": {"answered": False},
-            "already released": {"until": _in_days(60), "released": True},
-        }
-        for name, fields in cases.items():
-            with self.subTest(case=name):
-                record = self._paper(**fields)
-                before = self._state(record)
+    def test_a_released_paper_cannot_be_released_again(self):
+        record = self._paper(until=_in_days(60), released=True)
 
-                response = self._release(record, self.adviser)
+        response = self._release(record, self.adviser)
 
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
-                self.assertEqual(self._state(record), before)
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(self._state(record), EmbargoState.RELEASED)
 
     def test_a_draft_cannot_be_released(self):
         record = self._paper(PipelineStatus.DRAFT, until=_in_days(60))
@@ -326,11 +301,11 @@ class ReleasingAnEmbargoTests(ActsBase):
 class AReleasedPaperCanBeHeldAgainTests(ActsBase):
     """Decided 2026-11-02 under IR-812: a new embargo, not an undone release."""
 
-    def test_setting_a_new_embargo_makes_it_active_again(self):
+    def test_setting_a_new_date_makes_it_active_again(self):
         record = self._paper(until=_in_days(60), released=True)
         later = _in_days(300)
 
-        response = self._set(record, self.owner, embargoed_until=later.isoformat())
+        response = self._set(record, self.rdco, embargoed_until=later.isoformat())
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         self.assertEqual(self._state(record), EmbargoState.ACTIVE)
@@ -338,12 +313,21 @@ class AReleasedPaperCanBeHeldAgainTests(ActsBase):
         self.assertIsNone(record.embargo_released_at)
         self.assertIsNone(record.embargo_released_by)
 
+    def test_an_owner_cannot_hold_it_again(self):
+        """The IR-812 amendment's owner override is gone with IR-882."""
+        record = self._paper(released=True)
+
+        response = self._set(record, self.owner, embargoed_until=_in_days(300).isoformat())
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(self._state(record), EmbargoState.RELEASED)
+
     def test_only_the_adviser_or_rdco_can_release_it_again(self):
         record = self._paper(until=_in_days(60), released=True)
-        self._set(record, self.owner, embargoed_until=_in_days(300).isoformat())
+        self._set(record, self.adviser, embargoed_until=_in_days(300).isoformat())
 
         self.assertEqual(self._release(record, self.owner).status_code, status.HTTP_403_FORBIDDEN)
-        self.assertEqual(self._release(record, self.adviser).status_code, status.HTTP_200_OK)
+        self.assertEqual(self._release(record, self.rdco).status_code, status.HTTP_200_OK)
         self.assertEqual(self._state(record), EmbargoState.RELEASED)
 
 
@@ -352,18 +336,16 @@ class WhatAlreadyLeftTests(ActsBase):
 
     def _notice(self, **paper):
         record = self._paper(**paper)
-        response = self._set(record, self.owner, embargoed_until=_in_days(90).isoformat())
+        response = self._set(record, self.adviser, embargoed_until=_in_days(90).isoformat())
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         return response.data.get("notice", "")
 
-    def test_a_paper_answered_no_could_have_gone(self):
-        self.assertIn(RECALL_WORDS, self._notice())
-
     def test_a_released_paper_could_have_gone(self):
+        self.assertIn(RECALL_WORDS, self._notice(released=True))
         self.assertIn(RECALL_WORDS, self._notice(until=_in_days(60), released=True))
 
     def test_nothing_is_said_when_the_check_never_let_it_out(self):
-        self.assertEqual(self._notice(answered=False), "")
+        self.assertEqual(self._notice(), "")
         self.assertEqual(self._notice(until=_in_days(60)), "")
 
 
@@ -377,9 +359,11 @@ class AReleaseSendsThePaperOnTests(ActsBase):
         return queue
 
     def test_it_queues_the_paper_for_indexing(self):
-        record = self._paper(until=_in_days(60))
+        for fields in ({}, {"until": _in_days(60)}):
+            with self.subTest(fields=sorted(fields)):
+                record = self._paper(**fields)
 
-        self._release_and_commit(record).assert_called_once_with(record.pk)
+                self._release_and_commit(record).assert_called_once_with(record.pk)
 
     def test_it_asks_again_for_the_overview_refused_during_the_embargo(self):
         record = self._paper(until=_in_days(60))
@@ -397,11 +381,6 @@ class AReleaseSendsThePaperOnTests(ActsBase):
         overview.assert_called_once()
         self.assertEqual(RecordOverview.objects.get(record=record).state, "generating")
 
-    def test_a_paper_with_nothing_indexed_yet_releases_cleanly(self):
-        record = self._paper(until=_in_days(60))
-
-        self._release_and_commit(record).assert_called_once_with(record.pk)
-
     def test_an_ip_mark_still_holds_it_back(self):
         record = self._paper(until=_in_days(60), is_ip=True)
 
@@ -417,10 +396,10 @@ class AReleaseSendsThePaperOnTests(ActsBase):
         queue.assert_not_called()
 
     def test_setting_one_sends_nothing(self):
-        record = self._paper()
+        record = self._paper(released=True)
 
         with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
-            self._set(record, self.owner, embargoed_until=_in_days(90).isoformat())
+            self._set(record, self.adviser, embargoed_until=_in_days(90).isoformat())
 
         queue.assert_not_called()
 
@@ -441,34 +420,7 @@ class EveryActIsAuditedTests(ActsBase):
     def _event(self, record, event_type):
         return AuditEvent.objects.get(record=record, event_type=event_type)
 
-    def test_saving_an_answer_is_recorded(self):
-        record = self._paper(PipelineStatus.DRAFT, answered=False)
-        until = _in_days(45)
-        self.client.force_authenticate(self.owner)
-
-        self.client.post(
-            reverse("record-embargo-answer", args=[record.pk]),
-            {"embargoed": True, "embargoed_until": until.isoformat()}, format="json",
-        )
-
-        event = self._event(record, AuditEvent.EMBARGO_ANSWERED)
-        self.assertEqual(event.user, self.owner)
-        self.assertEqual(event.metadata, {"embargoed": True, "until": until.isoformat()})
-
-    def test_answering_no_is_recorded_as_no(self):
-        record = self._paper(PipelineStatus.DRAFT, answered=False)
-        self.client.force_authenticate(self.owner)
-
-        self.client.post(
-            reverse("record-embargo-answer", args=[record.pk]), {"embargoed": False}, format="json",
-        )
-
-        self.assertEqual(
-            self._event(record, AuditEvent.EMBARGO_ANSWERED).metadata,
-            {"embargoed": False, "until": None},
-        )
-
-    def test_setting_one_is_recorded_with_where_it_stood(self):
+    def test_dating_an_undated_embargo_is_a_set(self):
         record = self._paper()
         until = _in_days(90)
 
@@ -476,17 +428,17 @@ class EveryActIsAuditedTests(ActsBase):
 
         event = self._event(record, AuditEvent.EMBARGO_SET)
         self.assertEqual(event.user, self.adviser)
-        self.assertEqual(event.metadata, {"until": until.isoformat(), "previous_state": "none"})
+        self.assertEqual(event.metadata, {"until": until.isoformat(), "previous_state": "active"})
         self.assertFalse(AuditEvent.objects.filter(event_type=AuditEvent.EMBARGO_EXTENDED).exists())
 
-    def test_extending_one_is_its_own_event_with_both_dates(self):
+    def test_moving_a_date_is_its_own_event_with_both_dates(self):
         before, after = _in_days(10), _in_days(200)
         record = self._paper(until=before)
 
-        self._set(record, self.owner, embargoed_until=after.isoformat())
+        self._set(record, self.rdco, embargoed_until=after.isoformat())
 
         event = self._event(record, AuditEvent.EMBARGO_EXTENDED)
-        self.assertEqual(event.user, self.owner)
+        self.assertEqual(event.user, self.rdco)
         self.assertEqual(
             event.metadata, {"until": after.isoformat(), "previous_until": before.isoformat()},
         )
@@ -495,28 +447,29 @@ class EveryActIsAuditedTests(ActsBase):
     def test_holding_a_released_paper_again_is_a_set_that_says_so(self):
         record = self._paper(until=_in_days(60), released=True)
 
-        self._set(record, self.owner, embargoed_until=_in_days(90).isoformat())
+        self._set(record, self.adviser, embargoed_until=_in_days(90).isoformat())
 
         self.assertEqual(
             self._event(record, AuditEvent.EMBARGO_SET).metadata["previous_state"], "released",
         )
 
     def test_a_release_is_recorded_with_the_date_it_held(self):
-        until = _in_days(60)
-        record = self._paper(until=until)
+        for until in (_in_days(60), None):
+            with self.subTest(until=until):
+                record = self._paper(until=until)
 
-        self._release(record, self.rdco)
+                self._release(record, self.rdco)
 
-        event = self._event(record, AuditEvent.EMBARGO_RELEASED)
-        self.assertEqual(event.user, self.rdco)
-        self.assertEqual(event.metadata, {"until": until.isoformat()})
+                event = self._event(record, AuditEvent.EMBARGO_RELEASED)
+                self.assertEqual(event.user, self.rdco)
+                self.assertEqual(event.metadata, {"until": until.isoformat() if until else None})
 
     def test_a_refused_act_records_nothing(self):
         record = self._paper(until=_in_days(60))
 
         self._release(record, self.owner)
-        self._set(record, self.rdco, embargoed_until=_in_days(90).isoformat())
-        self._set(record, self.owner, embargoed_until=None)
+        self._set(record, self.owner, embargoed_until=_in_days(90).isoformat())
+        self._set(record, self.adviser, embargoed_until=None)
 
         self.assertFalse(AuditEvent.objects.filter(
             record=record, event_type__startswith="EMBARGO",
@@ -535,10 +488,10 @@ class RecordDetailOffersTheActsTests(ActsBase):
     def test_who_is_offered_what_on_an_active_embargo(self):
         record = self._paper(until=_in_days(60))
         expected = {
-            self.owner: {"set_embargo"},
-            self.co_owner: {"set_embargo"},
+            self.owner: set(),
+            self.co_owner: set(),
             self.adviser: {"set_embargo", "release_embargo"},
-            self.rdco: {"release_embargo"},
+            self.rdco: {"set_embargo", "release_embargo"},
             self.itso: set(),
             self.ktto: set(),
             self.reader: set(),
@@ -547,14 +500,16 @@ class RecordDetailOffersTheActsTests(ActsBase):
             with self.subTest(user=user.email):
                 self.assertEqual(self._offered(record, user), offered)
 
-    def test_release_is_not_offered_with_nothing_to_release(self):
-        for fields in ({}, {"until": _in_days(60), "released": True}):
-            record = self._paper(**fields)
-            with self.subTest(fields=fields):
-                self.assertEqual(self._offered(record, self.adviser), {"set_embargo"})
-                self.assertEqual(self._offered(record, self.rdco), set())
+    def test_release_is_not_offered_on_a_released_paper(self):
+        record = self._paper(until=_in_days(60), released=True)
+
+        for user in (self.adviser, self.rdco):
+            with self.subTest(user=user.email):
+                self.assertEqual(self._offered(record, user), {"set_embargo"})
 
     def test_a_draft_offers_neither(self):
         record = self._paper(PipelineStatus.DRAFT, until=_in_days(60))
 
-        self.assertEqual(self._offered(record, self.owner), set())
+        for user in (self.owner, self.adviser):
+            with self.subTest(user=user.email):
+                self.assertEqual(self._offered(record, user), set())

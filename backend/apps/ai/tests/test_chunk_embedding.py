@@ -98,7 +98,7 @@ def _disclosable_record(**kwargs) -> Record:
         # `dpa_accepted` is a derived property, not a field: consent is the
         # timestamp, and IR-226 made that stamp the only evidence of it.
         dpa_accepted_at=timezone.now(),
-        embargo_answered_at=timezone.now(),
+        is_embargoed=False, embargo_released_at=timezone.now(),
         **kwargs,
     )
     return record
@@ -310,9 +310,9 @@ class DisclosureGateTests:
         assert provider.grouped_calls == []
         assert not ChunkEmbedding.objects.filter(chunk__record=record).exists()
 
-    def test_a_record_with_no_embargo_answer_is_refused(self):
-        """ADR-052 §3. Nobody has said it may be sent, so the policy treats it as
-        under embargo. It should fail loudly the day someone changes that."""
+    def test_a_record_nobody_has_released_is_refused(self):
+        """ADR-052 §3 as amended for IR-882. Every paper starts embargoed and only a
+        release lets it be sent. It should fail loudly the day someone changes that."""
         record = Record.objects.create(
             title="A thesis",
             abstract="An abstract.",

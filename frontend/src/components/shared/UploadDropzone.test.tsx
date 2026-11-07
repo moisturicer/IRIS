@@ -43,7 +43,7 @@ describe("UploadDropzone", () => {
       <UploadDropzone label="Upload manuscript" onFiles={vi.fn()} accept=".pdf" hint="PDF, up to 50 MB" />,
     );
 
-    const zone = screen.getByRole("button", { name: "Upload manuscript" });
+    const zone = screen.getByRole("button", { name: /^Upload manuscript/ });
     zone.focus();
     await userEvent.keyboard("{Enter}");
     await userEvent.keyboard(" ");
@@ -53,12 +53,19 @@ describe("UploadDropzone", () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("is named by the label first and then every word drawn on it, so a voice-control user can say what they see (WCAG 2.5.3, IR-908)", () => {
+    renderScreen(<UploadDropzone label="Upload manuscript" onFiles={vi.fn()} accept=".pdf" hint="PDF, up to 50 MB" />);
+
+    const zone = screen.getByRole("button", { name: /^Upload manuscript/ });
+    expect(zone).toHaveAccessibleName("Upload manuscript Drag and drop here, or browse PDF, up to 50 MB");
+  });
+
   it("hands a dropped file to its parent", () => {
     const onFiles = vi.fn();
     renderScreen(<UploadDropzone label="Upload manuscript" onFiles={onFiles} accept=".pdf" />);
     const file = pdf();
 
-    drop(screen.getByRole("button", { name: "Upload manuscript" }), [file]);
+    drop(screen.getByRole("button", { name: /^Upload manuscript/ }), [file]);
 
     expect(onFiles).toHaveBeenCalledWith([file]);
   });
@@ -69,7 +76,7 @@ describe("UploadDropzone", () => {
       <UploadDropzone label="Upload manuscript" onFiles={onFiles} accept=".pdf" validate maxBytes={50 * MB} />,
     );
 
-    drop(screen.getByRole("button", { name: "Upload manuscript" }), [pdf("big.pdf", 62 * MB)]);
+    drop(screen.getByRole("button", { name: /^Upload manuscript/ }), [pdf("big.pdf", 62 * MB)]);
 
     expect(onFiles).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent("big.pdf is 62 MB. The limit is 50 MB.");
@@ -82,7 +89,7 @@ describe("UploadDropzone", () => {
       <UploadDropzone label="Upload manuscript" onFiles={onFiles} accept=".pdf" validate maxBytes={50 * MB} />,
     );
 
-    drop(screen.getByRole("button", { name: "Upload manuscript" }), [docx()]);
+    drop(screen.getByRole("button", { name: /^Upload manuscript/ }), [docx()]);
 
     expect(onFiles).not.toHaveBeenCalled();
     expect(screen.getByRole("alert")).toHaveTextContent("thesis.docx is not an accepted file. Accepted: PDF.");
@@ -93,7 +100,7 @@ describe("UploadDropzone", () => {
     renderScreen(
       <UploadDropzone label="Upload manuscript" onFiles={onFiles} accept=".pdf" validate maxBytes={50 * MB} />,
     );
-    const zone = screen.getByRole("button", { name: "Upload manuscript" });
+    const zone = screen.getByRole("button", { name: /^Upload manuscript/ });
 
     drop(zone, [docx()]);
     drop(zone, [pdf()]);
@@ -105,7 +112,7 @@ describe("UploadDropzone", () => {
   it("checks the type alone when no size limit is given", () => {
     const onFiles = vi.fn();
     renderScreen(<UploadDropzone label="Upload manuscript" onFiles={onFiles} accept=".pdf" validate />);
-    const zone = screen.getByRole("button", { name: "Upload manuscript" });
+    const zone = screen.getByRole("button", { name: /^Upload manuscript/ });
 
     drop(zone, [pdf("huge.pdf", 900 * MB)]);
     drop(zone, [docx()]);
@@ -127,7 +134,7 @@ describe("UploadDropzone", () => {
     renderScreen(<UploadDropzone label="Upload manuscript" onFiles={onFiles} accept=".pdf" />);
     const file = docx();
 
-    drop(screen.getByRole("button", { name: "Upload manuscript" }), [file]);
+    drop(screen.getByRole("button", { name: /^Upload manuscript/ }), [file]);
 
     expect(onFiles).toHaveBeenCalledWith([file]);
   });
@@ -146,7 +153,7 @@ describe("UploadDropzone", () => {
     expect(bar).toHaveAttribute("aria-valuenow", "40");
     expect(screen.getByRole("status")).toHaveTextContent("Uploading thesis.pdf");
     // A second file cannot be started over the one in flight.
-    expect(screen.queryByRole("button", { name: "Upload manuscript" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Upload manuscript/ })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
 
@@ -170,20 +177,20 @@ describe("UploadDropzone", () => {
   it("keeps keyboard focus through an upload, and says when it is done", () => {
     const zoneProps = { label: "Upload manuscript", onFiles: vi.fn() };
     const { rerender } = renderScreen(<UploadDropzone {...zoneProps} />);
-    screen.getByRole("button", { name: "Upload manuscript" }).focus();
+    screen.getByRole("button", { name: /^Upload manuscript/ }).focus();
 
     rerender(<UploadDropzone {...zoneProps} upload={{ status: "uploading", fileName: "thesis.pdf", progress: 0 }} />);
     expect(screen.getByRole("group", { name: "Upload in progress" })).toHaveFocus();
 
     rerender(<UploadDropzone {...zoneProps} upload={null} />);
-    expect(screen.getByRole("button", { name: "Upload manuscript" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: /^Upload manuscript/ })).toHaveFocus();
     expect(screen.getByRole("status")).toHaveTextContent("thesis.pdf uploaded");
   });
 
   it("does nothing while disabled", () => {
     const onFiles = vi.fn();
     renderScreen(<UploadDropzone label="Upload manuscript" onFiles={onFiles} disabled />);
-    const zone = screen.getByRole("button", { name: "Upload manuscript" });
+    const zone = screen.getByRole("button", { name: /^Upload manuscript/ });
 
     drop(zone, [pdf()]);
 

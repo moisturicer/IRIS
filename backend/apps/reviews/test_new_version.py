@@ -23,6 +23,7 @@ from apps.notifications.models import Notification
 from apps.documents.testing import real_pdf_bytes
 from apps.records import lifecycle
 from apps.records.models import Record, RecordVersion
+from apps.records.testing import released_embargo
 from apps.reviews import routing, seats
 from apps.reviews.models import (
     RecordAssignment,
@@ -601,6 +602,7 @@ class RestartAllTests(NewVersionTestBase):
             record=record, party=Party.RDCO, state=AssignmentState.ACTIVE,
         )
         seats.open_review(rdco.seats.get(reviewer=self.rdco), self.rdco)
+        released_embargo(record.pk)  # an embargoed paper is never published (IR-882)
         token = self.detail(record, self.rdco)["decision"]["token"]
         response = self.post(
             decide_url(record), self.rdco, {"outcome": "publish", "comment": "", "token": token},
