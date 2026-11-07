@@ -210,8 +210,8 @@ def test_a_later_turn_that_carried_a_revoked_turn_as_history_is_withheld_too(api
     assert [r["state"] for r in runs] == ["completed"] * 3
     # Positive control: the flood answer really was carried into Turn 3's request.
     assert "rainfall gauges" in json.dumps(provider.requests[-2:], default=str).lower()
-    assert rows("SELECT data->'turns' FROM iris_ai.run_event WHERE run_id = %s AND name = 'carried'",
-                runs[2]["id"]) == [([1, 2],)]
+    assert rows("SELECT (data->'turns')::text FROM iris_ai.run_event WHERE run_id = %s AND name = 'carried'",
+                runs[2]["id"]) == [("[1, 2]",)]
     before = client.get(path, headers=headers).json()["turns"]
     assert [len(t["citations"]) for t in before] == [1, 1, 1]
 
