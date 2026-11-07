@@ -66,3 +66,38 @@ def test_a_paid_run_refuses_before_sending_without_a_runtime_and_enforced_admiss
     with pytest.raises(CommandError, match="enforce"):
         _call("--run", "--lock", str(lock), "--grader-model", GRADER,
               "--runtime-url", "http://runtime.invalid", "--runtime-model", "m")
+
+
+def test_a_lowered_family_minimum_validates_a_draft_but_never_freezes_it(tmp_path):
+    data = json.loads(SET.read_text(encoding="utf-8"))
+    data["cases"] = [c for c in data["cases"] if c["id"] != "F03-01"]
+    short = tmp_path / "short.json"
+    short.write_text(json.dumps(data), encoding="utf-8")
+    out = StringIO()
+    call_command("eval_answer_quality", "--set", str(short), "--validate",
+                 "--min-per-family", "7", stdout=out)
+    assert "valid" in out.getvalue()
+    with pytest.raises(CommandError, match="F03"):
+        call_command("eval_answer_quality", "--set", str(short), "--min-per-family", "7",
+                     "--write-lock", str(tmp_path / "l.json"), "--grader-model", GRADER)
+
+
+def test_a_rescore_refuses_unless_admission_enforces(tmp_path, settings):
+    lock = tmp_path / "lock.json"
+    _call("--write-lock", str(lock), "--grader-model", GRADER)
+    settings.AI_PROVIDER_ADMISSION = "off"
+    with pytest.raises(CommandError, match="enforce"):
+        _call("--rescore", str(tmp_path / "run.json"), "--lock", str(lock),
+              "--grader-model", GRADER)
+
+
+def test_a_runtime_that_charged_nothing_here_or_used_another_model_is_a_condition_problem():
+    from apps.ai.management.commands.eval_answer_quality import _served_model_problems
+
+    def rows(*attempts):
+        return {"F01-01": {"turns": [{"outcome": "answered",
+                                      "physical_attempts": list(attempts)}]}}
+    assert "campaign key" in _served_model_problems(rows(), "m")[0]
+    assert _served_model_problems(rows({"operation": "llm", "model": "M"}), "m") == []
+    assert "other" in _served_model_problems(
+        rows({"operation": "llm", "model": "other"}), "m")[0]

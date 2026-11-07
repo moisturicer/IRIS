@@ -100,9 +100,9 @@ def validate_set(data: Mapping, *, min_per_family: int = MIN_PER_FAMILY) -> list
             if title not in known:
                 errors.append(f"{cid}: {title!r} is not a corpus paper")
         if private and reader != (corpus.get("private") or {}).get("readable_by"):
-            labelled = [t for t in _titles(expect) if t != private
-                        or t not in (expect.get("forbidden") or [])]
-            if private in labelled or private == case.get("scope") or mentions(
+            labels = [*expect.get("records", []), *(p.get("record") for p in expect.get(
+                "pages", [])), *(expect.get("listing") or [])]
+            if private in labels or private == case.get("scope") or mentions(
                     expect.get("reference"), private):
                 errors.append(f"{cid}: labelled with the private paper its reader cannot read")
         if case.get("family") == "F11" and not case.get("scope"):
@@ -294,8 +294,8 @@ def score_case(case: Mapping, row: Mapping | None, access: Access,
     readable = access.visible.get(case["reader"], set())
     cited = {c.get("record_id") for c in citations}
     unreadable = [t for t, i in access.title_to_id.items() if i not in readable]
-    leaks = len({i for i in cited if i not in readable and i is not None}) + sum(
-        mentions(text, t) for t in unreadable)
+    leaks = len({i for i in cited if i not in readable and i is not None}
+                | {access.title_to_id[t] for t in unreadable if mentions(text, t)})
     expected_ids = [access.title_to_id.get(t) for t in expect.get("records", [])]
     cited_pages = {(c.get("record_id"), c.get("page")) for c in citations}
     pages = expect.get("pages", [])
@@ -340,7 +340,7 @@ def score_case(case: Mapping, row: Mapping | None, access: Access,
         "leaks": leaks,
         "grade_missing": not failed and grade is None,
         "latency_ms": (turn or {}).get("latency_ms"),
-        "cost_usd": float((row or {}).get("cost") or 0.0),
+        "cost_usd": None if (row or {}).get("cost") is None else float(row["cost"]),
         "compaction": [t.get("outcome") for t in (row or {}).get("turns") or ()
                        if t.get("action") == COMPACT],
     }
@@ -351,6 +351,7 @@ def score_case(case: Mapping, row: Mapping | None, access: Access,
 ARMS = ("django", "agent")
 #: IR-955's bar: how far one family may fall below Django, in correctness or support.
 FAMILY_DROP = 0.10
+_COMPARED = (("correctness", "correctness"), ("support", "citation support"))
 _EPSILON = 1e-9
 
 
@@ -406,7 +407,7 @@ def verdict(summaries: Mapping[str, Mapping], conditions: Sequence[str] = ()) ->
     if agent["overall"]["leaks"]:
         reasons.append(f"the agent leaked {agent['overall']['leaks']} times")
         deciding += [f for f, m in agent["families"].items() if m["leaks"]]
-    for key, name in (("correctness", "correctness"), ("support", "citation support")):
+    for key, name in _COMPARED:
         if agent["overall"][key] is None or _below(agent["overall"][key], django["overall"][key]):
             reasons.append(f"overall {name} {_pct(agent['overall'][key])} is below "
                            f"Django's {_pct(django['overall'][key])}")
@@ -415,7 +416,7 @@ def verdict(summaries: Mapping[str, Mapping], conditions: Sequence[str] = ()) ->
         a, d = agent["families"].get(family), django["families"].get(family)
         if not a or not d:
             continue
-        for key, name in (("correctness", "correctness"), ("support", "citation support")):
+        for key, name in _COMPARED:
             if _below(a[key], d[key], FAMILY_DROP):
                 drops.append(family)
                 reasons.append(f"{family} {FAMILIES[family]}: {name} {_pct(a[key])} vs "
@@ -456,10 +457,10 @@ def render_markdown(report: Mapping) -> str:
              "beats Django `lanes-v1` on overall correctness and citation support, leaks "
              "nothing, and drops no family by more than ten points.", ""]
     lines += [f"- {r}" for r in decided["reasons"]] or ["- every condition of the bar holds"]
+    closest = decided.get("closest_family")
+    nothing = "none" + (f" (closest: {closest} {FAMILIES[closest]})" if closest else "")
     lines += ["", "Families that decided it: " + (", ".join(
-        f"{f} {FAMILIES[f]}" for f in decided["deciding_families"]) or "none"
-        + (f" (closest: {decided['closest_family']} {FAMILIES[decided['closest_family']]})"
-           if decided.get("closest_family") else "")), ""]
+        f"{f} {FAMILIES[f]}" for f in decided["deciding_families"]) or nothing), ""]
     if report.get("conditions"):
         lines += ["Condition problems:", *[f"- {c}" for c in report["conditions"]], ""]
     if report.get("not_run"):
@@ -533,7 +534,7 @@ class Budget:
 
 
 def _failed_row(case: Mapping, outcome: str = "failure") -> dict:
-    return {"id": case["id"], "status": "incomplete", "cost": 0.0, "turns": [
+    return {"id": case["id"], "status": "incomplete", "cost": None, "turns": [
         {"number": 1, "outcome": outcome, "public_answer": None, "latency_ms": None}]}
 
 
@@ -567,8 +568,9 @@ def grade_all(cases: Sequence[Mapping], rows: Mapping, access: Access, grader: G
     problems = []
     stopped = False
     for case in cases:
-        pending = [arm for arm in rows if grades[arm].get(case["id"]) is None
-                   and grader_payload(case, rows[arm].get(case["id"]), access)]
+        payloads = {arm: grader_payload(case, rows[arm].get(case["id"]), access)
+                    for arm in rows if grades[arm].get(case["id"]) is None}
+        pending = [arm for arm, payload in payloads.items() if payload]
         if not pending:
             continue
         if stopped or not fits(case):
@@ -578,7 +580,7 @@ def grade_all(cases: Sequence[Mapping], rows: Mapping, access: Access, grader: G
             problems.append(f"{case['id']}: not graded, the campaign budget cannot cover it")
             continue
         for arm in pending:
-            payload = grader_payload(case, rows[arm].get(case["id"]), access)
+            payload = payloads[arm]
             for attempt in (1, 2):
                 try:
                     grades[arm][case["id"]] = grader.grade(payload)

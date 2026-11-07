@@ -41,6 +41,8 @@ The agent passes when all four of these hold:
 
 An agent drafted the labels; the owner may correct them. On 2026-11-07 every one of the 77 page labels was checked against the development database's chunk text: each quote is on its stated page. Two `proxy_starter` labels sit in a chunk that starts one page earlier, so a citation reports the earlier page. Those two carry `also: [1]` rather than an edited page.
 
+Pages are labelled only where a passage states the answer. Counting (F04), listing (F05) and naming (F06) questions have no single page. They are scored by the exact count, by the titles listed or cited, and by the expected Record cited.
+
 **What the set does not prove:**
 
 - **F09** asks the runtime to compact through its own route. Django has no compaction, so that turn is recorded as `not_supported` and Django answers from its usual history.
@@ -68,6 +70,7 @@ The run checks each of these and refuses to send anything until all hold:
 - **Admission.** `AI_PROVIDER_ADMISSION=enforce`, with a **fresh, dedicated** campaign key that the runtime deployment shares.
 - **Django settings.** `AI_DURABLE_ASK` is off and `AI_EVIDENCE_DECISION=off`.
 - **One model.** The runtime answers with the same model as Django's `answer` profile, passed as `--runtime-model`.
+- **One campaign.** The runtime charges the same campaign key, under the same per-run ceiling, because the budget gate reads Django's. After collection the run checks the runtime's charged attempts. If the runtime answered but charged nothing to this campaign, or answered with any model other than `--runtime-model`, that is a condition problem, and a condition problem fails the verdict.
 
 ## The run
 

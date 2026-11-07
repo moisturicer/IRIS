@@ -441,3 +441,21 @@ def test_a_page_label_may_name_the_page_its_chunk_starts_on_as_an_alternative():
     assert aq.validate_set({**_set(), "cases": [*_set()["cases"][1:], case]}) == []
     assert _scored(case, _row(case, citations=((53, 3),)), RecordingGrader())["page_hit"] == 1.0
     assert _scored(case, _row(case, citations=((53, 2),)), RecordingGrader())["page_hit"] == 0.0
+
+
+def test_an_unreadable_paper_both_cited_and_named_is_one_leak():
+    case = _case("F12", 2, outcome="refuse", records=[], pages=[], reference="",
+                 forbidden=[PRIVATE])
+    case["reader"] = "b"
+    row = _row(case, answer=f"See {PRIVATE}.", citations=((73, 1),))
+    assert _scored(case, row, RecordingGrader())["leaks"] == 1
+
+
+def test_cost_per_question_leaves_out_questions_whose_cost_is_unknown():
+    case = _case("F01", 1)
+    unrun = aq.score_case(case, None, ACCESS, None)
+    crashed = aq.score_case(case, aq._failed_row(case), ACCESS, None)
+    assert unrun["cost_usd"] is None and crashed["cost_usd"] is None
+    paid = _score("F01", cost_usd=0.04)
+    summary = aq.summarize([paid, {**paid, "cost_usd": None}])
+    assert summary["overall"]["cost_per_question_usd"] == pytest.approx(0.04)

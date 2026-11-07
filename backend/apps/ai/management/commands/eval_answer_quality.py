@@ -94,6 +94,20 @@ def measure_access(data, users) -> tuple[aq.Access, list[str]]:
     return access, problems
 
 
+def _served_model_problems(rows, runtime_model) -> list[str]:
+    """Whether the runtime's charged attempts prove it answered on this campaign and model."""
+    answered = [t for row in rows.values() for t in row.get("turns") or ()
+                if t.get("outcome") == "answered"]
+    attempts = [a for t in answered for a in t.get("physical_attempts") or ()]
+    if answered and not attempts:
+        return ["the runtime charged no attempt to this campaign; its cost and the budget "
+                "gate are unattributed (does the runtime share the campaign key?)"]
+    served = {normalize_model(a["model"]) for a in attempts
+              if a.get("operation") == "llm" and a.get("model")}
+    other = sorted(served - {normalize_model(runtime_model)})
+    return [f"the runtime also answered with {other}, not only {runtime_model!r}"] if other else []
+
+
 class _Reader:
     def __init__(self, token):
         self.client = APIClient()
@@ -134,7 +148,7 @@ class AdmittedGrader(aq.ModelGrader):
                 raise aq.GraderError(f"the grader was unavailable: {exc}") from None
 
 
-def _scope(data, case, access):
+def _scope(case, access):
     case = dict(case)
     if case.get("scope"):
         case["scope_record_id"] = access.title_to_id[case["scope"]]
@@ -174,6 +188,12 @@ class Command(BaseCommand):
             raise CommandError("invalid set:\n  " + "\n  ".join(errors))
         if options["validate"]:
             self._describe(data)
+        if (options["write_lock"] or options["run"] or options["rescore"]) and (
+                options["min_per_family"] < aq.MIN_PER_FAMILY):
+            # A lowered minimum may validate a draft; it never freezes or scores one.
+            short = aq.validate_set(data)
+            if short:
+                raise CommandError("only a full set is frozen or scored: " + "; ".join(short))
         if options["write_lock"]:
             self._write_lock(data, options)
         if options["run"] or options["rescore"]:
@@ -212,8 +232,18 @@ class Command(BaseCommand):
 
     # -- the paid run ---------------------------------------------------------
 
-    def _preconditions(self, options):
+    @staticmethod
+    def _admission():
         from apps.ai.admission.limits import ENFORCE, mode, read_limits
+
+        if mode() != ENFORCE:
+            raise CommandError("paid runs need AI_PROVIDER_ADMISSION=enforce")
+        try:
+            return read_limits()
+        except Exception as exc:
+            raise CommandError(f"admission limits unavailable: {exc}") from None
+
+    def _preconditions(self, options):
         from apps.ai.inference.profiles import profile_for
         from apps.ai.inference.tasks import InferenceTask
 
@@ -227,12 +257,7 @@ class Command(BaseCommand):
                                "for attributable costs")
         if getattr(settings, "AI_EVIDENCE_DECISION", "off") != "off":
             raise CommandError("the evidence shadow must be off during a counted run")
-        if mode() != ENFORCE:
-            raise CommandError("paid runs need AI_PROVIDER_ADMISSION=enforce")
-        try:
-            limits = read_limits()
-        except Exception as exc:
-            raise CommandError(f"admission limits unavailable: {exc}") from None
+        limits = self._admission()
         answer_model = profile_for(InferenceTask.ANSWER).model
         if normalize_model(answer_model) != normalize_model(options["runtime_model"]):
             raise CommandError(f"both engines must answer with one model: Django uses "
@@ -280,7 +305,7 @@ class Command(BaseCommand):
                 raise CommandError("the reused Django run answered with another model")
         django_attempts = DjangoAttempts(limits.campaign_key)
         runtime_attempts = RuntimeAttempts(limits.campaign_key)
-        if previous is None and django_attempts.snapshot() != 0:
+        if previous is None and CampaignAttempts(limits.campaign_key).snapshot() != 0:
             raise CommandError("the campaign already has attempts; use a fresh dedicated "
                                "campaign key so every charge is this run's")
         caps = {"case_attempts": 10 ** 6}
@@ -290,14 +315,14 @@ class Command(BaseCommand):
             timeout=options["run_deadline_seconds"])) for r in aq.READERS}
 
         def django(case):
-            return collect_case(readers[case["reader"]], _scope(data, case, access),
+            return collect_case(readers[case["reader"]], _scope(case, access),
                                 attempts=django_attempts, limits=caps)
 
         def agent(case):
             seam = seams[case["reader"]]
             if case.get("scope"):
                 seam = seam.scoped(access.title_to_id[case["scope"]])
-            return collect_case_runtime(seam, _scope(data, case, access),
+            return collect_case_runtime(seam, _scope(case, access),
                                         attempts=runtime_attempts, limits=caps,
                                         depth=options["depth"],
                                         deadline_seconds=options["run_deadline_seconds"])
@@ -313,6 +338,9 @@ class Command(BaseCommand):
             rows["django"] = previous["rows"]["django"]
             not_run = sorted(set(not_run) | set(previous.get("not_run") or []))
         after, _ = measure_access(data, users)
+        conditions = [] if after.as_dict() == access.as_dict() else [
+            "access state changed during the run"]
+        conditions += _served_model_problems(rows.get("agent", {}), options["runtime_model"])
         run_id = str(uuid.uuid4())
         record = {
             "schema": "answer-quality-run-1", "run_id": run_id, "ticket": "IR-956",
@@ -325,8 +353,7 @@ class Command(BaseCommand):
             "runtime": {"url_declared": True, "depth": options["depth"]},
             "data_policy": options["data_policy"], "campaign_key": limits.campaign_key,
             "access": access.as_dict(),
-            "conditions": ([] if after.as_dict() == access.as_dict()
-                           else ["access state changed during the run"]),
+            "conditions": conditions,
             "reused_django_from": (previous or {}).get("run_id"),
             "collection_seconds": round(time.monotonic() - started),
             "rows": rows, "not_run": not_run,
@@ -339,15 +366,13 @@ class Command(BaseCommand):
         self._score(data, record, path, options, budget.fits_grade)
 
     def _rescore(self, data, options):
-        from apps.ai.admission.limits import read_limits
-
+        limits = self._admission()
         path = Path(options["rescore"])
         record = load_json(path)
         if record.get("set_sha256") != aq.set_digest(data):
             raise CommandError("the run file was collected from a different set")
         if record.get("grader_model") != options["grader_model"]:
             raise CommandError("rescore with the run's own pinned grader")
-        limits = read_limits()
         budget = aq.Budget(run_ceiling_micros=limits.run.cost_micros,
                            remaining=self._remaining(limits))
         self._score(data, record, path, options, budget.fits_grade)

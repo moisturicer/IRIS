@@ -233,7 +233,6 @@ def collect_case_runtime(seam, case: Mapping, *, attempts=None, limits: Mapping 
     }
 
 
-
 def _compact(seam, conversation_id, revision, number, *, clock, sleep, attempts,
              deadline_seconds, poll_seconds):
     """One manual compaction run, followed to its end; the Conversation's new revision."""

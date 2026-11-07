@@ -102,7 +102,7 @@ Current code retains its existing behavior until implementation and controlled c
 
 ## Amendment — 2026-11-07 (IR-955, IR-956): automatic answer-quality evaluation
 
-**Status: Accepted 2026-11-07. Decider: Jive Tyler I. Revalde, owner of the AI runtime.** The owner's decisions are recorded in IR-955. This amendment writes them into §24–26 so the ADR and IR-956 agree. §27 (the switch) is IR-957's to amend. Where this conflicts with §24–26, this wins.
+**Status: Proposed 2026-11-07, pending the owner's confirmation.** It records decisions the owner, Jive Tyler I. Revalde, already made in IR-955; an AI assistant wrote it down, and an AI does not accept an ADR. This amendment writes them into §24–26 so the ADR and IR-956 agree. §27 (the switch) is IR-957's to amend. Where this conflicts with §24–26, this wins.
 
 1. **§24, how answers are collected and scored.**
    - One frozen set of twelve question families is collected through both engines: Django `lanes-v1` and the runtime agent. Each family has at least eight questions. The families and the labels are in [`docs/evaluation/answer-quality/`](../evaluation/answer-quality/README.md).
