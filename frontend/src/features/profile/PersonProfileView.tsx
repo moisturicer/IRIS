@@ -8,40 +8,59 @@ import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { INSTITUTION } from "@/config/institution";
 import { personPath } from "@/lib/access";
 import { cn } from "@/lib/utils";
-import type { Collaborator, ProfilePaper } from "@/types/people";
+import type { Collaborator, ProfilePaper, PublicProfile } from "@/types/people";
 
 import { PersonAvatar } from "./PersonAvatar";
 import { affiliationOf, displayName, initialsOf } from "./names";
 import type { ListKey, ListState, PersonProfileModel } from "./usePersonProfile";
 
 /**
- * Another person's Profile (IR-700): who they are, what they wrote and advised,
- * and who they worked with. Presentation only; the page that mounts it decides
- * what a reader may see, and the server never sends what they may not.
+ * What the header, About and Research interests need. Another person's
+ * `PublicProfile` fits, and so does the signed-in user once their optional
+ * fields are filled in (IR-948), which is what lets both Profiles be this one
+ * view. `role_label` is a string here because an account with no role yet has
+ * none to show.
+ */
+export type ProfileSubject = Omit<PublicProfile, "id" | "role_label"> & { role_label: string };
+
+/** The paged lists, with the one way to ask for more of any of them. */
+export type ProfileLists = Omit<PersonProfileModel, "profile"> & { onMore: (key: ListKey) => void };
+
+interface PersonProfileViewProps {
+  profile: ProfileSubject;
+  /**
+   * Left out, the page has no Research, Advised or Collaborators and does not
+   * say there are no papers: saying so would be wrong for someone whose papers
+   * simply have not been loaded. Your own Profile leaves it out until IR-949.
+   */
+  lists?: ProfileLists;
+}
+
+/**
+ * A Profile (IR-700): who they are, what they wrote and advised, and who they
+ * worked with. It is the one design for everyone, including yourself (IR-948):
+ * `/people/:id` and your own `/profile` both mount it. Presentation only; the
+ * page that mounts it decides what a reader may see, and the server never sends
+ * what they may not.
  *
- * It follows the typeset entry of your own Profile (IR-933): a Garamond name,
- * then sections each under one hairline, and a field left empty is left out.
- * What is new is a second column. Collaborators sit beside the sections once
- * the page's own width allows it, read from the container and never the window
- * (DESIGN.md, Container Rule), and fall under them otherwise.
+ * A Garamond name, then sections each under one hairline, and a field left
+ * empty is left out. Collaborators sit beside the sections once the page's own
+ * width allows it, read from the container and never the window (DESIGN.md,
+ * Container Rule), and fall under them otherwise.
  *
  * Nothing here is a total: no counts in a heading, no summed views, no
  * citations. A paper shows its own views, because that figure is the paper's.
  */
-interface PersonProfileViewProps {
-  model:  PersonProfileModel;
-  onMore: (key: ListKey) => void;
-}
-
-export function PersonProfileView({ model, onMore }: PersonProfileViewProps) {
-  const { profile, research, advised, collaborators } = model;
+export function PersonProfileView({ profile, lists }: PersonProfileViewProps) {
   const name = displayName(profile);
   const affiliation = affiliationOf(profile);
   const interests = profile.research_interests;
   // A list that failed is not an empty one: it keeps its place and says so.
-  const showsRail = collaborators.items.length > 0 || collaborators.error !== null;
-  const noPapers = research.items.length === 0 && advised.items.length === 0
-    && research.error === null && advised.error === null;
+  const showsRail = lists !== undefined
+    && (lists.collaborators.items.length > 0 || lists.collaborators.error !== null);
+  const noPapers = lists !== undefined
+    && lists.research.items.length === 0 && lists.advised.items.length === 0
+    && lists.research.error === null && lists.advised.error === null;
 
   return (
     <div className="[container-type:inline-size] [container-name:profile]">
@@ -50,7 +69,7 @@ export function PersonProfileView({ model, onMore }: PersonProfileViewProps) {
           <PersonAvatar photoUrl={profile.photo_url} initials={initialsOf(profile)} alt={name} size="lg" />
           <div className="min-w-0 flex-1 basis-48">
             <h1 className="font-display text-title font-semibold text-stone-900 sm:text-display">{name}</h1>
-            <p className="mt-1 text-body text-stone-700">{profile.role_label}</p>
+            {profile.role_label && <p className="mt-1 text-body text-stone-700">{profile.role_label}</p>}
             {affiliation && <p className="text-body text-stone-600">{affiliation}</p>}
             <p className="text-small text-stone-600">{INSTITUTION.name}</p>
           </div>
@@ -81,15 +100,21 @@ export function PersonProfileView({ model, onMore }: PersonProfileViewProps) {
               </Section>
             )}
 
-            <PaperSection title="Research" list={research} onMore={() => onMore("research")} />
-            <PaperSection title="Advised" list={advised} onMore={() => onMore("advised")} />
+            {lists && (
+              <>
+                <PaperSection title="Research" list={lists.research} onMore={() => lists.onMore("research")} />
+                <PaperSection title="Advised" list={lists.advised} onMore={() => lists.onMore("advised")} />
+              </>
+            )}
 
             {noPapers && (
               <p className="py-6 text-body text-stone-600 first:pt-0">No published papers yet.</p>
             )}
           </div>
 
-          {showsRail && <CollaboratorRail list={collaborators} onMore={() => onMore("collaborators")} />}
+          {lists && showsRail && (
+            <CollaboratorRail list={lists.collaborators} onMore={() => lists.onMore("collaborators")} />
+          )}
         </div>
       </div>
     </div>

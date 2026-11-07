@@ -205,6 +205,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-U1 | General usability | [details](traceability/NFR-U1.md) | **NOT STARTED** |
 | **NFR-U2** | Submission in under 10 min, 5 of 5 participants | [details](traceability/NFR-U2.md) | **NOT STARTED** |
 | **IR-700** | Another person's Profile at `/people/:id` over the draft IR-696 contract, with Adviser and owner names linking to it, and no middle-initial or ORCID iD field on Edit profile — IR-694; no FR- id; waits on IR-696 and IR-692 | [details](traceability/IR-700.md) | **PARTIAL** |
+| **IR-948** | Your own Profile mounts the same view as another person's; no papers or collaborators until IR-949 — IR-694; no FR- id | [details](traceability/IR-948.md) | **PARTIAL** |
 | **IR-326** | Streaming Ask IRIS endpoint — no FR- id; part C of IR-323's "event-shaped answer path", under ADR-028 (one deterministic retrieval call … | [details](traceability/IR-326.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |
