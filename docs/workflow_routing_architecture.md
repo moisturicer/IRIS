@@ -252,7 +252,23 @@ This table drives the IR-257 backfill and the IR-260 contract migration. Party n
 | `parallel_review` | `in_review` | every office with a `pending` clearance | `intake`; every office with a `cleared` clearance | — |
 | `rdco_review` | `in_review` | `rdco` | `intake` and every cleared office | — |
 | `declined` | `in_review` | the declining party (from the last decline `Review.stage`), plus every office with a `pending` clearance | `intake` (if the record passed it) and every cleared office | one `ResubmissionRequest(party = declining party, review = that Review)` |
-| `approved` · `completed` · `published` · `rejected` · `pending_delete` | unchanged | — | one per distinct `Review.stage`, dated from those reviews | — |
+| `approved` · `completed` · `published` · `rejected` | unchanged | — | one per distinct `Review.stage`, dated from those reviews | — |
+| `pending_delete` | unchanged | — (active assignments close as `withdrawn`) | previously completed history is retained | — (open requests close as `withdrawn`) |
+
+**Soft-delete closure (IR-339).** `completed` means a party finished its review;
+`withdrawn` means its unfinished work ended. A soft delete withdraws every active
+assignment, its unfinished reviewer seats, and every open resubmission and document
+request, in the same transaction. Previously completed assignments, done seats and
+clearances remain history. See `records.lifecycle.apply()` and
+`reviews.withdrawal.withdraw_review()`; ADR-021 and ADR-022 contain no contrary
+soft-delete closure decision. The state lists in §5 already distinguish assignment
+`active | completed | withdrawn` from resubmission `open | resubmitted | withdrawn`.
+
+The table describes the intended lifecycle mapping. The already-applied IR-257
+backfill (`reviews/0008_backfill_shadow_assignments.py`) historically reconstructed
+completed rows from existing reviews, including records already at `pending_delete`;
+that migration is preserved. It does not define how a later soft delete closes an
+active assignment, and no historical rows are rewritten by this documentation fix.
 
 **No `RoutingEvent` is backfilled.** The old model never recorded who sent a record where, and
 this migration does not invent it. The tracker says *"Routing history recorded from
