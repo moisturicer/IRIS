@@ -144,7 +144,10 @@ class MyResearchSerializer(serializers.ModelSerializer):
 class RecordDetailSerializer(serializers.ModelSerializer):
     """Full record detail including all related objects."""
     keywords = serializers.ListField(child=serializers.CharField(), read_only=True)
-    owners         = RecordOwnerSerializer(many=True, read_only=True)
+    # Each owner carries `has_profile` (IR-696): true only on a published paper,
+    # and only when that person's `GET /users/<id>/profile/` would answer 200, so
+    # a name links to a page that opens. See `adviser_has_profile`.
+    owners         = serializers.SerializerMethodField()
     authors        = AuthorSerializer(many=True, read_only=True)
     classification = serializers.StringRelatedField()
     psced          = serializers.StringRelatedField()
@@ -196,6 +199,10 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # Paper View's byline credits the adviser by name (IR-472). It rides on
     # the record's own visibility: whoever may read the record may read this.
     adviser_name   = serializers.SerializerMethodField()
+    # Whether the Adviser's public profile opens (IR-696): the byline links to it
+    # only when true, so a suspended or former Adviser never links to a 404, and
+    # a paper that is not published links no one.
+    adviser_has_profile = serializers.SerializerMethodField()
     reviews        = serializers.SerializerMethodField()
     clearances     = serializers.SerializerMethodField()
     resubmission   = serializers.SerializerMethodField()
@@ -548,6 +555,19 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             return obj.adviser.get_full_name() or obj.adviser.email
         return None
 
+    def _open_profile_ids(self, obj) -> set:
+        from apps.accounts.public_profile import open_profile_ids
+
+        return self._once(obj, "open_profile_ids", lambda: open_profile_ids(obj))
+
+    def get_adviser_has_profile(self, obj) -> bool:
+        return obj.adviser_id is not None and obj.adviser_id in self._open_profile_ids(obj)
+
+    def get_owners(self, obj):
+        open_ids = self._open_profile_ids(obj)
+        rows = RecordOwnerSerializer(obj.owners.all(), many=True, context=self.context).data
+        return [{**row, "has_profile": row["user"] in open_ids} for row in rows]
+
     def get_abstract_file(self, obj):
         """The paper, at a URL that is actually served (IR-334).
 
@@ -569,7 +589,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "year_accomplished", "year_completed", "origin", "publication_year",
             "classification", "psced", "record_type",
             "classification_name", "record_type_name", "file_count", "has_manuscript", "download", "ai_hook",
-            "adviser", "adviser_name", "added_by", "is_ip", "ip_type",
+            "adviser", "adviser_name", "adviser_has_profile", "added_by", "is_ip", "ip_type",
             "for_commercialization", "community_extension",
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "access_count", "pipeline_status", "stage_label", "is_deleted",

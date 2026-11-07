@@ -19,13 +19,15 @@ from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
 from apps.audit import retention
 from apps.audit.models import AuditEvent
-from . import profile
+from . import profile, public_profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
-    RoleRequestSerializer, SystemSettingSerializer,
+    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer,
 )
+from .models import DataNotice
+from .notice import answer_notice, answer_payload, notice_payload, requires_answer
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
 
 #: RDCO's account acts leave a System Admin's account alone (ADR-051 §5).
@@ -125,7 +127,54 @@ class LoginView(APIView):
             # The signed-in user's own payload, `review_access` included, so
             # the landing after sign-in needs no second request (IR-415).
             "user":    MeSerializer(user).data,
+            # ADR-054 (IR-789): true means every other request will be refused
+            # with `notice_acceptance_required` until the person answers, so the
+            # client shows the notice instead of loading the app.
+            "notice_answer_required": requires_answer(user),
         })
+
+
+class CurrentNoticeView(APIView):
+    """
+    GET /auth/notice/
+    The current data notice (ADR-054, IR-789). Public, because registration
+    shows it before there is an account. A signed-in caller also gets `answer`
+    (their last answer, or null) and `answer_required`, which is what the
+    frontend reads to decide whether to show the pop-up. Reachable while the
+    notice is unanswered: it is what the person must read.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        notice = DataNotice.current()
+        if notice is None:
+            return Response({"detail": "No data notice has been published."}, status=status.HTTP_404_NOT_FOUND)
+        data = notice_payload(notice)
+        user = request.user
+        if user and user.is_authenticated:
+            data["answer"] = answer_payload(user)
+            data["answer_required"] = requires_answer(user)
+        return Response(data)
+
+
+class AnswerNoticeView(APIView):
+    """
+    POST /auth/notice/answer/   {notice_version, agree_dpa, ai_consent}
+    Answer the current notice (ADR-054 decisions 1-4). Everyone answers, office
+    staff and the System Admin included. 409 `notice_stale` with the current
+    notice when `notice_version` is not it. Saying No to AI is a complete answer.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = NoticeAnswerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        answer_notice(request.user, notice_version=data["notice_version"], ai_consent=data["ai_consent"])
+        return Response(
+            {"answer": answer_payload(request.user), "answer_required": requires_answer(request.user)},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class LogoutView(APIView):
@@ -274,6 +323,71 @@ class UserPhotoView(APIView):
         current = request.query_params.get("v") == str(owner.photo_version)
         response["Cache-Control"] = "private, max-age=86400" if current else "private, no-cache"
         return response
+
+
+class PublicProfileView(APIView):
+    """
+    `GET /users/<id>/profile/`: a person's public profile, for any signed-in
+    user (IR-696).
+
+    The person alone, with no lists: those are paged routes of their own. A
+    suspended, inactive, unverified or unapproved account, a System Admin and
+    a missing id all answer the same 404 (`public_profile.person_or_404`).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        return Response(public_profile.profile_payload(public_profile.person_or_404(pk)))
+
+
+class PublicProfilePapersView(APIView):
+    """
+    A person's published papers, newest first, ten at a time (IR-696).
+
+    Discover's visibility, so nothing unpublished is listed; each paper carries
+    its view count and there are no totals. A subclass says which papers.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def papers(self, viewer, person):
+        raise NotImplementedError
+
+    def get(self, request, pk):
+        person = public_profile.person_or_404(pk)
+        rows = self.papers(request.user, person)
+        return Response(public_profile.paginate(
+            request, rows, public_profile.PAPERS_PAGE_SIZE, public_profile.paper_payload,
+        ))
+
+
+class PublicProfileResearchView(PublicProfilePapersView):
+    """`GET /users/<id>/profile/research/`: the published papers the person owns."""
+
+    def papers(self, viewer, person):
+        return public_profile.research_papers(viewer, person)
+
+
+class PublicProfileAdvisedView(PublicProfilePapersView):
+    """`GET /users/<id>/profile/advised/`: the published papers they were the Adviser on."""
+
+    def papers(self, viewer, person):
+        return public_profile.advised_papers(viewer, person)
+
+
+class PublicProfileCollaboratorsView(APIView):
+    """
+    `GET /users/<id>/profile/collaborators/`: other accounts that shared a
+    published paper with the person, most papers shared first (IR-696).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        person = public_profile.person_or_404(pk)
+        rows = public_profile.collaborators(request.user, person)
+        return Response(public_profile.paginate(
+            request, rows, public_profile.COLLABORATORS_PAGE_SIZE,
+            lambda row: public_profile.collaborator_payload(*row),
+        ))
 
 
 class InterestSuggestionsView(APIView):
