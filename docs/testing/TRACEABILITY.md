@@ -192,6 +192,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-882** | Every paper starts embargoed; Publish asks no embargo question; only the Adviser or RDCO date or release one, and RDCO publishes only a released paper — extends FR-M3-02 (stable label only); ADR-052 IR-879 amendment | [details](traceability/IR-882.md) | **IMPLEMENTED** |
 | **IR-871** | Each Version keeps its review text, read on campus with pdfplumber and no AI, whatever the embargo or consent; never chunked, embedded or retrieved, and served only under `may_read_review` — ADR-058 §1 as amended 2026-11-05; touches FR-M5-01 (stable label only); run on three Version pairs of real CIT-U papers | [details](traceability/IR-871.md) | **IMPLEMENTED** |
 | **IR-874** | Review threads, backend: anchored threads, *Must fix* and *Suggestion*, drafts sent by Finish review, *Comment only*, resolving and answering, and what an open *Must fix* blocks — ADR-032 §7 (2026-11-04, corrected 2026-11-06); no FR- id | [details](traceability/IR-874.md) | **IMPLEMENTED** |
+| **IR-875** | Review threads, frontend: comment on a selection or find match, the Threads tab, and the Finish review dialog, driven by server capabilities — ADR-032 §7 (2026-11-04, corrected and noted 2026-11-06); no FR- id | [details](traceability/IR-875.md) | **IMPLEMENTED** |
 
 ### Non-functional
 
