@@ -48,31 +48,14 @@ class UserSerializer(serializers.ModelSerializer):
             "is_office_coordinator",
         ]
 
-    def _profile_college(self, obj):
-        adviser = getattr(obj, "adviser_profile", None)
-        if adviser and adviser.college:
-            return adviser.college
-        student = getattr(obj, "student_profile", None)
-        if student and student.course and student.course.department:
-            return student.course.department.college
-        return None
-
     def get_college_name(self, obj):
-        college = self._profile_college(obj)
-        return college.name if college else ""
+        return profile.affiliation(obj).college
 
     def get_department_name(self, obj):
-        adviser = getattr(obj, "adviser_profile", None)
-        if adviser and adviser.department:
-            return adviser.department.name
-        student = getattr(obj, "student_profile", None)
-        if student and student.course and student.course.department:
-            return student.course.department.name
-        return ""
+        return profile.affiliation(obj).department
 
     def get_course_name(self, obj):
-        student = getattr(obj, "student_profile", None)
-        return student.course.name if student and student.course else ""
+        return profile.affiliation(obj).course
 
 
 class AdviserOptionSerializer(UserSerializer):

@@ -18,7 +18,7 @@ from core.permissions import (
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
 from apps.audit.models import AuditEvent
-from . import profile
+from . import profile, public_profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
@@ -273,6 +273,71 @@ class UserPhotoView(APIView):
         current = request.query_params.get("v") == str(owner.photo_version)
         response["Cache-Control"] = "private, max-age=86400" if current else "private, no-cache"
         return response
+
+
+class PublicProfileView(APIView):
+    """
+    `GET /users/<id>/profile/`: a person's public profile, for any signed-in
+    user (IR-696).
+
+    The person alone, with no lists: those are paged routes of their own. A
+    suspended, inactive, unverified or unapproved account, a System Admin and
+    a missing id all answer the same 404 (`public_profile.person_or_404`).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        return Response(public_profile.profile_payload(public_profile.person_or_404(pk)))
+
+
+class PublicProfilePapersView(APIView):
+    """
+    A person's published papers, newest first, ten at a time (IR-696).
+
+    Discover's visibility, so nothing unpublished is listed; each paper carries
+    its view count and there are no totals. A subclass says which papers.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def papers(self, viewer, person):
+        raise NotImplementedError
+
+    def get(self, request, pk):
+        person = public_profile.person_or_404(pk)
+        rows = self.papers(request.user, person)
+        return Response(public_profile.paginate(
+            request, rows, public_profile.PAPERS_PAGE_SIZE, public_profile.paper_payload,
+        ))
+
+
+class PublicProfileResearchView(PublicProfilePapersView):
+    """`GET /users/<id>/profile/research/`: the published papers the person owns."""
+
+    def papers(self, viewer, person):
+        return public_profile.research_papers(viewer, person)
+
+
+class PublicProfileAdvisedView(PublicProfilePapersView):
+    """`GET /users/<id>/profile/advised/`: the published papers they were the Adviser on."""
+
+    def papers(self, viewer, person):
+        return public_profile.advised_papers(viewer, person)
+
+
+class PublicProfileCollaboratorsView(APIView):
+    """
+    `GET /users/<id>/profile/collaborators/`: other accounts that shared a
+    published paper with the person, most papers shared first (IR-696).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        person = public_profile.person_or_404(pk)
+        rows = public_profile.collaborators(request.user, person)
+        return Response(public_profile.paginate(
+            request, rows, public_profile.COLLABORATORS_PAGE_SIZE,
+            lambda row: public_profile.collaborator_payload(*row),
+        ))
 
 
 class InterestSuggestionsView(APIView):

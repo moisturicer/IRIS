@@ -510,6 +510,14 @@ ACCOUNTS = {
     }),
     "user-photo": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
     "user-interest-suggestions": Entry({"GET": _case(SIGNED_IN, query={"q": "mach"})}),
+    # IR-696: a person's public profile and its three lists, for any signed-in
+    # user. The subject is the one who is read, not an actor: an account the
+    # server hides answers the same 404 as a missing id, which is not an access
+    # outcome here, so `photo_user` (an active Student) is the target.
+    "user-profile": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
+    "user-profile-research": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
+    "user-profile-advised": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
+    "user-profile-collaborators": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
     "user-detail": Entry({m: _case(ACCOUNT_ADMINS, kwargs={"pk": Ref("target_user")},
                                  **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                           for m in ("GET", "PUT", "PATCH")}),
