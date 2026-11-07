@@ -18,7 +18,7 @@ from typing import Callable, Mapping
 
 import httpx
 
-from .replay import NOT_TRACED, STOP_OUTCOMES
+from .replay import COMPACTED, NOT_TRACED, STOP_OUTCOMES, TURN_OK
 
 RUNTIME_PREFIX = "/api/v1/ai/runtime"
 ACTIVE = frozenset({"queued", "running"})
@@ -55,6 +55,18 @@ class RuntimeSeam:
     def reopen(self, conversation_id):
         return self.client.get(f"{self.prefix}/conversations/{conversation_id}",
                                headers=self.headers() or None)
+
+    def compact(self, conversation_id, base_revision, key):
+        """A manual compaction of the Conversation, as the reader's own button sends it (IR-754)."""
+        return self.client.post(f"{self.prefix}/conversations/{conversation_id}/compact",
+                                json={"base_revision": base_revision},
+                                headers={**self.headers(), "Idempotency-Key": key})
+
+    def scoped(self, record_id: int) -> "RuntimeSeam":
+        """The same seam asking through Paper Chat for one Record (`X-IRIS-Record`)."""
+        outer = self.headers
+        return RuntimeSeam(self.client, prefix=self.prefix,
+                           headers=lambda: {**outer(), "X-IRIS-Record": str(record_id)})
 
 
 def _body(response) -> dict:
@@ -119,6 +131,17 @@ def collect_case_runtime(seam, case: Mapping, *, attempts=None, limits: Mapping 
     start = clock()
     transcript: list = []
     for number, source in enumerate(case["turns"], 1):
+        if source.get("action") == "compact":
+            turn, revision = _compact(seam, conversation_id, revision, number, clock=clock,
+                                      sleep=sleep, attempts=attempts,
+                                      deadline_seconds=deadline_seconds,
+                                      poll_seconds=poll_seconds)
+            total_attempts += len(turn["physical_attempts"])
+            total_cost += sum(row["cost_usd"] for row in turn["physical_attempts"])
+            recorded.append(turn)
+            if turn["outcome"] != COMPACTED:
+                break
+            continue
         if _capped(limits, total_attempts, total_cost):
             recorded.append({"number": number, "question": source["user"],
                              "outcome": "cap_stop", "public_answer": None,
@@ -199,9 +222,9 @@ def collect_case_runtime(seam, case: Mapping, *, attempts=None, limits: Mapping 
     else:
         final_turns = []
     complete = len(recorded) == len(case["turns"]) and all(
-        t["outcome"] == "answered" for t in recorded)
+        t["outcome"] in TURN_OK for t in recorded)
     return {
-        "id": case["id"], "family": case["family"], "split": case["split"],
+        "id": case["id"], "family": case["family"], "split": case.get("split"),
         "conversation_id": conversation_id, "status": "complete" if complete else "incomplete",
         "turns": recorded, "reopened_transcript": final_turns,
         "latency_ms": round((clock() - start) * 1000), "cost": total_cost,
@@ -209,3 +232,36 @@ def collect_case_runtime(seam, case: Mapping, *, attempts=None, limits: Mapping 
         "cost_final": all(t.get("cost_final", True) for t in recorded),
     }
 
+
+
+def _compact(seam, conversation_id, revision, number, *, clock, sleep, attempts,
+             deadline_seconds, poll_seconds):
+    """One manual compaction run, followed to its end; the Conversation's new revision."""
+    started = clock()
+    run_id, outcome, physical = None, "failure", []
+    if conversation_id is not None:
+        try:
+            submitted = seam.compact(conversation_id, revision, f"eval-{uuid.uuid4().hex}")
+            if submitted.status_code in (200, 201):
+                run = _body(submitted)
+                run_id = run["id"]
+                _, ended = _follow(seam, run, clock=clock, sleep=sleep,
+                                   deadline_seconds=deadline_seconds, poll_seconds=poll_seconds)
+                outcome = COMPACTED if ended == "completed" else ended
+        except (TimeoutError, httpx.TimeoutException):
+            outcome = "timeout"
+        except (OSError, ConnectionError, httpx.TransportError):
+            outcome = "failure"
+        physical = attempts.for_run(run_id) if attempts and run_id else []
+        if outcome == COMPACTED:
+            reopened = seam.reopen(conversation_id)
+            if reopened.status_code != 200:
+                raise ValueError(f"conversation reopen failed with HTTP {reopened.status_code}")
+            revision = _body(reopened).get("revision", revision)
+    return {"number": number, "action": "compact", "outcome": outcome, "public_answer": None,
+            "citation_record_ids": [], "source_ids": [], "saved_turn": None,
+            "reopened_transcript": None, "latency_ms": round((clock() - started) * 1000),
+            "physical_attempts": physical, "cost_final": True,
+            "usage_status": "reported" if physical and all(
+                p["usage_reported"] for p in physical) else "missing",
+            **({"runtime_run_id": run_id} if run_id else {})}, revision

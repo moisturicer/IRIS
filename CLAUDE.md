@@ -389,6 +389,19 @@ python manage.py eval_readiness --build --report <campaign.json> --candidate run
                                    # Authorizes nothing. Verified locally on synthetic fixtures only (no
                                    # real campaign, load run or human review exists). docs/evaluation/
                                    # general-tools/readiness.md
+python manage.py eval_answer_quality --set ../docs/evaluation/answer-quality/answer-quality-v1.json --validate
+                                   # IR-956: the switch measurement for IR-955. 108 questions in
+                                   # twelve families (F01-F12), each through Django lanes-v1 and the
+                                   # runtime agent on ONE paid run, scored automatically (exact
+                                   # checks + a pinned model grader, rubric aq-rubric-1) and
+                                   # reported pass/fail against IR-955's bar. --write-lock L
+                                   # --grader-model M freezes it (never rewritten); --run needs the
+                                   # lock, enforced admission on a fresh campaign, both readers'
+                                   # JWTs (IRIS_EVAL_TOKEN, IRIS_EVAL_TOKEN_B), --runtime-url and
+                                   # --runtime-model; --rescore and --reuse-django finish or redo a
+                                   # run. --validate verified 2026-11-07. NO PAID RUN YET, no lock
+                                   # written (the grader model is the owner's choice). Guide:
+                                   # docs/evaluation/answer-quality/README.md
 python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewer-name NAME --out <packets.json>
                                    # one reviewer's packet (IR-607). Holds NO text (IR-721): which
                                    # turns Record.visible_to(reviewer) allows, record ids, source
