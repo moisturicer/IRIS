@@ -24,6 +24,7 @@ const KIND_ICON: Record<TimelineKind, string> = {
   version: "fa-code-commit",
   reassignment: "fa-people-arrows",
   extension: "fa-calendar-plus",
+  published: "fa-globe",
   comment: "fa-comment",
 };
 

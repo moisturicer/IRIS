@@ -246,6 +246,9 @@ export const recordsApi = {
     apiClient.post<RecordEmbargo>(`/records/${id}/embargo-set/`, { embargoed_until: until }),
   releaseEmbargo: (id: number) => apiClient.post<RecordEmbargo>(`/records/${id}/embargo-release/`),
   releaseIp:      (id: number) => apiClient.post<IpReleaseResult>(`/records/${id}/ip-release/`),
+  /** RDCO publishes an Unlisted paper once its embargo is released (IR-878). */
+  publishUnlisted:(id: number, note: string) =>
+    apiClient.post(`/records/${id}/publish-unlisted/`, { note }),
   incrementAccess:(id: number) => apiClient.post(`/records/${id}/increment_access/`),
   updateTags:     (id: number, tags: { is_ip?: boolean; for_commercialization?: boolean; community_extension?: boolean; ip_type?: string }) =>
     apiClient.patch(`/records/${id}/tags/`, tags),

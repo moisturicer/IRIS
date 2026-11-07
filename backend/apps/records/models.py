@@ -617,6 +617,28 @@ class EmbargoReminder(models.Model):
         )]
 
 
+class UnlistedPublication(models.Model):
+    """
+    RDCO published an Unlisted paper after its Decision (ADR-047 §10, IR-878).
+
+    The Decision's `Review` says only "approved", so the history tells
+    *published* from *kept unlisted* by the paper's status. Once an Unlisted
+    paper is published later, this row is what keeps its Decision reading
+    *kept unlisted*, and it holds the optional note, which the audit log never
+    carries. A paper is published from Unlisted at most once: nothing moves a
+    published paper back to Unlisted.
+    """
+
+    record = models.OneToOneField(
+        "Record", on_delete=models.CASCADE, related_name="unlisted_publication",
+    )
+    published_by = models.ForeignKey(
+        "accounts.User", on_delete=models.SET_NULL, null=True, related_name="+",
+    )
+    published_at = models.DateTimeField(default=timezone.now)
+    note = models.TextField(blank=True, default="")
+
+
 class RecordOwner(models.Model):
     """
     Many-to-many between Record and User for ownership.

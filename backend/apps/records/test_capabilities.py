@@ -38,6 +38,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.records.models import Record
+from apps.records.testing import released_embargo
 from apps.reviews.models import RecordAssignment, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import AssignmentState, Party, RecordTypeName, ResubmissionRequestState, SeatState
@@ -113,6 +114,20 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             is_embargoed=True, embargo_released_at=None, embargo_released_by=None,
             embargo_date_set_at=timezone.now(), embargoed_until="2099-01-01",
         )
+        return record
+
+    def unlisted_embargoed(self):
+        """RDCO kept it unlisted while it was embargoed (ADR-047 §10, IR-878)."""
+        record = self.at_adviser()
+        self.accepted_to(record, Party.RDCO)
+        self.opened_seat(record, Party.RDCO, self.rdco)
+        self.decided(record, self.rdco, "keep_unlisted")
+        return record
+
+    def unlisted_released(self):
+        """Kept unlisted, then released by its Adviser: RDCO may publish it now."""
+        record = self.unlisted_embargoed()
+        released_embargo(record.pk)
         return record
 
     def proposal_with_adviser(self):
@@ -250,6 +265,8 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
                 u, "post", url("record-embargo-set", r), {"embargoed_until": "2099-06-01"},
             ),
             "release_embargo": lambda r, u, d: self._call(u, "post", url("record-embargo-release", r)),
+            # RDCO publishes an Unlisted paper later (ADR-047 §10, IR-878).
+            "publish_unlisted": lambda r, u, d: self._call(u, "post", url("record-publish-unlisted", r)),
             "release_ip": lambda r, u, d: self._call(u, "post", url("record-ip-release", r)),
             # RDCO's three acts on a paper in review (IR-797).
             "replace_adviser": lambda r, u, d: self._call(
@@ -359,6 +376,20 @@ class CapabilitiesMatchTheEndpoints(DecisionTestBase):
             "adviser": ADVISER_TAKES_PART,
             "itso": OFFICE, "ierc": OFFICE,
             "rdco": OFFICE | {"comment_review"} | EMBARGO_ACTS, "stranger": {"cite"},
+        },
+        # Unlisted (IR-878): any RDCO member is offered the later publish, held
+        # back while the embargo is Active so its reason can be shown.
+        "unlisted_embargoed": {
+            "owner": {"cite", "request_deletion", "comment_review"},
+            "adviser": ADVISER_TAKES_PART,
+            "itso": OFFICE, "ierc": OFFICE,
+            "rdco": OFFICE | {"comment_review", "publish_unlisted"} | EMBARGO_ACTS, "stranger": None,
+        },
+        "unlisted_released": {
+            "owner": {"cite", "request_deletion", "comment_review"},
+            "adviser": TAKES_PART | {"set_embargo"},
+            "itso": OFFICE, "ierc": OFFICE,
+            "rdco": OFFICE | {"comment_review", "set_embargo", "publish_unlisted"}, "stranger": None,
         },
         # A Proposal's Adviser accepts it or rejects it; it is never routed.
         "proposal_with_adviser": {
