@@ -24,7 +24,7 @@ from apps.audit.services import create_audit_event
 from apps.documents.testing import real_pdf_bytes
 from apps.documents.models import DocumentRequest, DocumentRequestItem, UploadSlot
 from apps.records.models import Record
-from apps.records.testing import answered_no_embargo
+from apps.records.testing import released_embargo
 from apps.reviews.models import RecordAssignment, ResubmissionRequest, ReviewerSeat
 from apps.reviews.test_decisions import DecisionTestBase
 from apps.reviews.test_new_version import RESTART_ALL, NewVersionTestBase, _pdf
@@ -154,7 +154,7 @@ class AuditTestBase(NewVersionTestBase, DecisionTestBase):
         return self.ok(response, status.HTTP_200_OK)
 
     def submit_via_api(self, record):
-        answered_no_embargo(record.pk)
+        released_embargo(record.pk)
         response = self.post(reverse("record-submit", args=[record.pk]), self.owner,
                              {"dpa_accepted": True})
         return self.ok(response, status.HTTP_200_OK)

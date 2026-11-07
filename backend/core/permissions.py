@@ -242,8 +242,13 @@ def may_read_embargo(user, record) -> bool:
 
 
 def may_set_embargo(user, record) -> bool:
-    """Owners or the Adviser (ADR-052 §5). No office, RDCO included."""
-    return record.adviser_id == user.pk or is_record_owner(user, record)
+    """
+    The Adviser or RDCO set, move or renew an embargo's date (ADR-052 §5, as
+    amended for IR-882). Owners no longer can, before or after submission: every
+    paper starts embargoed, and a date is the Adviser's or RDCO's judgement of IP
+    or patent potential, made during review.
+    """
+    return record.adviser_id == user.pk or get_role_name(user) == ROLE_RDCO
 
 
 def may_release_embargo(user, record) -> bool:
@@ -442,6 +447,11 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         offered.append("withdraw_revision")
     elif revision["party"] is not None:
         offered.append("request_revision")
+    # `finish-review/`: anyone holding an open seat here, the party
+    # `revision.party` names (ADR-032 §7, IR-874). Each verdict it carries is
+    # still offered, and refused, by its own key above.
+    if revision["party"] is not None:
+        offered.append("finish_review")
 
     if is_record_owner(user, record):
         from apps.records.continuation import continuable
@@ -458,8 +468,8 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         if delete_act is not None:
             offered.append(delete_act)
 
-    # `embargo-set/` and `embargo-release/` (ADR-052 §5, §6). A draft's answer
-    # is `embargo-answer/`'s instead, under `continue_draft`.
+    # `embargo-set/` and `embargo-release/` (ADR-052 §5, §6), once submitted. A
+    # draft has nothing to change: every paper starts embargoed (IR-882).
     if record.pipeline_status != PipelineStatus.DRAFT:
         if may_set_embargo(user, record):
             offered.append("set_embargo")

@@ -115,7 +115,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
           )}
         >
           <div className="flex items-center justify-between gap-2 px-4 py-2.5 border-b border-stone-100">
-            <p className="text-[13px] font-bold uppercase tracking-wider text-stone-400">
+            <p className="text-[13px] font-bold uppercase tracking-wider text-stone-600">
               Notifications
             </p>
             {items.length > 0 && (
@@ -131,7 +131,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
 
           <div className="max-h-80 overflow-y-auto">
             {items.length === 0 ? (
-              <p className="px-4 py-6 text-center text-[13px] text-stone-400">
+              <p className="px-4 py-6 text-center text-[13px] text-stone-600">
                 Nothing new. You&apos;re all caught up.
               </p>
             ) : (
@@ -140,7 +140,7 @@ export function NotificationBell({ align = "end" }: NotificationBellProps) {
                   const body = (
                     <>
                       <p className="text-[13px] text-stone-700 leading-snug">{n.message}</p>
-                      <p className="text-[12px] text-stone-400 mt-0.5">
+                      <p className="text-[12px] text-stone-600 mt-0.5">
                         {n.record_title ? `${n.record_title} · ` : ""}
                         {formatDate(n.created_at)}
                       </p>

@@ -83,7 +83,7 @@ export function ManuscriptCover({ recordId, available }: ManuscriptCoverProps) {
         />
       )}
       {status === "loading" && (
-        <div className="absolute inset-0 flex items-center justify-center gap-2 text-small text-stone-500">
+        <div className="absolute inset-0 flex items-center justify-center gap-2 text-small text-stone-600">
           <i className="far fa-file-pdf text-lg" aria-hidden />
           Preparing first page…
         </div>

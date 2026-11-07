@@ -189,7 +189,6 @@ export function UploadDropzone({
         <div
           ref={zoneRef}
           role="button"
-          aria-label={label}
           aria-disabled={disabled || undefined}
           tabIndex={disabled ? -1 : 0}
           onClick={(e) => {
@@ -213,6 +212,8 @@ export function UploadDropzone({
           )}
         >
           <i className="fas fa-cloud-arrow-up text-3xl text-stone-500" aria-hidden="true" />
+          {/* The name is the content, so it contains every word drawn on the zone (WCAG 2.5.3 Label in Name, IR-908); the label leads it. */}
+          {label && <span className="sr-only">{label}</span>}
           <p className="text-body text-stone-700 font-medium">
             Drag and drop here, or <span className="text-brand underline underline-offset-2">browse</span>
           </p>

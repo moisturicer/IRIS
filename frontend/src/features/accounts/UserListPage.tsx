@@ -17,6 +17,7 @@ import { RoleBadge }    from "@/components/shared/RoleBadge";
 import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { Input }        from "@/components/ui/Input";
 import { Button }       from "@/components/ui/Button";
+import { Select }       from "@/components/ui/Select";
 import { Badge }        from "@/components/ui/Badge";
 import { Modal }        from "@/components/ui/Modal";
 import { STAFF_ROLES } from "@/lib/constants";
@@ -300,20 +301,11 @@ export default function UserListPage() {
               removes their coordinator status, even if you keep {roleTarget.role_name}.
             </p>
           )}
-          <div>
-            <label htmlFor={roleSelectId} className="text-[14px] font-medium text-stone-700 block mb-1">New role</label>
-            <select
-              id={roleSelectId}
-              value={newRole}
-              onChange={(e) => setNewRole(e.target.value)}
-              className="w-full border border-stone-300 rounded-lg px-3 py-2 text-[14px] outline-none
-                focus:border-brand focus:ring-1 focus:ring-brand"
-            >
-              {rolesToOffer(viewer, roleTarget?.role_name ?? "").map((r) => (
-                <option key={r} value={r}>{r}</option>
-              ))}
-            </select>
-          </div>
+          <Select id={roleSelectId} label="New role" value={newRole} onChange={(e) => setNewRole(e.target.value)}>
+            {rolesToOffer(viewer, roleTarget?.role_name ?? "").map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </Select>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setRoleTarget(null)}>Cancel</Button>
             <Button onClick={handleRoleChange}>Save</Button>

@@ -399,7 +399,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
                 user=self._viewer(), readable=readable, in_review=in_review,
                 decision=self.get_decision(obj), revision=self.get_revision(obj),
                 office_review=self.get_office_review(obj), my_seats=self.get_my_seats(obj),
-                review_claim=self.get_review_claim(obj),
+                review_claim=self.get_review_claim(obj), routing=self.get_routing(obj),
                 facts=readiness.readiness_facts(obj, self._viewer())
                 if readable and in_review else {"assignments": [], "document_requests": []},
             )

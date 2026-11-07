@@ -12,6 +12,7 @@ from apps.notifications.models import Notification
 from apps.records.models import Record, RecordOwner, RecordType
 from apps.reviews import routing, seats
 from apps.reviews.models import RecordAssignment, ResubmissionRequest, RoutingEvent
+from apps.records.testing import released_embargo
 from core.enums import PipelineStatus, RecordTypeName, RoleName
 
 from .workflow_test_helpers import make_user
@@ -34,6 +35,9 @@ class ExecutiveReviewTests(APITestCase):
             adviser=self.adviser, added_by=self.owner, pipeline_status=PipelineStatus.DRAFT,
         )
         RecordOwner.objects.create(record=self.record, user=self.owner, is_primary=True)
+        # Released, as its Adviser would, so RDCO may publish (ADR-052 §14, IR-882):
+        # these tests are about the executive Decision, not the embargo.
+        released_embargo(self.record.pk)
         routing.enter_at_adviser(self.record, self.owner)
         seat = self.record.assignments.get(party="adviser").seats.get()
         seats.open_review(seat, self.adviser)

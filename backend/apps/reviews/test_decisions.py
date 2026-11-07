@@ -14,11 +14,11 @@ from django.utils import timezone
 from rest_framework import status
 
 
-from apps.ai.policy.disclosure import Reason
 from apps.ai.policy.records import decision_for_record
 from apps.documents.models import DocumentRequest
 from apps.notifications.models import Notification
 from apps.records.models import Record
+from apps.records.testing import released_embargo
 from apps.reviews import seats
 from apps.reviews.models import RecordAssignment, RecordClearance, Review, ReviewerSeat
 from core.enums import (
@@ -56,7 +56,12 @@ class DecisionTestBase(RevisionTestBase):
     def token(self, record, as_user):
         return self.detail(record, as_user)["decision"]["token"]
 
-    def decide(self, record, as_user, outcome, comment="", token=None):
+    def decide(self, record, as_user, outcome, comment="", token=None, *, release=True):
+        if outcome == "publish" and release and token is None:
+            # Every paper starts embargoed and an embargoed paper is never
+            # published (IR-882), so release it as its Adviser would have during
+            # review. `release=False` keeps it held, for the embargo's own tests.
+            released_embargo(record.pk)
         if token is None:
             self.client.force_authenticate(as_user)
             response = self.client.get(reverse("record-detail", args=[record.pk]))
@@ -534,6 +539,7 @@ class StaleTests(DecisionTestBase):
 
     def test_a_record_that_moved_is_a_409_describing_what_it_would_now_close(self):
         record = self.at_rdco()
+        released_embargo(record.pk)
         token = self.token(record, self.rdco)
         # While RDCO's dialog is open, RDCO's colleague sends it to IERC.
         seats.add_reviewer(
@@ -583,11 +589,15 @@ class DetailFlagTests(DecisionTestBase):
         self.assertEqual(flag["party"], Party.ADVISER)
         self.assertIsNone(flag["blocked"])
         self.assertTrue(flag["token"])
-        self.assertEqual(flag["closes"], {"assignments": [], "document_requests": 0, "revision_requests": [], "findings": []})
+        self.assertEqual(flag["closes"], {
+            "assignments": [], "document_requests": 0, "revision_requests": [], "findings": [],
+            "threads": [],
+        })
         self.assertEqual(flag["author_hints"], ["The author flagged possible intellectual property."])
 
     def test_rdco_is_offered_all_three_and_told_what_closes(self):
         record = self.at_rdco()
+        released_embargo(record.pk)  # an embargoed paper offers no publish (IR-882)
         seats.add_reviewer(
             RecordAssignment.objects.get(record=record, party=Party.RDCO, state=AssignmentState.ACTIVE),
             self.rdco, self.rdco2,
@@ -627,73 +637,108 @@ class DetailFlagTests(DecisionTestBase):
                 self.assertIsNone(flag["closes"])
 
 
-# --- ADR-052 decision 14: RDCO is warned about an embargo and can still decide (IR-818) --
+# --- ADR-052 decision 14 as amended: an embargo stops publishing (IR-818, IR-882) --------
 
 class EmbargoAtDecisionTests(DecisionTestBase):
+    """
+    Every paper starts embargoed, and RDCO publishes only a released one. While it
+    is held, RDCO keeps it unlisted or rejects it, and is told to release it first.
+    """
 
     UNTIL = "2099-01-01"
 
-    def embargoed(self, record):
+    def dated(self, record):
         Record.objects.filter(pk=record.pk).update(
-            embargo_answered_at=timezone.now(), embargoed_until=self.UNTIL,
+            embargo_date_set_at=timezone.now(), embargoed_until=self.UNTIL,
             dpa_accepted_at=timezone.now(),
         )
         record.refresh_from_db()
         return record
 
     def test_rdco_s_flags_carry_the_embargo(self):
-        record = self.embargoed(self.at_rdco())
+        record = self.dated(self.at_rdco())
 
         flag = self.detail(record, self.rdco)["decision"]
 
         self.assertEqual(flag["embargo"], {"state": "active", "until": self.UNTIL})
 
     def test_the_adviser_s_flags_carry_none(self):
-        record = self.embargoed(self.at_adviser())
+        record = self.dated(self.at_adviser())
 
         self.assertIsNone(self.detail(record, self.adviser)["decision"]["embargo"])
 
     def test_a_viewer_who_decides_nothing_is_told_nothing(self):
-        record = self.embargoed(self.at_rdco())
+        record = self.dated(self.at_rdco())
 
         self.assertIsNone(self.detail(record, self.itso)["decision"]["embargo"])
 
+    def test_an_embargoed_paper_offers_no_publish(self):
+        for name, prepare in {"undated": lambda r: r, "dated": self.dated}.items():
+            with self.subTest(name):
+                record = prepare(self.at_rdco())
+
+                flag = self.detail(record, self.rdco)["decision"]
+
+                self.assertEqual(flag["outcomes"], ["keep_unlisted", "reject"])
+
+    def test_publishing_an_embargoed_paper_is_refused_and_says_why(self):
+        cases = {"undated": (lambda r: r, "Under embargo. Release"),
+                 "dated": (self.dated, "Under embargo until 01 Jan 2099. Release")}
+        for name, (prepare, words) in cases.items():
+            with self.subTest(name):
+                record = prepare(self.at_rdco())
+
+                response = self.decide(record, self.rdco, "publish", release=False)
+
+                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+                self.assertIn(words, response.data["detail"])
+                record.refresh_from_db()
+                self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
+                self.assertFalse(Review.objects.filter(record=record, reviewed_by=self.rdco).exists())
+
+    def test_rdco_can_keep_it_unlisted_or_reject_it_while_embargoed(self):
+        expected = {
+            "keep_unlisted": PipelineStatus.COMPLETED,
+            "reject": PipelineStatus.REJECTED,
+        }
+        for outcome, pipeline in expected.items():
+            with self.subTest(outcome=outcome):
+                record = self.dated(self.at_rdco())
+
+                self.decided(record, self.rdco, outcome, REASON)
+
+                self.assertEqual(record.pipeline_status, pipeline)
+                self.assertTrue(record.is_embargoed)
+
+    def test_once_released_rdco_publishes_it(self):
+        for releaser in ("adviser", "rdco"):
+            with self.subTest(releaser=releaser):
+                record = self.dated(self.at_rdco())
+                released = self.post(
+                    reverse("record-embargo-release", args=[record.pk]), getattr(self, releaser), {},
+                )
+                self.assertEqual(released.status_code, status.HTTP_200_OK, released.data)
+
+                self.assertIn("publish", self.detail(record, self.rdco)["decision"]["outcomes"])
+                self.decided(record, self.rdco, "publish")
+
+                self.assertEqual(record.pipeline_status, PipelineStatus.PUBLISHED)
+                self.assertEqual(decision_for_record(record).reasons, ())
+
     def test_an_embargo_set_while_the_dialog_is_open_makes_it_stale(self):
         record = self.at_rdco()
-        Record.objects.filter(pk=record.pk).update(embargo_answered_at=timezone.now())
+        released_embargo(record.pk)
         token = self.token(record, self.rdco)
-        self.assertIsNone(self.detail(record, self.rdco)["decision"]["embargo"]["until"])
+        self.assertEqual(self.detail(record, self.rdco)["decision"]["embargo"]["state"], "released")
 
         set_ = self.post(
             reverse("record-embargo-set", args=[record.pk]), self.adviser,
             {"embargoed_until": self.UNTIL},
         )
         self.assertEqual(set_.status_code, status.HTTP_200_OK, set_.data)
-        response = self.decide(record, self.rdco, "publish", token=token)
+        response = self.decide(record, self.rdco, "keep_unlisted", token=token)
 
         self.assertEqual(response.status_code, status.HTTP_409_CONFLICT)
         self.assertEqual(response.data["decision"]["embargo"], {"state": "active", "until": self.UNTIL})
         record.refresh_from_db()
         self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
-
-    def test_rdco_can_still_publish_keep_unlisted_or_reject(self):
-        expected = {
-            "publish": PipelineStatus.PUBLISHED,
-            "keep_unlisted": PipelineStatus.COMPLETED,
-            "reject": PipelineStatus.REJECTED,
-        }
-        for outcome, pipeline in expected.items():
-            with self.subTest(outcome=outcome):
-                record = self.embargoed(self.at_rdco())
-
-                self.decided(record, self.rdco, outcome, REASON)
-
-                self.assertEqual(record.pipeline_status, pipeline)
-
-    def test_a_paper_published_during_an_embargo_is_still_refused_by_the_disclosure_gate(self):
-        record = self.embargoed(self.at_rdco())
-
-        self.decided(record, self.rdco, "publish")
-
-        self.assertEqual(record.pipeline_status, PipelineStatus.PUBLISHED)
-        self.assertEqual(decision_for_record(record).reasons, (Reason.EMBARGOED,))

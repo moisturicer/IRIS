@@ -150,7 +150,7 @@ def office_complete(assignment) -> bool:
     ).exists()
 
 
-def _close_if_complete(assignment, actor) -> bool:
+def _close_if_complete(assignment, actor, threads=0) -> bool:
     """
     Complete `assignment` when the rule holds, on a record still in review.
     """
@@ -168,7 +168,7 @@ def _close_if_complete(assignment, actor) -> bool:
     # a coordinator's withdrawal complete an office the same way.
     from .office_review import office_completed
 
-    office_completed(assignment, actor)
+    office_completed(assignment, actor, threads=threads)
     return True
 
 
@@ -408,7 +408,7 @@ def open_review(seat, user) -> ReviewerSeat:
 
 
 @transaction.atomic
-def complete_seat(seat, actor=None) -> bool:
+def complete_seat(seat, actor=None, threads=0) -> bool:
     """
     A reviewer's part is finished: the seat becomes `done`. Returns whether the
     office's assignment completed with it.
@@ -423,7 +423,9 @@ def complete_seat(seat, actor=None) -> bool:
     seat.state = SeatState.DONE
     seat.done_at = timezone.now()
     seat.save(update_fields=["state", "done_at"])
-    return _close_if_complete(assignment, actor)
+    # `threads`: the comments a finished review sent with this verdict, which
+    # the office's completion notice counts (IR-874).
+    return _close_if_complete(assignment, actor, threads=threads)
 
 
 # --- the Adviser's entry seat --------------------------------------------------

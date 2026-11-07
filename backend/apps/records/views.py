@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 
 from rest_framework import mixins, serializers, status, viewsets
@@ -64,6 +65,8 @@ from apps.notifications.services import (
 )
 from apps.audit.services import create_audit_event
 from apps.reviews.routing import RoutingError, enter_at_adviser
+
+logger = logging.getLogger(__name__)
 
 
 class RecordViewSet(viewsets.ModelViewSet):
@@ -149,7 +152,7 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "embargo_answer", "destroy", "duplicate_matches", "acknowledge_duplicates"):
+        if self.action in ("update", "partial_update", "submit", "destroy", "duplicate_matches", "acknowledge_duplicates"):
             return [IsAuthenticated(), IsRecordOwner()]
         if self.action == "embargo_set":
             return [IsAuthenticated(), MaySetEmbargo()]
@@ -387,15 +390,6 @@ class RecordViewSet(viewsets.ModelViewSet):
                                "before this disclosure can be submitted."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-        # The embargo answer (ADR-052 §2). Publish saved it through `embargo-answer/`
-        # before the file was sent. Refused like consent, before anything is written,
-        # so nothing enters review unanswered. A new Version goes through its own
-        # action and is not asked again.
-        if record.embargo_state == EmbargoState.UNKNOWN:
-            return Response(
-                {"embargoed": embargo.ANSWER_REQUIRED},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
         from .duplicates import acknowledgement_basis, enforce_exact, likely_matches, lock_digest
         lock_digest(record.manuscript_sha256)
         enforce_exact(request.user, record.pk, record.manuscript_sha256)
@@ -425,35 +419,6 @@ class RecordViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK,
         )
 
-    @action(detail=True, methods=["post"], url_path="embargo-answer")
-    @transaction.atomic
-    def embargo_answer(self, request, pk=None):
-        """
-        POST /records/<id>/embargo-answer/  {"embargoed": bool, "embargoed_until": date}
-
-        A draft's owner answers Publish's first question (ADR-052 §2, IR-816).
-        It is saved before the file is sent, so nothing that runs at upload can
-        act on a paper whose answer the server doesn't have yet. Draft only:
-        after submission an embargo changes by its own acts (IR-812).
-        """
-        record = self.get_object()  # enforces IsRecordOwner object permission
-        Record.objects.select_for_update().get(pk=record.pk)
-        record = self.get_object()
-
-        if record.pipeline_status != PipelineStatus.DRAFT:
-            return Response(
-                {"detail": "This paper has been submitted, so its embargo can't be answered here."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        answer = embargo.answer_from(request.data)
-        if answer is None:
-            return Response(
-                {"embargoed": embargo.ANSWER_REQUIRED},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        embargo.record_answer(record, answer, actor=request.user)
-        return Response(embargo.state_payload(record))
-
     def _paper_under_lock(self):
         record = self.get_object()  # a 404 for a paper they can't see, then a 403
         Record.objects.select_for_update().get(pk=record.pk)
@@ -462,7 +427,7 @@ class RecordViewSet(viewsets.ModelViewSet):
     def _submitted_paper_under_lock(self):
         record = self._paper_under_lock()
         if record.pipeline_status == PipelineStatus.DRAFT:
-            raise serializers.ValidationError({"detail": embargo.DRAFT_ANSWERS_INSTEAD})
+            raise serializers.ValidationError({"detail": embargo.NOT_SUBMITTED})
         return record
 
     @action(detail=True, methods=["post"], url_path="embargo-set")
@@ -471,9 +436,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         """
         POST /records/<id>/embargo-set/  {"embargoed_until": date}
 
-        An owner or the Adviser sets an embargo on a submitted paper, or moves an
-        active one's date (ADR-052 §5, IR-812). The date is required, so this can
-        never blank one: that would read as "no embargo" with no release.
+        The Adviser or RDCO gives a submitted paper's embargo a review date,
+        moves it, or embargoes a released paper again (ADR-052 §5 as amended for
+        IR-882, IR-812). Owners can't. The date is required, so this never blanks
+        one; a date is a reminder and ends nothing.
         """
         record = self._submitted_paper_under_lock()
         until = embargo.until_from(request.data)
@@ -739,6 +705,44 @@ class RecordViewSet(viewsets.ModelViewSet):
         response["Cache-Control"] = "private, no-store"
         return response
 
+    @action(
+        detail=True, methods=["get"],
+        url_path=r"versions/(?P<number>[0-9]+)/text", url_name="version-text",
+    )
+    def version_text(self, request, pk=None, number=None):
+        """
+        GET /records/<id>/versions/<n>/text/ -- version n's review text, its
+        sections and passages (ADR-058 §1 as amended, IR-871).
+
+        Review material, so the same rule as `version_manuscript`: a viewer
+        `may_read_review` refuses gets the 404 a missing version gets. A
+        version with no text yet answers with its state and message, and no
+        sections. Audited as the version's manuscript is (ADR-058 §4).
+        """
+        from core.permissions import may_read_review
+
+        from .models import RecordVersion
+        from .review_text.store import payload
+
+        record = self.get_object()
+        version = (
+            RecordVersion.objects.select_related("review_text")
+            .filter(record=record, number=number).first()
+            if may_read_review(request.user, record) else None
+        )
+        if version is None:
+            return Response(
+                {"detail": "No such version of this paper."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        create_audit_event(
+            "DOWNLOAD", request.user, record=record,
+            metadata={"source": "review_text", "version": version.number},
+        )
+        response = Response(payload(version))
+        response["Cache-Control"] = "private, no-store"
+        return response
+
     @action(detail=True, methods=["get"])
     def similar(self, request, pk=None):
         """
@@ -750,19 +754,35 @@ class RecordViewSet(viewsets.ModelViewSet):
         narrower second visibility rule — and of the module IR-285 deleted.
 
         **Empty until the corpus is indexed.** A record with no vector has no
-        neighbours, and the disclosure gate refuses a record with no embargo
-        answer (ADR-052). That is a visible behaviour change from keyword
+        neighbours, and the disclosure gate refuses a record whose embargo
+        hasn't been released (ADR-052). That is a visible behaviour change from keyword
         matching, and it is the intended one — a keyword fallback would hide
         "nothing is indexed" behind plausible results.
+
+        **The answer carries a `state` (IR-568):** `ready`, `no_matches`,
+        `not_indexed` or `incompatible`, and a failure is a 503 whose body is
+        `{"state": "unavailable", "results": []}`. Only the seed's own coverage is
+        ever stated; `no_matches` is identical whether close candidates are
+        absent or unreadable (IR-460).
         """
         from apps.ai.presentation import record_card
-        from apps.ai.similarity import similar_records
+        from apps.ai.similarity import UNAVAILABLE, related_works
 
         record = self.get_object()
-        matches = similar_records(record, request.user)
-        return Response(
-            {"results": [record_card(m.record, m.score) for m in matches]}
-        )
+        try:
+            related = related_works(record, request.user)
+        except Exception:
+            # A temporary failure, said as one (IR-568). Nothing about the
+            # cause reaches the reader, and it is not an empty list.
+            logger.exception("Related works failed for record %s", record.pk)
+            return Response(
+                {"state": UNAVAILABLE, "results": []},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response({
+            "state": related.state,
+            "results": [record_card(m.record, m.score) for m in related.matches],
+        })
 
     @action(detail=True, methods=["get"], url_path="related-research")
     def related_research(self, request, pk=None):
@@ -834,24 +854,122 @@ class RecordViewSet(viewsets.ModelViewSet):
             lambda c: c.comment_payload(c.post_comment(
                 record, request.user,
                 body=request.data.get("body"), reply_to=request.data.get("reply_to"),
+                severity=request.data.get("severity"), anchor=request.data.get("anchor"),
             ), request.user),
             success=status.HTTP_201_CREATED,
         )
 
     @action(
-        detail=True, methods=["patch"],
+        detail=True, methods=["patch", "delete"],
         url_path=r"review-comments/(?P<comment_id>[0-9]+)", url_name="review-comment",
     )
     def review_comment(self, request, pk=None, comment_id=None):
         """
-        PATCH /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+        PATCH  /records/<id>/review-comments/<comment_id>/ `{"body": str}`
+        DELETE /records/<id>/review-comments/<comment_id>/
 
-        Its author edits a comment; a changed body stamps `edited_at`.
+        Its author edits a comment; a changed body stamps `edited_at`. A
+        writer deletes only their own draft (IR-874); a sent comment stays.
         """
         record = self.get_object()
+        if request.method == "DELETE":
+            return self._comment_response(
+                lambda c: c.delete_draft(record, request.user, int(comment_id)),
+                success=status.HTTP_204_NO_CONTENT,
+            )
         return self._comment_response(lambda c: c.comment_payload(c.edit_comment(
             record, request.user, int(comment_id), body=request.data.get("body"),
         ), request.user))
+
+    @action(
+        detail=True, methods=["post"],
+        url_path=r"review-comments/(?P<comment_id>[0-9]+)/(?P<act>severity|resolve|reopen|answer)",
+        url_name="review-thread-act",
+    )
+    def review_thread_act(self, request, pk=None, comment_id=None, act=None):
+        """
+        POST /records/<id>/review-comments/<comment_id>/severity/ `{"severity": "must_fix" | "suggestion"}`
+        POST /records/<id>/review-comments/<comment_id>/resolve/
+        POST /records/<id>/review-comments/<comment_id>/reopen/
+        POST /records/<id>/review-comments/<comment_id>/answer/ `{"answer": "addressed" | "declined", "note": str}`
+
+        A review thread's acts (ADR-032 §7, IR-874; `apps.reviews.threads`).
+        Answers with the thread. 404 for a record, review or thread the caller
+        may not see -- another person's draft included -- 403 for one they
+        see but may not act on, 400 for what cannot be done now.
+        """
+        from apps.reviews import comments, threads
+
+        record = self.get_object()
+        user, thread_id = request.user, int(comment_id)
+        acts = {
+            "severity": lambda: threads.change_severity(
+                record, user, thread_id, request.data.get("severity")),
+            "resolve": lambda: threads.resolve(record, user, thread_id),
+            "reopen": lambda: threads.reopen(record, user, thread_id),
+            "answer": lambda: threads.answer(
+                record, user, thread_id,
+                kind=request.data.get("answer"), note=request.data.get("note")),
+        }
+        try:
+            thread = acts[act]()
+        except threads.ThreadNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except threads.ThreadRefused as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except threads.ThreadError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        thread.refresh_from_db()
+        return Response(comments.comment_payload(thread, user))
+
+    @action(detail=True, methods=["post"], url_path="finish-review")
+    def finish_review(self, request, pk=None):
+        """
+        POST /records/<id>/finish-review/
+        `{"verdict": str, "summary": str, "to"?: [...], "suggested_offices"?: [...], "token"?: str}`
+
+        A Seat holder sends their draft threads with a summary and a verdict
+        (ADR-032 §7, IR-874). `comment_only` is a recorded round with no
+        outcome; every other verdict is taken, and refused, by the act that
+        owns it, with its status codes: `send_to_rdco` as accept-and-route/,
+        `cleared` and `finding` as office-review/, `request_revision` as
+        request-revision/, and `accept`, `publish`, `keep_unlisted` and
+        `reject` as decide/ (`token`; 409 when stale). Answers with the tracker.
+        """
+        from apps.reviews import decisions, finish_review, office_review, revisions, routing
+        from apps.reviews.tracker import tracker_payload
+
+        record = self.get_object()
+        forbidden = (
+            finish_review.FinishRefused, revisions.RevisionRefused, routing.RoutingRefused,
+            office_review.OfficeReviewRefused, decisions.DecisionRefused,
+        )
+        invalid = (
+            finish_review.FinishError, revisions.RevisionError, routing.RoutingError,
+            office_review.OfficeReviewError, decisions.DecisionError,
+        )
+        try:
+            finish_review.finish_review(
+                record, request.user,
+                verdict=request.data.get("verdict"),
+                summary=request.data.get("summary", ""),
+                to=request.data.get("to"),
+                suggested_offices=request.data.get("suggested_offices"),
+                token=request.data.get("token"),
+            )
+        except finish_review.FinishNotFound:
+            raise Http404(f"No {Record._meta.object_name} matches the given query.")
+        except forbidden as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_403_FORBIDDEN)
+        except invalid as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except decisions.DecisionStale as exc:
+            return Response(
+                {"detail": str(exc), "decision": decisions.decision_flags(record, request.user)},
+                status=status.HTTP_409_CONFLICT,
+            )
+        record.refresh_from_db()
+        return Response(tracker_payload(record, request.user))
 
     @action(detail=True, methods=["get"], url_path="metadata-suggestions")
     def metadata_suggestions(self, request, pk=None):

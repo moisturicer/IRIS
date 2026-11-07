@@ -51,6 +51,9 @@ from .services import soft_delete_record
 
 #: A reason is read in a notification and an email, so it is bounded.
 MAX_REASON_LENGTH = 1000
+# The API's name for the field, read from the model so it is not a second spelling
+# of ReviewStage.ADVISER (apps/tests/test_enum_vocabulary.py).
+ADVISER_FIELD = Record.adviser.field.name
 
 NOT_IN_REVIEW = "This paper is not in review."
 NO_ADVISER_REVIEW = "No Adviser review is open on this paper."
@@ -88,11 +91,11 @@ def _text(value, field: str, *, required: bool, message: str = "") -> str:
     elif isinstance(value, str):
         text = value.strip()
     else:
-        raise serializers.ValidationError({field: "Give this as text."})
+        raise serializers.ValidationError({field: ["Give this as text."]})
     if required and not text:
-        raise serializers.ValidationError({field: message})
+        raise serializers.ValidationError({field: [message]})
     if len(text) > MAX_REASON_LENGTH:
-        raise serializers.ValidationError({field: REASON_TOO_LONG})
+        raise serializers.ValidationError({field: [REASON_TOO_LONG]})
     return text
 
 
@@ -129,17 +132,17 @@ def replace_adviser(record: Record, adviser_id, *, actor, reason="") -> dict:
         raise serializers.ValidationError({"detail": NO_ADVISER_REVIEW})
 
     if type(adviser_id) is not int:
-        raise serializers.ValidationError({"adviser": NOT_AN_ADVISER})
+        raise serializers.ValidationError({ADVISER_FIELD: [NOT_AN_ADVISER]})
     adviser = User.objects.filter(
         pk=adviser_id, is_active=True, role__name=RoleName.ADVISER,
     ).first()
     if adviser is None:
-        raise serializers.ValidationError({"adviser": NOT_AN_ADVISER})
+        raise serializers.ValidationError({ADVISER_FIELD: [NOT_AN_ADVISER]})
     if adviser.pk == record.adviser_id:
-        raise serializers.ValidationError({"adviser": ALREADY_THE_ADVISER})
+        raise serializers.ValidationError({ADVISER_FIELD: [ALREADY_THE_ADVISER]})
     if record.owners.filter(user=adviser).exists():
         # IR-260: the same rule `submit/` and the draft's owners hold.
-        raise serializers.ValidationError({"adviser": ADVISER_OWNS})
+        raise serializers.ValidationError({ADVISER_FIELD: [ADVISER_OWNS]})
 
     previous = record.adviser
     open_seats = list(
@@ -159,7 +162,7 @@ def replace_adviser(record: Record, adviser_id, *, actor, reason="") -> dict:
             )
     except IntegrityError:
         # The partial unique constraint, reached by a request the lock did not cover.
-        raise serializers.ValidationError({"adviser": ALREADY_THE_ADVISER})
+        raise serializers.ValidationError({ADVISER_FIELD: [ALREADY_THE_ADVISER]})
 
     record.adviser = adviser
     record.save(update_fields=["adviser", "updated_at"])
@@ -173,7 +176,7 @@ def replace_adviser(record: Record, adviser_id, *, actor, reason="") -> dict:
     transaction.on_commit(lambda: notify_adviser_replaced(
         record, replaced_by=actor, previous_adviser=previous, adviser=adviser,
     ))
-    return {"adviser": {"id": adviser.pk, "name": _name(adviser)}, "seat": seat.pk}
+    return {ADVISER_FIELD: {"id": adviser.pk, "name": _name(adviser)}, "seat": seat.pk}
 
 
 # --- add an owner ---------------------------------------------------------------------
@@ -192,24 +195,24 @@ def add_owner(record: Record, email, *, actor) -> dict:
 
     _require_in_review(record)
     if not isinstance(email, str) or not email.strip():
-        raise serializers.ValidationError({"email": NOT_A_MEMBER})
+        raise serializers.ValidationError({"email": [NOT_A_MEMBER]})
     owner = (
         User.objects.annotate(normalized_email=Lower("email"))
         .filter(normalized_email=email.strip().lower(), is_active=True, is_verified=True)
         .first()
     )
     if owner is None:
-        raise serializers.ValidationError({"email": NOT_A_MEMBER})
+        raise serializers.ValidationError({"email": [NOT_A_MEMBER]})
     if owner.pk == record.adviser_id:
-        raise serializers.ValidationError({"email": ADVISER_OWNS})
+        raise serializers.ValidationError({"email": [ADVISER_OWNS]})
     if record.owners.filter(user=owner).exists():
-        raise serializers.ValidationError({"email": ALREADY_AN_OWNER})
+        raise serializers.ValidationError({"email": [ALREADY_AN_OWNER]})
 
     try:
         with transaction.atomic():
             RecordOwner.objects.create(record=record, user=owner, is_primary=False)
     except IntegrityError:
-        raise serializers.ValidationError({"email": ALREADY_AN_OWNER})
+        raise serializers.ValidationError({"email": [ALREADY_AN_OWNER]})
 
     audit.owner_added(record, actor, owner=owner)
     transaction.on_commit(lambda: notify_owner_added(record, added_by=actor, owner=owner))

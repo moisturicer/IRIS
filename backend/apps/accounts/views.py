@@ -1,6 +1,8 @@
 from django.db import transaction
+from django.http import FileResponse, Http404
 from django.utils import timezone
 from rest_framework import generics, status
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -16,9 +18,10 @@ from core.permissions import (
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
 from apps.audit.models import AuditEvent
+from . import profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
-    UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
+    UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
     RoleRequestSerializer, SystemSettingSerializer,
 )
@@ -143,6 +146,15 @@ class LogoutView(APIView):
 
 
 class ActivateView(APIView):
+    """
+    DEPRECATED (IR-928): the link as emailed before the token moved to the
+    fragment, `GET /auth/activate/<uid>/<token>/`. Kept only so those emails
+    work until their tokens expire -- Django's `PASSWORD_RESET_TIMEOUT`, 3 days
+    and not overridden here -- and so a bundle cached across the deploy still
+    works. Remove it, its URL, the SPA's `/activate/:uidb64/:token` route and
+    nginx's `/activate/` locations once 3 days have passed since IR-928 shipped,
+    or sooner with IR-643's single-use verification (ADR-045 §8). IR-937 tracks it.
+    """
     permission_classes = [AllowAny]
 
     def get(self, request, uidb64, token):
@@ -150,6 +162,35 @@ class ActivateView(APIView):
         if user:
             return Response({"detail": "Account activated."})
         return Response({"detail": "Invalid or expired link."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ActivateConfirmView(APIView):
+    """
+    `POST /auth/activate/` with `{"uid", "token"}` (IR-928, ASVS 8.3.1).
+
+    What the verification page calls after reading the secret from the URL
+    fragment: the credentials travel in the body, never in a path or query.
+    One answer for every refusal, as `ActivateView` gives, so nothing says why a
+    link failed. A secret in the query string is not read. No authentication is
+    attempted, so a stale bearer token the browser still holds cannot turn a
+    valid link into a 401 (as the reset views, ADR-045 §2).
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+
+    REFUSED = {"detail": "Invalid or expired link."}
+
+    def post(self, request):
+        data = request.data
+        uid, token = (data.get("uid"), data.get("token")) if isinstance(data, dict) else (None, None)
+        user = activate_user(uid, token) if isinstance(uid, str) and isinstance(token, str) else None
+        if user:
+            response = Response({"detail": "Account activated."})
+        else:
+            response = Response(self.REFUSED, status=status.HTTP_400_BAD_REQUEST)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class ChangePasswordView(APIView):
@@ -182,6 +223,64 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class MePhotoView(APIView):
+    """
+    `PUT /users/me/photo/` (multipart) and `DELETE /users/me/photo/` (IR-695).
+
+    Both act on `request.user` and on nobody else, so there is no path or body
+    that names another person's photo to change.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser]
+
+    def put(self, request):
+        serializer = PhotoUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile.set_photo(request.user, serializer.validated_data["photo"], serializer.crop)
+        return Response({"photo_url": profile.photo_url(request.user)})
+
+    def delete(self, request):
+        profile.remove_photo(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserPhotoView(APIView):
+    """
+    `GET /users/<id>/photo/`: a person's photo, for any signed-in user (IR-695).
+
+    The only way to read one. The file lives under MEDIA_ROOT, which no URL
+    serves, so reading it needs a valid token like every other route. A person
+    with no photo, a deactivated account and an id that does not exist all
+    answer the same 404.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        owner = User.objects.filter(pk=pk, is_active=True).only("id", "photo", "photo_version").first()
+        if owner is None or not owner.photo:
+            raise Http404
+        try:
+            stored = owner.photo.open("rb")
+        except FileNotFoundError:
+            raise Http404
+        response = FileResponse(stored, content_type="image/jpeg")
+        response["X-Content-Type-Options"] = "nosniff"
+        # `photo_url` carries `?v=`, which changes with the photo, so a copy
+        # fetched under the current version is never stale. Private: a shared
+        # cache must not keep a photo only signed-in users may read.
+        current = request.query_params.get("v") == str(owner.photo_version)
+        response["Cache-Control"] = "private, max-age=86400" if current else "private, no-cache"
+        return response
+
+
+class InterestSuggestionsView(APIView):
+    """`GET /users/interests/?q=mach`: existing interests that contain `q` (IR-695)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(profile.suggest_interests(request.query_params.get("q", "")))
 
 
 class UserListView(generics.ListAPIView):

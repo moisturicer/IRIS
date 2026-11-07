@@ -62,7 +62,7 @@ export function DataTable<T>({
         {status}
       </p>
 
-      <div className="overflow-x-auto">
+      <div className="relative overflow-x-auto">
         <table className="w-full text-[14px]">
           <caption className="sr-only">{caption}</caption>
           <thead className="bg-stone-50 border-b border-stone-200">
