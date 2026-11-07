@@ -163,6 +163,20 @@ def test_text_drawn_off_the_page_is_not_read(read):
     assert texts(reading) == ["The only paragraph a reader of this page can see."]
 
 
+def test_each_contents_entry_is_one_passage_and_its_leader_one_mark(read):
+    # sample6, sample31: a table of contents' entries ran together, and dots
+    # left over from their leaders were kept as passages of their own.
+    entries = [("4.4 Model Evaluation ......................................... 13", "4.4 Model Evaluation … 13"),
+               ("4.5 Interpretation of Results ................................ 14",
+                "4.5 Interpretation of Results … 14"),
+               ("5.4 Limitations of the Study ..……………… ..... 18",
+                "5.4 Limitations of the Study … 18"),
+               ("Table of Contents ............................................. i", "Table of Contents … i")]
+    page = [(72, "Times-Bold", 12, "CONTENTS")] + [(72, BODY, 11, line) for line, _ in entries]
+    found = texts(read(placed([page])))
+    assert found == [shown for _, shown in entries]
+
+
 def test_an_unruled_tables_number_columns_are_not_a_page_column(read):
     # sample19 and a dozen others: on a one-column page, the gap between a
     # table's labels and its numbers was taken for a gutter, so every label

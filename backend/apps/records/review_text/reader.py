@@ -482,6 +482,13 @@ def _ends_entry(word) -> bool:
     return bool(re.search(r"[.!?][\"”’')\]]*$", word) or URL.search(word))
 
 
+#: A table of contents' dot leader: four or more dots or ellipses, spaces
+#: allowed between them ("…… ..... ").
+LEADER = re.compile(r"(?:[.…·]\s*){4,}")
+#: A contents entry's line: a leader, then the page number it points to.
+CONTENTS_ENTRY = re.compile(r"(?:[.…·]\s*){4,}(\d{1,4}|[ivxlcdm]{1,6})\s*$", re.I)
+
+
 def _url_broken(word) -> bool:
     """Does ``word`` end a line inside a web address, cut at a hyphen, slash
     or underscore, as "https://doi.org/10.1088/1755-" over "1315/1067/1/012044"?
@@ -825,7 +832,9 @@ def _structure(pages):
         gap = bool(para) and last_top is not None and page == para[-1][1] and top - last_top > line_gap * 1.6
         size = _size(line)
         resized = bool(para) and para_size[0] is not None and abs(size - para_size[0]) > SIZE_BREAK
-        if para and (bullet_x is not None or indented or gap or resized):
+        # A line ending in a leader and a page number is one contents entry.
+        after_entry = prev_line[0] is not None and prev_line[0][7]
+        if para and (bullet_x is not None or indented or gap or resized or after_entry):
             flush()
         if not para:
             para_size[0] = size
@@ -844,7 +853,8 @@ def _structure(pages):
             last_body[0] = (x, x - column_left)   # the margin, and its offset in its column
         para.extend((w["text"], page, w) for w in line)
         para.append(("\n", page, None))
-        prev_line[0] = (page, column, x, line[-1]["x1"], line[-1]["text"], column_right, column_left)
+        prev_line[0] = (page, column, x, line[-1]["x1"], line[-1]["text"], column_right, column_left,
+                        bool(CONTENTS_ENTRY.search(_line_text(line))))
         last_top = top
     flush()
     if pending_chapter:
@@ -950,6 +960,9 @@ def _sentences(para, known, paragraph, pages, whole=False):
         tokens.append((t, [w]))
         i += 1
 
+    if CONTENTS_ENTRY.search(" ".join(t for t, _ in tokens)):
+        tokens, whole = _collapse_leader(tokens), True
+
     text, spans = "", []
     for t, ws in tokens:
         if text:
@@ -977,6 +990,27 @@ def _sentences(para, known, paragraph, pages, whole=False):
                         "paragraph": paragraph, "kind": "sentence",
                         "regions": _normalize(boxes, pages)})
         start = end
+    return out
+
+
+def _collapse_leader(tokens):
+    """A contents entry's leader as one "…". Tokens of dots alone join it, and
+    a title word with dots on its end ("Summary……") gives the leader its dots."""
+    out, leader = [], None
+    for t, ws in tokens:
+        if re.fullmatch(r"[.…·]+", t):
+            leader = leader or ("…", [])
+            leader[1].extend(ws)
+            continue
+        if leader is not None:
+            out.append(leader)
+            leader = None
+        head = LEADER.sub("", t)
+        out.append((head or t, ws))
+        if head and head != t:
+            leader = ("…", [])
+    if leader is not None:
+        out.append(leader)
     return out
 
 
