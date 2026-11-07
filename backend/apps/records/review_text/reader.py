@@ -33,7 +33,7 @@ import unicodedata
 from collections import Counter
 
 #: Raise on any change that can alter what a stored text says.
-RULES_VERSION = 1
+RULES_VERSION = 2
 
 #: pdfplumber's default word gap (3 pt) is a 12 pt Times space, so a line that
 #: isn't justified came back as one word. Below a space's width (prototype finding 1).
@@ -191,6 +191,27 @@ def _unmapped_share(sections) -> float:
     return sum(1 for w in words if UNMAPPED.search(w)) / len(words) if words else 0.0
 
 
+WHITE = ((1,), (1, 1, 1), (0, 0, 0, 0))   # grey, RGB and CMYK
+
+
+def _visible(obj) -> bool:
+    """Whether a page object can be seen, for finding tables. A box filled
+    white with no border, or with neither fill nor border, is drawn behind
+    text by some exporters, one per line; its edges are no table's rules."""
+    if obj.get("object_type") != "rect" or obj.get("stroke"):
+        return True
+    if not obj.get("fill"):
+        return False
+    colour = obj.get("non_stroking_color")
+    if colour is None:
+        return True   # no colour given fills black
+    colour = tuple(colour) if isinstance(colour, (list, tuple)) else (colour,)
+    try:
+        return tuple(round(float(v), 3) for v in colour) not in WHITE
+    except (TypeError, ValueError):
+        return True   # a pattern or a named colour: assume it shows
+
+
 def _read_page(page) -> dict:
     number, width, height = page.page_number, float(page.width), float(page.height)
     words = page.extract_words(extra_attrs=["fontname", "size"], keep_blank_chars=False,
@@ -202,7 +223,8 @@ def _read_page(page) -> dict:
     # Only a grid of two columns or more is a table. A stack of one-cell boxes
     # is a bordered or shaded paragraph (Word draws one box per line), whose
     # text reads as ordinary lines, not as one "row" per line.
-    tables = [t for t in page.find_tables() if max((len(r) for r in t.extract()), default=0) >= 2]
+    tables = [t for t in page.filter(_visible).find_tables()
+              if max((len(r) for r in t.extract()), default=0) >= 2]
     boxes = [t.bbox for t in tables]
 
     def inside(w):

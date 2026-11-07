@@ -217,6 +217,31 @@ def placed(pages, size=letter) -> bytes:
     return out.getvalue()
 
 
+def white_boxed_columns(left_paragraphs, right_paragraphs, size=letter) -> bytes:
+    """Two columns of paragraphs, every line on an invisible box: filled white,
+    no border, as wide as its column, and starting at the indent on a
+    paragraph's first line. Some journal PDFs are exported this way, and the
+    boxes' edges then look like a table's grid."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    width, height = size
+    column = width / 2 - LEFT - 9
+    for x, paragraphs in ((LEFT, left_paragraphs), (width / 2 + 9, right_paragraphs)):
+        y = height - 90
+        for lines in paragraphs:
+            for i, line in enumerate(lines):
+                indent = 17 if i == 0 else 0
+                c.setFillColorRGB(1, 1, 1)
+                c.rect(x + indent, y - 3, column - indent, 13, stroke=0, fill=1)
+                c.setFillColorRGB(0, 0, 0)
+                c.setFont(BODY, 10)
+                c.drawString(x + indent, y, line)
+                y -= 13
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
 def boxed_paragraph(lines, size=letter) -> bytes:
     """A paragraph drawn as Word draws a bordered one: one box per line, the
     last word of a line overhanging the box's right border by a fraction."""

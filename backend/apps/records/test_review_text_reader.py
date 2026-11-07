@@ -5,7 +5,7 @@ import socket
 import pytest
 
 from apps.records.review_text import reader, sandbox
-from apps.records.review_text.testing import THESIS, blank, pdf, two_columns
+from apps.records.review_text.testing import THESIS, blank, pdf, two_columns, white_boxed_columns
 
 
 @pytest.fixture
@@ -69,6 +69,19 @@ def test_ruled_tables_are_read_as_rows(read):
     rows = [p for s in read(pdf(THESIS))["sections"] for p in s["passages"] if p["kind"] == "row"]
     assert [r["text"] for r in rows] == ["Technology | Output", "Digestion | 40 kW", "Gasification | 90 kW"]
     assert all(r["regions"] for r in rows)
+
+
+def test_invisible_boxes_behind_the_lines_make_no_table(read):
+    # sample15: every line sits on a white, borderless box. Its edges looked
+    # like a two-column grid, so the page read as table rows, a line at a time.
+    para = ["The construction industry adds much to the", "growth of the gross domestic product in the",
+            "country, as the statistics authority reports."]
+    left = [para, ["Delays raise the cost of a project and the", "time it takes, as earlier studies found."]] * 4
+    right = [para] * 6
+    reading = read(white_boxed_columns(left, right))
+    assert not [p for s in reading["sections"] for p in s["passages"] if p["kind"] == "row"]
+    assert ("The construction industry adds much to the growth of the gross domestic product in "
+            "the country, as the statistics authority reports.") in texts(reading)
 
 
 def test_two_columns_are_split_at_the_gutter(read):
