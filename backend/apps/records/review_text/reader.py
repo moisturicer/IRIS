@@ -165,6 +165,36 @@ def read(path, max_pages: int | None = None) -> dict:
     }
 
 
+def _join_touching(words, spaces=()):
+    """Rejoin a word split where its font changes: pdfplumber starts a new word
+    at every font change, and some publishers set ligatures, apostrophes and
+    dashes in a second font ("arti fi cial", "Nursing ' s"). Pieces in
+    different fonts, closer than a space, on the same line and in the same
+    size, with no space character between them (a tightly justified line can
+    set a space narrower than that), are one word, in the font of most of its
+    letters, so a bold heading is still found. ``spaces`` are the page's
+    space characters."""
+    def spaced(left, right):
+        # A narrow space can overlap the next letter, so it need only start in the gap.
+        return any(abs(s["top"] - right["top"]) < 2 and left["x1"] - 0.5 <= s["x0"] <= right["x0"] + 0.5
+                   for s in spaces)
+
+    out, last_font = [], None
+    for w in (w for line in _lines(words) for w in line):
+        prev = out[-1] if out else None
+        if (prev and w.get("fontname") != last_font and abs(prev["top"] - w["top"]) < 1
+                and -1 <= w["x0"] - prev["x1"] < X_TOLERANCE
+                and abs(float(prev.get("size") or 0) - float(w.get("size") or 0)) < 0.1
+                and not spaced(prev, w)):
+            font = prev["fontname"] if len(prev["text"]) >= len(w["text"]) else w["fontname"]
+            out[-1] = dict(prev, text=prev["text"] + w["text"], x1=w["x1"], fontname=font,
+                           bottom=max(prev["bottom"], w["bottom"]))
+        else:
+            out.append(w)
+        last_font = w.get("fontname")
+    return out
+
+
 def _join_small_caps(words):
     """Rejoin a small-capitals word split after its larger first letter, as
     "I NTRODUCTION": a single capital, then capitals in a smaller size, less
@@ -219,7 +249,8 @@ def _read_page(page) -> dict:
     for w in words:
         w["text"] = _clean(w["text"])
         w["page"] = number
-    words = _join_small_caps([w for w in words if w["text"].strip()])
+    spaces = [c for c in page.chars if c["text"].isspace()]
+    words = _join_small_caps(_join_touching([w for w in words if w["text"].strip()], spaces))
     # Only a grid of two columns or more is a table. A stack of one-cell boxes
     # is a bordered or shaded paragraph (Word draws one box per line), whose
     # text reads as ordinary lines, not as one "row" per line.

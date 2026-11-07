@@ -217,6 +217,27 @@ def placed(pages, size=letter) -> bytes:
     return out.getvalue()
 
 
+def mixed_font_words(lines, size=letter) -> bytes:
+    """Lines whose pieces are drawn one after another with no gap, each piece
+    ``(font, text)`` or ``(font, text, pull)``, the next piece then drawn
+    ``pull`` points further left (a tightly justified line's narrow space).
+    Some publishers set ligatures, apostrophes and dashes in a second font,
+    inside a word."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 100
+    for pieces in lines:
+        x = LEFT
+        for font, text, *pull in pieces:
+            c.setFont(font, 11)
+            c.drawString(x, y, text)
+            x += c.stringWidth(text, font, 11) - (pull[0] if pull else 0)
+        y -= LINE
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
 def white_boxed_columns(left_paragraphs, right_paragraphs, size=letter) -> bytes:
     """Two columns of paragraphs, every line on an invisible box: filled white,
     no border, as wide as its column, and starting at the indent on a

@@ -5,7 +5,8 @@ import socket
 import pytest
 
 from apps.records.review_text import reader, sandbox
-from apps.records.review_text.testing import THESIS, blank, pdf, two_columns, white_boxed_columns
+from apps.records.review_text.testing import (BODY, THESIS, blank, mixed_font_words, pdf, two_columns,
+                                               white_boxed_columns)
 
 
 @pytest.fixture
@@ -82,6 +83,22 @@ def test_invisible_boxes_behind_the_lines_make_no_table(read):
     assert not [p for s in reading["sections"] for p in s["passages"] if p["kind"] == "row"]
     assert ("The construction industry adds much to the growth of the gross domestic product in "
             "the country, as the statistics authority reports.") in texts(reading)
+
+
+def test_a_word_set_partly_in_another_font_stays_whole(read):
+    # sample21: the fi ligature, the apostrophe and the dash came from a second
+    # font, and each font change split the word ("arti fi cial", "Nursing ' s").
+    other = "Helvetica"
+    reading = read(mixed_font_words([
+        [(BODY, "The use of arti"), (other, "fi"), (BODY, "cial intelligence in Nursing"),
+         (other, "'"), (BODY, "s care models grows.")],
+        [(BODY, "The Human"), (other, "-"), (BODY, "AI model guides the curriculum.")],
+        # A narrow justified space, still a space character, between two fonts.
+        [(BODY, "The students' ", 1.6), (other, "perceptions"), (BODY, " were mixed.")],
+    ]))
+    assert texts(reading) == ["The use of artificial intelligence in Nursing's care models grows.",
+                              "The Human-AI model guides the curriculum.",
+                              "The students' perceptions were mixed."]
 
 
 def test_two_columns_are_split_at_the_gutter(read):
