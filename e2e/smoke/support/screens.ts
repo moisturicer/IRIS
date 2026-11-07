@@ -128,21 +128,32 @@ export const SCREENS: Screen[] = [
     heading: "Create an Account",
     primary: (p) => p.getByRole("button", { name: "Continue to affiliation" }), primaryLabel: "Continue to affiliation",
   },
-  // IR-928: the secret is in the fragment and the page POSTs it in a body. The
-  // link is one the server refuses, so the screen is drawn in its failed state.
+  // ADR-045 (IR-643). Opening the link verifies nothing, so the screen is drawn
+  // before its one POST and needs no mock.
+  {
+    id: "verify-email", path: "/verify-email#token=abc", route: "/verify-email", role: null,
+    heading: "Verify your email",
+    primary: (p) => p.getByRole("button", { name: "Verify email" }), primaryLabel: "Verify email",
+  },
+  {
+    id: "verify-email-resend", path: "/verify-email/resend", route: "/verify-email/resend", role: null,
+    heading: "Send a new verification email",
+    primary: (p) => p.getByRole("button", { name: "Send verification email" }),
+    primaryLabel: "Send verification email",
+  },
+  // Both retired link shapes (IR-643, ADR-045 §8) land on the same guidance,
+  // with no request at all.
   {
     id: "activate", path: "/activate#uid=abc&token=def", route: "/activate", role: null,
-    mocks: (api) => api.on("POST", "/auth/activate/", { detail: "Invalid link" }, 400),
-    heading: "Verification Failed",
-    primary: (p) => p.getByRole("link", { name: "Register again" }), primaryLabel: "Register again",
+    heading: "This link can't be used",
+    primary: (p) => p.getByRole("link", { name: "Resend verification email" }),
+    primaryLabel: "Resend verification email",
   },
-  // The deprecated path shape of links emailed before IR-928 is still routed
-  // (until those tokens expire), so it keeps a row; it now POSTs too.
   {
     id: "activate-path", path: "/activate/abc/def", route: "/activate/:uidb64/:token", role: null,
-    mocks: (api) => api.on("POST", "/auth/activate/", { detail: "Invalid link" }, 400),
-    heading: "Verification Failed",
-    primary: (p) => p.getByRole("link", { name: "Register again" }), primaryLabel: "Register again",
+    heading: "This link can't be used",
+    primary: (p) => p.getByRole("link", { name: "Resend verification email" }),
+    primaryLabel: "Resend verification email",
   },
   {
     id: "password-forgot", path: "/password/forgot", route: "/password/forgot", role: null,

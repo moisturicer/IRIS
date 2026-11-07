@@ -258,7 +258,12 @@ export default function LoginPage() {
 
       {loginAlert?.kind === "unverified" && (
         <AuthAlert variant="warning" title="Email not verified">
-          Check your inbox for the verification link, or register again if it expired.
+          Check your inbox for the verification link. If it expired or never arrived,{" "}
+          {/* The typed address rides in router state, never the URL (IR-643). */}
+          <Link to="/verify-email/resend" state={{ email: identifier }} className="font-semibold underline">
+            resend verification email
+          </Link>
+          .
         </AuthAlert>
       )}
 

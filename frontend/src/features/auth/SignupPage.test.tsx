@@ -729,6 +729,9 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     expect(screen.getByText("juan@cit.edu")).toBeInTheDocument();
     expect(screen.getByText(/An administrator reviews your request to join as a Student/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
+    // ADR-045 §7: a lost email has a resend, not a second registration (IR-643).
+    expect(screen.getByRole("link", { name: "resend verification email" }))
+      .toHaveAttribute("href", "/verify-email/resend");
 
     // The folder is closed (IR-709): every tab is a plain label, never a link or a button.
     const nav = steps();

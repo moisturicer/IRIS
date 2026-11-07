@@ -310,6 +310,12 @@ links. This trades old-link convenience for purpose separation and single use.
 > and keeps the old `GET /activate/<uid>/<token>/` route as deprecated for the 3 days
 > the old tokens live. IR-643's rollout supersedes both and retires them at once.
 
+> **Note, 2026-11-07 (IR-643).** The rollout above is done. Registration and resend both issue
+> single-use `email_verification` tokens through §6's durable path, linked as
+> `/verify-email#token=…`. `GET /auth/activate/<uid>/<token>/` and `POST /auth/activate/` now
+> answer only `invalid_link` and change nothing; Django's default-generator verification is
+> deleted. Evidence: [`docs/testing/traceability/IR-643.md`](../testing/traceability/IR-643.md).
+
 ### 9. Required automated evidence at implementation seams
 
 These are a test plan, **not executed tests or coverage claims**. Agree seams

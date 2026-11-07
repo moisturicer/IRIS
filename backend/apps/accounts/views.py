@@ -30,7 +30,10 @@ from .serializers import (
 )
 from .models import DataNotice
 from .notice import answer_notice, answer_payload, notice_payload, requires_answer
-from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
+from .models import RecoveryPurpose
+from .recovery import service as recovery_service
+from .recovery.views import INVALID_LINK
+from .services import approve_role_request, decline_role_request
 
 #: RDCO's account acts leave a System Admin's account alone (ADR-051 §5).
 LEAVE_SYSTEM_ADMIN_ALONE = "A System Admin's account is managed only in Django's admin site."
@@ -73,8 +76,11 @@ class RegisterView(generics.CreateAPIView):
                 except Role.DoesNotExist:
                     pass  # Unknown role — skip silently
 
-            # Send email verification link (inside transaction so a crash rolls back the user)
-            send_verification_email(user, self.request)
+            # The verification email goes the resend's way (ADR-045 §6, IR-643):
+            # an intent committed with the account, mailed by a worker after
+            # commit, under the same limits. A rollback leaves no intent and
+            # sends nothing.
+            recovery_service.admit_request(RecoveryPurpose.EMAIL_VERIFICATION, user.email)
 
 
 class LoginView(APIView):
@@ -200,48 +206,34 @@ class LogoutView(APIView):
 
 class ActivateView(APIView):
     """
-    DEPRECATED (IR-928): the link as emailed before the token moved to the
-    fragment, `GET /auth/activate/<uid>/<token>/`. Kept only so those emails
-    work until their tokens expire -- Django's `PASSWORD_RESET_TIMEOUT`, 3 days
-    and not overridden here -- and so a bundle cached across the deploy still
-    works. Remove it, its URL, the SPA's `/activate/:uidb64/:token` route and
-    nginx's `/activate/` locations once 3 days have passed since IR-928 shipped,
-    or sooner with IR-643's single-use verification (ADR-045 §8). IR-937 tracks it.
+    RETIRED (IR-643, ADR-045 §8): `GET /auth/activate/<uid>/<token>/`, the
+    link shape emailed before IR-928. Verification links are single-use
+    `RecoveryToken`s now, so this verifies no one: it gives the recovery
+    contract's one "invalid link" answer, which points to a new email, and
+    changes nothing. No Django default-generator token is accepted anywhere.
     """
+    authentication_classes = []
     permission_classes = [AllowAny]
 
     def get(self, request, uidb64, token):
-        user = activate_user(uidb64, token)
-        if user:
-            return Response({"detail": "Account activated."})
-        return Response({"detail": "Invalid or expired link."}, status=status.HTTP_400_BAD_REQUEST)
+        response = Response(INVALID_LINK, status=status.HTTP_400_BAD_REQUEST)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class ActivateConfirmView(APIView):
     """
-    `POST /auth/activate/` with `{"uid", "token"}` (IR-928, ASVS 8.3.1).
-
-    What the verification page calls after reading the secret from the URL
-    fragment: the credentials travel in the body, never in a path or query.
-    One answer for every refusal, as `ActivateView` gives, so nothing says why a
-    link failed. A secret in the query string is not read. No authentication is
-    attempted, so a stale bearer token the browser still holds cannot turn a
-    valid link into a 401 (as the reset views, ADR-045 §2).
+    RETIRED (IR-643, ADR-045 §8): `POST /auth/activate/`, IR-928's body form
+    of the same old link. Kept answering, rather than removed, so a page
+    cached from before the change shows "request a new email" instead of a
+    404. Reads nothing it is sent and changes nothing.
     """
     authentication_classes = []
     permission_classes = [AllowAny]
     parser_classes = [JSONParser]
 
-    REFUSED = {"detail": "Invalid or expired link."}
-
     def post(self, request):
-        data = request.data
-        uid, token = (data.get("uid"), data.get("token")) if isinstance(data, dict) else (None, None)
-        user = activate_user(uid, token) if isinstance(uid, str) and isinstance(token, str) else None
-        if user:
-            response = Response({"detail": "Account activated."})
-        else:
-            response = Response(self.REFUSED, status=status.HTTP_400_BAD_REQUEST)
+        response = Response(INVALID_LINK, status=status.HTTP_400_BAD_REQUEST)
         response["Cache-Control"] = "no-store"
         return response
 

@@ -19,7 +19,7 @@ const SIZE: Record<string, string> = {
  *
  * Pass `label` where nothing else announces the wait; leave it out where the
  * caller already has its own `role="status"` text (ProtectedRoute,
- * EmailVerifyPage, the Publish dialog) or the ring sits beside a verb.
+ * the Publish dialog) or the ring sits beside a verb.
  */
 export function Spinner({ size = "md", className = "", label }: SpinnerProps) {
   if (size !== "sm") {
