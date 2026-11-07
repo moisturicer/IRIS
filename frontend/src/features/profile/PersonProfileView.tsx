@@ -1,21 +1,18 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 
 import { ResearchCard } from "@/components/shared/ResearchCard";
+import { Spinner } from "@/components/ui/Spinner";
 import { FOCUS_RING, COLOUR_TRANSITION } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { INSTITUTION } from "@/config/institution";
+import { personPath } from "@/lib/access";
 import { cn } from "@/lib/utils";
+import type { Collaborator, ProfilePaper } from "@/types/people";
 
 import { PersonAvatar } from "./PersonAvatar";
 import { affiliationOf, displayName, initialsOf } from "./names";
-import {
-  PAGE_SIZE,
-  UNIVERSITY,
-  personPath,
-  type Collaborator,
-  type ProfilePaper,
-  type PublicProfile,
-} from "./publicProfile";
+import type { ListKey, ListState, PersonProfileModel } from "./usePersonProfile";
 
 /**
  * Another person's Profile (IR-700): who they are, what they wrote and advised,
@@ -32,35 +29,37 @@ import {
  * citations. A paper shows its own views, because that figure is the paper's.
  */
 interface PersonProfileViewProps {
-  profile: PublicProfile;
-  /** The large photo, already fetched; the page owns how (IR-699's blob fetch). */
-  photoSrc: string | null;
+  model:  PersonProfileModel;
+  onMore: (key: ListKey) => void;
 }
 
-export function PersonProfileView({ profile, photoSrc }: PersonProfileViewProps) {
+export function PersonProfileView({ model, onMore }: PersonProfileViewProps) {
+  const { profile, research, advised, collaborators } = model;
   const name = displayName(profile);
   const affiliation = affiliationOf(profile);
   const interests = profile.research_interests;
-  const hasPapers = profile.research.length > 0 || profile.advised.length > 0;
-  const hasRail = profile.collaborators.length > 0;
+  // A list that failed is not an empty one: it keeps its place and says so.
+  const showsRail = collaborators.items.length > 0 || collaborators.error !== null;
+  const noPapers = research.items.length === 0 && advised.items.length === 0
+    && research.error === null && advised.error === null;
 
   return (
     <div className="[container-type:inline-size] [container-name:profile]">
-      <div className="max-w-5xl">
+      <div className="max-w-4xl">
         <header className="flex flex-wrap items-start gap-6">
-          <PersonAvatar src={photoSrc} initials={initialsOf(profile)} alt={name} size="lg" />
+          <PersonAvatar photoUrl={profile.photo_url} initials={initialsOf(profile)} alt={name} size="lg" />
           <div className="min-w-0 flex-1 basis-48">
             <h1 className="font-display text-title font-semibold text-stone-900 sm:text-display">{name}</h1>
             <p className="mt-1 text-body text-stone-700">{profile.role_label}</p>
             {affiliation && <p className="text-body text-stone-600">{affiliation}</p>}
-            <p className="text-small text-stone-600">{UNIVERSITY}</p>
+            <p className="text-small text-stone-600">{INSTITUTION.name}</p>
           </div>
         </header>
 
         <div
           className={cn(
             "mt-8 border-t border-stone-200 pt-8",
-            hasRail && "grid gap-y-8 [@container_profile_(min-width:48rem)]:grid-cols-[minmax(0,1fr)_16rem] [@container_profile_(min-width:48rem)]:gap-x-10",
+            showsRail && "grid gap-y-8 [@container_profile_(min-width:48rem)]:grid-cols-[minmax(0,1fr)_16rem] [@container_profile_(min-width:48rem)]:gap-x-10",
           )}
         >
           <div className="min-w-0 divide-y divide-stone-200">
@@ -82,15 +81,15 @@ export function PersonProfileView({ profile, photoSrc }: PersonProfileViewProps)
               </Section>
             )}
 
-            {profile.research.length > 0 && <PaperSection title="Research" papers={profile.research} />}
-            {profile.advised.length > 0 && <PaperSection title="Advised" papers={profile.advised} />}
+            <PaperSection title="Research" list={research} onMore={() => onMore("research")} />
+            <PaperSection title="Advised" list={advised} onMore={() => onMore("advised")} />
 
-            {!hasPapers && (
+            {noPapers && (
               <p className="py-6 text-body text-stone-600 first:pt-0">No published papers yet.</p>
             )}
           </div>
 
-          {hasRail && <CollaboratorRail collaborators={profile.collaborators} />}
+          {showsRail && <CollaboratorRail list={collaborators} onMore={() => onMore("collaborators")} />}
         </div>
       </div>
     </div>
@@ -98,7 +97,7 @@ export function PersonProfileView({ profile, photoSrc }: PersonProfileViewProps)
 }
 
 /** One section under its hairline; the first one has nothing above it to divide from. */
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = useId();
   return (
     <section aria-labelledby={id} className="py-6 first:pt-0 last:pb-0">
@@ -109,69 +108,81 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 /**
- * Shows `step` rows at a time. Showing more puts focus on the first row that
- * arrived, so a keyboard reader lands where the new rows begin and not on a
- * button that has just disappeared.
+ * After Show more, focus goes to the first row that arrived, so a keyboard
+ * reader lands where the new rows begin and not on a button that has just gone.
  */
-function useReveal(total: number, step: number) {
-  const [shown, setShown] = useState(step);
+function useFocusFirstNewRow(count: number) {
   const list = useRef<HTMLUListElement>(null);
   const focusAt = useRef<number | null>(null);
-
   useEffect(() => {
-    if (focusAt.current === null) return;
-    const row = list.current?.querySelectorAll(":scope > li")[focusAt.current];
-    row?.querySelector<HTMLElement>("a")?.focus();
+    if (focusAt.current === null || count <= focusAt.current) return;
+    list.current?.querySelectorAll(":scope > li")[focusAt.current]?.querySelector<HTMLElement>("a")?.focus();
     focusAt.current = null;
-  }, [shown]);
-
-  return {
-    list,
-    shown: Math.min(shown, total),
-    hasMore: shown < total,
-    showMore: () => {
-      focusAt.current = shown;
-      setShown(shown + step);
-    },
-  };
+  }, [count]);
+  return { list, mark: () => { focusAt.current = count; } };
 }
 
-function PaperSection({ title, papers }: { title: string; papers: ProfilePaper[] }) {
-  const { list, shown, hasMore, showMore } = useReveal(papers.length, PAGE_SIZE.papers);
+/** What sits under a list: its failure, with a retry, or Show more while there is more. */
+function ListFooter({ list, label, onMore }: { list: ListState<unknown>; label: string; onMore: () => void }) {
+  if (list.loadingMore) {
+    return (
+      <p role="status" className="mt-4 inline-flex items-center gap-2 text-small text-stone-700">
+        <Spinner size="sm" /> Loading…
+      </p>
+    );
+  }
+  if (list.error) {
+    return (
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <p role="alert" className="text-small text-stone-700">{list.error}</p>
+        <button type="button" onClick={onMore} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>
+      </div>
+    );
+  }
+  if (!list.hasMore) return null;
+  return (
+    <button
+      type="button"
+      onClick={onMore}
+      aria-label={`Show more ${label}`}
+      className={cn(PILL_SECONDARY, FOCUS_RING, "mt-4")}
+    >
+      Show more
+    </button>
+  );
+}
+
+function PaperSection({ title, list, onMore }: { title: string; list: ListState<ProfilePaper>; onMore: () => void }) {
+  const { list: rows, mark } = useFocusFirstNewRow(list.items.length);
+  // A first page that is being retried keeps its place: the section does not vanish and come back.
+  if (list.items.length === 0 && !list.error && !list.loadingMore) return null;
   return (
     <Section title={title}>
-      <ul ref={list} aria-label={title} className="space-y-3">
-        {papers.slice(0, shown).map((paper) => (
-          <li key={paper.id}>
-            <ResearchCard
-              layout="list"
-              compact
-              headingLevel={3}
-              href={`/records/${paper.id}`}
-              title={paper.title}
-              eyebrow={[paper.classification_name, paper.record_type_name].filter(Boolean).join(" · ")}
-              meta={paper.publication_year ? `Published ${paper.publication_year}` : undefined}
-              byline={paper.authors.join(", ")}
-              footer={
-                <span className="inline-flex items-center gap-1.5 text-stone-700" title="Accounts that have opened this paper">
-                  <i className="fas fa-eye text-[12px] text-brand" aria-hidden />
-                  {paper.views} {paper.views === 1 ? "view" : "views"}
-                </span>
-              }
-            />
-          </li>
-        ))}
-      </ul>
-      {hasMore && (
-        <button
-          type="button"
-          onClick={showMore}
-          aria-label={`Show more ${title.toLowerCase()} papers`}
-          className={cn(PILL_SECONDARY, FOCUS_RING, "mt-4")}
-        >
-          Show more
-        </button>
+      {list.items.length > 0 && (
+        <ul ref={rows} aria-label={title} className="space-y-3">
+          {list.items.map((paper) => (
+            <li key={paper.id}>
+              <ResearchCard
+                layout="list"
+                compact
+                headingLevel={3}
+                href={`/records/${paper.id}`}
+                title={paper.title}
+                eyebrow={[paper.classification_name, paper.record_type_name].filter(Boolean).join(" · ")}
+                meta={paper.publication_year ? `Published ${paper.publication_year}` : undefined}
+                byline={paper.authors.join(", ")}
+                footer={
+                  <span className="inline-flex items-center gap-1.5 text-stone-700" title="Accounts that have opened this paper">
+                    <i className="fas fa-eye text-[12px] text-brand" aria-hidden />
+                    {paper.views} {paper.views === 1 ? "view" : "views"}
+                  </span>
+                }
+              />
+            </li>
+          ))}
+        </ul>
       )}
+      <ListFooter list={list} label={`${title.toLowerCase()} papers`} onMore={() => { mark(); onMore(); }} />
     </Section>
   );
 }
@@ -181,19 +192,18 @@ function PaperSection({ title, papers }: { title: string; papers: ProfilePaper[]
  * Beside the sections it is divided from them by one vertical hairline; under
  * them, by the same hairline laid flat.
  */
-function CollaboratorRail({ collaborators }: { collaborators: Collaborator[] }) {
+function CollaboratorRail({ list, onMore }: { list: ListState<Collaborator>; onMore: () => void }) {
   const id = useId();
-  const { list, shown, hasMore, showMore } = useReveal(collaborators.length, PAGE_SIZE.collaborators);
+  const { list: rows, mark } = useFocusFirstNewRow(list.items.length);
   return (
     <aside
       aria-labelledby={id}
       className="border-t border-stone-200 pt-6 [@container_profile_(min-width:48rem)]:border-l [@container_profile_(min-width:48rem)]:border-t-0 [@container_profile_(min-width:48rem)]:pl-8 [@container_profile_(min-width:48rem)]:pt-0"
     >
       <h2 id={id} className="font-display text-title font-semibold text-stone-900">Collaborators</h2>
-      <ul ref={list} className="-mx-2 mt-3">
-        {collaborators.slice(0, shown).map((person) => {
-          const name = displayName(person);
-          return (
+      {list.items.length > 0 && (
+        <ul ref={rows} className="-mx-2 mt-3">
+          {list.items.map((person) => (
             <li
               key={person.id}
               className={cn(
@@ -201,7 +211,7 @@ function CollaboratorRail({ collaborators }: { collaborators: Collaborator[] }) 
                 COLOUR_TRANSITION,
               )}
             >
-              <PersonAvatar src={person.photo_url} initials={initialsOf(person)} size="sm" />
+              <PersonAvatar photoUrl={person.photo_url} initials={initialsOf(person)} size="sm" />
               <div className="min-w-0">
                 <Link
                   to={personPath(person.id)}
@@ -212,26 +222,17 @@ function CollaboratorRail({ collaborators }: { collaborators: Collaborator[] }) 
                     "after:absolute after:inset-0 after:content-['']",
                   )}
                 >
-                  {name}
+                  {displayName(person)}
                 </Link>
                 <p className="text-small text-stone-600">
                   {person.shared_papers} shared {person.shared_papers === 1 ? "paper" : "papers"}
                 </p>
               </div>
             </li>
-          );
-        })}
-      </ul>
-      {hasMore && (
-        <button
-          type="button"
-          onClick={showMore}
-          aria-label="Show more collaborators"
-          className={cn(PILL_SECONDARY, FOCUS_RING, "mt-4")}
-        >
-          Show more
-        </button>
+          ))}
+        </ul>
       )}
+      <ListFooter list={list} label="collaborators" onMore={() => { mark(); onMore(); }} />
     </aside>
   );
 }

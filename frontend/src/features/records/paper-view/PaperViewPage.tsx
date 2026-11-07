@@ -77,6 +77,7 @@ import { useCitationReference, type CitationResolution } from "./useCitationRefe
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PaperDownloadControl } from "./PaperDownloadControl";
+import { OwnerNames, PersonLink } from "./PersonLink";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
 // Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
@@ -1032,7 +1033,15 @@ export default function PaperViewPage() {
                 ) : <p className="text-sm text-stone-500 italic">Authors not recorded</p>}
                 <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
-                  {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
+                  {record.adviser_name && (
+                    <span>
+                      Adviser:{" "}
+                      {record.adviser != null && record.adviser_has_profile
+                        ? <PersonLink id={record.adviser} name={record.adviser_name} />
+                        : record.adviser_name}
+                    </span>
+                  )}
+                  <OwnerNames owners={record.owners} />
                   {record.origin === "institutional" && <span>{INSTITUTION.name}</span>}
                   {record.publication_year && <span>Published {record.publication_year}</span>}
                   {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}

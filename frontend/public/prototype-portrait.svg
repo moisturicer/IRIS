@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 224 224" role="img" aria-label="Sample portrait">
-  <rect width="224" height="224" fill="#e7e5e4"/>
-  <path d="M0 224c4-48 40-76 112-76s108 28 112 76z" fill="#78716c"/>
-  <path d="M86 140h52v26c0 8-12 16-26 16s-26-8-26-16z" fill="#d6d3d1"/>
-  <ellipse cx="112" cy="98" rx="38" ry="46" fill="#d6d3d1"/>
-  <path d="M72 94c-2-30 18-50 42-50 26 0 44 20 38 52-6-14-14-22-26-26-12 6-34 8-54 24z" fill="#44403c"/>
-</svg>

@@ -1,8 +1,10 @@
 import { cn } from "@/lib/utils";
 
+import { useAuthedImage } from "./useAuthedImage";
+
 interface PersonAvatarProps {
-  /** A ready-to-use image URL, or `null` for the initials. */
-  src:      string | null;
+  /** Relative to the API base, or `null` for the initials. Fetched with auth. */
+  photoUrl: string | null;
   initials: string;
   /** Spoken for the large photo; the small one beside a name is decoration. */
   alt?:     string;
@@ -11,12 +13,13 @@ interface PersonAvatarProps {
 
 /**
  * A person's circular photo, or their initials on Maroon Wash when they added
- * none. `lg` is the Profile's 112 px mark; `sm` sits beside a name in a list.
- * Initials are Garamond only at `lg`: a small one is a chip, and Garamond never
- * sets a chip (DESIGN.md, Typeset Title Rule).
+ * none or it has not arrived. `lg` is the Profile's mark (80 px on a phone, 112
+ * from `sm`); `sm` sits beside a name in a list. Initials are Garamond only at
+ * `lg`: a small one is a chip, and Garamond never sets a chip (DESIGN.md, Typeset
+ * Title Rule).
  */
-export function PersonAvatar({ src, initials, alt = "", size }: PersonAvatarProps) {
-  // 80 px on a phone so the name can sit beside it; 112 px from `sm`.
+export function PersonAvatar({ photoUrl, initials, alt = "", size }: PersonAvatarProps) {
+  const src = useAuthedImage(photoUrl);
   const box = size === "lg" ? "h-20 w-20 sm:h-28 sm:w-28" : "h-10 w-10";
   if (src) {
     return <img src={src} alt={alt} className={cn(box, "shrink-0 rounded-full object-cover ring-1 ring-stone-200")} />;
