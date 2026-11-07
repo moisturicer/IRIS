@@ -10,7 +10,8 @@ from types import SimpleNamespace
 import pytest
 
 from ai.admission.errors import AdmissionDenied
-from ai.admission.guard import ProxyApproval, SendGuard
+from ai.admission.guard import ProxyApproval, SendGuard, routing_digest
+from ai.admission.limits import Price
 from ai.admission.scope import RunBinding, bound
 from ai.admission.transport import AdmittedAgentProvider
 from ai.agent.dialect import ChatCompletions
@@ -39,8 +40,7 @@ class Connection:
         self.run = {"state": "running", "fence": 1, "overdue": False, "granted": True,
                     "reader": reader, "reader_id": 9, "reader_grant": "grant", "scope_record_id": None}
         self.record = {"id": 7, "origin": origin, "is_ip": False,
-                       "embargo_answered_at": datetime.now(timezone.utc),
-                       "embargoed_until": None, "embargo_released_at": None,
+                       "is_embargoed": False, "embargo_released_at": datetime.now(timezone.utc),
                        "chunk_set_id": 31, "extraction_hash": revision}
 
     def transaction(self):
@@ -71,7 +71,7 @@ class Ticket:
 
 class Ledger:
     dsn = "unused"
-    limits = SimpleNamespace(max_output_tokens=100, campaign_key="pilot")
+    limits = SimpleNamespace(max_output_tokens=100, campaign_key="pilot", prices={})
 
     def __init__(self):
         self.tickets = []
@@ -225,7 +225,48 @@ def test_neutral_withheld_marker_can_continue_without_source_details(monkeypatch
 
 
 def test_real_adapter_remains_closed_without_vendor_account_evidence(monkeypatch):
-    real_pin = replace(PIN, adapter="openai")
+    real_pin = replace(PIN, adapter="openai-compatible")
     provider, tickets, turn, reason = send(monkeypatch, entry=replace(request(), pin=real_pin))
-    assert turn is None and reason == "provider_refused"
+    assert turn is None and reason == "source_unavailable"
     assert provider.requests == [] and not tickets[0].usage.sent
+
+
+ROUTING = {"only": ["azure/us"], "allow_fallbacks": False, "data_collection": "deny",
+           "zdr": True, "require_parameters": True,
+           "max_price": {"prompt": 0.22, "completion": 0.825}}
+REAL_PIN = replace(PIN, adapter="openai-compatible", endpoint="https://openrouter.ai/api/v1",
+                   model="openai/gpt-6-luna:floor")
+
+
+def test_real_proxy_requires_account_evidence_routing_and_covering_price(monkeypatch):
+    conn = Connection()
+
+    async def connect(*_):
+        return conn
+
+    monkeypatch.setattr("ai.admission.guard.asyncpg.connect", connect)
+    approval = ProxyApproval("IR-889", REAL_PIN.model, REAL_PIN.endpoint, "account", "pilot",
+                             datetime.now(timezone.utc) + timedelta(hours=1), frozenset({SOURCE}),
+                             "https://citiris.atlassian.net/browse/IR-827", routing_digest(ROUTING))
+    guard = SendGuard("unused", approval, stage="development")
+
+    def check(**overrides):
+        options = {"account": "account", "campaign": "pilot", "routing": ROUTING,
+                   "price": Price(0.22, 0.825), **overrides}
+        return asyncio.run(guard.check(BINDING, REAL_PIN, request().history, **options))
+
+    check()
+    asyncio.run(guard.check(BINDING, REAL_PIN, (), account="account", campaign="pilot",
+                            routing=ROUTING, price=Price(0.22, 0.825)))
+    with pytest.raises(AdmissionDenied):
+        asyncio.run(SendGuard("unused", stage="development").check(
+            BINDING, REAL_PIN, (), account="account", campaign="pilot",
+            routing=ROUTING, price=Price(0.22, 0.825)))
+    for options in ({"routing": {**ROUTING, "zdr": False}},
+                    {"price": Price(0.05, 0.25)}, {"account": "other"}):
+        with pytest.raises(AdmissionDenied):
+            check(**options)
+    conn.record["is_embargoed"] = True
+    conn.record["embargo_released_at"] = None
+    with pytest.raises(AdmissionDenied):
+        check()

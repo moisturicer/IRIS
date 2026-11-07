@@ -310,7 +310,8 @@ def test_every_admitted_attempt_records_the_agent_purpose_and_no_other_writer(ru
 def test_approved_proxy_can_be_searched_read_and_answered_by_admitted_agent(runtime):
     proxy = paper("Public proxy", {4: [("Methods", "Water levels forecast floods.")]})
     Record.objects.filter(pk=proxy.pk).update(
-        origin=Record.Origin.IMPORTED_REFERENCE, embargo_answered_at=timezone.now())
+        origin=Record.Origin.IMPORTED_REFERENCE, is_embargoed=False,
+        embargo_released_at=timezone.now())
     chunk_set = ChunkSet.objects.get(record=proxy, is_active=True)
     source = Source(proxy.pk, chunk_set.pk, chunk_set.extraction_hash)
 

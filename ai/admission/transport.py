@@ -72,7 +72,8 @@ class AdmittedAgentProvider(LLMProvider):
 
     async def _attempt(self, request):
         binding = scope.current()
-        payload = serialize(self.provider.dialect.encode(request))
+        payload = serialize(self.provider.encode(request) if hasattr(self.provider, "encode")
+                            else self.provider.dialect.encode(request))
         ticket = await self.ledger.admit(Request(
             operation="llm", purpose=self.purpose, purpose_version=request.pin.prompt_version,
             lane=self.lane, account=self.provider.account, models=(request.pin.model,),
@@ -89,7 +90,10 @@ class AdmittedAgentProvider(LLMProvider):
             # when the original tool result has left the fitted context.
             await self.guard.check(binding, request.pin, evidence,
                                    account=self.provider.account,
-                                   campaign=self.ledger.limits.campaign_key if self.ledger.limits else None)
+                                   campaign=self.ledger.limits.campaign_key if self.ledger.limits else None,
+                                   routing=getattr(self.provider, "routing", None),
+                                   price=(getattr(self.ledger.limits, "prices", {}).get(request.pin.model)
+                                          if self.ledger.limits else None))
             # From here the vendor may bill it, whatever happens next.
             usage.sent = True
             with scope.admitted_send():

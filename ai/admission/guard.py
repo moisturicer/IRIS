@@ -8,6 +8,7 @@ closed until their canonical Contact-person disclosure rule is available.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -28,6 +29,31 @@ CONTROL_KEYS = frozenset({"status", "reason", "coverage", "error", "revision"})
 CONTROL_VALUES = frozenset({"ok", "no_match", "partial", "unavailable", "tool_limit",
                             "invalid_arguments", "unknown_tool", "unknown_handle",
                             "source_replaced", "unauthorized", "run_ended", "exceeds_context"})
+OPENROUTER = "https://openrouter.ai/api/v1"
+LUNA_FLOOR = "openai/gpt-6-luna:floor"
+
+
+def routing_digest(routing) -> str:
+    return hashlib.sha256(json.dumps(routing, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+
+
+def _routed_policy(pin, routing, price) -> bool:
+    if (pin.adapter != "openai-compatible" or pin.endpoint != OPENROUTER
+            or pin.model != LUNA_FLOOR or not isinstance(routing, dict)
+            or price is None or not hasattr(price, "input") or not hasattr(price, "output")):
+        return False
+    if set(routing) != {"only", "allow_fallbacks", "data_collection", "zdr",
+                        "max_price", "require_parameters"}:
+        return False
+    only, cap = routing["only"], routing["max_price"]
+    return (isinstance(only, list) and bool(only) and len(only) <= 4
+            and all(isinstance(tag, str) and "/" in tag for tag in only)
+            and len(set(only)) == len(only)
+            and routing["allow_fallbacks"] is False and routing["data_collection"] == "deny"
+            and routing["zdr"] is True and routing["require_parameters"] is True
+            and isinstance(cap, dict) and set(cap) == {"prompt", "completion"}
+            and all(type(v) in (int, float) and 0 < v < 100 for v in cap.values())
+            and price.input >= cap["prompt"] and price.output >= cap["completion"])
 
 
 @dataclass(frozen=True)
@@ -41,14 +67,21 @@ class ProxyApproval:
     campaign: str
     expires_at: datetime
     sources: frozenset[Source]
+    vendor_evidence: str = ""
+    routing_digest: str = ""
 
     def permits(self, pin, account: str | None, campaign: str | None,
-                sources: frozenset[Source]) -> bool:
-        return (self.approval_id == "IR-889" and self.expires_at.tzinfo is not None
+                sources: frozenset[Source], routing=None, price=None) -> bool:
+        base = (self.approval_id == "IR-889" and self.expires_at.tzinfo is not None
                 and self.expires_at > datetime.now(timezone.utc)
                 and pin.model == self.model and pin.endpoint == self.endpoint
                 and account == self.account and campaign == self.campaign
-                and bool(sources) and sources <= self.sources)
+                and sources <= self.sources)
+        if pin.adapter == "recording":
+            return base
+        return (base and self.vendor_evidence.startswith("https://")
+                and len(self.routing_digest) == 64 and _routed_policy(pin, routing, price)
+                and self.routing_digest == routing_digest(routing))
 
     @classmethod
     def from_json(cls, raw: str) -> ProxyApproval | None:
@@ -57,8 +90,14 @@ class ProxyApproval:
             return None
         try:
             data = json.loads(raw)
-            if set(data) != {"approval_id", "model", "endpoint", "account", "campaign",
-                             "expires_at", "sources"}:
+            basic = {"approval_id", "model", "endpoint", "account", "campaign", "expires_at", "sources"}
+            if set(data) not in (basic, basic | {"vendor_evidence", "routing_digest"}):
+                return None
+            if any(not isinstance(data[key], str) or not data[key] for key in
+                   ("approval_id", "model", "endpoint", "account", "campaign", "expires_at")):
+                return None
+            if (not isinstance(data.get("vendor_evidence", ""), str)
+                    or not isinstance(data.get("routing_digest", ""), str)):
                 return None
             sources = frozenset(Source(**item) for item in data["sources"])
             if not sources or len(sources) > 40 or any(s.record_id < 1 or s.chunk_set_id < 1
@@ -67,7 +106,8 @@ class ProxyApproval:
                 return None
             return cls(data["approval_id"], data["model"], data["endpoint"],
                        data["account"], data["campaign"],
-                       datetime.fromisoformat(data["expires_at"]), sources)
+                       datetime.fromisoformat(data["expires_at"]), sources,
+                       data.get("vendor_evidence", ""), data.get("routing_digest", ""))
         except (TypeError, ValueError, KeyError):
             return None
 
@@ -118,16 +158,15 @@ class SendGuard:
         self.stage = stage
 
     async def check(self, binding: RunBinding, pin, dependencies: Iterable = (), *,
-                    account: str | None = None, campaign: str | None = None) -> None:
+                    account: str | None = None, campaign: str | None = None,
+                    routing=None, price=None) -> None:
         if pin.data_policy != NO_TRAINING:
             raise AdmissionDenied(errors.PROVIDER_REFUSED)
         sources = _sources(dependencies)
-        # IR-827 has no account-specific OpenRouter evidence yet. The approved
-        # proxy seam can be exercised through the recording provider only.
-        if sources and pin.adapter != "recording":
-            raise AdmissionDenied(errors.PROVIDER_REFUSED)
-        if sources and (self.stage != "development" or self.proxy_approval is None
-                        or not self.proxy_approval.permits(pin, account, campaign, sources)):
+        pilot = pin.adapter == "openai-compatible" and pin.endpoint == OPENROUTER
+        if (sources or pilot) and (self.stage != "development" or self.proxy_approval is None
+                                   or not self.proxy_approval.permits(pin, account, campaign, sources,
+                                                                      routing, price)):
             raise AdmissionDenied(errors.WITHHELD)
         try:
             conn = await asyncpg.connect(self.dsn)
@@ -171,8 +210,7 @@ class SendGuard:
             raise AdmissionDenied(errors.ACCESS_REVOKED)
         ids = sorted({source.record_id for source in sources})
         rows = await conn.fetch(
-            """SELECT r.id, r.origin, r.is_ip, r.embargo_answered_at,
-                      r.embargoed_until, r.embargo_released_at,
+            """SELECT r.id, r.origin, r.is_ip, r.is_embargoed, r.embargo_released_at,
                       cs.id AS chunk_set_id, cs.extraction_hash
                  FROM public.records_record r
                  JOIN public.ai_chunkset cs ON cs.record_id = r.id AND cs.is_active
@@ -186,7 +224,6 @@ class SendGuard:
             if (row is None or row["chunk_set_id"] != source.chunk_set_id
                     or row["extraction_hash"] != source.extraction_hash
                     or row["origin"] not in PROXY_ORIGINS or row["is_ip"] is not False
-                    or row["embargo_answered_at"] is None
-                    or (row["embargoed_until"] is not None
-                        and row["embargo_released_at"] is None)):
+                    or row["is_embargoed"] is not False
+                    or row["embargo_released_at"] is None):
                 raise AdmissionDenied(errors.WITHHELD)

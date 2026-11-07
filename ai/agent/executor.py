@@ -533,7 +533,7 @@ class _Run:
             summary, previous=self.handoff, compacted=compacted, passages=self.investigation.passages,
             plan=self.investigation.plan,
             state={"shown": state.get("shown", ()), "selected": self._focus("selected"),
-                   "excluded": self._focus("excluded")})
+                   "excluded": self._focus("excluded")}, entries=cut.summary())
         through = max([self.handoff_through, *compacted])
         outcome, revision = await self.context.commit_handoff(Handoff(
             body=body, through_ordinal=through, turns=tuple(body["turns"]), sources=tuple(body["sources"]),

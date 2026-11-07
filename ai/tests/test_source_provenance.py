@@ -2,8 +2,9 @@
 
 import json
 
+from ai.agent import checkpoint, compaction
 from ai.agent.dialect import ChatCompletions
-from ai.agent.protocol import AgentRequest, ModelTurn, Pin, StopReason, Text, ToolCall
+from ai.agent.protocol import AgentRequest, ModelTurn, Pin, StopReason, Text, ToolCall, ToolResult, User
 from ai.agent.tools import Investigation
 from ai.research.tools import OK, PassageRef, Source, ToolResult as Evidence
 
@@ -44,3 +45,37 @@ def test_unverified_prior_turn_is_marked_without_a_fake_source():
                       unverified_provenance=True)
     assert prior.unverified_provenance
     assert prior.dependencies == frozenset()
+
+
+def test_checkpoint_round_trips_source_manifests_and_refuses_old_format():
+    entries = (User("state", frozenset({SOURCE})),
+               ToolResult("call", "Public passage", frozenset({SOURCE})),
+               ModelTurn((Text("Finding"),), StopReason.END, dependencies=frozenset({SOURCE})))
+    for entry in entries:
+        restored = checkpoint._load_entry(checkpoint._entry(entry))
+        assert restored.dependencies == frozenset({SOURCE})
+    damaged = checkpoint._entry(entries[1])
+    del damaged["sources"]
+    try:
+        checkpoint._load_entry(damaged)
+    except KeyError:
+        pass
+    else:
+        raise AssertionError("checkpoint without a source manifest was accepted")
+    assert checkpoint.FORMAT == "agent-checkpoint-4"
+
+
+def test_compacted_handoff_keeps_source_and_unverified_prior_status():
+    summary = {"goal": "Answer", "findings": [], "preferences": [], "limitations": []}
+    state = {"shown": [], "selected": [], "excluded": []}
+    evidence = ToolResult("call", "Public passage", frozenset({SOURCE}))
+    body = compaction.build(summary, previous=None, compacted=[], passages={}, plan=[],
+                            state=state, entries=(evidence,))
+    handoff = compaction.render(body, {}, passages=False)
+    assert handoff.dependencies == frozenset({SOURCE})
+    assert not handoff.unverified_provenance
+    legacy = ModelTurn((Text("Unknown earlier answer"),), StopReason.END,
+                       unverified_provenance=True)
+    body = compaction.build(summary, previous=None, compacted=[], passages={}, plan=[],
+                            state=state, entries=(evidence, legacy))
+    assert compaction.render(body, {}, passages=False).unverified_provenance

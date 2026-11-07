@@ -76,6 +76,8 @@ class User:
     text: str
     #: Sources in application-supplied context, not the reader's own words.
     dependencies: frozenset = frozenset()
+    #: Older derived context without a complete source manifest cannot be resent.
+    unverified_provenance: bool = False
 
 
 @dataclass(frozen=True)

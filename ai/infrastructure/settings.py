@@ -87,6 +87,7 @@ class Settings(BaseSettings):
     AGENT_LLM_CAPABILITIES: str = ""
     AGENT_LLM_DATA_POLICY: str = ""
     AGENT_LLM_CAPACITIES: str = ""
+    AGENT_LLM_ROUTING: str = ""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

@@ -24,6 +24,7 @@ REQUIRED = (
 )
 #: Every `Capacity` field must be stated; `max_reasoning_tokens` may be null.
 CAPACITY_FIELDS = tuple(f.name for f in fields(Capacity))
+OPENROUTER = "https://openrouter.ai/api/v1"
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,7 @@ class AgentProviderConfig:
     capabilities: frozenset[str]
     data_policy: str
     capacities: Mapping[str, Capacity]
+    routing: Mapping | None = None
 
     def __repr__(self) -> str:
         return f"AgentProviderConfig(endpoint={self.endpoint!r}, models={sorted(self.models)!r})"
@@ -78,6 +80,27 @@ def read(values) -> AgentProviderConfig:
     unlisted = sorted(set(declared) - models)
     if unlisted:
         raise NotConfigured(f"AGENT_LLM_CAPACITIES names models not in AGENT_LLM_MODELS: {', '.join(unlisted)}")
+    routing = None
+    if endpoint == OPENROUTER:
+        try:
+            routing = json.loads(_raw(values, "AGENT_LLM_ROUTING"))
+        except ValueError:
+            raise NotConfigured("AGENT_LLM_ROUTING must be valid JSON") from None
+        if not isinstance(routing, dict) or set(routing) != {
+                "only", "allow_fallbacks", "data_collection", "zdr", "max_price", "require_parameters"}:
+            raise NotConfigured("AGENT_LLM_ROUTING must name the exact OpenRouter provider controls")
+        only = routing["only"]
+        prices = routing["max_price"]
+        if (not isinstance(only, list) or not only or len(only) > 4
+                or any(not isinstance(tag, str) or not tag or "/" not in tag for tag in only)
+                or len(set(only)) != len(only)
+                or routing["allow_fallbacks"] is not False
+                or routing["data_collection"] != "deny" or routing["zdr"] is not True
+                or routing["require_parameters"] is not True
+                or not isinstance(prices, dict) or set(prices) != {"prompt", "completion"}
+                or any(type(value) not in (int, float) or not 0 < value < 100
+                       for value in prices.values())):
+            raise NotConfigured("AGENT_LLM_ROUTING must restrict provider, retention and price")
     return AgentProviderConfig(
         endpoint=endpoint,
         api_key=_raw(values, "AGENT_LLM_API_KEY"),
@@ -85,4 +108,5 @@ def read(values) -> AgentProviderConfig:
         capabilities=_names(values, "AGENT_LLM_CAPABILITIES"),
         data_policy=_raw(values, "AGENT_LLM_DATA_POLICY"),
         capacities={model: _capacity(model, entry) for model, entry in declared.items()},
+        routing=routing,
     )

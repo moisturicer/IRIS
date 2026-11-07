@@ -26,7 +26,26 @@ from ai.research.tools import Count, PassageRef, Reading, Source, Span
 
 #: -2 adds the compact handoff the history opens with (IR-734); -3 adds the digest of the instructions and
 #: tool schemas the history was sent under (IR-736). An earlier body is rebuilt, never misread.
-FORMAT = "agent-checkpoint-3"
+FORMAT = "agent-checkpoint-4"
+
+
+def _sources(entry) -> list[dict]:
+    return [asdict(source) for source in sorted(entry.dependencies,
+            key=lambda source: (source.record_id, source.chunk_set_id, source.extraction_hash))]
+
+
+def _load_sources(raw) -> frozenset[Source]:
+    if not isinstance(raw, list):
+        raise ValueError("missing source manifest")
+    if any(not isinstance(item, dict) or set(item) != {"record_id", "chunk_set_id", "extraction_hash"}
+           or type(item["record_id"]) is not int or type(item["chunk_set_id"]) is not int
+           or not isinstance(item["extraction_hash"], str) for item in raw):
+        raise ValueError("invalid source manifest")
+    sources = frozenset(Source(**source) for source in raw)
+    if len(sources) != len(raw) or any(s.record_id < 1 or s.chunk_set_id < 1 or not s.extraction_hash
+                                       for s in sources):
+        raise ValueError("invalid source manifest")
+    return sources
 
 
 def prefix_digest(instructions: str, tools) -> str:
@@ -68,12 +87,15 @@ def _item(item) -> dict:
 
 def _entry(entry) -> dict:
     if isinstance(entry, User):
-        return {"t": "user", "text": entry.text}
+        return {"t": "user", "text": entry.text, "sources": _sources(entry),
+                "unverified": entry.unverified_provenance}
     if isinstance(entry, ToolResult):
-        return {"t": "result", "call_id": entry.call_id, "content": entry.content}
+        return {"t": "result", "call_id": entry.call_id, "content": entry.content,
+                "sources": _sources(entry), "control_only": entry.control_only}
     return {"t": "model", "stop": entry.stop.value, "reasoned": entry.reasoned,
             "input_tokens": entry.input_tokens, "output_tokens": entry.output_tokens,
-            "items": [_item(i) for i in entry.items]}
+            "items": [_item(i) for i in entry.items], "sources": _sources(entry),
+            "unverified": entry.unverified_provenance}
 
 
 def _load_item(raw: dict):
@@ -90,13 +112,16 @@ def _load_item(raw: dict):
 def _load_entry(raw: dict):
     kind = raw["t"]
     if kind == "user":
-        return User(raw["text"])
+        return User(raw["text"], _load_sources(raw["sources"]), raw["unverified"] is True)
     if kind == "result":
-        return ToolResult(raw["call_id"], raw["content"])
+        return ToolResult(raw["call_id"], raw["content"], _load_sources(raw["sources"]),
+                          raw["control_only"] is True)
     if kind == "model":
         return ModelTurn(items=tuple(_load_item(i) for i in raw["items"]), stop=StopReason(raw["stop"]),
                          reasoned=bool(raw["reasoned"]), input_tokens=raw["input_tokens"],
-                         output_tokens=raw["output_tokens"])
+                         output_tokens=raw["output_tokens"],
+                         dependencies=_load_sources(raw["sources"]),
+                         unverified_provenance=raw["unverified"] is True)
     raise ValueError(kind)
 
 
