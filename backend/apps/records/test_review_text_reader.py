@@ -133,6 +133,51 @@ def test_a_bold_word_off_to_the_right_is_a_table_cell_not_a_heading(read):
     assert keys(reading) == ["results", "discussion"]
 
 
+@pytest.mark.parametrize("heading", ["References", "6. REFERENCES", "Bibliography", "Literature Cited"])
+def test_each_reference_entry_is_one_passage(read, heading):
+    # sample14 split an entry at its year, "(2024).", and smartcities at each
+    # abbreviated journal name, "J. Clean." / "Prod.". Body text still splits.
+    reading = read(placed([[
+        (72, "Times-Bold", 12, "Conclusion"),
+        (72, BODY, 11, "Enrolment grew in every program. Women gained the most in architecture."),
+        (72, "Times-Bold", 12, heading),
+        (72, BODY, 11, "Torres, C. S., & Narsico, P. G. (2024). Gender trends in engineering. J. Eng."),
+        (108, BODY, 11, "Educ. Res. 12(3), 45-60."),
+        (72, BODY, 11, "Lim, A. (2021). Waste to energy in Cebu. J. Clean. Prod. 8, 1-13."),
+    ]]))
+    by_key = {s["key"]: [p["text"] for p in s["passages"]] for s in reading["sections"]}
+    assert by_key["conclusion"] == ["Enrolment grew in every program.", "Women gained the most in architecture."]
+    assert list(by_key.values())[1] == [
+        "Torres, C. S., & Narsico, P. G. (2024). Gender trends in engineering. J. Eng. Educ. Res. 12(3), 45-60.",
+        "Lim, A. (2021). Waste to energy in Cebu. J. Clean. Prod. 8, 1-13.",
+    ]
+
+
+def test_a_web_address_broken_across_lines_stays_in_its_entry(read):
+    # sample1, 18, 20: a DOI broken after a hyphen, its tail on the next line
+    # at another position, opened an entry of its own or glued onto the next.
+    reading = read(placed([[
+        (72, "Times-Bold", 12, "References"),
+        (72, BODY, 11, "Navarro, A. (2016). Procurement reforms. Earth and Environmental Science, 1067(1)."),
+        (108, BODY, 11, "https://doi.org/10.1088/1755-"),
+        (200, BODY, 11, "1315/1067/1/012044"),
+        (72, BODY, 11, "Gefen, D. (2000). E-commerce: The role of familiarity and trust in online"),
+        (108, BODY, 11, "shopping. Omega, 28(6), 725-737."),
+        # sample20: an address ending on a full stop ends its entry.
+        (72, BODY, 11, "Abrigo, M. R. M., & Tam, Z. C. (2021). Public sector procurement of medicines in the"),
+        (108, BODY, 11, "Philippines. http://hdl.handle.net/11540/14719."),
+        (72, BODY, 11, "Cui, R. (2018). Problems of bidding for construction projects."),
+    ]]))
+    assert [p["text"] for s in reading["sections"] for p in s["passages"]] == [
+        "Navarro, A. (2016). Procurement reforms. Earth and Environmental Science, 1067(1). "
+        "https://doi.org/10.1088/1755-1315/1067/1/012044",
+        "Gefen, D. (2000). E-commerce: The role of familiarity and trust in online shopping. Omega, 28(6), 725-737.",
+        "Abrigo, M. R. M., & Tam, Z. C. (2021). Public sector procurement of medicines in the Philippines. "
+        "http://hdl.handle.net/11540/14719.",
+        "Cui, R. (2018). Problems of bidding for construction projects.",
+    ]
+
+
 BODY_TEXT = ["The study asked how the curriculum prepares nurses for new tools in care.",
              "It reads the literature and proposes a model for teaching the use of them."]
 

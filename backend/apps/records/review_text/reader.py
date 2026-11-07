@@ -428,6 +428,13 @@ def _ends_entry(word) -> bool:
     return bool(re.search(r"[.!?][\"”’')\]]*$", word) or URL.search(word))
 
 
+def _url_broken(word) -> bool:
+    """Does ``word`` end a line inside a web address, cut at a hyphen, slash
+    or underscore, as "https://doi.org/10.1088/1755-" over "1315/1067/1/012044"?
+    A full stop isn't one: an entry ends on its address and a full stop."""
+    return bool(URL.search(word)) and word.endswith(("-", "/", "_"))
+
+
 def _continues_text(word) -> bool:
     """Does a line opening on ``word`` carry on what came before? Lower case,
     or a web address wrapped onto its own line."""
@@ -617,7 +624,8 @@ def _structure(pages):
     def flush():
         if para:
             paragraph[0] += 1
-            sections[-1]["passages"].extend(_sentences(para, known, paragraph[0], pages))
+            sections[-1]["passages"].extend(_sentences(
+                para, known, paragraph[0], pages, whole=_is_references(sections[-1]["heading"])))
             para.clear()
 
     for it in stream:
@@ -742,6 +750,9 @@ def _structure(pages):
         if _continues_text(line[0]["text"]):
             indented = False
         indented = indented or outdented
+        # A web address cut at "-" or "/" carries on, wherever its tail starts.
+        if prev_line[0] is not None and _url_broken(prev_line[0][4]):
+            indented = False
         gap = bool(para) and last_top is not None and page == para[-1][1] and top - last_top > line_gap * 1.6
         size = _size(line)
         resized = bool(para) and para_size[0] is not None and abs(size - para_size[0]) > SIZE_BREAK
@@ -831,7 +842,18 @@ def _unreliable(sections) -> list:
     return reasons
 
 
-def _sentences(para, known, paragraph, pages):
+REFERENCE_HEADINGS = {"references", "reference", "reference list", "list of references", "references cited",
+                      "bibliography", "literature cited", "works cited", "sources"}
+
+
+def _is_references(heading) -> bool:
+    """Whether a section heading opens a reference list, numbered or not."""
+    return NUMBERING.sub("", heading or "").strip(" .:").lower() in REFERENCE_HEADINGS
+
+
+def _sentences(para, known, paragraph, pages, whole=False):
+    """A paragraph's sentences, or the paragraph as one passage when ``whole``:
+    a reference entry, whose "(2024)." and "J. Clean. Prod." end no sentence."""
     # Join lines; repair a word hyphenated across a line break.
     tokens = []   # (text, [words])
     i = 0
@@ -841,6 +863,12 @@ def _sentences(para, known, paragraph, pages):
             i += 1
             continue
         nxt = para[i + 2] if i + 2 < len(para) and para[i + 1][0] == "\n" else None
+        if nxt and _url_broken(t):
+            # The address goes on with no space, its hyphen kept: most DOIs
+            # hold one ("1755-1315"), and a reader can't tell the rest apart.
+            tokens.append((t + nxt[0], [w, nxt[2]]))
+            i += 3
+            continue
         if t.endswith("-") and len(t) > 1 and nxt and nxt[0][:1].isalpha():
             head, tail = t[:-1], nxt[0]
             if _keeps_hyphen(head, tail, known):
@@ -870,7 +898,8 @@ def _sentences(para, known, paragraph, pages):
         return not re.search(r"(^|\s)[A-Z]\.$", before)
 
     out, start = [], 0
-    for end in [m.end() for m in SENTENCE_END.finditer(text) if splits_here(m)] + [len(text)]:
+    ends = [] if whole else [m.end() for m in SENTENCE_END.finditer(text) if splits_here(m)]
+    for end in ends + [len(text)]:
         chunk = text[start:end].strip()
         if chunk:
             ws = [w for s, e, wl in spans if s < end and e > start for w in wl if w]
