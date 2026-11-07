@@ -56,6 +56,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-637** | An Excel import row is all-or-nothing: its Record, primary owner and authors are saved together or not at all | [details](traceability/IR-637.md) | **IMPLEMENTED** |
 | **IR-638** | A cell value the system cannot accept skips its import row and says why | [details](traceability/IR-638.md) | **IMPLEMENTED** |
 | **IR-667** | System settings are readable and writable by RDCO only; a PATCH cannot create a key; every change is audited | [details](traceability/IR-667.md) | **IMPLEMENTED** |
+| **IR-794** | A daily job erases personal data past the retention period the System Admin sets; a blank period erases nothing, and audit rows are never touched. Subtask 15 of IR-779 (ADR-051 decision 19) | [details](traceability/IR-794.md) | **PARTIAL** |
 | FR-M3-02 | Semantic indexing | [details](traceability/FR-M3-02.md) | **PARTIAL** |
 | FR-M3-03 | Vector embeddings | [details](traceability/FR-M3-03.md) | **PARTIAL** |
 | FR-M4-01 | RAG chatbot (Ask IRIS) | [details](traceability/FR-M4-01.md) | **PARTIAL** |

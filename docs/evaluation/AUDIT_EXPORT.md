@@ -55,6 +55,8 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 `SYSTEM_SETTING_CHANGED` is an administrative event, excluded from workflow metrics. The actor is the System Admin that changed the setting (RDCO before IR-781). Metadata contains `key`, `old_value` and `new_value`. Writing the value a setting already holds records nothing.
 
+`RETENTION_CLEANUP_RUN` (IR-794) is an administrative event, excluded from workflow metrics. The daily retention cleanup writes one each run, with no actor and no record, even when every period is blank. Metadata is `counts`, the number of rows erased per data type (`{"download_notes": 0}`), and never a name, an email or any erased text.
+
 `RESEARCH_METADATA_CORRECTED` is an administrative metadata event, excluded from workflow metrics. The actor is the active superuser named by the correction command. Metadata contains `reason`, per-record `evidence`, and `before`/`after` objects with `origin`, nullable `publication_year`, and ordered `authors`. Corrections and audit rows share one transaction: failure rolls back the entire manifest. Dry runs produce no audit rows.
 
 ### Download requests (IR-688, ADR-048)
