@@ -922,8 +922,15 @@ class RunStore:
                 f"SELECT EXISTS (SELECT 1 FROM iris_ai.turn t WHERE t.run_id = $1 AND {COUNTED_UNREADABLE})",
                 run_id,
             )
+            # The run's Turn also rests on every earlier Turn it carried (IR-721).
+            carried_current = await conn.fetchval(
+                f"SELECT NOT EXISTS (SELECT 1 FROM iris_ai.turn t WHERE t.run_id = $1"
+                f" AND NOT ({CURRENT_SOURCE_TURN}))",
+                run_id,
+            )
             evidence["sources_available"] = (
-                {row["revision"] for row in current} == dependencies and not counted_unreadable)
+                {row["revision"] for row in current} == dependencies and not counted_unreadable
+                and carried_current)
         return {
             **evidence,
             "id": str(run["id"]),
