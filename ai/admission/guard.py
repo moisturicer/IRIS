@@ -47,7 +47,7 @@ def _routed_policy(pin, routing, price) -> bool:
         return False
     only, cap = routing["only"], routing["max_price"]
     return (isinstance(only, list) and bool(only) and len(only) <= 4
-            and all(isinstance(tag, str) and "/" in tag for tag in only)
+            and all(isinstance(tag, str) and tag.strip() == tag != "" for tag in only)
             and len(set(only)) == len(only)
             and routing["allow_fallbacks"] is False and routing["data_collection"] == "deny"
             and routing["zdr"] is True and routing["require_parameters"] is True

@@ -27,17 +27,17 @@ This decision permits implementation and, once the conditions below are met, act
 
 **Account evidence.** OpenRouter organization *Hackarambolas*, workspace **IRIS**, key `iris`. ZDR is required for all models, OpenAI first-party endpoints are disabled, and every training and publishing toggle is off, as observed 2026-11-07 and recorded on IR-827. Safety Retention is not an option for Luna: OpenRouter offers it only for Google and "all other models", and Luna is in the OpenAI group.
 
-**Routing (`AGENT_LLM_ROUTING`).** One global endpoint at Luna's base price. `amazon-bedrock/global` accepts the adapter's `max_tokens` and `tools`, and is reachable under ZDR. `azure` is the same price but lists only `max_completion_tokens`, so `require_parameters` would skip it.
+**Routing (`AGENT_LLM_ROUTING`).** Global Azure at Luna's base price, zero-retention. The 2026-11-07 smoke showed that `amazon-bedrock/global` is not a zero-retention endpoint for Luna: OpenRouter refused every request with `zdr: true`, failing at "Filter by Data Policy". `azure` accepted the adapter's `max_tokens` and tools. `max_price` excludes the dearer `azure/us` and `azure/eu`.
 
 ```json
-{"only":["amazon-bedrock/global"],"allow_fallbacks":false,"data_collection":"deny","zdr":true,"require_parameters":true,"max_price":{"prompt":0.1,"completion":0.5}}
+{"only":["azure"],"allow_fallbacks":false,"data_collection":"deny","zdr":true,"require_parameters":true,"max_price":{"prompt":0.1,"completion":0.5}}
 ```
 
-Routing digest (`ai.admission.guard.routing_digest`): `7f600dc2738b1f80070a0c972c4c0cd2c7c36292c0d0f4eac266048d68c41421`.
+Routing digest (`ai.admission.guard.routing_digest`): `e601031fde08362611a9d69b332e9a49dd770246878b6a89544ee32e50b5cad5`.
 
 **Price (`AI_ADMISSION_PRICES`).** `"openai/gpt-6-luna:floor": {"input": 0.1, "output": 0.5}` US$ per million tokens: the endpoint's price for prompts under 272,000 tokens. The capacity below keeps every request under that size, so the long-prompt price ($0.20 / $0.75) can't apply. Listing read from OpenRouter's endpoints API on 2026-11-07.
 
-*Superseded the same day:* `amazon-bedrock/us-east-1` + `azure/us` at $0.22 / $0.825. Those regional endpoints cost 10% more, and that price assumed the long-prompt tier, which the capacity cap already rules out.
+*Superseded the same day:* `amazon-bedrock/global` (not zero-retention for Luna), and before it `amazon-bedrock/us-east-1` + `azure/us` at $0.22 / $0.825. Those regional endpoints cost 10% more, and that price assumed the long-prompt tier, which the capacity cap already rules out.
 
 **Capacity (`AGENT_LLM_CAPACITIES`).** Conservative, not measured:
 
@@ -53,6 +53,8 @@ Routing digest (`ai.admission.guard.routing_digest`): `7f600dc2738b1f80070a0c972
 * `RUNS_PROXY_SEND_APPROVAL` naming the exact proxy sources, with an expiry.
 
 Both are local `ai/.env` values and are never committed.
+
+**First paid smoke, 2026-11-07.** One ordinary-depth proxy question (`proxy_starter.json` q01), asked as `student@cit.edu`, ran on run `70843937`. It completed `answered` in 92 s and cited the expected paper. It used 4 attempts, all settled with reported usage: 34,083 input and 1,128 output tokens, charged **US$0.0040**. Earlier attempts the same day sent nothing (local configuration was not loaded), and one sent request was refused by OpenRouter's data-policy filter with no reported usage. That request is charged at its reservation, US$0.0047.
 
 ## Fastest useful sequence
 

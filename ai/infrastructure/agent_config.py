@@ -92,7 +92,7 @@ def read(values) -> AgentProviderConfig:
         only = routing["only"]
         prices = routing["max_price"]
         if (not isinstance(only, list) or not only or len(only) > 4
-                or any(not isinstance(tag, str) or not tag or "/" not in tag for tag in only)
+                or any(not isinstance(tag, str) or not tag or tag.strip() != tag for tag in only)
                 or len(set(only)) != len(only)
                 or routing["allow_fallbacks"] is not False
                 or routing["data_collection"] != "deny" or routing["zdr"] is not True
