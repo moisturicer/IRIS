@@ -238,6 +238,13 @@ export const SCREENS: Screen[] = [
     primary: (p) => p.getByRole("button", { name: "Save" }), primaryLabel: "Save",
   },
   {
+    // Another person's Profile (IR-700): sample people until IR-696 ships, so no API mock is read.
+    id: "person-profile", path: "/people/101", route: "/people/:id", role: "Student",
+    mocks: wrap("Student"),
+    heading: "Marites C. Villanueva",
+    primary: (p) => p.getByRole("button", { name: "Show more advised papers" }), primaryLabel: "Show more advised papers",
+  },
+  {
     id: "settings", path: "/settings", route: "/settings", role: "Student",
     mocks: wrap("Student"),
     heading: "Settings",
