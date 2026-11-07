@@ -16,13 +16,13 @@ grades whatever a run file left ungraded and rewrites the report;
 ``--reuse-django`` collects only the agent and keeps the earlier Django answers,
 for rerunning the agent arm after a runtime change.
 
-Reader A's JWT is ``IRIS_EVAL_TOKEN`` and reader B's ``IRIS_EVAL_TOKEN_B``; they
-go only into Authorization headers.
+``--reader-a`` and ``--reader-b`` name the two readers by email. Every request
+carries a token minted for it, so a run outlives the token lifetime; tokens go
+only into Authorization headers.
 """
 
 from __future__ import annotations
 
-import os
 import time
 from pathlib import Path
 
@@ -39,25 +39,36 @@ from apps.ai.evaluation.runtime_replay import (DEFAULT_DEADLINE_SECONDS, Runtime
                                                collect_case_runtime)
 from apps.ai.controller.versions import LEGACY_ENGINE, NEW_RUN_ENGINE
 
-TOKEN_ENV = {"a": "IRIS_EVAL_TOKEN", "b": "IRIS_EVAL_TOKEN_B"}
 DEFAULT_OUT = "../docs/evaluation/runs"
 
 
-def _token(reader: str) -> str:
-    token = os.environ.get(TOKEN_ENV[reader], "").strip()
-    if not token:
-        raise CommandError(f"{TOKEN_ENV[reader]} must hold reader {reader.upper()}'s JWT")
-    return token
+def _user(email, reader: str):
+    from django.contrib.auth import get_user_model
+
+    if not email:
+        raise CommandError(f"--reader-{reader} must name reader {reader.upper()} by email")
+    user = get_user_model().objects.filter(email__iexact=email, is_active=True).first()
+    if user is None:
+        raise CommandError(f"no active account for reader {reader.upper()}")
+    return user
 
 
-def _user(token: str):
-    from rest_framework_simplejwt.authentication import JWTAuthentication
+def _bearer(user):
+    """Headers with a token minted per request: a run lasts longer than one token."""
+    from rest_framework_simplejwt.tokens import AccessToken
 
-    auth = JWTAuthentication()
-    try:
-        return auth.get_user(auth.get_validated_token(token))
-    except Exception as exc:
-        raise CommandError(f"an evaluation token is not valid here: {exc}") from None
+    return lambda: {"Authorization": f"Bearer {AccessToken.for_user(user)}"}
+
+
+def _stray_attempts(since, rows) -> list[str]:
+    """Campaign attempts made during collection that no case accounts for."""
+    ours = {a["id"] for arm in rows.values() for row in arm.values()
+            for turn in row.get("turns") or () for a in turn.get("physical_attempts") or ()}
+    stray = sorted(a["id"] for a in since if a["id"] not in ours)
+    if not stray:
+        return []
+    return [f"the campaign charged attempts no case made ({', '.join(map(str, stray))}); "
+            "other work shared the campaign during the run"]
 
 
 def measure_access(data, users) -> tuple[aq.Access, list[str]]:
@@ -109,16 +120,19 @@ def _served_model_problems(rows, runtime_model) -> list[str]:
 
 
 class _Reader:
-    def __init__(self, token):
-        self.client = APIClient()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Bearer {token}",
+    def __init__(self, user):
+        self.client, self.headers = APIClient(), _bearer(user)
+
+    def _fresh(self):
+        self.client.credentials(HTTP_AUTHORIZATION=self.headers()["Authorization"],
                                 HTTP_X_IRIS_PROTOCOL="public-1")
+        return self.client
 
     def post(self, path, payload):
-        return self.client.post(path, payload, format="json")
+        return self._fresh().post(path, payload, format="json")
 
     def get(self, path):
-        return self.client.get(path)
+        return self._fresh().get(path)
 
 
 class DjangoAttempts(CampaignAttempts):
@@ -169,6 +183,8 @@ class Command(BaseCommand):
         parser.add_argument("--rescore", metavar="RUN")
         parser.add_argument("--reuse-django", metavar="RUN",
                             help="Keep this run file's Django answers; collect only the agent.")
+        parser.add_argument("--reader-a", metavar="EMAIL")
+        parser.add_argument("--reader-b", metavar="EMAIL")
         parser.add_argument("--runtime-url")
         parser.add_argument("--runtime-model",
                             help="The model the runtime deployment answers with.")
@@ -301,7 +317,7 @@ class Command(BaseCommand):
         import uuid
 
         limits, answer_model = self._preconditions(options)
-        users = {reader: _user(_token(reader)) for reader in aq.READERS}
+        users = {r: _user(options[f"reader_{r}"], r) for r in aq.READERS}
         access, problems = measure_access(data, users)
         if problems:
             raise CommandError("access state is not what the set needs:\n  "
@@ -316,14 +332,12 @@ class Command(BaseCommand):
                 raise CommandError("the reused Django run answered with another model")
         django_attempts = DjangoAttempts(limits.campaign_key)
         runtime_attempts = RuntimeAttempts(limits.campaign_key)
-        if previous is None and CampaignAttempts(limits.campaign_key).snapshot() != 0:
-            raise CommandError("the campaign already has attempts; use a fresh dedicated "
-                               "campaign key so every charge is this run's")
+        watermark = CampaignAttempts(limits.campaign_key).snapshot()
         caps = {"case_attempts": 10 ** 6}
-        readers = {r: _Reader(_token(r)) for r in aq.READERS}
-        seams = {r: RuntimeSeam(httpx.Client(
-            base_url=options["runtime_url"], headers={"Authorization": f"Bearer {_token(r)}"},
-            timeout=options["run_deadline_seconds"])) for r in aq.READERS}
+        readers = {r: _Reader(users[r]) for r in aq.READERS}
+        seams = {r: RuntimeSeam(httpx.Client(base_url=options["runtime_url"],
+                                             timeout=options["run_deadline_seconds"]),
+                                headers=_bearer(users[r])) for r in aq.READERS}
 
         def django(case):
             return collect_case(readers[case["reader"]], _scope(case, access),
@@ -352,6 +366,9 @@ class Command(BaseCommand):
         conditions = [] if after.as_dict() == access.as_dict() else [
             "access state changed during the run"]
         conditions += _served_model_problems(rows.get("agent", {}), options["runtime_model"])
+        if previous is None:
+            conditions += _stray_attempts(
+                CampaignAttempts(limits.campaign_key).since(watermark), rows)
         run_id = str(uuid.uuid4())
         record = {
             "schema": "answer-quality-run-1", "run_id": run_id, "ticket": "IR-956",

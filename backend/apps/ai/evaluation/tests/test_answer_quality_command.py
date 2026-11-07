@@ -108,3 +108,25 @@ def test_the_committed_lock_freezes_the_committed_set_with_its_pinned_grader():
     data = json.loads(SET.read_text(encoding="utf-8"))
     assert lock["grader_model"] == "anthropic/claude-haiku-5.5"
     assert aq.check_lock(data, lock, grader_model=lock["grader_model"]) == []
+
+
+def test_every_request_carries_a_freshly_minted_reader_token():
+    from types import SimpleNamespace
+
+    from rest_framework_simplejwt.tokens import AccessToken
+
+    from apps.ai.management.commands.eval_answer_quality import _bearer
+
+    headers = _bearer(SimpleNamespace(id=7, pk=7))
+    first, second = headers()["Authorization"], headers()["Authorization"]
+    assert first.startswith("Bearer ") and first != second
+    assert str(AccessToken(second.removeprefix("Bearer "))["user_id"]) == "7"
+
+
+def test_a_campaign_attempt_no_case_accounts_for_is_a_condition_problem():
+    from apps.ai.management.commands.eval_answer_quality import _stray_attempts
+
+    rows = {"django": {"F01-01": {"turns": [{"physical_attempts": [{"id": 11}]}]}},
+            "agent": {"F01-01": {"turns": [{"physical_attempts": [{"id": 12}]}]}}}
+    assert _stray_attempts([{"id": 11}, {"id": 12}], rows) == []
+    assert "13" in _stray_attempts([{"id": 11}, {"id": 13}], rows)[0]

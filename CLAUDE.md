@@ -396,8 +396,8 @@ python manage.py eval_answer_quality --set ../docs/evaluation/answer-quality/ans
                                    # checks + a pinned model grader, rubric aq-rubric-1) and
                                    # reported pass/fail against IR-955's bar. --write-lock L
                                    # --grader-model M freezes it (never rewritten); --run needs the
-                                   # lock, enforced admission on a fresh campaign, both readers'
-                                   # JWTs (IRIS_EVAL_TOKEN, IRIS_EVAL_TOKEN_B), --runtime-url and
+                                   # lock, enforced admission on the runtime's campaign, both readers
+                                   # by email (--reader-a, --reader-b), --runtime-url and
                                    # --runtime-model; --rescore and --reuse-django finish or redo a
                                    # run. --validate verified 2026-11-07; frozen 2026-11-08 with grader
                                    # anthropic/claude-haiku-5.5 (owner's choice) in

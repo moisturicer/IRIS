@@ -69,8 +69,8 @@ The run checks each of these and refuses to send anything until all hold:
 
 - **Catalogue.** The database publishes exactly the 40 corpus papers, each title on one Record. Reader A and reader B can both read all of them. `seed_demo` also publishes 8 records, so a database that holds them fails this check: the count labels assume 40.
 - **Private paper.** "Proving and Improving the Platonic Representation Hypothesis with JEPAs" exists unpublished. It is readable by reader A (its owner) and not by reader B. It is chunked and embedded, which in development means using IR-317's disclosure bypass.
-- **Readers.** `IRIS_EVAL_TOKEN` holds reader A's JWT and `IRIS_EVAL_TOKEN_B` reader B's.
-- **Admission.** `AI_PROVIDER_ADMISSION=enforce`, with a **fresh, dedicated** campaign key that the runtime deployment shares.
+- **Readers.** `--reader-a` and `--reader-b` name two active accounts by email. Every request carries a token minted for it, so the run outlives the 30-minute token lifetime.
+- **Admission.** `AI_PROVIDER_ADMISSION=enforce`, with the campaign key the runtime deployment uses. The campaign may carry earlier charges: the run counts only attempts made after it starts. Any attempt during the run that no case made means other work shared the campaign, and that is a condition problem.
 - **Django settings.** `AI_DURABLE_ASK` is off and `AI_EVIDENCE_DECISION=off`.
 - **One model.** The runtime answers with the same model as Django's `answer` profile, passed as `--runtime-model`.
 - **One campaign.** The runtime charges the same campaign key, under the same per-run ceiling, because the budget gate reads Django's. After collection the run checks the runtime's charged attempts. If the runtime answered but charged nothing to this campaign, or answered with any model other than `--runtime-model`, that is a condition problem, and a condition problem fails the verdict.
@@ -78,7 +78,7 @@ The run checks each of these and refuses to send anything until all hold:
 ## The run
 
 ```bash
-python manage.py eval_answer_quality --set ../docs/evaluation/answer-quality/answer-quality-v1.json --lock ../docs/evaluation/answer-quality/answer-quality-v1.lock.json --grader-model <model> --run --runtime-url <reader origin> --runtime-model <model>
+python manage.py eval_answer_quality --set ../docs/evaluation/answer-quality/answer-quality-v1.json --lock ../docs/evaluation/answer-quality/answer-quality-v1.lock.json --grader-model <model> --run --reader-a <email> --reader-b <email> --runtime-url <reader origin> --runtime-model <model>
 ```
 
 **Collection.** Each case goes through Django and then through the runtime before the next case starts, so a stop affects both engines alike. Before a case starts, its worst case is compared with what is left of the campaign. That worst case is every turn of both engines plus two grading calls, each at the per-run ceiling. A case that might not fit is not sent, and it and every later case are reported as not run and scored as failures.
