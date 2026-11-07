@@ -18,10 +18,10 @@ Exempt by design, and listed so that a new exemption is a visible decision:
 - the routes `notice.ALLOWED_WHILE_UNANSWERED` names (read the notice, answer it,
   sign out), and
 - routes whose view has **no authentication class at all** -- token refresh and
-  the two password-recovery routes. They never look at a token, so there is no
+  the two password-recovery routes and the activation confirm (IR-928). They never look at a token, so there is no
   signed-in person for the block to stop.
 
-Sign-in, registration and email activation are *not* exempt: they do run the
+Sign-in, registration and the old email-activation link are *not* exempt: they do run the
 authentication class, so a request that carries an unanswered person's token is
 refused there too, as "every other API call" says. A client that wants to sign
 in as someone else signs out first, which is allowed.
@@ -49,6 +49,7 @@ NO_AUTHENTICATION = frozenset({
     ("accounts", "token-refresh"),
     ("accounts", "password-reset-request"),
     ("accounts", "password-reset-confirm"),
+    ("accounts", "auth-activate-confirm"),
 })
 
 
