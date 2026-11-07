@@ -5,8 +5,8 @@ import socket
 import pytest
 
 from apps.records.review_text import reader, sandbox
-from apps.records.review_text.testing import (BODY, THESIS, blank, mixed_font_words, pdf, two_columns,
-                                               white_boxed_columns)
+from apps.records.review_text.testing import (BODY, THESIS, blank, mixed_font_words, pdf, sized_headings,
+                                               two_columns, white_boxed_columns)
 
 
 @pytest.fixture
@@ -99,6 +99,38 @@ def test_a_word_set_partly_in_another_font_stays_whole(read):
     assert texts(reading) == ["The use of artificial intelligence in Nursing's care models grows.",
                               "The Human-AI model guides the curriculum.",
                               "The students' perceptions were mixed."]
+
+
+BODY_TEXT = ["The study asked how the curriculum prepares nurses for new tools in care.",
+             "It reads the literature and proposes a model for teaching the use of them."]
+
+
+@pytest.mark.parametrize("font", [BODY, "Times-Italic"])
+def test_a_heading_set_larger_than_the_body_is_found(read, font):
+    # sample21: 12 pt headings over a 10 pt body, in fonts not named bold.
+    reading = read(sized_headings([("Introduction", BODY_TEXT), ("Paper Design", BODY_TEXT),
+                                   ("Theoretical Framework", BODY_TEXT)], heading_font=font))
+    assert keys(reading) == ["introduction", "paper design", "theoretical framework"]
+
+
+@pytest.mark.parametrize("line", [
+    "Nurses must learn to question what a tool suggests.",
+    "Error = | predicted probability - actual class |",   # sample6: a formula
+    "Cando, Jean Marie *, Lizares, Estela, Villacastin",  # sample12: authors
+    "Judith Ismael, PhD 3 , Sitti Ali, MAN 1",           # sample21: authors and marks
+])
+def test_a_larger_line_that_is_no_heading_stays_text(read, line):
+    reading = read(sized_headings([("Introduction", BODY_TEXT), (line, BODY_TEXT)]))
+    assert keys(reading) == ["introduction"]
+
+
+@pytest.mark.parametrize("fontname, bold", [
+    ("NKOLOK+AdvOTab3e3698.B", True), ("ABCDEF+Arial-BoldMT", True), ("Calibri,Bold", True),
+    ("Helvetica-Black", True), ("MyriadPro-Semibold", True), ("Garamond-BI", True),
+    ("NKONAI+AdvOT29dffb6a.I", False), ("Times-Roman", False), ("Bodoni-Roman", False),
+])
+def test_bold_is_read_from_the_fonts_name(fontname, bold):
+    assert reader.is_bold(fontname) is bold
 
 
 def test_two_columns_are_split_at_the_gutter(read):

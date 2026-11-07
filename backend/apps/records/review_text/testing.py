@@ -217,6 +217,27 @@ def placed(pages, size=letter) -> bytes:
     return out.getvalue()
 
 
+def sized_headings(sections, heading_font=BODY, size=letter) -> bytes:
+    """``(heading, [body lines])`` sections whose headings are set 12 pt in
+    ``heading_font`` over a 10 pt body, as some journals mark their headings by
+    size and an italic or a font that isn't named bold."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 90
+    for heading, lines in sections:
+        c.setFont(heading_font, 12)
+        c.drawString(LEFT, y, heading)
+        y -= 18
+        c.setFont(BODY, 10)
+        for line in lines:
+            c.drawString(LEFT, y, line)
+            y -= 12
+        y -= 10
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
 def mixed_font_words(lines, size=letter) -> bytes:
     """Lines whose pieces are drawn one after another with no gap, each piece
     ``(font, text)`` or ``(font, text, pull)``, the next piece then drawn

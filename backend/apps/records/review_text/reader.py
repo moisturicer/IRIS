@@ -67,6 +67,9 @@ UNREADABLE_SHARE = 0.2
 #: A font size this many points off the paragraph's starts a new one: a
 #: footnote, caption or block quote is never glued into a body sentence.
 SIZE_BREAK = 1.0
+#: A short line this many points larger than the body is a heading (sample21:
+#: 12 pt headings over a 10 pt body, in fonts not named bold).
+HEADING_SIZE = 1.5
 
 SENTENCE_END = re.compile(r'(?<=[.!?])["”)]?\s+(?=[A-Z(“"])')
 ABBREVIATIONS = (
@@ -473,8 +476,29 @@ def _wordy(text) -> bool:
     return sum(c.isalpha() for c in text) >= 4 and len(words) * 2 >= len(tokens)
 
 
-def _is_heading(line):
-    """Bold, or numbered, or in capitals, and shaped like a heading."""
+BOLD_NAME = re.compile(r"bold|black|heavy|semibold|demi|[.,+\-_](b|bd|bi)$", re.I)
+
+
+def is_bold(fontname) -> bool:
+    """Whether a font's name says bold: "Arial-BoldMT", "Calibri,Bold",
+    "Helvetica-Black", or a short suffix as "…AdvOTab3e3698.B" or "-BI"."""
+    return bool(BOLD_NAME.search(fontname or ""))
+
+
+def _heading_words(text) -> bool:
+    """Whether a larger line reads as a heading's words, not a formula (a math
+    symbol or a Greek letter) or an author line (an asterisk, three commas, or
+    a bare number marking an affiliation)."""
+    if any(unicodedata.category(c) == "Sm" or "Ͱ" <= c <= "Ͽ" for c in text):
+        return False
+    if "*" in text or text.count(",") >= 3:
+        return False
+    return not any(t.isdigit() for t in text.split())
+
+
+def _is_heading(line, body_size=None):
+    """Bold, or numbered, or in capitals, or larger than the body (``body_size``),
+    and shaped like a heading."""
     text = _line_text(line).strip()
     if not text or len(text) > 100 or text.endswith((".", ",", ";", ":", "?", "!")):
         return False
@@ -487,11 +511,13 @@ def _is_heading(line):
         return False   # a bold word in mid-sentence, alone on its line
     if DOT_LEADER.search(text) or CAPTION.match(text):
         return False   # a table-of-contents line, or a caption
-    if all("bold" in (w.get("fontname") or "").lower() for w in line):
+    if all(is_bold(w.get("fontname")) for w in line):
         return True
     words = text.split()
     if len(words) > 12 or (TRAILING_PAGE.search(text) and not CHAPTER.fullmatch(text)):
         return False
+    if body_size and _size(line) >= body_size + HEADING_SIZE and _heading_words(text):
+        return True   # set larger than the body, as some journals mark headings
     if CHAPTER.fullmatch(text) or MULTI_LEVEL.match(text):
         return True
     single = SINGLE_LEVEL.match(text)
@@ -556,6 +582,8 @@ def _structure(pages):
     # How often the paper spells each word, to decide whether a line-end
     # hyphen is a compound's own (`_keeps_hyphen`).
     known = Counter(_word(w["text"]) for it in lines for w in it[2])
+    sizes = Counter(round(float(w.get("size") or 0), 1) for it in lines for w in it[2])
+    body_size = sizes.most_common(1)[0][0] if sizes else None
 
     sections = [{"heading": "", "page": 1, "passages": []}]
     para, paragraph, para_size, hang, prev_line, body_x = [], [0], [None], [None], [None], [None]
@@ -587,7 +615,7 @@ def _structure(pages):
                        and not para and not sections[-1]["passages"]
                        and sections[-1]["heading"].endswith("-") and text[:1].islower()
                        and _continues(sections[-1], line))
-        if hyphen_wrap or _is_heading(line):
+        if hyphen_wrap or _is_heading(line, body_size):
             flush()
             if CHAPTER.fullmatch(text.strip()):
                 pending_chapter = (text.strip(), page)
