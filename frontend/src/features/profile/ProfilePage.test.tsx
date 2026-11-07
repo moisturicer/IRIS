@@ -49,6 +49,29 @@ describe("the profile", () => {
     expect(screen.getByText("College of Computer Studies · BS Computer Science")).toBeVisible();
   });
 
+  it("names the university under the affiliation, as another person's Profile does (IR-948)", () => {
+    renderScreen(<ProfilePage />, { route: "/profile" });
+
+    expect(screen.getByText("Cebu Institute of Technology – University")).toBeVisible();
+  });
+
+  it("leaves out Research, Advised and Collaborators, and does not say there are no papers (IR-948)", () => {
+    renderScreen(<ProfilePage />, { route: "/profile" });
+
+    for (const name of ["Research", "Advised", "Collaborators"]) {
+      expect(screen.queryByRole("heading", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText(/no published papers yet/i)).not.toBeInTheDocument();
+  });
+
+  it("shows no role line for a person who has no role yet", () => {
+    signIn({ role_name: null as never });
+    renderScreen(<ProfilePage />, { route: "/profile" });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Ana L. Reyes" })).toBeVisible();
+    expect(screen.queryByText("Student")).not.toBeInTheDocument();
+  });
+
   it("shows the bio and the interests", () => {
     signIn({
       bio: "Coastal flood mapping.",

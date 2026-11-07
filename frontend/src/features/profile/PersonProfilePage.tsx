@@ -53,7 +53,7 @@ function PersonProfile({ id }: { id: number }) {
         />
       );
     case "ready":
-      return <PersonProfileView model={state.model} onMore={more} />;
+      return <PersonProfileView profile={state.model.profile} lists={{ ...state.model, onMore: more }} />;
   }
 }
 
