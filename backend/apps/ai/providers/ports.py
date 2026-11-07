@@ -39,6 +39,16 @@ class EmbeddingProvider(ABC):
         plausible-looking wrong rankings.
         """
 
+    @property
+    def model_id(self) -> "str | None":
+        """The model this provider asks for, or ``None`` when it does not say.
+
+        Not abstract: only a build into a *pending* Embedding Space needs it
+        (IR-752), where a provider that cannot name its model cannot be shown
+        to match the space's pinned identity and is refused.
+        """
+        return None
+
     @abstractmethod
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         """Embed corpus text. One vector per input, in the same order.

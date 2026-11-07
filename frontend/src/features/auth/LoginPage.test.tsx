@@ -109,7 +109,9 @@ describe("the frame sign in opens in", () => {
     const links = screen.getAllByRole("link", { name: "Create an account" });
     expect(links).toHaveLength(1);
     links.forEach((link) => expect(link).toHaveAttribute("href", "/signup"));
-    expect(within(screen.getByRole("banner")).getByRole("link", { name: "Help" })).toBeInTheDocument();
+    const header = screen.getByRole("banner");
+    expect(within(header).getAllByRole("link")).toHaveLength(1);
+    expect(within(header).getByRole("link", { name: "Help" })).toHaveAttribute("aria-haspopup", "dialog");
     expect(screen.queryByRole("link", { name: /sign up/i })).not.toBeInTheDocument();
   });
 

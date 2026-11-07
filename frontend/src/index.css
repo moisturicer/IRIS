@@ -25,11 +25,58 @@
 }
 
 @layer components {
+  /* The label's concave return continues its right edge into the sheet's
+     top border. The white underlay also masks the straight border below it. */
+  .entry-label {
+    @apply relative;
+  }
+
+  .entry-label::before,
+  .entry-label::after {
+    content: "";
+    @apply pointer-events-none absolute bottom-0 h-3;
+    right: calc(-1 * theme('spacing.3'));
+    width: calc(theme('spacing.3') + 1px);
+  }
+
+  .entry-label::before {
+    @apply bg-white;
+  }
+
+  .entry-label::after {
+    @apply rounded-bl-xl border-b border-l border-stone-200 bg-canvas;
+  }
+
   .chat-markdown pre {
     @apply rounded-lg overflow-x-auto text-[12px] p-3;
   }
   .chat-markdown pre code {
     @apply bg-transparent text-inherit p-0;
+  }
+
+  /* The end of an answer still arriving, in the text's own ink. It blinks in
+     hard steps like a text caret, and holds still under reduced motion. */
+  .answer-caret > p:last-child::after,
+  .answer-caret > :is(ul, ol):last-child > li:last-child::after {
+    content: "";
+    display: inline-block;
+    width: 2px;
+    height: 1.05em;
+    margin-left: 0.125rem;
+    vertical-align: -0.15em;
+    background-color: currentColor;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .answer-caret > p:last-child::after,
+    .answer-caret > :is(ul, ol):last-child > li:last-child::after {
+      animation: answer-caret 1s steps(1, end) infinite;
+    }
+  }
+
+  @keyframes answer-caret {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
   }
 }
 
@@ -136,13 +183,12 @@
 /* ── Folio Ribbon motion (IR-744) ────────────────────────────────────────
    The loader plays the concept board's storyboard: one leaf, its partner,
    then the two ribbons unspool from the spine, leaving the I standing in the
-   white space between them. Ask IRIS answering writes its three lines one after another.
+   white space between them. Ask IRIS answering sets the I of its bubble in type.
    Under reduced motion both become a slow fade. */
 .iris-loading .iris-leaf-tl,
 .iris-loading .iris-leaf-br,
 .iris-loading .iris-ribbon-tr,
-.iris-loading .iris-ribbon-bl,
-.iris-answering .iris-ask-line {
+.iris-loading .iris-ribbon-bl {
   transform-box: fill-box;
 }
 .iris-loading .iris-leaf-tl { transform-origin: 100% 50%; animation: iris-leaf-a 2s cubic-bezier(.16, 1, .3, 1) infinite; }
@@ -165,11 +211,17 @@
   100% { opacity: 0; transform: none; }
 }
 
-.iris-answering .iris-ask-line { transform-origin: 0% 50%; animation: iris-write 1.8s cubic-bezier(.16, 1, .3, 1) infinite; }
-.iris-answering .iris-ask-line-2 { animation-delay: .18s; }
-.iris-answering .iris-ask-line-3 { animation-delay: .36s; }
-@keyframes iris-write {
-  0% { transform: scaleX(0); }
+/* The I is set in type: serifs open from their centre, the stem drops from the top serif. */
+.iris-answering .iris-ask-part { transform-box: fill-box; transform-origin: 50% 50%; animation: iris-set-serif 1.8s cubic-bezier(.16, 1, .3, 1) infinite backwards; }
+.iris-answering .iris-ask-part-2 { transform-origin: 50% 0%; animation-name: iris-set-stem; animation-delay: .18s; }
+.iris-answering .iris-ask-part-3 { animation-delay: .36s; }
+@keyframes iris-set-serif {
+  0% { transform: scale(0, 1); }
+  35%, 78% { transform: none; }
+  100% { transform: none; opacity: 0; }
+}
+@keyframes iris-set-stem {
+  0% { transform: scale(1, 0); }
   35%, 78% { transform: none; }
   100% { transform: none; opacity: 0; }
 }
@@ -179,7 +231,7 @@
   .iris-loading .iris-leaf-br,
   .iris-loading .iris-ribbon-tr,
   .iris-loading .iris-ribbon-bl,
-  .iris-answering .iris-ask-line {
+  .iris-answering .iris-ask-part {
     animation: iris-fade 2s ease-in-out infinite;
     transform: none;
   }

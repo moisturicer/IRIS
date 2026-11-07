@@ -1,23 +1,23 @@
 """
-A paper's embargo answer at the API (ADR-052 decision 2, IR-811, IR-816).
+A paper's embargo before anyone acts on it (ADR-052 as amended for IR-882).
 
-Publish saves the answer through `POST /records/<id>/embargo-answer/` before the
-file is sent, and `POST /records/<id>/submit/` refuses a paper that has none.
-These pin three things: an answer is stored with who and when, a bad one changes
-nothing, and a missing one never reads as "no embargo", whatever shape the
-request takes.
+Every paper starts embargoed, with no date. Publish asks no question, a first
+submission needs no answer, and the disclosure gate refuses the paper until the
+Adviser or RDCO releases it (`test_embargo_acts.py` covers those acts). These pin
+the default, that nothing a draft's owner sends can open it, and who sees it.
 """
 
 from datetime import date, timedelta
+from uuid import uuid4
 from unittest import mock
 
-from django.urls import reverse
+from django.db import IntegrityError, transaction
+from django.urls import NoReverseMatch, reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from apps.ai.models import ChunkSet, RecordOverview
-from apps.ai.overview.service import PROMPT_VERSION
+from apps.ai.policy import Reason, decision_for_record
 from apps.reviews.test_decisions import DecisionTestBase
 from core.enums import EmbargoState, PipelineStatus, RecordTypeName
 
@@ -25,7 +25,6 @@ from .models import Record, RecordOwner, RecordType
 from .tests import make_user
 
 QUEUE = "apps.ai.tasks.index_record.delay"
-OVERVIEW_QUEUE = "apps.ai.overview.service._enqueue_overview"
 
 
 def _in_days(days: int) -> date:
@@ -42,295 +41,121 @@ class DraftBase(APITestCase):
 
     def _draft(self, status_=PipelineStatus.DRAFT, **fields):
         record = Record.objects.create(
-            title="C" * 10, abstract="D" * 40, record_type=self.record_type,
+            title="C" * 10 + uuid4().hex[:8], abstract="D" * 40, record_type=self.record_type,
             added_by=self.owner, adviser=self.adviser, pipeline_status=status_, **fields,
         )
         RecordOwner.objects.create(record=record, user=self.owner, is_primary=True)
         return record
 
-    def _answer(self, record=None, format_="json", **answer):
-        return self.client.post(
-            reverse("record-embargo-answer", args=[(record or self.record).pk]),
-            answer, format=format_,
-        )
-
-    def _submit(self, record=None):
+    def _submit(self, record=None, **extra):
         return self.client.post(
             reverse("record-submit", args=[(record or self.record).pk]),
-            {"dpa_accepted": True}, format="json",
+            {"dpa_accepted": True, **extra}, format="json",
         )
 
-    def _assert_unanswered(self):
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.embargo_state, EmbargoState.UNKNOWN)
-        self.assertIsNone(self.record.embargo_answered_at)
-        self.assertIsNone(self.record.embargo_answered_by)
-        self.assertIsNone(self.record.embargoed_until)
-
-
-class AnsweringTheQuestionTests(DraftBase):
-    """Publish's first question, saved before the file is sent."""
-
-    def test_no_embargo_is_saved_with_who_and_when(self):
-        response = self._answer(embargoed=False)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(response.data, {"state": "none", "until": None})
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.embargo_state, EmbargoState.NONE)
-        self.assertIsNotNone(self.record.embargo_answered_at)
-        self.assertEqual(self.record.embargo_answered_by, self.owner)
-
-    def test_an_embargo_is_saved_with_its_date_who_and_when(self):
-        until = _in_days(90)
-
-        response = self._answer(embargoed=True, embargoed_until=until.isoformat())
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.assertEqual(response.data, {"state": "active", "until": until.isoformat()})
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.embargo_state, EmbargoState.ACTIVE)
-        self.assertEqual(self.record.embargoed_until, until)
-        self.assertEqual(self.record.embargo_answered_by, self.owner)
-
-    def test_todays_date_is_accepted_because_it_has_not_passed(self):
-        response = self._answer(embargoed=True, embargoed_until=_in_days(0).isoformat())
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-
-    def test_no_embargo_with_a_null_date_is_a_plain_no(self):
-        response = self._answer(embargoed=False, embargoed_until=None)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.embargo_state, EmbargoState.NONE)
-
-    def test_an_owner_may_change_the_answer_before_submission(self):
-        """ADR-052 §5: nothing has been sent yet, so the answer stays theirs."""
-        for stored in (
-            {"embargo_answered_at": timezone.now(), "embargoed_until": _in_days(30)},
-            {
-                "embargo_answered_at": timezone.now(), "embargoed_until": _in_days(30),
-                "embargo_released_at": timezone.now(),
-            },
-        ):
-            with self.subTest(stored=sorted(stored)):
-                record = self._draft(**stored)
-
-                response = self._answer(record, embargoed=False)
-
-                self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-                record.refresh_from_db()
-                self.assertEqual(record.embargo_state, EmbargoState.NONE)
-                self.assertIsNone(record.embargo_released_at)
-                self.assertEqual(record.embargo_answered_by, self.owner)
-
-    def test_a_bad_answer_changes_nothing(self):
-        bad_answers = {
-            "nothing at all": {},
-            "on with no date": {"embargoed": True},
-            "on with a null date": {"embargoed": True, "embargoed_until": None},
-            "on with a date that is not one": {"embargoed": True, "embargoed_until": "soon"},
-            "on with a past date": {"embargoed": True, "embargoed_until": _in_days(-1).isoformat()},
-            "off with a date": {"embargoed": False, "embargoed_until": _in_days(30).isoformat()},
-            "a date with no toggle": {"embargoed_until": _in_days(30).isoformat()},
-            "a toggle that is not a yes or no": {"embargoed": "maybe"},
-            "a null toggle": {"embargoed": None},
-        }
-        for name, answer in bad_answers.items():
-            with self.subTest(name):
-                response = self._answer(**answer)
-
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-                self._assert_unanswered()
-
-    def test_a_form_post_never_reads_as_no(self):
-        """DRF reads a boolean missing from form data as False, which would record
-        "no embargo" that nobody gave and let the paper be sent to a vendor."""
-        for name, answer in {
-            "no toggle at all": {"unrelated": "x"},
-            "a blank date and no toggle": {"embargoed_until": ""},
-            "a blank toggle": {"embargoed": ""},
-        }.items():
-            with self.subTest(name):
-                response = self._answer(format_="multipart", **answer)
-
-                self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-                self.assertIn("embargoed", response.data)
-                self._assert_unanswered()
-
-    def test_the_refusal_names_the_field_to_fix(self):
-        response = self._answer(embargoed=True)
-
-        self.assertIn("embargoed_until", response.data)
-
-    def test_a_submitted_paper_cannot_be_answered_here(self):
-        """Otherwise an owner could end an embargo here with no release (§6)."""
-        record = self._draft(
-            PipelineStatus.IN_REVIEW,
-            embargo_answered_at=timezone.now(), embargoed_until=_in_days(30),
-        )
-
-        response = self._answer(record, embargoed=False)
-
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
+    def _assert_embargoed_with_no_date(self, record=None):
+        record = record or self.record
         record.refresh_from_db()
         self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
+        self.assertTrue(record.is_embargoed)
+        self.assertIsNone(record.embargoed_until)
+        self.assertIsNone(record.embargo_date_set_at)
+        self.assertIsNone(record.embargo_released_at)
 
-    def test_saving_the_answer_sends_nothing_on(self):
-        """Consent comes at the last step, so the gate has nothing to open yet."""
+
+class EveryPaperStartsEmbargoedTests(DraftBase):
+    def test_a_new_paper_is_active_with_no_date(self):
+        self._assert_embargoed_with_no_date()
+
+    def test_the_gate_refuses_it_even_with_consent(self):
+        Record.objects.filter(pk=self.record.pk).update(dpa_accepted_at=timezone.now())
+        self.record.refresh_from_db()
+
+        decision = decision_for_record(self.record)
+
+        self.assertFalse(decision.allowed)
+        self.assertEqual(decision.reasons, (Reason.EMBARGOED,))
+
+    def test_a_release_needs_its_stamp_in_the_database(self):
+        """The flag and the release stamp can't disagree, so no write clears one alone."""
+        for fields in ({"is_embargoed": False}, {"embargo_released_at": timezone.now()}):
+            with self.subTest(sorted(fields)), self.assertRaises(IntegrityError), transaction.atomic():
+                Record.objects.filter(pk=self.record.pk).update(**fields)
+
+    def test_a_date_needs_to_say_when_it_was_set(self):
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            Record.objects.filter(pk=self.record.pk).update(embargoed_until=_in_days(30))
+
+
+class PublishAsksNothingTests(DraftBase):
+    def test_there_is_no_route_to_answer_the_question(self):
+        """IR-816's `embargo-answer/` is gone with the question."""
+        with self.assertRaises(NoReverseMatch):
+            reverse("record-embargo-answer", args=[self.record.pk])
+        response = self.client.post(
+            f"/api/v1/records/{self.record.pk}/embargo-answer/", {"embargoed": False}, format="json",
+        )
+        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
+        self._assert_embargoed_with_no_date()
+
+    def test_a_first_submission_needs_no_answer_and_stays_embargoed(self):
+        response = self._submit()
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self.record.refresh_from_db()
+        self.assertEqual(self.record.pipeline_status, PipelineStatus.IN_REVIEW)
+        self._assert_embargoed_with_no_date()
+
+    def test_submitting_sends_nothing_on(self):
         with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
-            response = self._answer(embargoed=False)
+            response = self._submit()
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         queue.assert_not_called()
 
-    def test_patching_the_record_cannot_answer_for_it(self):
-        """An answer that opens the gate comes through this route, with who and
-        when, and never as an ordinary details edit."""
+    def test_saying_no_embargo_in_the_submit_body_changes_nothing(self):
+        response = self._submit(embargoed=False, is_embargoed=False)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
+        self._assert_embargoed_with_no_date()
+
+    def test_patching_the_record_cannot_release_or_date_it(self):
+        """An embargo changes only through its own acts, with who and when."""
         response = self.client.patch(
             reverse("record-detail", args=[self.record.pk]),
             {
-                "embargoed": False,
+                "is_embargoed": False,
                 "embargoed_until": _in_days(30).isoformat(),
-                "embargo_answered_at": timezone.now().isoformat(),
+                "embargo_date_set_at": timezone.now().isoformat(),
                 "embargo_released_at": timezone.now().isoformat(),
             },
             format="json",
         )
 
         self.assertLess(response.status_code, 500, response.data)
-        self._assert_unanswered()
+        self._assert_embargoed_with_no_date()
+
+    def test_a_draft_owner_cannot_set_or_release_one(self):
+        """Owners don't set dates (§5 as amended) or release (§6), even on a draft."""
+        for name in ("record-embargo-set", "record-embargo-release"):
+            with self.subTest(name):
+                response = self.client.post(
+                    reverse(name, args=[self.record.pk]),
+                    {"embargoed_until": _in_days(30).isoformat()}, format="json",
+                )
+                self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN, response.data)
+        self._assert_embargoed_with_no_date()
 
 
-class SubmittingNeedsAnAnswerTests(DraftBase):
-    """The form asks first, so a paper with no answer cannot enter review."""
+class TheEmbargoStandsTests(DecisionTestBase):
+    """ADR-052 §4. A new Version doesn't touch it, and nor does fixing a typo."""
 
-    def _assert_refused_as_unanswered(self, response):
-        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST, response.data)
-        self.assertIn("embargoed", response.data)
-        self._assert_unanswered()
-        self.assertEqual(self.record.pipeline_status, PipelineStatus.DRAFT)
-        self.assertIsNone(self.record.dpa_accepted_at)
-
-    def test_a_first_submission_with_no_answer_is_refused_and_stays_a_draft(self):
-        self._assert_refused_as_unanswered(self._submit())
-
-    def test_a_refused_submission_sends_nothing_on(self):
-        with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
-            self._assert_refused_as_unanswered(self._submit())
-
-        queue.assert_not_called()
-
-    def test_an_answer_in_the_submit_body_is_not_an_answer(self):
-        """One route writes the answer, so it always arrives before the file."""
-        self._assert_refused_as_unanswered(self.client.post(
-            reverse("record-submit", args=[self.record.pk]),
-            {"dpa_accepted": True, "embargoed": False}, format="json",
-        ))
-
-    def test_a_saved_answer_is_enough_to_submit_and_stands(self):
-        record = self._draft(
-            embargo_answered_at=timezone.now(), embargo_answered_by=self.adviser,
-            embargoed_until=_in_days(30),
-        )
-
-        response = self._submit(record)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        record.refresh_from_db()
-        self.assertEqual(record.pipeline_status, PipelineStatus.IN_REVIEW)
-        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
-        self.assertEqual(record.embargo_answered_by, self.adviser)
-
-
-class SendingThePaperOnTests(DraftBase):
-    """
-    ADR-052 §Consequences: a normal paper reaches the AI "once its owner says no
-    embargo". Its upload was refused while it was a draft with no consent, and a
-    refused paper is never tried again, so submitting has to queue it. Whatever
-    the gate still refuses is not queued.
-    """
-
-    def _submit_and_commit(self, record=None):
-        with mock.patch(QUEUE) as queue, self.captureOnCommitCallbacks(execute=True):
-            response = self._submit(record)
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        return queue
-
-    def test_answering_no_queues_the_paper_for_indexing(self):
-        self._answer(embargoed=False)
-
-        self._submit_and_commit().assert_called_once_with(self.record.pk)
-
-    def test_an_active_embargo_queues_nothing(self):
-        self._answer(embargoed=True, embargoed_until=_in_days(30).isoformat())
-
-        self._submit_and_commit().assert_not_called()
-
-    def test_an_ip_mark_still_holds_the_paper_back(self):
-        record = self._draft(is_ip=True)
-        self._answer(record, embargoed=False)
-
-        self._submit_and_commit(record).assert_not_called()
-
-    def _overview_refused_at_upload(self):
-        """What chunking leaves behind: its overview was refused by the gate and
-        stored as unavailable, which stands until someone asks again."""
-        ChunkSet.objects.create(
-            record=self.record, extraction_hash="e", strategy_id="s", options={},
-            content_hash="c", is_active=True,
-        )
-        RecordOverview.objects.create(
-            record=self.record, state="unavailable", content_hash="c",
-            prompt_version=PROMPT_VERSION,
-        )
-
-    def test_answering_no_asks_again_for_the_overview_refused_at_upload(self):
-        self._overview_refused_at_upload()
-        self._answer(embargoed=False)
-
-        with mock.patch(OVERVIEW_QUEUE) as overview:
-            self._submit_and_commit()
-
-        overview.assert_called_once()
-        self.assertEqual(RecordOverview.objects.get(record=self.record).state, "generating")
-
-    def test_an_active_embargo_leaves_the_overview_alone(self):
-        self._overview_refused_at_upload()
-        self._answer(embargoed=True, embargoed_until=_in_days(30).isoformat())
-
-        with mock.patch(OVERVIEW_QUEUE) as overview:
-            self._submit_and_commit()
-
-        overview.assert_not_called()
-        self.assertEqual(RecordOverview.objects.get(record=self.record).state, "unavailable")
-
-    def test_a_broker_outage_does_not_fail_the_submission(self):
-        """The submission has already committed. A paper that missed its queue
-        is one a backfill can reach, and the owner's act succeeded."""
-        self._answer(embargoed=False)
-
-        with (
-            mock.patch(QUEUE, side_effect=ConnectionError("broker down")),
-            self.captureOnCommitCallbacks(execute=True),
-        ):
-            response = self._submit()
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
-        self.record.refresh_from_db()
-        self.assertEqual(self.record.pipeline_status, PipelineStatus.IN_REVIEW)
-
-
-class TheAnswerStandsTests(DecisionTestBase):
-    """ADR-052 §4. Not asked again, and not re-stamped by fixing a typo."""
-
-    def test_a_new_version_keeps_the_answer(self):
+    def test_a_new_version_keeps_the_embargo_and_its_date(self):
         record = self.at_adviser()
-        answered_at = timezone.now() - timedelta(days=3)
+        set_at = timezone.now() - timedelta(days=3)
         until = _in_days(60)
         Record.objects.filter(pk=record.pk).update(
-            embargo_answered_at=answered_at, embargo_answered_by=self.owner, embargoed_until=until,
+            embargo_date_set_at=set_at, embargo_date_set_by=self.adviser, embargoed_until=until,
         )
         self.asked(record, self.adviser)
 
@@ -346,16 +171,17 @@ class TheAnswerStandsTests(DecisionTestBase):
 
         record.refresh_from_db()
         self.assertEqual(record.resubmission_count, 1, "the new version itself was recorded")
-        self.assertEqual(record.embargo_answered_at, answered_at)
-        self.assertEqual(record.embargo_answered_by, self.owner)
+        self.assertTrue(record.is_embargoed)
+        self.assertEqual(record.embargo_date_set_at, set_at)
+        self.assertEqual(record.embargo_date_set_by, self.adviser)
         self.assertEqual(record.embargoed_until, until)
 
 
 class RecordDetailShowsTheEmbargoTests(APITestCase):
     """
     The state and date go to owners, the Adviser and office staff, and to no one
-    else. Any signed-in reader can open a published paper, and that a paper is
-    under an agreement is not theirs to learn from it.
+    else (decision 18). Any signed-in reader can open a published paper, and that
+    a paper is under an agreement is not theirs to learn from it.
     """
 
     @classmethod
@@ -366,7 +192,7 @@ class RecordDetailShowsTheEmbargoTests(APITestCase):
         cls.record = Record.objects.create(
             title="E" * 10, abstract="F" * 40, adviser=cls.adviser,
             pipeline_status=PipelineStatus.PUBLISHED,
-            embargo_answered_at=timezone.now(), embargo_answered_by=cls.owner,
+            embargo_date_set_at=timezone.now(), embargo_date_set_by=cls.adviser,
             embargoed_until=cls.until,
         )
         RecordOwner.objects.create(record=cls.record, user=cls.owner, is_primary=True)
@@ -400,9 +226,11 @@ class RecordDetailShowsTheEmbargoTests(APITestCase):
             with self.subTest(user.email):
                 data = self._detail_as(user)
                 self.assertIsNone(data["embargo"])
-                self.assertFalse([key for key in data if key.startswith("embargoed")])
+                self.assertFalse([key for key in data if key.startswith("embargo")
+                                  and key != "embargo"])
+                self.assertNotIn("is_embargoed", data)
 
-    def test_an_unanswered_paper_says_so(self):
+    def test_a_paper_nobody_has_dated_reads_active_with_no_date(self):
         record = Record.objects.create(
             title="H" * 10, abstract="I" * 40, adviser=self.adviser,
             pipeline_status=PipelineStatus.PUBLISHED,
@@ -410,7 +238,7 @@ class RecordDetailShowsTheEmbargoTests(APITestCase):
 
         self.assertEqual(
             self._detail_as(self.adviser, record)["embargo"],
-            {"state": EmbargoState.UNKNOWN, "until": None},
+            {"state": EmbargoState.ACTIVE, "until": None},
         )
 
     def test_the_catalogue_does_not_carry_it(self):
@@ -420,4 +248,4 @@ class RecordDetailShowsTheEmbargoTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_200_OK, response.data)
         row = next(r for r in response.data["results"] if r["id"] == self.record.pk)
-        self.assertFalse([key for key in row if key.startswith("embargo")])
+        self.assertFalse([key for key in row if "embargo" in key])

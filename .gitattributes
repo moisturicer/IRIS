@@ -3,3 +3,19 @@
 backend/entrypoint.sh text eol=lf
 frontend/docker-entrypoint.d/*.sh text eol=lf
 scripts/*.sh text eol=lf
+
+# Contract fixtures are compared byte for byte with what their layout draws (IR-838).
+*.pdf binary
+
+# Preserve the audited proxy fixture bytes in Windows checkouts (IR-730).
+docs/evaluation/proxy_starter.json text eol=lf
+
+# Vitest writes snapshots with LF. A CRLF checkout (Windows core.autocrlf=true) made
+# every test run leave the snapshot modified, so pin it to LF (IR-922).
+*.snap text eol=lf
+
+# Recordings stay byte for byte as LlamaParse returned them (IR-841).
+backend/apps/ai/extraction/tests/fixtures/llamaparse/** -text
+
+# Recorded API responses (IR-915): byte-stable, so a refresh diff shows only a real change.
+contracts/*.json text eol=lf

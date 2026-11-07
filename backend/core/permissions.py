@@ -1,8 +1,8 @@
 from rest_framework.permissions import BasePermission
 
 from core.enums import (
-    DELETE_REVIEW_STATUSES, OPEN_SEAT_STATES, AssignmentState, Party, PipelineStatus,
-    RoleName, WorkflowState,
+    DELETE_REVIEW_STATUSES, OPEN_SEAT_STATES, AssignmentState, EmbargoState, Party,
+    PipelineStatus, RoleName, WorkflowState,
 )
 
 # Role name constants -- match the Role.name values in the DB exactly.
@@ -16,11 +16,23 @@ ROLE_KTTO    = RoleName.KTTO
 ROLE_RDCO    = RoleName.RDCO
 ROLE_ITSO    = RoleName.ITSO
 ROLE_IERC    = RoleName.IERC
+ROLE_SYSTEM_ADMIN = RoleName.SYSTEM_ADMIN
 
 # Convenience sets
 REVIEWER_ROLES = {ROLE_ADVISER, ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}
 STAFF_ROLES    = {ROLE_KTTO, ROLE_RDCO, ROLE_ITSO, ROLE_IERC}
+# RDCO administers people's accounts and the request queues. It is not IRIS's
+# administrator: the System Admin is (ADR-051 §1), and holds no workflow access,
+# so it is in none of the sets above.
 ADMIN_ROLES    = {ROLE_RDCO}
+#: The roles RDCO may give, to someone outside the offices (ADR-051 §4, amended).
+#: Office roles are the System Admin's to give, and the System Admin role itself
+#: is given only in Django's admin site.
+RDCO_GIVES     = {ROLE_STUDENT, ROLE_ADVISER}
+#: Who opens the Users page: RDCO and the System Admin.
+ACCOUNT_ADMIN_ROLES = ADMIN_ROLES | {ROLE_SYSTEM_ADMIN}
+#: What `get_role_name` returns for an account with no role yet.
+NO_ROLE = ""
 # Who may author a disclosure. SRS Use Cases M2-2.1 (Create IP Disclosure Draft)
 # and M2-2.2 (Submit Record for Review) both name the actor "Record Owner
 # (Student or Adviser)". Deliberately excludes the clearing offices -- ITSO,
@@ -120,9 +132,47 @@ class IsStaff(BasePermission):
 
 
 class IsAdmin(BasePermission):
-    """RDCO alone: account administration, the audit log, and the request queues."""
+    """RDCO alone: account administration and the request queues."""
     def has_permission(self, request, view):
         return get_role_name(request.user) in ADMIN_ROLES
+
+
+def is_system_admin(user) -> bool:
+    return get_role_name(user) == ROLE_SYSTEM_ADMIN
+
+
+class IsSystemAdmin(BasePermission):
+    """
+    The System Admin alone: the Audit Log, system settings and office roles
+    (ADR-051 §3). `is_superuser` grants nothing here, as everywhere (IR-165).
+    """
+    def has_permission(self, request, view):
+        return is_system_admin(request.user)
+
+
+class IsAccountAdmin(BasePermission):
+    """RDCO or the System Admin: the Users page and its role changes."""
+    def has_permission(self, request, view):
+        return get_role_name(request.user) in ACCOUNT_ADMIN_ROLES
+
+
+def role_change_refusal(actor, target, role) -> str | None:
+    """
+    Why `actor` may not give `target` the role `role`, or None when they may.
+
+    Nobody gives or changes the System Admin role through IRIS: it is given in
+    Django's admin site (ADR-051 §5, amended). The System Admin gives any other
+    role. RDCO gives Student or Adviser to someone outside the offices.
+    """
+    if role.name == ROLE_SYSTEM_ADMIN or is_system_admin(target):
+        return "The System Admin role is given and removed only in Django's admin site."
+    if is_system_admin(actor):
+        return None
+    if get_role_name(actor) in ADMIN_ROLES:
+        if role.name in RDCO_GIVES and get_role_name(target) in RDCO_GIVES | {NO_ROLE}:
+            return None
+        return "Office roles are given by the System Admin."
+    return "You do not have permission to change roles."
 
 
 class IsOpportunityPoster(BasePermission):
@@ -189,6 +239,33 @@ def may_read_embargo(user, record) -> bool:
     if not user or not getattr(user, "is_authenticated", False):
         return False
     return record.adviser_id == user.pk or owns_or_staffs_record(user, record)
+
+
+def may_set_embargo(user, record) -> bool:
+    """
+    The Adviser or RDCO set, move or renew an embargo's date (ADR-052 §5, as
+    amended for IR-882). Owners no longer can, before or after submission: every
+    paper starts embargoed, and a date is the Adviser's or RDCO's judgement of IP
+    or patent potential, made during review.
+    """
+    return record.adviser_id == user.pk or get_role_name(user) == ROLE_RDCO
+
+
+def may_release_embargo(user, record) -> bool:
+    """
+    The Adviser or RDCO, and never a student owner, even on their own paper (§6).
+    A release sends text out for good, and an embargo may protect a sponsor's
+    agreement or the other owners' wishes. If the Adviser has left, RDCO does it.
+    """
+    return record.adviser_id == user.pk or get_role_name(user) == ROLE_RDCO
+
+
+def may_release_ip(user, record) -> bool:
+    """
+    KTTO alone releases an IP-marked paper, because KTTO evaluates IP (ADR-052
+    §11-12). Not RDCO, not the Adviser and not an owner.
+    """
+    return get_role_name(user) == ROLE_KTTO
 
 
 def is_record_owner(user, record) -> bool:
@@ -370,6 +447,11 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         offered.append("withdraw_revision")
     elif revision["party"] is not None:
         offered.append("request_revision")
+    # `finish-review/`: anyone holding an open seat here, the party
+    # `revision.party` names (ADR-032 §7, IR-874). Each verdict it carries is
+    # still offered, and refused, by its own key above.
+    if revision["party"] is not None:
+        offered.append("finish_review")
 
     if is_record_owner(user, record):
         from apps.records.continuation import continuable
@@ -385,6 +467,18 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         delete_act = DELETE_CAPABILITY.get(record.pipeline_status)
         if delete_act is not None:
             offered.append(delete_act)
+
+    # `embargo-set/` and `embargo-release/` (ADR-052 §5, §6), once submitted. A
+    # draft has nothing to change: every paper starts embargoed (IR-882).
+    if record.pipeline_status != PipelineStatus.DRAFT:
+        if may_set_embargo(user, record):
+            offered.append("set_embargo")
+        if record.embargo_state == EmbargoState.ACTIVE and may_release_embargo(user, record):
+            offered.append("release_embargo")
+        from apps.records.ip_release import why_not_releasable
+
+        if may_release_ip(user, record) and why_not_releasable(record) is None:
+            offered.append("release_ip")
 
     # `review-comments/`: the record's participants, once it is submitted
     # (ADR-032 §7, IR-419). A pool member reads the discussion but is not
@@ -404,6 +498,21 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
     if office_staff and filing_party(record, user) is not None:
         offered.append("attach_file")
     return offered
+
+
+class MaySetEmbargo(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return may_set_embargo(request.user, obj)
+
+
+class MayReleaseEmbargo(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return may_release_embargo(request.user, obj)
+
+
+class MayReleaseIp(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        return may_release_ip(request.user, obj)
 
 
 class IsRecordOwner(BasePermission):

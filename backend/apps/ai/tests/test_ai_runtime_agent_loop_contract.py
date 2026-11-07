@@ -6,6 +6,7 @@ vendor's behaviour or answer quality.
 """
 
 import asyncio
+import dataclasses
 import json
 import sys
 from pathlib import Path
@@ -19,6 +20,7 @@ if str(REPO) not in sys.path:
 from ai.admission.limits import Price  # noqa: E402
 from ai.agent.budget import Bounds  # noqa: E402
 from ai.agent.dialect import ChatCompletions  # noqa: E402
+from ai.agent.assurance import LIMITATION  # noqa: E402
 from ai.agent.executor import FINAL_NOTE, AgentExecutor  # noqa: E402
 from ai.agent.protocol import Pin  # noqa: E402
 from ai.infrastructure.recording_adapter import RecordingAgentProvider  # noqa: E402
@@ -67,6 +69,11 @@ class Corpus:
         self.events = []
         self.ended = False
         self.replaced = set()
+        # Original Turns this reader may recover: ordinal -> (RecoveredTurn, cited passages) (IR-735).
+        self.turns = {}
+        # What the handoff recheck answers (a value, or a function of the check number); None while it stands.
+        self.handoff_reason = None
+        self.handoff_checks = []
 
     def record(self, rid):
         title, source, _ = self.papers[rid]
@@ -102,6 +109,21 @@ class Corpus:
     async def recall(self, record_ids):
         self.calls.append(("recall", tuple(record_ids)))
         return ToolResult(OK, records=tuple(self.record(r) for r in record_ids if r in self.papers))
+
+    async def recover_turn(self, ordinal):
+        self.calls.append(("recover_turn", ordinal))
+        if ordinal not in self.turns:
+            return ToolResult.unavailable("unknown_turn")
+        turn, passages = self.turns[ordinal]
+        records = tuple({p.record_id: self.record(p.record_id) for p in passages}.values())
+        return ToolResult(OK, records=records, passages=tuple(passages), turn=turn,
+                          coverage=Coverage(len(passages), len(passages)))
+
+    async def handoff_current(self, turns, sources):
+        self.handoff_checks.append((tuple(turns), tuple(sources)))
+        if callable(self.handoff_reason):
+            return self.handoff_reason(len(self.handoff_checks))
+        return self.handoff_reason
 
     async def journal(self, name, data):
         if self.ended:
@@ -343,11 +365,13 @@ def test_stop_between_steps_admits_no_further_attempt():
     f"«A paper nobody read» predicted floods [{handle('P', 1)}].",
     f"All papers agree [{handle('P', 1)}].",
 ])
-def test_a_draft_failing_a_deterministic_check_is_not_delivered(draft):
-    provider = recording(tools(call("a", "search", query="flood")), reply(draft))
+def test_a_draft_failing_a_deterministic_check_twice_is_not_delivered(draft):
+    # IR-729: the one repair repeats the mistake, and no sentence stands on its own.
+    provider = recording(tools(call("a", "search", query="flood")), reply(draft), reply(draft))
     with pytest.raises(Unavailable) as refused:
         ask(provider)
     assert refused.value.code == "invalid_draft"
+    assert len(provider.requests) == 3
 
 
 def test_a_cited_source_replaced_before_commit_fails_safely():
@@ -364,6 +388,157 @@ def test_a_cited_source_replaced_before_commit_fails_safely():
     with pytest.raises(Unavailable) as refused:
         ask(provider, corpus)
     assert refused.value.code == "source_changed"
+
+
+# --- One repair (IR-729) -------------------------------------------------------
+
+def feedback(payload):
+    return payload["messages"][-1]["content"]
+
+
+def test_a_bad_page_and_a_wrong_count_are_corrected_once_in_the_same_conversation():
+    bad = f"On page 9 it predicted 912 floods [{handle('P', 1)}]."
+    good = f"On page 4 it predicted 87 floods [{handle('P', 1)}]."
+    provider = recording(tools(call("a", "search", query="flood")), reply(bad), reply(good))
+    result, corpus = ask(provider)
+
+    assert result.answer == "On page 4 it predicted 87 floods [1]."
+    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair"]
+    draft, repair = provider.requests[1:]
+    # The same ordered Conversation: everything sent before, then the draft, then the feedback.
+    assert repair["messages"][:len(draft["messages"])] == draft["messages"]
+    assert repair["messages"][-2] == {"role": "assistant", "content": bad}
+    assert repair["messages"][0] == draft["messages"][0] and repair["tools"] == draft["tools"]
+    assert repair["tool_choice"] == "none"
+    note = feedback(repair)
+    assert "9" in note and "912" in note and "unsupported_number" not in note
+
+
+def test_a_second_invalid_draft_keeps_only_sentences_supported_on_their_own_and_says_so():
+    good = f"It predicted 87 floods [{handle('P', 1)}]."
+    # An uncited sentence is not supported by anything, however harmless it reads.
+    bad = (f"{good} «A paper nobody read» agrees [{handle('P', 1)}].\n"
+           "Gauges are cheap to install. Some 40 more papers agree.")
+    provider = recording(tools(call("a", "search", query="flood")), reply(bad), reply(bad))
+    result, corpus = ask(provider)
+    assert result.answer == f"It predicted 87 floods [1].\n\n{LIMITATION}"
+    [citation] = result.citations
+    assert citation.page == 4
+    # One repair, never a second.
+    assert [m["phase"] for m in models(corpus)] == ["gather", "gather", "repair"]
+
+
+def test_a_citation_after_the_full_stop_stays_with_its_sentence_and_never_stands_alone():
+    p1 = handle("P", 1)
+    bad = f"Rainfall gauges fed the network. [{p1}] It predicted 912 floods. [{p1}]"
+    provider = recording(tools(call("a", "search", query="flood")), reply(bad), reply(bad))
+    result, _ = ask(provider)
+    assert result.answer == f"Rainfall gauges fed the network. [1]\n\n{LIMITATION}"
+
+
+def test_without_a_repair_reserve_the_first_draft_keeps_its_supported_sentences():
+    no_repair = dataclasses.replace(RESERVES, repair_tokens=0)
+    draft = f"It predicted 87 floods [{handle('P', 1)}]. It predicted 912 more [{handle('P', 1)}]."
+    provider = recording(tools(call("a", "search", query="flood")), reply(draft), reply("Never sent."))
+    result = run(AgentExecutor(provider, PIN, no_repair, profiles=PROFILES).answer("q", Corpus(), context()))
+    assert result.answer == f"It predicted 87 floods [1].\n\n{LIMITATION}"
+    assert len(provider.requests) == 2
+
+
+def test_access_revoked_during_the_repair_ends_the_run_without_delivery():
+    corpus = Corpus()
+
+    def revoke_then_answer(payload):
+        async def unauthorized(passage):
+            return ToolResult.unavailable("unauthorized")
+        corpus.open_passage = unauthorized
+        return reply(f"It predicted 87 floods [{handle('P', 1)}].")
+
+    provider = recording(tools(call("a", "search", query="flood")),
+                         reply(f"It predicted 912 floods [{handle('P', 1)}]."), revoke_then_answer)
+    with pytest.raises(Unavailable) as refused:
+        ask(provider, corpus)
+    assert refused.value.code == "unauthorized"
+
+
+def test_a_truncated_repair_falls_back_to_what_the_first_draft_supports():
+    first = f"It predicted 87 floods [{handle('P', 1)}]. It predicted 912 more."
+    provider = recording(tools(call("a", "search", query="flood")), reply(first), reply("Half", finish="length"))
+    result, _ = ask(provider)
+    assert result.answer == f"It predicted 87 floods [1].\n\n{LIMITATION}"
+
+
+def test_a_source_replaced_before_the_repair_fences_delivery_and_sends_no_repair():
+    corpus = Corpus()
+    provider = recording(tools(call("a", "search", query="flood")),
+                         reply(f"It predicted 912 floods [{handle('P', 1)}]."), reply("Never sent."))
+    original = corpus.search
+
+    async def search_then_replace(*args):
+        result = await original(*args)
+        corpus.replaced.add(1)
+        return result
+
+    corpus.search = search_then_replace
+    with pytest.raises(Unavailable) as refused:
+        ask(provider, corpus)
+    assert refused.value.code == "source_changed"
+    assert len(provider.requests) == 2
+
+
+def test_a_source_revoked_during_the_repair_fences_the_repaired_answer():
+    corpus = Corpus()
+
+    def revoke_then_answer(payload):
+        corpus.replaced.add(1)
+        return reply(f"It predicted 87 floods [{handle('P', 1)}].")
+
+    provider = recording(tools(call("a", "search", query="flood")),
+                         reply(f"It predicted 912 floods [{handle('P', 1)}]."), revoke_then_answer)
+    with pytest.raises(Unavailable) as refused:
+        ask(provider, corpus)
+    assert refused.value.code == "source_changed"
+    assert len(provider.requests) == 3
+
+
+def test_no_repair_is_sent_without_a_repair_reserve():
+    no_repair = dataclasses.replace(RESERVES, repair_tokens=0)
+    provider = recording(tools(call("a", "search", query="flood")),
+                         reply(f"It predicted 912 floods [{handle('P', 1)}]."), reply("Never sent."))
+    with pytest.raises(Unavailable) as refused:
+        run(AgentExecutor(provider, PIN, no_repair, profiles=PROFILES).answer("q", Corpus(), context()))
+    assert refused.value.code == "invalid_draft"
+    assert len(provider.requests) == 2
+
+
+def test_the_repair_is_charged_to_the_original_allowance():
+    # The draft reports nearly the whole input allowance, so the reserved repair no longer fits.
+    greedy = reply(f"It predicted 912 floods [{handle('P', 1)}].")
+    greedy["usage"]["prompt_tokens"] = ALLOWANCE["max_input_tokens"] - 100
+    provider = recording(tools(call("a", "search", query="flood")), greedy, reply("Never sent."))
+    with pytest.raises(Unavailable) as refused:
+        ask(provider)
+    assert refused.value.code == "invalid_draft"
+    assert len(provider.requests) == 2
+
+    # Within the allowance, the repair's usage is counted with the rest of the run.
+    provider = recording(tools(call("a", "search", query="flood")),
+                         reply(f"It predicted 912 floods [{handle('P', 1)}]."),
+                         reply(f"It predicted 87 floods [{handle('P', 1)}]."))
+    result, _ = ask(provider)
+    assert result.reported_units == (50 + 5) + 2 * (60 + 20)
+
+
+def test_stop_before_the_repair_admits_no_repair():
+    corpus = Corpus()
+    provider = recording(tools(call("a", "search", query="flood")),
+                         lambda payload: (setattr(corpus, "ended", True),
+                                          reply(f"It predicted 912 floods [{handle('P', 1)}]."))[1],
+                         reply("Never sent."))
+    with pytest.raises(Unavailable) as refused:
+        ask(provider, corpus)
+    assert refused.value.code == "run_ended"
+    assert len(provider.requests) == 2
 
 
 # --- Tools confer nothing ------------------------------------------------------
@@ -486,8 +661,9 @@ def test_a_follow_up_answered_without_tools_is_still_checked():
     # A number from a checked earlier Turn is supported; an invented title is not.
     result, _ = ask(recording(reply("It predicted 87 floods.")), ctx=ctx, question="How many?")
     assert result.answer == "It predicted 87 floods."
+    invented = reply("«An invented study» agrees.")
     with pytest.raises(Unavailable) as refused:
-        ask(recording(reply("«An invented study» agrees.")), ctx=ctx, question="Who agrees?")
+        ask(recording(invented, invented), ctx=ctx, question="Who agrees?")
     assert refused.value.code == "invalid_draft"
 
 
@@ -500,7 +676,8 @@ def test_earlier_turns_reach_the_model_without_their_delivered_markers():
 
 def test_citing_a_paper_the_reader_excluded_is_refused():
     ctx = context(state={"shown": [1], "selected": [], "excluded": [1]})
-    provider = recording(tools(call("a", "search", query="flood")), reply(f"Floods [{handle('P', 1)}]."))
+    excluded = reply(f"Floods [{handle('P', 1)}].")
+    provider = recording(tools(call("a", "search", query="flood")), excluded, excluded)
     with pytest.raises(Unavailable) as refused:
         ask(provider, ctx=ctx)
     assert refused.value.code == "invalid_draft"

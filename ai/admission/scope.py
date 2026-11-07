@@ -30,6 +30,7 @@ def run_key(run_id) -> str:
 
 
 _run: ContextVar[Optional[RunBinding]] = ContextVar("ai_admission_run", default=None)
+_sending: ContextVar[bool] = ContextVar("ai_admission_sending", default=False)
 
 
 @contextmanager
@@ -43,3 +44,17 @@ def bound(binding: RunBinding) -> Iterator[RunBinding]:
 
 def current() -> Optional[RunBinding]:
     return _run.get()
+
+
+@contextmanager
+def admitted_send() -> Iterator[None]:
+    """Around one admitted physical send; a paid adapter refuses outside it (IR-860)."""
+    token = _sending.set(True)
+    try:
+        yield
+    finally:
+        _sending.reset(token)
+
+
+def sending() -> bool:
+    return _sending.get()

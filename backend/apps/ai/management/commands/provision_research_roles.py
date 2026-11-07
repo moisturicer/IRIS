@@ -29,6 +29,12 @@ DEFINER_FUNCTIONS = (
     "begin_research(text, text)",
     "research_record_ids()",
     "reader_status(bigint)",
+    "indexing_source()",
+    "indexed_source_current(uuid,uuid,bigint)",
+    "processing_source()",
+    "lock_processing_source()",
+    "pending_manuscript_work(integer, uuid)",
+    "manuscript_invalidations(integer, uuid)",
 )
 HELPER_FUNCTIONS = ("hmac_sha256(bytea, bytea)", "b64url_encode(bytea)", "b64url_decode(text)")
 RUNTIME_FUNCTIONS = (
@@ -45,11 +51,21 @@ LEDGER_TABLES = {
                               " charge_input_tokens, charge_output_tokens, charge_cost_micros,"
                               " charge_active_ms",
 }
+# Non-content metadata is read-only, without per-reader row filtering.
+RUNTIME_METADATA_TABLES = (
+    "ai_embeddingspace",
+    # Catalogue vocabulary the AI runtime counts by (IR-750); names, no Record.
+    "records_classification", "records_pscedclassification", "records_recordtype",
+)
 #: Columns the verifier reads, and nothing else (no password hashes).
 VERIFIER_COLUMNS = {
     "accounts_user": "id, is_active, is_locked, credential_version, role_id",
     "accounts_role": "id, name",
-    "records_record": "id, is_deleted, pipeline_status, adviser_id",
+    "records_record": "id, is_deleted, pipeline_status, adviser_id, abstract_file, title, abstract, dpa_accepted_at, is_ip, ip_released_at, "
+                      "is_embargoed, embargo_answered_at, embargo_released_at, embargoed_until",
+    "publication_manuscriptwork": "id, record_id, revision, source_file, operation, revoked_at,"
+                                  " created_at, grant_token, grant_expires_at, authority_generation",
+    "publication_manuscriptinvalidation": "id, record_id, work_id, reason, authority_generation",
     "records_recordowner": "record_id, user_id",
     "ai_askrun": "id, state, deadline_at, user_id, conversation_id",
     "ai_conversation": "id, user_id, record_id",
@@ -96,6 +112,12 @@ def problems(cursor) -> list[str]:
     found += _policy_problems(cursor)
     cursor.execute("SELECT 1 FROM pg_roles WHERE rolname = 'iris_ai_runtime'")
     if cursor.fetchone() is not None:
+        for table in RUNTIME_METADATA_TABLES:
+            cursor.execute(
+                "SELECT has_table_privilege('iris_ai_runtime', %s, 'SELECT')", [f"public.{table}"]
+            )
+            if not cursor.fetchone()[0]:
+                found.append(f"role iris_ai_runtime cannot read {table}")
         for table in LEDGER_TABLES:
             cursor.execute(
                 "SELECT has_table_privilege('iris_ai_runtime', %s, 'DELETE, TRUNCATE')",
@@ -208,6 +230,8 @@ class Command(BaseCommand):
         cursor.execute(f"GRANT SELECT ON iris_authz.grant_key TO {VERIFIER}")
         for table, columns in VERIFIER_COLUMNS.items():
             cursor.execute(f"GRANT SELECT ({columns}) ON public.{table} TO {VERIFIER}")
+        # PostgreSQL row locks require UPDATE on at least one column.
+        cursor.execute(f"GRANT UPDATE (id) ON public.records_record TO {VERIFIER}")
         for fn in HELPER_FUNCTIONS:
             cursor.execute(f"GRANT EXECUTE ON FUNCTION iris_authz.{fn} TO {VERIFIER}")
         for fn in DEFINER_FUNCTIONS:
@@ -221,10 +245,19 @@ class Command(BaseCommand):
         for role in RUNTIME_ROLES:
             for table in PROTECTED_TABLES:
                 cursor.execute(f"GRANT SELECT ON public.{table} TO {role}")
+        # Restore Django-owned metadata grants after historical table recreation,
+        # even when independent AI schema migrations are already recorded.
+        for table in RUNTIME_METADATA_TABLES:
+            cursor.execute(f"GRANT SELECT ON public.{table} TO iris_ai_runtime")
         # The AI runtime fences a departed reader's runs (IR-722).
         cursor.execute(
             "GRANT EXECUTE ON FUNCTION iris_authz.reader_status(bigint) TO iris_ai_runtime"
         )
+        cursor.execute("GRANT EXECUTE ON FUNCTION iris_authz.processing_source(),"
+                       " iris_authz.pending_manuscript_work(integer, uuid),"
+                       " iris_authz.manuscript_invalidations(integer, uuid),"
+                       " iris_authz.lock_processing_source(), iris_authz.indexing_source(),"
+                       " iris_authz.indexed_source_current(uuid,uuid,bigint) TO iris_ai_runtime")
         # The AI runtime reserves and settles in the one shared ledger (IR-725).
         for table, columns in LEDGER_TABLES.items():
             cursor.execute(f"REVOKE UPDATE ON public.{table} FROM iris_ai_runtime")

@@ -8,8 +8,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-EXECUTORS = ("deterministic",)
+EXECUTORS = ("deterministic", "agent")
 DEPTHS = ("ordinary", "deep")
+#: Owner decision, ADR-049's 2026-11-04 amendment (IR-885).
+DEFAULT_DEPTH = "deep"
+#: What a run is for, in its pin: absent means an Ask; a compaction asks nothing and writes no Turn (IR-754).
+KIND_COMPACT = "compact"
 PROTOCOL = "runs-1"
 SCHEMA = "0004_agent.sql"
 
@@ -60,6 +64,7 @@ class Dispatch:
     #: Running at once per reader, so one account cannot hold every slot.
     max_running_per_reader: int
     #: Deep runs running at once; every other slot is kept for ordinary ones.
+    #: Deep is the default depth, so this caps most runs.
     deep_concurrency: int
     #: Slots per worker process.
     worker_concurrency: int
@@ -81,6 +86,8 @@ def problems(values) -> list[str]:
     found = []
     if not getattr(values, "RUNS_DATABASE_URL", ""):
         found.append("RUNS_DATABASE_URL is required")
+    if getattr(values, "RUNS_MIGRATION_DATABASE_URL", ""):
+        found.append("RUNS_MIGRATION_DATABASE_URL must not be set on a running service")
     if getattr(values, "RUNS_EXECUTOR", None) not in EXECUTORS:
         found.append(f"RUNS_EXECUTOR must be one of {', '.join(EXECUTORS)}")
     for name in LIMIT_NAMES:
@@ -96,8 +103,9 @@ def problems(values) -> list[str]:
 
 def read(values) -> RunsConfig:
     """From the gateway's settings; raises RunsUnavailable when incomplete."""
-    if problems(values):
-        raise RunsUnavailable
+    found = problems(values)
+    if found:
+        raise RunsUnavailable("; ".join(found))
     return RunsConfig(
         database_url=values.RUNS_DATABASE_URL,
         executor=values.RUNS_EXECUTOR,

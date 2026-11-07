@@ -17,10 +17,8 @@ from typing import Union
 class InferenceTask(Enum):
     """What a model is being asked to do.
 
-    ``DESCRIBE_FIGURE`` is declared and unused: its implementation is a
-    separate spec (it reverses ADR-025's no-image-leaves-the-deployment
-    clause and needs two new ports), and reserving the name here keeps the
-    set closed rather than growing it later by surprise.
+    ``DESCRIBE_FIGURE`` writes retrieval-only Figure descriptions (IR-852,
+    ADR-056 §10), reached only through ``CompositionRoot.figure_describer``.
     """
 
     ANSWER = "answer"

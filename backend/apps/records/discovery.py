@@ -1,4 +1,4 @@
-"""Owner-scoped metadata discovery: IR-567, and IR-576's feedback and reset."""
+"""Owner-scoped metadata discovery: IR-567, IR-575's saved-Area signal, and IR-576's feedback and reset."""
 
 from collections import deque
 from datetime import timedelta
@@ -11,6 +11,7 @@ from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.library.models import SavedRecord
 from core.enums import PUBLICLY_VISIBLE_STATUSES
 
 from .models import (
@@ -22,7 +23,8 @@ from .serializers import RecordListSerializer
 
 
 PAGE_SIZE = 20
-RECIPE_VERSION = 1
+# 2: saved Records' Areas join the chosen ones (IR-575); entries gain a `source`.
+RECIPE_VERSION = 2
 CURSOR_SALT = "records.discovery.v1"
 SNAPSHOT_AGE = 24 * 60 * 60
 FILTER_KEYS = (
@@ -82,6 +84,40 @@ def _locked_interests(user):
     return DiscoveryInterests.objects.select_for_update().get(pk=_interests(user).pk)
 
 
+def invalidate_feed(user):
+    """The reader's saves changed, so every outstanding cursor goes stale (409).
+
+    Called by the library inside the same transaction as the save it follows.
+    Serialised with interest edits and resets by the same row lock.
+    """
+    _invalidate(_locked_interests(user))
+
+
+def _saved_areas(user):
+    """Areas of the Records the reader has saved *and may still read* (IR-575).
+
+    The one visibility predicate and the published-catalogue rule apply here
+    exactly as they do to candidates, so a save the reader lost access to
+    stops being a signal. A dismissal does not remove it: unsaving and
+    "Not interested" are independent. A Record with no Area adds nothing.
+    """
+    saved = (
+        Record.objects.visible_to(user)
+        .filter(
+            pipeline_status__in=PUBLICLY_VISIBLE_STATUSES,
+            pk__in=SavedRecord.objects.filter(owner=user).values("record_id"),
+        )
+        .values_list("classification_id", "psced_id")
+    )
+    areas = set()
+    for classification_id, psced_id in saved:
+        if classification_id is not None:
+            areas.add(("classification", classification_id))
+        if psced_id is not None:
+            areas.add(("psced", psced_id))
+    return areas
+
+
 @transaction.atomic
 def reset_interests(user):
     """Clear chosen Areas and every Not interested. Saved papers are not feedback."""
@@ -131,29 +167,58 @@ def _catalogue(user, filters=None):
     return queryset
 
 
-def _ordered_entries(records, interests):
-    selected = [
+def _ordered_entries(records, interests, saved_areas, saved_ids):
+    """Metadata recipe v2 (IR-567, IR-575).
+
+    The interest Areas are the reader's chosen ones plus the Areas of
+    currently readable saved Records. Matching Records the reader has not
+    saved come first, rotated across the Areas; matching Records they have
+    saved (a completed Record is a saved one) come after all of those, rotated
+    the same way. Each Area's Records keep added-date order, so older research
+    stays eligible. An entry says which kind of input put it there: a Record
+    in any chosen Area is attributed to that Area, so the reason names what
+    the reader actually did even when a saved Area also holds the Record.
+    """
+    chosen = {
         ("classification", area_id)
-        for area_id in interests.classifications.order_by("id").values_list("id", flat=True)
-    ] + [
+        for area_id in interests.classifications.values_list("id", flat=True)
+    } | {
         ("psced", area_id)
-        for area_id in interests.psced.order_by("id").values_list("id", flat=True)
-    ]
-    selected.sort(key=lambda area: (area[1], area[0]))
-    buckets = [
-        deque(record for record in records if getattr(record, f"{kind}_id") == area_id)
-        for kind, area_id in selected
-    ]
+        for area_id in interests.psced.values_list("id", flat=True)
+    }
+    selected = sorted(chosen | saved_areas, key=lambda area: (area[1], area[0]))
+    matching = {
+        area: [record for record in records if getattr(record, f"{area[0]}_id") == area[1]]
+        for area in selected
+    }
+
+    def attributed(record, area):
+        if area not in chosen:
+            area = next(
+                (own for own in selected
+                 if own in chosen and getattr(record, f"{own[0]}_id") == own[1]),
+                area,
+            )
+        return {
+            "id": record.pk, "area_type": area[0], "area_id": area[1],
+            "source": "selected" if area in chosen else "saved",
+        }
+
     entries = []
     seen = set()
-    while any(buckets):
-        for (kind, area_id), bucket in zip(selected, buckets):
-            if not bucket:
-                continue
-            record = bucket.popleft()
-            if record.pk not in seen:
-                entries.append({"id": record.pk, "area_type": kind, "area_id": area_id})
-                seen.add(record.pk)
+    for saved_tier in (False, True):
+        buckets = [
+            deque(record for record in matching[area] if (record.pk in saved_ids) is saved_tier)
+            for area in selected
+        ]
+        while any(buckets):
+            for area, bucket in zip(selected, buckets):
+                if not bucket:
+                    continue
+                record = bucket.popleft()
+                if record.pk not in seen:
+                    entries.append(attributed(record, area))
+                    seen.add(record.pk)
     mode = "for_you" if entries else "latest"
     entries.extend({"id": record.pk} for record in records if record.pk not in seen)
     return mode, entries
@@ -201,7 +266,10 @@ def get_feed(request):
     else:
         filters = {key: request.query_params[key] for key in FILTER_KEYS if key in request.query_params}
         records = list(_catalogue(request.user, filters))
-        mode, entries = _ordered_entries(records, interests)
+        mode, entries = _ordered_entries(
+            records, interests, _saved_areas(request.user),
+            set(SavedRecord.objects.filter(owner=request.user).values_list("record_id", flat=True)),
+        )
         snapshot = DiscoveryFeedSnapshot.objects.create(
             user=request.user, interest_revision=interests.revision,
             recipe_version=RECIPE_VERSION, mode=mode, entries=entries,
@@ -238,15 +306,27 @@ def get_feed(request):
     else:
         next_cursor = None
 
+    # The snapshot also froze which Areas were saved-sourced. A reason may only
+    # name a signal the reader can still read, so a saved Area whose Records
+    # were withdrawn since is no longer named; the item stays where it is.
+    saved_areas = _saved_areas(request.user) if any(
+        entry.get("source") == "saved" for entry in page_entries
+    ) else set()
     rows = []
     for entry in page_entries:
         record = live[entry["id"]]
         row = dict(RecordListSerializer(record, context={"request": request}).data)
         kind = entry.get("area_type")
-        row["reason"] = (
-            {"kind": "selected_area", "area": getattr(record, kind).name}
-            if kind else {"kind": "latest"}
-        )
+        if kind and entry.get("source") == "saved":
+            named = (kind, entry["area_id"]) in saved_areas
+            row["reason"] = (
+                {"kind": "saved_area", "area": getattr(record, kind).name}
+                if named else {"kind": "latest"}
+            )
+        elif kind:
+            row["reason"] = {"kind": "selected_area", "area": getattr(record, kind).name}
+        else:
+            row["reason"] = {"kind": "latest"}
         rows.append(row)
     return Response({
         "mode": snapshot.mode,

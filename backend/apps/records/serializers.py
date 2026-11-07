@@ -176,6 +176,22 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         expires = state["grant_expires_at"]
         return {**state, "grant_expires_at": serializers.DateTimeField().to_representation(expires) if expires else None}
 
+    # The author's field-source decisions (IR-833), for Publish to resume
+    # from. Owners only: they describe how the owner filled the form in.
+    # The draft revision is the owner's too: only a save needs it.
+    metadata_sources    = serializers.SerializerMethodField()
+    details_revision    = serializers.SerializerMethodField()
+
+    def _viewer_owns(self, obj) -> bool:
+        viewer = self._viewer()
+        return viewer is not None and viewer.is_authenticated and obj.owners.filter(user=viewer).exists()
+
+    def get_metadata_sources(self, obj):
+        return obj.metadata_sources if self._viewer_owns(obj) else None
+
+    def get_details_revision(self, obj):
+        return obj.details_revision if self._viewer_owns(obj) else None
+
     ai_hook             = serializers.SerializerMethodField()
     # Paper View's byline credits the adviser by name (IR-472). It rides on
     # the record's own visibility: whoever may read the record may read this.
@@ -247,6 +263,18 @@ class RecordDetailSerializer(serializers.ModelSerializer):
     # `{state, until}` (ADR-052 §3, IR-811); `None` to anyone but the owners, the
     # Adviser and office staff.
     embargo              = serializers.SerializerMethodField()
+    # `{released, released_at}` for a marked paper (ADR-052 §11, IR-813), to the
+    # same people as `embargo`; `None` otherwise.
+    ip_release           = serializers.SerializerMethodField()
+
+    def get_ip_release(self, obj):
+        from core.permissions import may_read_embargo
+
+        from .ip_release import detail_payload
+
+        if not obj.is_ip or not may_read_embargo(self._viewer(), obj):
+            return None
+        return detail_payload(obj)
 
     def get_embargo(self, obj):
         from core.permissions import may_read_embargo
@@ -371,7 +399,7 @@ class RecordDetailSerializer(serializers.ModelSerializer):
                 user=self._viewer(), readable=readable, in_review=in_review,
                 decision=self.get_decision(obj), revision=self.get_revision(obj),
                 office_review=self.get_office_review(obj), my_seats=self.get_my_seats(obj),
-                review_claim=self.get_review_claim(obj),
+                review_claim=self.get_review_claim(obj), routing=self.get_routing(obj),
                 facts=readiness.readiness_facts(obj, self._viewer())
                 if readable and in_review else {"assignments": [], "document_requests": []},
             )
@@ -548,11 +576,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
             "workflow_state", "workflow_state_label", "current_holders",
             "can_request_document", "my_seats", "review_claim", "is_participant", "routing",
             "office_review", "revision", "decision", "capabilities", "readiness", "keywords",
-            "dpa_accepted", "dpa_accepted_at",
+            "dpa_accepted", "dpa_accepted_at", "details_revision", "metadata_sources",
             "created_at", "updated_at",
             "owners", "authors", "reviews", "clearances", "resubmission", "files",
             "versions", "manuscript_unsubmitted", "submitter_status", "lineage",
-            "paper_details", "embargo",
+            "paper_details", "embargo", "ip_release",
         ]
         # Consent is stamped by `RecordViewSet.submit` and read everywhere else
         # (IR-226). `dpa_accepted` is a model property so DRF would infer it as
@@ -561,6 +589,11 @@ class RecordDetailSerializer(serializers.ModelSerializer):
         # writable column -- from becoming settable if this serializer is ever
         # given a write path.
         read_only_fields = ["dpa_accepted", "dpa_accepted_at"]
+
+
+# What a manuscript upload writes. None of it is a detail (IR-273), so none of
+# it moves `details_revision` (IR-833).
+_MANUSCRIPT_FIELDS = frozenset({"abstract_file", "manuscript_revision", "manuscript_sha256", "manuscript_filename"})
 
 
 class RecordWriteSerializer(serializers.ModelSerializer):
@@ -578,6 +611,10 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         default=list,
         help_text="List of author name strings. On update, replaces all existing authors.",
     )
+    metadata_sources = serializers.JSONField(required=False)
+    # The revision the client last saw (IR-833). Named, it makes the save
+    # conditional; left out, the save is unchecked, as it always was.
+    expected_details_revision = serializers.IntegerField(min_value=0, required=False, write_only=True)
 
     class Meta:
         model  = Record
@@ -589,8 +626,22 @@ class RecordWriteSerializer(serializers.ModelSerializer):
             "requires_ethics_review", "requested_itso", "requested_ierc", "requested_ktto",
             "abstract_file",
             "authors", "keywords", "owner_emails",
+            "metadata_sources", "expected_details_revision", "details_revision",
         ]
-        read_only_fields = ["id", "pipeline_status", "added_by"]
+        read_only_fields = ["id", "pipeline_status", "added_by", "details_revision"]
+
+    def validate_metadata_sources(self, value):
+        """The author's decisions, in the one shape Publish writes (IR-833).
+
+        Field names are the five Publish can fill in; nothing here names an
+        owner, adviser, route or hint, so saving decisions can change none.
+        """
+        from .metadata_sources import metadata_sources_problem
+
+        problem = metadata_sources_problem(value)
+        if problem:
+            raise serializers.ValidationError(problem)
+        return value
 
     def validate_abstract_file(self, file):
         """The manuscript is a PDF within the upload limit (IR-408).
@@ -676,6 +727,14 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         if "owner_emails" in validated_data:
             raise serializers.ValidationError({"owner_emails": "Save the draft before editing its owners."})
         authors_data = validated_data.pop("authors", [])
+        validated_data.pop("expected_details_revision", None)
+        from apps.documents.sources import manuscript_changes
+        if validated_data.get("abstract_file"):
+            validated_data.update(manuscript_changes(None, validated_data["abstract_file"]))
+            from .duplicates import enforce_exact, lock_digest
+            digest = validated_data["manuscript_sha256"]
+            lock_digest(digest)
+            enforce_exact(self.context["request"].user, None, digest)
         record = super().create(validated_data)
         if authors_data:
             self._sync_authors(record, authors_data)
@@ -685,14 +744,36 @@ class RecordWriteSerializer(serializers.ModelSerializer):
         from django.db import transaction
         from .models import RecordOwner
 
+        from .metadata_sources import StaleDraft
+
+        expected = validated_data.pop("expected_details_revision", None)
+        # `RecordViewSet.update` holds the row lock, so `instance` is current.
+        if expected is not None and expected != instance.details_revision:
+            raise StaleDraft(instance.details_revision)
         owners = validated_data.pop("owner_emails", None)
         authors_data = validated_data.pop("authors", None)
+        if "abstract_file" in validated_data:
+            from apps.documents.sources import manuscript_changes
+            changes = manuscript_changes(instance, validated_data["abstract_file"])
+            from .duplicates import enforce_exact, lock_digest
+            if changes is None:
+                digest = validated_data["abstract_file"].source_sha256
+                lock_digest(digest)
+                enforce_exact(self.context["request"].user, instance.pk, digest)
+                validated_data.pop("abstract_file")
+            else:
+                digest = changes["manuscript_sha256"]
+                lock_digest(digest)
+                enforce_exact(self.context["request"].user, instance.pk, digest)
+                validated_data.update(changes)
         if self._details_changed(instance, validated_data, authors_data):
             # What a new version answers a revision request with, when no file
             # changed (IR-273). Only a real change: saving the same details
             # again answers nothing. Only an owner edits at all (IR-507), so
             # every change stamped here is the owner's own revision.
             validated_data["details_edited_at"] = timezone.now()
+        if authors_data is not None or owners is not None or set(validated_data) - _MANUSCRIPT_FIELDS:
+            validated_data["details_revision"] = instance.details_revision + 1
         with transaction.atomic():
             record = super().update(instance, validated_data)
             if authors_data is not None:
@@ -711,7 +792,7 @@ class RecordWriteSerializer(serializers.ModelSerializer):
     def _details_changed(instance, validated_data, authors_data) -> bool:
         """Does this update change a detail? The manuscript is not one (IR-273)."""
         for field, value in validated_data.items():
-            if field == "abstract_file":
+            if field in _MANUSCRIPT_FIELDS or field == "metadata_sources":
                 continue
             if getattr(instance, field) != value:
                 return True

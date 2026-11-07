@@ -39,7 +39,7 @@ _MARKER_DIMENSION = 0
 _MARKER_WEIGHT = 0.05
 
 
-def _feature_vector(text: str, dimensions: int, marker: float) -> list[float]:
+def _feature_vector(text: str, dimensions: int, marker: float, salt: str = "") -> list[float]:
     """A hashed bag-of-words vector.
 
     Feature hashing rather than a random draw, so the fake behaves like an
@@ -54,7 +54,7 @@ def _feature_vector(text: str, dimensions: int, marker: float) -> list[float]:
     """
     values = [0.0] * dimensions
     for token in text.lower().split():
-        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        digest = hashlib.sha256((salt + token).encode("utf-8")).digest()
         index = int.from_bytes(digest[:4], "big") % dimensions
         # Sign from a second byte, so unrelated tokens can cancel rather than
         # only ever accumulating towards one corner of the space.
@@ -76,16 +76,27 @@ class DeterministicEmbeddingProvider(EmbeddingProvider):
     shares words still lands close, so ranking is testable.
     """
 
-    def __init__(self, dimensions: int = 1024) -> None:
+    def __init__(self, dimensions: int = 1024, model_id: Optional[str] = None) -> None:
         self._dimensions = dimensions
+        self._model_id = model_id
 
     @property
     def dimensions(self) -> int:
         return self._dimensions
 
+    @property
+    def model_id(self) -> Optional[str]:
+        return self._model_id
+
+    @property
+    def _salt(self) -> str:
+        # A named identity lands in its own region of the space (IR-752), so
+        # two identities can be told apart in a test. Unnamed stays as it was.
+        return f"{self._model_id}:" if self._model_id else ""
+
     def embed_documents(self, texts: Sequence[str]) -> list[list[float]]:
         return [
-            _feature_vector(t, self._dimensions, _MARKER_WEIGHT) for t in texts
+            _feature_vector(t, self._dimensions, _MARKER_WEIGHT, self._salt) for t in texts
         ]
 
     def embed_document_chunks(
@@ -106,7 +117,7 @@ class DeterministicEmbeddingProvider(EmbeddingProvider):
         return [self.embed_documents(document) for document in documents]
 
     def embed_query(self, text: str) -> list[float]:
-        return _feature_vector(text, self._dimensions, -_MARKER_WEIGHT)
+        return _feature_vector(text, self._dimensions, -_MARKER_WEIGHT, self._salt)
 
 
 class ScriptedReranker(Reranker):

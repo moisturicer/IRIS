@@ -1,7 +1,11 @@
+import unicodedata
+
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from rest_framework import serializers
 from core.enums import RequestStatus, RoleName
+from . import profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 
 
@@ -92,6 +96,24 @@ class AdviserOptionSerializer(UserSerializer):
         read_only_fields = fields
 
 
+class ResearchInterestsField(serializers.ListField):
+    """
+    The tags on a profile, as a list of strings (IR-695).
+
+    Read as the person's own tags in the order they gave them. Written as a
+    whole list: it is tidied and checked by `profile.clean_interests`, and the
+    spelling of an existing tag wins over the one typed (that happens when it
+    is stored, in `profile.set_interests`).
+    """
+    child = serializers.CharField(allow_blank=True, trim_whitespace=False)
+
+    def get_attribute(self, instance):
+        return profile.interest_names(instance)
+
+    def to_internal_value(self, data):
+        return profile.clean_interests(super().to_internal_value(data))
+
+
 class MeSerializer(UserSerializer):
     """
     `GET /users/me/`: the signed-in user, plus what only they may read about
@@ -113,8 +135,34 @@ class MeSerializer(UserSerializer):
     review_access = serializers.SerializerMethodField()
     role_request  = serializers.SerializerMethodField()
 
+    # The person's own optional profile (IR-695). Editable here and nowhere
+    # else, so "only the person edits their own fields" holds by construction:
+    # `/users/me/` acts on the signed-in user, and `UserSerializer`, which the
+    # administrators' endpoints use, does not carry them. The photo is not a
+    # field you PATCH: it is uploaded to `/users/me/photo/`, read as `photo_url`.
+    bio = serializers.CharField(
+        max_length=profile.BIO_MAX_LENGTH, allow_blank=True, required=False,
+        error_messages={"max_length": profile.BIO_TOO_LONG},
+    )
+    research_interests = ResearchInterestsField(required=False)
+    photo_url = serializers.SerializerMethodField()
+
     class Meta(UserSerializer.Meta):
-        fields = [*UserSerializer.Meta.fields, "review_access", "role_request"]
+        fields = [
+            *UserSerializer.Meta.fields, "review_access", "role_request",
+            "bio", "research_interests", "photo_url",
+        ]
+
+    def get_photo_url(self, obj):
+        return profile.photo_url(obj)
+
+    def update(self, instance, validated_data):
+        interests = validated_data.pop("research_interests", None)
+        with transaction.atomic():
+            instance = super().update(instance, validated_data)
+            if interests is not None:
+                profile.set_interests(instance, interests)
+        return instance
 
     def get_review_access(self, obj):
         from apps.reviews.seats import review_access
@@ -149,7 +197,37 @@ def enforce_password_policy(password, user, field):
         raise serializers.ValidationError({field: list(exc.messages)})
 
 
+class RegistrationNameField(serializers.CharField):
+    """Trim only the edges; keep the spelling and spacing a person supplied."""
+
+    def __init__(self, label):
+        super().__init__(max_length=100, error_messages={
+            "required": f"{label} is required.",
+            "blank": f"{label} is required.",
+            "null": f"{label} is required.",
+            "invalid": f"{label} must be text.",
+            "max_length": f"{label} must be 100 characters or fewer.",
+        })
+        self.name_label = label
+
+    def to_internal_value(self, data):
+        if not isinstance(data, str):
+            self.fail("invalid")
+        value = super().to_internal_value(data)
+        categories = [unicodedata.category(char)[0] for char in value]
+        if "L" not in categories or any(
+            category not in {"L", "M"} and char not in " '’‐‑-"
+            for char, category in zip(value, categories)
+        ):
+            raise serializers.ValidationError(
+                f"{self.name_label} must contain letters and may include spaces, apostrophes or hyphens."
+            )
+        return value
+
+
 class RegisterSerializer(serializers.ModelSerializer):
+    first_name = RegistrationNameField("First name")
+    last_name = RegistrationNameField("Last name")
     password         = serializers.CharField(write_only=True)
     confirm_password = serializers.CharField(write_only=True)
     consent_given    = serializers.BooleanField(write_only=True)
@@ -193,6 +271,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         enforce_password_policy(data["password"], candidate, "password")
 
         role_name = data.get("role_name")
+        # Sign-up asks only for an author's role. Office accounts are the System
+        # Admin's to make, and the System Admin role is given in Django's admin
+        # site (ADR-051 §4-5, amended).
+        if role_name and role_name not in (RoleName.STUDENT, RoleName.ADVISER):
+            raise serializers.ValidationError({"role_name": "Sign up as a Student or an Adviser."})
         if role_name == RoleName.STUDENT and not data.get("course_id"):
             raise serializers.ValidationError({"course_id": "Course is required for students."})
         if role_name == RoleName.ADVISER:
@@ -230,6 +313,42 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Stash for the view's perform_create to pick up
         self._role_name = role_name
         return user
+
+
+class PhotoUploadSerializer(serializers.Serializer):
+    """`PUT /users/me/photo/`: the file, and optionally the square to keep (IR-695)."""
+
+    photo = serializers.FileField(
+        allow_empty_file=False,
+        error_messages={key: profile.NOT_AN_IMAGE for key in ("required", "invalid", "empty", "no_name")},
+    )
+    #: Pixels of the image as the person sees it, from its top-left corner.
+    #: A negative or zero value is a square that is not inside the image, so it
+    #: says what the contract says for one that runs past the edge.
+    crop_x    = serializers.IntegerField(required=False, min_value=0,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
+    crop_y    = serializers.IntegerField(required=False, min_value=0,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
+    crop_size = serializers.IntegerField(required=False, min_value=1,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
+
+    CROP_FIELDS = ("crop_x", "crop_y", "crop_size")
+
+    def validate(self, attrs):
+        given = [name for name in self.CROP_FIELDS if name in attrs]
+        if given and len(given) != len(self.CROP_FIELDS):
+            raise serializers.ValidationError({
+                name: [profile.CROP_INCOMPLETE] for name in self.CROP_FIELDS if name not in attrs
+            })
+        return attrs
+
+    @property
+    def crop(self):
+        """`(x, y, side)`, or None when the person sent none."""
+        data = self.validated_data
+        if "crop_size" not in data:
+            return None
+        return data["crop_x"], data["crop_y"], data["crop_size"]
 
 
 class ChangePasswordSerializer(serializers.Serializer):

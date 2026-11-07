@@ -163,7 +163,7 @@ class Command(BaseCommand):
         for entry in plan.to_embed:
             turn = Turn.objects.get(pk=entry.turn_id)
             try:
-                embed_turn_answer(turn, space_id=space_id, embedder=embedder)
+                embedded = embed_turn_answer(turn, space_id=space_id, embedder=embedder)
             except Exception as exc:
                 # Logged and carried, not raised: one Turn that will not embed
                 # must not abandon the rest, and the run is resumable anyway,
@@ -171,7 +171,7 @@ class Command(BaseCommand):
                 report.record_failure(entry.turn_id, exc)
                 self.stderr.write(self.style.ERROR(f"  turn {entry.turn_id}: {exc}"))
             else:
-                report.embedded += 1
+                report.embedded += int(embedded)
 
         self.stdout.write(
             self.style.SUCCESS(f"\nEmbedded {report.embedded} Turn answers.")

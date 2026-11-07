@@ -21,7 +21,6 @@ interface Course     { id: number; name: string; department: number; }
 interface FormState {
   first_name:     string;
   last_name:      string;
-  middle_initial: string;
   email:          string;
   password:       string;
   password2:      string;
@@ -34,7 +33,7 @@ type FieldName   = keyof FormState;
 type FieldErrors = Partial<Record<FieldName, string>>;
 
 const EMPTY: FormState = {
-  first_name: "", last_name: "", middle_initial: "",
+  first_name: "", last_name: "",
   email: "",
   password: "", password2: "",
   college_id: "", course_id: "", dept_id: "",
@@ -42,7 +41,7 @@ const EMPTY: FormState = {
 
 /** The three steps, in order, and the fields each one owns (IR-704). */
 const STEPS: { name: string; shortName?: string; fields: FieldName[] }[] = [
-  { name: "Identity",             fields: ["first_name", "last_name", "middle_initial", "email"] },
+  { name: "Identity",             fields: ["first_name", "last_name", "email"] },
   { name: "Affiliation",          fields: ["college_id", "course_id", "dept_id"] },
   { name: "Security & agreement", shortName: "Security", fields: ["password", "password2"] },
 ];
@@ -59,7 +58,6 @@ const SERVER_FIELD: Record<string, FieldName> = {
   email:            "email",
   first_name:       "first_name",
   last_name:        "last_name",
-  middle_initial:   "middle_initial",
   password:         "password",
   confirm_password: "password2",
   college_id:       "college_id",
@@ -95,10 +93,13 @@ const LEDE = {
 function validateAll(f: FormState, role: Role): FieldErrors {
   const e: FieldErrors = {};
 
-  if (!f.first_name.trim()) e.first_name = "First name is required.";
-  if (!f.last_name.trim())  e.last_name  = "Last name is required.";
-  if (f.middle_initial.trim() && !f.middle_initial.trim().endsWith("."))
-    e.middle_initial = "Missing (.).";
+  for (const [field, label] of [["first_name", "First name"], ["last_name", "Last name"]] as const) {
+    const name = f[field].trim();
+    if (!name) e[field] = `${label} is required.`;
+    else if (!/\p{L}/u.test(name) || !/^[\p{L}\p{M} \u0027\u2019\u002D\u2010\u2011]+$/u.test(name))
+      e[field] = `${label} must contain letters and may include spaces, apostrophes or hyphens.`;
+    else if ([...name].length > 100) e[field] = `${label} must be 100 characters or fewer.`;
+  }
 
   if (!f.email.trim())      e.email = "Email is required.";
   else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email))
@@ -184,6 +185,7 @@ export default function SignupPage() {
   // Focus follows a step change, never the first render: arriving on the page
   // must not pull focus past the masthead.
   const stepChanged = useRef(false);
+  const focusInvalid = useRef(false);
 
   const [submitting, setSubmitting] = useState(false);
   const [showPassword, setShowPassword]   = useState(false);
@@ -222,6 +224,12 @@ export default function SignupPage() {
   useEffect(() => {
     if (stepChanged.current) stepHeadingRef.current?.focus();
   }, [step]);
+  useEffect(() => {
+    if (focusInvalid.current) {
+      focusInvalid.current = false;
+      document.querySelector<HTMLElement>('form [aria-invalid="true"]')?.focus();
+    }
+  }, [errors, serverErrors, step]);
 
   /** Moves to a step; `returned` says a refusal brought the registrant there. */
   const goTo = (next: number, returned = false) => {
@@ -292,7 +300,10 @@ export default function SignupPage() {
   const handleContinue = () => {
     const errs = validateAll(form, role);
     revealStep(step, errs);
-    if (hasAny(stepErrors(errs, step)) || refused[step]) return;
+    if (hasAny(stepErrors(errs, step)) || refused[step]) {
+      focusInvalid.current = true;
+      return;
+    }
     goTo(step + 1);
   };
 
@@ -310,10 +321,14 @@ export default function SignupPage() {
     const earliest = STEPS.findIndex((_, i) => hasAny(stepErrors(errs, i)) || refused[i]);
     if (earliest !== -1 && earliest < LAST_STEP) {
       revealStep(earliest, errs);
+      focusInvalid.current = true;
       goTo(earliest);
       return;
     }
-    if (earliest !== -1 || !consented) return;
+    if (earliest !== -1 || !consented) {
+      focusInvalid.current = true;
+      return;
+    }
 
     setFormAlert(null);
     setReturnedTo(null);
@@ -322,7 +337,6 @@ export default function SignupPage() {
       await authApi.register({
         email:            form.email.trim(),
         first_name:       form.first_name.trim(),
-        middle_initial:   form.middle_initial.trim() || undefined,
         last_name:        form.last_name.trim(),
         password:         form.password,
         confirm_password: form.password2,
@@ -355,6 +369,7 @@ export default function SignupPage() {
         else if (SERVER_FIELD[key]) onFields[SERVER_FIELD[key]] = allMessages(val);
         else elsewhere.push(firstMessage(val));
       }
+      focusInvalid.current = Object.keys(onFields).length > 0;
       setServerErrors(onFields);
       setRoleRefusal(onRole);
       // Anything no field owns stays here on Security, as an alert above Register.
@@ -466,7 +481,7 @@ export default function SignupPage() {
   }));
 
   const roleArticle = role === "Adviser" ? "an Adviser" : "a Student";
-  const fullName = [form.first_name.trim(), form.middle_initial.trim(), form.last_name.trim()]
+  const fullName = [form.first_name.trim(), form.last_name.trim()]
     .filter(Boolean).join(" ");
 
   // What sits under the step heading in the left column, beside the fields.
@@ -603,17 +618,11 @@ export default function SignupPage() {
                 )}
               </fieldset>
 
-              <div className="grid gap-5 sm:grid-cols-5 sm:gap-3">
-                <div className="sm:col-span-2">
-                  <Input id="signup-first-name" label="First Name" required
-                    autoComplete="given-name" {...field("first_name")} />
-                </div>
-                <div className="sm:col-span-2">
-                  <Input id="signup-last-name" label="Last Name" required
-                    autoComplete="family-name" {...field("last_name")} />
-                </div>
-                <Input id="signup-middle-initial" label="M.I." maxLength={10}
-                  {...field("middle_initial")} />
+              <div className="grid gap-5 sm:grid-cols-2 sm:gap-3">
+                <Input id="signup-first-name" label="First Name" required
+                  autoComplete="given-name" {...field("first_name")} />
+                <Input id="signup-last-name" label="Last Name" required
+                  autoComplete="family-name" {...field("last_name")} />
               </div>
 
               <Input id="signup-email" label="Institutional email" required type="email"

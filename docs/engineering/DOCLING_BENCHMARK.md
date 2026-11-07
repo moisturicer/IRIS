@@ -1,5 +1,7 @@
 # Repeatable Docling extraction benchmark
 
+> **Historical (IR-843, 2026-11-04).** ADR-056 replaced Docling with LlamaParse, and IR-843 removed the `docling` service, its `docling/` build, `DoclingExtractor` and the GPU detection in `scripts/setup_env.py`. The commands and files below no longer exist in the repository. Kept as the record of what was measured.
+
 This is an opt-in resource experiment for [IR-495](https://citiris.atlassian.net/browse/IR-495). It runs isolated Docling containers and calls IRIS's real `DoclingExtractor`. It never updates records or publishes Celery tasks. Do not run it in CI.
 
 ## Prepare

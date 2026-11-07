@@ -21,7 +21,7 @@
 #     The frontend's start-order dependency on it is dropped to match.
 #
 # Not changed: the image builds, gunicorn + UvicornWorker, every Celery worker
-# and beat, Docling, nginx, migrations, feature flags (all at their defaults).
+# and beat, nginx, migrations, feature flags (all at their defaults).
 # TLS is out of IR-631's scope, so caddy is behind a profile and the frontend
 # is published directly; see e2e/README.md, Limitations.
 

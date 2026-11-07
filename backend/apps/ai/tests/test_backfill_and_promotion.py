@@ -84,7 +84,7 @@ def _record(title="A thesis", chunks=("alpha", "beta")) -> Record:
         abstract="An abstract.",
         is_ip=False,
         dpa_accepted_at=timezone.now(),
-        embargo_answered_at=timezone.now(),
+        is_embargoed=False, embargo_released_at=timezone.now(),
     )
     if chunks:
         _chunk(record, *chunks)
@@ -322,7 +322,7 @@ class StubUploadTests:
             title="Stub only",
             record_type=record_type,
             dpa_accepted_at=timezone.now(),
-            embargo_answered_at=timezone.now(),
+            is_embargoed=False, embargo_released_at=timezone.now(),
         )
         slot = UploadSlot.objects.create(name="Manuscript", record_type=record_type)
         RecordUpload.objects.create(
@@ -387,12 +387,24 @@ class PromotionTests:
     def test_a_complete_space_promotes_and_retires_the_previous_one(
         self, space, pending
     ):
-        record = _record(chunks=("alpha", "beta"))
-        embed_active_chunk_set(
-            record.id, provider=_CountingEmbedder(), space_id=pending.id
+        # IR-739: a space is complete only when its Record summary vectors AND
+        # its Passage vectors are there, so the build (both) replaces the
+        # passage-only fill this test used, and the query provider that would
+        # serve the space must name its model.
+        from apps.ai.space_build import build_pending_space
+
+        _record(chunks=("alpha", "beta"))
+        build_pending_space(
+            pending.id,
+            provider=DeterministicEmbeddingProvider(
+                dimensions=VECTOR_COLUMN_DIMENSIONS, model_id=pending.model_id),
         )
 
-        promote(pending)
+        promote(
+            pending,
+            provider_factory=lambda model: DeterministicEmbeddingProvider(
+                dimensions=VECTOR_COLUMN_DIMENSIONS, model_id=model),
+        )
 
         pending.refresh_from_db()
         space.refresh_from_db()

@@ -17,6 +17,13 @@ export interface RecordOwner {
   email:      string;
   full_name:  string;
   is_primary: boolean;
+  /**
+   * Draft IR-696: true only when this person's Profile can be opened from a
+   * published paper's page. Absent or false means the name is plain text: a
+   * suspended or former user's Profile answers 404, and a link there would land
+   * on not-found. Never inferred from the id.
+   */
+  has_profile?: boolean;
 }
 
 export interface Author {
@@ -32,7 +39,11 @@ export interface RecordListItem {
   title:                 string;
   abstract:              string;
   year_accomplished:     number | null;
-  classification_name:   string | null;
+  /**
+   * Absent, not null, when the record has no classification: the serializer's
+   * `source="classification.name"` skips the field (found by IR-915's contract check).
+   */
+  classification_name?:  string | null;
   record_type_name:      string | null;
   pipeline_status:       PipelineStatus;
   is_ip:                 boolean;
@@ -50,13 +61,16 @@ export interface RecordListItem {
   authors:               Author[];
 }
 
+/** The catalogue metadata kept with an unsent comparison (IR-574). */
+export type ComparisonRecord = Pick<RecordListItem, "id" | "title" | "origin" | "classification_name">;
+
 export interface DiscoverInterestOption { id: number; name: string }
 export interface DiscoverInterests {
   classifications: DiscoverInterestOption[];
   psced: DiscoverInterestOption[];
 }
 export interface ForYouItem extends RecordListItem {
-  reason: { kind: "selected_area" | "latest"; area?: string };
+  reason: { kind: "selected_area" | "saved_area" | "latest"; area?: string };
 }
 export interface ForYouPage {
   mode: "for_you" | "latest";
@@ -219,25 +233,83 @@ export type Capability =
   | "withdraw_submission"
   | "request_deletion"
   | "continue_as"
+  | "set_embargo"
+  | "release_embargo"
+  | "release_ip"
   | "set_visibility"
   | "tag_ip"
   | "attach_file"
   | "comment_review"
+  | "finish_review"
   | "comment_public"
   | "cite";
 
 /**
  * `GET /records/<id>/metadata-suggestions/` (IR-406; spec §4.5). `pending`
- * while Docling reads the manuscript, `ready` once it has, `failed` when it
+ * while the manuscript is being read, `ready` once it has, `failed` when it
  * could not (an image-only scan included), `unsupported` when there is no
  * manuscript extraction at all. A `ready` field with nothing found is null.
- * There is deliberately no confidence value: Docling gives none.
+ * `source` is `llamaextract` when LlamaExtract read a LlamaParse Manuscript
+ * (IR-846), and `pdf_structure` when the stored structure was read.
  */
 export interface MetadataSuggestions {
   state:       "pending" | "ready" | "failed" | "unsupported";
+  /** The legacy projection, kept while clients move to `fields` (IR-833). */
   suggestions: { title: string | null; abstract: string | null };
-  source:      "pdf_structure";
+  source:      "pdf_structure" | "llamaextract";
+  /** Each field's value and where it was read, null when none was (IR-833). */
+  fields?:     SuggestionFields;
+  /** Opaque: the accepted manuscript these values were read from (IR-831). */
+  manuscript_revision?: string | null;
+  /** `queued`, `reading`, `retrying`, `ready`, `failed`, … (IR-831). */
+  phase?:      string;
+  /** A failed read the owner may ask to retry. */
+  retryable?:  boolean;
+  message?:    string | null;
 }
+
+/**
+ * One value read from the PDF (IR-833). A LlamaExtract value (IR-846) also
+ * carries the text it cites and the confidence LlamaExtract reported, which
+ * the interface never shows as a number: only `low_confidence`, the server's
+ * comparison with its threshold, becomes words ("Check this").
+ */
+export interface SuggestionEntry<T> {
+  value:         T;
+  source?:       "pdf_structure" | "llamaextract";
+  basis:         "document_title" | "abstract_section" | "labelled_front_matter" | "cited_text";
+  /** Only when the stored structure records them. */
+  page:          number | null;
+  region:        { page: number; left: number; top: number; right: number; bottom: number } | null;
+  /** Publish may fill it in unasked: a title or abstract within its limit. */
+  auto_apply:    boolean;
+  /** Longer than the field allows: offered whole, for the author to shorten. */
+  exceeds_limit: boolean;
+  /** The text in the PDF the value was read from (IR-846). */
+  matching_text?: string | null;
+  /** As LlamaExtract reported it; absent when it reported none. Never shown. */
+  confidence?:    number | null;
+  /** Below the server's threshold: the author should check it. */
+  low_confidence?: boolean;
+}
+
+export interface SuggestionFields {
+  title:            SuggestionEntry<string> | null;
+  abstract:         SuggestionEntry<string> | null;
+  authors:          SuggestionEntry<string[]> | null;
+  keywords:         SuggestionEntry<string[]> | null;
+  publication_year: SuggestionEntry<number> | null;
+}
+
+/** The author's decision about a field Publish can fill in (IR-833). */
+export interface FieldDecision {
+  state:            "placeholder" | "automatic" | "accepted" | "authored" | "dismissed";
+  source_revision?: string | null;
+  /** What Undo restores, for an `automatic` value. */
+  previous?:        string;
+}
+
+export type MetadataSources = Partial<Record<keyof SuggestionFields, FieldDecision>>;
 
 /** Server-filtered fields: null means withheld or not recorded. */
 export interface PaperPerson {
@@ -272,25 +344,42 @@ export interface PaperDetails {
   due_dates: PaperDueDate[] | null;
 }
 
-/** Where a paper's embargo stands (ADR-052 §3). A date never moves it: a person does. */
-export type EmbargoState = "unknown" | "none" | "active" | "released";
+/**
+ * Where a paper's embargo stands (ADR-052 §3, amended for IR-882). Every paper
+ * starts `active`, with or without a date; a date never moves it, a release does.
+ */
+export type EmbargoState = "active" | "released";
 
 export interface RecordEmbargo {
   state: EmbargoState;
   until: string | null;
+  /** Set when the paper's text may already have gone out (embargo-set/). */
+  notice?: string;
 }
 
-/** What `POST /records/<id>/embargo-answer/` takes. */
-export interface EmbargoAnswer {
-  embargoed:       boolean;
-  embargoed_until: string | null;
+/** KTTO's release of an IP mark (ADR-052 §11). The mark itself stays. */
+export interface RecordIpRelease {
+  released:    boolean;
+  released_at: string | null;
+}
+
+/** What `POST /records/<id>/ip-release/` answers. */
+export interface IpReleaseResult {
+  marked:   boolean;
+  released: boolean;
 }
 
 export interface RecordDetail extends RecordListItem {
+  /** Moved by each detail save; name it to make a save conditional (IR-833). */
+  details_revision?: number | null;
+  /** The owner's field-source decisions; null for anyone else (IR-833). */
+  metadata_sources?: MetadataSources | null;
   /** Added in IR-686; absent only when using an older API. */
   paper_details?: PaperDetails;
   /** Null for anyone but the owners, the Adviser and office staff (ADR-052 §18). */
   embargo?: RecordEmbargo | null;
+  /** Null for an unmarked paper, and to the same viewers as `embargo`. */
+  ip_release?: RecordIpRelease | null;
   lineage?: {
     derived_from: { id: number; title: string; record_type_name: string | null } | null;
     continued_as: { id: number; title: string; record_type_name: string | null } | null;
@@ -311,6 +400,8 @@ export interface RecordDetail extends RecordListItem {
   adviser:         number | null;
   /** The adviser's name, or their email when none is on file; null with no adviser (IR-472). */
   adviser_name:    string | null;
+  /** Draft IR-696: whether the Adviser's Profile can be opened; see `RecordOwner.has_profile`. */
+  adviser_has_profile?: boolean;
   added_by:        number | null;
   /** ADR-018: what the submitter requested; RDCO confirms at intake. */
   requires_ethics_review: boolean;
@@ -412,6 +503,33 @@ export interface RecordVersion {
   created_by_name: string | null;
   /** Null when this version was submitted with no manuscript. */
   manuscript_url:  string | null;
+  /** What it was submitted with, one per upload slot (ADR-058 §2, IR-872). */
+  documents?:               VersionDocument[];
+  /** Uploads made while it was the latest version: "added during vN". */
+  documents_added?:         VersionDocument[];
+  /** True when `documents` is a best guess, for versions older than IR-872. */
+  documents_reconstructed?: boolean;
+  /** Its review text's state (ADR-058 §1 as amended, IR-871). Null with no manuscript. */
+  review_text?:             VersionReviewText | null;
+}
+
+/** Whether a version's review text was read, and what to say if not (IR-871). */
+export interface VersionReviewText {
+  state:    "pending" | "read" | "no_text" | "unavailable" | "not_kept" | "not_read";
+  /** Server-authored, e.g. "No text for v2, so it can't be compared." Null when read. */
+  message:  string | null;
+  warnings: { code: string; [detail: string]: unknown }[];
+  /** `GET .../versions/<n>/text/` when read, else null. */
+  url:      string | null;
+}
+
+/** One slot's file, as a version names it (IR-872). */
+export interface VersionDocument {
+  upload_id:    number;
+  slot:         string;
+  version:      number;
+  uploaded_at:  string;
+  download_url: string;
 }
 
 /**
@@ -434,6 +552,8 @@ export interface DecisionFlags {
   token:        string | null;
   /** The author's flags, shown in the Adviser's *Accept & send to RDCO* dialog. */
   author_hints: string[];
+  /** For RDCO only: while it is `active` RDCO can't publish, only keep unlisted or reject (ADR-052 §14). */
+  embargo?:     RecordEmbargo | null;
 }
 
 export interface DecisionCloses {
@@ -888,6 +1008,9 @@ export interface RecordFormData {
   requested_ktto?:        boolean;
   /** Flat list of author name strings — backend creates Author rows. */
   authors?:              string[];
+  metadata_sources?:     MetadataSources;
+  /** The revision last seen; a newer one on the server refuses the save (409). */
+  expected_details_revision?: number;
 }
 
 export interface Classification {

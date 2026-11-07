@@ -16,6 +16,7 @@ PROTECTED_TABLES = (
     "ai_documentchunk",
     "ai_chunkembedding",
     "ai_recordembedding",
+    "ai_recordspaceembedding",
     "ai_recordoverview",
     "ai_paperbrief",
 )

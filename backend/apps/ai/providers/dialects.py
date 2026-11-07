@@ -180,10 +180,11 @@ class OpenRouterDialect(VendorDialect):
 
     name = "openrouter"
 
-    def __init__(self, provider_only: tuple[str, ...] = ()) -> None:
+    def __init__(self, provider_only: tuple[str, ...] = (), zero_retention: bool = False) -> None:
         # The hosting rule (IR-485 #6, IR-489): an allow-list of OpenRouter
         # provider slugs, so a provider nobody vetted is never used.
         self.provider_only = tuple(provider_only)
+        self.zero_retention = zero_retention
 
     #: OpenRouter tries `models` itself, in one request, in order -- see
     #: `request_extras`. IR-385 is what stops `apps/ai/inference/providers.py`
@@ -227,6 +228,8 @@ class OpenRouterDialect(VendorDialect):
         provider: dict[str, Any] = {"data_collection": "deny"}
         if self.provider_only:
             provider["only"] = list(self.provider_only)
+        if self.zero_retention:
+            provider["zdr"] = True
         extra_body: dict[str, Any] = {
             "provider": provider,
             "reasoning": (
@@ -253,7 +256,7 @@ _DIALECTS: dict[str, VendorDialect] = {GROQ.name: GROQ, OPENROUTER.name: OPENROU
 
 
 def dialect_for(
-    vendor: str | None, provider_only: tuple[str, ...] = ()
+    vendor: str | None, provider_only: tuple[str, ...] = (), zero_retention: bool = False
 ) -> VendorDialect:
     """The dialect for `vendor`, or the default when it has none yet.
 
@@ -268,12 +271,12 @@ def dialect_for(
         if vendor
         else DEFAULT_DIALECT
     )
-    if not provider_only:
+    if not provider_only and not zero_retention:
         return dialect
     if dialect is not OPENROUTER:
-        # A pin that does nothing would read as protection.
+        # A pin or a retention promise that does nothing would read as protection.
         raise ValueError(
-            f"a provider pin needs OpenRouter's provider routing; {vendor!r} "
-            "has none (IR-489)."
+            f"a provider pin or zero retention needs OpenRouter's provider routing; "
+            f"{vendor!r} has none (IR-489, IR-852)."
         )
-    return OpenRouterDialect(provider_only=provider_only)
+    return OpenRouterDialect(provider_only=provider_only, zero_retention=zero_retention)

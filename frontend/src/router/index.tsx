@@ -2,7 +2,7 @@ import { lazy } from "react";
 import { createBrowserRouter, type RouteObject } from "react-router-dom";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { ReviewAccessRoute } from "@/components/auth/ReviewAccessRoute";
-import { rolesFor } from "@/lib/access";
+import { pathFor, rolesFor } from "@/lib/access";
 import { redirectRoutes } from "./redirects";
 
 // Auth pages
@@ -25,6 +25,9 @@ import OfficeConsolePage    from "@/features/review/OfficeConsolePage";
 
 import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import SettingsPage         from "@/features/settings/SettingsPage";
+import ProfilePage          from "@/features/profile/ProfilePage";
+import EditProfilePage      from "@/features/profile/EditProfilePage";
+import PersonProfilePage    from "@/features/profile/PersonProfilePage";
 import HelpPage             from "@/features/help/HelpPage";
 
 // Error screens (IR-745)
@@ -50,6 +53,9 @@ export const routes: RouteObject[] = [{
   children: [
   { path: "/login",  element: <LoginPage /> },
   { path: "/signup", element: <SignupPage /> },
+  // IR-928: the secret is in the fragment. The path form is the deprecated shape of
+  // links emailed earlier; remove it once their tokens have expired (3 days).
+  { path: "/activate", element: <EmailVerifyPage /> },
   { path: "/activate/:uidb64/:token", element: <EmailVerifyPage /> },
   // ADR-045 (IR-642). Public: recovery must never require signing in.
   { path: "/password/forgot", element: <ForgotPasswordPage /> },
@@ -100,7 +106,17 @@ export const routes: RouteObject[] = [{
             ],
           },
           { path: "help",                  element: <HelpPage />,        handle: { crumb: "Help" } },
-          { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings & Profile" } },
+          {
+            // Edit profile sits under Profile, so its breadcrumb reads Profile > Edit profile.
+            path: "profile", handle: { crumb: "Profile" },
+            children: [
+              { index: true,  element: <ProfilePage /> },
+              { path: "edit", element: <EditProfilePage />, handle: { crumb: "Edit profile" } },
+            ],
+          },
+          { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings" } },
+          // Another person's Profile (IR-700). Prototype: sample people, no API yet.
+          { path: "people/:id",            element: <PersonProfilePage />, handle: { crumb: "Profile" } },
 
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,
@@ -126,35 +142,55 @@ export const routes: RouteObject[] = [{
           {
             // RDCO coordination. `Import Records` is the "file on behalf of"
             // path -- which is why RDCO does not also get the submission wizard.
-            element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
+            element: <ProtectedRoute allowedRoles={rolesFor("importRecords")} />,
             children: [
               {
-                path: "records/import",
+                path: pathFor("importRecords"),
                 element: <DeferredPage name="Import Records"><ImportRecordsPage /></DeferredPage>,
                 handle: { crumb: "Import Records" },
               },
               {
-                path: "admin/users",
-                element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
-                handle: { crumb: "Users", width: "full" },
-              },
-              {
-                path: "admin/role-requests",
+                path: pathFor("roleRequests"),
                 element: <DeferredPage name="Role Requests"><RoleRequestsPage /></DeferredPage>,
                 handle: { crumb: "Role Requests", width: "full" },
               },
               {
-                path: "admin/download-requests",
+                path: pathFor("downloadRequests"),
                 element: <DeferredPage name="Download Requests"><DownloadRequestsPage /></DeferredPage>,
                 handle: { crumb: "Download Requests", width: "full" },
               },
               {
-                path: "admin/delete-requests",
+                path: pathFor("deleteRequests"),
                 element: <DeferredPage name="Delete Requests"><DeleteRequestsPage /></DeferredPage>,
                 handle: { crumb: "Delete Requests", width: "full" },
               },
+            ],
+          },
+          {
+            // RDCO gives Student and Adviser at its own Users address.
+            element: <ProtectedRoute allowedRoles={rolesFor("users")} />,
+            children: [
               {
-                path: "admin/audit",
+                path: pathFor("users"),
+                element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
+                handle: { crumb: "Users", width: "full" },
+              },
+            ],
+          },
+          {
+            element: <ProtectedRoute allowedRoles={rolesFor("adminUsers")} />,
+            children: [{
+              path: pathFor("adminUsers"),
+              element: <DeferredPage name="Users"><UserListPage /></DeferredPage>,
+              handle: { crumb: "Users", width: "full" },
+            }],
+          },
+          {
+            // The System Admin alone (ADR-051 §3).
+            element: <ProtectedRoute allowedRoles={rolesFor("audit")} />,
+            children: [
+              {
+                path: pathFor("audit"),
                 element: <DeferredPage name="Audit Log"><AuditLogPage /></DeferredPage>,
                 handle: { crumb: "Audit Log", width: "full" },
               },

@@ -12,6 +12,8 @@ The access/recovery suite uses IR-606 `collect_case`: fresh saved Conversations,
 
 A revocation regression exposed public history retaining answer prose after its citation was removed. Public history now withholds that Turn's answer, question, resolved question, summary and derived listing/comparison when any cited Record is unreadable. Readable historical source pointers retain their existing semantics. The legacy protocol is unchanged.
 
+The AI runtime's own reader lifecycle (IR-726) is in the same two suites rather than a new scenario, so the report shape and the campaign gate are unchanged: `test_ai_runtime_lifecycle_public.py` (journal replay and the Retry link, no database) joins `access_and_recovery`, and `test_ai_runtime_lifecycle_db.py` (Stop racing a final commit and a takeover in independent processes, reconnect with a cursor, explicit Retry, and a lost wakeup, disconnect, delayed completion and deletion through the request/worker seam) joins `durability`. Both use a scripted provider: they prove contracts, not paid capacity or answer quality.
+
 ## Evidence and access
 
 The run records the tested commit, evidence kind, measured/not_measured status, counts and pass/fail per suite. Any failed or unmeasured required exercise blocks enablement. Missing Postgres, dependencies, workers, browser evidence, skips, collection errors and timeouts never pass. Raw pytest tracebacks and XML stay in a temporary directory and are removed after extraction; the saved report carries no paper text, diagnostic trace, credentials or screenshots. Actual Conversation data remains owned by its reader and follows the existing application access/deletion rules. No review endpoint or new permission is introduced.

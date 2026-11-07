@@ -53,6 +53,9 @@ is open (`revisions.decision_blocked_reason`).
 - an unopened seat (400, "Open the review first", as Clear and Request
   revision refuse);
 - an open revision request (400, its explanation);
+- a Proposal's *Accept* while the Adviser has an open *Must fix* thread, and
+  any outcome with no comment while a *Must fix* thread is open: the comment
+  is the reason each open thread closes with (400; ADR-032 §7, IR-874);
 - a stale dialog (409). Record detail carries a `token` summarising what the
   decision would close; the client echoes it, and a record that has moved
   since -- a new version, an office routed to, a seat or document request
@@ -72,6 +75,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.audit import workflow as audit
+from apps.records.embargo import state_payload as embargo_payload
 from apps.records.lifecycle import type_name_of
 from apps.records.versions import latest_version
 from core.enums import (
@@ -79,6 +83,7 @@ from core.enums import (
     PUBLICLY_VISIBLE_STATUSES,
     AssignmentState,
     DocumentRequestState,
+    EmbargoState,
     Party,
     PipelineStatus,
     RecordTypeName,
@@ -89,7 +94,7 @@ from core.enums import (
 )
 from core.permissions import is_office_member
 
-from . import revisions, routing, seats
+from . import revisions, routing, seats, threads
 from .models import RecordAssignment, Review, ReviewerSeat
 
 ACCEPT = "accept"
@@ -159,10 +164,26 @@ def _is_proposal(record) -> bool:
 
 
 def outcomes_for(record, party) -> tuple:
-    """The outcomes `party` may decide `record` with, in the bar's order."""
+    """
+    The outcomes `party` may decide `record` with, in the bar's order.
+
+    An embargoed paper is never published (ADR-052's first 2026-11-04
+    amendment, ADR-047 §10): RDCO keeps it unlisted or rejects it, and publishes
+    it once the Adviser or RDCO has released the embargo.
+    """
     if _is_proposal(record):
         return PROPOSAL_OUTCOMES if party == Party.ADVISER else ()
-    return OUTCOMES_FOR.get(str(party), ())
+    allowed = OUTCOMES_FOR.get(str(party), ())
+    if record.embargo_state != EmbargoState.RELEASED:
+        allowed = tuple(o for o in allowed if o != PUBLISH)
+    return allowed
+
+
+def embargo_refusal(record) -> str:
+    """Why an embargoed paper can't be published, as RDCO is told (ADR-047 §10)."""
+    until = record.embargoed_until
+    dated = f" until {until:%d %b %Y}" if until else ""
+    return f"Under embargo{dated}. Release the embargo, then publish."
 
 
 # --- who decides, as what ------------------------------------------------------------
@@ -294,15 +315,19 @@ def closes_payload(record, decider_seat) -> dict:
             {"party": r.stage, "label": _label(r.stage), "comment": r.comment}
             for r in record.reviews.filter(status=ReviewDecision.NEGATIVE_FINDING)
         ],
+        # The open threads deciding closes, the decider's own drafts included
+        # (ADR-032 §7, IR-874).
+        "threads": threads.closing_payload(record, decider_seat.reviewer),
     }
 
 
-def decision_token(record) -> str:
+def decision_token(record, user=None) -> str:
     """
     A short digest of everything a decision would act on: the latest version,
-    every active assignment, every open seat and every open document request.
-    Any change to any of them changes the token, so a dialog opened before the
-    change is refused rather than deciding into it (IR-270, decision 11).
+    every active assignment, every open seat and every open document request,
+    the open review threads it would close as `user` sees them (IR-874), and the embargo that decides whether RDCO may publish (ADR-052 §14). Any change to any of
+    them changes the token, so a dialog opened before the change is refused
+    rather than deciding into it (IR-270, decision 11).
     """
     version = latest_version(record)
     active = sorted(
@@ -318,7 +343,12 @@ def decision_token(record) -> str:
     requests = sorted(_open_document_requests(record).values_list("pk", flat=True))
     revision_requests = list(revisions.open_requests(record).values_list("pk", "reason"))
     findings = list(record.reviews.filter(status=ReviewDecision.NEGATIVE_FINDING).order_by("pk").values_list("pk", "comment"))
-    facts = f"{version.pk if version else 0}|{active}|{open_seats}|{requests}|{revision_requests}|{findings}"
+    embargo = embargo_payload(record)
+    open_threads = threads.token_facts(record, user)
+    facts = (
+        f"{version.pk if version else 0}|{active}|{open_seats}|{requests}|{revision_requests}|{findings}"
+        f"|{embargo}|{open_threads}"
+    )
     return hashlib.sha256(facts.encode()).hexdigest()[:16]
 
 
@@ -333,12 +363,14 @@ def decision_flags(record, user) -> dict:
     """
     `decision` on record detail (IR-270): the outcomes the viewer may take, why
     not yet, what deciding would close, the staleness token, and -- for the
-    Adviser -- the author's hints the send-to-RDCO dialog shows. A rendering
-    hint; `decide/` re-checks all of it.
+    Adviser -- the author's hints the send-to-RDCO dialog shows; for RDCO, the
+    embargo that keeps it from publishing (ADR-052 §14 as amended). A
+    rendering hint; `decide/` re-checks all of it.
     """
     empty = {
-        "party": None, "outcomes": [], "blocked": None, "closes": None,
-        "token": None, "author_hints": [],
+        "party": None, "outcomes": [], "blocked": None, "blocked_outcomes": {},
+        "reason_required": False, "closes": None,
+        "token": None, "author_hints": [], "embargo": None,
     }
     if not _decidable(record):
         return empty
@@ -353,10 +385,28 @@ def decision_flags(record, user) -> dict:
         "party": party,
         "outcomes": list(outcomes_for(record, party)),
         "blocked": _blocked_reason(record, seat),
+        # An outcome alone held back, when the rest are not (IR-874).
+        "blocked_outcomes": _blocked_outcomes(record, party),
+        # A Decision now closes an open Must fix, so it needs a comment.
+        "reason_required": threads.decision_needs_reason(record, user),
         "closes": closes_payload(record, seat),
-        "token": decision_token(record),
+        "token": decision_token(record, user),
         "author_hints": author_hints(record) if party == Party.ADVISER and routable else [],
+        "embargo": embargo_payload(record) if party == Party.RDCO else None,
     }
+
+
+def _blocked_outcomes(record, party) -> dict:
+    """
+    The outcomes held back while the rest are not: a Proposal's *Accept*, by
+    the Adviser's own open *Must fix* (ADR-032 §7, IR-874). *Reject* never is,
+    and RDCO's Decision never is.
+    """
+    if party == Party.ADVISER and _is_proposal(record):
+        reason = threads.approval_blocked_reason(record, Party.ADVISER)
+        if reason:
+            return {ACCEPT: reason}
+    return {}
 
 
 # --- the act ------------------------------------------------------------------------------
@@ -370,7 +420,7 @@ def _close_assignment(assignment, actor, now, review, state):
 
 
 @transaction.atomic
-def decide(record, actor, *, outcome, comment="", token=None) -> Review:
+def decide(record, actor, *, outcome, comment="", token=None, thread_count=0) -> Review:
     """
     Decide `record` as the caller's party. Returns the decider's `Review`.
     Raises `DecisionRefused` (403), `DecisionError` (400) or `DecisionStale`
@@ -396,6 +446,8 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         choices = " or ".join(OUTCOME_WORDS[o] for o in allowed)
         raise DecisionError(f"Choose to {choices}.")
     if outcome not in allowed:
+        if outcome == PUBLISH and party == Party.RDCO and not _is_proposal(record):
+            raise DecisionError(embargo_refusal(record))
         if _is_proposal(record):
             raise DecisionError(
                 "A Proposal is accepted or rejected, never published or kept unlisted "
@@ -415,12 +467,17 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         raise DecisionError("Say why the record is rejected. The owner reads it as written.")
 
     seat = _decider_seat(record, actor, party)
-    blocked = _blocked_reason(record, seat)
+    blocked = _blocked_reason(record, seat) or _blocked_outcomes(record, party).get(outcome)
     if blocked:
         raise DecisionError(blocked)
+    if not comment and threads.decision_needs_reason(record, actor):
+        raise DecisionError(
+            "Say why you're deciding while Must fix threads are open. Each one closes "
+            "with your reason."
+        )
     if not isinstance(token, str) or not token:
         raise DecisionError("Reload the record and decide again.")
-    if token != decision_token(record):
+    if token != decision_token(record, actor):
         raise DecisionStale(
             "This record changed while you were deciding. Check what deciding "
             "would now close, then decide again."
@@ -477,6 +534,10 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
 
         restore_submitted_manuscript(record)
 
+    # Every open thread closes, named by the Decision and its reason (ADR-032
+    # §7, IR-874). The decider's drafts were sent first, by Finish review.
+    threads.close_by_decision(record, actor, review, reason=comment)
+
     # The one status write of a Decision (module note, point 4).
     record.pipeline_status = new_status
     record.save(update_fields=["pipeline_status", "updated_at"])
@@ -484,7 +545,8 @@ def decide(record, actor, *, outcome, comment="", token=None) -> Review:
         audit.published(record, actor, party=party)
 
     _notify(record, actor, party, outcome, review, closed_requests=len(requests), cut_off=cut_off,
-            closed_revisions=[{"id": r.pk, "label": _label(r.party)} for r in closed_revisions])
+            closed_revisions=[{"id": r.pk, "label": _label(r.party)} for r in closed_revisions],
+            threads=thread_count)
     return review
 
 
@@ -504,7 +566,8 @@ def withdrawn_by_label(review) -> str:
     return f"{DECIDER_NAME[str(review.stage)]} {OUTCOME_PHRASE[outcome]}"
 
 
-def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off, closed_revisions):
+def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off, closed_revisions,
+            threads=0):
     from apps.notifications.services import notify_decided
 
     transaction.on_commit(lambda: notify_decided(
@@ -516,4 +579,5 @@ def _notify(record, actor, party, outcome, review, *, closed_requests, cut_off, 
         closed_requests=closed_requests,
         cut_off=cut_off,
         closed_revisions=closed_revisions,
+        threads=threads,
     ))

@@ -32,3 +32,8 @@ describe("the post-login landing", () => {
     expect(landingPathFor({ role_name: null, review_access: work })).toBe("/");
   });
 });
+
+it("lands the System Admin on its Users page even if review work is reported", () => {
+  expect(landingPathFor({ role_name: ROLES.SYSTEM_ADMIN })).toBe("/admin/users");
+  expect(landingPathFor({ role_name: ROLES.SYSTEM_ADMIN, review_access: work })).toBe("/admin/users");
+});

@@ -8,6 +8,8 @@ import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import type { ChatCitation } from "@/types/ai";
 import { hasCitationQuote, openCitationLabel, useCitationLink } from "@/lib/citedPage";
+import { remarkLimitMath } from "./mathLimit";
+import { breakLongRuns } from "./runLimit";
 
 /**
  * An answer's text with citation markers rendered as inline chips (IR-329).
@@ -83,9 +85,9 @@ function CitationChip({ citation, page = false }: { citation: ChatCitation; page
           ? "inline-flex items-center px-1 mx-0.5 rounded-md text-2xs font-semibold tabular-nums " +
             "text-brand leading-5 align-baseline no-underline hover:bg-brand-50 hover:underline transition-colors duration-150"
           : // min-w: a marker can run to three digits.
-            "inline-flex items-center justify-center min-w-[15px] px-[2px] h-[15px] rounded-full " +
-            "bg-[#6B0F12]/10 text-[8px] font-bold text-[#6B0F12] align-super leading-none " +
-            "no-underline hover:bg-[#6B0F12]/20 mx-px"
+            "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 mx-0.5 rounded-md " +
+            "bg-brand-50 text-2xs font-semibold tabular-nums text-brand align-text-bottom leading-none " +
+            "no-underline hover:bg-brand-100 transition-colors duration-150 motion-reduce:transition-none"
       }
     >
       {page ? `p${citation.marker}` : citation.marker}
@@ -107,7 +109,12 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
   const byMarker = new Map(citations.map((citation) => [citation.marker, citation]));
 
   function CitationLink({ href, children }: ComponentPropsWithoutRef<"a">) {
-    if (!href?.startsWith(CITATION_SCHEME)) {
+    // `react-markdown` blanks a link whose scheme it refuses (`javascript:`,
+    // `data:`, ...). An `<a href="">` would still be a live link back to this
+    // page in a new tab, so the words stay and the link goes (IR-917).
+    if (!href) return <span>{children}</span>;
+
+    if (!href.startsWith(CITATION_SCHEME)) {
       return (
         <a href={href} target="_blank" rel="noreferrer">
           {children}
@@ -129,7 +136,7 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
   return (
     <div className={className}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm, remarkMath]}
+        remarkPlugins={[remarkGfm, remarkMath, remarkLimitMath]}
         rehypePlugins={[rehypeHighlight, rehypeKatex]}
         components={{
           a: CitationLink,
@@ -144,7 +151,7 @@ export function CitationText({ text, citations, streaming = false, pageMarkers =
         }}
         urlTransform={urlTransform}
       >
-        {toMarkdownLinks(text, streaming)}
+        {toMarkdownLinks(breakLongRuns(text), streaming)}
       </ReactMarkdown>
     </div>
   );

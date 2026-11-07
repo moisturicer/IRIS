@@ -2,8 +2,11 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 
 import { recordsApi } from "@/api/records";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ReadFailedState } from "@/components/shared/ReadFailedState";
+import { isRequestTimeout } from "@/api/requestPolicy";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { Select } from "@/components/ui/Select";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import type { Collection, ReadingVisit } from "@/lib/recordLibrary";
 import { readingStatusLabel, sortedItems, type LibraryItem } from "@/store/library.store";
@@ -38,6 +41,8 @@ interface SavedViewProps {
   /** The account's saves (IR-566), keyed by Record id. */
   library:     Record<number, LibraryItem>;
   libraryLoad: "idle" | "loading" | "ready" | "error";
+  /** `libraryLoad` is `error` because the read timed out (IR-906). */
+  libraryInterrupted?: boolean;
   onRetryLibrary: () => void;
   onRemove:    (ids: number[]) => void;
   onRename:    (id: string, name: string) => void;
@@ -65,12 +70,13 @@ interface SavedViewProps {
  * rather than silently hidden.
  */
 export function SavedView({
-  view, collections, history, library, libraryLoad, onRetryLibrary, onRemove, onRename, onDelete, onClearHistory, filters, folderControl,
+  view, collections, history, library, libraryLoad, libraryInterrupted = false, onRetryLibrary, onRemove, onRename, onDelete, onClearHistory, filters, folderControl,
 }: SavedViewProps) {
   const accountView = view.kind === "saved" || view.kind === "status";
   const [records, setRecords] = useState<RecordListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
+  const [interrupted, setInterrupted] = useState(false);
   const [layout, setLayout] = useState<LibraryLayout>("grid");
   const [sort, setSort] = useState<SortKey>("added");
   const [query, setQuery] = useState("");
@@ -113,13 +119,15 @@ export function SavedView({
     }
     setLoading(true);
     setFailed(false);
+    setInterrupted(false);
     try {
       const pages = await Promise.all(
         chunk(ids, ID_CHUNK).map((part) => recordsApi.list({ id: part.join(","), page_size: ID_CHUNK })),
       );
       setRecords(pages.flatMap((p) => p.data.results ?? []));
-    } catch {
+    } catch (error) {
       setFailed(true);
+      setInterrupted(isRequestTimeout(error));
       setRecords([]);
     } finally {
       setLoading(false);
@@ -201,16 +209,15 @@ export function SavedView({
           />
         </label>
         {folderControl}
-        <label className="flex items-center gap-2 text-small text-stone-600">
-          Sort
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
-            className="min-h-9 rounded-lg border border-stone-300 bg-white px-2 text-small text-stone-800 focus:border-brand focus:outline-none"
-          >
-            {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <option key={key} value={key}>{SORT_LABELS[key]}</option>)}
-          </select>
-        </label>
+        <Select
+          label="Sort"
+          size="sm"
+          inline
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+        >
+          {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => <option key={key} value={key}>{SORT_LABELS[key]}</option>)}
+        </Select>
         <div className="flex items-center rounded-lg border border-stone-300 bg-white p-0.5">
           {(["list", "grid"] as const).map((mode) => (
             <button
@@ -289,15 +296,14 @@ export function SavedView({
           {[0, 1, 2].map((i) => <div key={i} className="h-16 rounded-xl border border-stone-200 bg-white motion-safe:animate-pulse" aria-hidden />)}
         </div>
       ) : isFailed ? (
-        <EmptyState
-          framed
-          tone="error"
-          icon="fa-plug-circle-xmark"
+        <ReadFailedState
+          interrupted={accountView ? libraryInterrupted : interrupted}
+          what="saved papers"
           title="Could not load these papers"
           message={accountView
             ? "Your saved papers are safe in your account; only loading them failed."
             : "This list is still stored in this browser; only fetching the papers failed."}
-          action={<button type="button" onClick={retry} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>}
+          onRetry={retry}
         />
       ) : visible.length === 0 ? (
         <EmptyState

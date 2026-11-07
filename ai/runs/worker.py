@@ -40,15 +40,29 @@ class Worker:
         await asyncio.gather(*(self._slot(stop) for _ in range(self.dispatch.worker_concurrency)))
 
 
-def build(settings) -> RunService:
+def build(settings, *, agent_provider=None) -> RunService:
+    """New runs are pinned to `RUNS_EXECUTOR`; every claimed run is answered
+    by the executor its own pin names (IR-862). An AGENT worker still serves
+    deterministic runs, so both coexist during the cutover.
+
+    `agent_provider` replaces the configured vendor adapter, for tests only.
+    """
+    from ai.runs import agent_profile
     from ai.runs import config as runs_config
     from ai.runs.dispatch import notifier_for
     from ai.runs.executor import DeterministicExecutor
     from ai.runs.store import RunStore
 
     cfg = runs_config.read(settings)
-    return RunService(RunStore(cfg.database_url), cfg, DeterministicExecutor(),
-                      notifier_for(cfg.redis_url))
+    profile = agent_profile.selected(settings)
+    deterministic = DeterministicExecutor()
+    if profile is None:
+        pinned_to, also = deterministic, ()
+    else:
+        pinned_to = agent_profile.executor(profile, cfg.database_url, provider=agent_provider)
+        also = (deterministic,)
+    return RunService(RunStore(cfg.database_url), cfg, pinned_to, notifier_for(cfg.redis_url),
+                      serves=also)
 
 
 async def _main() -> None:
@@ -70,8 +84,8 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     try:
         asyncio.run(_main())
-    except RunsUnavailable:
-        raise SystemExit("runs are not configured; every RUNS_* limit is required") from None
+    except RunsUnavailable as refused:
+        raise SystemExit(f"runs are not configured: {refused}") from None
 
 
 if __name__ == "__main__":

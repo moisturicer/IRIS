@@ -1,0 +1,32 @@
+{
+  "route": "record-document-requests",
+  "method": "GET",
+  "as": "owner",
+  "sample": [
+    {
+      "id": 1,
+      "party": "itso",
+      "label": "ITSO",
+      "state": "open",
+      "state_label": "Open",
+      "message": "Please attach the signed endorsement.",
+      "requested_by": "Ivan Santos",
+      "created_at": "2026-11-06T14:34:53.341437+00:00",
+      "closed_at": null,
+      "can_manage": false,
+      "items": [
+        {
+          "id": 1,
+          "slot": 42,
+          "label": "",
+          "state": "missing",
+          "state_label": "Missing",
+          "upload": null,
+          "uploaded_at": null,
+          "rejection_reason": null,
+          "decided_at": null
+        }
+      ]
+    }
+  ]
+}

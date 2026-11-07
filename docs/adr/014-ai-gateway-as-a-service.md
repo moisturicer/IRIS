@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted — 2026-09-02
+Accepted — 2026-09-02 · **amended 2026-11-04 (IR-826): AI-owned runs hold the `iris_ai_runtime` login**
 
 **Supersedes [ADR-012](012-ai-provider-abstraction-not-a-service.md).** **Amends [ADR-010](010-deployment-topology.md)** — the topology becomes six services, not five. ADR-010 is otherwise unchanged and remains accepted.
 
@@ -37,6 +37,31 @@ It is adopted **subject to five preconditions**, each of which must be met befor
 5. **It boots.** `ai/services/chat_service.py` and `embedding_service.py` exist, `ai/.env.example` is committed, and `docker compose config` validates.
 
 **The provider ports stay in `ai/domain/ports.py`** and are the single definition. Django reaches them over HTTP.
+
+## Amendment — 2026-11-03 (IR-826): the database logins the AI runtime may hold — ACCEPTED
+
+**Status: Accepted 2026-11-04. Decider: Jive Tyler I. Revalde, owner of the AI runtime.** Drafted 2026-11-03 for IR-826. ADR-014 predates the dedicated AI runtime, and the runtime's needs decide this. For AI-owned runs this replaces precondition 4's mechanism; its purpose stays.
+
+**Why.** Precondition 4 says the gateway gets no direct database access. Three things on `main` disagree with it:
+
+- **`DATABASE_URL`.** Both Compose files handed the gateway Django's own login. Nothing under `ai/` read it (`ai/infrastructure/settings.py` declares no such field). **Removed in IR-826**; this needs no decision, because precondition 4 already forbade it.
+- **`RUNS_DATABASE_URL`.** AI-owned runs (IR-722, IR-723) connect as `iris_ai_runtime` and write schema `iris_ai`. That is direct database access, from `ai-gateway` and from `ai-runs-worker` (development Compose only; `docker-compose.prod.yml` has no worker yet).
+- **Research tools (IR-719).** Under a Django-issued `reader_session` grant, `iris_ai_runtime` reads the Passages its reader may see, through `research_record_ids()` (migration `ai/0037`). That is retrieval outside Django.
+
+These come from [ADR-049](049-dedicated-ai-runtime-and-local-research.md), whose Reconciliation section replaces ADR-014's stateless-gateway restriction. This amendment states the same boundary on ADR-014's side.
+
+**Decision.**
+
+1. **The gateway and `ai-runs-worker` never receive Django's login** — no `DATABASE_URL`, `DB_USER`, `DB_PASSWORD` or `DB_NAME`. `backend/apps/tests/test_gateway_database_access.py` fails if Compose hands one back, to the gateway in both Compose files or to the worker, which only `docker-compose.yml` defines.
+2. **A long-running AI service holds one login, `iris_ai_runtime`, through `RUNS_DATABASE_URL`.** The maintenance login (`RUNS_MIGRATION_DATABASE_URL`) is for the one-shot `python -m ai.runs.migrate` and is not set on a running service.
+3. **Precondition 4's purpose stays; its mechanism changes.** "The gateway never decides what a user may see" still holds. Visibility is decided inside PostgreSQL by the row policy, under a grant Django issues. Python in `ai/` doesn't implement it again. For AI-owned runs this replaces "Django performs retrieval and passes the candidate chunks as request payload". `asyncpg` stays in `ai/requirements.txt`.
+
+**The two open questions, settled with this decision:**
+
+- **The row policy and `Record.objects.visible_to(user)` are two implementations, and a test holds them together.** `backend/apps/ai/tests/test_research_read_policy_db.py` (IR-718) compares them on real PostgreSQL for owner, adviser, every office role, catalogue reader, a second owner and a role-less account, and pins the policy's office and catalogue constants to `STAFF_ROLES` and `PUBLICLY_VISIBLE_STATUSES`. A new visibility branch needs a new case there.
+- **The maintenance login stays out of `ai/.env`.** `ai/.env.example` no longer lists it, and `ai/runs/config.py` refuses runs when a service has it set, so the routes answer `unavailable` and the worker stops. It is given only to the one command: `RUNS_MIGRATION_DATABASE_URL=... python -m ai.runs.migrate`.
+
+**Gain.** It records what the AI runtime actually holds, and Django's login leaves a container that can reach the internet. **Cost.** The gateway is no longer a "stateless transformation over text it was handed" (§Decision Rationale). A compromised gateway can read whatever the row policy lets a reader read, under that reader's grant. Before IR-826 it held Django's own login, which can read everything.
 
 ## Alternatives Considered
 

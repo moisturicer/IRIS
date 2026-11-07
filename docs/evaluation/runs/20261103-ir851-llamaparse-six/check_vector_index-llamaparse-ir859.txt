@@ -1,0 +1,32 @@
+
+Index recall against an exact scan — space 2 (voyage-context-4)
+  chunk_embedding_hnsw_idx: recall@10 0.985 over 60 probe(s) at depth 200
+      probe 42: 0.90
+      probe 64: 0.90
+      probe 104: 0.90
+      probe 257: 0.90
+      probe 267: 0.90
+  embedding_hnsw_idx: recall@10 1.000 over 6 probe(s) at depth 200
+CommandError: Vector search is not returning what an exact scan would. Raise AI_HNSW_EF_SEARCH, or REINDEX the index named above and re-run.
+SET
+ distance 
+----------
+ 0.000000
+ 0.080090
+ 0.098725
+ 0.141306
+ 0.141306
+ 0.158279
+ 0.158279
+ 0.158745
+ 0.158745
+ 0.160334
+ 0.160334
+ 0.170349
+(12 rows)
+
+ duplicate_vectors | vectors 
+-------------------+---------
+               169 |     929
+(1 row)
+

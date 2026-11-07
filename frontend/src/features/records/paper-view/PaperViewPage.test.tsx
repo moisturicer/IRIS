@@ -44,6 +44,7 @@ import type { User } from "@/types/auth";
 import type { PaperDetails, PaperPerson, Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { documentsApi } from "@/api/documents";
 import * as utils from "@/lib/utils";
 import { seatsApi } from "@/api/reviews";
@@ -53,6 +54,13 @@ import { PANEL_WIDTH_KEY } from "./PaperChatDock";
 import PaperViewPage from "./PaperViewPage";
 import { citationNavigationState } from "@/lib/citedPage";
 import { formatDate } from "@/lib/utils";
+
+// The Django path; which path answers is the deployment's switch (IR-863),
+// tested in RAGChatPage.runtime.test.tsx and RAGChatPage.switchOff.test.tsx.
+vi.mock("@/api/runtimeReader", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/runtimeReader")>()),
+  useReaderPath: () => "django",
+}));
 
 vi.mock("@/config/institution", () => ({
   INSTITUTION: { name: "Example Research University", shortName: "ERU", logo: "example.png", emailDomain: "example.edu" },
@@ -212,6 +220,10 @@ vi.mock("@/api/records", () => ({
     } })),
     route:            vi.fn(() => Promise.resolve({ data: {} })),
     updateTags:       vi.fn(),
+    // The embargo card's acts (IR-817); its own behaviour is `EmbargoCard.test.tsx`'s.
+    setEmbargo:       vi.fn(),
+    releaseEmbargo:   vi.fn(() => Promise.resolve({ data: { state: "released", until: "2099-01-01" } })),
+    releaseIp:        vi.fn(),
     // Edit details (IR-411); its own behaviour is `EditDetailsDialog.test.tsx`'s.
     update:           vi.fn(() => Promise.resolve({ data: {} })),
     classifications:  vi.fn(() => Promise.resolve(page([]))),
@@ -672,14 +684,15 @@ describe("the new-version control follows revision requests", () => {
 });
 
 describe("the status the paper shows", () => {
-  it("is the API's workflow_state_label, on the badge and in governance", async () => {
+  it("is the API's workflow_state_label, stated once on the badge and not again in governance (IR-525)", async () => {
     shownRecord = { ...inReview, pipeline_status: "in_review", workflow_state_label: "Final review", workflow_state: "final_review" };
     signInAs(99, "Student");
     renderPaperView();
 
     await waitForRecord(inReview.title);
-    // Once as the badge, once as the governance ledger's status row.
-    expect(screen.getAllByText("Final review")).toHaveLength(2);
+    // Once, as the badge. Governance has no "Pipeline Status" row repeating it.
+    expect(screen.getAllByText("Final review")).toHaveLength(1);
+    expect(screen.queryByText("Pipeline Status")).not.toBeInTheDocument();
     expect(screen.queryByText("RDCO Final Review")).not.toBeInTheDocument();
   });
 });
@@ -703,6 +716,57 @@ describe("the byline credits the adviser (IR-472)", () => {
 
     await waitForRecord(record.title);
     expect(screen.queryByText(/^Adviser:/)).not.toBeInTheDocument();
+  });
+});
+
+describe("names that open a Profile (IR-700)", () => {
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  it("links the adviser only when the server says their Profile can be opened", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos", adviser_has_profile: true };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByRole("link", { name: "Maria Santos" })).toHaveAttribute("href", `/people/${ASSIGNED_ADVISER_ID}`);
+  });
+
+  it("leaves the adviser as plain text when the flag is false or absent", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos", adviser_has_profile: false };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByText("Adviser: Maria Santos")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Maria Santos" })).not.toBeInTheDocument();
+  });
+
+  it("lists the owners, linking those with a Profile, and shows nothing when none has one", async () => {
+    shownRecord = {
+      ...record,
+      owners: [
+        { id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true, has_profile: true },
+        { id: 2, user: 42, email: "j@x.edu", full_name: "Jomar Ybanez", is_primary: false, has_profile: false },
+      ],
+    };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByRole("link", { name: "Ana Reyes" })).toHaveAttribute("href", "/people/41");
+    expect(screen.queryByRole("link", { name: "Jomar Ybanez" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Owners:/)).toHaveTextContent("Jomar Ybanez");
+  });
+
+  it("shows no owners line, and no email, when no owner has a Profile", async () => {
+    shownRecord = {
+      ...record,
+      owners: [{ id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true }],
+    };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.queryByText(/Owners:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("a@x.edu")).not.toBeInTheDocument();
   });
 });
 
@@ -1773,22 +1837,39 @@ describe("the sections follow the capabilities (IR-411)", () => {
     expect(tabNames()).toEqual(["Overview", "Paper"]);
   });
 
-  it("gives the owner Review and Files as well", async () => {
+  // Changed on purpose by IR-879 (ADR-032 §10, 2026-11-04): a participant
+  // reads the paper in Review, and Files moved into Review's Documents drawer.
+  it("gives the owner Overview and Review, where the paper is", async () => {
     shownRecord = inReview;
     signInAs(OWNER_ID, "Student");
     renderPaperView();
 
     await waitForRecord(inReview.title);
-    expect(tabNames()).toEqual(["Overview", "Paper", "Review", "Files"]);
+    expect(tabNames()).toEqual(["Overview", "Review"]);
   });
 
-  it("gives a reviewer the API names Review and Files", async () => {
+  it("gives a reviewer the API names Overview and Review", async () => {
     shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
     renderPaperView();
 
     await waitForRecord(inReview.title);
-    expect(tabNames()).toEqual(["Overview", "Paper", "Review", "Files"]);
+    expect(tabNames()).toEqual(["Overview", "Review"]);
+  });
+
+  it("lands a participant's old Paper link in Review", async () => {
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?section=paper`);
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+  });
+
+  it("opens a participant's cited page in Review", async () => {
+    shownRecord = { ...inReview, ...reviewing };
+    signInAs(2, "ITSO");
+    renderPaper(`/records/${RECORD_ID}?page=3`);
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    expect(await screen.findByText(/paper reader open at page 3/i)).toBeInTheDocument();
   });
 
   it("has no Paper section on a record with no paper to read", async () => {
@@ -1800,13 +1881,26 @@ describe("the sections follow the capabilities (IR-411)", () => {
     expect(tabNames()).toEqual(["Overview"]);
   });
 
-  it("opens the section the URL names", async () => {
+  it("opens an old Files link as Review with the Documents drawer open (IR-879)", async () => {
     shownRecord = inReview;
     signInAs(OWNER_ID, "Student");
     renderPaper(`/records/${RECORD_ID}?section=files`);
 
-    expect(await screen.findByRole("tab", { name: "Files", selected: true })).toBeInTheDocument();
-    expect(await screen.findByRole("heading", { name: "Supporting documents" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toBeInTheDocument();
+    const drawer = await screen.findByRole("dialog", { name: "All documents" });
+    expect(await within(drawer).findByRole("heading", { name: "Supporting documents" })).toBeInTheDocument();
+
+    await userEvent.click(within(drawer).getByRole("button", { name: /close/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "All documents" })).not.toBeInTheDocument());
+  });
+
+  it("opens the Documents drawer from the author's Review pane", async () => {
+    shownRecord = inReview;
+    signInAs(OWNER_ID, "Student");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Documents" }));
+    expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
   });
 
   it("shows Overview, not the section, to a viewer who may not open it", async () => {
@@ -1841,7 +1935,8 @@ describe("the sections follow the capabilities (IR-411)", () => {
     overview.focus();
     await userEvent.keyboard("{ArrowRight}");
 
-    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toHaveFocus();
+    // Changed on purpose by IR-879: an owner's next section is Review.
+    expect(await screen.findByRole("tab", { name: "Review", selected: true })).toHaveFocus();
   });
 });
 
@@ -2518,20 +2613,18 @@ describe("the Review section (IR-412)", () => {
       expect(due).not.toHaveTextContent("Blocker");
       expect(within(due).queryByRole("button")).not.toBeInTheDocument();
 
+      // Changed on purpose by IR-879: Documents is a drawer, not a sidebar target.
       await userEvent.click(within(request).getByRole("button", { name: "Open Documents" }));
-      const side = screen.getByRole("complementary", { name: "Review details" });
-      await waitFor(() => expect(document.activeElement).toHaveTextContent(/^Documents/));
-      expect(side).toContainElement(document.activeElement as HTMLElement);
+      expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
     });
 
-    it("takes a folded Open Documents to the Details tab", async () => {
+    it("opens the Documents drawer from a folded workspace too", async () => {
       workspaceAt(1100);
       shownRecord = { ...inReview, ...reviewing, readiness: documentsAndDue() };
       signInAs(2, "ITSO");
       renderPaper(`/records/${RECORD_ID}?section=review`);
       await userEvent.click(await screen.findByRole("button", { name: "Open Documents" }));
-      expect(screen.getByRole("tab", { name: "Details", selected: true })).toBeInTheDocument();
-      await waitFor(() => expect(document.activeElement).toHaveTextContent(/^Documents/));
+      expect(await screen.findByRole("dialog", { name: "All documents" })).toBeInTheDocument();
     });
   });
 
@@ -2609,22 +2702,17 @@ describe("the Review section (IR-412)", () => {
     await waitFor(() => expect(recordsApi.tracker).toHaveBeenCalledTimes(2));
   });
 
-  it("has no Ask IRIS, and Ask about this paper takes the reader to the Paper tab with the chat open", async () => {
+  // Changed on purpose by IR-879 (ADR-032 §10, IR-372 kept): no Ask IRIS in
+  // Review, and nothing that sends a participant to a Paper tab they no longer have.
+  it("has no Ask IRIS and no Ask about this paper", async () => {
     shownRecord = { ...inReview, ...reviewing };
     signInAs(2, "ITSO");
-    renderWithProbe(`/records/${RECORD_ID}?section=review`);
+    renderPaper(`/records/${RECORD_ID}?section=review`);
 
     await screen.findByRole("list", { name: "Review timeline" });
     expect(screen.queryByRole("complementary", { name: "Ask IRIS" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Ask IRIS" })).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Ask about this paper" }));
-
-    expect(await screen.findByRole("tab", { name: "Paper", selected: true })).toBeInTheDocument();
-    expect(await screen.findByRole("complementary", { name: "Ask IRIS" })).toBeInTheDocument();
-    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(
-      `/records/${RECORD_ID}?section=paper`,
-    );
+    expect(screen.queryByRole("button", { name: "Ask about this paper" })).not.toBeInTheDocument();
   });
 
   it("offers no Ask about this paper when there is no paper to ask about", async () => {
@@ -2673,6 +2761,46 @@ describe("a record the viewer cannot read (IR-411)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitForRecord(record.title);
+  });
+
+  // IR-906. A refusal is a refusal whichever status carries it: a hidden Record
+  // and a missing id must not be told apart.
+  it("treats a 403 exactly like a 404", async () => {
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 403, data: { detail: "You do not have permission." } } });
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "We couldn't load this record" })).not.toBeInTheDocument();
+  });
+
+  it("shows a load that timed out as interrupted, and Retry reads again", async () => {
+    shownRecord = record;
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/records/1/"));
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Record not available" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitForRecord(record.title);
+  });
+
+  it("falls to the same not-available state when a re-read finds access gone", async () => {
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Request documents" }));
+    const dialog = screen.getByRole("dialog", { name: "Request documents" });
+    await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Ethics Clearance" }));
+    await userEvent.type(within(dialog).getByRole("textbox", { name: /Message to the owner/ }), "Please.");
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 });
 
@@ -2881,13 +3009,13 @@ describe("the Overview's header (IR-569)", () => {
     expect(screen.queryByRole("region", { name: "Record details" })).not.toBeInTheDocument();
   });
 
-  it("sets the reading sections apart with hairlines, and draws Comments last (IR-569)", async () => {
+  it("sets the reading sections apart with spacing, and draws Comments last (IR-569)", async () => {
     renderPaperView();
     await waitForRecord(record.title);
 
     const abstract = screen.getByRole("heading", { level: 2, name: "Abstract" }).closest("section");
     const group = abstract?.parentElement;
-    expect(group).toHaveClass("divide-y", "divide-stone-200");
+    expect(group).toHaveClass("space-y-8");
     const sections = within(group as HTMLElement).getAllByRole("heading", { level: 2 });
     expect(sections[sections.length - 1]).toHaveTextContent("Comments");
   });
@@ -3103,5 +3231,65 @@ describe("back to the answer after following a citation (IR-578)", () => {
 
     expect(await screen.findByText(/open at page 14, 0 region\(s\)/i)).toBeInTheDocument();
     expect(screen.getByRole("status")).toHaveTextContent("Page context: the Overview drew on page 14 as a whole.");
+  });
+});
+
+
+// The embargo and its acts sit in Record details, beside what the paper is
+// held under (IR-817). Which control shows is `EmbargoCard.test.tsx`'s.
+describe("the embargo in Record details (IR-817)", () => {
+  const underEmbargo: RecordDetail = {
+    ...record,
+    embargo: { state: "active", until: "2099-01-01" },
+    capabilities: [...record.capabilities, "set_embargo", "release_embargo"],
+  };
+
+  beforeEach(() => {
+    shownRecord = underEmbargo;
+    signInAs(99, "Adviser");
+  });
+
+  it("shows the card in the rail, and a release reloads the record", async () => {
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+    const rail = screen.getByRole("complementary", { name: "Record details" });
+    const card = within(rail).getByRole("region", { name: "Embargo" });
+    expect(within(card).getByText("Under embargo")).toBeInTheDocument();
+
+    shownRecord = { ...underEmbargo, embargo: { state: "released", until: "2099-01-01" }, capabilities: record.capabilities };
+    await userEvent.click(within(card).getByRole("button", { name: "Release embargo" }));
+    await userEvent.click(within(screen.getByRole("dialog", { name: "Release this embargo?" })).getByRole("button", { name: "Release" }));
+
+    expect(recordsApi.releaseEmbargo).toHaveBeenCalledWith(RECORD_ID);
+    expect(await within(card).findByText("Released")).toBeInTheDocument();
+    expect(within(card).queryByRole("button", { name: "Release embargo" })).not.toBeInTheDocument();
+  });
+
+  it("works on a phone, dialog included", async () => {
+    workspaceAt(360);
+    const { container } = renderPaperView();
+    await waitForRecord(record.title);
+    const card = within(screen.getByRole("complementary", { name: "Record details" })).getByRole("region", { name: "Embargo" });
+    await expectNoBlockingA11yViolations(container);
+
+    await userEvent.click(within(card).getByRole("button", { name: "Release embargo" }));
+    expect(screen.getByRole("dialog", { name: "Release this embargo?" })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(document.body);
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    await userEvent.click(within(card).getByRole("button", { name: "Change date" }));
+    expect(screen.getByRole("dialog", { name: "Change the review date" })).toBeInTheDocument();
+    await expectNoBlockingA11yViolations(document.body);
+  });
+
+  it("says in Institutional Governance whether KTTO released the IP mark", async () => {
+    shownRecord = { ...underEmbargo, is_ip: true, ip_type: "patent", ip_release: { released: true, released_at: "2026-11-03T02:00:00Z" } };
+    workspaceAt(1400);
+    renderPaperView();
+    await waitForRecord(record.title);
+
+    const governance = screen.getByRole("region", { name: "Institutional Governance" });
+    expect(within(governance).getByText("Released for the AI by KTTO")).toBeInTheDocument();
   });
 });

@@ -207,7 +207,7 @@ def test_deep_and_ordinary_keep_their_own_deadlines(queued):
         return (datetime.fromisoformat(body["deadline_at"])
                 - datetime.fromisoformat(body["created_at"])).total_seconds()
 
-    ordinary = submit(client, grant, "request-ordinary").json()
+    ordinary = submit(client, grant, "request-ordinary", depth="ordinary").json()
     deep = submit(client, grant, "request-deep", depth="deep").json()
     assert ordinary["depth"] == "ordinary" and deep["depth"] == "deep"
     assert round(span(ordinary)) == LIMITS.deadline_seconds
@@ -307,7 +307,7 @@ def test_ordinary_capacity_is_protected_and_deep_work_completes(queued, runtime)
         ids["deep"].append(submit(client, grant, f"request-load-d{n}", f"deep: {n}", depth="deep").json()["id"])
     for n in range(6):
         grant = session(make_user(f"dispatch-load-o{n}@cit.edu"))
-        ids["ordinary"].append(submit(client, grant, f"request-load-o{n}", f"ordinary {n}").json()["id"])
+        ids["ordinary"].append(submit(client, grant, f"request-load-o{n}", f"ordinary {n}", depth="ordinary").json()["id"])
 
     procs = workers(runtime, 2, ordinary=0.2, deep=deep_seconds, idle=1.5)
     peak = asyncio.run(_peak_connections(procs))

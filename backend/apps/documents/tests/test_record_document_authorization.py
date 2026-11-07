@@ -33,6 +33,7 @@ from unittest import mock
 
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import override_settings
+from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -608,7 +609,7 @@ class RecordFileAdminTests(APITestCase):
         )
 
     def _delete_url(self):
-        return f"/admin/documents/recordfile/{self.record_file.pk}/delete/"
+        return reverse("admin:documents_recordfile_delete", args=[self.record_file.pk])
 
     def test_the_superuser_deleting_a_file_in_admin_removes_the_stored_file(self):
         from django.contrib.admin.models import DELETION, LogEntry
@@ -633,7 +634,7 @@ class RecordFileAdminTests(APITestCase):
         name = self.record_file.file.name
         self.client.force_login(self.superuser)
         response = self.client.post(
-            "/admin/documents/recordfile/",
+            reverse("admin:documents_recordfile_changelist"),
             {"action": "delete_selected", "_selected_action": [self.record_file.pk], "post": "yes"},
         )
         self.assertEqual(response.status_code, 302)

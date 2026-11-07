@@ -3,20 +3,27 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties
 import { aiApi } from "@/api/ai";
 import type { RecordDetail } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
-import { newChatMessage, turnToMessages } from "@/lib/chatMessages";
+import { newChatMessage } from "@/lib/chatMessages";
 import { CitationConversationContext, CitationOriginContext, type AnswerReturn } from "@/lib/citedPage";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
 import { StreamingMessageBubble } from "@/features/ai/components/StreamingMessageBubble";
 import { AskIrisNotice } from "@/features/ai/components/AskIrisNotice";
-import { useAskStream } from "@/features/ai/hooks/useAskStream";
+import { useConversationClient } from "@/features/ai/conversation/useConversationClient";
 import { Button } from "@/components/ui";
+import type { ConversationSummary } from "@/types/ai";
+import { RecentChats } from "./RecentChats";
+import { CHAT_COMPOSER_FIELD, CHAT_COMPOSER_SURFACE, CHAT_OPENING } from "@/features/ai/components/answerLayout";
+import { StarterQuestions } from "@/features/ai/components/StarterQuestions";
 import { cn } from "@/lib/utils";
+import { useReaderPath } from "@/api/runtimeReader";
+import { useAuthStore } from "@/store/auth.store";
+import { useUIStore } from "@/store/ui.store";
+import { RuntimeReader } from "@/features/ai/components/RuntimeReader";
 import {
   CONTROL_BASE,
   CONTROL_FILLED,
   CONTROL_ON,
-  CONTROL_OUTLINE,
   CONTROL_SHAPE,
   CONTROL_SQUARE,
 } from "./controls";
@@ -148,7 +155,11 @@ interface PaperChatPanelProps {
  * The paper a Paper Chat conversation is about, and, when the reader came
  * back to one by its address, which of the paper's Conversations (IR-578).
  */
-type ChatSubject = Pick<RecordDetail, "id" | "title"> & { conversationId?: number };
+type ChatSubject = Pick<RecordDetail, "id" | "title"> & {
+  conversationId?: number;
+  /** The reader chose New chat: no Conversation until the first question (IR-584). */
+  fresh?: boolean;
+};
 
 function subjectOf(record: RecordDetail): ChatSubject {
   return { id: record.id, title: record.title };
@@ -171,7 +182,46 @@ function subjectOf(record: RecordDetail): ChatSubject {
  * "Chat about this paper instead", closing the panel, and reaching a paper
  * any other way all bring back the page's own record.
  */
-export function PaperChatPanel({
+export function PaperChatPanel(props: PaperChatPanelProps) {
+  const path = useReaderPath();
+  if (path === "runtime") return <RuntimePaperChatPanel key={props.record.id} {...props} />;
+  if (path === "django") return <LegacyPaperChatPanel {...props} />;
+  // The deployment's switch is still being read (IR-863); the panel holds its place.
+  return <aside ref={props.panelRef} style={props.style} tabIndex={-1} aria-label="Ask IRIS"
+    className={cn("bg-canvas flex flex-col overflow-hidden", props.className)}>
+    <p role="status" className="p-4 text-sm text-stone-600">Opening Ask IRIS…</p>
+  </aside>;
+}
+
+function RuntimePaperChatPanel(props: PaperChatPanelProps) {
+  const userId = useAuthStore(s => s.user?.id);
+  const storageKey = `iris-runtime-paper:${userId}:${props.record.id}`;
+  const [conversationId, setConversationId] = useState<string | undefined>(() => {
+    try { return sessionStorage.getItem(storageKey) ?? undefined; } catch { return undefined; }
+  });
+  const headingId = useId();
+  return <aside ref={props.panelRef} style={props.style} tabIndex={-1} aria-labelledby={headingId}
+    role={props.modal ? "dialog" : undefined} aria-modal={props.modal || undefined}
+    className={cn("bg-canvas flex flex-col overflow-hidden", props.className)}>
+    {props.resize && !props.minimized && <ResizeEdge {...props.resize} />}
+    <header className="flex items-start justify-between gap-3 border-b border-stone-200 p-4">
+      <div className="min-w-0"><h2 id={headingId} className="font-display text-xl text-stone-900">Ask IRIS</h2>
+        <p className="text-sm text-stone-600 break-words">{props.record.title}</p>
+        <p className="text-xs text-stone-500">Research stays within this paper.</p></div>
+      <button type="button" aria-label="Close Paper Chat" className="min-h-11 px-2 text-sm" onClick={props.onClose}>Close</button>
+    </header>
+    {props.viewingVersion != null && <p className="px-4 py-2 text-xs text-stone-600">You are viewing an older manuscript. Answers use the current version.</p>}
+    {props.minimized && <button type="button" onClick={props.onRestore} className="min-h-14 px-4 text-left">Ask IRIS: back to the answer</button>}
+    <div className={props.minimized ? "hidden" : "min-h-0 flex-1"}>
+      <RuntimeReader conversationId={conversationId} recordId={props.record.id} onConversation={id => {
+        setConversationId(id);
+        try { sessionStorage.setItem(storageKey, id); } catch { /* optional address convenience */ }
+      }} />
+    </div>
+  </aside>;
+}
+
+function LegacyPaperChatPanel({
   record,
   arrival,
   onClose,
@@ -189,28 +239,47 @@ export function PaperChatPanel({
   returnTo = null,
 }: PaperChatPanelProps) {
   const headingId = useId();
+  const addToast = useUIStore((s) => s.addToast);
   const [ownInput, setOwnInput] = useState("");
-  const input = draft ?? ownInput;
-  const setInput = onDraftChange ?? setOwnInput;
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const pageDraft = draft ?? ownInput;
+  const setPageDraft = onDraftChange ?? setOwnInput;
   const [widen, setWiden] = useState(false);
   const [ready, setReady] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const sending = useRef(false);
+  // The paper whose Conversation a first question is starting, from Send until
+  // the client has the question: a second Send for it in that gap would start
+  // a second Conversation. Another paper is free meanwhile.
+  const [startingFor, setStartingFor] = useState<number | null>(null);
+  const starting = useRef<number | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const transcriptScrollTop = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement>(null);
-  const { streaming, ask, cancel } = useAskStream();
+  // Every Conversation this panel has opened, its transcript, and the answers
+  // in flight: the same client Ask IRIS runs on (IR-571). An answer lands in
+  // the Conversation that asked it, shown or not (IR-355, IR-562).
+  const client = useConversationClient({
+    onFailed: (id, error) =>
+      client.note(id, newChatMessage("assistant", errorDetail(error, "IRIS could not answer right now."))),
+  });
+  const { messages, streaming, isAnswering } = client;
+  // Each Conversation keeps its own unsent draft (IR-584); the page's copy is
+  // the one a close keeps, and the one a chat that does not exist yet types into.
+  const input = client.activeId !== null ? client.draft : pageDraft;
+  const setInput = (value: string) => {
+    if (client.activeId !== null) client.setDraft(value);
+    setPageDraft(value);
+  };
+  const [recent, setRecent] = useState<ConversationSummary[]>([]);
+  const [recentOpen, setRecentOpen] = useState(false);
+  const seeded = useRef(false);
   const [subject, setSubject] = useState<ChatSubject>(() => subjectOf(record));
   const pinned = subject.id !== record.id;
-  // Read after an answer arrives: the reader may have switched conversations
-  // while it streamed, and it belongs to the one it was asked in.
+  const busy = isAnswering || startingFor === subject.id;
+  // Read after the Conversation is created: the reader may have moved to
+  // another paper meanwhile, and the question belongs to the one it was asked in.
   const subjectId = useRef(subject.id);
   subjectId.current = subject.id;
   /** The Conversation on screen, once there is one; its citations name it (IR-578). */
-  const [conversationId, setConversationId] = useState<number | null>(null);
-  const shownConversation = useRef<number | null>(null);
-  shownConversation.current = conversationId;
+  const conversationId = client.activeId;
   /** The Turn to show once the transcript has it (IR-578). */
   const pendingTurn = useRef<number | null>(null);
 
@@ -233,18 +302,16 @@ export function PaperChatPanel({
     let cancelled = false;
     setReady(false);
     setWiden(false);
-    // Nothing of the old conversation may receive or show anything meanwhile.
-    setMessages([]);
-    setConversationId(null);
+    // Nothing of the old conversation may show meanwhile; an answer it is
+    // still waiting for stays with it.
+    client.showEmpty();
 
     (async () => {
       try {
-        const conversation = subject.conversationId
-          ? (await aiApi.conversations.get(subject.conversationId)).data
-          : await aiApi.conversations.findForRecord(subject.id);
-        if (cancelled || !conversation) return;
-        setConversationId(conversation.id);
-        setMessages(conversation.turns.flatMap(turnToMessages));
+        await client.openFound(async () =>
+          subject.fresh ? null : subject.conversationId
+            ? (await aiApi.conversations.get(subject.conversationId)).data
+            : await aiApi.conversations.findForRecord(subject.id));
       } catch {
         // No conversation to show: the panel starts empty, as with none yet.
       } finally {
@@ -253,7 +320,34 @@ export function PaperChatPanel({
     })();
 
     return () => { cancelled = true; };
-  }, [subject.id, subject.conversationId]);
+    // The client's callbacks are stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subject.id, subject.conversationId, subject.fresh]);
+
+  // The draft the page kept through a close goes to the Conversation it was
+  // typed for, once; after that each Conversation's draft is its own.
+  useEffect(() => {
+    if (client.activeId === null || seeded.current) return;
+    seeded.current = true;
+    if (pageDraft && !client.draft) client.setDraft(pageDraft);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client.activeId]);
+
+  // The reader's own chats about the page's paper. A refusal or failure shows
+  // none, and says nothing about whether the paper has any (IR-584).
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data } = await aiApi.conversations.list({ record: record.id });
+        if (!cancelled) setRecent(Array.isArray(data) ? data.filter((c) => c.record === record.id) : []);
+      } catch {
+        if (!cancelled) setRecent([]);
+      }
+    })();
+    return () => { cancelled = true; };
+    // Re-read when a chat is started or opened, so the list keeps up.
+  }, [record.id, client.activeId]);
 
   // Back to an answer (IR-578). The one on screen scrolls to it; another is
   // opened first, about the paper it belongs to, which may not be this one.
@@ -261,7 +355,7 @@ export function PaperChatPanel({
     if (!returnTo) return;
     pendingTurn.current = returnTo.turnId;
     // On screen already: the scroll below, keyed by the same request, does it.
-    if (shownConversation.current === returnTo.conversationId) return;
+    if (client.isOnScreen(returnTo.conversationId)) return;
     let cancelled = false;
     aiApi.conversations
       .get(returnTo.conversationId)
@@ -277,18 +371,6 @@ export function PaperChatPanel({
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [returnTo?.key]);
-
-  /** The subject's Conversation, started now if this is its first question. */
-  const conversationFor = async (askedAbout: number): Promise<number> => {
-    if (subject.conversationId && subject.id === askedAbout) return subject.conversationId;
-    const { data } = await aiApi.conversations.create({ record: askedAbout, reuse_default: true });
-    if (subjectId.current === askedAbout) {
-      // Another tab may have started this default after our initial GET.
-      setConversationId(data.id);
-      setMessages([...data.turns.flatMap(turnToMessages)]);
-    }
-    return data.id;
-  };
 
   // Scroll the transcript itself, never with `scrollIntoView` (IR-351): that
   // scrolls every scrollable ancestor too, the window included, and threw a
@@ -315,36 +397,57 @@ export function PaperChatPanel({
     if (!minimized && transcript) transcript.scrollTop = transcriptScrollTop.current;
   }, [minimized]);
 
-  const sendQuestion = async (question: string, questionWiden: boolean) => {
-    if (!question || sending.current || !ready) return;
-    sending.current = true;
-    const requestId = crypto.randomUUID();
-
-    setBusy(true);
-    const askedAbout = subject.id;
-    // The answer is stored in the conversation it was asked in either way;
-    // it is shown only if that is still the one on screen (IR-355).
-    const show = (reply: ChatMessage) => {
-      if (subjectId.current === askedAbout) setMessages((prev) => [...prev, reply]);
-    };
+  const retry = async (message: ChatMessage) => {
     try {
-      const conversationId = await conversationFor(askedAbout);
-      if (subjectId.current === askedAbout) setMessages((prev) => [...prev, newChatMessage("user", question)]);
-      const { message } = await ask(question, { conversationId, widen: questionWiden, requestId });
-      show(message);
+      await client.retry(message);
     } catch (error) {
-      show(newChatMessage("assistant", errorDetail(error, "IRIS could not answer right now.")));
-    } finally {
-      sending.current = false;
-      setBusy(false);
+      addToast({ type: "error", message: errorDetail(error, "IRIS could not retry that question right now.") });
     }
   };
 
-  const send = () => {
+  const send = async () => {
     const question = input.trim();
-    if (!question || busy || !ready) return;
+    if (!question || busy || !ready || starting.current === subject.id) return;
+    const askedAbout = subject.id;
+    starting.current = askedAbout;
     setInput("");
-    return sendQuestion(question, widen);
+    setStartingFor(askedAbout);
+    try {
+      let target = client.activeId ?? subject.conversationId;
+      if (target === undefined || target === null) {
+        // The first question starts the paper's Conversation, or finds the one
+        // another tab already started (IR-561, IR-569).
+        // New chat is a distinct Conversation; anything else reuses the default.
+        const { data } = await aiApi.conversations.create(
+          subject.fresh ? { record: askedAbout } : { record: askedAbout, reuse_default: true });
+        setSubject((now) => (now.id === askedAbout && now.fresh ? { ...now, fresh: false } : now));
+        target = data.id;
+        // Shown only if its paper is still the one on screen (IR-355); asked
+        // in either way, and the answer stays with it.
+        if (subjectId.current === askedAbout) client.show(data);
+      }
+      // Not awaited: the answer is the client's to follow, and the reader may
+      // ask about another paper while it comes.
+      void client.send(question, { widen, conversationId: target });
+    } catch (error) {
+      setInput(question);
+      addToast({ type: "error", message: errorDetail(error, "IRIS could not answer right now.") });
+    } finally {
+      if (starting.current === askedAbout) starting.current = null;
+      setStartingFor((now) => (now === askedAbout ? null : now));
+    }
+  };
+
+  const newChat = () => {
+    setRecentOpen(false);
+    setInput("");
+    setSubject({ ...subjectOf(record), fresh: true });
+  };
+
+  const chooseRecent = (chat: ConversationSummary) => {
+    setRecentOpen(false);
+    if (chat.id === conversationId) return;
+    setSubject({ id: record.id, title: record.title, conversationId: chat.id });
   };
 
   const chooseStarter = (question: string) => {
@@ -434,8 +537,34 @@ export function PaperChatPanel({
             Chat about this paper instead
           </button>
         )}
+
+        {/* One chat to continue, or a new one (IR-584). */}
+        <div className="mt-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setRecentOpen((v) => !v)}
+            aria-expanded={recentOpen}
+            disabled={recent.length === 0}
+            className={cn("px-3", CONTROL_BASE, CONTROL_ON)}
+          >
+            Recent chats{recent.length > 0 ? ` (${recent.length})` : ""}
+          </button>
+          <button type="button" onClick={newChat} className={cn("px-3", CONTROL_BASE, CONTROL_ON)}>
+            <i className="fas fa-plus text-2xs" aria-hidden />
+            New chat
+          </button>
+        </div>
+        {recentOpen && (
+          <RecentChats
+            className="mt-2 max-h-48 overflow-y-auto"
+            chats={recent}
+            activeId={conversationId}
+            onChoose={chooseRecent}
+          />
+        )}
       </div>
 
+      <div className={cn("min-h-0 flex-1 flex-col", minimized ? "hidden" : "flex", ready && !busy && messages.length === 0 && CHAT_OPENING)}>
       {/* Transcript */}
       <div
         ref={transcriptRef}
@@ -445,7 +574,7 @@ export function PaperChatPanel({
         hidden={minimized}
         // Only while shown: hiding it is not the reader scrolling it.
         onScroll={minimized ? undefined : (e) => { transcriptScrollTop.current = e.currentTarget.scrollTop; }}
-        className="flex-1 overflow-y-auto px-4 py-5 space-y-5"
+        className={cn("space-y-5 px-4 py-5", ready && !busy && messages.length === 0 ? "shrink-0 pb-1" : "flex-1 overflow-y-auto")}
       >
         {ready && messages.length === 0 && (
           <div className="pt-2">
@@ -455,18 +584,13 @@ export function PaperChatPanel({
                 ? "Answers come from every paper in the repository, with citations you can open."
                 : "Answers come from this paper’s own text, with citations that open the passage."}
             </p>
-            <div role="group" aria-label="Suggested questions" className="mt-5 grid gap-2">
-              {STARTER_QUESTIONS.map((question) => (
-                <button
-                  key={question}
-                  type="button"
-                  onClick={() => chooseStarter(question)}
-                  className={cn("px-3 text-left font-normal hover:bg-brand-50", CONTROL_BASE, CONTROL_OUTLINE)}
-                >
-                  {question}
-                </button>
-              ))}
-            </div>
+            <StarterQuestions className="mt-4" questions={STARTER_QUESTIONS} onChoose={chooseStarter} />
+            {!recentOpen && recent.length > 0 && (
+              <div className="mt-5">
+                <h3 className="text-2xs font-semibold uppercase tracking-wider text-stone-600">Recent chats</h3>
+                <RecentChats className="mt-1" chats={recent} activeId={conversationId} onChoose={chooseRecent} />
+              </div>
+            )}
           </div>
         )}
 
@@ -475,17 +599,17 @@ export function PaperChatPanel({
         <CitationOriginContext.Provider value="paper-chat">
         <CitationConversationContext.Provider value={conversationId}>
           {messages.map((m) => (
-            <ChatMessageBubble key={m.id} message={m} compact retryDisabled={busy || !ready} />
+            <ChatMessageBubble key={m.id} message={m} compact retryDisabled={busy || !ready} onRetry={retry} />
           ))}
 
-          {busy && streaming && <StreamingMessageBubble state={streaming} compact onStop={() => void cancel()} />}
+          {busy && streaming && <StreamingMessageBubble state={streaming} compact onStop={() => void client.stop()} />}
         </CitationConversationContext.Provider>
         </CitationOriginContext.Provider>
       </div>
 
       {/* Composer: the question, then its scope and Send (IR-569). */}
-      <div className="shrink-0 border-t border-stone-200 p-3" hidden={minimized}>
-        <div className="rounded-lg border border-stone-300 focus-within:border-brand/60 focus-within:ring-2 focus-within:ring-brand/20 transition-colors duration-200">
+      <div className={cn("shrink-0 p-3", (!ready || busy || messages.length > 0) && "border-t border-stone-200")} hidden={minimized}>
+        <div className={CHAT_COMPOSER_SURFACE}>
           <textarea
             ref={composerRef}
             rows={2}
@@ -501,7 +625,7 @@ export function PaperChatPanel({
             // a screen reader on Y must not hear "this paper" and mean X.
             aria-label={pinned ? `Ask about ${subject.title}` : "Ask about this paper"}
             placeholder="Ask about methodology, findings, datasets…"
-            className="block w-full resize-none bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 outline-none"
+            className={cn("block w-full bg-transparent px-3 pt-2.5 text-sm text-stone-800 placeholder-stone-500 outline-none min-h-14", CHAT_COMPOSER_FIELD)}
           />
           <div className="flex items-center justify-between gap-2 px-2 pb-2">
             {/* The scope control (IR-298, ADR-026 section 9): visible, and the
@@ -542,6 +666,7 @@ export function PaperChatPanel({
         </div>
         <p className="mt-1.5 px-1 text-2xs text-stone-500">Enter to send · Shift+Enter for a new line</p>
         <AskIrisNotice className="mt-1 px-1 text-2xs" />
+      </div>
       </div>
     </aside>
   );

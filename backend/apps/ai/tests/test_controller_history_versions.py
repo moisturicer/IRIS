@@ -8,10 +8,11 @@ from django.utils import timezone
 from apps.ai.answers.citations import Citation, GroundedAnswer
 from apps.ai.composition import use_composition_root
 from apps.ai.conversations import record_turn, turn_for_reader
-from apps.ai.history import readable_turns
+from apps.ai.history import sendable_turns
 from apps.ai.memory import ConversationMemory
 from apps.ai.models import ChunkSet, TurnCitation, TurnEmbedding
 from apps.ai.providers.fakes import ScriptedLLM, ScriptedToolCallingLLM
+from apps.records.models import Record
 
 from .test_controller_http import compose, controller_root
 from .test_routed_chat_http import answer
@@ -28,6 +29,10 @@ def historical(flood_scene, settings):
     # also inject it into RESOLVE and trigger a mid-answer mutation early.
     settings.AI_QUESTION_RESOLUTION_ENABLED = False
     scene = flood_scene
+    # Released and consented, so these tests are about stale versions alone. A Turn
+    # citing a paper the real gate refuses stays out of history too (IR-812).
+    now = timezone.now()
+    Record.objects.filter(pk=scene["flood"].pk).update(is_embargoed=False, embargo_released_at=now, dpa_accepted_at=now)
     chunk = scene["flood"].document_chunks.get()
     citation = Citation(
         marker=1, chunk_id=chunk.pk, record_id=scene["flood"].pk,
@@ -56,7 +61,7 @@ def _replace_source(scene):
 @pytest.mark.parametrize("change", ["replace", "tombstone", "delete", "missing"])
 def test_stale_chunk_history_is_rejected_even_while_the_record_remains_readable(historical, change):
     scene = historical
-    assert readable_turns([scene["turn"]], scene["reader"]) == [scene["turn"]]
+    assert sendable_turns([scene["turn"]], scene["reader"]) == [scene["turn"]]
     if change == "replace":
         _replace_source(scene)
     elif change == "tombstone":
@@ -65,7 +70,7 @@ def test_stale_chunk_history_is_rejected_even_while_the_record_remains_readable(
         scene["chunk"].delete()
     else:
         TurnCitation.objects.filter(turn=scene["turn"]).update(chunk=None)
-    assert readable_turns([scene["turn"]], scene["reader"]) == []
+    assert sendable_turns([scene["turn"]], scene["reader"]) == []
 
 
 @pytest.mark.parametrize("endpoint", ["ai-ask", "ai-ask-stream"])

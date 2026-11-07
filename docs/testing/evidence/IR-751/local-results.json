@@ -1,0 +1,76 @@
+{
+  "implementation_commit": "8905b32f8d859524748da6bdc3ea02ea2c945cb4",
+  "baseline": "15c1ac36",
+  "configuration": "four independent serial CI shards, separate PostgreSQL servers and media storage; HYPOTHESIS_PROFILE=ci",
+  "totals": {
+    "passed_tests": 5992,
+    "passed_subtests": 625,
+    "optional_skips": 18,
+    "expected_failures": 1,
+    "failures": 0,
+    "errors": 0
+  },
+  "ai_unit_tests": 44,
+  "shards": [
+    {
+      "shard": 1,
+      "passed_tests": 1513,
+      "passed_subtests": 108,
+      "junit": {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "1",
+        "tests": "1622",
+        "time": "740.292",
+        "timestamp": "2026-11-03T23:14:32.816104+08:00",
+        "hostname": "886afee44862"
+      }
+    },
+    {
+      "shard": 2,
+      "passed_tests": 1525,
+      "passed_subtests": 133,
+      "junit": {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "0",
+        "tests": "1658",
+        "time": "679.916",
+        "timestamp": "2026-11-03T23:14:33.898185+08:00",
+        "hostname": "d73589af6c4b"
+      }
+    },
+    {
+      "shard": 3,
+      "passed_tests": 1520,
+      "passed_subtests": 236,
+      "junit": {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "16",
+        "tests": "1772",
+        "time": "812.223",
+        "timestamp": "2026-11-03T23:14:34.308928+08:00",
+        "hostname": "33719e56c566"
+      }
+    },
+    {
+      "shard": 4,
+      "passed_tests": 1434,
+      "passed_subtests": 148,
+      "junit": {
+        "name": "pytest",
+        "errors": "0",
+        "failures": "0",
+        "skipped": "2",
+        "tests": "1584",
+        "time": "724.409",
+        "timestamp": "2026-11-03T23:14:34.288030+08:00",
+        "hostname": "0d2963d1ff49"
+      }
+    }
+  ]
+}

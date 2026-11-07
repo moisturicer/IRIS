@@ -15,9 +15,9 @@ cryptography>=43.0
 # removed 2026-09-17 — two pins for one package is how they drift apart.
 pgvector>=0.3
 
-# Extraction is one on-premise service (ADR-016): Docling-serve over HTTP. The
-# extractor libraries the prototype chain imported — unstructured, pymupdf,
-# pytesseract — were never declared here and are gone with it.
+# Extraction is LlamaParse over HTTP (ADR-056). The extractor libraries the
+# prototype chain imported — unstructured, pymupdf, pytesseract — were never
+# declared here and are gone with it.
 
 # openai: the client for every OpenAI-compatible vendor (Groq, OpenRouter, etc.),
 # not only OpenAI — apps/ai/providers/openai_compatible.py imports it directly
@@ -25,7 +25,7 @@ pgvector>=0.3
 # that was false and broke the configured-LLM test path. Restored.
 openai>=1.30
 
-# httpx: Docling-serve extraction (ADR-016), Voyage embedding and reranking
+# httpx: LlamaParse extraction (ADR-056), Voyage embedding and reranking
 # (ADR-015), and the OpenAI-compatible inference call (ADR-036). It no longer
 # proxies to the ai-gateway — ADR-024 took the embedding path off it, and nothing
 # else in Django called it.
@@ -62,3 +62,14 @@ defusedxml>=0.7.1,<0.8
 pypdf>=6.0,<7
 # reportlab: draws the watermark overlay that pypdf merges (ADR-048, IR-676). BSD-licensed
 reportlab>=5.0,<6
+
+# IR-871: each Version's review text, read on campus with no AI (ADR-058 §1 as
+# amended). Exactly pinned, like tokenizers above: stored text is never re-read
+# in place, and the reader's version is stored with it, so moving this pin is a
+# deliberate new reader, not an upgrade. It pins pdfminer.six itself: 0.11.10
+# pins 20260107, past PYSEC-2026-1761 (CMap pickle) and PYSEC-2026-1762 (code
+# execution from a crafted PDF), which the security gate blocks on 0.11.4.
+pdfplumber==0.11.10
+# Pillow: opens and re-encodes an account photo (IR-695). pdfplumber already pulls it in; named here so a
+# change to that pin cannot silently remove what apps.accounts.profile imports.
+Pillow>=11.3,<14

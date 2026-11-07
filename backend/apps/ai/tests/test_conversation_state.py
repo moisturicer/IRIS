@@ -10,6 +10,7 @@ import threading
 
 import pytest
 from django.db import connection
+from django.utils import timezone
 
 from apps.ai.answers.citations import GENERATED, PARTIAL, UNAVAILABLE, Citation, GroundedAnswer
 from apps.ai.conversation_state import (
@@ -22,7 +23,7 @@ from apps.ai.conversation_state import (
     snapshot,
 )
 from apps.ai.conversations import record_turn
-from apps.ai.history import readable_turns, recent_window
+from apps.ai.history import recent_window, sendable_turns
 from apps.ai.memory import ConversationMemory
 from apps.ai.models import (
     TURN_QUESTION_VECTOR,
@@ -41,8 +42,12 @@ pytestmark = [pytest.mark.db_required]
 
 
 def _record(title, content_hash=None):
+    # Released and consented, because a Turn citing a paper the gate refuses stays
+    # out of what goes back to a model (IR-812). A test here revokes by visibility.
+    now = timezone.now()
     record = Record.objects.create(
-        title=title, abstract=f"About {title}.", pipeline_status=PipelineStatus.PUBLISHED
+        title=title, abstract=f"About {title}.", pipeline_status=PipelineStatus.PUBLISHED,
+        is_embargoed=False, embargo_released_at=now, dpa_accepted_at=now,
     )
     if content_hash:
         ChunkSet.objects.create(
@@ -297,7 +302,7 @@ class RevocationTests:
 
         assert [t.pk for t in window] == [kept.pk]
         assert lost.pk not in [t.pk for t in recalled]
-        assert [t.pk for t in readable_turns([kept, lost], reader)] == [kept.pk]
+        assert [t.pk for t in sendable_turns([kept, lost], reader)] == [kept.pk]
 
 
 @pytest.mark.django_db

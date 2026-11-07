@@ -34,7 +34,7 @@ from django.db import transaction
 from core.enums import PipelineStatus, VersionCause
 from core.permissions import is_record_owner
 
-from .models import Record, RecordVersion
+from .models import Record, RecordVersion, RecordVersionDocument
 
 #: The statuses in which a record's manuscript may be replaced (module note).
 MANUSCRIPT_REPLACEABLE_STATUSES = frozenset({PipelineStatus.DRAFT})
@@ -129,9 +129,22 @@ def served_manuscript(record, user):
     version's while the stored one is still unsubmitted. Falsy when there is
     no manuscript.
     """
-    if stored_manuscript_unsubmitted(record) and not is_record_owner(user, record):
+    if _reads_submitted_version(record, user):
         return latest_version(record).manuscript
     return record.abstract_file
+
+
+def served_manuscript_revision(record, user):
+    """The revision of ``served_manuscript(record, user)``: what a Figure
+    must have been cropped from to be shown to ``user`` (IR-845)."""
+    if _reads_submitted_version(record, user):
+        return latest_version(record).manuscript_revision
+    return record.manuscript_revision
+
+
+def _reads_submitted_version(record, user) -> bool:
+    """Is ``user`` served the latest version rather than the stored file?"""
+    return stored_manuscript_unsubmitted(record) and not is_record_owner(user, record)
 
 
 def restore_submitted_manuscript(record) -> bool:
@@ -146,8 +159,18 @@ def restore_submitted_manuscript(record) -> bool:
     """
     if not stored_manuscript_unsubmitted(record):
         return False
-    record.abstract_file = latest_version(record).manuscript.name or None
-    record.save(update_fields=["abstract_file", "updated_at"])
+    submitted = latest_version(record)
+    record.abstract_file = submitted.manuscript.name or None
+    for field in ("manuscript_revision", "manuscript_sha256", "manuscript_filename"):
+        setattr(record, field, getattr(submitted, field))
+    record.save(update_fields=["abstract_file", "updated_at", "manuscript_revision",
+                               "manuscript_sha256", "manuscript_filename"])
+    # The discarded revision never entered research. Keep the submitted chunks
+    # and discard its pending status rather than re-extracting the submitted file.
+    from apps.documents.models import PdfExtraction
+    PdfExtraction.objects.filter(record=record).exclude(
+        source_revision=record.manuscript_revision,
+    ).delete()
     return True
 
 
@@ -163,7 +186,12 @@ def versions_payload(record) -> list[dict]:
     review (`may_read_review`, IR-479), because earlier versions are review
     material (ADR-032 §5 Amendment).
     """
-    rows = list(record.versions.select_related("created_by").order_by("number"))
+    from .review_text.store import status as review_text_status
+
+    rows = list(
+        record.versions.select_related("created_by", "review_text")
+        .prefetch_related("documents__upload__slot").order_by("number")
+    )
     return [
         {
             "number": v.number,
@@ -175,9 +203,28 @@ def versions_payload(record) -> list[dict]:
                 f"/api/v1/records/{record.pk}/versions/{v.number}/manuscript/"
                 if v.manuscript else None
             ),
+            # ADR-058 §2 (IR-872): what it was submitted with, what arrived
+            # while it was the latest, and whether the first list is a guess.
+            "documents": [_document(d.upload) for d in v.documents.all()],
+            "documents_added": [
+                _document(u) for u in documents_added_during(v, rows[i + 1] if i + 1 < len(rows) else None)
+            ],
+            "documents_reconstructed": v.documents_reconstructed,
+            # ADR-058 §1 as amended (IR-871): whether this Version's text was read.
+            "review_text": review_text_status(v),
         }
-        for v in rows
+        for i, v in enumerate(rows)
     ]
+
+
+def _document(upload) -> dict:
+    return {
+        "upload_id": upload.pk,
+        "slot": upload.slot.name,
+        "version": upload.version,
+        "uploaded_at": upload.created_at.isoformat(),
+        "download_url": f"/api/v1/documents/uploads/{upload.pk}/download/",
+    }
 
 
 @transaction.atomic
@@ -192,15 +239,79 @@ def write_version(record, actor, cause: VersionCause) -> RecordVersion:
     """
     # Only the record row (see `routing._locked`).
     Record.objects.select_for_update(of=("self",)).get(pk=record.pk)
-    previous = (
-        RecordVersion.objects.filter(record=record)
-        .order_by("-number").values_list("number", flat=True).first()
-    )
+    previous = RecordVersion.objects.filter(record=record).order_by("-number").first()
     created_by = actor if getattr(actor, "is_authenticated", False) else None
-    return RecordVersion.objects.create(
+    version = RecordVersion.objects.create(
         record=record,
-        number=(previous or 0) + 1,
+        number=(previous.number if previous else 0) + 1,
         cause=cause,
         manuscript=record.abstract_file.name or None,
+        manuscript_revision=record.manuscript_revision,
+        manuscript_sha256=record.manuscript_sha256,
+        manuscript_filename=record.manuscript_filename,
         created_by=created_by,
     )
+    # The documents it was submitted with, in the same transaction (ADR-058 §2).
+    RecordVersionDocument.objects.bulk_create(
+        RecordVersionDocument(version=version, upload=upload)
+        for upload in current_uploads(record)
+    )
+    # Its review text: its own when the manuscript changed, read after commit
+    # on campus whatever the embargo says; else the previous one's (ADR-058 §1, IR-871).
+    from .review_text.store import attach
+
+    attach(version, previous)
+    return version
+
+
+def current_uploads(record) -> list:
+    """Each slot's newest upload on `record`: what a version submitted now names."""
+    from apps.documents.models import RecordUpload
+
+    latest = {}
+    for upload in (
+        RecordUpload.objects.filter(record=record).select_related("slot")
+        .order_by("slot_id", "-version", "-pk")
+    ):
+        latest.setdefault(upload.slot_id, upload)
+    return sorted(latest.values(), key=lambda u: (u.slot.name, u.pk))
+
+
+def documents_added_during(version, next_version=None) -> list:
+    """
+    Uploads made while `version` was the latest: after it was submitted and,
+    if there is one, before `next_version` was. Read from upload times, never
+    stored (ADR-058 §2, IR-872); an upload a version names, or one that
+    answered a document request, cannot be deleted, so the times stay true.
+    """
+    from apps.documents.models import RecordUpload
+
+    uploads = RecordUpload.objects.filter(
+        record_id=version.record_id, created_at__gt=version.created_at,
+    )
+    if next_version is not None:
+        uploads = uploads.filter(created_at__lte=next_version.created_at)
+    return list(uploads.select_related("slot").order_by("created_at", "pk"))
+
+
+def deletion_refused_reason(upload) -> Optional[str]:
+    """
+    Why `upload` may not be deleted, or None (ADR-058 §2, IR-872). It holds
+    for everyone, staff included: only a superuser in Django admin can remove
+    such a file, after unlinking it on purpose.
+    """
+    named = (
+        RecordVersion.objects.filter(documents__upload=upload)
+        .order_by("number").values_list("number", flat=True).first()
+    )
+    if named is not None:
+        return (
+            f"v{named} was submitted with this file, so it can't be deleted. "
+            f"Upload a corrected version instead."
+        )
+    if upload.request_items.exists():
+        return (
+            "This file answered a document request, so it can't be deleted. "
+            "Upload a corrected version instead."
+        )
+    return None

@@ -1,0 +1,117 @@
+{
+  "live": {
+    "protocol": "runs-reader-1",
+    "id": "00000000-0000-4000-8000-000000000001",
+    "conversation_id": "00000000-0000-4000-8000-000000000002",
+    "state": "completed",
+    "question": "How do these studies sample water?",
+    "base_revision": 0,
+    "version": 3,
+    "turn_id": "00000000-0000-4000-8000-000000000003",
+    "depth": "deep",
+    "awaiting_reader": false,
+    "created_at": "2026-11-04T00:00:00+00:00",
+    "finished_at": "2026-11-04T00:00:00+00:00",
+    "kind": "ask",
+    "plan": {
+      "revision": 1,
+      "steps": [
+        {
+          "id": "compare",
+          "title": "Compare how each study samples water",
+          "status": "done"
+        }
+      ]
+    },
+    "context": {
+      "estimated": true,
+      "used_tokens": 4000,
+      "capacity_tokens": 1000000
+    },
+    "compaction": null,
+    "cursor": 6,
+    "retry_of": null,
+    "retried_by": null,
+    "sources_available": true,
+    "capabilities": {
+      "manual_compaction": false
+    }
+  },
+  "conversation": {
+    "protocol": "runs-reader-1",
+    "id": "00000000-0000-4000-8000-000000000002",
+    "revision": 1,
+    "runs": [
+      {
+        "protocol": "runs-reader-1",
+        "id": "00000000-0000-4000-8000-000000000001",
+        "conversation_id": "00000000-0000-4000-8000-000000000002",
+        "state": "completed",
+        "question": "How do these studies sample water?",
+        "base_revision": 0,
+        "version": 3,
+        "turn_id": "00000000-0000-4000-8000-000000000003",
+        "depth": "deep",
+        "awaiting_reader": false,
+        "created_at": "2026-11-04T00:00:00+00:00",
+        "finished_at": "2026-11-04T00:00:00+00:00",
+        "kind": "ask",
+        "plan": {
+          "revision": 1,
+          "steps": [
+            {
+              "id": "compare",
+              "title": "Compare how each study samples water",
+              "status": "done"
+            }
+          ]
+        },
+        "context": {
+          "estimated": true,
+          "used_tokens": 4000,
+          "capacity_tokens": 1000000
+        },
+        "compaction": null,
+        "cursor": 6,
+        "retry_of": null,
+        "retried_by": null,
+        "sources_available": true,
+        "capabilities": {
+          "manual_compaction": false
+        }
+      }
+    ],
+    "turns": [
+      {
+        "id": "00000000-0000-4000-8000-000000000003",
+        "run_id": "00000000-0000-4000-8000-000000000001",
+        "ordinal": 1,
+        "question": "How do these studies sample water?",
+        "answer": "Both studies sample water: [1] [2].",
+        "kind": "answer",
+        "created_at": "2026-11-04T00:00:00+00:00",
+        "citations": [
+          {
+            "record_id": 1,
+            "page": 3,
+            "quote": "river gauges measure water level hourly",
+            "revision": "1:e-1-1"
+          },
+          {
+            "record_id": 2,
+            "page": 5,
+            "quote": "pond water sampled weekly for turbidity",
+            "revision": "2:e-2-1"
+          }
+        ],
+        "facts": [
+          {
+            "kind": "keyword_sample",
+            "papers": 2,
+            "exhaustive": false
+          }
+        ]
+      }
+    ]
+  }
+}

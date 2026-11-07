@@ -58,14 +58,29 @@ async function* doneStreamOf(overrides: Partial<AIAnswer> = {}) {
 const findForRecord = vi.fn();
 const create = vi.fn();
 const askStream = vi.fn();
+const get = vi.fn();
+const resumeAskRun = vi.fn();
+const cancelRun = vi.fn();
+const retryRun = vi.fn();
+
+// The Django path; which path answers is the deployment's switch (IR-863),
+// tested in RAGChatPage.runtime.test.tsx and RAGChatPage.switchOff.test.tsx.
+vi.mock("@/api/runtimeReader", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/api/runtimeReader")>()),
+  useReaderPath: () => "django",
+}));
 
 vi.mock("@/api/ai", () => ({
   aiApi: {
     conversations: {
       findForRecord: (...args: unknown[]) => findForRecord(...(args as [])),
       create: (...args: unknown[]) => create(...(args as [])),
+      get: (...args: unknown[]) => get(...(args as [])),
     },
     askStream: (...args: unknown[]) => askStream(...(args as [])),
+    resumeAskRun: (...args: unknown[]) => resumeAskRun(...(args as [])),
+    cancelRun: (...args: unknown[]) => cancelRun(...(args as [])),
+    retryRun: (...args: unknown[]) => retryRun(...(args as [])),
   },
 }));
 
@@ -462,5 +477,168 @@ describe("clean answers in Paper Chat (IR-596)", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Reasoning summary" }));
 
     await expectNoBlockingA11yViolations(container);
+  });
+});
+
+/**
+ * Paper Chat runs on the shared Conversation client (IR-571): what Ask IRIS
+ * does when an answer arrives late, is stopped, or is cut off, Paper Chat does.
+ */
+describe("Paper Chat on the shared Conversation client (IR-571)", () => {
+  const other = { id: 8, title: "Rainfall Gauges in Cebu" } as RecordDetail;
+
+  /** The page's side of moving between papers: a new arrival that is not a citation. */
+  function Moving() {
+    const [shown, setShown] = useState(record);
+    const [n, setN] = useState(0);
+    const go = (to: RecordDetail) => { setShown(to); setN((k) => k + 1); };
+    return (
+      <>
+        <button onClick={() => go(other)}>go to other paper</button>
+        <button onClick={() => go(record)}>go to first paper</button>
+        <PaperChatPanel record={shown} arrival={{ key: `k${n}`, fromPaperChat: false }} onClose={noop} />
+      </>
+    );
+  }
+
+  async function ask(question: string) {
+    await userEvent.type(await screen.findByRole("textbox", { name: /ask about/i }), `${question}{Enter}`);
+  }
+
+  it("keeps a late answer with the Conversation that asked, never in the paper now on screen", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    askStream.mockImplementation(() => (async function* () {
+      await gate;
+      yield { event: "done", data: { ...answer({ answer: "Answer about the first paper." }), turn_id: 90 } };
+    })());
+    findForRecord.mockImplementation(async (id: number) =>
+      id === record.id ? conversation() : conversation({ id: 50, record: other.id, record_title: other.title }));
+    renderScreen(<Moving />);
+
+    await ask("What datasets were used?");
+    await userEvent.click(screen.getByRole("button", { name: "go to other paper" }));
+    await waitFor(() => expect(findForRecord).toHaveBeenCalledWith(other.id));
+    // The paper on screen is the other one: empty, with its own starters.
+    expect(await screen.findByRole("group", { name: /suggested questions/i })).toBeInTheDocument();
+    expect(screen.queryByText("What datasets were used?")).toBeNull();
+
+    release();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(screen.queryByText("Answer about the first paper.")).toBeNull();
+    expect(screen.queryByText("What datasets were used?")).toBeNull();
+
+    // Back on the first paper, its Conversation has the answer the server stored.
+    findForRecord.mockResolvedValue(conversation({ turns: [{
+      id: 90, question: "What datasets were used?", resolved_question: null,
+      answer: "Answer about the first paper.", message: null, state: "generative",
+      degraded: false, widened: false, created_at: "2026-09-20T00:00:00.000Z", citations: [],
+    }] }));
+    await userEvent.click(screen.getByRole("button", { name: "go to first paper" }));
+    expect(await screen.findByText("Answer about the first paper.")).toBeInTheDocument();
+  });
+
+  it("asks a first question in the paper it was typed for, even if the reader moves on while it starts", async () => {
+    let created: (value: unknown) => void = () => {};
+    findForRecord.mockImplementation(async (id: number) =>
+      id === record.id ? null : conversation({ id: 50, record: other.id, record_title: other.title }));
+    create.mockImplementation(() => new Promise((resolve) => { created = resolve; }));
+    askStream.mockImplementation(() => doneStreamOf({ answer: "Answer about the first paper." }));
+    renderScreen(<Moving />);
+
+    await ask("What datasets were used?");
+    await waitFor(() => expect(create).toHaveBeenCalledWith({ record: record.id, reuse_default: true }));
+    await userEvent.click(screen.getByRole("button", { name: "go to other paper" }));
+    await waitFor(() => expect(findForRecord).toHaveBeenCalledWith(other.id));
+    // The other paper's composer is not held by the first paper's start.
+    await waitFor(() => expect(screen.getByRole("textbox", { name: /ask about this paper/i })).toBeEnabled());
+
+    created({ data: conversation({ id: 43 }) });
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    expect(askStream.mock.calls[0][1]).toMatchObject({ conversationId: 43 });
+    expect(screen.queryByText("Answer about the first paper.")).toBeNull();
+    expect(screen.queryByText("What datasets were used?")).toBeNull();
+  });
+
+  it("asks in a citation's own Conversation when it could not be reloaded, never in the paper's default", async () => {
+    // The return address finds it once, which pins the panel to it; loading it
+    // again for the panel then fails.
+    get.mockResolvedValueOnce({ data: conversation({ id: 77 }) }).mockRejectedValue(new Error("down"));
+    findForRecord.mockResolvedValue(null);
+    renderScreen(<PaperChatPanel record={record} onClose={noop} returnTo={{ conversationId: 77, turnId: 5, key: 1 }} />);
+    await waitFor(() => expect(get).toHaveBeenCalledTimes(2));
+
+    await ask("What datasets were used?");
+
+    await waitFor(() => expect(askStream).toHaveBeenCalled());
+    expect(askStream.mock.calls[0][1]).toMatchObject({ conversationId: 77 });
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("offers Stop for a queued run, and shows a confirmed stop as the reader's own, not a cut-off", async () => {
+    let release: () => void = () => {};
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    askStream.mockImplementation(() => (async function* () {
+      yield { event: "run_queued", id: "1", data: { run_id: "r-1", state: "queued" } };
+      await gate;
+      yield { event: "run_cancelled", id: "2", data: { run_id: "r-1", state: "cancelled", reason: "cancelled" } };
+    })());
+    cancelRun.mockImplementation(async () => { release(); return { data: { run_id: "r-1", state: "cancelled" } }; });
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+
+    await ask("What datasets were used?");
+    await userEvent.click(await screen.findByRole("button", { name: /stop answering/i }));
+
+    expect(cancelRun).toHaveBeenCalledWith("r-1");
+    expect(await screen.findByText(/you stopped this question/i)).toBeInTheDocument();
+    expect(screen.queryByText(/cut off before it finished/i)).toBeNull();
+  });
+
+  it("labels an answer lost to a dropped connection as partial, apart from a confirmed stop", async () => {
+    askStream.mockImplementation(() => (async function* () {
+      yield { event: "text_delta", id: "1", data: { text: "The network reduced" } };
+    })());
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+
+    await ask("What datasets were used?");
+
+    expect(await screen.findByText("The network reduced")).toBeInTheDocument();
+    expect(screen.getByText(/cut off before it finished/i)).toBeInTheDocument();
+    expect(screen.queryByText(/you stopped this question/i)).toBeNull();
+    // No run was ever named, so there is nothing to stop on the server.
+    expect(screen.queryByRole("button", { name: /stop answering/i })).toBeNull();
+  });
+
+  it("retries a question whose run ended unanswered, as the full page does", async () => {
+    findForRecord.mockResolvedValue(conversation({
+      latest_run: { id: "r-7", state: "cancelled", end_reason: "cancelled", question: "What predicts flooding?", retry_of: null, last_sequence: 2 },
+    }));
+    retryRun.mockResolvedValue({ data: { run_id: "r-8", retry_of: "r-7", state: "queued" } });
+    resumeAskRun.mockImplementation(() => (async function* () {
+      yield { event: "run_queued", id: "1", data: { run_id: "r-8", state: "queued" } };
+      yield { event: "done", id: "2", data: { ...answer({ answer: "Answered on retry." }), turn_id: 51 } };
+    })());
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+
+    expect(await screen.findByText(/you stopped this question/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /retry/i }));
+
+    expect(retryRun).toHaveBeenCalledWith("r-7");
+    expect(await screen.findByText("Answered on retry.")).toBeInTheDocument();
+    expect(resumeAskRun).toHaveBeenCalledWith("r-8", 0, expect.any(AbortSignal));
+  });
+
+  it("follows a run still answering when the panel opens", async () => {
+    findForRecord.mockResolvedValue(conversation({
+      latest_run: { id: "r-5", state: "running", end_reason: "", question: "What predicts flooding?", retry_of: null, last_sequence: 3 },
+    }));
+    resumeAskRun.mockImplementation(() => (async function* () {
+      yield { event: "run_queued", id: "1", data: { run_id: "r-5", state: "queued" } };
+      yield { event: "done", id: "2", data: { ...answer({ answer: "Rainfall gauges help." }), turn_id: 50 } };
+    })());
+    renderScreen(<PaperChatPanel record={record} onClose={noop} />);
+
+    expect(await screen.findByText("Rainfall gauges help.")).toBeInTheDocument();
+    expect(askStream).not.toHaveBeenCalled();
   });
 });

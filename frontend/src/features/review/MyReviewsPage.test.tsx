@@ -6,6 +6,7 @@ import userEvent from "@testing-library/user-event";
 import { Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
@@ -176,6 +177,35 @@ describe("MyReviewsPage", () => {
 
     expect(await screen.findByText("Waiting on author")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Claim review/ })).not.toBeInTheDocument();
+  });
+
+  // IR-906: the load states a tab can be in besides rows and empty.
+  it("offers Try again when the first load fails, rather than a dead end", async () => {
+    mine.mockRejectedValueOnce(new Error("offline"));
+    show();
+
+    expect(await screen.findByRole("heading", { name: "Could not load My Reviews" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(await screen.findByRole("link", { name: "Smart Campus Energy Monitor" })).toBeInTheDocument();
+  });
+
+  it("shows a load that timed out as interrupted, and Retry reads again", async () => {
+    mine.mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/reviews/mine/"));
+    show();
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Could not load My Reviews" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByRole("link", { name: "Smart Campus Energy Monitor" })).toBeInTheDocument();
+  });
+
+  it("says My Reviews is not available when the server refuses it, with no retry to offer", async () => {
+    mine.mockRejectedValue({ response: { status: 403, data: { detail: "You do not have permission." } } });
+    show();
+
+    expect(await screen.findByRole("heading", { name: "My Reviews isn't available to you" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry" })).not.toBeInTheDocument();
   });
 
   it("announces nothing when the refetch after a claim fails", async () => {

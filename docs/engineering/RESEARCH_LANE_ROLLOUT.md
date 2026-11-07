@@ -44,7 +44,7 @@ Rollout:
 
 Rollback: set `AI_RESEARCH_LANE=off` and restart. Turns already written keep their `routing` and `research` and replay unchanged; new questions take the passage pipeline. If routing itself misbehaves, `AI_JEV_ROUTING_ENABLED=false` is the second switch (ADR-038 §Consequences).
 
-A paper reaches the research lane only once someone has answered for it: the disclosure gate refuses an unanswered one (ADR-052). Test papers are answered for by `seed_demo`, `load_corpus --clear-for-ai` and `mark_corpus_cleared` (IR-815).
+A paper reaches the research lane only once its embargo is released: every paper starts embargoed, and the disclosure gate refuses an unreleased one (ADR-052 as amended for IR-882). Test papers are released by `seed_demo`, `load_corpus --clear-for-ai` and `mark_corpus_cleared` (IR-815, IR-882).
 
 ## Logging
 

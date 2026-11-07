@@ -44,7 +44,7 @@ is a schema decision ADR-013 has not taken. Until it does, ingestion is
 sound only for records whose substantive document is the one being uploaded.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING, Optional
 
 from apps.ai.chunking import (
@@ -125,9 +125,22 @@ def build_chunk_set(
     this is the one place in the codebase that builds the chunker for real
     ingestion.
     """
+    if document.structure_is_authoritative:
+        from apps.ai.chunking.strategies.labeled import LabeledStructureChunker
+
+        options = _options_for_document(document, options)
+        return LabeledStructureChunker().chunk(normalize(document, options), options)
     return build_context_path_chunker(options).chunk(
         normalize(document, options), options
     )
+
+
+def _options_for_document(document, options):
+    if document.structure_is_authoritative:
+        from apps.ai.chunking.strategies.labeled import STRATEGY_ID
+
+        return replace(options, strategy=STRATEGY_ID)
+    return options
 
 
 def _record_failure(extraction, error: Exception) -> Exception:
@@ -177,6 +190,10 @@ def ingest_extraction(
                 f"(status={extraction.status!r}). Extraction must succeed first."
             ),
         )
+    from apps.ai.figure_descriptions import with_descriptions
+
+    document = with_descriptions(document, extraction)
+    options = _options_for_document(document, options)
     if not extraction.content_hash:
         raise _record_failure(
             extraction,

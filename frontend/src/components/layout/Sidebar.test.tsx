@@ -2,7 +2,7 @@
  * The sidebar (IR-413, spec §4.1-§4.2).
  *
  * One short list, My Reviews only for a user with review work, RDCO's
- * Administration group, and an account menu holding Settings & Profile, Help
+ * Administration group, and an account menu holding Profile, Settings, Help
  * and Sign out. Below `md` it is a drawer that is out of the tab order while
  * closed, takes focus when opened, and closes on Escape.
  *
@@ -53,7 +53,8 @@ function renderAt(path: string) {
         children: [
           { path: "/", element: <h1>Discover</h1> },
           { path: "/records/mine", element: <h1>My Library</h1> },
-          { path: "/settings", element: <h1>Settings &amp; Profile</h1> },
+          { path: "/profile", element: <h1>Profile</h1> },
+          { path: "/settings", element: <h1>Settings</h1> },
           {
             element: <ReviewAccessRoute />,
             children: [{ path: "/review", element: <h1>My Reviews</h1> }],
@@ -130,15 +131,34 @@ describe("the sidebar's list", () => {
     expect(mainLinks()).not.toContain("My Reviews");
   });
 
-  it("names RDCO's Administration group and counts its waiting role requests", async () => {
+  it("names RDCO's group and counts its waiting role requests", async () => {
     vi.mocked(apiClient.get).mockResolvedValue({ data: { count: 3, results: [] } } as never);
     signIn(ROLES.RDCO, true);
     renderAt("/records/mine");
 
     await screen.findByRole("heading", { name: "My Library" });
-    const admin = screen.getByRole("list", { name: "Administration" });
+    const admin = screen.getByRole("list", { name: "RDCO" });
     expect(within(admin).getAllByRole("link").map((l) => l.textContent?.trim())[0]).toBe("Import Records");
-    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 waiting" })).toBeInTheDocument();
+    expect(await within(admin).findByRole("link", { name: "Role Requests, 3 waiting" })).toHaveAttribute("href", "/rdco/role-requests");
+    expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/rdco/users");
+    expect(within(admin).getByRole("link", { name: "Download Requests" })).toHaveAttribute("href", "/rdco/download-requests");
+    expect(within(admin).getByRole("link", { name: "Delete Requests" })).toHaveAttribute("href", "/rdco/delete-requests");
+    expect(screen.queryByRole("link", { name: "Audit Log" })).not.toBeInTheDocument();
+  });
+
+  it.each([false, true])("gives the System Admin only its administration and catalogue links (collapsed: %s)", async (collapsed) => {
+    useUIStore.setState({ sidebarCollapsed: collapsed });
+    signIn(ROLES.SYSTEM_ADMIN, true);
+    const { container } = renderAt("/");
+
+    await screen.findByRole("heading", { name: "Discover" });
+    const nav = screen.getByRole("navigation", { name: "Main" });
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Discover", "Users", "Audit Log"]);
+    const admin = within(nav).getByRole("list", { name: "Administration" });
+    expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
+    expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
+    expect(within(nav).queryByRole("list", { name: "RDCO" })).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("keeps every link named on the collapsed rail", async () => {
@@ -230,7 +250,8 @@ describe("the My Library dot (IR-534, B2)", () => {
 });
 
 describe("the account menu", () => {
-  it("holds Settings & Profile, Help and Sign out", async () => {
+  // IR-933: Profile (who you are) and Settings (your account) are two pages.
+  it("holds Profile, Settings, Help and Sign out", async () => {
     const user = userEvent.setup();
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
@@ -240,20 +261,26 @@ describe("the account menu", () => {
     await user.click(trigger);
 
     expect(trigger).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("link", { name: "Settings & Profile" })).toHaveAttribute("href", "/settings");
+    expect(screen.getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
+    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+    expect(screen.queryByRole("link", { name: "Settings & Profile" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Help" })).toHaveAttribute("href", "/help");
     expect(screen.getByRole("button", { name: "Sign out" })).toBeInTheDocument();
   });
 
-  it("opens Settings & Profile and closes behind it", async () => {
+  it("opens Profile and Settings, each closing the menu behind it", async () => {
     const user = userEvent.setup();
     signIn(ROLES.STUDENT);
     renderAt("/records/mine");
 
     await user.click(await screen.findByRole("button", { name: /account menu/ }));
-    await user.click(screen.getByRole("link", { name: "Settings & Profile" }));
+    await user.click(screen.getByRole("link", { name: "Profile" }));
+    expect(await screen.findByRole("heading", { name: "Profile" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
 
-    expect(await screen.findByRole("heading", { name: "Settings & Profile" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: /account menu/ }));
+    await user.click(screen.getByRole("link", { name: "Settings" }));
+    expect(await screen.findByRole("heading", { name: "Settings" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Help" })).not.toBeInTheDocument();
   });
 

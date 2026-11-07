@@ -57,6 +57,12 @@ See the *Amendment* notes under §4 and §10.
 
 **Amended 2026-10-31 (project lead, IR-311): §8's Discoverable consent text** gains a clause covering the Contact person's email that ADR-029's amendment of the same date adds to the match notification. Accepted by Lee Jasmin Adolfo on 2026-10-31, as relayed by Hermoine Zozobrado. Decided by Hermoine Zozobrado, transcribed by an agent. See the note under §8.
 
+**Amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted): §5, §7, §10 and §11.** §7 gains review threads: comments anchored to a passage, *Must fix* and *Suggestion*, Resolve and Mark addressed, suggested wording, the response to reviewers, draft comments sent with a finished review, *Comment only* as a recorded verdict, Viewed marks, saved replies and @mentions. IRIS never edits the manuscript. §10 gives participants **Overview · Review** and moves Files into Review. There is still no Ask IRIS in Review: IR-372 stands, as corrected the same day. §5 points at [ADR-058](058-each-version-keeps-its-text-and-its-files.md), where a Version keeps its text and its documents. §11 is corrected to match ADR-047. See the *Amendment, 2026-11-04* notes under each section. Transcribed by an agent.
+
+**Corrected 2026-11-06 (Hermoine Zozobrado, IR-874): §7's review threads.** Only the parties that asked hold a Version with their open *Must fix* threads, every Decision closes open threads with its comment as the reason, and the Adviser's *Accept* of a Proposal is blocked like *Accept & send to RDCO*. See the *Correction, 2026-11-06* note under §7.
+
+**Corrected 2026-11-04: the IR-767 paragraph below.** Its last sentence, "Proposals and the Adviser's direct publication path remain", is wrong about the second half. The Adviser has no publication path. `OUTCOMES_FOR` gives the Adviser `REJECT` only on a Thesis/Research or Project (`apps/reviews/decisions.py:115-118`), as ADR-047's amendment decided. Proposals remain.
+
 **The new tickets in §14 are deliberately not created yet.** The project lead asked for them to wait for the frontend redesign specification, so the ticket architecture can be reconciled with it and no frontend work is specified twice or in conflict. The re-planned IR-255 subtasks carry the same hold on their frontend parts.
 
 **Lee Jasmin Adolfo** (project lead) reopened the submission workflow on 2026-09-26 and settled it as a business decision. Every rule in §1–§9 comes from that session. Where the design had to fill a gap, the section says so and names the default it chose, so a reviewer can overturn that default without reopening the rest.
@@ -338,6 +344,14 @@ EXT  Review          + version (FK RecordVersion, nullable for rows written befo
 
 The "two policies differ only in which clearances reset" rule above becomes **the two policies differ only in which offices reset and review again**. `test_the_policies_differ_only_in_which_clearances_reset` pinned the old rule, and is rewritten on purpose to pin this one.
 
+**Amendment, 2026-11-04 (Hermoine Zozobrado, design session; Accepted): a Version keeps its text and its documents.** [ADR-058](058-each-version-keeps-its-text-and-its-files.md) owns this. In short:
+
+- Each manuscript-changing Version keeps its own extraction for the Record's life, and only the latest submitted one is chunked for AI.
+- Each Version names the file that was current in every upload slot. A document uploaded between Versions joins the current one.
+- No file a Version names can be deleted.
+
+"`RecordUpload.version` keeps numbering files" above still holds. A Version now also points at the uploads.
+
 ### 6. Lineage: an accepted Proposal continues as a new record
 
 ```
@@ -378,6 +392,74 @@ The review discussion remains one record-level timeline, with the same readers, 
 - **Reports.** Any reader may report someone else's comment once, with a reason (spam, harassment, off-topic, or other with a note); the report keeps a copy of the text as it was. Reports go to RDCO alone, through a Reported comments queue where RDCO removes with a reason or dismisses; RDCO is notified on a comment's first report. The reporter sees a brief "Comment reported" and nothing more. **The writer never learns of a report**, only of a removal.
 - **Notifications,** in-app only: the paper's owners on each new comment, a writer when someone replies, a writer when their comment is removed, RDCO on a first report.
 - Removals and dismissals are audited. Ask IRIS never reads comments.
+
+**Amendment, 2026-11-04 (Hermoine Zozobrado, design session; Accepted): review threads.** This replaces the IR-679 note's "Changes and Threads are later phases" and the review-workspace roadmap's Phases 3–5 (`../review_workspace_roadmap.md`). The review discussion keeps its readers and writers (`may_read_review` reads, participants write, IR-419). What follows is how a discussion becomes a review.
+
+**IRIS never edits the manuscript.** "Like Google Docs" means comments on a passage, suggested wording, replies and resolving. A revision is always a new PDF the author makes elsewhere, submitted as a Version. *Rejected: editing in the browser.* It would turn the manuscript from a PDF into stored text, against extraction (ADR-056), chunking (ADR-013) and citation anchors (ADR-031), and it would need a document model nobody has budgeted.
+
+**Threads.**
+
+- **A thread** is a comment and its replies. It is either **anchored** to a passage of one Version or **general** (the whole record, as every `ReviewComment` is today).
+- **An anchor** records the Version, the page, the quoted text, the text around it and its regions in ADR-031's page-fraction format, so the passage can be found again in a later Version. Selecting text in the reader or in the Changes tab offers *Comment* (key **C**).
+- **A thread belongs to its writer's party, not the person**, as a document request does (ADR-022). If its writer's Seat is withdrawn or they leave, it stays the party's, and the party's current Seat holders own it.
+- **Existing `ReviewComment` rows become general threads** with severity *Suggestion*, so no history blocks anything. Nothing is rewritten.
+
+**Severity: *Must fix* or *Suggestion*.**
+
+- Every thread a reviewer opens has one, chosen in the composer. It defaults to *Must fix* in a review finished with *Request revision*, and to *Suggestion* otherwise. The author's own threads and replies carry none.
+- Its party may change it. Each change is recorded in the timeline with the person and the time.
+
+**Draft comments and finishing a review.**
+
+- **A reviewer's threads start as drafts**, seen only by their writer (*"Only you see these until you finish"*). **Finish review** sends them together with a summary and a verdict. Each person gets **one notification per finished review**, not one per comment.
+- **Replies post immediately** and are never held.
+- **The verdicts** are *Comment only* plus the acts the viewer's capabilities already offer: *Request revision*, *Accept & send to RDCO* (Adviser), *Clear* and *Record a finding* (offices), and RDCO's Decision. Each is still checked by the service that owns it (`revisions`, `routing`, `office_review`, `decisions`). Finishing a review grants no new authority.
+- **Comment only is a recorded review round.** It writes a timeline and audit entry (*"The Adviser reviewed v3: 3 comments, no decision"*), changes no Clearance, keeps the Seat open and reads as no outcome everywhere a `Review` status is read.
+
+**Resolving.**
+
+- **Anyone who may write in the discussion may resolve or reopen a thread**, except that **an owner can't resolve a thread a reviewer opened**.
+- **An owner answers a reviewer's thread instead:** *Addressed*, saying where, *Declined* with a required reason, or a reply. *Addressed* doesn't resolve it. A reviewer checks the change and resolves it.
+- Resolving and reopening are recorded in the timeline and audited. A resolved thread stays visible under the Resolved filter.
+
+**What an open *Must fix* blocks.**
+
+- **The owner's next Version.** *Submit vN* is refused until every open *Must fix* thread from the Revision requests it answers has an *Addressed* or *Declined* answer.
+- **Its own party's approval.** While its party has an open *Must fix* thread, a Seat holder can't take *Accept & send to RDCO* (Adviser) or *Clear* (an office). They must resolve each one, or change it to *Suggestion*, which is recorded. *Request revision*, *Record a finding* and *Reject* aren't blocked, because none of them approves.
+- **RDCO's Decision is not blocked, and it answers for open threads** (ADR-047 §5). When *Must fix* threads are open, the Decision dialog lists them and requires one reason. Deciding closes them as *"Closed by RDCO's Decision"*, with the reason, linked to the Decision the same way `closed_by_decision` links Seats and requests.
+- **A *Suggestion* never blocks anything.**
+- **The open threads are listed in three places:** the Threads tab's count (*"2 must fix · 5 suggestions"*), the Readiness panel (a new `open_thread` item, `blocker` exactly where one of the blocks above applies, `info` otherwise), and the Finish and Decision dialogs.
+
+**Outdated threads.** When a Version is submitted, IRIS looks for each open anchored thread's passage in the new Version's text (ADR-058):
+
+- **Found and unchanged:** the anchor moves to it.
+- **Found and changed:** the thread is **Outdated**, shown against its original Version, with the new passage beside it.
+- **Not found:** Outdated, *passage removed*.
+
+Moving an anchor never resolves a thread, and a removed passage still needs resolving.
+
+**Suggested wording.** A reviewer's thread may carry replacement text. The owner accepts or declines it, and declining needs a reason. **Accepting is a promise**, because IRIS can't apply it to the PDF. When the next Version arrives, the comparison checks whether the text appears and shows *found on p. N* or *not found* (ADR-058 §3). That is a hint. The reviewer still resolves the thread.
+
+**The response to reviewers.** Submitting a Version asks the owner to answer each open thread from the Revision requests it answers. IRIS assembles the answers into a letter attached to that Version (*"Addressed in …" / "Declined: …"*), and every reopened reviewer is shown it first.
+
+**Conveniences.**
+
+- **Viewed:** a reviewer may mark a section of a comparison viewed. A later Version that changes the section clears the mark. It is stored per person and per Version, seen by nobody else, and decides nothing.
+- **Saved replies:** a reviewer keeps their own reusable texts and inserts one into a comment. It is private to them and inserts text only.
+- **@mentions:** a comment may mention a person **only if `may_read_review` admits them for the record**. Anyone else is refused, so a mention never grants access. The person mentioned gets one notification. A mention in a draft is sent when the review is finished.
+
+**Who reads it.** Threads, drafts (their writer only), answers, the response letter, Viewed marks and mentions are review content under `may_read_review`. They never reach Discover, Ask IRIS or public Comments.
+
+**When it goes live.** It is built and live **before** ADR-004's evaluation runs, so both arms run with it. *Rejected: an on/off setting to hold it back.* Nothing is being evaluated yet, so a setting would add a second behaviour to test and nothing more. If evaluation data collection had begun first, its runs would have to be repeated on the new system.
+
+**Correction, 2026-11-06 (Hermoine Zozobrado, IR-874 design session): which threads hold a Version, and every Decision closes threads.** Transcribed by an agent. Where this note and the amendment above differ, this note wins; the amendment's text is kept.
+
+- **"From the Revision requests it answers" means "of the parties that asked".** *Submit vN* is refused until every open *Must fix* thread **owned by a party with an open Revision request** has an *Addressed* or *Declined* answer. No thread is linked to a request: a *Must fix* the party wrote in an earlier *Comment only* round counts too, and another party's open *Must fix* never holds the Version, which keeps clearance-aware resubmission (ADR-003) intact.
+- **Every Decision closes the open threads, not RDCO's alone.** The Adviser's *Reject*, and its *Accept* or *Reject* of a Proposal, close them the same way, linked by `closed_by_decision`, so no thread stays open on a record whose review has ended.
+- **The reason is the Decision's own comment.** It is required for every outcome while a *Must fix* thread is open (*Reject* already required it), and each thread closes with it. There is no second reason field.
+- **The Adviser accepting a Proposal is an approval,** so the Adviser's own open *Must fix* blocks it, as it blocks *Accept & send to RDCO*. *Reject* stays unblocked.
+- **An approval that would send one of its own *Must fix* drafts is refused** by *Finish review*: the thread would block that approval as soon as it was sent.
+- **A verdict's own notification is the one notification, and it counts the comments.** *Finish review* adds no notice to a verdict; the verdict's notice ends "The review came with 3 comments." *Comment only*, which has no service of its own, sends a new one to the owners and the other open Seat holders. So does an office reviewer's *Clear* or finding that doesn't complete the office: a single reviewer's verdict is still not announced (§4), so that notice says only that comments were sent.
 
 ### 8. Discover: research, and Discoverable Proposals
 
@@ -514,7 +596,17 @@ readiness: null | {
 
 **Verification.** Record-detail endpoint tests use real workflow services to check verdict/Decision parity, coverage of blockers, server text and privacy. Page tests render payload fixtures and exercise the controls, single primary action, container breakpoints, keyboard clamps, reset and unavailable storage. The visual layout is checked against the prototype. This supporting UX changes no workflow contribution. Under ADR-004 it must be present in both comparison arms or absent from both.
 
-**Separate work.** ADR-047 is not a dependency: this UI follows today's server flags without implementing its routing graph, hand-back removal or Revision override. Version diffs, anchored threads, resolution, suggested wording and notification subscriptions remain later phases. Acceptance of this amendment did not accept ADR-047, which was accepted separately on 2026-11-01.
+**Separate work.** ADR-047 is not a dependency: this UI follows today's server flags without implementing its routing graph, hand-back removal or Revision override. Version diffs, anchored threads, resolution, suggested wording and notification subscriptions remain later phases. Acceptance of this amendment did not accept ADR-047, which was accepted separately on 2026-11-01. *Those later phases are decided by the §7 amendment of 2026-11-04 and ADR-058.*
+
+**Amendment, 2026-11-04 (Hermoine Zozobrado, design session; Accepted): Review is the participant's workspace, and the Paper and Files tabs go.** Today a participant's header shows **Overview · Paper · Review · Files** (`frontend/src/features/records/capabilities.ts:18`, `sectionsFor` at `:84-97`). Paper and Review both show the manuscript, and Files is a third place for the same Record's documents.
+
+- **Participants** (whoever `sectionsFor` offers Review today) see **Overview · Review**.
+- **Everyone else** sees **Overview** and the **reader**, which is today's Paper section with Ask IRIS and in-paper find. Review and Files were never theirs, and that is unchanged. A Discover reader of a published paper loses nothing.
+- **No Ask IRIS anywhere in Review** (corrected the same day, before anything was built, during IR-879). The 2026-09-26 amendment above stands ("Ask IRIS is not part of Review mode", IR-372). A participant who wants Ask IRIS opens it on Overview or at `/ai`, for example in a new tab, and a citation brings them back to Review at its page. *Rejected, as first written that day: Ask IRIS in Review's reader.* It would crowd a three-region workspace already holding the paper, the review pane and the sidebar. Review's reader keeps in-paper find.
+- **Files move into Review as the sidebar's *Documents* section.** It lists the shown Version's manuscript and each slot's current document with its state (requested, uploaded), plus the office files. *All documents* opens a drawer with everything the Files section does today: slot history, uploading, downloading, removing, *Download all*, and answering a document request. A document request also appears in Readiness with *Upload it*.
+- **Nothing about who may do what changes.** Every act keeps its endpoint and its check (`authorize_record_documents`, `can_remove`, ADR-022 §Amendment 4, the IR-474/476 rules above). Only where it is shown moves.
+- **Old addresses keep working.** For a participant, `?section=paper` and `?section=files` open Review, and `?section=files` also opens the Documents drawer. For anyone else, `?section=review` and `?section=files` fall back to the default section, as an unavailable section does today (`PaperViewPage.tsx:432-436`).
+- **The prototype** (`../ui-ux/prototypes/review-workspace.html`) still draws the four-item track. This amendment, not the prototype, is the authority.
 
 **Amendment, 2026-10-06 (project lead, IR-411): two more capabilities.** The list above is examples, not a closed set; these two are named so the capabilities payload (IR-418) sends them and the frontend never derives them itself once it does:
 
@@ -648,6 +740,8 @@ readiness: null | {
 5. `in_review`
 
 A decision still closes the record's other open work (ADR-021 §12). A decision is still refused while any resubmission request is open.
+
+**Correction, 2026-11-04.** "A decision is still refused while any resubmission request is open" no longer holds for RDCO. Its Decision withdraws open Revision requests (ADR-047 §5, `apps/reviews/decisions.py:238-239`). It still holds for the Adviser's rejection and for a Proposal's decisions. **`completed` (Unlisted) is no longer terminal:** RDCO may publish it later (ADR-047 §10, 2026-11-04).
 
 **Amendment, 2026-10-09 (project lead, IR-270): how a Decision moves the status, and a stale dialog.**
 

@@ -1,0 +1,45 @@
+{
+  "fixture": "figures.pdf",
+  "pdf_sha256": "a3298d86ffc2ee9c8a4f9962faf110c0b0b46a2b1a3bd4dc06798a0b9156ebcd",
+  "tier": "agentic",
+  "version": "2026-09-28",
+  "request": {
+    "tier": "agentic",
+    "version": "2026-09-28",
+    "disable_cache": true,
+    "processing_options": {
+      "cost_optimizer": {
+        "enable": true
+      },
+      "confidence_score_effort": "high",
+      "specialized_chart_parsing": "agentic"
+    },
+    "output_options": {
+      "granular_bboxes": [
+        "word",
+        "line",
+        "cell"
+      ],
+      "extract_printed_page_number": true,
+      "markdown": {
+        "tables": {
+          "merge_continued_tables": true
+        }
+      },
+      "images_to_save": [
+        "layout"
+      ]
+    }
+  },
+  "expand": [
+    "items",
+    "markdown",
+    "metadata",
+    "job_metadata",
+    "usage",
+    "images_content_metadata"
+  ],
+  "job_id": "pjb-lvuemvx9ccf5km4a4uct51g5fxtz",
+  "credits": 15.0,
+  "recorded_at": "2026-11-02T15:07:10+00:00"
+}

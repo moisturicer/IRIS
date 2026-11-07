@@ -327,7 +327,7 @@ def test_a_chunking_run_queues_the_vectors_it_leaves_owing(
     queued = []
     overview_queued = []
     monkeypatch.setattr(
-        "apps.ai.tasks.embed_chunk_set.delay", lambda record_id: queued.append(record_id)
+        "apps.ai.tasks.embed_chunk_set.delay", lambda record_id, **pin: queued.append((record_id, pin))
     )
     monkeypatch.setattr(
         "apps.ai.tasks.generate_record_overview.delay",
@@ -337,7 +337,8 @@ def test_a_chunking_run_queues_the_vectors_it_leaves_owing(
     with TestCase.captureOnCommitCallbacks(execute=True):
         chunk_extraction.apply(args=[extraction.id])
 
-    assert queued == [upload.record_id]
+    active = ChunkSetModel.objects.get(record_id=upload.record_id, is_active=True)
+    assert queued == [(upload.record_id, {"chunk_set_id": active.pk, "source_revision": None})]
     assert len(overview_queued) == 1
     assert overview_queued[0][0] == upload.record_id
     assert overview_queued[0][1] == ChunkSetModel.objects.get(

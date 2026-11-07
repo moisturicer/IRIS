@@ -41,6 +41,13 @@ class Command(BaseCommand):
         )
         parser.add_argument("--seed", type=int, default=0, help="Sample seed.")
         parser.add_argument(
+            "--space", type=int, default=None, dest="space_id",
+            help="Check this EmbeddingSpace's chunk and space-keyed record "
+            "vectors instead of the active space's (IR-752) -- how a pending "
+            "build is looked at before it is trusted. Calls no vendor; not "
+            "combinable with --titles, which asks the live stack.",
+        )
+        parser.add_argument(
             "--titles", action="store_true",
             help="Also ask the retrieval stack about every publicly visible "
             "paper by name. COSTS one query embedding per record.",
@@ -54,9 +61,19 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         from apps.ai.models import EmbeddingSpace, EmbeddingSpaceState
         from apps.ai.models.chunk import ChunkEmbedding
-        from apps.ai.models.embedding import RecordEmbedding
+        from apps.ai.models.embedding import RecordEmbedding, RecordSpaceEmbedding
 
-        space = EmbeddingSpace.objects.filter(state=EmbeddingSpaceState.ACTIVE).first()
+        if options["space_id"] is not None and options["titles"]:
+            raise CommandError(
+                "--titles asks the live retrieval stack, which reads the active "
+                "space only; it cannot be combined with --space."
+            )
+        if options["space_id"] is not None:
+            space = EmbeddingSpace.objects.filter(pk=options["space_id"]).first()
+            if space is None:
+                raise CommandError(f"No EmbeddingSpace with id {options['space_id']}.")
+        else:
+            space = EmbeddingSpace.objects.filter(state=EmbeddingSpaceState.ACTIVE).first()
         if space is None:
             raise CommandError(
                 "No active EmbeddingSpace: nothing has been indexed, so there "
@@ -69,18 +86,28 @@ class Command(BaseCommand):
             )
         )
 
+        if options["space_id"] is None:
+            # Record vectors carry no space column -- one per record -- so no
+            # space filter, which is how stage 1 queries them too.
+            record_check = measure_index_recall(
+                RecordEmbedding, k=options["k"], probes=options["probes"],
+                seed=options["seed"], label="embedding_hnsw_idx",
+            )
+        else:
+            # The space-keyed table has the space column the legacy one lacks,
+            # so a pending space is checked on its own rows only (IR-752).
+            record_check = measure_index_recall(
+                RecordSpaceEmbedding, space_id=space.pk, k=options["k"],
+                probes=options["probes"], seed=options["seed"],
+                label="record_space_embedding_hnsw_idx",
+            )
         results = [
             measure_index_recall(
                 ChunkEmbedding, space_id=space.pk, k=options["k"],
                 probes=options["probes"], seed=options["seed"],
                 label="chunk_embedding_hnsw_idx",
             ),
-            # Record vectors carry no space column -- one per record -- so no
-            # space filter, which is how stage 1 queries them too.
-            measure_index_recall(
-                RecordEmbedding, k=options["k"], probes=options["probes"],
-                seed=options["seed"], label="embedding_hnsw_idx",
-            ),
+            record_check,
         ]
 
         failed = False

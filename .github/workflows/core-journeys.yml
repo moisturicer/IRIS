@@ -1,16 +1,31 @@
 name: Core journeys (IR-631)
 
-# The pinned-build verification run. Started by hand on one commit; never on
-# push or pull request. It builds the production compose stack under
-# production settings (docker-compose.e2e.yml says exactly what differs),
-# runs every journey once, serially, and uploads the evidence.
+# The pinned-build verification run. Started by hand on one commit, or on a
+# schedule against the head of main (IR-905); never on push or pull request.
+# It builds the production compose stack under production settings
+# (docker-compose.e2e.yml says exactly what differs), runs every journey once,
+# serially, and uploads the evidence.
 #
-# Not a PR gate on purpose (IR-631 Q7): the stack builds Docling and every
-# worker, which would slow every PR and make CI flaky, and IR-631 asks for one
+# Not a PR gate on purpose (IR-631 Q7): the stack builds every worker, which
+# would slow every PR and make CI flaky, and IR-631 asks for one
 # run on one build, not a run per change. A failure here is a failed check in
 # the run record, not a red PR.
+#
+# A scheduled failure is made visible without opening the run (IR-905): the
+# `report` job opens, or comments on, one issue labelled `core-journeys-failure`.
+# The issue is closed by a person once the cause is understood. Manual runs
+# report only in their own run page; whoever started one is watching it.
 
 on:
+  # IR-905. Scheduled runs always build the default branch (main) as it is when
+  # the run starts; GitHub does not let a schedule name another ref.
+  #
+  # THE CADENCE IS A TEAM CHOICE and the ticket does not set it. Weekly is a
+  # placeholder chosen because each run builds every worker for up to 75
+  # minutes of runner time: Monday 02:00 UTC (10:00 Manila). Change the cron
+  # line below once the team has decided; nothing else depends on it.
+  schedule:
+    - cron: "0 2 * * 1"
   workflow_dispatch:
     inputs:
       ref:
@@ -31,15 +46,17 @@ concurrency:
 
 jobs:
   journeys:
-    name: Core journeys on ${{ inputs.ref }}
+    # A schedule has no inputs, so the ref falls back to main.
+    name: Core journeys on ${{ inputs.ref || 'main' }}
     runs-on: ubuntu-latest
-    # Docling's CPU image and the worker builds dominate; the journeys are
-    # minutes. A hang must fail rather than bill.
+    # The worker builds dominate; the journeys are minutes. A hang must fail rather than bill.
     timeout-minutes: 75
+    outputs:
+      sha: ${{ steps.build.outputs.sha }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.ref }}
+          ref: ${{ inputs.ref || 'main' }}
 
       - name: Resolve the build under test
         id: build
@@ -47,7 +64,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
           cache-dependency-path: e2e/package-lock.json
 
@@ -80,6 +97,26 @@ jobs:
             npx playwright test
           fi
 
+      - name: Summarise the run
+        # On the run page, so a result is readable without downloading the
+        # artifact. Counts come from Playwright's own JSON report; a run that
+        # died before writing one says so rather than showing zeros.
+        if: ${{ !cancelled() }}
+        env:
+          SHA: ${{ steps.build.outputs.sha }}
+        run: |
+          {
+            echo "## Core journeys on \`$SHA\`"
+            echo
+            if [ -f e2e/test-results/results.json ]; then
+              jq -r '.stats | "| Passed | Failed | Flaky | Skipped |", "|---|---|---|---|", "| \(.expected) | \(.unexpected) | \(.flaky) | \(.skipped) |"' e2e/test-results/results.json
+            else
+              echo "No results report was written: the stack or the runner failed before the journeys finished."
+            fi
+            echo
+            echo "Evidence: artifact \`core-journeys-$SHA\`. Record the run under \`docs/testing/runs/\` from the template."
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Stack logs
         if: ${{ !cancelled() }}
         run: |
@@ -100,3 +137,36 @@ jobs:
         run: |
           docker compose -p iris-e2e --env-file e2e/.env.e2e \
             -f docker-compose.prod.yml -f docker-compose.e2e.yml down -v || true
+
+  report:
+    # IR-905: a scheduled failure reaches the team as an issue, not as a red
+    # run nobody opened. One open issue collects consecutive failures, so a
+    # week-long outage is one thread, not one issue per run.
+    name: Report a scheduled failure
+    needs: journeys
+    # failure() is true when `journeys` failed; a cancelled run reports nothing.
+    if: ${{ failure() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      issues: write
+    steps:
+      - name: Open or update the failure issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SHA: ${{ needs.journeys.outputs.sha || github.sha }}
+        run: |
+          label=core-journeys-failure
+          gh label create "$label" --color B60205 \
+            --description "A scheduled core-journeys run failed" 2>/dev/null || true
+          body="The scheduled core-journeys run failed on \`$SHA\`. Run: $RUN_URL. Evidence is in the artifact \`core-journeys-$SHA\` (kept 90 days)."
+          existing=$(gh issue list --label "$label" --state open --json number --jq '.[0].number // empty')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body "Failed again. $body"
+          else
+            gh issue create --label "$label" \
+              --title "Scheduled core journeys failed on main" \
+              --body "$body Close this issue once the cause is understood; the next failure opens a new one."
+          fi

@@ -9,7 +9,9 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
+import { useAuthStore } from "@/store/auth.store";
 import { renderScreen, screen, waitFor, within } from "@/test/render";
+import type { User } from "@/types/auth";
 import type { DecisionFlags, DecisionOutcome, RecordDetail } from "@/types/records";
 
 import { DecisionDialog } from "./DecisionDialog";
@@ -60,8 +62,14 @@ function open(outcome: DecisionOutcome, decision: DecisionFlags = RDCO_ALONE, ty
   return { onClose, onDone, view };
 }
 
+/** The signed-in user; null is nobody signed in. */
+function signInAs(id: number | null) {
+  useAuthStore.setState({ user: id === null ? null : ({ id } as User) });
+}
+
 beforeEach(() => {
   sessionStorage.clear();
+  signInAs(1);
   decide.mockReset().mockResolvedValue({ data: {} });
 });
 
@@ -203,7 +211,62 @@ describe("DecisionDialog", () => {
     await userEvent.click(screen.getByRole("button", { name: "Reject and archive" }));
     await waitFor(() => expect(decide).toHaveBeenCalled());
 
-    expect(readDecisionDraft(7, "reject")).toBe("");
+    expect(readDecisionDraft(1, 7, "reject")).toBe("");
+  });
+
+  describe("drafts belong to the signed-in user (IR-931)", () => {
+    const reason = () => screen.getByRole("textbox", { name: "Why is it rejected?" });
+
+    it("does not show A's unsent reason to B on the same tab, and gives it back to A", async () => {
+      signInAs(1);
+      const first = open("reject");
+      await userEvent.type(reason(), "A's unsent reason.");
+      first.view.unmount();
+
+      signInAs(2);
+      const asB = open("reject");
+      expect(reason()).toHaveValue("");
+      asB.view.unmount();
+
+      // Back after an idle expiry: nothing was cleared on the way out.
+      signInAs(1);
+      open("reject");
+      expect(reason()).toHaveValue("A's unsent reason.");
+    });
+
+    it("keeps B's decision from touching A's draft", async () => {
+      signInAs(1);
+      const first = open("reject");
+      await userEvent.type(reason(), "A's unsent reason.");
+      first.view.unmount();
+
+      signInAs(2);
+      open("reject");
+      expect(reason()).toHaveValue("");
+      await userEvent.type(reason(), "B's reason.");
+      await userEvent.click(screen.getByRole("button", { name: "Reject and archive" }));
+      await waitFor(() => expect(decide).toHaveBeenCalled());
+
+      expect(readDecisionDraft(2, 7, "reject")).toBe("");
+      expect(readDecisionDraft(1, 7, "reject")).toBe("A's unsent reason.");
+    });
+
+    it("reads and writes nothing with nobody signed in, and ignores the old unkeyed key", async () => {
+      sessionStorage.setItem("iris_decision_draft:7:reject", "From before the change.");
+      signInAs(null);
+      const none = open("reject");
+      expect(reason()).toHaveValue("");
+
+      await userEvent.type(reason(), "Nobody's draft.");
+      expect(Object.keys(sessionStorage)).toEqual(["iris_decision_draft:7:reject"]);
+      expect(sessionStorage.getItem("iris_decision_draft:7:reject")).toBe("From before the change.");
+      none.view.unmount();
+
+      // Signed in, the old key is not picked up either.
+      signInAs(1);
+      open("reject");
+      expect(reason()).toHaveValue("");
+    });
   });
 });
 
@@ -218,4 +281,70 @@ it("RDCO sees the revision requests and findings its executive Decision supersed
   expect(screen.getByRole("region", { name: "Recorded findings" })).toHaveTextContent("Patent filing should precede publication");
   await userEvent.click(screen.getByRole("button", { name: "Publish" }));
   await waitFor(() => expect(onDone).toHaveBeenCalled());
+});
+
+// ADR-052 decision 14 as amended (IR-818, IR-882): an embargoed paper is never
+// published. The server offers no Publish for it, keeping it unlisted says why,
+// and a Publish dialog an embargo overtook is refused with the embargo reason.
+describe("an embargo at RDCO's Decision", () => {
+  const EMBARGOED: DecisionFlags = { ...RDCO_ALONE, embargo: { state: "active", until: "2099-01-01" } };
+  const warning = () => screen.queryByRole("region", { name: "Under embargo" });
+
+  it("says, when keeping it unlisted, that it can't be published until released", async () => {
+    const { view } = open("keep_unlisted", EMBARGOED);
+
+    expect(warning()).toHaveTextContent("under embargo until Jan 1, 2099, so it can't be published");
+    expect(warning()).toHaveTextContent("release the embargo first");
+    expect(warning()).toHaveTextContent("Kept unlisted, its text stays away from outside AI companies.");
+    await expectNoBlockingA11yViolations(view.container);
+  });
+
+  it("leaves the date out rather than showing a dash when there is none", () => {
+    open("keep_unlisted", { ...RDCO_ALONE, embargo: { state: "active", until: null } });
+
+    expect(warning()).toHaveTextContent("This paper is under embargo, so it can't be published.");
+  });
+
+  it("says nothing when rejecting, where the embargo doesn't matter", () => {
+    open("reject", EMBARGOED);
+
+    expect(warning()).not.toBeInTheDocument();
+  });
+
+  it("says nothing once the embargo is released, and publishing promises Ask IRIS", () => {
+    for (const embargo of [null, { state: "released", until: "2099-01-01" }] as const) {
+      const { view } = open("publish", { ...RDCO_ALONE, embargo });
+      expect(warning()).not.toBeInTheDocument();
+      expect(screen.getByRole("dialog")).toHaveTextContent("Ask IRIS can cite it");
+      view.unmount();
+    }
+  });
+
+  // The server refuses the outcome before it checks the token, so an embargo set
+  // while the dialog was open comes back as a 400 with the embargo reason and no
+  // fresh `decision` (`decide()` in apps/reviews/decisions.py). It used to mock a
+  // 409 here, which the server never sends for this case.
+  it("shows the embargo reason when an embargo set meanwhile refuses the publish", async () => {
+    decide.mockRejectedValueOnce({
+      response: {
+        status: 400,
+        data: { detail: "Under embargo until 01 Jan 2099. Release the embargo, then publish." },
+      },
+    });
+    const { onDone } = open("publish", RDCO_ALONE);
+    expect(warning()).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Publish" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Under embargo until 01 Jan 2099. Release the embargo, then publish. Your comment is kept.",
+    );
+    expect(onDone).not.toHaveBeenCalled();
+  });
+
+  it("can't be confirmed when the record it opened on is already embargoed", () => {
+    open("publish", EMBARGOED);
+
+    expect(screen.getByRole("button", { name: "Publish" })).toBeDisabled();
+  });
 });

@@ -1,54 +1,94 @@
-"""What an uploaded PDF must be, stated once (IR-408).
-
-`SubmitDocumentView` (a supplementary file) and `RecordWriteSerializer`
-(the manuscript, `Record.abstract_file`) both accept PDFs, and before IR-408
-only the first checked them. Both now ask this module, so the two cannot
-disagree about the type or the limit.
-
-The name and content type are the client's say-so, so the bytes decide (IR-665).
-The parser only opens the file and counts its pages: no page content is read, so
-a compressed stream is never expanded here.
-"""
-import logging
+"""Shared, bounded PDF intake (IR-830). No parser runs in the web worker."""
+import hashlib
+import math
+import os
+from pathlib import Path
+import subprocess
+import sys
+import tempfile
 from typing import Optional
 
-from pypdf import PdfReader
+from django.conf import settings
 
-logger = logging.getLogger(__name__)
-
-MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
-
-#: How far into a file readers look for the signature.
+MAX_PDF_SIZE_BYTES = 50 * 1024 * 1024
 PDF_SIGNATURE_WINDOW = 1024
+LIMIT_NAMES = (
+    "PDF_VALIDATION_WALL_SECONDS", "PDF_VALIDATION_MEMORY_MIB",
+    "PDF_VALIDATION_MAX_PAGES", "PDF_VALIDATION_MAX_OBJECTS", "PDF_VALIDATION_MAX_DEPTH",
+)
+PROBLEMS = {
+    2: "This file is not a readable PDF.",
+    3: "Encrypted PDFs are not accepted.",
+    4: "This PDF contains unsupported active content.",
+    5: "This PDF exceeds the processing limits.",
+    6: "PDF checking is temporarily unavailable. Please try again later.",
+}
 
 
-def _is_readable_pdf(file) -> bool:
-    """Whether `file` opens as a PDF with at least one page. Leaves it at the start."""
-    try:
-        file.seek(0)
-        if b"%PDF-" not in file.read(PDF_SIGNATURE_WINDOW):
-            return False
-        file.seek(0)
-        return len(PdfReader(file).pages) > 0
-    # A parser reading hostile bytes fails in more ways than it documents, and
-    # any of them means the same thing here: this file is refused, not a 500.
-    except Exception as exc:  # noqa: BLE001
-        logger.info("Refused an upload that does not open as a PDF: %s", type(exc).__name__)
-        return False
-    finally:
-        file.seek(0)
+def validation_limits() -> tuple:
+    values = tuple(getattr(settings, name, None) for name in LIMIT_NAMES)
+    for index, value in enumerate(values):
+        if (isinstance(value, bool) or not isinstance(value, (int, float))
+                or not math.isfinite(value) or value <= 0
+                or (index > 0 and int(value) != value)):
+            raise ValueError("PDF validation requires finite positive limits.")
+    return values
+
+
+def is_pdf_upload(file) -> bool:
+    """General attachments retain their formats; PDF claims/bytes opt into checking."""
+    file.seek(0)
+    signature = file.read(PDF_SIGNATURE_WINDOW)
+    file.seek(0)
+    return (
+        (getattr(file, "name", "") or "").lower().endswith(".pdf")
+        or (getattr(file, "content_type", "") or "").lower() == "application/pdf"
+        or b"%PDF-" in signature
+    )
 
 
 def pdf_upload_problem(file) -> Optional[str]:
-    """Why `file` is not an acceptable PDF upload, or None when it is."""
     name = (getattr(file, "name", "") or "").lower()
-    content_type = getattr(file, "content_type", "") or ""
-    if not name.endswith(".pdf") or "pdf" not in content_type:
+    mime = (getattr(file, "content_type", "") or "").lower()
+    if not name.endswith(".pdf") or mime not in {"application/pdf", "application/octet-stream", ""}:
         return "Only PDF files are accepted."
     if file.size > MAX_PDF_SIZE_BYTES:
-        mb = file.size / (1024 * 1024)
-        limit = MAX_PDF_SIZE_BYTES / (1024 * 1024)
-        return f"File size {mb:.1f} MB exceeds the {limit:.0f} MB limit."
-    if not _is_readable_pdf(file):
-        return "This file is not a readable PDF."
-    return None
+        return f"File size {file.size / (1024 * 1024):.1f} MB exceeds the 50 MB limit."
+    if not file.size:
+        return PROBLEMS[2]
+    try:
+        limits = validation_limits()
+    except ValueError:
+        return PROBLEMS[6]
+    if sys.platform != "linux":
+        return PROBLEMS[6]
+    digest = hashlib.sha256()
+    try:
+        with tempfile.TemporaryDirectory(prefix="iris-pdf-") as directory:
+            path = Path(directory) / "source.pdf"
+            total = 0
+            file.seek(0)
+            with path.open("wb") as target:
+                for chunk in file.chunks():
+                    total += len(chunk)
+                    if total > MAX_PDF_SIZE_BYTES:
+                        return "File size exceeds the 50 MB limit."
+                    digest.update(chunk)
+                    target.write(chunk)
+            result = subprocess.run(
+                [sys.executable, "-I", str(Path(__file__).with_name("pdf_inspection.py")),
+                 str(path), *(str(value) for value in limits[1:])],
+                stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                timeout=limits[0], check=False,
+                env={key: value for key, value in os.environ.items() if key in {"PATH", "LANG"}},
+            )
+            if result.returncode:
+                return PROBLEMS.get(result.returncode, PROBLEMS[5])
+            file.source_sha256 = digest.hexdigest()
+            return None
+    except subprocess.TimeoutExpired:
+        return PROBLEMS[5]
+    except OSError:
+        return PROBLEMS[6]
+    finally:
+        file.seek(0)

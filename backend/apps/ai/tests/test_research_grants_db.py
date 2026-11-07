@@ -298,7 +298,7 @@ def maintenance_login(grant_db):
     from django.db import connection
 
     from apps.ai.management.commands.provision_research_roles import (
-        HELPER_FUNCTIONS, LEDGER_TABLES, RUNTIME_ROLES, VERIFIER, VERIFIER_COLUMNS,
+        HELPER_FUNCTIONS, LEDGER_TABLES, RUNTIME_METADATA_TABLES, RUNTIME_ROLES, VERIFIER, VERIFIER_COLUMNS,
     )
     from apps.ai.grants.policy import PROTECTED_TABLES
 
@@ -313,7 +313,7 @@ def maintenance_login(grant_db):
         cursor.execute(f'ALTER TABLE iris_authz.grant_key OWNER TO "{name}"')
         for fn in HELPER_FUNCTIONS:
             cursor.execute(f'ALTER FUNCTION iris_authz.{fn} OWNER TO "{name}"')
-        for table in {*VERIFIER_COLUMNS, *PROTECTED_TABLES, *LEDGER_TABLES}:
+        for table in {*VERIFIER_COLUMNS, *PROTECTED_TABLES, *LEDGER_TABLES, *RUNTIME_METADATA_TABLES}:
             cursor.execute(f'ALTER TABLE public.{table} OWNER TO "{name}"')
     try:
         yield name, password

@@ -2,6 +2,7 @@
 
 import pytest
 
+from ai.api.runs import SubmitRequest
 from ai.infrastructure.settings import Settings
 from ai.runs import config
 
@@ -33,15 +34,29 @@ def test_any_unset_limit_refuses_runs(name):
     assert f"{name} must be set and positive" in config.problems(settings(**{name: None}))
 
 
-def test_no_paid_executor_can_be_selected():
+def test_only_a_known_executor_can_be_selected():
+    # IR-862 adds "agent", which also needs the whole AGENT profile (test_agent_profile.py).
     assert config.problems(settings(RUNS_EXECUTOR="openai")) == [
-        "RUNS_EXECUTOR must be one of deterministic"
+        "RUNS_EXECUTOR must be one of deterministic, agent"
     ]
 
 
 def test_runs_need_a_database():
     with pytest.raises(config.RunsUnavailable):
         config.read(settings(RUNS_DATABASE_URL=""))
+
+
+def test_a_submission_is_deep_unless_it_names_a_depth():
+    assert SubmitRequest(question="q").depth == "deep"
+    assert SubmitRequest(question="q", depth="ordinary").depth == "ordinary"
+
+
+def test_a_running_service_refuses_the_maintenance_login():
+    # ADR-014's IR-826 amendment: only `python -m ai.runs.migrate` holds it.
+    held = settings(RUNS_MIGRATION_DATABASE_URL="postgresql://maintenance@db/iris")
+    assert config.problems(held) == ["RUNS_MIGRATION_DATABASE_URL must not be set on a running service"]
+    with pytest.raises(config.RunsUnavailable):
+        config.read(held)
 
 
 def test_each_depth_keeps_its_own_deadline():

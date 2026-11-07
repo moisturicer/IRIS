@@ -5,7 +5,7 @@
     python manage.py eval_campaign --report --set s.json --lock s.lock.json \\
         --runs controller=r1.json --runs controller=r2.json --runs controller=r3.json \\
         --reviews reviews.json --approvals approvals.json --scenarios ir608.json \\
-        [--label-review lr.json --packets p.json --counted] [--mode architecture|model]
+        [--label-review lr.json --packets p.json --counted] [--mode architecture|model|capability]
 
 Reads collected run files, named human reviews and IR-608 evidence. It
 collects nothing, calls no model and authorizes no spending or release.

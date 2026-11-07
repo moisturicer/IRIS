@@ -13,6 +13,7 @@ from unittest import mock
 
 from axes.models import AccessAttempt
 from django.conf import settings
+from django.test import override_settings
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
@@ -36,6 +37,8 @@ def make_user(email, **extra):
     )
 
 
+# The lockout is off by default for now (IR-865); these prove it works when on.
+@override_settings(AXES_ENABLED=True)
 class AxesLockoutTests(APITestCase):
     def setUp(self):
         self.user = make_user("locked.out@cit.edu")
@@ -91,6 +94,7 @@ class AxesLockoutTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_429_TOO_MANY_REQUESTS)
 
 
+@override_settings(AXES_ENABLED=True)
 class AsgiLockoutTests(APITestCase):
     """
     Production serves Django over ASGI, where axes' middleware runs its async
@@ -127,3 +131,18 @@ class ManualLockTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
         self.assertEqual(response.json(), {"detail": "Account is locked.", "code": "locked_by_admin"})
+
+
+@override_settings(AXES_ENABLED=False)
+class LockoutSwitchedOffTests(APITestCase):
+    """IR-865: with AXES_ENABLED off, wrong passwords never lock the account."""
+
+    def test_wrong_passwords_past_the_limit_are_refused_but_never_locked(self):
+        user = make_user("never.locked@cit.edu")
+        url = reverse("auth-login")
+        for _ in range(settings.AXES_FAILURE_LIMIT + 2):
+            response = self.client.post(url, {"email": user.email, "password": "wrong"}, format="json")
+            self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+
+        right = self.client.post(url, {"email": user.email, "password": PASSWORD}, format="json")
+        self.assertEqual(right.status_code, status.HTTP_200_OK)

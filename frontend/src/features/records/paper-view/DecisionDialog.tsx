@@ -4,7 +4,8 @@ import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
-import { joinLabels } from "@/lib/utils";
+import { formatDate, joinLabels } from "@/lib/utils";
+import { useAuthStore } from "@/store/auth.store";
 import type { DecisionCloses, DecisionFlags, DecisionOutcome, RecordDetail } from "@/types/records";
 
 import { clearDecisionDrafts, readDecisionDraft, writeDecisionDraft } from "./decisionDraft";
@@ -24,6 +25,21 @@ const CONFIRM: Record<DecisionOutcome, { label: string; done: string }> = {
   keep_unlisted: { label: "Keep unlisted", done: "Accepted and kept unlisted." },
   reject: { label: "Reject and archive", done: "Rejected. The record is archived." },
 };
+
+/** RDCO's warnings: the executive Decision, and an embargo (ADR-047, ADR-052 §14). */
+const WARNING_CALLOUT = "rounded-lg border border-brand/30 bg-brand/5 p-3 text-small text-brand";
+
+/**
+ * Why RDCO isn't offered *Publish* (ADR-052 §14 as amended, IR-882): an
+ * embargoed paper is never published, so it is released first.
+ */
+function embargoWarning(until: string | null): string {
+  const dated = until ? ` until ${formatDate(until)}` : "";
+  return (
+    `This paper is under embargo${dated}, so it can't be published. To publish it, release the ` +
+    "embargo first. Kept unlisted, its text stays away from outside AI companies."
+  );
+}
 
 /**
  * The title and the consequence, stated before anyone commits to it
@@ -49,7 +65,8 @@ function wording(outcome: DecisionOutcome, kind: string) {
   if (outcome === "publish") {
     return {
       title: `Publish this ${kind}?`,
-      body: "This publishes it to Discover, where any signed-in user can read it and Ask IRIS can cite it.",
+      body:
+        "This publishes it to Discover, where any signed-in user can read it and Ask IRIS can cite it.",
     };
   }
   if (outcome === "keep_unlisted") {
@@ -107,18 +124,26 @@ function closingLines(closes: DecisionCloses | null): string[] {
 export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDialogProps) {
   const ids = useId();
   const [flags, setFlags] = useState<DecisionFlags>(record.decision);
-  const [text, setText] = useState(() => readDecisionDraft(record.id, outcome));
+  const userId = useAuthStore(s => s.user?.id);
+  const [text, setText] = useState(() => readDecisionDraft(userId, record.id, outcome));
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
   const reject = outcome === "reject";
-  const ready = !reject || text.trim() !== "";
   const kind =
     record.record_type_name === "Project"
       ? "project"
       : record.record_type_name === "Proposal"
         ? "proposal"
         : "thesis";
+  // An embargoed paper is never published, so `decide/` offers no publish for it
+  // (ADR-052 §14 as amended). Keeping it unlisted says why, and what to do. A
+  // Publish dialog an embargo overtook gets a 400, not the 409 below: `decide()`
+  // refuses the outcome before it checks the token, so the reply carries the
+  // embargo reason and no fresh `decision`, and the server refuses every retry.
+  const embargo = flags.embargo && flags.embargo.state !== "released" ? flags.embargo : null;
+  const warnEmbargo = embargo !== null && (outcome === "keep_unlisted" || outcome === "publish");
+  const ready = (!reject || text.trim() !== "") && !(outcome === "publish" && embargo !== null);
   const { title, body } = wording(outcome, kind);
   const stillReviewing = (flags.closes?.assignments ?? []).map((a) => a.label);
   const withdrawsRevisions = (flags.closes?.revision_requests ?? []).length > 0;
@@ -126,7 +151,7 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
 
   const change = (value: string) => {
     setText(value);
-    writeDecisionDraft(record.id, outcome, value);
+    writeDecisionDraft(userId, record.id, outcome, value);
   };
 
   const submit = async (e: FormEvent) => {
@@ -136,7 +161,7 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
     setSending(true);
     try {
       await recordsApi.decide(record.id, { outcome, comment: text.trim(), token: flags.token ?? "" });
-      clearDecisionDrafts(record.id);
+      clearDecisionDrafts(userId, record.id);
       onDone(CONFIRM[outcome].done);
     } catch (err) {
       const fresh = (err as { response?: { status?: number; data?: { decision?: DecisionFlags } } })
@@ -181,13 +206,19 @@ export function DecisionDialog({ record, outcome, onClose, onDone }: DecisionDia
         <p className="text-[14px] text-stone-700 leading-relaxed">{body}</p>
 
         {flags.party === "rdco" && (stillReviewing.length > 0 || withdrawsRevisions) && (
-          <p className="rounded-lg border border-brand/30 bg-brand/5 p-3 text-small text-brand">
+          <p className={WARNING_CALLOUT}>
             <i className="fas fa-triangle-exclamation mr-1.5" aria-hidden />
             This is RDCO's executive Decision. RDCO doesn't have to wait.
             {stillReviewing.length > 0 &&
               ` ${joinLabels(stillReviewing)}'s open review${stillReviewing.length > 1 ? "s close" : " closes"}, marked "closed by RDCO's Decision"; their comments and findings stay in the history.`}
             {withdrawsRevisions && " Open revision requests are withdrawn."}
           </p>
+        )}
+        {warnEmbargo && (
+          <section aria-label="Under embargo" className={WARNING_CALLOUT}>
+            <i className="fas fa-lock mr-1.5" aria-hidden />
+            {embargoWarning(embargo.until)}
+          </section>
         )}
         {!!flags.closes?.findings?.length && <section aria-label="Recorded findings">
           <h3 className="text-small font-semibold">Recorded findings</h3>

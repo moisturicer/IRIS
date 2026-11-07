@@ -89,6 +89,23 @@ def turns_to_consider(conversation_ids: Optional[Sequence[int]] = None):
     return queryset
 
 
+def _turns_citing_refused_papers(turn_ids) -> set:
+    """Turns quoting a paper the disclosure check now refuses (ADR-052, IR-812).
+
+    Embedding an answer sends its text to the vendor, and an answer that quotes a
+    paper is that paper's text. Any reader's answer, so the check alone decides.
+    """
+    from apps.ai.history import disclosable_record_ids
+    from apps.ai.models import TurnCitation
+
+    cited = list(
+        TurnCitation.objects.filter(turn_id__in=turn_ids).values_list("turn_id", "record_id")
+    )
+    papers = {record_id for _, record_id in cited}
+    refused = papers - disclosable_record_ids(papers)
+    return {turn_id for turn_id, record_id in cited if record_id in refused}
+
+
 def plan_turns(turns, *, space_id: int, space_model: str, cost_per_million: float):
     """Cost a backfill without sending anything.
 
@@ -111,6 +128,9 @@ def plan_turns(turns, *, space_id: int, space_model: str, cost_per_million: floa
         ).values_list("turn_id", flat=True)
     )
 
+    turns = list(turns)
+    withheld = _turns_citing_refused_papers([turn.pk for turn in turns])
+
     for turn in turns:
         plan.considered += 1
         if turn.state not in _EMBEDDABLE_STATES:
@@ -119,6 +139,8 @@ def plan_turns(turns, *, space_id: int, space_model: str, cost_per_million: floa
             plan.skip("no answer text")
         elif turn.pk in already:
             plan.skip("already has an answer vector in this space")
+        elif turn.pk in withheld:
+            plan.skip("cites a paper the disclosure check refuses")
         else:
             plan.to_embed.append(
                 TurnPlan(
@@ -146,15 +168,22 @@ class TurnRunReport:
         self.failed.append((turn_id, str(error)))
 
 
-def embed_turn_answer(turn, *, space_id: int, embedder) -> None:
+def embed_turn_answer(turn, *, space_id: int, embedder) -> bool:
     """Store one Turn's answer vector, overwriting any row already there.
 
     `embed_query`, not `embed_documents`, for the reason ADR-015 rule 3's note
     records and `TurnEmbedding` restates: recall is one ranked list, and an
     answer stored as a document would put a second, non-comparable distance
     scale into it.
+
+    Checks the disclosure rule again, right before sending, and returns False
+    having sent nothing if a cited paper is now refused. A run can be long, and
+    an embargo set since planning has to stop it (IR-812).
     """
     from apps.ai.models import TURN_ANSWER_VECTOR, TurnEmbedding
+
+    if _turns_citing_refused_papers([turn.pk]):
+        return False
 
     vector = embedder.embed_query(turn.answer)
     TurnEmbedding.objects.update_or_create(
@@ -163,3 +192,4 @@ def embed_turn_answer(turn, *, space_id: int, embedder) -> None:
         kind=TURN_ANSWER_VECTOR,
         defaults={"embedding": vector},
     )
+    return True

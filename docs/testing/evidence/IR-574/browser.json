@@ -1,0 +1,100 @@
+{
+  "backend": "running local Docker backend, actual demo authentication and catalogue; answer SSE intercepted, no provider call",
+  "checks": [
+    "actual catalogue supplies at least two papers",
+    "one selected paper blocks sending",
+    "server-configured maximum disables extra choices",
+    "Enter on checkbox does not send draft",
+    "X closes picker without sending draft",
+    "touch target null null height at least 44px",
+    "touch target null null height at least 44px",
+    "touch target Close null height at least 44px",
+    "touch target null null height at least 44px",
+    "touch target null null height at least 44px",
+    "touch target null null height at least 44px",
+    "picker has no axe WCAG A/AA violations",
+    "closing returns focus to trigger",
+    "selected IDs reach existing comparison request",
+    "comparison does not widen scope",
+    "360px page has no horizontal overflow",
+    "focus enters dialog",
+    "Tab 1 remains in dialog",
+    "Tab 2 remains in dialog",
+    "Tab 3 remains in dialog",
+    "Tab 4 remains in dialog",
+    "Tab 5 remains in dialog",
+    "Tab 6 remains in dialog",
+    "Tab 7 remains in dialog",
+    "Tab 8 remains in dialog",
+    "Tab 9 remains in dialog",
+    "Tab 10 remains in dialog",
+    "Tab 11 remains in dialog",
+    "Tab 12 remains in dialog",
+    "Tab 13 remains in dialog",
+    "Tab 14 remains in dialog",
+    "Tab 15 remains in dialog",
+    "Tab 16 remains in dialog",
+    "Tab 17 remains in dialog",
+    "Tab 18 remains in dialog",
+    "Tab 19 remains in dialog",
+    "Tab 20 remains in dialog",
+    "Escape closes dialog",
+    "opening confirmation does not delete",
+    "mobile confirmation closes history drawer",
+    "Cancel has initial focus",
+    "Escape cancels without deleting",
+    "failed deletion keeps confirmation for retry",
+    "only explicit confirmation deletes, with retry"
+  ],
+  "errors": [],
+  "serverMaximum": 6,
+  "desktopAxe": [
+    {
+      "id": "color-contrast",
+      "impact": "serious",
+      "nodes": [
+        {
+          "target": [
+            "a[href$=\"conversations/5\"] > .mt-0\\.5.text-\\[12px\\].text-stone-400"
+          ],
+          "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.41 (foreground color: #a8a29e, background color: #fafaf9, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "target": [
+            ".ring-1 > .mt-0\\.5.text-\\[12px\\].text-stone-400"
+          ],
+          "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.3 (foreground color: #a8a29e, background color: #fdf2f2, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "target": [
+            ".uppercase.tracking-wider.text-\\[12px\\]"
+          ],
+          "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.52 (foreground color: #a8a29e, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+        },
+        {
+          "target": [
+            ".\\[\\@media\\(pointer\\:coarse\\)\\]\\:hidden"
+          ],
+          "summary": "Fix any of the following:\n  Element has insufficient color contrast of 2.52 (foreground color: #a8a29e, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+        }
+      ]
+    }
+  ],
+  "pickerAxe": [],
+  "removed": "Remove A Low-Cost IoT Flood Sensor Network for Cebu Barangays from comparison",
+  "request": {
+    "comparison_record_ids": [
+      7,
+      8,
+      4,
+      5,
+      1
+    ],
+    "conversation_id": 6
+  },
+  "deleteConfirmation": {
+    "attempts": 2,
+    "firstResponse": "injected 503; retry used actual DELETE against script-created Conversation"
+  },
+  "browser": "156.0.8078.4"
+}

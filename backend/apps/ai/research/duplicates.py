@@ -8,7 +8,7 @@ import unicodedata
 from django.conf import settings
 from pgvector.django import CosineDistance
 
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.record_vectors import active_space, record_vectors
 
 from .tools.common import disclosable
 
@@ -26,10 +26,11 @@ def possible_duplicates(run, evidence):
         for a, b in combinations(sorted(ids), 2):
             reasons[(a, b)].add("normalized_title")
 
-    vectors = RecordEmbedding.objects.filter(record_id__in=allowed)
+    # One space for the whole comparison (IR-739): the active one, resolved once.
+    vectors = record_vectors(active_space()).filter(record_id__in=allowed)
     maximum_distance = 1 - settings.AI_SCREEN_DUPLICATE_MIN_SIMILARITY
     for seed in vectors.order_by("record_id"):
-        close = (vectors.filter(model_name=seed.model_name, record_id__gt=seed.record_id)
+        close = (vectors.filter(record_id__gt=seed.record_id)
                  .annotate(distance=CosineDistance("embedding", seed.embedding))
                  .filter(distance__lte=maximum_distance).order_by()
                  .values_list("record_id", flat=True))

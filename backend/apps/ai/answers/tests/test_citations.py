@@ -408,6 +408,18 @@ class ImageStrippingTests:
         text, _ = parse_citations("See [the docs](https://x.test).", [chunk(1)])
         assert "[the docs](https://x.test)" in text
 
+    def test_only_an_image_the_system_handed_over_survives(self):
+        """IR-845: the rule is "no image the system did not hand you"
+        (ADR-056 §12). Nothing hands one over until IR-293, so every
+        caller still strips them all."""
+        from apps.ai.answers.citations import strip_images
+
+        handed = "/api/v1/records/7/figures/3/"
+        answer = f"Shown ![Figure 1]({handed}) and ![Figure 2](https://x.test/f2.png) and ![r][ref]."
+
+        assert strip_images(answer, handed={handed}) == f"Shown ![Figure 1]({handed}) and  and ."
+        assert strip_images(answer) == "Shown  and  and ."
+
     def test_images_in_reports_what_it_found(self):
         from apps.ai.answers.citations import images_in
 

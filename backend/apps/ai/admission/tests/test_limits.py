@@ -3,10 +3,14 @@
 import pytest
 from django.core.exceptions import ImproperlyConfigured
 
+from decimal import Decimal
+
 from apps.ai.admission.limits import (
+    EXTRACTION_SETTINGS,
     NotConfigured,
     REQUIRED_SETTINGS,
     output_cap,
+    read_extraction_price,
     read_limits,
     verify_admission_configuration,
 )
@@ -84,5 +88,46 @@ def test_the_output_cap_is_sent_only_under_enforcement(settings):
 ])
 def test_a_value_too_long_to_store_stops_startup(settings, name, value):
     enforce(settings, **{name: value})
+    with pytest.raises(ImproperlyConfigured):
+        verify_admission_configuration()
+
+
+EXTRACTION = {
+    "AI_ADMISSION_EXTRACTION_CREDIT_USD": "0.00125",
+    "AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE": "10",
+    "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE": "0",
+}
+
+
+def test_an_extraction_reserves_every_page_at_its_dearest_rate(settings):
+    enforce(settings, **{**EXTRACTION, "AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE": "2"})
+    price = read_extraction_price()
+    # 100 pages x 12 credits x US$0.00125 = US$1.50.
+    assert price.reserve_micros(100) == 1_500_000
+    assert price.micros(Decimal("24")) == 30_000
+
+
+@pytest.mark.parametrize("name", EXTRACTION_SETTINGS)
+def test_an_unset_extraction_price_is_not_configured_and_never_defaulted(settings, name):
+    enforce(settings, **{**EXTRACTION, name: ""})
+    with pytest.raises(NotConfigured, match=name):
+        read_extraction_price()
+    verify_admission_configuration()
+
+
+def test_an_unset_extraction_price_refuses_nothing_else(settings):
+    enforce(settings)
+    read_limits()
+
+
+@pytest.mark.parametrize("name, value", [
+    ("AI_ADMISSION_EXTRACTION_CREDIT_USD", "free"),
+    ("AI_ADMISSION_EXTRACTION_CREDIT_USD", "0"),
+    ("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", "-3"),
+    ("AI_ADMISSION_EXTRACTION_CREDITS_PER_PAGE", "NaN"),
+    ("AI_ADMISSION_EXTRACTION_ADDON_CREDITS_PER_PAGE", "-1"),
+])
+def test_a_malformed_extraction_price_stops_startup(settings, name, value):
+    enforce(settings, **{**EXTRACTION, name: value})
     with pytest.raises(ImproperlyConfigured):
         verify_admission_configuration()

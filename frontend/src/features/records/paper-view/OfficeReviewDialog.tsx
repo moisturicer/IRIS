@@ -4,6 +4,7 @@ import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
+import { useAuthStore } from "@/store/auth.store";
 import type { OfficeReviewOutcome, RecordDetail } from "@/types/records";
 
 import {
@@ -41,7 +42,8 @@ export function OfficeReviewDialog({ record, outcome, onClose, onDone }: OfficeR
   const ids = useId();
   const office = record.office_review.label ?? "your office";
   const finding = outcome === "finding";
-  const [comment, setComment] = useState(() => readOfficeReviewDraft(record.id, outcome));
+  const userId = useAuthStore(s => s.user?.id);
+  const [comment, setComment] = useState(() => readOfficeReviewDraft(userId, record.id, outcome));
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -49,7 +51,7 @@ export function OfficeReviewDialog({ record, outcome, onClose, onDone }: OfficeR
 
   const change = (value: string) => {
     setComment(value);
-    writeOfficeReviewDraft(record.id, outcome, value);
+    writeOfficeReviewDraft(userId, record.id, outcome, value);
   };
 
   const submit = async (e: FormEvent) => {
@@ -59,7 +61,7 @@ export function OfficeReviewDialog({ record, outcome, onClose, onDone }: OfficeR
     setSending(true);
     try {
       await recordsApi.officeReview(record.id, { outcome, comment: comment.trim() });
-      clearOfficeReviewDrafts(record.id);
+      clearOfficeReviewDrafts(userId, record.id);
       onDone(finding ? `Finding recorded for ${office}.` : `Cleared for ${office}.`);
     } catch (err) {
       setError(

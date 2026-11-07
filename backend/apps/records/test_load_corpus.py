@@ -25,7 +25,9 @@ from apps.records.management.commands.load_corpus import DEFAULT_OWNER_EMAIL
 from apps.records.models import Classification, Record, RecordOwner, RecordType
 from core.enums import EmbargoState, PipelineStatus
 
-FAKE_PDF = b"%PDF-1.7 fake bytes"
+from apps.documents.testing import real_pdf_bytes
+
+FAKE_PDF = real_pdf_bytes()
 
 
 def _write(root: Path, category: str, filename: str, content: bytes = FAKE_PDF) -> Path:
@@ -154,7 +156,7 @@ class LoadCorpusTests(_LoadsCorpus):
         mock_delay = self.load(str(self.root))
 
         record = Record.objects.get(title="Paper")
-        mock_delay.assert_called_once_with(record.id)
+        mock_delay.assert_called_once_with(record.id, str(record.manuscript_revision))
 
     def test_a_non_pdf_file_is_skipped_not_fatal(self):
         _write(self.root, "econometrics", "Paper.pdf")
@@ -291,11 +293,11 @@ class LoadCorpusClearingTests(_LoadsCorpus):
         self.root = Path(self.tmp.name)
         _write(self.root, "econometrics", "Paper.pdf")
 
-    def test_a_paper_loaded_without_the_option_stays_unknown(self):
+    def test_a_paper_loaded_without_the_option_stays_embargoed(self):
         self.load(str(self.root))
 
         record = Record.objects.get(title="Paper")
-        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
         self.assertFalse(decision_for_record(record).allowed)
 
     @override_settings(DEBUG=True)
@@ -303,9 +305,9 @@ class LoadCorpusClearingTests(_LoadsCorpus):
         self.load(str(self.root), clear_for_ai=True)
 
         record = Record.objects.get(title="Paper")
-        self.assertEqual(record.embargo_state, EmbargoState.NONE)
+        self.assertEqual(record.embargo_state, EmbargoState.RELEASED)
         self.assertTrue(decision_for_record(record).allowed)
-        self.assertEqual(record.embargo_answered_by.email, DEFAULT_OWNER_EMAIL)
+        self.assertEqual(record.embargo_released_by.email, DEFAULT_OWNER_EMAIL)
         self.assertEqual(record.dpa_accepted_by.email, DEFAULT_OWNER_EMAIL)
 
     @override_settings(DEBUG=True)
@@ -337,7 +339,7 @@ class LoadCorpusClearingTests(_LoadsCorpus):
         self.load(str(self.root), clear_for_ai=True)
 
         record = Record.objects.get(title="Paper")
-        self.assertEqual(record.embargo_state, EmbargoState.UNKNOWN)
+        self.assertEqual(record.embargo_state, EmbargoState.ACTIVE)
 
     def test_force_does_not_get_past_the_refusal_with_debug_off(self):
         """`--force` loads on any machine. Clearing never does: it would answer

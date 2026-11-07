@@ -124,6 +124,17 @@ components:
     textColor: "{colors.page-white}"
     rounded: "{rounded.pill}"
     size: "56px"
+  profile-note:
+    backgroundColor: "{colors.bar-stone}"
+    textColor: "{colors.body-ink}"
+    typography: "{typography.label}"
+    rounded: "{rounded.sheet}"
+    padding: "8px 8px 8px 16px"
+  profile-avatar:
+    backgroundColor: "{colors.maroon-wash}"
+    textColor: "{colors.binding-maroon}"
+    rounded: "{rounded.pill}"
+    size: "112px"
   entry-masthead:
     backgroundColor: "{colors.page-white}"
     textColor: "{colors.binding-maroon}"
@@ -271,17 +282,17 @@ The record's sections (Overview, Paper, Review, Files) are a recessed Desk Stone
 - **Scope chip** ("This paper" / "All papers") in the composer: Maroon Wash with a maroon dot; filled maroon when widened to all papers.
 
 ### Citations
-In the AI Overview a citation is the page it cites: "p8", 12 px semibold maroon on a Maroon Wash, at the baseline of the text, linking to that page. Chat citations stay small numbered markers.
+In the AI Overview a citation is the page it cites: "p8", 12 px semibold maroon on a Maroon Wash, at the baseline of the text, linking to that page. Chat citations stay small numbered markers: 12 px semibold maroon on a Maroon Wash square, and the same numbers appear on the answer's sources button.
 
 ### Inputs / Fields
-A white field with a Rule Stone outline and the control radius. Focus darkens the outline to maroon with a soft maroon ring. A disabled field sits on Endpaper with a not-allowed cursor and says why beside it. The Ask IRIS composer holds the scope chip and Send inside its field.
+A white field with a Rule Stone outline and the control radius. Focus darkens the outline to maroon with a soft maroon ring. A disabled field sits on Endpaper with a not-allowed cursor and says why beside it. Paper Chat's composer holds the scope chip and Send inside its field. The Ask IRIS page's composer is one line that grows with the question up to a cap, over a row of round icon controls (attach, closed until uploads exist; compare) and a Bar Stone settings pill whose menu offers only what the server supports. Send is Bar Stone until there is something to send.
 
 ### Navigation
 - **Record bar:** 56 px, Bar Stone, a Desk Stone hairline under it. Back (always labelled), a hairline divider, the paper's title on Paper, then the section tabs.
 - **Ask IRIS icon:** a 56 px Binding Maroon circle at the bottom right with the white Folio Ribbon Ask IRIS glyph, shown only while the panel is closed, lifting 2 px on hover.
 
 ### Ask IRIS panel (signature)
-A column on Endpaper behind one Rule Stone line, never a card. A Bar Stone header with the Garamond heading, an "AI" tag and the paper's title. Below it, the conversation, or a Garamond "Ask about this paper." with three outlined starter questions. At the bottom, the composer. It arrives from its edge (320 ms) and has dialog semantics only when it covers the paper.
+A column on Endpaper behind one Rule Stone line, never a card. A Bar Stone header with the Garamond heading, an "AI" tag and the paper's title. Below it, the conversation, or a Garamond "Ask about this paper." with three starter questions in a hairline list (`StarterQuestions`, shared with the Ask IRIS page). At the bottom, the composer. It arrives from its edge (320 ms) and has dialog semantics only when it covers the paper.
 
 ### Overview sections (signature)
 Abstract, AI Overview, Related works and Comments, each under one Desk Stone hairline, each with a Garamond headline. The AI Overview has no card and no provenance label: just the heading with the IRIS mark, a ghost Copy, and the article. Comments are drawn and plainly closed (disabled field and Post, "Not open yet") until the feature exists.
@@ -297,8 +308,14 @@ Sign in, register, email verification and the pending and declined screens share
 
 Replaced the split screen with its "shelf of bound work" brand panel (IR-535, IR-586), deleted in IR-711.
 
+### Profile and Settings (IR-933)
+Two pages. **Profile** reads like a short typeset entry: an initials avatar (112 px, Maroon Wash with maroon Garamond initials) or the person's photo beside a Garamond name, the role and the affiliation, then About and Research interests, each under one hairline. A field left empty is left out. On your own profile a Bar Stone **note** strip says this is how others see you and holds the page's one filled pill, Edit profile. **Edit profile** is the same sections as fields, closed by Cancel and Save, and returns to Profile with a "Profile saved." line. **Settings** holds the account only: sign-in and password, consent, and role.
+
+### Another person's Profile (IR-700)
+The same typeset entry as your own, at `/people/:id`, with a second column. **Collaborators** (a 40 px avatar, a name link and "N shared papers") sit beside the sections once the page's own width reaches 48rem, behind one vertical hairline, and fall under them behind the same hairline laid flat; the layout reads the `profile` container, never the window. Research and Advised are compact `ResearchCard`s with only their own views, ten at a time with Show more, and Collaborators load twelve at a time. There are no totals, no citation counts and no email; a section with nothing in it is left out. A name with no visible Profile is plain text, and a hidden person is the standard not-found screen.
+
 ### Identity (IR-744)
-**Folio Ribbon.** The mark is a serif I standing in the gutter of an open folio: four maroon pieces (two leaves, two ribbons), with the I as the white space between them. `IrisMark`, `IrisWordmark`, `IrisLoader`, `SearchGlyph` and `AskIrisGlyph` (`frontend/src/components/brand/IrisBrand.tsx`) fill with `currentColor`: maroon on white, white only on maroon. The loader replays the concept's storyboard (one leaf, its partner, the ribbons, then the I) on a 2 s loop; Ask IRIS answering writes its three lines in turn. Both fade instead under reduced motion. Assets and their build: `docs/brand/folio-ribbon/final/`.
+**Folio Ribbon.** The mark is a serif I standing in the gutter of an open folio: four maroon pieces (two leaves, two ribbons), with the I as the white space between them. `IrisMark`, `IrisWordmark`, `IrisLoader`, `SearchGlyph` and `AskIrisGlyph` (`frontend/src/components/brand/IrisBrand.tsx`) fill with `currentColor`: maroon on white, white only on maroon. The loader replays the concept's storyboard (one leaf, its partner, the ribbons, then the I) on a 2 s loop; Ask IRIS is a speech bubble with the mark's serif I cut out of it; answering sets that I in type (top serif, stem, bottom serif). Both fade instead under reduced motion. Assets and their build: `docs/brand/folio-ribbon/final/`.
 
 ## Do's and Don'ts
 

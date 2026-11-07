@@ -114,7 +114,8 @@ export function ProtectedRoute({ allowedRoles }: ProtectedRouteProps) {
     return <Navigate to="/login" replace state={{ from: attempted }} />;
   }
 
-  if (isDjangoStaff(user)) {
+  // A named application role keeps its own gates, even on demo Django staff.
+  if (isDjangoStaff(user) && !user?.role_name) {
     return <Outlet />;
   }
 

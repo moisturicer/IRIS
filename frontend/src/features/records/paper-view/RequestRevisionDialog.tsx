@@ -4,6 +4,7 @@ import { recordsApi } from "@/api/records";
 import { Button, Modal } from "@/components/ui";
 import { LABEL, LOAD_ERROR, fieldClasses } from "@/components/ui/fieldClasses";
 import { errorDetail } from "@/lib/errorDetail";
+import { useAuthStore } from "@/store/auth.store";
 import type { RecordDetail } from "@/types/records";
 
 import { clearRevisionDraft, readRevisionDraft, writeRevisionDraft } from "./revisionDraft";
@@ -34,7 +35,8 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
   // The version the request is made against: the latest one. Null when the
   // record has none recorded, and then nothing is claimed.
   const version = record.versions?.length ? record.versions[record.versions.length - 1].number : null;
-  const [reason, setReason] = useState(() => readRevisionDraft(record.id));
+  const userId = useAuthStore(s => s.user?.id);
+  const [reason, setReason] = useState(() => readRevisionDraft(userId, record.id));
   const [error, setError] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
@@ -42,7 +44,7 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
 
   const change = (value: string) => {
     setReason(value);
-    writeRevisionDraft(record.id, value);
+    writeRevisionDraft(userId, record.id, value);
   };
 
   const submit = async (e: FormEvent) => {
@@ -52,7 +54,7 @@ export function RequestRevisionDialog({ record, onClose, onDone }: RequestRevisi
     setSending(true);
     try {
       await recordsApi.requestRevision(record.id, { reason: reason.trim() });
-      clearRevisionDraft(record.id);
+      clearRevisionDraft(userId, record.id);
       onDone("Revision requested. The owner has been notified.");
     } catch (err) {
       setError(

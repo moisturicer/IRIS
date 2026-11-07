@@ -70,6 +70,17 @@ def _log_failure(event: str, *, record=None, request=None, user=None):
 # Public API
 # ---------------------------------------------------------------------------
 
+def comments_sentence(threads: int) -> str:
+    """
+    How a finished review's verdict notice counts the comments sent with it
+    (ADR-032 §7, IR-874): one notice per finished review, however many. Empty
+    for a verdict taken with none, or outside Finish review.
+    """
+    if not threads:
+        return ""
+    return f" The review came with {threads} comment{'' if threads == 1 else 's'}."
+
+
 def notify_new_record(record, submitted_by):
     """
     Notify the correct party when a student submits a record.
@@ -125,6 +136,7 @@ def _role_for_party(party: str):
 
 def notify_routed(
     record, *, actor, from_label, target_labels, opened_parties, nominees, reason, accepted,
+    threads=0,
 ):
     """
     A record was routed to one or more offices (ADR-032 §4, IR-261).
@@ -182,7 +194,10 @@ def notify_routed(
 
         if accepted:
             offices = " and ".join(target_labels)
-            message = f'Your Adviser accepted "{title}" and sent it to {offices} for review.'
+            message = (
+                f'Your Adviser accepted "{title}" and sent it to {offices} for review.'
+                f"{comments_sentence(threads)}"
+            )
             for ownership in record.owners.select_related("user").all():
                 Notification.objects.create(
                     sender=actor, recipient=ownership.user, record=record,
@@ -193,7 +208,7 @@ def notify_routed(
 
 
 def notify_office_completed(
-    record, *, actor, office_label, outcome_label, rdco_holding, rdco_holders,
+    record, *, actor, office_label, outcome_label, rdco_holding, rdco_holders, threads=0,
 ):
     """
     A specialist office finished its review round (ADR-032 §3-§4, IR-269).
@@ -210,7 +225,10 @@ def notify_office_completed(
         title = record.title
         owners = [o.user for o in record.owners.select_related("user").all()]
 
-        message = f'{office_label} finished its review of "{title}": {outcome_label}.'
+        message = (
+            f'{office_label} finished its review of "{title}": {outcome_label}.'
+            f"{comments_sentence(threads)}"
+        )
         for owner in owners:
             Notification.objects.create(
                 sender=actor, recipient=owner, record=record,
@@ -251,7 +269,8 @@ def notify_office_completed(
         _log_failure("notify_office_completed", record=record)
 
 
-def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off, closed_revisions=()):
+def notify_decided(record, *, actor, decided_by, outcome, reason, closed_requests, cut_off,
+                   closed_revisions=(), threads=0):
     """
     A Decision ended the record's review (ADR-032 §2-§3; IR-270, IR-271).
 
@@ -291,6 +310,7 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
             message += " RDCO withdrew revision requests: " + ", ".join(
                 f"#{r['id']} from {r['label']}" for r in closed_revisions
             ) + ". No response to those requests is required."
+        message += comments_sentence(threads)
 
         notif_type = NotificationType.objects.get_or_create(name="Record Decided")[0]
         owners = list(record.owners.select_related("user").all())
@@ -321,7 +341,7 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
         _log_failure("notify_decided", record=record)
 
 
-def notify_revision_requested(revision_request, *, party_label: str):
+def notify_revision_requested(revision_request, *, party_label: str, threads: int = 0):
     """
     Tell every owner that a party has asked for a revision (ADR-032 §5
     Amendment, IR-272). The owners only: reviewers see *Waiting on author*.
@@ -331,6 +351,7 @@ def notify_revision_requested(revision_request, *, party_label: str):
         message = (
             f'{party_label} asked for a revision of "{record.title}". '
             f"Nothing can be decided until you submit a new version."
+            f"{comments_sentence(threads)}"
         )
         owners = list(record.owners.select_related("user").all())
         notif_type = NotificationType.objects.get_or_create(name="Revision Requested")[0]
@@ -399,6 +420,36 @@ def notify_new_version(record, version, *, submitted_by, reviewers, asked_by: st
             )
     except Exception:
         _log_failure("notify_new_version", record=record)
+
+
+def notify_review_finished(record, *, actor, party_label: str, version, threads: int, reviewers,
+                           comment_only: bool = True):
+    """
+    A finished review that no verdict notice announces (ADR-032 §7, IR-874):
+    one notice each to the owners and to the other open Seat holders, however
+    many threads it sent. Either *Comment only*, or an office reviewer's Clear
+    or finding that did not complete the office -- whose verdict is still not
+    announced (`notify_office_completed`), only the comments it sent. In-app
+    only, like the review discussion itself.
+    """
+    try:
+        on = f" v{version}" if version else ""
+        said = f"{threads} comment{'' if threads == 1 else 's'}" if threads else "a summary"
+        message = (
+            f'{party_label} reviewed{on} of "{record.title}": {said}, no decision.' if comment_only
+            else f'{party_label} sent {said} on{on} of "{record.title}".'
+        )
+        notif_type = NotificationType.objects.get_or_create(name="Review Finished")[0]
+        recipients = {o.user for o in record.owners.select_related("user")} | set(reviewers)
+        for recipient in recipients:
+            if recipient.pk == getattr(actor, "pk", None):
+                continue
+            Notification.objects.create(
+                sender=actor, recipient=recipient, record=record,
+                notif_type=notif_type, message=message,
+            )
+    except Exception:
+        _log_failure("notify_review_finished", record=record)
 
 
 def notify_document_requested(document_request, *, party_label: str):
@@ -530,11 +581,11 @@ def notify_document_rejected(document_request, item, *, rejected_by):
         _log_failure("notify_document_rejected", request=document_request)
 
 
-def notify_deadline(record, recipient, *, type_name, message):
+def _notify_in_app(record, recipient, *, type_name, message, label):
     """
-    One in-app deadline reminder or escalation (ADR-043 §7). No email: §7
-    keeps deadlines in-app. Returns whether it was written; the savepoint
-    lets the scheduled batch carry on inside its transaction (IR-300).
+    One in-app notice from a scheduled batch, with no email. Returns whether it
+    was written; the savepoint lets the batch carry on inside its transaction
+    (IR-300).
     """
     try:
         with transaction.atomic():
@@ -546,8 +597,20 @@ def notify_deadline(record, recipient, *, type_name, message):
             )
         return True
     except Exception:
-        _log_failure("notify_deadline", record=record)
+        _log_failure(label, record=record)
         return False
+
+
+def notify_deadline(record, recipient, *, type_name, message):
+    """One in-app deadline reminder or escalation (ADR-043 §7 keeps deadlines in-app)."""
+    return _notify_in_app(record, recipient, type_name=type_name, message=message,
+                          label="notify_deadline")
+
+
+def notify_embargo_review(record, recipient, *, type_name, message):
+    """One in-app embargo reminder (ADR-052 §9), in-app like deadlines."""
+    return _notify_in_app(record, recipient, type_name=type_name, message=message,
+                          label="notify_embargo_review")
 
 
 def notify_role_request(user, requested_role):

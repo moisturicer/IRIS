@@ -1,4 +1,11 @@
 import { errorDetail } from "@/lib/errorDetail";
+import { readFailureKind } from "@/lib/readFailure";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { Skeleton } from "@/components/ui";
+import { FOCUS_RING } from "@/components/ui/interaction";
+import { PILL_SECONDARY } from "@/components/ui/pillStyles";
+import { cn } from "@/lib/utils";
+import { InterruptedState } from "@/components/shared/InterruptedState";
 import { TONES } from "@/components/ui/statusTones";
 /**
  * FR-M3-01 — Conversational RAG chatbot UI (SDD Module 3).
@@ -31,6 +38,10 @@ import { recordsApi } from "@/api/records";
 import { AskIrisMark } from "./components/AskIrisIcons";
 import { ChatMessageList } from "./components/ChatMessageList";
 import { ChatInput } from "./components/ChatInput";
+import { CHAT_OPENING } from "./components/answerLayout";
+import { ComparisonPicker } from "./components/ComparisonPicker";
+import { ModelPill } from "./components/ModelPill";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { ChatToolbar } from "./components/ChatToolbar";
 import { ChatDrawer } from "./components/ChatDrawer";
 import { ConversationHistoryList, ConversationSidebar } from "./components/ConversationSidebar";
@@ -38,6 +49,8 @@ import { SourceContextPanel, SourcePassages } from "./components/SourceContextPa
 import { ASK_PANELS_INLINE_PX } from "./components/answerLayout";
 import { useElementWidth } from "@/hooks/useElementWidth";
 import { useConversationClient } from "./conversation/useConversationClient";
+import { useReaderPath } from "@/api/runtimeReader";
+import { RuntimeReader } from "./components/RuntimeReader";
 
 /** History or sources: the two panels that sit beside the answer, or open over it (IR-570). */
 type AskPanel = "history" | "sources";
@@ -81,6 +94,40 @@ function useLegacyConversationsNotice() {
 }
 
 export default function RAGChatPage() {
+  const rawId = useParams().conversationId;
+  // The server's switch decides the path (IR-863). Neither page mounts before
+  // it is known, so the Django page's requests are exactly what they were.
+  const path = useReaderPath();
+  if (!path) return <p role="status" className="p-6 text-sm text-stone-600">Opening Ask IRIS…</p>;
+  if (path === "runtime" && (!rawId || /^[0-9a-f-]{36}$/i.test(rawId))) return <RuntimeAskPage />;
+  return <LegacyRAGChatPage />;
+}
+
+function RuntimeAskPage() {
+  const { conversationId } = useParams();
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+  const rawRecord = params.get("record");
+  const recordId = rawRecord && /^[1-9]\d*$/.test(rawRecord) ? Number(rawRecord) : undefined;
+  if (rawRecord !== null && (!recordId || !Number.isSafeInteger(recordId))) {
+    return <p role="alert" className="p-6">This paper could not be opened.</p>;
+  }
+  return <div className="flex h-full min-h-0 flex-col">
+    <header className="flex items-center justify-between gap-4 border-b border-stone-200 px-6 py-4">
+      <h1 className="font-display text-2xl text-stone-900">Ask IRIS</h1>
+      <button type="button" className="min-h-11 text-sm text-brand underline" onClick={() => navigate("/ai")}>New conversation</button>
+    </header>
+    <RuntimeReader key={`${recordId}:${conversationId}`} conversationId={conversationId} recordId={recordId}
+      onConversation={id => { if (id !== conversationId) navigate(`/ai/conversations/${id}${recordId ? `?record=${recordId}` : ""}`, { replace: true }); }} />
+  </div>;
+}
+
+// The server picks the model; a reader has no choice to make (ADR-036).
+const ANSWER_MODEL = [
+  { value: "auto", short: "Auto", label: "Auto", description: "IRIS chooses the model for each answer", icon: "far fa-lightbulb" },
+] as const;
+
+function LegacyRAGChatPage() {
   const [searchParams] = useSearchParams();
   const recordParam = searchParams.get("record");
   const routeId = parseConversationParam(useParams().conversationId);
@@ -95,6 +142,16 @@ export default function RAGChatPage() {
   const [sourcesOpen, setSourcesOpen]       = useState(false);
   const [status, setStatus]                 = useState<AIStatus | null>(null);
   const [suggestions, setSuggestions]       = useState<string[]>([]);
+  const [deleteTarget, setDeleteTarget] = useState<ConversationSummary | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  /**
+   * A conversation (or the list) that did not load (IR-906). `interrupted` is a
+   * timeout (Retry); anything else is a failure (Try again). A missing or
+   * refused conversation is not this: it is `client.unavailable`.
+   */
+  const [loadFailure, setLoadFailure] = useState<{ interrupted: boolean; noun: string; subject: string } | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   // Too narrow to hold history and sources beside the answer, they open one at
   // a time as drawers over it, closed until asked for (IR-570). Unmeasured
   // (jsdom, the first paint) counts as wide: the layout this page always had.
@@ -124,6 +181,9 @@ export default function RAGChatPage() {
 
   // Transcripts, drafts, selected answers and answers in flight, one set per
   // conversation, each answer bound to the conversation that asked (IR-562).
+  const configuredLimit = status?.comparison_max_records;
+  const comparisonLimit = configuredLimit !== undefined && Number.isInteger(configuredLimit) && configuredLimit >= 2
+    ? configuredLimit : undefined;
   const client = useConversationClient({
     onAnswered: (_conversationId, message, onScreen) => {
       if (onScreen && message.citations?.length) setSourcesOpen(true);
@@ -135,9 +195,11 @@ export default function RAGChatPage() {
         message: errorDetail(error, "IRIS could not answer right now. Check that the AI service is available."),
       });
     },
-  });
+  }, comparisonLimit);
   const { activeId, unavailable, messages, selected } = client;
   const loading = client.isAnswering;
+  const comparisonInvalid = client.comparisonRecords.length > 0 &&
+    (comparisonLimit === undefined || client.comparisonRecords.length < 2 || client.comparisonRecords.length > comparisonLimit);
 
   // Read off the selected reply itself, so the panel cannot show one answer's
   // passages beside another, or one conversation's beside another's (IR-284,
@@ -180,6 +242,7 @@ export default function RAGChatPage() {
   useEffect(() => {
     let cancelled = false;
     const recordId = recordParam;
+    setLoadFailure(null);
 
     (async () => {
       try {
@@ -214,10 +277,7 @@ export default function RAGChatPage() {
         goTo(data, true);
       } catch (error) {
         if (!cancelled) {
-          addToast({
-            type:    "error",
-            message: errorDetail(error, "Could not load your conversations. Check that the AI service is available."),
-          });
+          setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", noun: "conversations", subject: "your conversations" });
         }
       }
     })();
@@ -227,7 +287,7 @@ export default function RAGChatPage() {
     // and `handoff` is read once on arrival — only the `record` query param, or arriving at `/ai`
     // itself, should re-run this.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordParam, atIndex]);
+  }, [recordParam, atIndex, loadAttempt]);
 
   // A draft that arrived with a conversation's own address -- a reload after
   // a handoff -- belongs to the first conversation that address opens.
@@ -235,7 +295,10 @@ export default function RAGChatPage() {
 
   // Opening an address: directly, on refresh, or by back and forward.
   useEffect(() => {
-    if (routeId === undefined || (routeId !== null && isOnScreen(routeId))) return;
+    // At `/ai` the first effect owns the failure; clearing it here would erase it.
+    if (routeId === undefined) return;
+    setLoadFailure(null);
+    if (routeId !== null && isOnScreen(routeId)) return;
     if (routeId === null) {
       showUnavailable();
       return;
@@ -247,12 +310,9 @@ export default function RAGChatPage() {
         if (draft && isOnScreen(routeId)) setDraftFor(routeId, draft);
       })
       .catch((error: unknown) => {
-        addToast({
-          type:    "error",
-          message: errorDetail(error, "Could not load this conversation. Check that the AI service is available."),
-        });
+        setLoadFailure({ interrupted: readFailureKind(error) === "interrupted", noun: "conversation", subject: "this conversation" });
       });
-  }, [routeId, isOnScreen, open, setDraftFor, showUnavailable, addToast]);
+  }, [routeId, isOnScreen, open, setDraftFor, showUnavailable, loadAttempt]);
 
   // A drawer belongs to the layout that opened it, and to the conversation it
   // was opened over: widening the page or moving to another conversation (a
@@ -316,18 +376,47 @@ export default function RAGChatPage() {
     refreshList();
   };
 
-  const handleDelete = async (id: number) => {
-    await aiApi.conversations.remove(id);
-    client.forget(id);
-    const list = await refreshList();
-    if (isOnScreen(id) || unavailable) {
-      const { data } = list.length > 0
-        ? await aiApi.conversations.get(list[0].id)
-        : await aiApi.conversations.create();
-      // The deleted address must not come back with Back.
-      goTo(data, true);
+  const requestDelete = (id: number) => {
+    if (deleting) return;
+    const target = conversations.find((c) => c.id === id);
+    if (!target) return;
+    // Only one focus trap is active: the phone history drawer closes first.
+    setDrawer(null);
+    setDeleteError(null);
+    setDeleteTarget(target);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || deleting) return;
+    const id = deleteTarget.id;
+    let removed = false;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await aiApi.conversations.remove(id);
+      removed = true;
+      client.forget(id);
+      setDeleteTarget(null);
+      setConversations((all) => all.filter((c) => c.id !== id));
+      const list = await refreshList();
+      if (isOnScreen(id) || unavailable) {
+        const { data } = list.length > 0
+          ? await aiApi.conversations.get(list[0].id)
+          : await aiApi.conversations.create();
+        // The deleted address must not come back with Back.
+        goTo(data, true);
+      }
+      addToast({ type: "info", message: "Chat removed." });
+    } catch (error) {
+      if (removed) {
+        if (isOnScreen(id)) showUnavailable();
+        addToast({ type: "error", message: "Chat removed, but history could not be refreshed. Reload to continue." });
+      } else {
+        setDeleteError(errorDetail(error, "Could not delete this conversation. Please try again."));
+      }
+    } finally {
+      setDeleting(false);
     }
-    addToast({ type: "info", message: "Chat removed." });
   };
 
   const handleRetry = async (message: ChatMessage) => {
@@ -337,6 +426,8 @@ export default function RAGChatPage() {
       addToast({ type: "error", message: errorDetail(error, "IRIS could not retry that question right now.") });
     }
   };
+
+  const centered = !unavailable && !loading && !client.streaming && messages.length === 0;
 
   return (
     // `dvh`, not `vh`: the page is the height of what a phone shows, so the
@@ -354,7 +445,7 @@ export default function RAGChatPage() {
             conversations={conversations}
             activeId={activeId}
             open={historyOpen}
-            onDelete={handleDelete}
+            onDelete={requestDelete}
           />
         )}
 
@@ -404,6 +495,7 @@ export default function RAGChatPage() {
             </div>
           )}
 
+          <div className={`flex min-h-0 flex-1 flex-col ${centered ? CHAT_OPENING : ""}`}>
           {unavailable ? (
             <div role="status" className="flex-1 flex items-center justify-center p-8 text-center">
               <div className={`max-w-md rounded-xl px-6 py-5 ${TONES.attention}`}>
@@ -419,6 +511,24 @@ export default function RAGChatPage() {
                   Start a new chat
                 </button>
               </div>
+            </div>
+          ) : loadFailure ? (
+            <div className="flex-1 flex items-center justify-center">
+              {loadFailure.interrupted ? (
+                <InterruptedState what={loadFailure.noun} onRetry={() => setLoadAttempt((n) => n + 1)} />
+              ) : (
+                <EmptyState
+                  icon="fa-plug-circle-xmark"
+                  tone="error"
+                  title={`Could not load ${loadFailure.subject}`}
+                  message="Check that the AI service is available, then try again."
+                  action={<button type="button" onClick={() => setLoadAttempt((n) => n + 1)} className={cn(PILL_SECONDARY, FOCUS_RING)}>Try again</button>}
+                />
+              )}
+            </div>
+          ) : client.isOpening && messages.length === 0 ? (
+            <div className="flex-1">
+              <Skeleton rows={3} label="Loading this conversation…" />
             </div>
           ) : (
             <ChatMessageList
@@ -440,14 +550,21 @@ export default function RAGChatPage() {
             />
           )}
           <ChatInput
+            centered={centered}
             onSend={client.send}
             draft={client.draft}
             onDraftChange={client.setDraft}
             disabled={loading || !activeId}
+            sendDisabled={comparisonInvalid}
             label={FOLLOW_UP_LABEL}
             // One line in a phone's composer; the name above stays whole.
             placeholder={panelsAsDrawers ? "Ask a follow-up…" : FOLLOW_UP_LABEL}
-          />
+          >
+            <ComparisonPicker key={activeId} selected={client.comparisonRecords} onChange={client.setComparisonRecords}
+              limit={comparisonLimit} scoped={client.record !== null} disabled={loading || !activeId} />
+            <ModelPill name="Model" value="auto" options={ANSWER_MODEL} />
+          </ChatInput>
+          </div>
         </div>
 
         {!panelsAsDrawers && (
@@ -483,7 +600,7 @@ export default function RAGChatPage() {
               New chat
             </button>
           </div>
-          <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={handleDelete} />
+          <ConversationHistoryList conversations={conversations} activeId={activeId} onDelete={requestDelete} />
         </ChatDrawer>
       )}
       {drawer === "sources" && (
@@ -500,6 +617,10 @@ export default function RAGChatPage() {
           </CitationTurnContext.Provider>
         </ChatDrawer>
       )}
+      <ConfirmDialog open={deleteTarget !== null} title="Delete conversation?"
+        message={`Delete “${deleteTarget?.title || "New conversation"}” and its messages? This cannot be undone.`}
+        confirmLabel="Delete conversation" danger focusCancel confirming={deleting} error={deleteError}
+        onCancel={() => setDeleteTarget(null)} onConfirm={() => void handleDelete()} />
     </div>
     </CitationConversationContext.Provider>
   );

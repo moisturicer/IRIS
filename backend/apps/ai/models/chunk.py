@@ -37,6 +37,7 @@ class ChunkSet(models.Model):
         "records.Record", on_delete=models.CASCADE, related_name="chunk_sets"
     )
     extraction_hash = models.CharField(max_length=64)
+    source_revision = models.UUIDField(null=True, blank=True, editable=False)
     strategy_id = models.CharField(max_length=100)
     options = models.JSONField()
     content_hash = models.CharField(max_length=64)

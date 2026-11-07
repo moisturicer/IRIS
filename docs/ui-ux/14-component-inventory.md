@@ -199,7 +199,7 @@ The Paper tab overrides the stored dock choice but never overwrites it, so the A
 | Component | Change |
 |---|---|
 | `components/ui/statusTones.ts` | `TONES`: the four status tones (quiet · active · attention · settled, [01](01-design-system.md) §0) defined once, for any screen that shows a state. `StatusBadge` takes its colours from here |
-| `src/test/palette.test.ts` | The palette guard: fails naming the file and class on any off-palette colour ([01](01-design-system.md) §0) outside `NOT_YET_CONVERTED`, and on any file in that list that no longer has one. The list only shrinks as IR-357's subtasks land; IR-366 removes it |
+| `src/test/palette.test.ts` | The palette guard: fails naming the file and class on any off-palette hue, second grey (`gray`/`slate`) or see-through white background anywhere in frontend source. **IR-366 removed the staged exception lists; there is no palette allowlist.** |
 
 ## IR-408 additions (2026-10-06)
 
@@ -223,6 +223,13 @@ The Publish dialog replaces Submit Disclosure ([`frontend_redesign_spec.md`](../
 
 | Component | What it is |
 |---|---|
-| `components/brand/IrisBrand.tsx` | The Folio Ribbon identity: `IrisMark`, `IrisWordmark`, `IrisLoader` (storyboard loop, `role="status"` when labelled), `SearchGlyph` and `AskIrisGlyph` (`answering` writes its lines). All `currentColor` |
+| `components/brand/IrisBrand.tsx` | The Folio Ribbon identity: `IrisMark`, `IrisWordmark`, `IrisLoader` (storyboard loop, `role="status"` when labelled), `SearchGlyph` and `AskIrisGlyph` (a speech bubble with the I cut out; `answering` sets the I in type). All `currentColor` |
 | `components/brand/brandPaths.ts` | Generated path data, written by `docs/brand/folio-ribbon/final/build.py`; never edited by hand |
 | `Spinner` | `md`/`lg` render `IrisLoader` (28 / 40 px) and take a `label`; `sm` stays the button ring |
+
+## IR-366 additions (2026-11-02)
+
+| Component | Change |
+|---|---|
+| `src/test/palette.test.ts` | **Palette rollout closed.** The staged `NOT_YET_CONVERTED`, `GREY_NOT_YET_CONVERTED` and empty translucent-white exception list are gone. Every frontend source file is checked with no allowlist. |
+| `DpaConsentModal`, `Breadcrumbs`, `NotificationBell`, `DownloadRequestModal`, `DataTable`, `PaperCiteModal` | Final shared `gray`/`slate` stragglers moved to `stone`; hand-written maroon values in the touched modals moved to `brand` tokens. |

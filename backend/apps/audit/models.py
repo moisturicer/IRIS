@@ -61,6 +61,22 @@ class AuditEvent(models.Model):
     DOCUMENT_REQUEST_ACCEPTED  = "DOCUMENT_REQUEST_ACCEPTED"
     DOCUMENT_REQUEST_REJECTED  = "DOCUMENT_REQUEST_REJECTED"
     DOCUMENT_REQUEST_WITHDRAWN = "DOCUMENT_REQUEST_WITHDRAWN"
+    # Review threads (ADR-032 §7, 2026-11-04; IR-874). No thread text is copied.
+    REVIEW_FINISHED                = "REVIEW_FINISHED"
+    REVIEW_THREAD_RESOLVED         = "REVIEW_THREAD_RESOLVED"
+    REVIEW_THREAD_REOPENED         = "REVIEW_THREAD_REOPENED"
+    REVIEW_THREAD_SEVERITY_CHANGED = "REVIEW_THREAD_SEVERITY_CHANGED"
+    REVIEW_THREAD_ANSWERED         = "REVIEW_THREAD_ANSWERED"
+    REVIEW_THREADS_CLOSED          = "REVIEW_THREADS_CLOSED"
+
+    # A paper's embargo (ADR-052 §8, IR-812). Nothing writes EMBARGO_ANSWERED
+    # since IR-882 removed Publish's question; it names the rows written before.
+    EMBARGO_ANSWERED = "EMBARGO_ANSWERED"
+    EMBARGO_SET      = "EMBARGO_SET"
+    EMBARGO_EXTENDED = "EMBARGO_EXTENDED"
+    EMBARGO_RELEASED = "EMBARGO_RELEASED"
+    # KTTO's release of an IP-marked paper (ADR-052 §11, IR-813).
+    IP_RELEASED      = "IP_RELEASED"
 
     # Account recovery (ADR-045 §8, IR-642). Metadata is an allowlist --
     # purpose, correlation_id, outcome, reason, attempt -- written only by
@@ -113,11 +129,22 @@ class AuditEvent(models.Model):
         (REVIEWER_ADDED,             "Reviewer Added"),
         (SEAT_OPENED,                "Seat Opened"),
         (RECORD_WITHDRAWN,           "Record Withdrawn"),
+        (EMBARGO_ANSWERED,           "Embargo Question Answered"),
+        (EMBARGO_SET,                "Embargo Set"),
+        (EMBARGO_EXTENDED,           "Embargo Date Moved"),
+        (EMBARGO_RELEASED,           "Embargo Released"),
+        (IP_RELEASED,                "IP Mark Released"),
         (DOCUMENT_REQUESTED,         "Documents Requested"),
         (DOCUMENT_REQUEST_FULFILLED, "Document Request Fulfilled"),
         (DOCUMENT_REQUEST_ACCEPTED,  "Requested Document Accepted"),
         (DOCUMENT_REQUEST_REJECTED,  "Requested Document Rejected"),
         (DOCUMENT_REQUEST_WITHDRAWN, "Document Request Withdrawn"),
+        (REVIEW_FINISHED,                "Review Finished"),
+        (REVIEW_THREAD_RESOLVED,         "Review Thread Resolved"),
+        (REVIEW_THREAD_REOPENED,         "Review Thread Reopened"),
+        (REVIEW_THREAD_SEVERITY_CHANGED, "Review Thread Severity Changed"),
+        (REVIEW_THREAD_ANSWERED,         "Review Thread Answered"),
+        (REVIEW_THREADS_CLOSED,          "Review Threads Closed by Decision"),
         (RECOVERY_REQUESTED,           "Recovery Requested"),
         (RECOVERY_SUPPRESSED,          "Recovery Suppressed"),
         (RECOVERY_TOKEN_REJECTED,      "Recovery Link Rejected"),

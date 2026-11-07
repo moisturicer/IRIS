@@ -29,7 +29,7 @@ JWT through SimpleJWT, with rotation and blacklist after rotation.
 | Refresh token | 7 days by default, the absolute limit on a session. Used once, then blacklisted. Only the refresh token is stored in the browser, in `sessionStorage` (`frontend/src/lib/authStorage.ts`) |
 | Refresh in the client | `refreshOnce` shares one refresh between concurrent 401s, and the new pair goes through `setTokens` (`frontend/src/api/client.ts`) |
 | Inactivity | A session idle for 30 minutes is ended on the server for good, and polling doesn't count as activity ([IR-166](https://citiris.atlassian.net/browse/IR-166), `apps/accounts/sessions.py`) |
-| Failed sign-ins | `django-axes` locks a username and client address pair after 3 failures for 10 minutes by default, answering 429 with `unlock_at`. The address comes from `TRUSTED_PROXY_COUNT`, so it is the real client behind nginx ([IR-656](https://citiris.atlassian.net/browse/IR-656)) |
+| Failed sign-ins | **Switched off by default for now** ([IR-865](https://citiris.atlassian.net/browse/IR-865)); `AXES_ENABLED=True` turns it on. When on, `django-axes` locks a username and client address pair after 3 failures for 10 minutes by default, answering 429 with `unlock_at`. The address comes from `TRUSTED_PROXY_COUNT`, so it is the real client behind nginx ([IR-656](https://citiris.atlassian.net/browse/IR-656)) |
 | Manual lock | `User.is_locked`, set by an administrator. It never lifts on its own and ends the person's sessions at once ([IR-644](https://citiris.atlassian.net/browse/IR-644)) |
 | Password change or reset | Ends every session and revokes unused reset links. API passwords meet `AUTH_PASSWORD_VALIDATORS` ([IR-644](https://citiris.atlassian.net/browse/IR-644)) |
 | Session revoke | An administrator's revoke ends the session, so its access token stops working on the next request ([IR-657](https://citiris.atlassian.net/browse/IR-657)) |
@@ -53,7 +53,16 @@ Governed by [ADR-009](../adr/009-authorization-model.md).
 
 ### Who holds administrator powers
 
-`ADMIN_ROLES` is `{RDCO}`, so **RDCO holds them**: accounts, locks, sessions, system settings and the Audit Log. [ADR-051](../adr/051-system-admin-account-deletion-and-consent.md) accepts a separate System Admin role, and it isn't built yet ([IR-781](https://citiris.atlassian.net/browse/IR-781)).
+[ADR-051](../adr/051-system-admin-account-deletion-and-consent.md) splits them between two roles ([IR-781](https://citiris.atlassian.net/browse/IR-781), `core/permissions.py`):
+
+| Power | Who |
+|---|---|
+| The Users page, and giving Student or Adviser to someone outside the offices | RDCO or the System Admin (`IsAccountAdmin`) |
+| Locks, sessions and role requests | RDCO (`IsAdmin`) |
+| Office roles, the coordinator flag, system settings and the Audit Log | The System Admin (`IsSystemAdmin`) |
+| Giving or removing the System Admin role | A Django superuser, in Django's admin site only |
+
+The System Admin holds no workflow access. No API act changes a System Admin's account: RDCO can't edit, lock or unlock one, or revoke its sessions, so a compromised System Admin is stopped in Django's admin site. The role can't be held together with `is_staff` or `is_superuser`.
 
 Django's admin site is separate. It is guarded by Django's own `is_staff` flag, and §7 describes its exposure.
 
@@ -93,15 +102,15 @@ If download throughput ever matters, the answer is `X-Accel-Redirect`, where ngi
 
 ## 7 · Boundaries
 
-**Production** (`docker-compose.prod.yml`) publishes only `frontend`. `db`, `redis`, `backend`, `docling`, `ai-gateway` and the Celery services stay on the Compose network. Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)).
+**Production** (`docker-compose.prod.yml`) publishes only `frontend`. `db`, `redis`, `backend`, `ai-gateway` and the Celery services stay on the Compose network. Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)).
 
-**Development** (`docker-compose.yml`) publishes Postgres and Redis on `127.0.0.1` only, and Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)). `backend`, `frontend` and `docling` are still published on every interface (§11).
+**Development** (`docker-compose.yml`) publishes Postgres and Redis on `127.0.0.1` only, and Redis requires a password ([IR-669](https://citiris.atlassian.net/browse/IR-669)). `backend` and `frontend` are still published on every interface (§11). The `docling` service was removed by IR-843.
 
 **TLS.** nginx listens on plain 8080 and takes the scheme from the proxy in front of it, so TLS must end upstream. This repository doesn't configure that proxy (§11).
 
-**Django admin.** nginx closes `/django-admin/` except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)), but **Django still serves its admin at `/admin/`, which nginx leaves open**, because that path also carries IRIS's own pages. The allowlist protects the admin only once [IR-782](https://citiris.atlassian.net/browse/IR-782) moves it.
+**Django admin.** Django serves its admin only at `/django-admin/` ([IR-782](https://citiris.atlassian.net/browse/IR-782)), and nginx closes that path except to `DJANGO_ADMIN_ALLOWED_NETWORKS` ([IR-668](https://citiris.atlassian.net/browse/IR-668)). `/admin/...` and `/rdco/...` are IRIS's own pages: nginx serves them the app and proxies nothing there to Django.
 
-**`ai-gateway`** is adopted by [ADR-014](../adr/014-ai-gateway-as-a-service.md) under preconditions. It sets no CORS, publishes no port and refuses any request without the shared service secret (`ai/main.py`). **It still receives `DATABASE_URL`**, against ADR-014's "no direct DB access" (§11).
+**`ai-gateway`** is adopted by [ADR-014](../adr/014-ai-gateway-as-a-service.md) under preconditions. It sets no CORS, publishes no port and refuses any request without the shared service secret (`ai/main.py`). It no longer receives Django's `DATABASE_URL` ([IR-826](https://citiris.atlassian.net/browse/IR-826)). **It connects to PostgreSQL as `iris_ai_runtime`** for AI-owned runs, which ADR-014's IR-826 amendment allows (§11). A running service refuses runs while it holds the maintenance login.
 
 **Tenancy** is one instance per tenant ([ADR-005](../adr/005-instance-per-tenant.md)). Each institution gets its own database and media volume, so a missing tenant filter can't leak across institutions.
 
@@ -113,12 +122,11 @@ In production, `private` is an internal Compose network with no route to the int
 | Service | Reaches outside | Why |
 |---|---|---|
 | `db`, `redis`, `migrate` | Nothing | Internal only |
-| `docling` | Nothing | It parses uploaded PDFs, so a hostile file stays contained. Its models are in the image |
 | `frontend` | Nothing | It serves files and forwards to `backend` |
-| `celery-extraction` | Nothing | It only calls Docling |
 | `celery-beat` | Nothing | It only queues tasks |
 | `backend`, `celery-default` | AI vendors, mail server | Answers and email |
 | `celery-embedding`, `celery-shadow` | AI vendors | Embedding, overviews and evidence decisions |
+| `celery-extraction` | LlamaParse and its result storage | It sends each permitted PDF to be read ([ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md), [IR-842](https://citiris.atlassian.net/browse/IR-842)). It also checks uploads with `pypdf`, so a hostile PDF that exploits that check now has a route out |
 | `ai-gateway` | AI vendors | Chat |
 | `caddy` | The certificate authority | Getting and renewing certificates |
 
@@ -130,11 +138,22 @@ In production, `private` is an internal Compose network with no route to the int
 
 [ADR-015](../adr/015-voyage-embedding-and-reranking.md) sends chunk text to Voyage, and it dropped the earlier written sign-off precondition on 2026-09-04. Its remaining conditions:
 
-1. **A disclosure check before sending.** `apps/ai/policy/disclosure.py` refuses on IP status, embargo state and missing consent. An Unknown embargo is refused, and nothing yet sends an embargo answer, so **new submissions stay refused until [IR-250](https://citiris.atlassian.net/browse/IR-250) finishes**.
+1. **A disclosure check before sending.** `apps/ai/policy/disclosure.py` refuses on IP status, embargo state and missing consent. An Unknown embargo is refused until someone answers: Publish asks first, and after submission owners or the Adviser set an embargo and the Adviser or RDCO release it ([IR-812](https://citiris.atlassian.net/browse/IR-812)).
 2. **Voyage's training opt-out**, an account setting. The repository can't show whether it was exercised (§11).
 3. **`VOYAGE_API_KEY` as a production secret.**
 
+[ADR-056](../adr/056-manuscript-extraction-moves-to-llamaparse.md) sends **whole Manuscript PDFs** to LlamaParse the only Extractor since [IR-843](https://citiris.atlassian.net/browse/IR-843) removed Docling. Its conditions:
+
+1. **The same disclosure check**, read when a read is queued and again just before sending ([IR-850](https://citiris.atlassian.net/browse/IR-850)).
+2. **ADR-041 admission**, which refuses every read unless admission enforces.
+3. **No vendor copy kept.** Every job sets `disable_cache`, and the uploaded file is deleted afterwards. Retention in writing and the region are still ADR-056's open conditions, and no-training evidence is [IR-827](https://citiris.atlassian.net/browse/IR-827)'s (§11).
+4. **`LLAMAPARSE_API_KEY` and a dated `LLAMAPARSE_VERSION` as production settings.** Django won't start without them when LlamaParse is selected.
+
+The threat model's Django ↔ LlamaParse boundary ([ADR-053](../adr/053-threat-model.md), [IR-864](https://citiris.atlassian.net/browse/IR-864)) lists what each condition is for.
+
 IR-317's development bypass is deleted ([IR-815](https://citiris.atlassian.net/browse/IR-815)), and the indexing path no longer accepts a substitute for the check. Test papers get an answer instead: `load_corpus --clear-for-ai` and `mark_corpus_cleared` refuse with `DEBUG` off, and `--force` doesn't change that. Neither answers for a paper declared `institutional`, but neither can recognise a real paper whose origin was never declared, so they depend on `DEBUG` and on who runs them. `seed_demo` answers only for its own synthetic papers, whose text it wrote.
+
+An earlier chat answer citing a paper the check now refuses stays out of history, recall and the answer backfill ([IR-812](https://citiris.atlassian.net/browse/IR-812)), because it holds that paper's text. It goes by what a Turn cites, so an answer repeating a paper without citing it isn't caught.
 
 `apps/ai/policy/outbound.py` rechecks withheld or revoked sources before each provider attempt ([IR-720](https://citiris.atlassian.net/browse/IR-720), partially implemented and awaiting review). Retrieval is filtered by `visible_to(user)` before anything is scored.
 
@@ -168,18 +187,20 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 
 | # | Risk | Severity | Why | Closed by |
 |---|---|---|---|---|
-| 1 | Django's admin is reachable from the internet at `/admin/`, guarded only by `is_staff`, with no MFA | **High** | One stolen staff password opens a separate path to the database | [IR-782](https://citiris.atlassian.net/browse/IR-782), then [IR-668](https://citiris.atlassian.net/browse/IR-668)'s allowlist applies (spec [IR-655](https://citiris.atlassian.net/browse/IR-655)) |
+| 1 | Django's admin has no MFA. Since IR-782 it is served only at `/django-admin/`, and nginx's network allowlist is the one control in front of `is_staff` | **High** | One stolen staff password, from an allowlisted network, opens a separate path to the database | MFA, once CIT-U IT provides an identity provider ([IR-652](https://citiris.atlassian.net/browse/IR-652)); the allowlist is [IR-668](https://citiris.atlassian.net/browse/IR-668) |
 | 2 | Uploads aren't scanned for malware | **High** | A hostile file reaches the parser and the people who download it | [IR-666](https://citiris.atlassian.net/browse/IR-666) (spec [IR-654](https://citiris.atlassian.net/browse/IR-654)) |
 | 3 | No backups and no rehearsed restore | **High** | A lost disk loses records that can't be recreated | [IR-167](https://citiris.atlassian.net/browse/IR-167) (parent [IR-151](https://citiris.atlassian.net/browse/IR-151)) |
 | 4 | TLS is configured but hasn't run on a deployed domain, and HSTS isn't confirmed for one | **High** | Passwords, tokens and unpublished work could be read in transit until it has | [IR-847](https://citiris.atlassian.net/browse/IR-847), [IR-806](https://citiris.atlassian.net/browse/IR-806) |
 | 5 | Security-relevant sign-in events leave no audit row | **Medium** | Password guessing leaves nothing to investigate | [IR-659](https://citiris.atlassian.net/browse/IR-659) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
 | 6 | Registration accepts any email domain | **Medium** | Anyone can get a signed-in account | [IR-660](https://citiris.atlassian.net/browse/IR-660) (spec [IR-652](https://citiris.atlassian.net/browse/IR-652)) |
-| 7 | One office holds workflow and system administration powers together | **Medium** | One compromised account reaches both sets of powers | [IR-781](https://citiris.atlassian.net/browse/IR-781) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
 | 8 | Consent has no version and can't be withdrawn, and the notice lacks DPO review | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-789](https://citiris.atlassian.net/browse/IR-789), [IR-791](https://citiris.atlassian.net/browse/IR-791), [IR-123](https://citiris.atlassian.net/browse/IR-123) |
 | 9 | No account deletion, personal data copy or retention job | **Medium** | RA 10173 duties stay unmet once real people's data is held | [IR-785](https://citiris.atlassian.net/browse/IR-785), [IR-786](https://citiris.atlassian.net/browse/IR-786), [IR-794](https://citiris.atlassian.net/browse/IR-794) (spec [IR-779](https://citiris.atlassian.net/browse/IR-779)) |
-| 10 | `ai-gateway` still receives `DATABASE_URL` | **Medium** | A compromised gateway could read records past Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
+| 10 | `ai-gateway` reads Records as `iris_ai_runtime`, as ADR-014's IR-826 amendment allows | **Medium** | A compromised gateway could read whatever the row policy lets a reader read under that reader's grant. `test_research_read_policy_db.py` holds the policy to Django's visibility rule | [IR-826](https://citiris.atlassian.net/browse/IR-826) |
 | 11 | Voyage's training opt-out has no recorded evidence | **Medium** | Nothing shows the vendor isn't training on unpublished text | [IR-827](https://citiris.atlassian.net/browse/IR-827) |
 | 12 | The ASVS checklist is a draft awaiting review | **Medium** | Its statuses come from reading code, and nobody has confirmed them | [IR-617](https://citiris.atlassian.net/browse/IR-617) (spec [IR-611](https://citiris.atlassian.net/browse/IR-611)) |
+| 13 | LlamaParse's retention and region aren't confirmed in writing, and there's no recorded no-training evidence for it | **Medium** | Whole unpublished Manuscripts would go to it at the cutover | ADR-056 open conditions 1–2 ([IR-848](https://citiris.atlassian.net/browse/IR-848)), [IR-827](https://citiris.atlassian.net/browse/IR-827) |
+| 14 | `celery-extraction` gets a route out at the LlamaParse cutover | **Medium** | A PDF that exploits the worker's own checks could then send data out, and `egress` can't filter by host (§7) | Accepted at the cutover ([IR-842](https://citiris.atlassian.net/browse/IR-842)). An outbound proxy would narrow it |
+| 15 | The sign-in lockout is switched off by default for now | **High** | Wrong passwords never lock an account. Only the per-address throttle (300 an hour) slows guessing, and SSO and MFA are deferred | Set `AXES_ENABLED=True` before launch ([IR-865](https://citiris.atlassian.net/browse/IR-865)) |
 
 [`SECURITY_CHECKLIST.md`](../testing/SECURITY_CHECKLIST.md) lists further Level 1 gaps: [IR-819](https://citiris.atlassian.net/browse/IR-819), [IR-820](https://citiris.atlassian.net/browse/IR-820), [IR-821](https://citiris.atlassian.net/browse/IR-821), [IR-822](https://citiris.atlassian.net/browse/IR-822), [IR-823](https://citiris.atlassian.net/browse/IR-823), [IR-824](https://citiris.atlassian.net/browse/IR-824), [IR-825](https://citiris.atlassian.net/browse/IR-825).
 
@@ -203,7 +224,8 @@ Severity is this document's estimate. [IR-617](https://citiris.atlassian.net/bro
 | Lockout counted the proxy's address, not the client's | [IR-656](https://citiris.atlassian.net/browse/IR-656) |
 | A revoked session's access token kept working | [IR-657](https://citiris.atlassian.net/browse/IR-657) |
 | CI didn't run `ai/tests`, including the gateway's service authentication test | [IR-844](https://citiris.atlassian.net/browse/IR-844) |
-| Development `backend`, `frontend` and `docling` listened on every interface | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
+| Development `backend` and `frontend` listened on every interface (`docling` removed by IR-843) | [IR-828](https://citiris.atlassian.net/browse/IR-828) |
+| One office held workflow and system administration powers together | [IR-781](https://citiris.atlassian.net/browse/IR-781) |
 | Production HTTPS redirect loop behind the proxy | [IR-662](https://citiris.atlassian.net/browse/IR-662) |
 | No browser security headers | [IR-663](https://citiris.atlassian.net/browse/IR-663) |
 | Uploads accepted without checking the content was a PDF | [IR-665](https://citiris.atlassian.net/browse/IR-665) |

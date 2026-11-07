@@ -129,6 +129,9 @@ jobs:
           FRONTEND_URL: https://iris.example.edu
           EMAIL_HOST_USER: ci@example.edu
           EMAIL_HOST_PASSWORD: ci-only-not-a-real-password
+          # Production refuses to start without LlamaParse (IR-843). Throwaway values.
+          LLAMAPARSE_API_KEY: ci-only-not-a-real-key
+          LLAMAPARSE_VERSION: '2026-09-28'
           SECRET_KEY: ci-only-not-a-real-secret
           # ADR-045 §8 (IR-642): Django refuses to start without these. Throwaway values.
           RECOVERY_COUNTER_HMAC_KEY: ci-only-not-a-real-counter-key
@@ -208,6 +211,7 @@ jobs:
         run: >-
           python -m pytest -p testing.ci_sharding
           --ci-shard=${{ matrix.shard }} --ci-shards=4
+          --ci-timings=testing/module_durations.json
           -ra --durations=25 --junitxml=pytest-results.xml
 
       - name: Report authorization matrix duration
@@ -297,7 +301,8 @@ jobs:
           # 20, matching frontend/Dockerfile's build image (node:20-alpine).
           # Not a preference: jsdom 29, which the Vitest suite runs under, needs
           # Node >=20.19, and on 18 `npm ci` already warned EBADENGINE.
-          node-version: '20'
+          # pdfjs-dist 6 and jsdom require a newer runtime than Node 20.
+          node-version: '24'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -312,14 +317,76 @@ jobs:
         # existing frontend CI job and a failure blocks the PR" -- was never
         # met: this job ran lint and build only, so no Vitest file (the
         # accessible-name tests, the axe serious/critical gate) ever ran in CI
-        # and the job was green regardless. `npm test` is `vitest run`:
-        # non-interactive, exits non-zero on any failure, and prints how many
-        # tests ran, so the count is in the log rather than asserted.
-        run: npm test
+        # and the job was green regardless. `vitest run` is non-interactive,
+        # exits non-zero on any failure, and prints how many tests ran, so the
+        # count is in the log rather than asserted.
+        #
+        # IR-912: the same single run also collects v8 coverage, so the suite is
+        # not run twice. Report only: there is deliberately no threshold, so a
+        # percentage cannot fail this step (whether one applies is a team
+        # decision). `npm test` stays the plain local command.
+        run: npx vitest run --coverage
+
+      - name: Coverage summary
+        # Runs even when a test failed, as long as a report was written.
+        if: always()
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            {
+              echo "### Frontend coverage"
+              echo
+              echo '```'
+              node -e "const t=require('./coverage/coverage-summary.json').total;for(const k of ['lines','statements','functions','branches'])console.log(k.padEnd(11)+t[k].pct+'% ('+t[k].covered+'/'+t[k].total+')')"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: frontend/coverage
+          if-no-files-found: ignore
 
       - name: Build
         # Runs `tsc && vite build`, so a type error fails the build. Intended.
         run: npm run build
+
+      # IR-918. The repository secret scan and `npm audit` never read what the
+      # browser is handed; Vite inlines every VITE_ variable and imported file
+      # into dist/. This job already runs on every pull request, so the scan
+      # does too, whether or not frontend/ changed.
+      - name: Scan the built bundle for secrets
+        # Secret patterns, the values of secret-named environment variables, and
+        # any VITE_ variable named like a secret. No third-party scanner: it is
+        # frontend/scripts/bundle-scan.mjs. Exit 1 on a finding, 2 on no build.
+        run: npm run scan:bundle
+
+      - name: Bundle scan and address-privacy self-test
+        # The scan's own tests (planted secrets must fail) and the check that no
+        # query-string key outside scripts/query-keys.json is built anywhere in src/.
+        run: npm run test:security
+
+      - name: Bundle scan fails on a planted secret
+        # The self-test against the REAL build: copy dist/, plant a fake key in
+        # one asset, and require the scan to refuse it. A scan that cannot fail
+        # is not a gate. The key is assembled here so the repository's own secret
+        # scan does not report this file.
+        run: |
+          planted="$RUNNER_TEMP/dist-planted"
+          cp -r dist "$planted"
+          asset=$(ls "$planted"/assets/*.js | head -n 1)
+          printf '\nvar plantedKey="%s%s";\n' AKIA QWERTYUIOP123456 >> "$asset"
+          # Exactly 1 means "found a secret". 0 passed it; 2 means the scan could
+          # not run (no build, bad copy), which must not count as a refusal.
+          code=0
+          node scripts/bundle-scan.mjs "$planted" || code=$?
+          if [ "$code" -ne 1 ]; then
+            echo "::error::expected the scan to refuse the planted secret (exit 1), got exit $code"
+            exit 1
+          fi
+          echo "the bundle scan refused the planted secret, as it must"
 
   compose:
     name: Docker Compose
@@ -429,7 +496,9 @@ jobs:
       # SPA route, an asset, a 404 and the legacy activation path. A stand-in
       # index.html replaces the build; `backend` resolves to the runner so the
       # proxy locations load, and nothing here is proxied. `nginx -t` first, so
-      # a config error fails with nginx's own message.
+      # a config error fails with nginx's own message. No `ai-gateway` host on
+      # purpose (IR-892): nginx must start without the gateway, as the Core
+      # journeys stack runs it.
       - name: nginx sends the browser security headers
         run: |
           mkdir -p "$RUNNER_TEMP/html/assets"
@@ -440,6 +509,7 @@ jobs:
           mounts="-v $PWD/frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
                   -v $PWD/frontend/security-headers.conf:/etc/nginx/iris/security-headers.conf:ro
                   -v $PWD/frontend/docker-entrypoint.d/40-iris-django-admin.sh:/docker-entrypoint.d/40-iris-django-admin.sh:ro
+                  -v $PWD/frontend/docker-entrypoint.d/41-iris-runtime-reader.sh:/docker-entrypoint.d/41-iris-runtime-reader.sh:ro
                   -v $RUNNER_TEMP/html:/usr/share/nginx/html:ro"
           docker run --rm --add-host backend:127.0.0.1 $mounts "$image" nginx -t
           docker run -d --name iris-nginx --add-host backend:127.0.0.1 -p 8080:8080 $mounts "$image"
@@ -468,8 +538,8 @@ jobs:
           esac
           exit $status
 
-      # IR-668: the default is deny, the allowlist reads the real client, and
-      # IRIS's own /admin/... pages are not refused.
+      # IR-668: the default is deny and the allowlist reads the real client.
+      # IR-782: IRIS's own /admin/... and /rdco/... pages load the app, not Django.
       - name: nginx closes /django-admin/ unless allowlisted
         run: sh scripts/check_django_admin_allowlist.sh
 

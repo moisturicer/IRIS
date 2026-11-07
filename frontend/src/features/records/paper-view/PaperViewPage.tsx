@@ -1,6 +1,8 @@
 import { INSTITUTION } from "@/config/institution";
 import { lazy, Suspense, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { StatusScreen } from "@/components/shared/StatusScreen";
+import { InterruptedState } from "@/components/shared/InterruptedState";
+import { readFailureKind } from "@/lib/readFailure";
 import { NotFoundScreen } from "@/features/errors/NotFoundScreen";
 import { useParams, useNavigate, useSearchParams, useLocation, Link } from "react-router-dom";
 import { recordsApi } from "@/api/records";
@@ -26,20 +28,22 @@ import {
 import { conversationPath } from "@/lib/askHandoff";
 import type { RecordDetail, IpType } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
-import type { Region, SemanticSearchResult } from "@/types/ai";
+import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
+import { RelatedWorks } from "./RelatedWorks";
 import { ContinueProposal } from "../ContinueProposal";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
 import {
-  asSection,
   capabilitiesFor,
+  hasPaper as recordHasPaper,
   isOwner,
   isParticipant,
   isReviewing,
+  landingSection,
   seatToOpen,
   sectionsFor,
   type PaperSection,
@@ -57,6 +61,7 @@ import {
 import { AskIrisFab } from "./AskIrisFab";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
+import { EmbargoCard } from "./EmbargoCard";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
@@ -73,6 +78,7 @@ import { useCitationReference, type CitationResolution } from "./useCitationRefe
 import { WAITING_TARGET } from "../waitingOnYou";
 import { SectionHeading } from "./headings";
 import { PaperDownloadControl } from "./PaperDownloadControl";
+import { OwnerNames, PersonLink } from "./PersonLink";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 
 // Lazy: pdf.js is a large dependency (its worker alone is over a megabyte),
@@ -167,97 +173,6 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Similar papers — record-vector similarity (ADR-029 §5), through the same
-// `visible_to` predicate as Ask IRIS. The *predicate* is shared; the retrieval
-// is not — Ask IRIS ranks passages, this ranks whole records on their
-// title-and-abstract vector, so it answers "broadly about the same thing?"
-// and will miss two papers sharing a method described mid-document.
-// ---------------------------------------------------------------------------
-
-function SimilarPapers({ recordId }: { recordId: number }) {
-  const [items, setItems] = useState<SemanticSearchResult[] | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    recordsApi
-      .similar(recordId)
-      .then(({ data }) => {
-        if (alive) setItems(data.results ?? []);
-      })
-      .catch(() => {
-        if (alive) setItems([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [recordId]);
-
-  if (items === null) {
-    return (
-      <section>
-        <SectionHeading>Related works</SectionHeading>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-28 rounded-2xl ring-1 ring-stone-200 bg-white animate-pulse motion-reduce:animate-none"
-            />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  // Empty is the common case today and says nothing by itself: a record with
-  // no vector has no neighbours, and the disclosure gate (IR-250) means no
-  // record has one yet. Rendering nothing at all left a reader to conclude
-  // this paper is unrelated to everything in the repository, which is a
-  // stronger claim than IRIS can make.
-  if (items.length === 0) {
-    return (
-      <section>
-        <SectionHeading>Related works</SectionHeading>
-        <p className="text-sm text-stone-500">
-          No related works found. Similarity is computed from indexed records, and indexing
-          has not run for this repository yet.
-        </p>
-      </section>
-    );
-  }
-
-  return (
-    <section>
-      <div className="flex items-baseline justify-between gap-3">
-        <SectionHeading>Related works</SectionHeading>
-        <Link to="/" className="text-sm font-semibold text-brand hover:underline">
-          Explore all papers →
-        </Link>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {items.map((item) => (
-          <Link
-            key={item.id}
-            to={`/records/${item.id}`}
-            className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
-          >
-            <p className="text-2xs font-semibold tracking-wider text-stone-500 mb-2">
-              Record #{item.id}
-            </p>
-            <p className="font-display text-lg font-semibold text-stone-900 leading-snug line-clamp-3 group-hover:text-brand transition-colors duration-200">
-              {item.title}
-            </p>
-            <p className="text-2xs text-stone-500 mt-2">
-              {item.year ?? "—"}
-              {item.classification ? ` · ${item.classification}` : ""}
-            </p>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -290,8 +205,8 @@ function LoadingSkeleton() {
 }
 
 /** An outlined fact about the record: its type, classification, programme flags. */
-const META_CHIP =
-  "px-2.5 py-1 rounded-full ring-1 ring-stone-300 text-xs font-semibold text-stone-700";
+const META_PILL = "inline-flex min-h-5 items-center rounded-full px-2.5 text-2xs font-semibold leading-4";
+const META_CHIP = cn(META_PILL, "ring-1 ring-inset ring-stone-300 text-stone-700");
 
 /** Initials for the byline's mark. */
 function initials(name: string): string {
@@ -331,8 +246,11 @@ export default function PaperViewPage() {
   const chat = usePaperChat();
   const [record, setRecord] = useState<RecordDetail | null>(null);
   const [loading, setLoading] = useState(true);
-  /** The last load failed for a reason other than "no such record"; Try again bumps `attempt`. */
-  const [loadFailed, setLoadFailed] = useState(false);
+  /**
+   * The last load failed for a reason other than "no such record": `failed`
+   * for an error, `interrupted` for no answer in time. Retry bumps `attempt`.
+   */
+  const [loadFailed, setLoadFailed] = useState<"failed" | "interrupted" | null>(null);
   const [attempt, setAttempt] = useState(0);
   const [citeOpen, setCiteOpen] = useState(false);
   const [shareState, setShareState] = useState<"idle" | "copied" | "failed">("idle");
@@ -429,10 +347,19 @@ export default function PaperViewPage() {
   // Before the early returns below, so the hooks that follow can use them.
   const viewer: Viewer | null = user ? { id: user.id, role_name: user.role_name } : null;
   const sections = record ? sectionsFor(record, viewer) : [];
-  // The section asked for, else the reader for a citation's page, else
-  // Overview. One the viewer may not open is Overview too.
-  const asked = asSection(searchParams.get("section")) ?? (openAtPage != null ? "paper" : "overview");
-  const section: PaperSection = sections.includes(asked) ? asked : "overview";
+  // The section asked for, else the reader for a citation's page -- Paper, or
+  // a participant's Review, which holds their reader (IR-879) -- else
+  // Overview. One the viewer may not open is Overview too, and a
+  // participant's old Paper or Files link lands in Review.
+  const landing = landingSection(searchParams.get("section"), sections);
+  const readerSection: PaperSection = sections.includes("paper")
+    ? "paper"
+    : sections.includes("review")
+      ? "review"
+      : "overview";
+  const section: PaperSection = landing?.section ?? (openAtPage != null ? readerSection : "overview");
+  // Review's Documents drawer (ADR-032 §10, IR-879): `?documents=open`, or an old `?section=files`.
+  const documentsOpen = section === "review" && (landing?.documents === true || searchParams.get("documents") === "open");
   // Still on the record being left while the next one loads.
   const arriving = loading || !record || record.id !== Number(id);
   const onPaperTab = record != null && section === "paper";
@@ -553,18 +480,19 @@ export default function PaperViewPage() {
       .detail(Number(id))
       .then(({ data }) => {
         setRecord(data);
-        setLoadFailed(false);
+        setLoadFailed(null);
         // access_count is a global counter, so it cannot answer "what have I
         // read?". My Library's reading history is written here instead, per
         // browser. See lib/recordLibrary.
         recordVisit(data.id, data.title);
       })
       // A 404 is a missing record and a refused one alike (IR-153): the API
-      // never says which, so neither does this page. Any other failure is
-      // not "not found", and says so with a way to try again.
-      .catch((err: { response?: { status?: number } }) => {
+      // never says which, so neither does this page, and a 403 reads the same.
+      // Any other failure is not "not found", and says so with a way to try again.
+      .catch((err: unknown) => {
+        const kind = readFailureKind(err);
         setRecord(null);
-        setLoadFailed(err?.response?.status !== 404);
+        setLoadFailed(kind === "unavailable" ? null : kind);
       })
       .finally(() => setLoading(false));
     if (attempt === 0) recordsApi.incrementAccess(Number(id)).catch(() => {});
@@ -587,27 +515,28 @@ export default function PaperViewPage() {
     window.setTimeout(() => setShareState("idle"), 2500);
   };
 
-  /** The viewer's download state may have moved (IR-677): re-read the record. */
+  /**
+   * Re-read the record after something changed -- the viewer's download state
+   * (IR-677), a document request. A failure leaves the page as
+   * it was, except one that means the viewer can no longer read the record
+   * (revoked while it was open, IR-906): that becomes the same not-available
+   * screen as a record that never existed.
+   */
   const reloadRecord = async () => {
     if (!id) return;
     try {
       const { data } = await recordsApi.detail(Number(id));
       setRecord(data);
-    } catch {
-      // The control keeps its last state; a reload catches up.
+    } catch (err) {
+      if (readFailureKind(err) === "unavailable") setRecord(null);
+      // Otherwise the control keeps its last state; a reload catches up.
     }
   };
 
   /** A document or request changed: re-read what derives from it. */
   const handleDocumentRequestChanged = async () => {
     setTrackerVersion((v) => v + 1);
-    if (!id) return;
-    try {
-      const { data } = await recordsApi.detail(Number(id));
-      setRecord(data);
-    } catch {
-      // The panel already shows the new state; the badge catches up on reload.
-    }
+    await reloadRecord();
   };
 
   // The whole page is a skeleton only before the first record arrives.
@@ -615,6 +544,10 @@ export default function PaperViewPage() {
   // it, and swaps only the main column (IR-355): a citation followed from
   // the chat must not unmount the conversation it was followed from.
   if (loading && !record) return <LoadingSkeleton />;
+
+  if (!record && loadFailed === "interrupted") {
+    return <InterruptedState what="record" onRetry={() => setAttempt((n) => n + 1)} />;
+  }
 
   if (!record && loadFailed) {
     return (
@@ -686,8 +619,8 @@ export default function PaperViewPage() {
   const chooseVersion = (n: number | null) =>
     setViewParams({
       version: n == null ? null : String(n),
-      ...(section !== "paper" && section !== "review" && sections.includes("paper")
-        ? { section: "paper" }
+      ...(section !== "paper" && section !== "review" && readerSection !== "overview"
+        ? { section: readerSection }
         : {}),
     });
   // A citation's regions and page are the current paper's (ADR-031), so an
@@ -774,7 +707,8 @@ export default function PaperViewPage() {
   // Review section's action bar -- the header fills nothing. The bar fills
   // its first granted action, so any granted review action puts the primary
   // there.
-  const hasPaper = sections.includes("paper");
+  // Where *View* opens the paper: Paper, or a participant's Review (IR-879).
+  const hasPaper = readerSection !== "overview" && recordHasPaper(record);
   const showRail = section === "overview" && !arriving;
   // Ask IRIS open beside the page leaves no room for the rail (IR-569).
   const railHidden = showRail && chat.open && !chatMinimized;
@@ -833,6 +767,50 @@ export default function PaperViewPage() {
     setViewParam("section", next);
     document.getElementById(tabId(next))?.focus();
   };
+
+  const viewAction = hasPaper && (
+    <button
+      type="button"
+      onClick={() => setViewParam("section", readerSection)}
+      className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
+    >
+      <i className="fas fa-book-open text-xs" aria-hidden />
+      View
+    </button>
+  );
+
+  const saveCiteShareActions = (
+    <>
+      <PaperSaveDropdown
+        record={record}
+        variant="pill"
+        emphasis={primary === "save" ? "primary" : "secondary"}
+      />
+
+      <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
+        <i className="fas fa-quote-right text-2xs" aria-hidden />
+        Cite
+      </button>
+
+      <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
+        <i
+          className={cn(
+            "fas text-2xs",
+            shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
+          )}
+          aria-hidden
+        />
+        {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
+      </button>
+      <span className="sr-only" role="status" aria-live="polite">
+        {shareState === "copied"
+          ? "Link to this paper copied"
+          : shareState === "failed"
+            ? "Couldn’t copy the link. Copy it from the address bar."
+            : ""}
+      </span>
+    </>
+  );
 
   return (
     // The `reading` container (IR-569): its width, not the window's, lays
@@ -893,7 +871,7 @@ export default function PaperViewPage() {
                   "transition-[grid-template-columns,column-gap,row-gap] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none",
                   railHidden
                     ? "gap-y-0 overview-wide:grid-cols-[minmax(0,1fr)_0rem] overview-wide:gap-x-0"
-                    : "overview-wide:grid-cols-[minmax(0,1fr)_22rem] overview-wide:gap-x-12",
+                    : "overview-wide:grid-cols-[minmax(0,1fr)_clamp(17rem,25cqw,22rem)] overview-wide:gap-x-8",
                 ),
             )}
           >
@@ -917,7 +895,7 @@ export default function PaperViewPage() {
                 what to do with it. Not in Paper mode, where the record bar
                 holds the paper in one line (IR-569). */}
             {!onPaperTab && !reviewerWorkspace && (
-            <header className="space-y-5">
+            <header className={cn("space-y-5", section === "overview" && "pb-1")}>
               <p className="flex items-center gap-x-2 text-small text-stone-500">
                 <span>Added {formatDate(record.created_at)}</span>
                 <span aria-hidden className="text-stone-300">·</span>
@@ -931,11 +909,11 @@ export default function PaperViewPage() {
               </h1>
 
               <div className="flex items-center gap-2 flex-wrap">
-                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} />
+                <StatusBadge state={record.workflow_state} label={record.workflow_state_label} compact />
                 {record.record_type_name && <span className={META_CHIP}>{record.record_type_name}</span>}
                 {record.classification_name && <span className={META_CHIP}>{record.classification_name}</span>}
                 {record.is_ip && (
-                  <span className="px-2.5 py-1 rounded-full bg-brand-50 text-brand ring-1 ring-brand-200 text-xs font-semibold inline-flex items-center gap-1.5">
+                  <span className={cn(META_PILL, "gap-1.5 bg-brand-50 text-brand ring-1 ring-inset ring-brand-200")}>
                     <i className="fas fa-shield-halved text-2xs" aria-hidden />
                     Intellectual Property
                   </span>
@@ -965,7 +943,15 @@ export default function PaperViewPage() {
                 ) : <p className="text-sm text-stone-500 italic">Authors not recorded</p>}
                 <ResearchOriginBadge origin={record.origin} />
                 <div className="flex items-center gap-x-3 gap-y-1 flex-wrap text-sm text-stone-600">
-                  {record.adviser_name && <span>Adviser: {record.adviser_name}</span>}
+                  {record.adviser_name && (
+                    <span>
+                      Adviser:{" "}
+                      {record.adviser != null && record.adviser_has_profile
+                        ? <PersonLink id={record.adviser} name={record.adviser_name} />
+                        : record.adviser_name}
+                    </span>
+                  )}
+                  <OwnerNames owners={record.owners} />
                   {record.origin === "institutional" && <span>{INSTITUTION.name}</span>}
                   {record.publication_year && <span>Published {record.publication_year}</span>}
                   {record.year_accomplished && <span>Completed {record.year_accomplished}</span>}
@@ -995,70 +981,34 @@ export default function PaperViewPage() {
                 />
               )}
 
-              {/* View · Save · Cite · Share, plus what the capabilities add.
-                  One filled pill (IR-356): see `primary` above. */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {primary === "continue" && (
-                  <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
-                    <i className="fas fa-pen-to-square text-xs" aria-hidden />
-                    Continue
-                  </Link>
-                )}
+              {(section !== "overview" || primary === "continue" || primary === "open_review" || can.has("edit_details")) && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  {primary === "continue" && (
+                    <Link to={`/?publish=${record.id}`} className={PILL_PRIMARY}>
+                      <i className="fas fa-pen-to-square text-xs" aria-hidden />
+                      Continue
+                    </Link>
+                  )}
 
-                {primary === "open_review" && (
-                  <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
-                    <i className="fas fa-clipboard-check text-xs" aria-hidden />
-                    Open review
-                  </button>
-                )}
+                  {primary === "open_review" && (
+                    <button type="button" onClick={() => void openReview()} className={PILL_PRIMARY}>
+                      <i className="fas fa-clipboard-check text-xs" aria-hidden />
+                      Open review
+                    </button>
+                  )}
 
-                {hasPaper && (
-                  <button
-                    type="button"
-                    onClick={() => setViewParam("section", "paper")}
-                    className={primary === "view" ? PILL_PRIMARY : PILL_SECONDARY}
-                  >
-                    <i className="fas fa-book-open text-xs" aria-hidden />
-                    View
-                  </button>
-                )}
+                  {section !== "overview" && viewAction}
 
-                {can.has("edit_details") && (
-                  <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
-                    <i className="fas fa-pen text-2xs" aria-hidden />
-                    Edit details
-                  </button>
-                )}
+                  {can.has("edit_details") && (
+                    <button type="button" onClick={() => setViewParam("edit", "details")} className={PILL_SECONDARY}>
+                      <i className="fas fa-pen text-2xs" aria-hidden />
+                      Edit details
+                    </button>
+                  )}
 
-                <PaperSaveDropdown
-                  record={record}
-                  variant="pill"
-                  emphasis={primary === "save" ? "primary" : "secondary"}
-                />
-
-                <button type="button" onClick={() => setCiteOpen(true)} className={PILL_SECONDARY}>
-                  <i className="fas fa-quote-right text-2xs" aria-hidden />
-                  Cite
-                </button>
-
-                <button type="button" onClick={handleShare} className={PILL_SECONDARY}>
-                  <i
-                    className={cn(
-                      "fas text-2xs",
-                      shareState === "copied" ? "fa-check text-brand" : shareState === "failed" ? "fa-circle-exclamation" : "fa-link",
-                    )}
-                    aria-hidden
-                  />
-                  {shareState === "copied" ? "Link copied" : shareState === "failed" ? "Couldn’t copy" : "Share"}
-                </button>
-                <span className="sr-only" role="status" aria-live="polite">
-                  {shareState === "copied"
-                    ? "Link to this paper copied"
-                    : shareState === "failed"
-                      ? "Couldn’t copy the link. Copy it from the address bar."
-                      : ""}
-                </span>
-              </div>
+                  {section !== "overview" && saveCiteShareActions}
+                </div>
+              )}
             </header>
             )}
 
@@ -1183,10 +1133,9 @@ export default function PaperViewPage() {
                   </div>
                 )}
 
-                {/* The reading sections, each under a hairline (IR-569). */}
-                <div className="border-t border-stone-200 divide-y divide-stone-200 [&>*]:py-8 [&>:last-child]:pb-0">
-                {/* Abstract, as a reading column: a measure of ~65 characters
-                    and relaxed leading, not justified text (IR-356). */}
+                {/* Reading sections are separated by space. */}
+                <div className="space-y-8">
+                {/* The abstract shares the reading column with its heading and actions. */}
                 <section>
                   <SectionHeading>Abstract</SectionHeading>
                   {record.abstract ? (
@@ -1198,6 +1147,10 @@ export default function PaperViewPage() {
                       No abstract was provided for this record.
                     </p>
                   )}
+                  <div className="mt-6 flex flex-wrap items-center gap-x-2 gap-y-2.5">
+                    {viewAction}
+                    {saveCiteShareActions}
+                  </div>
                 </section>
 
                 <PaperAiOverview record={record} />
@@ -1216,7 +1169,7 @@ export default function PaperViewPage() {
                   <RelatedPublishedResearch recordId={record.id} />
                 )}
 
-                <SimilarPapers recordId={record.id} />
+                <RelatedWorks recordId={record.id} />
 
                 {/* Public discussion (IR-420, spec §8): drawn, not yet open. */}
                 <CommentsSection
@@ -1233,29 +1186,23 @@ export default function PaperViewPage() {
                 onOpenReview={openReview}
                 onBarInset={setReviewBarInset}
                 can={can}
-                reader={sections.includes("paper") ? reader() : null}
+                reader={recordHasPaper(record) ? reader() : null}
                 timelineVersion={trackerVersion}
                 onChanged={handleDocumentRequestChanged}
-                onAskAboutPaper={
-                  sections.includes("paper")
-                    ? () => {
-                        chat.setOpen(true);
-                        setViewParam("section", "paper");
-                      }
-                    : undefined
+                // No Ask IRIS in Review (ADR-032 §10, IR-372 as kept by IR-879).
+                documentsOpen={documentsOpen}
+                onDocuments={(open) => setViewParams({ documents: open ? "open" : null, section: "review" })}
+                documents={
+                  <FilesSection
+                    record={record}
+                    owner={userIsOwner}
+                    editable={can.has("edit_details")}
+                    reviewing={reviewing}
+                    attach={can.has("attach_file")}
+                    replaceManuscript={can.has("replace_manuscript")}
+                    onChanged={handleDocumentRequestChanged}
+                  />
                 }
-              />
-            )}
-
-            {section === "files" && (
-              <FilesSection
-                record={record}
-                owner={userIsOwner}
-                editable={can.has("edit_details")}
-                reviewing={reviewing}
-                attach={can.has("attach_file")}
-                replaceManuscript={can.has("replace_manuscript")}
-                onChanged={handleDocumentRequestChanged}
               />
             )}
             </div>
@@ -1281,16 +1228,17 @@ export default function PaperViewPage() {
             >
               <aside
                 aria-labelledby={`${tabsId}-details`}
-                className="min-h-0 space-y-4 overflow-hidden border-t border-stone-200 pt-8 overview-wide:w-[22rem] overview-wide:overflow-visible overview-wide:border-t-0 overview-wide:pt-0"
+                className="min-h-0 space-y-4 overflow-hidden overview-wide:w-[clamp(17rem,25cqw,22rem)] overview-wide:overflow-visible"
               >
                 <h2 id={`${tabsId}-details`} className="font-display text-xl font-semibold text-stone-900">
                   Record details
                 </h2>
                 {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
                 <PaperGovernance record={record} />
+                <EmbargoCard record={record} onChanged={reloadRecord} />
                 <PaperDocuments
                   files={record.files}
-                  manageHref={participant ? `/records/${record.id}?section=files` : null}
+                  manageHref={participant ? `/records/${record.id}?section=review&documents=open` : null}
                 />
               </aside>
             </div>

@@ -1,22 +1,43 @@
 from django.db import transaction
+from django.http import FileResponse, Http404
 from django.utils import timezone
 from rest_framework import generics, status
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from core.enums import RequestStatus, RoleName, SessionEndReason
 from rest_framework_simplejwt.tokens import RefreshToken
-from core.permissions import IsAdmin
+from core.permissions import (
+    IsAccountAdmin,
+    IsAdmin,
+    IsSystemAdmin,
+    is_system_admin,
+    role_change_refusal,
+)
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
 from apps.audit.models import AuditEvent
+from . import profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
-    UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
+    UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
     RoleRequestSerializer, SystemSettingSerializer,
 )
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
+
+#: RDCO's account acts leave a System Admin's account alone (ADR-051 §5).
+LEAVE_SYSTEM_ADMIN_ALONE = "A System Admin's account is managed only in Django's admin site."
+
+
+def _refused(detail):
+    return Response({"detail": detail}, status=status.HTTP_403_FORBIDDEN)
+
+
+def _refuse_system_admin(user):
+    """A 403 when `user` is a System Admin, whose account no API act touches; else None."""
+    return _refused(LEAVE_SYSTEM_ADMIN_ALONE) if is_system_admin(user) else None
 from .credentials import set_password_and_invalidate
 from .sessions import (
     end_all_sessions, end_session, start_session, require_eligible_account, refuse_if_ended,
@@ -125,6 +146,15 @@ class LogoutView(APIView):
 
 
 class ActivateView(APIView):
+    """
+    DEPRECATED (IR-928): the link as emailed before the token moved to the
+    fragment, `GET /auth/activate/<uid>/<token>/`. Kept only so those emails
+    work until their tokens expire -- Django's `PASSWORD_RESET_TIMEOUT`, 3 days
+    and not overridden here -- and so a bundle cached across the deploy still
+    works. Remove it, its URL, the SPA's `/activate/:uidb64/:token` route and
+    nginx's `/activate/` locations once 3 days have passed since IR-928 shipped,
+    or sooner with IR-643's single-use verification (ADR-045 §8). IR-937 tracks it.
+    """
     permission_classes = [AllowAny]
 
     def get(self, request, uidb64, token):
@@ -132,6 +162,35 @@ class ActivateView(APIView):
         if user:
             return Response({"detail": "Account activated."})
         return Response({"detail": "Invalid or expired link."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ActivateConfirmView(APIView):
+    """
+    `POST /auth/activate/` with `{"uid", "token"}` (IR-928, ASVS 8.3.1).
+
+    What the verification page calls after reading the secret from the URL
+    fragment: the credentials travel in the body, never in a path or query.
+    One answer for every refusal, as `ActivateView` gives, so nothing says why a
+    link failed. A secret in the query string is not read. No authentication is
+    attempted, so a stale bearer token the browser still holds cannot turn a
+    valid link into a 401 (as the reset views, ADR-045 §2).
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+
+    REFUSED = {"detail": "Invalid or expired link."}
+
+    def post(self, request):
+        data = request.data
+        uid, token = (data.get("uid"), data.get("token")) if isinstance(data, dict) else (None, None)
+        user = activate_user(uid, token) if isinstance(uid, str) and isinstance(token, str) else None
+        if user:
+            response = Response({"detail": "Account activated."})
+        else:
+            response = Response(self.REFUSED, status=status.HTTP_400_BAD_REQUEST)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class ChangePasswordView(APIView):
@@ -166,9 +225,67 @@ class MeView(generics.RetrieveUpdateAPIView):
         return self.request.user
 
 
+class MePhotoView(APIView):
+    """
+    `PUT /users/me/photo/` (multipart) and `DELETE /users/me/photo/` (IR-695).
+
+    Both act on `request.user` and on nobody else, so there is no path or body
+    that names another person's photo to change.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser]
+
+    def put(self, request):
+        serializer = PhotoUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile.set_photo(request.user, serializer.validated_data["photo"], serializer.crop)
+        return Response({"photo_url": profile.photo_url(request.user)})
+
+    def delete(self, request):
+        profile.remove_photo(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserPhotoView(APIView):
+    """
+    `GET /users/<id>/photo/`: a person's photo, for any signed-in user (IR-695).
+
+    The only way to read one. The file lives under MEDIA_ROOT, which no URL
+    serves, so reading it needs a valid token like every other route. A person
+    with no photo, a deactivated account and an id that does not exist all
+    answer the same 404.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        owner = User.objects.filter(pk=pk, is_active=True).only("id", "photo", "photo_version").first()
+        if owner is None or not owner.photo:
+            raise Http404
+        try:
+            stored = owner.photo.open("rb")
+        except FileNotFoundError:
+            raise Http404
+        response = FileResponse(stored, content_type="image/jpeg")
+        response["X-Content-Type-Options"] = "nosniff"
+        # `photo_url` carries `?v=`, which changes with the photo, so a copy
+        # fetched under the current version is never stale. Private: a shared
+        # cache must not keep a photo only signed-in users may read.
+        current = request.query_params.get("v") == str(owner.photo_version)
+        response["Cache-Control"] = "private, max-age=86400" if current else "private, no-cache"
+        return response
+
+
+class InterestSuggestionsView(APIView):
+    """`GET /users/interests/?q=mach`: existing interests that contain `q` (IR-695)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(profile.suggest_interests(request.query_params.get("q", "")))
+
+
 class UserListView(generics.ListAPIView):
     serializer_class   = UserSerializer
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsAccountAdmin]
     queryset           = User.objects.select_related("role").order_by("-date_joined")
     # The default SearchFilter matches nothing until a view names its fields,
     # so the Users page's search box listed everyone (IR-478).
@@ -198,13 +315,21 @@ class AdviserListView(generics.ListAPIView):
 
 class UserDetailView(generics.RetrieveUpdateAPIView):
     serializer_class   = UserSerializer
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsAccountAdmin]
     queryset           = User.objects.all()
+
+    def update(self, request, *args, **kwargs):
+        return _refuse_system_admin(self.get_object()) or super().update(request, *args, **kwargs)
 
 
 class ChangeUserRoleView(APIView):
-    """PATCH /users/<id>/role/ -- change a user's role by name or ID."""
-    permission_classes = [IsAuthenticated, IsAdmin]
+    """
+    PATCH /users/<id>/role/ -- change a user's role by name or ID.
+
+    The System Admin gives office roles and RDCO gives Student or Adviser
+    (ADR-051 §4, amended); `role_change_refusal` says who may give what.
+    """
+    permission_classes = [IsAuthenticated, IsAccountAdmin]
 
     def patch(self, request, pk):
         from .models import Role
@@ -226,6 +351,9 @@ class ChangeUserRoleView(APIView):
         else:
             return Response({"detail": "role_name or role is required."}, status=400)
 
+        refusal = role_change_refusal(request.user, user, role)
+        if refusal is not None:
+            return _refused(refusal)
         user.assign_role(role)
 
         create_audit_event(
@@ -254,12 +382,13 @@ class OfficeCoordinatorView(APIView):
     """
     PATCH /users/<id>/coordinator/  {"is_office_coordinator": bool}
 
-    ADR-032 §4: an administrator grants or revokes the coordinator flag. A
-    coordinator may assign, reassign and withdraw reviewer seats in the office
-    their role staffs, so granting it to a user with no office role is
-    refused rather than stored as a flag that means nothing.
+    ADR-032 §4: the System Admin grants or revokes the coordinator flag, as it
+    gives office roles (ADR-051 §4, amended). A coordinator may assign, reassign
+    and withdraw reviewer seats in the office their role staffs, so granting it
+    to a user with no office role is refused rather than stored as a flag that
+    means nothing.
     """
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
 
     def patch(self, request, pk):
         from core.permissions import office_parties_of
@@ -296,6 +425,8 @@ class LockUserView(APIView):
     @transaction.atomic
     def patch(self, request, pk):
         user      = User.objects.select_for_update().get(pk=pk)
+        if refused := _refuse_system_admin(user):
+            return refused
         is_locked = request.data.get("is_locked")
         if is_locked is None:
             return Response({"detail": "is_locked is required."}, status=400)
@@ -342,6 +473,8 @@ class UnlockUserView(APIView):
 
     def post(self, request, pk):
         user = User.objects.get(pk=pk)
+        if refused := _refuse_system_admin(user):
+            return refused
         user.is_locked = False
         user.save(update_fields=["is_locked"])
 
@@ -376,8 +509,15 @@ class RoleRequestDetailView(APIView):
 
     def patch(self, request, pk):
         role_request = RoleRequest.objects.get(pk=pk)
+        if refused := _refuse_system_admin(role_request.user):
+            return refused
         action = request.data.get("action")  # "approve" or "decline"
         if action == "approve":
+            # Approving gives the role, so it follows the same rule as giving one:
+            # RDCO gives Student or Adviser only (ADR-051 §4, amended).
+            refusal = role_change_refusal(request.user, role_request.user, role_request.requested_role)
+            if refusal is not None:
+                return _refused(refusal)
             approve_role_request(role_request, reviewed_by=request.user)
         elif action == "decline":
             decline_role_request(role_request, reviewed_by=request.user)
@@ -473,6 +613,8 @@ class RevokeSessionView(APIView):
             token = OutstandingToken.objects.get(jti=jti)
         except OutstandingToken.DoesNotExist:
             return Response({"detail": "Session not found."}, status=404)
+        if refused := _refuse_system_admin(token.user):
+            return refused
 
         revoke_token(token)
         create_audit_event(
@@ -484,13 +626,14 @@ class RevokeSessionView(APIView):
 
 class SystemSettingView(APIView):
     """
-    GET or PATCH a single setting by key. RDCO alone (IR-667).
+    GET or PATCH a single setting by key. The System Admin alone (IR-667,
+    ADR-051 §3).
 
     A PATCH changes an existing key and never creates one, and a change is
     audited with its old and new value. Settings hold no secrets, so neither
     value is masked.
     """
-    permission_classes = [IsAuthenticated, IsAdmin]
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
 
     def get(self, request, key):
         setting = SystemSetting.objects.filter(key=key).first()
