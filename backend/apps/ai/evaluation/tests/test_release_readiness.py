@@ -827,25 +827,41 @@ def test_the_workload_reports_successes_failures_and_observed_rates_per_class():
     assert g["classes"]["ordinary"]["observed_success_rate"] == pytest.approx(0.925)
     assert g["classes"]["deep"]["observed_success_rate"] == 1.0
     assert g["classes"]["ingestion"]["successes"] == 5
-    assert "no success-rate threshold is approved" in g["success_rate_policy"]
+    assert g["classes"]["ordinary"]["min_success_rate"] == 0.9
+    assert "min_success_rate" in g["success_rate_policy"]
 
 
-def test_a_low_but_not_total_failure_rate_is_reported_not_blocked_because_no_threshold_exists():
+def test_a_success_rate_below_the_authorized_minimum_is_not_met():
+    # Decided 2026-11-07: a low but not total failure rate now blocks (it used to pass).
     m = measurements()
     for s in m["samples"]:
         if s["class"] == "ordinary" and s["total_ms"] < 1300:
             s["outcome"] = "failed"
     g = gate(full(measurements=m), "workload")
     assert g["classes"]["ordinary"]["observed_success_rate"] < 0.25
-    assert g["status"] == "met"          # the limitation, stated: no approved threshold to fail
-    assert g["success_rate_policy"]
+    assert g["status"] == "not_met"
+    assert any("ordinary success rate" in r and "below the authorized 0.9" in r
+               for r in g["reasons"])
+    # At exactly the minimum it passes: 36/40 = 0.9.
+    edge = measurements()
+    edge["samples"][36] = dict(edge["samples"][36], outcome="failed")
+    assert gate(full(measurements=edge), "workload")["status"] == "met"
 
 
-def test_every_manifest_lists_the_interpretations_awaiting_confirmation():
+@pytest.mark.parametrize("value", [None, 0, -0.5, 1.5, float("inf"), "0.9", True])
+def test_the_minimum_success_rate_must_be_authorized_as_a_rate(value):
+    profile = copy.deepcopy(PROFILE)
+    profile["success"] = {} if value is None else {"min_success_rate": value}
+    assert "profile.success.min_success_rate" in collection_preflight(
+        WORKLOAD, profile, APPROVED)["unrecorded"]
+    assert gate(full(profile=profile), "workload")["status"] == "not_measured"
+
+
+def test_every_manifest_lists_the_policy_decisions_it_applies_and_who_made_them():
     ids = {d["id"] for d in full()["policy_decisions"]}
-    assert ids == {"objectives_on_point_estimate", "no_success_rate_threshold"}
-    assert all(d["status"] == "awaiting_confirmation" and d["confirm_with"]
-               for d in POLICY_DECISIONS)
+    assert ids == {"objectives_on_point_estimate", "minimum_success_rate", "commit_from_run_file"}
+    assert all(d["status"] == "confirmed" and d["decided_by"] == "Jive Tyler Revalde"
+               and d["decided_on"] == "2026-11-07" for d in POLICY_DECISIONS)
     q = gate(full(), "quality")["repetitions"][0]["overall"]["task_completion"]
     assert {"wilson_low", "wilson_high", "value", "target"} <= set(q)   # reported, not gated
 

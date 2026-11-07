@@ -232,11 +232,12 @@ def test_an_eval_scenarios_run_file_carries_its_commit_into_the_gates(tmp_path):
     assert _manifest(tmp_path)["gates"]["postgres_workers"]["provenance"] == "unverified"
 
 
-def test_build_prints_the_interpretations_that_await_confirmation(tmp_path, capsys):
+def test_build_prints_the_policy_decisions_it_applies(tmp_path, capsys):
     call_command("eval_readiness", build=True, **_inputs(tmp_path))
     out = capsys.readouterr().out
-    assert "CONFIRM objectives_on_point_estimate" in out
-    assert "CONFIRM no_success_rate_threshold" in out
+    for decision in ("objectives_on_point_estimate", "minimum_success_rate",
+                     "commit_from_run_file"):
+        assert f"DECISION {decision} (confirmed, Jive Tyler Revalde, 2026-11-07)" in out
 
 
 def test_assert_ready_needs_a_commit_and_refuses_a_resealed_verdict(tmp_path):

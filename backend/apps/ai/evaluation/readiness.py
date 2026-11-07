@@ -51,25 +51,29 @@ READY, BLOCKED = "evidence_met", "blocked"
 METRICS = tuple(TARGETS)
 #: Families the campaign report itself lists as disabled; named in the gate, never dropped.
 EXCLUDED_FAMILIES = {"A15": DISABLED["scenario:A15_public_research"]}
-#: Interpretations this report applies that no approved policy states. They are written into
-#: every manifest so a reader sees them; nothing here is a confirmed decision.
+#: Policy choices this report applies, each decided by a named person. Written into every
+#: manifest so a reader sees what the gates assume.
+DECIDED = {"decided_by": "Jive Tyler Revalde", "decided_on": "2026-11-07", "status": "confirmed"}
 POLICY_DECISIONS = (
-    {"id": "objectives_on_point_estimate", "status": "awaiting_confirmation",
-     "confirm_with": "Jive Tyler Revalde",
+    {"id": "objectives_on_point_estimate", **DECIDED,
      "applied": "The 90% and 95% objectives are judged on the observed proportion. The Wilson "
                 "95% interval is reported beside it and is not gated.",
      "why": "A 10-case family cannot have a Wilson lower bound at 0.90 (10/10 gives 0.72), so "
             "gating on the lower bound would make the profile unreachable at the required "
-            "family size.",
-     "if_changed": "Gating on the lower bound would need larger families or a lower target."},
-    {"id": "no_success_rate_threshold", "status": "awaiting_confirmation",
-     "confirm_with": "Jive Tyler Revalde",
-     "applied": "No success-rate threshold is applied to the workload. Successes, failures "
-                "and observed rates are reported; only a class whose every sample failed "
-                "blocks.",
-     "why": "No approved success-rate threshold exists and none is invented here.",
-     "if_changed": "An approved threshold would be added to the profile and enforced by the "
-                   "workload gate."},
+            "family size. ADR-049 section 25 asks for uncertainty to be published.",
+     "cost": "9/10 passes on thin evidence; the observed rate is not statistical proof."},
+    {"id": "minimum_success_rate", **DECIDED,
+     "applied": "The authorized profile must state success.min_success_rate (above 0, at most "
+                "1). Every workload class whose observed success rate is below it is not met.",
+     "why": "Without a floor a 5% success rate with a fast p95 cleared the workload gate, and "
+            "fast failures can hide a slow success in the percentile.",
+     "cost": "One more value a person must authorize before live collection."},
+    {"id": "commit_from_run_file", **DECIDED,
+     "applied": "An IR-608 suite row with no commit of its own takes the run file's commit, "
+                "marked git_commit_source: run_file. A dirty tree never verifies.",
+     "why": "eval_scenarios records the commit once per run; reading only rows meant real "
+            "producer files could never pass.",
+     "cost": "No per-suite provenance: every suite in one run file is tied to one commit."},
 )
 RELEASE_DECISION_GAP = ("release_owner_decision: no named person has recorded the release "
                         "decision; this manifest decides nothing")
@@ -539,10 +543,8 @@ CAP_KEYS = ("deadline_seconds", "deep_deadline_seconds", "max_attempts", "max_in
             "worker_concurrency", "campaign_cost_usd")
 
 
-#: No success-rate threshold has been approved, so none is applied; the observed rate is
-#: reported for a reader to judge. Only a class in which every sample failed blocks.
-SUCCESS_RATE_POLICY = ("no success-rate threshold is approved, so none is enforced: observed "
-                       "rates are reported and only a class whose every sample failed blocks")
+SUCCESS_RATE_POLICY = ("every class must meet the authorized success.min_success_rate "
+                       "(policy decision minimum_success_rate)")
 
 
 def _positive(value: Any) -> bool:
@@ -574,6 +576,9 @@ def _declaration_missing(workload: Optional[Mapping], profile: Optional[Mapping]
         for section, keys in PROFILE_LIMITS.items():
             own = profile.get(section) if isinstance(profile.get(section), Mapping) else {}
             missing += [f"profile.{section}.{k}" for k in keys if not _positive(own.get(k))]
+        success = profile.get("success") if isinstance(profile.get("success"), Mapping) else {}
+        if not (_positive(success.get("min_success_rate")) and success["min_success_rate"] <= 1):
+            missing.append("profile.success.min_success_rate")
         caps = profile.get("caps") if isinstance(profile.get("caps"), Mapping) else {}
         missing += [f"profile.caps.{k}" for k in CAP_KEYS if not _positive(caps.get(k))]
     return missing
@@ -793,10 +798,14 @@ def _workload(report, label, workload, profile, measurement) -> dict:
         row = {"n": len(own), "declared": declared_n, "successes": successes,
                "failures": len(own) - successes,
                "observed_success_rate": successes / len(own) if own else None}
-        if own and row["failures"] == len(own):
-            problems.append((NOT_MET, f"every {cls} sample failed"
-                             + ("; a latency figure over failures alone says nothing about "
-                                "answered tasks" if cls in TASK_CLASSES else "")))
+        floor = profile["success"]["min_success_rate"]
+        row["min_success_rate"] = floor
+        if own and row["observed_success_rate"] < floor:
+            problems.append((NOT_MET, f"{cls} success rate {row['observed_success_rate']:.3f} "
+                             f"({successes}/{len(own)}) is below the authorized {floor:g}"
+                             + (f"; every {cls} sample failed, so its latency says nothing "
+                                "about answered tasks" if successes == 0 and cls in TASK_CLASSES
+                                else "")))
         if cls in TASK_CLASSES:
             untimed = [s for s in own if not (_number(s.get("tool_ms"))
                                               and _number(s.get("model_ms")))]

@@ -138,6 +138,7 @@ PROFILE = {
     "latency": {"ordinary_p95_ms": 2000, "deep_p95_ms": 40000},
     "cost": {"cost_per_successful_task_usd": 0.02},
     "resources": {"memory_mb": 1024, "connections": 50, "lock_wait_ms": 200},
+    "success": {"min_success_rate": 0.9},
     "caps": CAPS,
 }
 

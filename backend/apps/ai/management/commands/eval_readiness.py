@@ -180,7 +180,8 @@ class Command(BaseCommand):
         for gap in manifest["human_review_gaps"]:
             w(f"HUMAN REVIEW {gap}")
         for decision in manifest["policy_decisions"]:
-            w(f"CONFIRM {decision['id']} with {decision['confirm_with']}: {decision['applied']}")
+            w(f"DECISION {decision['id']} ({decision['status']}, {decision['decided_by']}, "
+              f"{decision['decided_on']}): {decision['applied']}")
         w(("evidence_met" if manifest["status"] == "evidence_met" else "BLOCKED")
           + f"; wrote {out}")
 

@@ -26,7 +26,7 @@ or capacity) and `breached` (an access or disclosure breach, which no average of
 | `access_disclosure`, `postgres_workers` | IR-608 evidence of the required kind, run, not skipped, passed |
 | `browser_accessibility` | a named manual browser exercise at the candidate's commit with every check measured |
 | `authorization` | workload, profile, every operational cap and every approval recorded |
-| `workload` | a measurement of the declared workload, real PostgreSQL and independent workers, queue-inclusive p95 and resource pressure inside the profile |
+| `workload` | a measurement of the declared workload, real PostgreSQL and independent workers, every class at or above the authorized minimum success rate, queue-inclusive p95 and resource pressure inside the profile |
 | `cost` | cost per successful task inside the profile, failures and unknown usage included |
 
 Capability and model results (`--capability`, `--model`) are carried in `separate_results`.
@@ -97,11 +97,24 @@ measured check, and readiness accepts that or an `evidence_ref`.
 
 ## Success rates
 
-The `workload` gate reports, per class, `successes`, `failures` and `observed_success_rate`.
-**No success-rate threshold is approved, so none is enforced**; only a class in which every
-sample failed blocks. A run with a 5% success rate and a fast p95 therefore still passes this
-gate. That is a limitation of the policy, stated in the gate (`success_rate_policy`) and in
-every manifest (`policy_decisions`), not a judgement that such a rate is acceptable.
+The `workload` gate reports, per class, `successes`, `failures` and `observed_success_rate`,
+and every class, ingestion included, must be at or above the profile's
+`success.min_success_rate` (above 0, at most 1). The value is the authorizing person's to
+state; there is no default, and `--preflight` names it while it is unrecorded. A run with a 5%
+success rate and a fast p95 is therefore `not_met`.
+
+## Policy decisions
+
+Every manifest lists the policy choices its gates apply (`policy_decisions`), each confirmed by
+Jive Tyler Revalde on 2026-11-07, and `--build` prints them:
+
+- `objectives_on_point_estimate`: the 90%/95% objectives are judged on the observed proportion;
+  the Wilson 95% interval is reported beside it and not gated. A 10-case family cannot have a
+  lower bound at 0.90, and ADR-049 section 25 asks for uncertainty to be published. Cost: 9/10
+  passes on thin evidence.
+- `minimum_success_rate`: the profile must state `success.min_success_rate`, as above.
+- `commit_from_run_file`: a suite row with no commit takes the run file's, marked
+  `git_commit_source: run_file`; a dirty tree never verifies. Cost: no per-suite provenance.
 
 ## `workload-measurement-1`
 
