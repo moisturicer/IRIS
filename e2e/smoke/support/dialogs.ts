@@ -208,6 +208,17 @@ export const DIALOGS: DialogCase[] = [
     dialog: anyDialog,
   },
   {
+    // RDCO publishes an Unlisted paper once its embargo is released (IR-878).
+    id: "publish an unlisted paper", screen: "paper-view", sources: ["features/records/paper-view/UnlistedCard.tsx"],
+    override: (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "completed", workflow_state: "completed", workflow_state_label: "Unlisted",
+        stage_label: "Unlisted", capabilities: ["cite", "publish_unlisted"], publish_unlisted: { blocked: null },
+      });
+    },
+    open: press("Publish to Discover"), dialog: anyDialog,
+  },
+  {
     id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
     override: (api) => {
       api.on("GET", `/records/${PAPER.id}/tracker/`, { ...TRACKER, workflow_state: "revision_requested", workflow_state_label: "Revision requested" });

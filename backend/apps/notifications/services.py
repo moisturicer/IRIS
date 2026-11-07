@@ -341,6 +341,41 @@ def notify_decided(record, *, actor, decided_by, outcome, reason, closed_request
         _log_failure("notify_decided", record=record)
 
 
+def notify_published_later(record, *, published_by, note=""):
+    """
+    RDCO published an Unlisted paper after its Decision (ADR-047 §10, IR-878).
+    Every owner and the Adviser hear it in-app, carrying RDCO's note as
+    written; the primary owner by email too, as a Decision's notice is sent.
+    """
+    try:
+        title = record.title
+        message = f'RDCO published "{title}" to Discover. It was kept unlisted until now.'
+        if note:
+            message += f" Note: {note}"
+        notif_type = NotificationType.objects.get_or_create(name="Record Published")[0]
+        owners = list(record.owners.select_related("user").all())
+        recipients = [o.user for o in owners]
+        if record.adviser is not None and record.adviser not in recipients:
+            recipients.append(record.adviser)
+        for recipient in recipients:
+            Notification.objects.create(
+                sender=published_by, recipient=recipient, record=record,
+                notif_type=notif_type, message=message,
+            )
+        if owners:
+            primary = next((o.user for o in owners if o.is_primary), owners[0].user)
+            send_email_async(
+                subject=f"[IRIS] Published: {title[:60]}",
+                message=(
+                    f"Hello {primary.first_name},\n\n{message}\n\n"
+                    f"{_record_url(record)}\n\n-- The IRIS Team"
+                ),
+                recipient_list=[primary.email],
+            )
+    except Exception:
+        _log_failure("notify_published_later", record=record)
+
+
 def notify_revision_requested(revision_request, *, party_label: str, threads: int = 0):
     """
     Tell every owner that a party has asked for a revision (ADR-032 §5
@@ -856,26 +891,34 @@ def _tell_other_owners(record, actor, *, notif_type, message, subject, link):
         )
 
 
-def notify_record_withdrawn(record, *, withdrawn_by, seats, requesting_parties):
+def notify_record_withdrawn(record, *, withdrawn_by, seats, requesting_parties, reason=None):
     """
-    An owner withdrew a record from review by deleting it (IR-517).
+    A record was withdrawn from review: its owner deleted it (IR-517), or, when
+    `reason` is given, RDCO withdrew it (IR-797).
 
     - Each reviewer whose open seat closed hears that their review is closed,
       in-app only, as a Decision's cut-off reviewer does (IR-270). When their
       party had an open document request, the notice says it is withdrawn.
       No office pool is told: nobody there had started.
-    - Every other owner hears it, in-app and by email.
+    - Every other owner hears it, in-app and by email. When RDCO withdrew it,
+      that is every owner, and they read RDCO's reason.
     """
     try:
         title = record.title
         notif_type = NotificationType.objects.get_or_create(name="Record Withdrawn")[0]
+        by_rdco = reason is not None
 
-        told = set()
+        # RDCO who held a seat on it needs no notice of their own act.
+        told = {withdrawn_by.pk} if by_rdco else set()
         for reviewer, party in seats:
             if reviewer.pk in told:
                 continue
             told.add(reviewer.pk)
-            message = f'The author withdrew "{title}" from review, so your review is closed.'
+            message = (
+                f'RDCO withdrew "{title}" from review, so your review is closed.'
+                if by_rdco else
+                f'The author withdrew "{title}" from review, so your review is closed.'
+            )
             if party in requesting_parties:
                 # The Adviser is a person, not an office (ADR-032 §1).
                 whose = "Your" if party == Party.ADVISER else "Your office's"
@@ -885,16 +928,65 @@ def notify_record_withdrawn(record, *, withdrawn_by, seats, requesting_parties):
                 notif_type=notif_type, message=message,
             )
 
+        owners_message = (
+            f'RDCO withdrew "{title}" from review. Reason: {reason} '
+            f"It is deleted and can't be restored."
+            if by_rdco else
+            f'{_name(withdrawn_by)} withdrew "{title}" from review. '
+            f"It is deleted and can't be restored."
+        )
         _tell_other_owners(
             record, withdrawn_by, notif_type=notif_type, link=False,
-            message=(
-                f'{_name(withdrawn_by)} withdrew "{title}" from review. '
-                f"It is deleted and can't be restored."
-            ),
+            message=owners_message,
             subject=f"[IRIS] Withdrawn: {title[:60]}",
         )
     except Exception:
         _log_failure("notify_record_withdrawn", record=record)
+
+
+def notify_adviser_replaced(record, *, replaced_by, previous_adviser, adviser):
+    """
+    RDCO replaced a paper's Adviser (IR-797), in-app only.
+
+    The old Adviser hears their review is closed, with no link: they no longer
+    advise the paper. The new one hears the paper is theirs now, with a link.
+    """
+    try:
+        title = record.title
+        notif_type = NotificationType.objects.get_or_create(name="Adviser Replaced")[0]
+        if previous_adviser is not None:  # None: their account is gone
+            Notification.objects.create(
+                sender=replaced_by, recipient=previous_adviser, record=None,
+                notif_type=notif_type,
+                message=f'RDCO replaced you as Adviser of "{title}", so your review is closed.',
+            )
+        Notification.objects.create(
+            sender=replaced_by, recipient=adviser, record=record, notif_type=notif_type,
+            message=f'RDCO made you the Adviser of "{title}". Its Adviser review is waiting for you.',
+        )
+    except Exception:
+        _log_failure("notify_adviser_replaced", record=record)
+
+
+def notify_owner_added(record, *, added_by, owner):
+    """
+    RDCO added an owner to a paper in review (IR-797), in-app only: the new
+    owner hears it is theirs too, and each owner already on it hears who joined.
+    """
+    try:
+        title = record.title
+        notif_type = NotificationType.objects.get_or_create(name="Owner Added")[0]
+        Notification.objects.create(
+            sender=added_by, recipient=owner, record=record, notif_type=notif_type,
+            message=f'RDCO added you as an owner of "{title}".',
+        )
+        for other in _other_owners(record, owner):
+            Notification.objects.create(
+                sender=added_by, recipient=other, record=record, notif_type=notif_type,
+                message=f'RDCO added {_name(owner)} as an owner of "{title}".',
+            )
+    except Exception:
+        _log_failure("notify_owner_added", record=record)
 
 
 def notify_record_deleted(record, *, deleted_by):

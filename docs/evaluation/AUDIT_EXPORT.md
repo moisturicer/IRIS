@@ -55,6 +55,8 @@ Conventions in `metadata`: every party is a `Party` value (`adviser`, `itso`, `i
 
 `SYSTEM_SETTING_CHANGED` is an administrative event, excluded from workflow metrics. The actor is the System Admin that changed the setting (RDCO before IR-781). Metadata contains `key`, `old_value` and `new_value`. Writing the value a setting already holds records nothing.
 
+`RETENTION_CLEANUP_RUN` (IR-794) is an administrative event, excluded from workflow metrics. The daily retention cleanup writes one each run, with no actor and no record, even when every period is blank. Metadata is `counts`, the number of rows erased per data type (`{"download_notes": 0}`), and never a name, an email or any erased text.
+
 `RESEARCH_METADATA_CORRECTED` is an administrative metadata event, excluded from workflow metrics. The actor is the active superuser named by the correction command. Metadata contains `reason`, per-record `evidence`, and `before`/`after` objects with `origin`, nullable `publication_year`, and ordered `authors`. Corrections and audit rows share one transaction: failure rolls back the entire manifest. Dry runs produce no audit rows.
 
 ### Download requests (IR-688, ADR-048)
@@ -95,12 +97,18 @@ history. Existing assignments receive no backfilled date or event.
 | Type | Written when | `metadata` |
 |---|---|---|
 | `DECISION_RECORDED` | Every verdict | `party`, `outcome`, `final`, `review` (the Review's id), `version` |
-| `PUBLISHED` | **Beside** a `DECISION_RECORDED`, only when the decision made the record publicly visible | `party`, `version` |
+| `PUBLISHED` | **Beside** a `DECISION_RECORDED`, only when the decision made the record publicly visible. **Or alone**, when RDCO publishes an Unlisted paper later (ADR-047 §10, IR-878) | `party`, `version`, and `via: "publish_unlisted"` on the later publish only (absent on a Decision's) |
 
 `outcome` values: an office's `cleared` or `finding`; the Adviser's `accepted_and_routed`
 (not a Decision: the record stays in review, `final` false); and the final outcomes `accept`
 (a Proposal), `publish`, `keep_unlisted` and `reject` (`final` true). Keep-unlisted, reject
 and a Proposal's accept write no `PUBLISHED`.
+
+A later publish of an Unlisted paper (IR-878) writes `PUBLISHED` with `via: "publish_unlisted"` and **no**
+`DECISION_RECORDED`: the paper's final Decision stays its `keep_unlisted`, so total turnaround still ends
+there and never counts the time a paper waited Unlisted. Its optional note is prose and is not copied; it
+is kept on `records.UnlistedPublication`. To count papers published from Unlisted, select `PUBLISHED`
+rows whose `metadata.via` is `publish_unlisted`.
 
 ### Revisions and resubmission
 
@@ -152,16 +160,33 @@ The Adviser's entry seat writes no seat event: `SUBMITTED` is that act.
 
 There is no backfill: answers saved before this have no row. The Record holds only who gave the latest answer or set the current date, and when.
 
+### A person's answer to the data notice (ADR-054, IR-789)
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `NOTICE_ANSWERED` | A person answers the current data notice, at registration or after a new one is published. `user` is the person. Each answer writes a row, including a later answer to the same version. `seed_demo` writes one for each account it answers for, with a Yes | `notice_version`, `ai_consent` (the Yes or No on AI), `previous_notice_version` and `previous_ai_consent` (`null` on a first answer) |
+
+It has no `record`. There is no backfill: accounts that existed before IR-789 start unanswered and write their first row at next sign-in.
+
 ### Withdrawal
 
 | Type | Written when | `metadata` |
 |---|---|---|
-| `RECORD_WITHDRAWN` | A record in review is soft-deleted, which today only its owner can do (IR-508); `user` is whoever deleted it | `version`, `closed_parties` (the parties whose open assignment closed) |
+| `RECORD_WITHDRAWN` | A record in review is soft-deleted, by its owner (IR-508) or by RDCO (IR-797); `user` is whoever deleted it | `version`, `closed_parties` (the parties whose open assignment closed), and `reason` when RDCO withdrew it (absent on an owner's deletion) |
 
 It is followed by an `ASSIGNMENT_CLOSED` (`how`: `withdrawn`) per party, and a
 `REVISION_REQUEST_WITHDRAWN` or `DOCUMENT_REQUEST_WITHDRAWN` (`closed_by`:
 `record_withdrawn`) per request it closed. Deleting a record that is not in review
 writes none of these.
+
+### RDCO's acts on a paper in review (ADR-051 decision 10, IR-797)
+
+Each act is one event. Withdrawing writes `RECORD_WITHDRAWN` above, with RDCO's `reason`.
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `ADVISER_REPLACED` | RDCO names another Adviser while the paper's Adviser review is open. The old Adviser's seat is withdrawn and the new one seated in the same act, so no `SEAT_*` event is written | `assignment`, `previous_adviser` (null if that account is gone), `adviser`, `previous_seat`, `seat` (the new one), `reason` (optional, may be empty) |
+| `OWNER_ADDED` | RDCO adds an owner to a paper in review. The Contact person is unchanged | `owner` |
 
 ### Document requests (ADR-022)
 

@@ -43,6 +43,7 @@ export const AUDIT_EVENT_GROUPS = {
     EMBARGO_EXTENDED: "Embargo Date Moved", EMBARGO_RELEASED: "Embargo Released",
   },
   IP: { IP_RELEASED: "IP Mark Released" },
+  "Data notice": { NOTICE_ANSWERED: "Data Notice Answered" },
   Seats: {
     SEAT_CLAIMED: "Seat Claimed", SEAT_ASSIGNED: "Seat Assigned", SEAT_NOMINATED: "Seat Nominated",
     SEAT_REASSIGNED: "Seat Reassigned", SEAT_WITHDRAWN: "Seat Withdrawn",

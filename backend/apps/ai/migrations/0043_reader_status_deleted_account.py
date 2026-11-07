@@ -40,7 +40,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("ai", "0042_record_space_embedding_read_policy"),
-        ("accounts", "0019_account_deletion"),
+        ("accounts", "0021_account_deletion"),
     ]
 
     operations = [

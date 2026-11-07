@@ -28,6 +28,7 @@
     "ai_hook": null,
     "adviser": 2,
     "adviser_name": "Ana Adviser",
+    "adviser_has_profile": true,
     "added_by": 1,
     "is_ip": false,
     "ip_type": "",
@@ -98,7 +99,8 @@
         "user": 1,
         "email": "student@cit.edu",
         "full_name": "Sam Student",
-        "is_primary": true
+        "is_primary": true,
+        "has_profile": true
       }
     ],
     "authors": [],

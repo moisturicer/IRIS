@@ -413,7 +413,7 @@ DELETE_CAPABILITY = {
 
 
 def record_capabilities(record, user, *, workflow, my_seats, routing, office_review,
-                        revision, decision) -> list[str]:
+                        revision, decision, publish_unlisted=None) -> list[str]:
     """Action keys offered by Record detail (ADR-032 §10, IR-418).
 
     These are rendering hints assembled from the same server predicates and
@@ -479,6 +479,21 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
 
         if may_release_ip(user, record) and why_not_releasable(record) is None:
             offered.append("release_ip")
+
+    # RDCO's three acts on a paper in review (ADR-051 §10, IR-797): `add-owner/`
+    # and `withdraw/`, and `replace-adviser/` while an Adviser review is open.
+    # The same predicates `rdco_acts` checks, so the hint cannot offer more.
+    from apps.records import rdco_acts
+
+    if rdco_acts.is_rdco(user) and record.pipeline_status == PipelineStatus.IN_REVIEW:
+        if rdco_acts.adviser_review(record) is not None:
+            offered.append("replace_adviser")
+        offered.extend(["add_owner", "withdraw_paper"])
+    # `publish-unlisted/` (ADR-047 §10, IR-878): any RDCO member, on an Unlisted
+    # paper. Offered while its embargo holds too, so the reason can be shown.
+    # `publish_unlisted` is Record detail's block, `unlisted.offer_payload`.
+    if publish_unlisted is not None:
+        offered.append("publish_unlisted")
 
     # `review-comments/`: the record's participants, once it is submitted
     # (ADR-032 §7, IR-419). A pool member reads the discussion but is not

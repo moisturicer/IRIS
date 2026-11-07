@@ -11,11 +11,12 @@ import pytest
 
 RATE_KEYS = (
     "API_THROTTLE_ANON", "API_THROTTLE_USER", "API_THROTTLE_AI_QUERY",
-    "API_THROTTLE_LOGIN", "API_THROTTLE_REGISTER",
+    "API_THROTTLE_LOGIN", "API_THROTTLE_REGISTER", "API_THROTTLE_DATA_EXPORT",
 )
 DEFAULT_RATES = {
     "anon": "100/day", "user": "1000/day", "ai_query": "60/hour",
     "ai_overview": "600/hour", "auth_login": "300/hour", "auth_register": "60/hour",
+    "personal_data_export": "5/hour",
 }
 
 
@@ -47,6 +48,7 @@ def test_unset_rates_keep_existing_defaults_even_in_debug(debug, module):
     ("API_THROTTLE_AI_QUERY", "ai_query", "6000/hour"),
     ("API_THROTTLE_LOGIN", "auth_login", "9000/hour"),
     ("API_THROTTLE_REGISTER", "auth_register", "900/hour"),
+    ("API_THROTTLE_DATA_EXPORT", "personal_data_export", "90/hour"),
 ])
 @pytest.mark.parametrize("module", ["base", "development"])
 def test_each_rate_can_be_overridden_independently(key, scope, value, module):

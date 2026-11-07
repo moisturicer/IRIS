@@ -29,7 +29,7 @@ so the rows join back to the workflow tables when a question needs more.
 
 from __future__ import annotations
 
-from core.enums import AssignmentState
+from core.enums import AssignmentState, Party
 
 from .models import AuditEvent
 from .services import create_audit_event
@@ -139,6 +139,18 @@ def published(record, actor, *, party):
     _write(AuditEvent.PUBLISHED, actor, record, party=str(party), version=_version(record))
 
 
+def published_from_unlisted(record, actor) -> None:
+    """
+    RDCO published an Unlisted paper after its Decision (ADR-047 §10, IR-878).
+    `PUBLISHED` alone, with no second `DECISION_RECORDED`: the paper's final
+    Decision was its *keep unlisted*. The note is prose, so it is not copied.
+    """
+    _write(
+        AuditEvent.PUBLISHED, actor, record,
+        party=str(Party.RDCO), version=_version(record), via="publish_unlisted",
+    )
+
+
 # --- revisions ---------------------------------------------------------------------
 
 def resubmission_requested(request, actor):
@@ -221,12 +233,40 @@ def seat_opened(seat, actor):
 
 # --- withdrawal ----------------------------------------------------------------------
 
-def record_withdrawn(record, actor, *, closed_parties):
-    """The owner withdrew the record from review; `closed_parties` lost their open work."""
+def record_withdrawn(record, actor, *, closed_parties, reason=None):
+    """
+    The record was withdrawn from review; `closed_parties` lost their open work.
+
+    `reason` is RDCO's, given when RDCO withdraws a paper (IR-797). An owner's
+    deletion gives none, and its row carries no `reason` key.
+    """
+    extra = {"reason": reason} if reason else {}
     _write(
         AuditEvent.RECORD_WITHDRAWN, actor, record,
         version=_version(record), closed_parties=sorted(str(p) for p in closed_parties),
+        **extra,
     )
+
+
+# --- RDCO's acts on a paper in review (ADR-051 §10, IR-797) --------------------------
+
+def adviser_replaced(record, actor, *, previous_adviser, adviser, assignment, previous_seat, seat, reason=""):
+    """
+    RDCO named another Adviser on a paper whose Adviser review is open. The old
+    Adviser's seat was withdrawn and `seat` is the new one's, in one act.
+    """
+    _write(
+        AuditEvent.ADVISER_REPLACED, actor, record,
+        assignment=assignment.pk,
+        previous_adviser=previous_adviser.pk if previous_adviser else None, adviser=adviser.pk,
+        previous_seat=previous_seat.pk if previous_seat else None, seat=seat.pk,
+        reason=reason,
+    )
+
+
+def owner_added(record, actor, *, owner):
+    """RDCO added `owner` to a paper in review. The Contact person is unchanged."""
+    _write(AuditEvent.OWNER_ADDED, actor, record, owner=owner.pk)
 
 
 # --- document requests (ADR-022) -----------------------------------------------------

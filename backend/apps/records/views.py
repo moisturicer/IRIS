@@ -22,7 +22,7 @@ from core.enums import (
     RecordTypeName,
     RequestStatus,
 )
-from . import embargo, ip_release, lifecycle
+from . import embargo, ip_release, lifecycle, rdco_acts, unlisted
 from core.permissions import (
     IsAdmin,
     IsAuthor,
@@ -160,6 +160,11 @@ class RecordViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), MayReleaseEmbargo()]
         if self.action == "ip_release":
             return [IsAuthenticated(), MayReleaseIp()]
+        # RDCO's three acts on a paper in review (ADR-051 §10, IR-797): a role
+        # gate before any lookup, so a refusal reads the same for a paper that
+        # does not exist. What each does, and the lock it takes, is `rdco_acts`.
+        if self.action in ("replace_adviser", "add_owner", "rdco_withdraw", "publish_unlisted"):
+            return [IsAuthenticated(), IsRDCO()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -472,6 +477,64 @@ class RecordViewSet(viewsets.ModelViewSet):
         if refused is not None:
             return Response({"detail": refused}, status=status.HTTP_400_BAD_REQUEST)
         return Response(ip_release.release_ip(record, actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="replace-adviser")
+    @transaction.atomic
+    def replace_adviser(self, request, pk=None):
+        """
+        POST /records/<id>/replace-adviser/  {"adviser": <user id>, "reason": optional}
+
+        RDCO names another account holding the Adviser role on a paper whose
+        Adviser review is open (ADR-051 §10, IR-797). The old Adviser's seat is
+        withdrawn and the new one is seated; both are told in-app.
+        """
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(rdco_acts.replace_adviser(
+            record, body.get(rdco_acts.ADVISER_FIELD), actor=request.user,
+            reason=body.get("reason", ""),
+        ))
+
+    @action(detail=True, methods=["post"], url_path="add-owner")
+    @transaction.atomic
+    def add_owner(self, request, pk=None):
+        """
+        POST /records/<id>/add-owner/  {"email": "..."}
+
+        RDCO adds an existing, active, verified account as an owner of a paper
+        in review (ADR-051 §10, IR-797). The Contact person does not change.
+        """
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(rdco_acts.add_owner(record, body.get("email"), actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="withdraw", url_name="withdraw")
+    @transaction.atomic
+    def rdco_withdraw(self, request, pk=None):
+        """
+        POST /records/<id>/withdraw/  {"reason": "..."}
+
+        RDCO withdraws a paper in review, with a required reason (ADR-051 §10,
+        IR-797), by the path an owner's deletion takes: the review ends, and the
+        owners and the people whose work ends are told.
+        """
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(rdco_acts.withdraw(record, body.get("reason"), actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="publish-unlisted")
+    @transaction.atomic
+    def publish_unlisted(self, request, pk=None):
+        """
+        POST /records/<id>/publish-unlisted/  {"note": optional}
+
+        RDCO publishes an Unlisted paper once its embargo is released (ADR-047
+        §10, IR-878). An embargoed paper is refused with a 400 naming the
+        embargo; nothing about its review reopens.
+        """
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(unlisted.publish_unlisted(record, body.get("note", ""), actor=request.user))
 
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):
