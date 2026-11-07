@@ -356,7 +356,18 @@ def _lines(words):
             lines[-1].append(w)
         else:
             lines.append([w])
-    return [sorted(line, key=lambda w: w["x0"]) for line in lines]
+    lines = [sorted(line, key=lambda w: w["x0"]) for line in lines]
+    # A lone list mark set higher than its text (Word's Courier "o" sits
+    # 2.6 pt up) joins the line to its right that its height overlaps.
+    joined = []
+    for line in lines:
+        mark = joined[-1] if joined and len(joined[-1]) == 1 and _is_mark(joined[-1][0]) else None
+        if (mark and mark[0]["top"] < line[0]["top"] < mark[0]["bottom"]
+                and line[0]["x0"] > mark[0]["x1"]):
+            joined[-1] = mark + line
+        else:
+            joined.append(line)
+    return joined
 
 
 def _columns(words, width, height, margin):
@@ -431,13 +442,15 @@ SYMBOL_FONTS = ("wingdings", "webdings", "symbol", "zapfdingbats", "dingbats")
 def _is_mark(word) -> bool:
     """A single list mark: a bullet character, a private-use character (Word's
     default Symbol bullet reads as U+F0B7), any one character in a symbol font,
-    or one glyph with no character behind it ("(cid:127)")."""
+    an "o" in Courier (Word's second level), or one glyph with no character behind it ("(cid:127)")."""
     text = word["text"]
     if UNMAPPED.fullmatch(text):
         return True   # a lone glyph with no character, as a bullet's font often has
     if len(text) != 1:
         return False
     font = (word.get("fontname") or "").lower()
+    if text == "o" and "courier" in font:
+        return True   # Word's second-level bullet
     return text in BULLETS or 0xE000 <= ord(text) <= 0xF8FF or any(f in font for f in SYMBOL_FONTS)
 
 

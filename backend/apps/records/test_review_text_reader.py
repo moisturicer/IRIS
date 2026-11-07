@@ -5,8 +5,8 @@ import socket
 import pytest
 
 from apps.records.review_text import reader, sandbox
-from apps.records.review_text.testing import (BODY, THESIS, blank, mixed_font_words, pdf, placed, sized_headings,
-                                               two_columns, unruled_table, white_boxed_columns)
+from apps.records.review_text.testing import (BODY, THESIS, blank, mixed_font_words, pdf, placed, raised_bullets,
+                                               sized_headings, two_columns, unruled_table, white_boxed_columns)
 
 
 @pytest.fixture
@@ -137,6 +137,15 @@ def test_a_table_row_led_by_a_number_far_from_its_word_is_no_heading(read):
                                      [(BODY, "2.91", -60), (BODY, "Effective")],
                                      [(BODY, "The respondents rated each of the coping mechanisms as effective.")]]))
     assert keys(reading) == ["results"]
+
+
+def test_words_second_level_o_bullet_leads_its_item(read):
+    # sample29: Word's "o" in Courier New, 2.6 pt above its text, was read
+    # as a line of its own and kept as a passage holding only "o".
+    items = ["Brushless motors: efficient over long operation.", "PVC pipes: cheap and easily shaped."]
+    found = texts(read(raised_bullets("The parts were chosen as follows:", items)))
+    assert "o" not in found
+    assert [t for t in found if t.endswith(tuple(i[-12:] for i in items))] == [f"o {i}" for i in items]
 
 
 def test_an_unruled_tables_number_columns_are_not_a_page_column(read):

@@ -299,6 +299,26 @@ def mixed_font_words(lines, size=letter) -> bytes:
     return out.getvalue()
 
 
+def raised_bullets(intro, items, mark="o", font="Courier", rise=3, size=letter) -> bytes:
+    """A paragraph, then list ``items`` each led by ``mark`` in ``font`` drawn
+    ``rise`` pt above its text's baseline, as Word sets its second-level "o"
+    bullet in Courier New."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    y = size[1] - 100
+    c.setFont(BODY, 12)
+    c.drawString(LEFT, y, intro)
+    for item in items:
+        y -= 18
+        c.setFont(font, 12)
+        c.drawString(LEFT + 36, y + rise, mark)
+        c.setFont(BODY, 12)
+        c.drawString(LEFT + 54, y, item)
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
 def white_boxed_columns(left_paragraphs, right_paragraphs, size=letter) -> bytes:
     """Two columns of paragraphs, every line on an invisible box: filled white,
     no border, as wide as its column, and starting at the indent on a
