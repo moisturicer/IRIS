@@ -81,6 +81,39 @@ class EmbeddingSpace(models.Model):
         return f"{self.model_id} ({self.dimensions}d, {self.metric}, {self.state})"
 
 
+class ActivationKind(models.TextChoices):
+    PROMOTE = "promote", "Promote"
+    ROLLBACK = "rollback", "Rollback"
+
+
+class EmbeddingSpaceActivation(models.Model):
+    """One committed change of which Embedding Space is live (IR-739).
+
+    Written in the same transaction that flips the states, so the history can
+    never disagree with them: the newest row's ``space_id`` is the active space
+    and its ``previous_space_id`` is the compatible prior revision a deliberate
+    rollback returns to. Plain integers rather than foreign keys on purpose --
+    this is a record of what happened, and deleting a space must not delete or
+    block on the evidence that it once served readers.
+
+    ``report`` is the verification that let the change through (counts and the
+    checks that ran), kept as the operator's result.
+    """
+
+    kind = models.CharField(max_length=10, choices=ActivationKind.choices)
+    space_id = models.BigIntegerField()
+    previous_space_id = models.BigIntegerField(null=True, blank=True)
+    actor = models.CharField(max_length=254, blank=True)
+    report = models.JSONField(default=dict)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-id"]
+
+    def __str__(self) -> str:
+        return f"{self.kind} space {self.space_id} (was {self.previous_space_id})"
+
+
 def get_active_embedding_space() -> EmbeddingSpace:
     """The one active ``EmbeddingSpace``, or a loud, specific failure.
 

@@ -175,6 +175,17 @@ def _checked_space(provider: EmbeddingProvider, space_id: Optional[int] = None):
             f"but space {space.pk} ({space.model_id!r}) is {space.dimensions}. "
             f"Refusing before the vendor call rather than after it."
         )
+    # A provider that names its model must name this space's. After a promotion
+    # the active space is a different model; a worker still configured for the
+    # old one would otherwise write old-model vectors into the new space, a
+    # mix of two spaces under one identity (IR-739). A provider that names no
+    # model (a fake) cannot be shown to differ and is let by.
+    if provider.model_id is not None and provider.model_id != space.model_id:
+        raise ImproperlyConfigured(
+            f"The embedding provider is model {provider.model_id!r} but space "
+            f"{space.pk} is {space.model_id!r}. Refusing before the vendor call: "
+            f"its vectors do not belong in this space."
+        )
     return space
 
 
@@ -214,6 +225,29 @@ def _require_disclosure(record) -> None:
     decision = default_permits(record)
     if not decision:
         raise EmbeddingRefused(decision.explain())
+
+
+#: Why a write stopped because its space was retired while it embedded (IR-739).
+SPACE_RETIRED = "The embedding space was retired while this was embedding; nothing was written."
+
+
+def _hold_space(space) -> bool:
+    """Share-lock ``space``'s row until the transaction ends; True while it is writable.
+
+    A promotion holds every space row ``FOR UPDATE``, so a write that began
+    against the then-active space either commits before the promotion's final
+    check (and is counted) or waits, and then finds the space retired and
+    writes nothing. Without this a vector computed for the old space could land
+    after the flip and leave the retired space ahead of the live one.
+    """
+    from django.db import connection
+
+    from apps.ai.models import EmbeddingSpaceState
+
+    with connection.cursor() as cursor:
+        cursor.execute("SELECT state FROM ai_embeddingspace WHERE id = %s FOR SHARE", [space.pk])
+        row = cursor.fetchone()
+    return row is not None and row[0] != EmbeddingSpaceState.RETIRED
 
 
 def summary_text(record) -> str:
@@ -288,6 +322,9 @@ def embed_record_summary(
     except Withheld as refused:
         return _withheld(record_id, space, refused)
     with transaction.atomic():
+        if not _hold_space(space):
+            return EmbeddingOutcome(
+                record_id=record_id, space_id=space.id, refused=True, reason=SPACE_RETIRED)
         if space_id is None:
             RecordEmbedding.objects.update_or_create(
                 record=record,
@@ -418,6 +455,9 @@ def embed_active_chunk_set(
     from django.db import transaction
     with transaction.atomic():
         Record.objects.select_for_update().get(pk=record_id)
+        if not _hold_space(space):
+            return EmbeddingOutcome(
+                record_id=record_id, space_id=space.id, refused=True, reason=SPACE_RETIRED)
         if chunk_set_id is not None and not ChunkSet.objects.filter(
             pk=chunk_set_id, record_id=record_id, is_active=True, source_revision=source_revision,
         ).exists():

@@ -18,7 +18,9 @@ outcome is refused.
   finishing an unopened seat would leave it empty;
 - an office with its own document request still open. An office never
   finishes while it is still asking the author for something; likewise an
-  office with its own revision request open (IR-272).
+  office with its own revision request open (IR-272);
+- *Clear* while the office has an open *Must fix* review thread (ADR-032 §7,
+  IR-874). A finding is not held: it doesn't approve.
 
 **When an office completes** -- every seat it did not withdraw is done, by the
 last verdict or by a coordinator withdrawing the last unfinished seat --
@@ -55,6 +57,7 @@ from core.permissions import holds_seat
 
 from . import revisions, routing, seats
 from .models import RecordAssignment, RecordClearance, Review, ReviewerSeat
+from .threads import approval_blocked_reason
 
 #: The specialist offices (ADR-032 §3): the only parties that clear.
 SPECIALIST_PARTIES = (str(Party.ITSO), str(Party.IERC), str(Party.KTTO))
@@ -132,12 +135,15 @@ def office_review_flags(record, user) -> dict:
     """
     party = _seated_specialist(record, user) if routing.is_in_review(record) else None
     if party is None:
-        return {"party": None, "label": None, "blocked": None, "assignment": None}
+        return {"party": None, "label": None, "blocked": None, "clear_blocked": None, "assignment": None}
     seat = _open_seat(record, user, party)
     return {
         "party": party,
         "label": _label(party),
         "blocked": _blocked_reason(record, user, party),
+        # Clear alone, held by the office's own open Must fix (ADR-032 §7,
+        # IR-874). Record a finding is never held by a thread.
+        "clear_blocked": approval_blocked_reason(record, party),
         "assignment": seat.assignment_id if seat else None,
     }
 
@@ -145,7 +151,7 @@ def office_review_flags(record, user) -> dict:
 # --- the act ------------------------------------------------------------------------
 
 @transaction.atomic
-def record_office_review(record, actor, *, outcome, comment=""):
+def record_office_review(record, actor, *, outcome, comment="", threads=0):
     """
     Clear, or record a finding, for the office `actor` is seated for.
 
@@ -171,7 +177,9 @@ def record_office_review(record, actor, *, outcome, comment=""):
         raise OfficeReviewError("Say what the finding is, so RDCO and the author can act on it.")
 
     seat = _open_seat(record, actor, party)
-    blocked = _blocked_reason(record, actor, party)
+    blocked = _blocked_reason(record, actor, party) or (
+        approval_blocked_reason(record, party) if outcome == CLEARED else None
+    )
     if blocked:
         raise OfficeReviewError(blocked)
 
@@ -182,7 +190,7 @@ def record_office_review(record, actor, *, outcome, comment=""):
     )
     audit.decision_recorded(record, actor, party=party, outcome=outcome, final=False, review=review)
     try:
-        completed = seats.complete_seat(seat, actor)
+        completed = seats.complete_seat(seat, actor, threads=threads)
     except seats.SeatError as exc:
         raise OfficeReviewError(str(exc))
     return party, completed
@@ -190,7 +198,7 @@ def record_office_review(record, actor, *, outcome, comment=""):
 
 # --- when an office completes --------------------------------------------------------
 
-def office_completed(assignment, actor) -> None:
+def office_completed(assignment, actor, threads=0) -> None:
     """
     `assignment` has just completed (`seats._close_if_complete`). For a
     specialist office: settle its clearance and notify RDCO, which already
@@ -217,10 +225,10 @@ def office_completed(assignment, actor) -> None:
     rdco = RecordAssignment.objects.filter(
         record=record, party=Party.RDCO, state=AssignmentState.ACTIVE,
     ).first()
-    _notify(record, actor, party, outcome, rdco)
+    _notify(record, actor, party, outcome, rdco, threads=threads)
 
 
-def _notify(record, actor, party, outcome, rdco):
+def _notify(record, actor, party, outcome, rdco, threads=0):
     from apps.notifications.services import notify_office_completed
 
     rdco_holders = []
@@ -236,4 +244,5 @@ def _notify(record, actor, party, outcome, rdco):
         outcome_label=str(ClearanceStatus(outcome).label),
         rdco_holding=rdco is not None,
         rdco_holders=rdco_holders,
+        threads=threads,
     ))

@@ -59,7 +59,7 @@ from django.utils import timezone
 from apps.accounts.models import College, Course, Role, StudentProfile, User
 from apps.documents.models import RecordUpload, UploadSlot
 from apps.records import lifecycle
-from apps.records.embargo import EmbargoAnswer, record_answer
+from apps.records.embargo import mark_released, set_embargo
 from apps.records.models import (
     Author,
     Classification,
@@ -165,11 +165,15 @@ AT_RDCO_TITLE = f"{_PREFIX} Thesis ITSO cleared, RDCO's turn to decide"
 PROPOSAL_AT_ADVISER_TITLE = f"{_PREFIX} Proposal at its Adviser, ready to accept or reject"
 AWAITING_DOCUMENT_TITLE = f"{_PREFIX} Adviser requested a supporting document"
 
-#: The one paper under embargo, so the blocked state can be seen (ADR-052
-#: decision 16). This one because RDCO's warning (IR-818) needs a paper in front
-#: of RDCO. A date always ahead, so the demo never reads as overdue.
+#: Every paper starts embargoed (ADR-052, amended for IR-882), and decision 16
+#: as amended leaves some submitted papers Active and releases the rest, so both
+#: paths can be shown. This one is in front of RDCO, which can't publish it until
+#: it is released, and carries a date always ahead, so it never reads as overdue.
 EMBARGOED_TITLE = AT_RDCO_TITLE
 EMBARGO_DAYS_AHEAD = 365
+#: Active with no date, at its Adviser, who can add a date or release it.
+UNDATED_EMBARGO_TITLE = AWAITING_DOCUMENT_TITLE
+STAYS_EMBARGOED = (EMBARGOED_TITLE, UNDATED_EMBARGO_TITLE)
 
 
 class Command(BaseCommand):
@@ -209,7 +213,7 @@ class Command(BaseCommand):
             self._seed_classifications()
             self._seed_catalogue(users)
             self._seed_workflow(users)
-            self._answer_for_papers_seeded_earlier()
+            self._settle_papers_seeded_earlier()
 
         self.stdout.write("")
         self.stdout.write(self.style.SUCCESS("Demo data ready."))
@@ -220,7 +224,8 @@ class Command(BaseCommand):
             self.stdout.write(f"  Already-preserved badges render on: '{RESUBMITTED_TITLE}'")
             self.stdout.write(f"  Pick the offices as RDCO on: '{IN_RDCO_POOL_TITLE}'")
             self.stdout.write(f"  Decide early as RDCO on: '{RDCO_DECIDES_EARLY_TITLE}'")
-            self.stdout.write(f"  Under embargo, so the AI refuses it: '{EMBARGOED_TITLE}'")
+            self.stdout.write(f"  Under embargo until a date, so RDCO can't publish it: '{EMBARGOED_TITLE}'")
+            self.stdout.write(f"  Under embargo with no date, for the Adviser to release: '{UNDATED_EMBARGO_TITLE}'")
 
     # -- phase 1: accounts -------------------------------------------------
 
@@ -395,39 +400,51 @@ class Command(BaseCommand):
         """Submit through the same adviser-first service as the API."""
         from apps.reviews.routing import enter_at_adviser
 
-        record_answer(record, self._embargo_answer(record), actor=owner)
         record.dpa_accepted_at = timezone.now()
         record.dpa_accepted_by = owner
         record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
-        return enter_at_adviser(record, owner)
+        entry = enter_at_adviser(record, owner)
+        self._settle_embargo(record)
+        return entry
 
-    def _embargo_answer(self, record: Record) -> EmbargoAnswer:
-        if record.title == EMBARGOED_TITLE:
-            return EmbargoAnswer(until=timezone.localdate() + timedelta(days=EMBARGO_DAYS_AHEAD))
-        return EmbargoAnswer(until=None)
-
-    def _answer_for_papers_seeded_earlier(self):
+    def _settle_embargo(self, record: Record) -> None:
         """
-        Answer for this command's own papers that an older run left Unknown.
+        What the Adviser would do: date the one paper RDCO is shown, leave the
+        undated one Active, and release every other. As the Adviser, because only
+        the Adviser or RDCO set a date or release (ADR-052 §5-6, amended for IR-882).
+        """
+        if record.title == EMBARGOED_TITLE:
+            until = timezone.localdate() + timedelta(days=EMBARGO_DAYS_AHEAD)
+            set_embargo(record, until, actor=record.adviser)
+        elif record.title not in STAYS_EMBARGOED:
+            mark_released(record, actor=record.adviser)
+
+    def _settle_papers_seeded_earlier(self):
+        """
+        Settle this command's own papers that an older run left embargoed.
 
         A second run creates nothing, so without this a database seeded before
-        the question existed would keep answering "no readable sources". Named
-        by title and origin together, so a paper from anywhere else doesn't get an
-        answer nobody gave. The draft stays for Publish to ask.
+        IR-882 would keep papers it meant to show as released out of Ask IRIS.
+        Only papers still embargoed with no date set and never released: a date
+        someone set, or a released paper held again, is left as it is. Named by
+        title and origin together, so nothing from anywhere else is released. The
+        draft stays as it is.
         """
         catalogue = [entry[0] for entry in CATALOGUE]
         earlier = (
             Record.objects.filter(
                 Q(title__startswith=_PREFIX) | Q(title__in=catalogue),
                 origin=Record.Origin.SYNTHETIC,
-                embargo_answered_at__isnull=True,
+                is_embargoed=True, embargo_date_set_at__isnull=True,
             )
             .exclude(pipeline_status=PipelineStatus.DRAFT)
             .select_related("added_by")
         )
-        for record in earlier:
-            record_answer(record, self._embargo_answer(record), actor=record.added_by)
-            self.stdout.write(f"  ~ {record.title[:58]} (embargo answered)")
+        for record in earlier.select_related("adviser"):
+            if record.title == UNDATED_EMBARGO_TITLE:
+                continue  # already as it should be; say nothing about it
+            self._settle_embargo(record)
+            self.stdout.write(f"  ~ {record.title[:58]} (embargo settled)")
 
     @transaction.atomic
     def _scenario_draft(self, users):

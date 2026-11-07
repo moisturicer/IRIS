@@ -12,6 +12,11 @@ capping to `max_sources` gives exactly the passages the answer service's own
 `limit=max_sources` call would have — both paths recall wide and trim at the
 end, so the prefix is the same — and it halves what a run spends on reranking.
 
+**Unanswerable questions run through the same retriever (IR-454).** Each
+retrieves exactly as an answerable one does; its outcome goes to the report's
+`refusals` list instead of `outcomes`, so correct refusal is measured under the
+same configuration as recall and never averaged into it.
+
 Nothing here calls a model. A retrieval measurement that needed an answering
 vendor would be unrunnable on a deployment with no generation configured, which
 is every deployment today.
@@ -34,6 +39,7 @@ def _outcome(
     *,
     degraded: bool,
     mode: Optional[str],
+    expects_refusal: bool = False,
 ) -> QuestionOutcome:
     retrieved_hits = hits(question.expected, retrieved)
     final_hits = hits(question.expected, final)
@@ -70,6 +76,7 @@ def _outcome(
             if label not in found
         ),
         page_mismatches=tuple(page_mismatches),
+        expects_refusal=expects_refusal,
     )
 
 
@@ -90,6 +97,7 @@ def run(
     """
     limit = max(config.retrieval_limit, config.max_sources)
     outcomes: list[QuestionOutcome] = []
+    refusals: list[QuestionOutcome] = []
     spaces: set[int] = set()
     modes: set[str] = set()
 
@@ -97,7 +105,7 @@ def run(
         active = root if config.reranking else root.without_reranking()
         retriever = active.retriever()
         selection = active.source_selection(config.max_sources)
-        for question in question_set.scored:
+        for question in (*question_set.scored, *question_set.unanswerable):
             result = retriever.retrieve(question.question, user, limit=limit)
             passages = list(result.passages)
             final = selection.apply(passages)
@@ -105,20 +113,21 @@ def run(
                 spaces.add(result.embedding_space_id)
             if result.mode:
                 modes.add(result.mode)
-            outcomes.append(
-                _outcome(
-                    question,
-                    passages[: config.retrieval_limit],
-                    final,
-                    degraded=result.degraded,
-                    mode=result.mode,
-                )
+            outcome = _outcome(
+                question,
+                passages[: config.retrieval_limit],
+                final,
+                degraded=result.degraded,
+                mode=result.mode,
+                expects_refusal=question.unanswerable,
             )
+            (refusals if question.unanswerable else outcomes).append(outcome)
 
     return EvalReport(
         question_set=question_set,
         config=config,
         outcomes=tuple(outcomes),
+        refusals=tuple(refusals),
         provenance={
             "ran_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "embedding_spaces": sorted(spaces),

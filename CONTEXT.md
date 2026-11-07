@@ -40,6 +40,10 @@ _Avoid_: Submission, paper, thesis (a Record's `record_type` may be a thesis, bu
 The structured document read out of one PDF (a `PdfExtraction` row): its elements in reading order with page boxes, the flattened search text derived from them, and the Provenance of the Extractor that produced it.
 _Avoid_: Parse, OCR result, the PDF text
 
+**Review text**:
+What reviewers compare and comment against: one Version's sections and passages, each with its page, read from that Version's own Manuscript on campus with no AI. Every Version that changes the Manuscript has its own. Distinct from the Extraction, which the AI reads, exists only for the latest released Version, and comes from a different reader, so the two can disagree about the same page.
+_Avoid_: Extraction (the AI's text, not the reviewers'), Version text alone (ambiguous between the two), diff text.
+
 **Extractor**:
 The adapter that turns PDF bytes into an Extraction behind the `StructuredExtractor` port. `EXTRACTION_BACKEND` chooses which one runs; every non-legacy Extractor passes the contract suite.
 _Avoid_: Parser, Docling (one legacy Extractor, not the role)
@@ -263,12 +267,16 @@ _Avoid_: Recently viewed, activity, reading log.
 ### People
 
 **Profile**:
-A page about one account that any signed-in user can open: their name, affiliation and role, the photo, bio, research interests and ORCID iD they chose to add, the published papers they own or advised, and their [[Collaborator]]s. It never shows their email address.
-_Avoid_: Account (the sign-in identity), user page, bio.
+A page about one account that any signed-in user can open: their name, affiliation and role, the photo, bio, research interests and ORCID iD they chose to add, the published papers they own or advised, and their [[Collaborator]]s. It never shows their email address. The role shown is Student, Adviser or the office's name (ITSO, IERC, KTTO, RDCO). A [[System Admin]] has no Profile, and a [[Suspension]] hides one. Where a name has no Profile to open, as for a suspended or former user on a paper, it shows as plain text and is left out of Collaborators.
+_Avoid_: Account (the sign-in identity), user page, bio, Faculty (the role is Adviser).
 
 **Collaborator**:
 Another account that shared a published paper with this person, as a co-owner, as its Adviser, or as an advisee. Byline authors without an account are not collaborators.
 _Avoid_: Co-author (a byline name, not an account), team member.
+
+**People search**:
+Finding [[Profile]]s from Discover's one search bar, by name or research interest, narrowed by college, department and role. It needs a search term or a filter and never lists everyone. A result shows the person's photo, name, role, affiliation and how many published papers they own or advised, and says which interest matched when it was not the name. Never an email address. Suspended and former users, and System Admins, do not appear.
+_Avoid_: Directory (it never lists everyone), user search.
 
 **Contact person**:
 The one owner of a Record who gets its review emails, and whom IRIS names when someone outside it needs to reach its owners, such as the owners of a similar open Proposal. By default it is the owner who submitted the Record; any owner can choose another. Their email is shown only where a decision says so, never on their Profile.
@@ -333,6 +341,10 @@ _Avoid_: Admin, administrator.
 **System Admin**:
 The role that runs IRIS itself rather than its research workflow. It decides [[Account deletion]] requests, sets [[Retention period]]s and alone reads the Audit Log, and it shares removing Comments and publishing [[Notice]]s with RDCO. Nobody can ask for it; developers set up the first one.
 _Avoid_: Admin (on its own), administrator, superuser.
+
+**Suspension**:
+RDCO's hold on an account, always with a written reason. The person is emailed the reason when it starts and again when it is lifted. While it lasts they cannot sign in, and their [[Profile]] and search entry are hidden; their papers and [[Comment]]s stay where they are. Not the same as the pause after repeated failed sign-ins, which hides nothing and emails no one, nor as [[Account deletion]].
+_Avoid_: Lock (the code's word), lockout (the failed-attempts pause), deactivation, ban.
 
 **Account deletion**:
 Removing a person from IRIS at their own request, once the System Admin confirms it and nobody is waiting on them. Their personal details go and they can't sign in. A published paper keeps their name as an Author or as Adviser, and elsewhere they show as "Former user".

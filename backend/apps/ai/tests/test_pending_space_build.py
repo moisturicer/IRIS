@@ -114,7 +114,7 @@ def pending(active):
 def _record(title="A thesis", chunks=("alpha", "beta"), abstract="An abstract."):
     record = Record.objects.create(
         title=title, abstract=abstract, is_ip=False,
-        dpa_accepted_at=timezone.now(), embargo_answered_at=timezone.now(),
+        dpa_accepted_at=timezone.now(), is_embargoed=False, embargo_released_at=timezone.now(),
         pipeline_status=PipelineStatus.PUBLISHED,
     )
     if chunks:
@@ -267,7 +267,7 @@ class ReadersStayOnTheActiveSpaceTests:
                         embedder=embedder, space=space),
         ]
         Record.objects.filter(pk__in=[r.pk for r in records]).update(
-            is_ip=False, dpa_accepted_at=timezone.now(), embargo_answered_at=timezone.now())
+            is_ip=False, dpa_accepted_at=timezone.now(), is_embargoed=False, embargo_released_at=timezone.now())
         return reader, records
 
     def _read(self, reader, records, embedder):
@@ -308,7 +308,7 @@ class ReadersStayOnTheActiveSpaceTests:
             model_id=NEW, dimensions=DIMENSIONS, metric="cosine",
             state=EmbeddingSpaceState.PENDING)
         Record.objects.update(is_ip=False, dpa_accepted_at=timezone.now(),
-                              embargo_answered_at=timezone.now())
+                              is_embargoed=False, embargo_released_at=timezone.now())
         client = APIClient()
         client.force_authenticate(user=reader)
 
@@ -318,14 +318,18 @@ class ReadersStayOnTheActiveSpaceTests:
         assert client.get("/api/v1/ai/status/").json() == before
 
     def test_only_the_build_and_indexing_modules_name_the_space_keyed_table(self):
-        """A reader of `RecordSpaceEmbedding` must name its space. Until IR-739
-        moves the readers, the table has exactly these callers."""
+        """A reader of `RecordSpaceEmbedding` must name its space. IR-739 moved
+        the readers onto it, through `record_vectors` (which takes the space) and
+        `similarity` (which seeds from it); activation counts it. Any other
+        module naming the table is a reader that has not shown it names a space,
+        and must be added here deliberately."""
         import ast
         from testing.source_files import python_sources
 
         apps_ai = pathlib.Path(__file__).resolve().parents[1]
         allowed = {"space_build.py", "indexing.py", "embedding.py", "__init__.py",
-                   "backfill.py", "check_vector_index.py"}
+                   "backfill.py", "check_vector_index.py",
+                   "record_vectors.py", "similarity.py", "space_activation.py"}
         named = []
         for path in python_sources(apps_ai):
             if "tests" in path.parts or "migrations" in path.parts:
@@ -430,7 +434,7 @@ class EveryAttemptIsCheckedTests:
 
     def test_a_record_the_gate_refuses_is_never_sent(self, active, pending):
         record = _record()
-        Record.objects.filter(pk=record.pk).update(embargo_answered_at=None)
+        Record.objects.filter(pk=record.pk).update(is_embargoed=True, embargo_released_at=None)
         provider = Embedder(NEW)
 
         report = build_pending_space(pending.id, provider=provider)

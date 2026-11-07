@@ -186,8 +186,10 @@ def versions_payload(record) -> list[dict]:
     review (`may_read_review`, IR-479), because earlier versions are review
     material (ADR-032 §5 Amendment).
     """
+    from .review_text.store import status as review_text_status
+
     rows = list(
-        record.versions.select_related("created_by")
+        record.versions.select_related("created_by", "review_text")
         .prefetch_related("documents__upload__slot").order_by("number")
     )
     return [
@@ -208,6 +210,8 @@ def versions_payload(record) -> list[dict]:
                 _document(u) for u in documents_added_during(v, rows[i + 1] if i + 1 < len(rows) else None)
             ],
             "documents_reconstructed": v.documents_reconstructed,
+            # ADR-058 §1 as amended (IR-871): whether this Version's text was read.
+            "review_text": review_text_status(v),
         }
         for i, v in enumerate(rows)
     ]
@@ -235,14 +239,11 @@ def write_version(record, actor, cause: VersionCause) -> RecordVersion:
     """
     # Only the record row (see `routing._locked`).
     Record.objects.select_for_update(of=("self",)).get(pk=record.pk)
-    previous = (
-        RecordVersion.objects.filter(record=record)
-        .order_by("-number").values_list("number", flat=True).first()
-    )
+    previous = RecordVersion.objects.filter(record=record).order_by("-number").first()
     created_by = actor if getattr(actor, "is_authenticated", False) else None
     version = RecordVersion.objects.create(
         record=record,
-        number=(previous or 0) + 1,
+        number=(previous.number if previous else 0) + 1,
         cause=cause,
         manuscript=record.abstract_file.name or None,
         manuscript_revision=record.manuscript_revision,
@@ -255,6 +256,11 @@ def write_version(record, actor, cause: VersionCause) -> RecordVersion:
         RecordVersionDocument(version=version, upload=upload)
         for upload in current_uploads(record)
     )
+    # Its review text: its own when the manuscript changed, read after commit
+    # on campus whatever the embargo says; else the previous one's (ADR-058 §1, IR-871).
+    from .review_text.store import attach
+
+    attach(version, previous)
     return version
 
 

@@ -11,7 +11,7 @@ import { authApi } from "@/api/auth";
 import { useAuthStore } from "@/store/auth.store";
 
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, userEvent } from "@/test/render";
+import { renderScreen, screen, userEvent, within } from "@/test/render";
 
 import LoginPage from "@/features/auth/LoginPage";
 import SettingsPage from "./SettingsPage";
@@ -109,4 +109,34 @@ it("distinguishes the current disclosure notice from historical account consent 
   expect(screen.getByText(/does not confirm.*accepted this revised notice/i)).toBeVisible();
   expect(screen.queryByText("What you agreed to")).not.toBeInTheDocument();
   expect(screen.getByText(/external AI providers outside CIT-U/i)).toBeVisible();
+});
+
+// IR-933: Profile is its own page; Settings keeps the account.
+describe("settings and profile are separate", () => {
+  it("has the account sections only, opening on Account & security", () => {
+    renderScreen(<SettingsPage />, { route: "/settings" });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Settings" })).toBeVisible();
+    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    expect(within(nav).getAllByRole("button").map((b) => b.textContent)).toEqual([
+      "Account & security", "Data privacy & consent", "Role & access",
+    ]);
+    expect(within(nav).getByRole("button", { name: "Account & security" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByLabelText("Current password")).toBeVisible();
+  });
+
+  it("points to the Profile instead of holding it", () => {
+    renderScreen(<SettingsPage />, { route: "/settings" });
+
+    expect(screen.getByRole("link", { name: "Your profile" })).toHaveAttribute("href", "/profile");
+    expect(screen.queryByLabelText("Bio")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View my profile" })).not.toBeInTheDocument();
+  });
+
+  it("shows the sign-in email as read-only, managed by the university", () => {
+    renderScreen(<SettingsPage />, { route: "/settings" });
+
+    expect(screen.getByLabelText("Sign-in email")).toHaveValue("reader@cit.edu");
+    expect(screen.getByLabelText("Sign-in email")).toHaveAttribute("readonly");
+  });
 });

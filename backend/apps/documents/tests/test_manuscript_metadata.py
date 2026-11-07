@@ -94,7 +94,7 @@ def _record(*, consent=True):
         title="two_columns.pdf",
         record_type=RecordType.objects.get_or_create(name="Thesis")[0],
         abstract_file=SimpleUploadedFile("two_columns.pdf", PDF),
-        embargo_answered_at=timezone.now(),
+        is_embargoed=False, embargo_released_at=timezone.now(),
         dpa_accepted_at=timezone.now() if consent else None,
         manuscript_revision=uuid.uuid4(),
     )

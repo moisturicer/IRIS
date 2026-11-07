@@ -132,10 +132,12 @@ test("the System Admin's nav is Discover, Users and Audit Log (IR-783)", () => {
   ]);
 });
 
-test("Settings & Profile is in the account menu, not the nav, and its page stays open", () => {
+test("Profile and Settings are in the account menu, not the nav, and their pages stay open (IR-933)", () => {
   for (const role of EVERY_ROLE) {
-    assertEqual(navFor(role, REVIEW_WORK).some((item) => item.key === "settings"), false, `${role} nav lists Settings`);
-    assertEqual(canAccess(role, "settings"), true, `${role} may open /settings`);
+    for (const key of ["profile", "settings"] as ScreenKey[]) {
+      assertEqual(navFor(role, REVIEW_WORK).some((item) => item.key === key), false, `${role} nav lists ${key}`);
+      assertEqual(canAccess(role, key), true, `${role} may open ${key}`);
+    }
   }
 });
 

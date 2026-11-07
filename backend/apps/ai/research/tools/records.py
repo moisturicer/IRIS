@@ -8,8 +8,7 @@ from django.db.models import F
 from pgvector.django import CosineDistance
 
 from apps.ai.keyword_index import CONFIG
-from apps.ai.models.embedding import RecordEmbedding
-from apps.ai.models.embedding_space import EmbeddingSpace, EmbeddingSpaceState
+from apps.ai.record_vectors import active_space, record_vectors
 from apps.ai.research.registry import Tool, ToolRun
 from apps.ai.research.results import Completeness, Coverage, CoverageSubject, ToolResult, status_for
 from apps.ai.retrieval.fusion import fuse_by_rank
@@ -113,11 +112,15 @@ def _relevant(result):
 
 
 def _by_vector(run: ToolRun, candidates, topic: str) -> list[int]:
-    if not EmbeddingSpace.objects.filter(state=EmbeddingSpaceState.ACTIVE).exists():
+    space = active_space()
+    if space is None:
         return []
-    vector = run.root.embedder().embed_query(topic)
+    embedder = run.root.embedder()
+    if embedder.model_id is not None and embedder.model_id != space.model_id:
+        return []  # a query from another model is not comparable (ADR-049 §23)
+    vector = embedder.embed_query(topic)
     return list(
-        RecordEmbedding.objects.filter(record__in=candidates.values("pk"))
+        record_vectors(space).filter(record__in=candidates.values("pk"))
         .order_by(CosineDistance("embedding", vector))
         .values_list("record_id", flat=True)[:SIGNAL_DEPTH]
     )

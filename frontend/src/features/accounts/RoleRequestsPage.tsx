@@ -82,7 +82,7 @@ export default function RoleRequestsPage() {
           <p className="text-[13px] text-stone-500 mt-1">No pending role requests.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
+        <div className="relative bg-white rounded-xl border border-stone-200 overflow-x-auto">
           <table className="w-full text-[14px]">
             <thead>
               <tr className="border-b border-stone-100 bg-stone-50">

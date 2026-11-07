@@ -178,6 +178,7 @@ At the REST seam, replacing ADR-032 §12's two hand-back tests:
 - *Rejected: Unlisted stays terminal.* A paper held for a patent would then stay hidden forever once the patent is filed.
 - *Rejected: publishing releases the embargo itself.* It saves a step, but ending an embargo would happen as a side effect, and ADR-052's rule is that a person ends it on purpose.
 - Tests: RDCO publishes a `completed` Record with a Released embargo, and it is `published` and audited. The same with an Active or Unknown embargo is refused with a 400. RDCO's Decision on an embargoed Record offers no `accept_publish`. Nobody outside RDCO is offered `publish_unlisted`.
+- **Corrected 2026-11-04 (IR-882):** ADR-052's IR-879 amendment removed None and Unknown, so "None or Released" now reads **Released**: every paper starts Active and only a release lets it be published. The Decision's half is built by IR-882 (`decisions.outcomes_for`); `publish_unlisted` is still IR-878's.
 
 ## Alternatives Considered
 

@@ -32,7 +32,8 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from pgvector.django import CosineDistance
 
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.models.embedding import RecordEmbedding, RecordSpaceEmbedding
+from apps.ai.record_vectors import active_space, record_vectors
 from apps.ai.retrieval.scan_depth import scan_depth
 from apps.records.models import Record
 from core.enums import PUBLICLY_VISIBLE_STATUSES, RecordTypeName
@@ -59,6 +60,56 @@ class SimilarRecord:
     score: float
 
 
+#: Why a Related works list is what it is (IR-568). The reader is told only the
+#: seed Record's own coverage, which is a Record they can already open. Whether
+#: a close candidate exists but is withheld is never stated (IR-460), so
+#: `NO_MATCHES` is one answer for "nothing close" and "close but unreadable".
+READY = "ready"
+NO_MATCHES = "no_matches"
+NOT_INDEXED = "not_indexed"
+INCOMPATIBLE = "incompatible"
+#: Raised by the endpoint, not computed here: the comparison itself failed.
+UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class RelatedWorks:
+    """A Related works list and the reason it is the length it is."""
+
+    state: str
+    matches: list[SimilarRecord]
+
+
+def related_works(
+    record: Record, user, limit: int = DEFAULT_LIMIT
+) -> RelatedWorks:
+    """The same comparison as ``similar_records``, with the reason it was empty.
+
+    The ranking and the visibility predicate are exactly ``similar_records``':
+    one seed vector, ``_nearest`` over ``research_records(user)``. Only an
+    empty answer gains a label, and the label depends on the seed alone:
+
+    * the seed has no summary vector anywhere: ``NOT_INDEXED``;
+    * the seed has one, but none under the active Embedding Space (a model the
+      space does not hold, or no active space): ``INCOMPATIBLE``;
+    * the seed is indexed and nothing came back: ``NO_MATCHES``.
+    """
+    seed = _seed(record)
+    if seed is None:
+        return RelatedWorks(_missing_coverage(record), [])
+    matches = _nearest(seed, research_records(user), limit=limit)
+    return RelatedWorks(READY if matches else NO_MATCHES, matches)
+
+
+def _missing_coverage(record: Record) -> str:
+    """Why ``record`` has no vector to compare *from* under the active space."""
+    held_elsewhere = (
+        RecordSpaceEmbedding.objects.filter(record=record).exists()
+        or RecordEmbedding.objects.filter(record=record).exists()
+    )
+    return INCOMPATIBLE if held_elsewhere else NOT_INDEXED
+
+
 def similar_records(
     record: Record, user, limit: int = DEFAULT_LIMIT
 ) -> list[SimilarRecord]:
@@ -71,12 +122,12 @@ def similar_records(
     The seed record is excluded. A record seeded with its own vector matches
     itself perfectly, so leaving it in would fill the panel with the paper the
     reader already has open.
+
+    Just the matches of ``related_works``, which holds the one comparison. A
+    record with nothing to compare *from* has none: not an error, see the
+    module docstring.
     """
-    seed = _seed(record)
-    if seed is None:
-        # Nothing to compare *from*. Not an error — see the module docstring.
-        return []
-    return _nearest(seed, research_records(user), limit=limit)
+    return related_works(record, user, limit).matches
 
 
 def related_published_research(record: Record, user) -> Optional[list[SimilarRecord]]:
@@ -132,12 +183,18 @@ def verify_novelty_configuration() -> None:
         )
 
 
-def _seed(record: Record) -> Optional[RecordEmbedding]:
-    return RecordEmbedding.objects.filter(record=record).first()
+def _seed(record: Record) -> Optional[RecordSpaceEmbedding]:
+    """``record``'s summary vector under the active space (IR-739).
+
+    Its space is the seed's space: ``_nearest`` compares only against vectors
+    of that same space, so a promotion between the two reads cannot compare
+    across spaces.
+    """
+    return record_vectors(active_space()).filter(record=record).first()
 
 
 def _nearest(
-    seed: RecordEmbedding,
+    seed: RecordSpaceEmbedding,
     candidates,
     *,
     limit: int,
@@ -149,16 +206,15 @@ def _nearest(
     visibility predicate. The one query both related-works paths run, so a fix
     to it reaches both.
     """
-    # Only vectors written by the **same model** are comparable. `RecordEmbedding`
-    # records the model on the row rather than pointing at an `EmbeddingSpace`,
-    # so this is the scoping the chunk path gets from `space=space`. Without it,
-    # a half-finished re-index compares a `voyage-context-4` vector against
+    # Only vectors of the **same Embedding Space** are comparable (ADR-049 §23).
+    # The seed names its space, and the candidates are read from that space and
+    # no other -- the scoping the chunk path gets from `space=space`. Without
+    # it, a half-finished re-index compares one model's vector against
     # whatever preceded it and returns rankings that look ordinary and mean
-    # nothing — the failure mode the Embedding Space exists to prevent, arriving
-    # by a different door.
+    # nothing: the failure the Embedding Space exists to prevent.
     rows = (
-        RecordEmbedding.objects.filter(
-            record__in=candidates.values("pk"), model_name=seed.model_name
+        RecordSpaceEmbedding.objects.filter(
+            record__in=candidates.values("pk"), space_id=seed.space_id
         )
         .exclude(record_id=seed.record_id)
         .select_related("record", "record__classification")

@@ -31,7 +31,7 @@ from apps.ai.indexing import embed_active_chunk_set, embed_record_summary
 from apps.ai.memory import ConversationMemory
 from apps.ai.models import TURN_ANSWER_VECTOR, ChunkSet, Turn, TurnCitation, TurnEmbedding
 from apps.ai.models.chunk import ChunkEmbedding
-from apps.ai.models.embedding import RecordEmbedding
+from apps.ai.models.embedding import RecordEmbedding, RecordSpaceEmbedding
 from apps.ai.overview.service import PROMPT_VERSION, generate_overview
 from apps.ai.providers.fakes import DeterministicEmbeddingProvider, ScriptedLLM
 from apps.ai.providers.ports import RerankedCandidate, Reranker
@@ -39,7 +39,9 @@ from apps.ai.tasks import index_record
 from apps.ai.turn_backfill import embed_turn_answer, plan_turns, turns_to_consider
 from apps.records.management.commands.load_corpus import DEFAULT_OWNER_EMAIL
 from apps.records.management.commands.seed_demo import AT_RDCO_TITLE, PROPOSAL_AT_ADVISER_TITLE
+from apps.accounts.models import User
 from apps.records.models import Record, RecordOwner
+from core.enums import RoleName
 
 from .corpus import (
     DIMENSIONS,
@@ -56,23 +58,26 @@ pytestmark = [pytest.mark.db_required, pytest.mark.django_db]
 
 
 def _stamps(*, until_days=None, released=False):
+    """A paper's embargo stamps. With nothing asked, it is embargoed with no date,
+    which is how every paper starts (IR-882)."""
     now = timezone.now()
-    stamps = {"embargo_answered_at": now}
+    stamps = {}
     if until_days is not None:
         stamps["embargoed_until"] = timezone.localdate() + timedelta(days=until_days)
+        stamps["embargo_date_set_at"] = now
     if released:
-        stamps["embargo_released_at"] = now
+        stamps.update(is_embargoed=False, embargo_released_at=now)
     return stamps
 
 
 BLOCKED = {
-    "never answered": lambda: {},
+    "never released": lambda: _stamps(),
     "under embargo": lambda: _stamps(until_days=30),
     "its date is today": lambda: _stamps(until_days=0),
     "its date has passed": lambda: _stamps(until_days=-30),
 }
 ALLOWED = {
-    "answered no": lambda: _stamps(),
+    "released with no date": lambda: _stamps(released=True),
     "released before its date": lambda: _stamps(until_days=30, released=True),
     "released after its date": lambda: _stamps(until_days=-30, released=True),
 }
@@ -147,6 +152,7 @@ def _unindexed(record) -> Record:
     """As it stands after chunking, with its vectors still owed."""
     ChunkEmbedding.objects.filter(chunk__record=record).delete()
     RecordEmbedding.objects.filter(record=record).delete()
+    RecordSpaceEmbedding.objects.filter(record=record).delete()
     return record
 
 
@@ -245,8 +251,9 @@ class TestAiOverview:
         with use_composition_root(self._root(embedder, llm)):
             assert self._read(client_for(reader), record)["state"] == "generating"
             Record.objects.filter(pk=record.pk).update(
+                is_embargoed=True, embargo_released_at=None,
                 embargoed_until=timezone.localdate() + timedelta(days=30),
-                embargo_released_at=None,
+                embargo_date_set_at=timezone.now(),
             )
             chunk_set = ChunkSet.objects.get(record=record, is_active=True)
             generate_overview(record.pk, chunk_set.pk, chunk_set.content_hash, PROMPT_VERSION)
@@ -355,8 +362,12 @@ class TestTheBypassIsGone:
             assert not composition_root().vendor_permits()(record)
 
 
-def _embargo_set(client_for, user, record):
-    response = client_for(user).post(
+def _embargo_set(client_for, record):
+    """Set a date as RDCO, who may (ADR-052 §5 as amended for IR-882); owners can't."""
+    rdco = User.objects.filter(email="way-out-rdco@cit.edu").first() or make_user(
+        "way-out-rdco@cit.edu", RoleName.RDCO,
+    )
+    response = client_for(rdco).post(
         reverse("record-embargo-set", args=[record.pk]),
         {"embargoed_until": (timezone.localdate() + timedelta(days=90)).isoformat()},
         format="json",
@@ -405,12 +416,12 @@ class TestTheActsThroughTheRealGate:
     def test_setting_one_stops_further_sending_and_says_what_left(
         self, embedder, space, owner, reader, client_for,
     ):
-        record = self._owned(embedder, space, owner, _stamps())
+        record = self._owned(embedder, space, owner, _stamps(released=True))
         reranker, llm = _ask_recording_vendors(embedder, reader, client_for)
         assert FLOOD_TEXT in reranker.sent
         assert _llm_received(llm, FLOOD_TEXT)
 
-        body = _embargo_set(client_for, owner, record)
+        body = _embargo_set(client_for, record)
 
         assert "can't be recalled" in body["notice"]
         reranker, llm = _ask_recording_vendors(embedder, reader, client_for)
@@ -434,10 +445,10 @@ class TestEarlierAnswersThatQuoteThePaper:
     @pytest.fixture
     def scene(self, embedder, space, reader, client_for):
         owner = make_user("quoted-owner@cit.edu")
-        flood = _paper(embedder, space, _stamps())
+        flood = _paper(embedder, space, _stamps(released=True))
         RecordOwner.objects.create(record=flood, user=owner, is_primary=True)
         pond = make_record(title="Pond Culture", text=POND_TEXT, embedder=embedder, space=space)
-        Record.objects.filter(pk=pond.pk).update(dpa_accepted_at=timezone.now(), **_stamps())
+        Record.objects.filter(pk=pond.pk).update(dpa_accepted_at=timezone.now(), **_stamps(released=True))
         RecordOwner.objects.create(record=pond, user=owner, is_primary=True)
         client = client_for(reader)
         conversation_id = client.post(reverse("ai-conversations"), {}, format="json").json()["id"]
@@ -461,7 +472,7 @@ class TestEarlierAnswersThatQuoteThePaper:
     ):
         assert self._next_prompt_quotes_it(embedder, reader, client_for, scene)
 
-        _embargo_set(client_for, scene["owner"], scene["flood"])
+        _embargo_set(client_for, scene["flood"])
 
         assert not self._next_prompt_quotes_it(embedder, reader, client_for, scene)
 
@@ -471,7 +482,7 @@ class TestEarlierAnswersThatQuoteThePaper:
             assert [t.pk for t in recent_window(turns, user=reader)] == [scene["turn"].pk]
             assert [t.pk for t in sendable_turns(turns, reader)] == [scene["turn"].pk]
 
-            _embargo_set(client_for, scene["owner"], scene["flood"])
+            _embargo_set(client_for, scene["flood"])
 
             assert recent_window(turns, user=reader) == []
             assert sendable_turns(turns, reader) == []
@@ -488,7 +499,7 @@ class TestEarlierAnswersThatQuoteThePaper:
         with use_composition_root(CompositionRoot(embedder=embedder)):
             assert [t.pk for t in sendable_turns(turns, reader)] == [scene["turn"].pk]
 
-            _embargo_set(client_for, scene["owner"], scene["pond"])
+            _embargo_set(client_for, scene["pond"])
 
             assert sendable_turns(turns, reader) == []
 
@@ -498,7 +509,7 @@ class TestEarlierAnswersThatQuoteThePaper:
             recalled = ConversationMemory().recall(scene["conversation"], query, space.pk)
             assert scene["turn"].pk in [t.pk for t in recalled]
 
-            _embargo_set(client_for, scene["owner"], scene["flood"])
+            _embargo_set(client_for, scene["flood"])
 
             recalled = ConversationMemory().recall(scene["conversation"], query, space.pk)
             assert scene["turn"].pk not in [t.pk for t in recalled]
@@ -513,7 +524,7 @@ class TestEarlierAnswersThatQuoteThePaper:
 
         assert [p.turn_id for p in planned().to_embed] == [scene["turn"].pk]
 
-        _embargo_set(client_for, scene["owner"], scene["flood"])
+        _embargo_set(client_for, scene["flood"])
 
         plan = planned()
         assert plan.to_embed == []
@@ -524,7 +535,7 @@ class TestEarlierAnswersThatQuoteThePaper:
         TurnEmbedding.objects.filter(turn=scene["turn"], kind=TURN_ANSWER_VECTOR).delete()
         vendor = _RecordingEmbedder()
 
-        _embargo_set(client_for, scene["owner"], scene["flood"])
+        _embargo_set(client_for, scene["flood"])
 
         assert embed_turn_answer(scene["turn"], space_id=space.pk, embedder=vendor) is False
         assert vendor.sent == []
@@ -550,7 +561,7 @@ class TestEarlierAnswersThatQuoteThePaper:
         record_turn(scene["conversation"], "while it is clear", answer, embedder=vendor)
         assert "Rainfall gauges [1]." in vendor.sent
 
-        _embargo_set(client_for, scene["owner"], scene["flood"])
+        _embargo_set(client_for, scene["flood"])
 
         vendor = _RecordingEmbedder()
         turn = record_turn(scene["conversation"], "as it lands", answer, embedder=vendor)
@@ -560,7 +571,7 @@ class TestEarlierAnswersThatQuoteThePaper:
     def test_a_release_lets_it_back_in(self, scene, reader, client_for, embedder):
         adviser = make_user("quoted-adviser@cit.edu")
         Record.objects.filter(pk=scene["flood"].pk).update(adviser=adviser)
-        _embargo_set(client_for, scene["owner"], scene["flood"])
+        _embargo_set(client_for, scene["flood"])
 
         response = client_for(adviser).post(
             reverse("record-embargo-release", args=[scene["flood"].pk]), {}, format="json",
@@ -572,7 +583,7 @@ class TestEarlierAnswersThatQuoteThePaper:
         assert [t.pk for t in window] == [scene["turn"].pk]
 
     def test_the_reader_keeps_it_in_their_own_transcript(self, scene, reader, client_for):
-        _embargo_set(client_for, scene["owner"], scene["flood"])
+        _embargo_set(client_for, scene["flood"])
 
         response = client_for(reader).get(
             reverse("ai-conversation-detail", args=[scene["conversation"].pk]),

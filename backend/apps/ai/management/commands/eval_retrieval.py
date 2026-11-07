@@ -195,6 +195,14 @@ class Command(BaseCommand):
                 )
             )
 
+        unanswerable = len(question_set.unanswerable)
+        if unanswerable:
+            self.stdout.write(
+                f"{unanswerable} unanswerable question(s) carry no expected "
+                f"passage by design: correct refusal scores them, recall does "
+                f"not (IR-454)."
+            )
+
         if options["dry_run"]:
             checks = check_question_set(question_set)
             self.stdout.write("")

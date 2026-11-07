@@ -16,6 +16,8 @@ from .brief import PaperBrief
 from .metadata import DocumentMetadata
 from .embedding import RecordEmbedding, RecordSpaceEmbedding, EmbeddingJob
 from .embedding_space import (
+    ActivationKind,
+    EmbeddingSpaceActivation,
     VECTOR_COLUMN_DIMENSIONS,
     EmbeddingSpace,
     EmbeddingSpaceState,
@@ -58,6 +60,8 @@ __all__ = [
     "EmbeddingJob",
     "VECTOR_COLUMN_DIMENSIONS",
     "EmbeddingSpace",
+    "EmbeddingSpaceActivation",
+    "ActivationKind",
     "EmbeddingSpaceState",
     "get_active_embedding_space",
     "assert_embedding_space_consistent",
