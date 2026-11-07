@@ -19,13 +19,15 @@ This decision permits implementation and, once the conditions below are met, act
 3. IR-827 links the owner's earlier Voyage confirmation and records the no-training and retention settings on the actual OpenRouter account and eligible endpoints. The owner reconfirmed on 2026-11-05 that Voyage was confirmed long ago; do not ask for a second Voyage approval. The original dated account-specific record was not found in the repository or Jira, so it still needs linking. A configuration label alone is not evidence of the OpenRouter account setting.
 4. Tool results and all text derived from them carry source dependencies through retries, repair, compaction and resume. A dependency that fails removes its dependent content or refuses the send; the guard cannot simply be disabled.
 
-**Current state (2026-11-07):** conditions 1 and 4 are implemented for public proxy and synthetic papers. Condition 3 is recorded for OpenRouter ([IR-827 evidence](https://citiris.atlassian.net/browse/IR-827?focusedCommentId=11157)); the Voyage link is still missing. Condition 2 holds for proxy papers only: institutional papers stay refused until IR-791. No paid send has run yet.
+**Current state (2026-11-07):** conditions 1 and 4 are implemented for public proxy and synthetic papers. Condition 3 is recorded for OpenRouter ([IR-827 evidence](https://citiris.atlassian.net/browse/IR-827?focusedCommentId=11157)); the Voyage link is still missing. Condition 2 holds for proxy papers only: institutional papers stay refused until IR-791. Paid development sends have run; see the smoke results below.
 
 ## Luna declaration — amendment, 2026-11-07
 
 **Approved for development only by Jive Tyler I. Revalde, 2026-11-07.** Entered by an AI agent on his instruction in chat; not an independent signature.
 
-**Account evidence.** OpenRouter organization *Hackarambolas*, workspace **IRIS**, key `iris`. ZDR is required for all models, OpenAI first-party endpoints are disabled, and every training and publishing toggle is off, as observed 2026-11-07 and recorded on IR-827. Safety Retention is not an option for Luna: OpenRouter offers it only for Google and "all other models", and Luna is in the OpenAI group.
+**Account evidence.** OpenRouter organization *Hackarambolas*, workspace **IRIS**, key `iris`. As first observed on 2026-11-07 (recorded on IR-827), ZDR was required for all models, OpenAI first-party endpoints were disabled, and every training and publishing toggle was off. Later that day the owner had the account-wide ZDR requirement turned off and the IRIS workspace guardrail changed to allow Safety Retention. The training and publishing toggles stay off. Safety Retention is not an option for Luna: OpenRouter offers it only for Google and "all other models", and Luna is in the OpenAI group. Luna sends therefore still go only to zero-retention endpoints, enforced per request by `zdr: true` in the routing below and checked by the send guard. The account setting is no longer what enforces it.
+
+**Account limits (set by the owner, 2026-11-07).** The `iris` key's limit was lowered from $50 to the approved $30, and the IRIS workspace's monthly budget was raised from $3 to $30.
 
 **Routing (`AGENT_LLM_ROUTING`).** Global Azure at Luna's base price, zero-retention. The 2026-11-07 smoke showed that `amazon-bedrock/global` is not a zero-retention endpoint for Luna: OpenRouter refused every request with `zdr: true`, failing at "Filter by Data Policy". `azure` accepted the adapter's `max_tokens` and tools. `max_price` excludes the dearer `azure/us` and `azure/eu`.
 
@@ -47,14 +49,19 @@ Routing digest (`ai.admission.guard.routing_digest`): `e601031fde08362611a9d69b3
 
 272,000 keeps a request below the long-prompt tier (listed context: 1,050,000). 8,000 matches `AI_ADMISSION_MAX_OUTPUT_TOKENS`, and reasoning counts as output. A byte floor of 1.0 bounds any tokenizer.
 
-**Still required before the first paid send:**
-
-* The `iris` key in `ai/.env` (`AGENT_LLM_API_KEY`), entered by the signer. Its digest goes into the approval's `account`. The key's $50 limit is above the approved $30, and the workspace's $3 monthly budget will stop the pilot early unless raised.
-* `RUNS_PROXY_SEND_APPROVAL` naming the exact proxy sources, with an expiry.
-
-Both are local `ai/.env` values and are never committed.
+**Local configuration (done 2026-11-07).** The signer entered the `iris` key in `ai/.env` (`AGENT_LLM_API_KEY`), and its digest is the approval's `account`. `RUNS_PROXY_SEND_APPROVAL` names the exact revisions of the 40 proxy papers and expires 2026-11-21 23:59 +08. Both are local `ai/.env` values and are never committed.
 
 **First paid smoke, 2026-11-07.** One ordinary-depth proxy question (`proxy_starter.json` q01), asked as `student@cit.edu`, ran on run `70843937`. It completed `answered` in 92 s and cited the expected paper. It used 4 attempts, all settled with reported usage: 34,083 input and 1,128 output tokens, charged **US$0.0040**. Earlier attempts the same day sent nothing (local configuration was not loaded), and one sent request was refused by OpenRouter's data-policy filter with no reported usage. That request is charged at its reservation, US$0.0047.
+
+**Twenty-question smoke, 2026-11-07.** Twenty `proxy_starter.json` questions were asked at deep depth, one at a time: 8 mechanism, 3 exact-term, 3 near-duplicate, 3 cross-paper and 3 off-corpus. Together they used 56 attempts, 425,544 input and 7,080 output tokens, charged **US$0.0461** (about $0.0023 a question).
+
+* 13 of 20 answered. Every answered in-corpus question cited its expected paper (12 of 12).
+* 6 in-corpus questions ended `unavailable` because the guard refused the whole send: their search results included an institutional Record. Commit `4cc0bf14` now drops sources the approval does not cover from tool results instead. After that change q03 answered and cited its expected paper.
+* Of the 3 off-corpus questions, which the set expects to decline, q55 and q56 ended `unavailable` and **q66 answered**. Answer quality needs the IR-755 human review; this smoke does not measure it.
+
+**Ledger total, 2026-11-07:** 82 sent attempts on `openai/gpt-6-luna:floor`, **US$0.0868** charged (US$0.0821 settled at reported usage, plus the refused request's US$0.0047 reservation). Recomputing at the declared price gives the same figure to within per-attempt rounding, which only rounds up. Reconciling against OpenRouter's own activity for the `iris` key is still to be recorded.
+
+**Latency.** The 20-question batch took a median of 53 s and at most 140 s. Most of that came from a local Windows artifact: each database connection to `localhost` waited about 2 s on an IPv6 fallback. With `127.0.0.1`, one ordinary question took 25 s instead of 72 s, and model calls (about 4.6 s each) became about 92% of the time. Production containers reach PostgreSQL by service name and should not pay that delay. Production latency has not been measured.
 
 ## Fastest useful sequence
 
