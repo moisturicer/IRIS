@@ -619,7 +619,8 @@ class ReadinessMatchesTheRefusalsTests(ThreadTestBase):
         self.assertEqual(self.review(record, self.itso).status_code, 400)
         [theirs] = self.thread_items(record, self.owner)
         self.assertEqual(theirs["severity"], "info")
-        self.assertEqual(theirs["label"], "ITSO has 1 open Must fix thread.")
+        self.assertEqual(theirs["label"], "ITSO has 1 open Must fix thread. "
+                                          "It holds your next version only if they ask for a revision.")
 
     def test_rdco_is_told_a_decision_closes_them(self):
         record = self.at_rdco()

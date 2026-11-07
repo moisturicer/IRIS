@@ -149,6 +149,9 @@ def _thread_items(*, facts, routing, office_review, decision, revision, deciding
             text = f"{who} {_threads_said(row)}."
             if deciding and decision.get("party") == Party.RDCO and row["must_fix"]:
                 text += " A Decision now closes them, with your reason."
+            elif facts.get("owner") and party != OWNER and row["must_fix"]:
+                # Not a blocker yet: say why it does not contradict "nothing waits" (IR-875).
+                text += " It holds your next version only if they ask for a revision."
         items.append(_item(
             "open_thread", BLOCKER if holds_approval or holds_version else INFO, text,
             party=party or None, action=action,
