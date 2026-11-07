@@ -5,6 +5,8 @@ urlpatterns = [
     path("",              views.UserListView.as_view(),        name="user-list"),
     path("advisers/",     views.AdviserListView.as_view(),     name="user-advisers"),
     path("me/",           views.MeView.as_view(),              name="user-me"),
+    # ADR-054 (IR-791): change one's own AI answer. Not in `ALLOWED_WHILE_UNANSWERED`.
+    path("me/ai-answer/", views.AiAnswerView.as_view(),        name="user-me-ai-answer"),
     path("me/data/",      views.PersonalDataExportView.as_view(), name="user-me-data"),
     path("me/photo/",     views.MePhotoView.as_view(),         name="user-me-photo"),
     path("interests/",    views.InterestSuggestionsView.as_view(), name="user-interest-suggestions"),

@@ -439,6 +439,24 @@ class NoticeAnswerSerializer(serializers.Serializer):
             raise serializers.ValidationError("You must agree to the data-privacy agreement to use IRIS.")
         return value
 
+    # Which papers a No-to-Yes answer covers (ADR-054 decision 13): neither is
+    # assumed, so it is optional here and required by `ai_answer` for that one
+    # change.
+    papers         = serializers.ChoiceField(choices=("all", "from_now"), required=False)
+
     def validate_notice_version(self, value):
         require_current(value)
         return value
+
+
+class AiAnswerChangeSerializer(serializers.Serializer):
+    """The body of ``POST /users/me/ai-answer/`` (ADR-054 decisions 11-13, IR-791).
+
+    The new answer is required with no default, so nothing is ever changed by
+    omission. `papers` is optional here because only a No becoming a Yes asks
+    about papers; `apps.accounts.ai_answer` refuses that change without it, and
+    ignores it for every other.
+    """
+
+    ai_consent = NoDefaultBoolean()
+    papers     = serializers.ChoiceField(choices=("all", "from_now"), required=False)

@@ -299,8 +299,29 @@ class Record(models.Model):
 
         Derived, never stored, so it cannot drift from the timestamp it
         describes. Serializers expose this; nothing writes it.
+
+        **Legacy since IR-791 (ADR-054 decision 17):** nothing reads this for a
+        decision any more. The disclosure gate reads `ai_consent`.
         """
         return self.dpa_accepted_at is not None
+
+    # The Contact person's answer to "may AI use my papers?", copied onto the
+    # paper when its draft is created (ADR-054 decisions 9, 10; IR-791). It is
+    # what the disclosure gate reads (`apps.ai.policy.records`).
+    #
+    # **Keeps the answer it started with.** Nothing ever copies a person's later
+    # answer onto it, and changing the Contact person doesn't either. The only
+    # writers are `apps.records.ai_answer.store_on_new_draft` (creation) and
+    # `apps.accounts.ai_answer.change_ai_answer`, which turns a No into a Yes for
+    # a person's own papers when they choose "all my papers" (decision 13).
+    # Co-owners' answers never count. No serializer can write it.
+    #
+    # **Null is "no answer stored", and the gate refuses it** -- a paper with no
+    # Contact person, one made by an import, or one older than IR-791.
+    ai_consent = models.BooleanField(
+        null=True, blank=True,
+        help_text="The Contact person's AI answer when this draft was created. Null means none stored; the gate refuses it.",
+    )
 
     # The paper's embargo (ADR-052, embargoed by default as amended for IR-882).
     # Its own fact: separate from status, IP and consent, because a published
