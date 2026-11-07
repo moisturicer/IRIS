@@ -74,7 +74,8 @@ function wording(outcome: DecisionOutcome, kind: string) {
       title: "Accept and keep unlisted?",
       body:
         `This accepts the ${kind} without publishing it. It stays out of Discover and Ask IRIS, and its ` +
-        "owners and reviewers can still open it. Publishing it later is not yet possible in IRIS.",
+        "owners and reviewers can still open it. RDCO can publish it to Discover later, once its " +
+        "embargo is released.",
     };
   }
   return {

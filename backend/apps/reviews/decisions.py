@@ -555,12 +555,19 @@ def withdrawn_by_label(review) -> str:
     How the tracker names the Decision that closed something: "RDCO published
     the record". *Published* is told from *kept unlisted* by the record's
     status, the rule My Reviews uses (ADR-032 §9 Amendment), so the two always
-    agree; an act that later publishes an unlisted record would reword both.
+    agree. A paper RDCO published later from Unlisted (IR-878) was kept
+    unlisted by its Decision, and its `UnlistedPublication` says so.
     """
+    from apps.records.unlisted import was_published_from_unlisted
+
+    record = review.record
     outcome = (
         REJECT if review.status == ReviewDecision.REJECTED
-        else ACCEPT if _is_proposal(review.record)
-        else PUBLISH if review.record.pipeline_status == PipelineStatus.PUBLISHED
+        else ACCEPT if _is_proposal(record)
+        else PUBLISH if (
+            record.pipeline_status == PipelineStatus.PUBLISHED
+            and not was_published_from_unlisted(record)
+        )
         else KEEP_UNLISTED
     )
     return f"{DECIDER_NAME[str(review.stage)]} {OUTCOME_PHRASE[outcome]}"

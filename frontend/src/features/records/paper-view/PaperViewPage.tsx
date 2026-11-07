@@ -62,6 +62,7 @@ import { AskIrisFab } from "./AskIrisFab";
 import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { EmbargoCard } from "./EmbargoCard";
+import { UnlistedCard } from "./UnlistedCard";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
@@ -1236,6 +1237,7 @@ export default function PaperViewPage() {
                 {participant && <ReviewRoutingTracker key={trackerVersion} recordId={record.id} />}
                 <PaperGovernance record={record} />
                 <EmbargoCard record={record} onChanged={reloadRecord} />
+                <UnlistedCard record={record} onChanged={reloadRecord} />
                 <PaperDocuments
                   files={record.files}
                   manageHref={participant ? `/records/${record.id}?section=review&documents=open` : null}

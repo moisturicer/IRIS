@@ -38,7 +38,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
 from apps.documents.models import DocumentRequest
-from apps.records.models import Record, RecordOwner
+from apps.records.models import Record, RecordOwner, UnlistedPublication
 from core.enums import (
     OPEN_SEAT_STATES,
     AssignmentState,
@@ -220,6 +220,14 @@ def _latest_approval(record_ref):
     ).order_by("-created_at", "-pk").values("pk")[:1]
 
 
+def _published_from_unlisted(record_ref):
+    """
+    RDCO published the paper from Unlisted after its Decision (ADR-047 §10,
+    IR-878), so the Decision was a *keep unlisted*, whatever the status says now.
+    """
+    return Exists(UnlistedPublication.objects.filter(record=OuterRef(record_ref)))
+
+
 def _done_seats(scope):
     verdict = _verdict("assignment_id", "reviewer_id")
     return scope.seats().filter(
@@ -231,6 +239,7 @@ def _done_seats(scope):
         v_stage=Subquery(verdict.values("stage")[:1]),
         record_status=F("assignment__record__pipeline_status"),
         latest_approval=Subquery(_latest_approval("assignment__record_id")),
+        published_from_unlisted=_published_from_unlisted("assignment__record_id"),
     )
 
 
@@ -256,13 +265,14 @@ def _seatless_reviews(scope):
         v_stage=F("stage"),
         record_status=F("record__pipeline_status"),
         latest_approval=Subquery(_latest_approval("record_id")),
+        published_from_unlisted=_published_from_unlisted("record_id"),
     )
 
 
 # --- outcomes -------------------------------------------------------------------------
 
 def _published_q():
-    return Q(record_status=PipelineStatus.PUBLISHED, latest_approval=F("v_id"))
+    return Q(record_status=PipelineStatus.PUBLISHED, latest_approval=F("v_id"), published_from_unlisted=False)
 
 
 def _outcome_q(outcome) -> Q:
@@ -294,7 +304,8 @@ def _outcome(item) -> ReviewOutcome | None:
         return None
     if item.v_stage in SPECIALIST_STAGES:
         return ReviewOutcome.CLEARED
-    if item.record_status == PipelineStatus.PUBLISHED and item.latest_approval == item.v_id:
+    if (item.record_status == PipelineStatus.PUBLISHED and item.latest_approval == item.v_id
+            and not item.published_from_unlisted):
         return ReviewOutcome.PUBLISHED
     return ReviewOutcome.ACCEPTED
 

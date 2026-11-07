@@ -10,7 +10,7 @@
 
 **Amended 2026-11-01, after the build,** by Hermoine Zozobrado, to record two behaviours PR #410 added and this text did not state: §5's return to the last submitted manuscript, and §7's refusal to reverse once work exists.
 
-**Amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted): §9 and §10 added.** §9 records where a resubmission goes and what the Adviser may do after the send. Both were built in IR-767 and stated only in code (`apps/reviews/new_version.py:18-24`) and in an ADR-032 §5 line. §10 lets RDCO publish an Unlisted paper later, and makes publishing, at the Decision or later, require the embargo to be None or Released. That reverses [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) decision 14. Not built.
+**Amended 2026-11-04 (Hermoine Zozobrado, design session; Accepted): §9 and §10 added.** §9 records where a resubmission goes and what the Adviser may do after the send. Both were built in IR-767 and stated only in code (`apps/reviews/new_version.py:18-24`) and in an ADR-032 §5 line. §10 lets RDCO publish an Unlisted paper later, and makes publishing, at the Decision or later, require the embargo to be None or Released. That reverses [ADR-052](052-each-paper-states-its-embargo-and-a-person-ends-it.md) decision 14. §10 is built: its Decision half by IR-882, and `publish_unlisted` by IR-878 (see the notes at its end).
 
 **Supersedes, in part, [ADR-032](032-adviser-first-review-and-office-reviewer-pools.md):**
 
@@ -179,6 +179,13 @@ At the REST seam, replacing ADR-032 §12's two hand-back tests:
 - *Rejected: publishing releases the embargo itself.* It saves a step, but ending an embargo would happen as a side effect, and ADR-052's rule is that a person ends it on purpose.
 - Tests: RDCO publishes a `completed` Record with a Released embargo, and it is `published` and audited. The same with an Active or Unknown embargo is refused with a 400. RDCO's Decision on an embargoed Record offers no `accept_publish`. Nobody outside RDCO is offered `publish_unlisted`.
 - **Corrected 2026-11-04 (IR-882):** ADR-052's IR-879 amendment removed None and Unknown, so "None or Released" now reads **Released**: every paper starts Active and only a release lets it be published. The Decision's half is built by IR-882 (`decisions.outcomes_for`); `publish_unlisted` is still IR-878's.
+- **Built by IR-878 (2026-11-07).** Decided by Hermoine Zozobrado in its design session, and transcribed by an agent:
+  - **`POST /records/<id>/publish-unlisted/`** (`apps/records/unlisted.py`), behind `IsRDCO` and the per-record lock, with an optional note of at most 1,000 characters. Any RDCO member, not only the one who decided. A Record that isn't Unlisted is refused with a 400, as is an embargoed one, with the Decision's own words: *"Under embargo [until <date>]. Release the embargo, then publish."*
+  - **The history stays true.** A Decision's `Review` says only "approved", and the history used to tell *published* from *kept unlisted* by the status, so a later publish would have rewritten RDCO's Decision as *published*. A new `records.UnlistedPublication` row (who, when, the note) keeps the Decision reading *kept unlisted* in the tracker and My Reviews, and the tracker shows the later publish as its own entry. Who and the note are review material (`may_read_review`); when is public.
+  - **Audit:** `PUBLISHED` alone, marked `via: "publish_unlisted"`, and no second `DECISION_RECORDED`, so a paper has one final Decision and total turnaround is unchanged (`docs/evaluation/AUDIT_EXPORT.md`).
+  - **Paper View:** an *Unlisted* card in Record details, beside the Embargo card, because an RDCO member who never held a seat can't open Review. While the embargo holds, *Publish to Discover* stays visible and disabled, with the server's reason (`record.publish_unlisted.blocked`).
+  - *Rejected: a second Decision (a new `DECISION_RECORDED` and `Review`).* The paper would then have two final Decisions, and its turnaround would end at the later publish.
+  - *Rejected: the note in the notification only, with no new table.* The history would still say RDCO published it on the Decision's date.
 
 ## Alternatives Considered
 
