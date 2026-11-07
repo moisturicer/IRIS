@@ -75,7 +75,7 @@ def embed(space, record, *, record_axis, chunk_axes):
         ChunkEmbedding.objects.create(chunk=chunk, space=space, embedding=axis(n))
 
 
-def run(api, reader, script, *, key, embedder=None, record_id=None, **service_kw):
+def run(api, reader, script, *, request, embedder=None, record_id=None, **service_kw):
     from ai.admission.ledger import Ledger
     from ai.runs.service import RunService
 
@@ -93,7 +93,7 @@ def run(api, reader, script, *, key, embedder=None, record_id=None, **service_kw
     built.notifier.service = built
     holder["service"] = built
     grant = issue.reader_session_grant(reader, record_id).token
-    response = runs_db.submit(client, grant, key)
+    response = runs_db.submit(client, grant, request)
     assert response.status_code == 201, response.json()
     return executor.seen
 
@@ -111,7 +111,7 @@ def test_a_meaning_only_match_is_found_even_when_its_paper_is_outside_the_paper_
     async def script(tools):
         await tools.hybrid_search("inundation", 5)
 
-    ((_, found),) = run(research, reader, script, key="hybrid-meaning-1", embedder=embedder)
+    ((_, found),) = run(research, reader, script, request="hybrid-meaning-1", embedder=embedder)
     assert found.status == "ok"
     hits = [(p.record_id, p.page) for p in found.passages]
     assert (answer.pk, 7) in hits
@@ -128,7 +128,7 @@ def test_without_a_provider_search_answers_by_keyword_and_says_meaning_search_is
         await tools.hybrid_search("flooding")
         await tools.hybrid_search("inundation")
 
-    (_, term), (_, meaning) = run(research, reader, script, key="hybrid-gated-1")
+    (_, term), (_, meaning) = run(research, reader, script, request="hybrid-gated-1")
     assert term.status == "ok" and [p.record_id for p in term.passages] == [flood.pk]
     assert dict(term.signals) == {"keyword": "ok", "semantic": "provider_gated", "rerank": "off"}
     # Nothing found by keyword is a no-match by keyword only: the gap is stated, not hidden.
@@ -145,7 +145,7 @@ def test_a_term_only_match_is_found_with_meaning_search_on(research, space):
     async def script(tools):
         await tools.hybrid_search("tilapia")
 
-    ((_, found),) = run(research, reader, script, key="hybrid-term-1", embedder=embedder)
+    ((_, found),) = run(research, reader, script, request="hybrid-term-1", embedder=embedder)
     assert [p.record_id for p in found.passages][0] == flood.pk
     assert dict(found.signals)["semantic"] == "ok"
 
@@ -166,7 +166,7 @@ def test_metadata_filters_narrow_every_signal_and_an_unknown_value_is_explicit(r
         await tools.hybrid_search("flooding", 10, {"colour": "red"})
 
     (_, narrowed), (_, unknown), (_, invalid) = run(
-        research, reader, script, key="hybrid-filter-1", embedder=embedder)
+        research, reader, script, request="hybrid-filter-1", embedder=embedder)
     assert {p.record_id for p in narrowed.passages} == {new.pk}
     assert (unknown.status, unknown.reason) == ("unavailable", "unknown_filter_value")
     assert (invalid.status, invalid.reason) == ("unavailable", "invalid_argument")
@@ -188,8 +188,8 @@ def test_a_passage_the_reader_cannot_read_is_never_returned_however_close_its_ve
     async def script(tools):
         await tools.hybrid_search("flooding")
 
-    ((_, as_owner),) = run(research, owner, script, key="hybrid-owner-1", embedder=embedder)
-    ((_, as_stranger),) = run(research, stranger, script, key="hybrid-stranger-1", embedder=embedder)
+    ((_, as_owner),) = run(research, owner, script, request="hybrid-owner-1", embedder=embedder)
+    ((_, as_stranger),) = run(research, stranger, script, request="hybrid-stranger-1", embedder=embedder)
     assert private.pk in {p.record_id for p in as_owner.passages}
     assert {p.record_id for p in as_stranger.passages} == {public.pk}
     assert as_stranger.coverage.inspected_records == 1
@@ -207,7 +207,7 @@ def test_paper_chat_scope_confines_every_signal_to_its_paper(research, space):
     async def script(tools):
         await tools.hybrid_search("flooding")
 
-    ((_, found),) = run(research, reader, script, key="hybrid-scope-1", embedder=embedder,
+    ((_, found),) = run(research, reader, script, request="hybrid-scope-1", embedder=embedder,
                         record_id=chosen.pk)
     assert {p.record_id for p in found.passages} == {chosen.pk}
 
@@ -223,7 +223,7 @@ def test_a_space_change_during_the_run_refuses_meaning_search_and_never_mixes_sp
         await asyncio.to_thread(promote_a_new_space, space)
         await tools.hybrid_search("inundation")
 
-    (_, before), (_, after) = run(research, reader, script, key="hybrid-space-1", embedder=embedder)
+    (_, before), (_, after) = run(research, reader, script, request="hybrid-space-1", embedder=embedder)
     assert dict(before.signals)["semantic"] == "ok" and before.passages
     assert dict(after.signals)["semantic"] == "embedding_space_changed"
     assert after.status == "no_match" and not after.passages
@@ -305,7 +305,7 @@ def test_reranking_sends_nothing_unless_the_send_guard_admits_every_candidate(re
     async def script(tools):
         await tools.hybrid_search("flooding")
 
-    ((_, found),) = run(research, reader, script, key="hybrid-rerank-closed-1",
+    ((_, found),) = run(research, reader, script, request="hybrid-rerank-closed-1",
                         embedder=QueryEmbedder({"flooding": axis(0)}), reranker=reranker)
     assert dict(found.signals)["rerank"] == "withheld"
     assert reranker.calls == []
@@ -332,7 +332,7 @@ def test_an_admitted_rerank_reorders_the_fused_candidates_and_is_charged_to_the_
     async def script(tools):
         await tools.hybrid_search("flooding")
 
-    ((_, found),) = run(research, reader, script, key="hybrid-rerank-open-1",
+    ((_, found),) = run(research, reader, script, request="hybrid-rerank-open-1",
                         embedder=QueryEmbedder({"flooding": axis(0)}), reranker=reranker,
                         send_guard=SendGuard(research[1]["dsn"], approval, stage="development"))
     assert dict(found.signals)["rerank"] == "ok"
