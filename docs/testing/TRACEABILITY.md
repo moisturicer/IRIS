@@ -81,6 +81,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-632** | Under `RESTART_ALL` every reset office that had completed reviews the new version again, with the same reviewer — ADR-004's control arm … | [details](traceability/IR-632.md) | **IMPLEMENTED** |
 | **IR-268** | My Reviews: a reviewer's own seats plus their office's pool, as To review · In review · Done — touches FR-M5-01 (stable label only) | [details](traceability/IR-268.md) | **IMPLEMENTED** |
 | **IR-478** | RDCO grants and removes office coordinators on the Users page; demo coordinators — ADR-032 §4, after IR-415; touches FR-M5-01 (stable label … | [details](traceability/IR-478.md) | **IMPLEMENTED** |
+| **IR-797** | RDCO replaces a paper's Adviser, adds an owner and withdraws a paper in review — ADR-051 decision 10; touches FR-M5-01 (stable label only) | [details](traceability/IR-797.md) | **PARTIAL** |
 | **IR-413** | The sidebar: one short list, My Reviews only for review work, and an account menu — no FR- id; F1's navigation slice. The redirect table, … | [details](traceability/IR-413.md) | **IMPLEMENTED** |
 | **IR-534** | F1b: the redirect table, Discover home for everyone, the post-login landing on `review_access`, and the My Library needs-action dot (B2) — … | [details](traceability/IR-534.md) | **IMPLEMENTED** |
 | **IR-537** | A declined applicant is told so: `role_request` on `/users/me/`, and the pending screen in the entry frame — no FR- id; subtask 3 of IR-533 … | [details](traceability/IR-537.md) | **IMPLEMENTED** |

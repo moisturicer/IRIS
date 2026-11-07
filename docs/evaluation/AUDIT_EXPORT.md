@@ -166,12 +166,21 @@ It has no `record`. There is no backfill: accounts that existed before IR-789 st
 
 | Type | Written when | `metadata` |
 |---|---|---|
-| `RECORD_WITHDRAWN` | A record in review is soft-deleted, which today only its owner can do (IR-508); `user` is whoever deleted it | `version`, `closed_parties` (the parties whose open assignment closed) |
+| `RECORD_WITHDRAWN` | A record in review is soft-deleted, by its owner (IR-508) or by RDCO (IR-797); `user` is whoever deleted it | `version`, `closed_parties` (the parties whose open assignment closed), and `reason` when RDCO withdrew it (absent on an owner's deletion) |
 
 It is followed by an `ASSIGNMENT_CLOSED` (`how`: `withdrawn`) per party, and a
 `REVISION_REQUEST_WITHDRAWN` or `DOCUMENT_REQUEST_WITHDRAWN` (`closed_by`:
 `record_withdrawn`) per request it closed. Deleting a record that is not in review
 writes none of these.
+
+### RDCO's acts on a paper in review (ADR-051 decision 10, IR-797)
+
+Each act is one event. Withdrawing writes `RECORD_WITHDRAWN` above, with RDCO's `reason`.
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `ADVISER_REPLACED` | RDCO names another Adviser while the paper's Adviser review is open. The old Adviser's seat is withdrawn and the new one seated in the same act, so no `SEAT_*` event is written | `assignment`, `previous_adviser` (null if that account is gone), `adviser`, `previous_seat`, `seat` (the new one), `reason` (optional, may be empty) |
+| `OWNER_ADDED` | RDCO adds an owner to a paper in review. The Contact person is unchanged | `owner` |
 
 ### Document requests (ADR-022)
 
