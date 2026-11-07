@@ -83,22 +83,6 @@ export default function ProfilePage() {
           </ul>
         </section>
       )}
-
-      {user.orcid && (
-        <section aria-labelledby="profile-orcid" className="border-t border-stone-200 pt-6">
-          <h2 id="profile-orcid" className="font-display text-title font-semibold text-stone-900">ORCID iD</h2>
-          <p className="mt-2 text-body">
-            <a
-              href={`https://orcid.org/${user.orcid}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cn("rounded font-mono text-brand underline underline-offset-2", FOCUS_RING)}
-            >
-              {user.orcid}
-            </a>
-          </p>
-        </section>
-      )}
     </div>
   );
 }

@@ -12,7 +12,6 @@ import type { CropRect } from "@/lib/photoCrop";
 export interface ProfileFields {
   bio:                string;
   research_interests: string[];
-  orcid:              string | null;
 }
 
 export const BIO_MAX_LENGTH = 500;
