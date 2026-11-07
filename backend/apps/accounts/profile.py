@@ -30,6 +30,8 @@ BIO_MAX_LENGTH = 500
 INTERESTS_MAX = 10
 INTEREST_MAX_LENGTH = 40
 SUGGESTIONS_MAX = 10
+#: A list longer than this is refused unread: nobody meant it, and it is not worth scanning.
+INTERESTS_SCAN_CEILING = 10 * INTERESTS_MAX
 
 PHOTO_MAX_BYTES = 2 * 1024 * 1024
 #: The stored photo's side, in pixels.
@@ -61,7 +63,7 @@ def clean_interests(items) -> list[str]:
     repeated in another case collapses into its first spelling. The limits apply
     to what is left, so a list with duplicates in it is not refused for them.
     """
-    if len(items) > 10 * INTERESTS_MAX:  # nobody meant this; do not even scan it
+    if len(items) > INTERESTS_SCAN_CEILING:
         raise ValidationError(TOO_MANY_INTERESTS)
     names, seen = [], set()
     for item in items:
@@ -70,7 +72,7 @@ def clean_interests(items) -> list[str]:
             continue
         if len(name) > INTEREST_MAX_LENGTH:
             raise ValidationError(INTEREST_TOO_LONG)
-        key = name.casefold()
+        key = name.lower()  # PostgreSQL's lower(), as the unique index uses, not casefold()
         if key not in seen:
             seen.add(key)
             names.append(name)
@@ -172,6 +174,8 @@ def prepare_photo(upload, crop: tuple[int, int, int] | None) -> bytes:
         if side < 1 or left + side > width or top + side > height:
             raise ValidationError({"crop_size": [CROP_OUTSIDE]})
     square = image.crop((left, top, left + side, top + side))
+    if square.mode.startswith("I;16"):  # 16-bit greyscale: scale to 8 bits, or convert() clips it to white
+        square = square.point(lambda value: value / 256).convert("L")
 
     # JPEG has no transparency: lay it on white rather than let it turn black.
     if square.mode in ("RGBA", "LA", "PA") or "transparency" in square.info:
@@ -201,7 +205,7 @@ def set_photo(user: User, upload, crop: tuple[int, int, int] | None) -> None:
             storage.delete(locked.photo.name)  # the row did not take it: do not orphan the file
             raise
         if old:  # after commit, so a failed request cannot leave a row naming a deleted file
-            transaction.on_commit(lambda: storage.delete(old))
+            transaction.on_commit(lambda: storage.delete(old), robust=True)
     user.photo, user.photo_version = locked.photo, locked.photo_version
 
 
@@ -215,7 +219,7 @@ def remove_photo(user: User) -> None:
         locked.photo = None
         locked.photo_version += 1
         locked.save(update_fields=["photo", "photo_version"])
-        transaction.on_commit(lambda: storage.delete(old))
+        transaction.on_commit(lambda: storage.delete(old), robust=True)
     user.photo, user.photo_version = locked.photo, locked.photo_version
 
 

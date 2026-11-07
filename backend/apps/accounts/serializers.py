@@ -1,8 +1,8 @@
 import unicodedata
 
-from django.db import transaction
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
+from django.db import transaction
 from rest_framework import serializers
 from core.enums import RequestStatus, RoleName
 from . import profile
@@ -323,16 +323,16 @@ class PhotoUploadSerializer(serializers.Serializer):
         error_messages={key: profile.NOT_AN_IMAGE for key in ("required", "invalid", "empty", "no_name")},
     )
     #: Pixels of the image as the person sees it, from its top-left corner.
-    crop_x    = serializers.IntegerField(required=False, min_value=0)
-    crop_y    = serializers.IntegerField(required=False, min_value=0)
-    crop_size = serializers.IntegerField(required=False, min_value=1)
+    #: A negative or zero value is a square that is not inside the image, so it
+    #: says what the contract says for one that runs past the edge.
+    crop_x    = serializers.IntegerField(required=False, min_value=0,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
+    crop_y    = serializers.IntegerField(required=False, min_value=0,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
+    crop_size = serializers.IntegerField(required=False, min_value=1,
+                                         error_messages={"min_value": profile.CROP_OUTSIDE})
 
     CROP_FIELDS = ("crop_x", "crop_y", "crop_size")
-
-    def validate_photo(self, upload):
-        if upload.size > profile.PHOTO_MAX_BYTES:
-            raise serializers.ValidationError(profile.PHOTO_TOO_LARGE)
-        return upload
 
     def validate(self, attrs):
         given = [name for name in self.CROP_FIELDS if name in attrs]

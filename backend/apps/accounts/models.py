@@ -194,16 +194,18 @@ class UserInterest(models.Model):
 
 @receiver(post_delete, sender=User)
 def delete_photo_with_account(sender, instance, using, **kwargs):
-    """Deleting an account deletes its stored photo (IR-695).
+    """Deleting an account deletes its stored photo, and any tag only it used (IR-695).
 
-    Runs once the row is really gone: a rolled-back deletion keeps the photo.
+    The file goes once the deletion commits: a rolled-back deletion keeps it.
     Django does not remove an ImageField's file with its row, so without this
-    the file would outlive the person it shows.
+    the file would outlive the person it shows. The cascade has already removed
+    the account's `UserInterest` rows, which may leave a tag nobody uses.
     """
     name = instance.photo.name if instance.photo else None
     if name:
         storage = instance.photo.storage
-        transaction.on_commit(lambda: storage.delete(name), using=using)
+        transaction.on_commit(lambda: storage.delete(name), using=using, robust=True)
+    ResearchInterest.objects.using(using).filter(user_links__isnull=True).delete()
 
 
 class StudentProfile(models.Model):

@@ -199,6 +199,13 @@ class InterestTests(ProfileTestCase):
         self.assertEqual(response.data["research_interests"], [])
         self.assertEqual(self.ana.interest_links.count(), 0)
 
+    def test_deleting_the_last_account_that_used_a_tag_deletes_the_tag(self):
+        self.patch(research_interests=["GIS", "Hydrology"])
+        self.client.force_authenticate(self.ben)
+        self.patch(research_interests=["GIS"])
+        self.ana.delete()
+        self.assertEqual(list(ResearchInterest.objects.values_list("name", flat=True)), ["GIS"])
+
     def test_a_tag_nobody_uses_any_more_is_deleted(self):
         self.patch(research_interests=["GIS", "Hydrology"])
         self.client.force_authenticate(self.ben)
@@ -295,6 +302,14 @@ class PhotoUploadTests(ProfileTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(stored(self.ana).size, (512, 512))
 
+    def test_a_16_bit_greyscale_png_keeps_its_tones(self):
+        out = io.BytesIO()
+        image = Image.new("I;16", (40, 40), 32768)  # mid grey
+        image.save(out, "PNG")
+        self.assertEqual(self.put_photo(out.getvalue(), "g.png", "image/png").status_code, 200)
+        r, g, b = stored(self.ana).getpixel((256, 256))
+        self.assertTrue(100 < r < 160, (r, g, b))
+
     def test_a_transparent_png_is_laid_on_white(self):
         data = image_bytes("PNG", size=(40, 40), left=(0, 0, 0, 0), right=(0, 0, 0, 0), alpha=True)
         self.assertEqual(self.put_photo(data, "photo.png", "image/png").status_code, 200)
@@ -343,11 +358,21 @@ class PhotoUploadTests(ProfileTestCase):
         self.ana.refresh_from_db()
         self.assertFalse(self.ana.photo)
 
-    def test_a_crop_with_a_zero_size_negative_or_fractional_value_is_refused(self):
-        for fields in ({"crop_size": 0}, {"crop_x": -1}, {"crop_y": "1.5"}, {"crop_size": "wide"}):
-            with self.subTest(fields=fields):
-                body = {"crop_x": 0, "crop_y": 0, "crop_size": 50, **fields}
-                self.assertEqual(self.put_photo(**body).status_code, 400)
+    def test_a_crop_with_a_zero_size_or_a_negative_value_says_it_does_not_fit(self):
+        for field, value in (("crop_size", 0), ("crop_size", -5), ("crop_x", -1), ("crop_y", -1)):
+            with self.subTest(field=field, value=value):
+                body = {"crop_x": 0, "crop_y": 0, "crop_size": 50, field: value}
+                response = self.put_photo(**body)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.data, {field: ["The crop must fit inside the image."]})
+
+    def test_a_crop_that_is_not_a_whole_number_is_refused(self):
+        for field, value in (("crop_y", "1.5"), ("crop_size", "wide")):
+            with self.subTest(field=field, value=value):
+                body = {"crop_x": 0, "crop_y": 0, "crop_size": 50, field: value}
+                response = self.put_photo(**body)
+                self.assertEqual(response.status_code, 400)
+                self.assertIn(field, response.data)
 
     def test_a_partial_crop_is_refused(self):
         response = self.put_photo(crop_x=10)
