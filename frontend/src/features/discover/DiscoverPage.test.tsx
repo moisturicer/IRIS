@@ -1182,6 +1182,46 @@ describe("saved custom feeds (IR-577)", () => {
     expect(probe()).toHaveTextContent("myfeed=8");
   });
 
+  it("says an open feed matches nothing, keeps its criteria, and does not offer to clear them", async () => {
+    withFeeds(savedFeed({ query: { q: "flood", classification: "7" } }));
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    listed = [];
+
+    await openFeed();
+
+    expect(await screen.findByText("No papers match this feed right now")).toBeInTheDocument();
+    // The criteria stay in view, and "Clear filters" would empty the feed.
+    expect(screen.getByText(/Keywords: flood; Areas: Applied Research/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Clear filters" })).not.toBeInTheDocument();
+    expect(screen.queryByText("No research matches these filters")).not.toBeInTheDocument();
+  });
+
+  it("does not offer to save an empty set of filters into the open feed", async () => {
+    withFeeds(savedFeed({ query: { q: "flood" } }));
+    renderDiscover("/?myfeed=5");
+
+    expect(await screen.findByRole("region", { name: "Feed Coastal hazards" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument();
+  });
+
+  it("holds a feed's list back, and keeps the feed open, when the reader's feeds cannot be checked", async () => {
+    vi.mocked(libraryApi.feeds).mockRejectedValueOnce(new Error("offline"));
+    renderDiscover("/?q=flood&myfeed=5");
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/could not be checked right now/i);
+    // Not fetched, and the feed is not quietly dropped to show a wider list.
+    expect(recordsApi.list).not.toHaveBeenCalled();
+    expect(probe()).toHaveTextContent("myfeed=5");
+
+    withFeeds(savedFeed({ query: { q: "flood" } }));
+    await userEvent.click(within(alert).getByRole("button", { name: "Try again" }));
+
+    expect(await screen.findByRole("region", { name: "Feed Coastal hazards" })).toBeInTheDocument();
+    expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
+  });
+
   it("has no blocking accessibility violations with a feed open and with a correction pending", async () => {
     withFeeds(savedFeed({ name: "Old Area", query: { classification: "7,99" }, stale: { classification: [99] } }));
     const { container } = renderDiscover();

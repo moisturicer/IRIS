@@ -67,6 +67,46 @@ describe("feeds store", () => {
     expect(useFeedsStore.getState().interrupted).toBe(false);
   });
 
+  // CODING_STANDARDS F1: a response that is not the shape the screens read is
+  // the failed-read state, never a crash in Discover.
+  it("treats a list that is not a list as a failed read", async () => {
+    vi.mocked(libraryApi.feeds).mockResolvedValue(answer({ count: 0, results: { not: "a list" }, limit: 10 }));
+
+    await useFeedsStore.getState().ensureLoaded();
+
+    expect(useFeedsStore.getState().load).toBe("error");
+    expect(useFeedsStore.getState().feeds).toEqual([]);
+  });
+
+  it("treats a feed with no query or stale map as a failed read, keeping none of the list", async () => {
+    vi.mocked(libraryApi.feeds).mockResolvedValue(answer({
+      results: [feed(1, "Fine"), { id: 2, name: "Broken" }], limit: 10,
+    }));
+
+    await useFeedsStore.getState().ensureLoaded();
+
+    expect(useFeedsStore.getState().load).toBe("error");
+    expect(useFeedsStore.getState().feeds).toEqual([]);
+  });
+
+  it("accepts the router tests' generic answer as a list with no feeds", async () => {
+    vi.mocked(libraryApi.feeds).mockResolvedValue(answer({ count: 0, results: [] }));
+
+    await useFeedsStore.getState().ensureLoaded();
+
+    expect(useFeedsStore.getState().load).toBe("ready");
+    expect(useFeedsStore.getState().limit).toBe(10);
+  });
+
+  it("does not add a saved feed whose answer is not a feed", async () => {
+    vi.mocked(libraryApi.createFeed).mockResolvedValue(answer({ id: 7 }));
+
+    const result = await useFeedsStore.getState().create("Coastal", { q: "flood" });
+
+    expect(result.ok).toBe(false);
+    expect(useFeedsStore.getState().feeds).toEqual([]);
+  });
+
   it("adds a saved feed only once the server has accepted it", async () => {
     const pending = deferred<ReturnType<typeof answer>>();
     vi.mocked(libraryApi.createFeed).mockReturnValue(pending.promise as never);

@@ -67,6 +67,24 @@ function reasonFrom(error: unknown, fallback: string): string {
   return fallback;
 }
 
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+/**
+ * Is this the shape the screens read? They call `Object.keys(feed.stale)` and
+ * read `feed.query`, so a feed without them would crash Discover (F1, IR-913).
+ * A wrong shape is treated as the failed request the menu already shows.
+ */
+function isFeed(value: unknown): value is SavedFeed {
+  return isObject(value)
+    && typeof value.id === "number"
+    && typeof value.name === "string"
+    && isObject(value.query)
+    && isObject(value.stale);
+}
+
+const NOT_SHOWN = "The feed was saved, but could not be shown. Reload the page to see it.";
+
 let inflightLoad: Promise<void> | null = null;
 
 export const useFeedsStore = create<FeedsState>()((set, get) => ({
@@ -84,7 +102,16 @@ export const useFeedsStore = create<FeedsState>()((set, get) => ({
     const request = libraryApi.feeds().then(
       ({ data }) => {
         if (currentEpoch() !== epoch) return;
-        set({ feeds: data.results ?? [], limit: data.limit, load: "ready" });
+        const results: unknown = data?.results;
+        if (!Array.isArray(results) || !results.every(isFeed)) {
+          set({ feeds: [], load: "error", interrupted: false });
+          return;
+        }
+        set({
+          feeds: results,
+          limit: typeof data.limit === "number" ? data.limit : get().limit,
+          load: "ready",
+        });
       },
       (error: unknown) => {
         if (currentEpoch() !== epoch) return;
@@ -100,6 +127,7 @@ export const useFeedsStore = create<FeedsState>()((set, get) => ({
     try {
       const { data } = await libraryApi.createFeed({ name, query });
       if (currentEpoch() !== epoch) return { ok: false, message: SIGNED_OUT };
+      if (!isFeed(data)) return { ok: false, message: NOT_SHOWN };
       set((s) => ({ feeds: [...s.feeds, data] }));
       return { ok: true, feed: data };
     } catch (error) {
@@ -112,6 +140,7 @@ export const useFeedsStore = create<FeedsState>()((set, get) => ({
     try {
       const { data } = await libraryApi.updateFeed(id, change);
       if (currentEpoch() !== epoch) return { ok: false, message: SIGNED_OUT };
+      if (!isFeed(data)) return { ok: false, message: NOT_SHOWN };
       set((s) => ({ feeds: s.feeds.map((f) => (f.id === id ? data : f)) }));
       return { ok: true, feed: data };
     } catch (error) {

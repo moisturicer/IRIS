@@ -36,6 +36,7 @@ import { PaperCiteModal } from "./PaperCiteModal";
 import {
   DEFAULT_QUERY,
   discoverQueryKey,
+  feedCriteria,
   feedQueryOf,
   feedSearchParams,
   listParams,
@@ -211,9 +212,19 @@ export default function DiscoverPage() {
    *  for the reader: the list waits until they correct the feed. */
   const correctionPending = activeFeed !== null && Object.keys(activeFeed.stale).length > 0;
   /** Until the reader's feeds are known there is no telling whether this one is
-   *  stale, and a stale one's remainder can be wider than it was saved to be. */
-  const awaitingFeed = feedId !== null && (feedsLoad === "idle" || feedsLoad === "loading");
+   *  stale, and a stale one's remainder can be wider than it was saved to be.
+   *  That includes a failed read: the feed stays open, with its list held back
+   *  and a way to try again, and is never quietly dropped to show a wider one. */
+  const feedsReading = feedId !== null && (feedsLoad === "idle" || feedsLoad === "loading");
+  const feedUnchecked = feedId !== null && feedsLoad === "error";
+  const awaitingFeed = feedsReading || feedUnchecked;
   const holdResults = correctionPending || awaitingFeed;
+  /** Held back with nothing standing in for the list: the panel above says why. */
+  const holdQuietly = correctionPending || feedUnchecked;
+  const ensureFeeds = useFeedsStore((s) => s.ensureLoaded);
+  /** Filters on screen that a feed could hold: a sort alone is not one, and
+   *  saving none would only be refused. */
+  const feedHasCriteria = Object.keys(feedQueryOf(query)).some((key) => key !== "sort");
   const [feedBusy, setFeedBusy] = useState(false);
   const [feedError, setFeedError] = useState("");
 
@@ -229,7 +240,7 @@ export default function DiscoverPage() {
   /* A feed that is not the reader's (or is gone) is dropped from the URL
      without being named: it reads exactly like one that never existed. */
   useEffect(() => {
-    if (feedId !== null && ((feedsLoad === "ready" && !activeFeed) || feedsLoad === "error")) leaveFeed();
+    if (feedId !== null && feedsLoad === "ready" && !activeFeed) leaveFeed();
   }, [feedId, feedsLoad, activeFeed, leaveFeed]);
 
   const openFeed = (feed: SavedFeed) => {
@@ -365,7 +376,7 @@ export default function DiscoverPage() {
       setRecords([]);
       setFeedRecords([]);
       setTotalCount(null);
-      setLoading(awaitingFeed);
+      setLoading(feedsReading);
       return;
     }
     const restored = feed !== "for_you" ? readPosition(queryKey) : null;
@@ -423,7 +434,7 @@ export default function DiscoverPage() {
     // `query` is fully described by `feedKey`; keying on the string keeps an
     // unrelated URL change (the Publish dialog) from refetching.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feedKey, attempt, holdResults, awaitingFeed]);
+  }, [feedKey, attempt, holdResults, feedsReading]);
 
   const loadMore = useCallback(() => {
     const current = generation.current;
@@ -631,7 +642,7 @@ export default function DiscoverPage() {
         </button>
         <MyFeeds
           query={query}
-          matchCount={loading || correctionPending ? null : totalCount}
+          matchCount={loading || holdQuietly ? null : totalCount}
           options={{ classifications, colleges, recordTypes }}
           activeFeedId={activeFeed?.id ?? null}
           onOpen={openFeed}
@@ -666,11 +677,26 @@ export default function DiscoverPage() {
           </button>
         )}
       </div>
+      {feedUnchecked && (
+        <section aria-label="Saved feed" className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3">
+          <div role="alert" className="flex flex-wrap items-center gap-x-4 gap-y-2 text-small text-stone-700">
+            <p>This feed could not be checked right now, so its list is not shown.</p>
+            <button type="button" onClick={() => void ensureFeeds(true)}
+              className={cn("font-semibold text-brand underline-offset-2 hover:underline", FOCUS_RING)}>
+              Try again
+            </button>
+            <button type="button" onClick={leaveFeed}
+              className={cn("font-medium text-stone-700 underline-offset-2 hover:text-brand hover:underline", FOCUS_RING)}>
+              Leave feed
+            </button>
+          </div>
+        </section>
+      )}
       {activeFeed && (
         <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <p className="text-small font-semibold text-stone-900">Feed: {activeFeed.name}</p>
-            {!correctionPending && !sameFeedQuery(activeFeed.query, query) && (
+            {!correctionPending && feedHasCriteria && !sameFeedQuery(activeFeed.query, query) && (
               <button type="button" disabled={feedBusy} onClick={() => void saveToFeed()}
                 className={cn("text-small font-semibold text-brand underline-offset-2 hover:underline disabled:opacity-60", FOCUS_RING)}>
                 Save these filters to this feed
@@ -724,7 +750,7 @@ export default function DiscoverPage() {
       </p>
 
       <div className="mt-4">
-      {correctionPending ? null : loading ? (
+      {holdQuietly ? null : loading ? (
         <ResultsSkeleton columns={gridColumns} />
       ) : failed && interrupted ? (
         <InterruptedState framed what="research" onRetry={() => setAttempt((n) => n + 1)} />
@@ -742,7 +768,16 @@ export default function DiscoverPage() {
           }
         />
       ) : shownRecords.length === 0 ? (
-        narrowed ? (
+        activeFeed ? (
+          // The feed's own criteria stay in view, and there is no "Clear
+          // filters": clearing would empty the feed, not widen a search.
+          <EmptyState
+            framed
+            icon="fa-filter-circle-xmark"
+            title="No papers match this feed right now"
+            message={`Its filters: ${feedCriteria(activeFeed.query, { classifications, colleges, recordTypes }).join("; ")}. Papers appear here once they match.`}
+          />
+        ) : narrowed ? (
           <EmptyState
             framed
             icon="fa-filter-circle-xmark"

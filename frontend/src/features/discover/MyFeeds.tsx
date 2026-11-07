@@ -57,7 +57,9 @@ export function MyFeeds({ query, matchCount, options, activeFeedId, onOpen, onDe
   const limit = useFeedsStore((s) => s.limit);
   const ensureLoaded = useFeedsStore((s) => s.ensureLoaded);
 
-  useEffect(() => { void ensureLoaded(); }, [ensureLoaded]);
+  // Reads when the store is empty, which is also true again after the account
+  // changes, so the next reader's feeds are fetched and not left waiting.
+  useEffect(() => { if (load === "idle") void ensureLoaded(); }, [load, ensureLoaded]);
 
   useEffect(() => {
     if (!open) return;

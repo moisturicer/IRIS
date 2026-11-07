@@ -105,6 +105,15 @@ describe("My feeds menu", () => {
     expect(await screen.findByRole("button", { name: "Open Coastal hazards" })).toBeInTheDocument();
   });
 
+  it("reads the next account's feeds after the account changes", async () => {
+    show();
+    await waitFor(() => expect(libraryApi.feeds).toHaveBeenCalledTimes(1));
+
+    useAuthStore.getState().login({ id: 2, email: "r2@cit.edu", role_name: "Student" } as unknown as User, "a", "r");
+
+    await waitFor(() => expect(libraryApi.feeds).toHaveBeenCalledTimes(2));
+  });
+
   it("closes on Escape", async () => {
     show();
     await openMenu();
