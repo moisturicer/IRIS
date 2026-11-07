@@ -3,12 +3,16 @@ export function errorDetail(err: unknown, fallback: string): string {
   const response = (err as { response?: {
     status?: number;
     headers?: Record<string, unknown>;
-    data?: { detail?: unknown };
+    data?: { detail?: unknown; retry_after?: unknown };
   } } | null)?.response;
   const detail = response?.data?.detail;
   if (response?.status === 429) {
     const header = response.headers?.["retry-after"] ?? response.headers?.["Retry-After"];
     let seconds = typeof header === "string" || typeof header === "number" ? Number(header) : NaN;
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      const retryAfter = response.data?.retry_after;
+      seconds = typeof retryAfter === "string" || typeof retryAfter === "number" ? Number(retryAfter) : NaN;
+    }
     if (!Number.isFinite(seconds) || seconds <= 0) {
       const match = typeof detail === "string" ? /available in (\d+(?:\.\d+)?) seconds?/i.exec(detail) : null;
       seconds = match ? Number(match[1]) : NaN;

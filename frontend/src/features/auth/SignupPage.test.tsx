@@ -761,7 +761,7 @@ describe("the register screen's finish", { timeout: 30_000 }, () => {
     )).toBeInTheDocument();
     expect(screen.getByText(
       "If that address is wrong, register again with the right one. "
-      + "Your first request stays pending until an administrator declines it.",
+      + "An unverified signup is deleted after 30 days.",
     )).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Go to sign in" })).toHaveAttribute("href", "/login");
     await expectNoBlockingA11yViolations(container);
@@ -801,6 +801,20 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     expect(alert).toHaveTextContent("about 30 minutes");
     expect(alert).not.toHaveTextContent("throttled");
     expect(screen.getByLabelText("Password")).toBeInTheDocument();
+  });
+
+  it("shows the verification send cooldown from the server and keeps the signup answers (IR-804)", async () => {
+    const user = userEvent.setup();
+    refuse({ code: "rate_limited", detail: "Too many requests. Try again later.", retry_after: 90 }, 429);
+    const { container } = renderSignup();
+    await submit(user);
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("Too many requests — try again in about 2 minutes.");
+    expect(screen.getByLabelText("Password")).toHaveValue("IrisDemo123!");
+    expect(screen.getByRole("button", { name: "Register" })).toBeEnabled();
+    expect(screen.queryByRole("heading", { name: "Check your email" })).not.toBeInTheDocument();
+    await expectNoBlockingA11yViolations(container);
   });
 
   it("shows every reason the server refused a password, not just the first (IR-647)", async () => {
