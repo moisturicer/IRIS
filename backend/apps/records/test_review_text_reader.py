@@ -178,6 +178,24 @@ def test_a_web_address_broken_across_lines_stays_in_its_entry(read):
     ]
 
 
+def test_a_line_set_smaller_than_the_body_is_no_heading(read):
+    # sample25: an unruled table in 7.9 pt under a 10.1 pt body. Its score
+    # column, "3.23 Agree", read as numbered headings, and its bold
+    # "Overall Mean" row as another, so the paper looked like repeated headings.
+    body = "The students rated each statement on a four point scale from the survey."
+    reading = read(placed([[
+        (72, "Times-Bold", 11, "3.3 Academic Performance"), (72, BODY, 11, body), (72, BODY, 11, body),
+        *[(72, BODY, 8, f"3.{n} Agree") for n in (23, 10, 16, 4, 62, 2)],
+        (72, "Times-Bold", 8, "Overall Mean"),
+        (72, BODY, 11, body),
+        (72, "Times-Bold", 11, "3.4 Relationship Between Variables"), (72, BODY, 11, body),
+        # sample6: a questionnaire set small throughout keeps its bold capitals parts.
+        (72, "Times-Bold", 8, "II. ATTENDANCE HISTORY"),
+        (72, BODY, 8, "Approximately how many times were you absent from class this semester?"),
+    ]]))
+    assert keys(reading) == ["academic performance", "relationship between variables", "attendance history"]
+
+
 BODY_TEXT = ["The study asked how the curriculum prepares nurses for new tools in care.",
              "It reads the literature and proposes a model for teaching the use of them."]
 

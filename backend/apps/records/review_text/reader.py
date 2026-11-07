@@ -502,6 +502,12 @@ def is_bold(fontname) -> bool:
     return bool(BOLD_NAME.search(fontname or ""))
 
 
+def _bold_capitals(line, text) -> bool:
+    letters = [c for c in text if c.isalpha()]
+    return (len(letters) >= 4 and all(c.isupper() for c in letters)
+            and all(is_bold(w.get("fontname")) for w in line))
+
+
 def _has_cells(line) -> bool:
     """Whether a line's words stand apart as a table's cells do: a gap wider
     than `CELL_GAP` times the font size, where a heading has only spaces."""
@@ -528,6 +534,11 @@ def _is_heading(line, body_size=None):
     and shaped like a heading."""
     text = _line_text(line).strip()
     if not text or len(text) > 100 or text.endswith((".", ",", ";", ":", "?", "!")):
+        return False
+    if body_size and _size(line) < body_size - HEADING_SIZE and not _bold_capitals(line, text):
+        # Set smaller than the body: a table's cell, as "3.23 Agree" (sample25).
+        # Bold capitals are a heading at any size: a questionnaire set small
+        # throughout keeps "II. ATTENDANCE HISTORY" (sample6).
         return False
     if CHAPTER.fullmatch(text):
         return True   # all numbering, which `_wordy` would strip to nothing
