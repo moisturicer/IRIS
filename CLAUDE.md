@@ -399,8 +399,9 @@ python manage.py eval_answer_quality --set ../docs/evaluation/answer-quality/ans
                                    # lock, enforced admission on a fresh campaign, both readers'
                                    # JWTs (IRIS_EVAL_TOKEN, IRIS_EVAL_TOKEN_B), --runtime-url and
                                    # --runtime-model; --rescore and --reuse-django finish or redo a
-                                   # run. --validate verified 2026-11-07. NO PAID RUN YET, no lock
-                                   # written (the grader model is the owner's choice). Guide:
+                                   # run. --validate verified 2026-11-07; frozen 2026-11-08 with grader
+                                   # anthropic/claude-haiku-5.5 (owner's choice) in
+                                   # answer-quality-v1.lock.json. NO PAID RUN YET. Guide:
                                    # docs/evaluation/answer-quality/README.md
 python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewer-name NAME --out <packets.json>
                                    # one reviewer's packet (IR-607). Holds NO text (IR-721): which

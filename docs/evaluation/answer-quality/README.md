@@ -50,6 +50,9 @@ Pages are labelled only where a passage states the answer. Counting (F04), listi
 
 ## Freeze
 
+**Frozen 2026-11-08** in [`answer-quality-v1.lock.json`](answer-quality-v1.lock.json). The owner chose the grader: `anthropic/claude-haiku-5.5`. It is reached through the `answer` profile's own vendor account, OpenRouter, so admission charges one account.
+
+
 ```bash
 python manage.py eval_answer_quality --set ../docs/evaluation/answer-quality/answer-quality-v1.json --validate
 ```

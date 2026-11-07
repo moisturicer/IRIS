@@ -101,3 +101,10 @@ def test_a_runtime_that_charged_nothing_here_or_used_another_model_is_a_conditio
     assert _served_model_problems(rows({"operation": "llm", "model": "M"}), "m") == []
     assert "other" in _served_model_problems(
         rows({"operation": "llm", "model": "other"}), "m")[0]
+
+
+def test_the_committed_lock_freezes_the_committed_set_with_its_pinned_grader():
+    lock = json.loads(SET.with_name("answer-quality-v1.lock.json").read_text(encoding="utf-8"))
+    data = json.loads(SET.read_text(encoding="utf-8"))
+    assert lock["grader_model"] == "anthropic/claude-haiku-5.5"
+    assert aq.check_lock(data, lock, grader_model=lock["grader_model"]) == []

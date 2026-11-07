@@ -276,12 +276,23 @@ class Command(BaseCommand):
         return remaining
 
     def _grader(self, options, run_id):
+        from apps.ai.admission.limits import output_cap
         from apps.ai.admission.llm import AdmittedLLMProvider
+        from apps.ai.inference.profiles import DataPolicy, profile_for
+        from apps.ai.inference.tasks import InferenceTask
+        from apps.ai.providers.dialects import dialect_for
         from apps.ai.providers.openai_compatible import OpenAICompatibleAdapter
 
+        # The grader spends the answer task's vendor account, so admission charges one account.
+        answer = profile_for(InferenceTask.ANSWER)
+        cap = output_cap()
         adapter = OpenAICompatibleAdapter(
-            model=options["grader_model"], temperature=0.0, reasoning_effort="",
-            max_tokens=options["grader_max_tokens"], bounded_attempts=True)
+            base_url=answer.base_url, api_key=answer.api_key, model=options["grader_model"],
+            temperature=0.0, reasoning_effort="",
+            dialect=dialect_for(answer.vendor.value, (),
+                                answer.data_policy is DataPolicy.ZERO_RETENTION),
+            max_tokens=min(options["grader_max_tokens"], cap or options["grader_max_tokens"]),
+            bounded_attempts=True)
         return AdmittedGrader(AdmittedLLMProvider(adapter, lane=options["grader_lane"]),
                               model=options["grader_model"], lane=options["grader_lane"],
                               run_key=f"eval-grade:{run_id}")
