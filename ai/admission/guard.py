@@ -163,7 +163,8 @@ class SendGuard:
         if pin.data_policy != NO_TRAINING:
             raise AdmissionDenied(errors.PROVIDER_REFUSED)
         sources = _sources(dependencies)
-        pilot = pin.adapter == "openai-compatible" and pin.endpoint == OPENROUTER
+        pilot = (getattr(pin, "adapter", None) == "openai-compatible"
+                 and getattr(pin, "endpoint", None) == OPENROUTER)
         if (sources or pilot) and (self.stage != "development" or self.proxy_approval is None
                                    or not self.proxy_approval.permits(pin, account, campaign, sources,
                                                                       routing, price)):
