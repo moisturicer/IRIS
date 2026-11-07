@@ -590,7 +590,7 @@ def validate_measurement(measurement: Any, *, limit: int = 20) -> list[str]:
         if cls not in CLASSES:
             bad(f"samples[{i}].class must be one of {', '.join(CLASSES)}")
         if not _filled(s.get("outcome")):
-            bad(f"samples[{i}] needs a non-empty outcome string")
+            bad(f"samples[{i}]'s outcome must be a non-empty string")
         if not isinstance(s.get("usage_reported"), bool):
             bad(f"samples[{i}].usage_reported must be true or false")
         cost = s.get("cost_usd")
