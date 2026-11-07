@@ -1,14 +1,16 @@
-"""Review packets: what one human reviewer may see of a collected run (IR-607).
+"""Review packets: what one human reviewer may see of a collected run (IR-607, IR-721).
 
-Pure. The caller supplies the record ids the reviewer can read now and each
-one's active source revision. A turn resting on anything else, cited or only
-read, is withheld whole, question included, since its answer may quote it.
-Diagnostics, usage, saved Turns and other reviewers' verdicts never enter.
+Pure. A packet holds **no text**: no question, answer, title or quotation, only
+which turns a reviewer may see, the Records and source revisions each rests on,
+citation markers and pages, and a blank review template. Copying the file
+reveals nothing a reader could not already name.
 
-A written packet is a plaintext snapshot, not access control: whoever holds
-the file can read what it holds. `reauthorize` is the re-check an honest
-holder runs before reading, by the opening account's access and the sources'
-current revisions (IR-721).
+The text is rendered only on demand, by `render`, from the run file the packet
+was built from (pinned by its SHA-256), after the opening account's access and
+each source's current revision are checked again by `reauthorize`. A turn
+resting on anything unreadable or replaced, cited or only read, is withheld
+whole and is never rendered again. Diagnostics, usage, saved Turns and other
+reviewers' verdicts never enter.
 """
 
 from __future__ import annotations
@@ -17,7 +19,14 @@ from typing import Iterable, Mapping, Optional
 
 from .conversation_scoring import EXPLICIT, NOT_REVIEWED
 
-CITATION_FIELDS = ("marker", "record_id", "record_title", "page", "text")
+#: What a packet keeps of a citation: where it points, never what it says.
+CITATION_FIELDS = ("marker", "record_id", "page")
+TEXT_NOT_STORED = ("not stored: render it with eval_review_packets --show, which checks the "
+                   "opening account's access first")
+
+
+class PacketRefused(ValueError):
+    """The run file is not the one the packet was built from."""
 
 
 def cited_ids(run: Mapping) -> set[int]:
@@ -32,9 +41,8 @@ def _run_turn_ids(turn: Mapping) -> set[int]:
 
 
 def _withheld(turn: Mapping) -> dict:
-    """A turn shown as present but empty: nothing it said or asked survives."""
-    return {"number": turn.get("number"), "question": None, "outcome": turn.get("outcome"),
-            "answer": None, "citations": [], "withheld": True}
+    return {"number": turn.get("number"), "outcome": turn.get("outcome"), "citations": [],
+            "withheld": True}
 
 
 def _turn(turn: Mapping, readable: set[int],
@@ -43,14 +51,9 @@ def _turn(turn: Mapping, readable: set[int],
     ids = _run_turn_ids(turn)
     if ids - readable:
         return _withheld(turn), set()
-    citations = [{k: c.get(k) for k in CITATION_FIELDS}
-                 for c in answer.get("citations") or ()]
-    # `record_ids` and `revisions` let a packet opened later be judged again without
-    # the run file (IR-721).
-    return {"number": turn.get("number"), "question": turn.get("question"),
-            "outcome": turn.get("outcome"),
-            "answer": answer.get("answer") or answer.get("message"), "citations": citations,
-            "record_ids": sorted(ids),
+    citations = [{k: c.get(k) for k in CITATION_FIELDS} for c in answer.get("citations") or ()]
+    return {"number": turn.get("number"), "outcome": turn.get("outcome"),
+            "citations": citations, "record_ids": sorted(ids),
             "revisions": {str(rid): revisions.get(rid) for rid in sorted(ids)},
             "withheld": False}, ids
 
@@ -62,24 +65,22 @@ def packet_ids(bundle: Mapping) -> set[int]:
 
 
 def _turn_ids(turn: Mapping) -> set[int]:
-    # A packet written before `record_ids` existed still names its citations.
     cited = {c.get("record_id") for c in turn.get("citations") or ()}
     return {rid for rid in set(turn.get("record_ids") or ()) | cited if rid is not None}
 
 
 def _replaced(turn: Mapping, current: Mapping[int, Optional[int]]) -> bool:
-    """A source read at another revision than its current one. A packet written
-    before `revisions` existed records none and is judged by access alone."""
+    """A source read at another revision than its current one."""
     recorded = turn.get("revisions")
     if not isinstance(recorded, Mapping):
-        return False
+        return True                     # no recorded revisions: nothing to judge it by
     return any(current.get(int(rid)) != rev for rid, rev in recorded.items())
 
 
 def _own_review(review: Mapping, reviewer: str, authorized: set[int], conversation, arm,
                 rubric) -> dict:
-    """The review a reopened packet carries for `reviewer`. Another reviewer's work never
-    passes to a new holder; the same reviewer keeps only judgments on what is still shown."""
+    """Another reviewer's work never passes to a new holder; the same reviewer keeps only
+    judgments on what is still shown."""
     if not review or review.get("reviewer") != reviewer:
         return template(conversation, arm, reviewer, rubric)
     claims = [c for c in review.get("claims") or () if c.get("record_id") in authorized]
@@ -89,13 +90,10 @@ def _own_review(review: Mapping, reviewer: str, authorized: set[int], conversati
 
 def reauthorize(bundle: Mapping, *, readable: Iterable[int], reviewer: str,
                 revisions: Optional[Mapping[int, Optional[int]]] = None) -> dict:
-    """A written packet, opened again by `reviewer`, whose account may read only `readable`.
+    """A packet judged again for `reviewer`, whose account may read only `readable` now.
 
-    Pure. Each turn is judged by that account's current access and, where the packet
-    recorded them, by its sources' current revisions; a turn resting on anything
-    unreadable or replaced is withheld whole. A withheld turn stays withheld, since its
-    text is gone and a later grant of access must not bring it back from the file. This
-    is a re-check for an honest holder: the file itself is plaintext.
+    Each shown turn needs every Record it rests on readable and at the revision the packet
+    recorded; otherwise it is withheld, and a withheld turn stays withheld.
     """
     readable = set(readable)
     current = dict(revisions or {})
@@ -117,6 +115,49 @@ def reauthorize(bundle: Mapping, *, readable: Iterable[int], reviewer: str,
     return {**bundle, "reviewer": reviewer, "packets": packets}
 
 
+def render(bundle: Mapping, run: Mapping, run_sha256: str, *, readable: Iterable[int],
+           revisions: Mapping[int, Optional[int]]) -> list[dict]:
+    """The text of every turn `bundle` (already reauthorized) still shows, from `run`.
+
+    Refuses a run file other than the one the packet pins. A turn's dependencies are read
+    again from the run file, not from the packet, so editing a packet's references cannot
+    unlock a turn: each must be readable now and at the revision the packet recorded.
+    Withheld turns render nothing.
+    """
+    readable = set(readable)
+    if run_sha256 != bundle.get("run_sha256"):
+        raise PacketRefused("the run file is not the one this packet was built from "
+                            "(run_sha256 differs)")
+    rows = {row.get("id"): row for row in run.get("conversations", ())}
+    shown = []
+    for packet in bundle.get("packets", ()):
+        source = {t.get("number"): t for t in (rows.get(packet.get("conversation")) or {})
+                  .get("turns", ())}
+        turns = []
+        for turn in packet.get("turns", ()):
+            if turn.get("withheld"):
+                turns.append({"number": turn.get("number"), "withheld": True})
+                continue
+            original = source.get(turn.get("number")) or {}
+            recorded = turn.get("revisions") if isinstance(turn.get("revisions"), Mapping) else {}
+            needs = _run_turn_ids(original)
+            if (not original or needs - readable
+                    or any(str(rid) not in recorded or recorded[str(rid)] != revisions.get(rid)
+                           for rid in needs)):
+                turns.append({"number": turn.get("number"), "withheld": True})
+                continue
+            answer = original.get("public_answer") or {}
+            turns.append({
+                "number": turn.get("number"), "withheld": False,
+                "question": original.get("question"),
+                "answer": answer.get("answer") or answer.get("message"),
+                "citations": [{k: c.get(k) for k in ("marker", "record_id", "record_title",
+                                                     "page", "text")}
+                              for c in answer.get("citations") or ()]})
+        shown.append({"conversation": packet.get("conversation"), "turns": turns})
+    return shown
+
+
 def template(conversation: str, arm: str, reviewer: str, rubric_version) -> dict:
     return {"conversation": conversation, "arm": arm, "reviewer": reviewer,
             "reviewer_kind": "human", "role": "independent", "rubric_version": rubric_version,
@@ -127,7 +168,8 @@ def template(conversation: str, arm: str, reviewer: str, rubric_version) -> dict
 
 
 def build_packets(run: Mapping, *, reviewer: str, readable: Iterable[int],
-                  revisions: Optional[Mapping[int, Optional[int]]] = None) -> dict:
+                  revisions: Optional[Mapping[int, Optional[int]]] = None,
+                  run_sha256: Optional[str] = None) -> dict:
     readable = set(readable)
     revisions = dict(revisions or {})
     arm = run.get("arm")
@@ -142,5 +184,6 @@ def build_packets(run: Mapping, *, reviewer: str, readable: Iterable[int],
         packets.append({"conversation": row["id"], "family": row.get("family"),
                         "turns": turns, "authorized_record_ids": sorted(authorized),
                         "review": template(row["id"], arm, reviewer, rubric)})
-    return {"run_id": run.get("run_id"), "arm": arm, "reviewer": reviewer,
-            "rubric_version": rubric, "packets": packets}
+    return {"run_id": run.get("run_id"), "run_sha256": run_sha256, "arm": arm,
+            "reviewer": reviewer, "rubric_version": rubric, "text": TEXT_NOT_STORED,
+            "packets": packets}

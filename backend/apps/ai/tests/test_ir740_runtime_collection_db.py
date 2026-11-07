@@ -163,7 +163,7 @@ def test_a_source_made_unreadable_after_collection_is_denied_in_reopen_export_an
     readable = set(Record.objects.visible_to(reader).values_list("pk", flat=True))
     assert flood.pk not in readable and pond.pk in readable
     packet = build_packets(run, reviewer="Rev One", readable=readable)["packets"][0]
-    assert packet["turns"][0]["withheld"] is True and packet["turns"][0]["answer"] is None
+    assert packet["turns"][0]["withheld"] is True and "answer" not in packet["turns"][0]
     assert packet["turns"][0]["citations"] == []
     assert packet["authorized_record_ids"] == []
     assert "gauges" not in json.dumps(packet)
