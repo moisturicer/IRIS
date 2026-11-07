@@ -99,6 +99,7 @@ export function mockShell(
   api.on("GET", "/records/", paginated(papers));
   api.on("GET", "/notifications/", paginated([]));
   api.on("GET", "/library/saves/", { results: [] });
+  api.on("GET", "/library/feeds/", { results: [], limit: 10 });
 }
 
 /**
