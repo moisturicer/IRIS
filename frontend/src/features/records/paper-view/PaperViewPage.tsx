@@ -28,11 +28,12 @@ import {
 import { conversationPath } from "@/lib/askHandoff";
 import type { RecordDetail, IpType } from "@/types/records";
 import { IP_TYPE_LABELS } from "@/types/records";
-import type { Region, SemanticSearchResult } from "@/types/ai";
+import type { Region } from "@/types/ai";
 import { PaperCiteModal } from "@/features/discover/PaperCiteModal";
 import { PaperSaveDropdown } from "@/features/discover/PaperSaveDropdown";
 import { recordVisit } from "@/lib/recordLibrary";
 import { RelatedPublishedResearch } from "./RelatedPublishedResearch";
+import { RelatedWorks } from "./RelatedWorks";
 import { ContinueProposal } from "../ContinueProposal";
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
 import { ActionRequiredPanel } from "@/features/document-requests/ActionRequiredPanel";
@@ -165,97 +166,6 @@ function IpTagger({ recordId, currentIpType, onSaved }: IpTaggerProps) {
         </button>
         {saved && <span className="text-xs font-semibold text-stone-900">Saved</span>}
         {error && <span className="text-xs text-brand">{error}</span>}
-      </div>
-    </section>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Similar papers — record-vector similarity (ADR-029 §5), through the same
-// `visible_to` predicate as Ask IRIS. The *predicate* is shared; the retrieval
-// is not — Ask IRIS ranks passages, this ranks whole records on their
-// title-and-abstract vector, so it answers "broadly about the same thing?"
-// and will miss two papers sharing a method described mid-document.
-// ---------------------------------------------------------------------------
-
-function SimilarPapers({ recordId }: { recordId: number }) {
-  const [items, setItems] = useState<SemanticSearchResult[] | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    recordsApi
-      .similar(recordId)
-      .then(({ data }) => {
-        if (alive) setItems(data.results ?? []);
-      })
-      .catch(() => {
-        if (alive) setItems([]);
-      });
-    return () => {
-      alive = false;
-    };
-  }, [recordId]);
-
-  if (items === null) {
-    return (
-      <section>
-        <SectionHeading>Related works</SectionHeading>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <div
-              key={i}
-              className="h-28 rounded-2xl ring-1 ring-stone-200 bg-white animate-pulse motion-reduce:animate-none"
-            />
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  // Empty is the common case today and says nothing by itself: a record with
-  // no vector has no neighbours, and the disclosure gate (IR-250) means no
-  // record has one yet. Rendering nothing at all left a reader to conclude
-  // this paper is unrelated to everything in the repository, which is a
-  // stronger claim than IRIS can make.
-  if (items.length === 0) {
-    return (
-      <section>
-        <SectionHeading>Related works</SectionHeading>
-        <p className="text-sm text-stone-500">
-          No related works found. Similarity is computed from indexed records, and indexing
-          has not run for this repository yet.
-        </p>
-      </section>
-    );
-  }
-
-  return (
-    <section>
-      <div className="flex items-baseline justify-between gap-3">
-        <SectionHeading>Related works</SectionHeading>
-        <Link to="/" className="text-sm font-semibold text-brand hover:underline">
-          Explore all papers →
-        </Link>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-3">
-        {items.map((item) => (
-          <Link
-            key={item.id}
-            to={`/records/${item.id}`}
-            className="group bg-white ring-1 ring-stone-200 rounded-2xl p-4 hover:ring-brand/30 hover:shadow-card-md transition-all duration-200"
-          >
-            <p className="text-2xs font-semibold tracking-wider text-stone-500 mb-2">
-              Record #{item.id}
-            </p>
-            <p className="font-display text-lg font-semibold text-stone-900 leading-snug line-clamp-3 group-hover:text-brand transition-colors duration-200">
-              {item.title}
-            </p>
-            <p className="text-2xs text-stone-500 mt-2">
-              {item.year ?? "—"}
-              {item.classification ? ` · ${item.classification}` : ""}
-            </p>
-          </Link>
-        ))}
       </div>
     </section>
   );
@@ -1250,7 +1160,7 @@ export default function PaperViewPage() {
                   <RelatedPublishedResearch recordId={record.id} />
                 )}
 
-                <SimilarPapers recordId={record.id} />
+                <RelatedWorks recordId={record.id} />
 
                 {/* Public discussion (IR-420, spec §8): drawn, not yet open. */}
                 <CommentsSection

@@ -162,6 +162,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-424** | Answer presentation: Markdown structure, delimited formulas and no invented images — no FR- id; changes answer-path behaviour (IR-426 … | [details](traceability/IR-424.md) | **IMPLEMENTED** |
 | **IR-440** | Retrieval looks past 40 candidates — no FR- id; a bug fix, not a technique | [details](traceability/IR-440.md) | **IMPLEMENTED** |
 | **IR-442** | A retrieval miss is detectable rather than silent — no FR- id; the checker for the failure class ADR-023 measures in aggregate but cannot … | [details](traceability/IR-442.md) | **IMPLEMENTED** |
+| **IR-568** | Related works says why it is empty (ready, no matches, not indexed, incompatible, unavailable) without revealing hidden Records — no FR- id; user story 14 of IR-557's spec | [details](traceability/IR-568.md) | **IMPLEMENTED** |
 | **IR-312** | A proposer sees when their idea was already done here — the Novelty check; FR-M4 (stable label only) | [details](traceability/IR-312.md) | **IMPLEMENTED** |
 | **IR-826** | The AI gateway gets no Django database login; ADR-014's accepted amendment allows its runs login only | [details](traceability/IR-826.md) | **VERIFIED** |
 | **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
