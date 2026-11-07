@@ -163,6 +163,7 @@ def measurements(workload=WORKLOAD, **over):
                + [sample("deep", i, cost=0.05) for i in range(10)]
                + [sample("ingestion", i, cost=0.002, total_ms=5000) for i in range(5)])
     base = {"schema_version": "workload-measurement-1", "run_id": "load-1", "providers": "real",
+            "git_commit": "rt1",
             "environment": {"database": "postgresql", "workers": "independent_processes"},
             "started_at": "2026-10-21T00:00:00+00:00", "concurrency": 8,
             "workload_sha256": canonical_digest(workload), "samples": samples,

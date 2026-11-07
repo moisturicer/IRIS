@@ -195,11 +195,6 @@ ALLOWED = {
     # "missing" is a report key, three times: cases with no reported count,
     # no assessment and no latency. A list, not an item's state.
     "ai/evaluation/milestone.py",
-    # (IR-741) "missing" is a report key twice over: the declarations, caps and
-    # approvals a live collection still lacks, and the list `eval_readiness`
-    # prints from it. A list of names, not an item's state.
-    "ai/evaluation/readiness.py",
-    "ai/management/commands/eval_readiness.py",
     # (IR-606) "missing" labels unreported usage in replay evidence;
     # "open" is a provider reservation awaiting settlement. Neither is a
     # document-request item or request state.

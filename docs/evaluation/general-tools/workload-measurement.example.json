@@ -1,6 +1,7 @@
 {
   "schema_version": "workload-measurement-1",
   "run_id": "EXAMPLE-ONLY-not-a-measurement",
+  "git_commit": "EXAMPLE-ONLY-not-a-commit",
   "providers": "fake",
   "environment": {
     "database": "sqlite",

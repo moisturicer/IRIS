@@ -43,17 +43,26 @@ python manage.py eval_readiness --build --report campaign.json --candidate runti
 python manage.py eval_readiness --verify manifest.json [--check-files] [--assert-ready --expect-commit SHA]
 ```
 
-- `--preflight` names every missing declaration, operational cap and approval, and exits
+- `--preflight` names every unrecorded declaration, operational cap and approval, and exits
   non-zero unless paid collection could begin. Nothing supplies a default or approves anything.
 - `--build` writes `docs/evaluation/runs/<stamp>-IR-741-readiness-<set>.json`. A blocked
   manifest is a normal result: it exits 0 and prints each blocking reason.
 - `--verify` fails when the schema is unknown, the manifest was edited after it was sealed
   (`manifest_sha256`), a gate was removed, or a `met` gate lacks an evidence reference.
   `--check-files` re-hashes every input the manifest names (`inputs`), so invented digests do
-  not pass. `--assert-ready` implies it and additionally refuses a blocked manifest or one for
-  another commit; this is what cutover preflight calls.
+  not pass. `--assert-ready --expect-commit SHA` (the commit is required and must be clean)
+  **rebuilds the manifest from the files it names** and refuses unless the rebuild is
+  byte-identical, so a verdict edited by hand and resealed, or one whose `inputs` were emptied,
+  does not pass. It also refuses a blocked manifest or one for another commit; this is what
+  cutover preflight calls. Run it from the directory the manifest was built in, since inputs
+  are recorded by the paths given to `--build`. The digest is not a signature: the rebuild is
+  what makes the verdict checkable.
 - `--baseline-sha256` is the SHA-256 of the canonical JSON of the baseline report (sorted
-  keys, compact separators). A baseline whose digest differs is `incomparable`.
+  keys, compact separators). A baseline whose digest differs is `incomparable`. The pin is the
+  operator's argument (`pin_source: operator_argument`): it proves the file is unchanged, not
+  that the right file was frozen, so record the digest wherever the baseline was frozen. A
+  baseline that is the candidate itself (same arm, same runs, or same commit and engine) is
+  `incomparable`.
 
 Every input is recorded in the manifest by path and file SHA-256, and a gate cannot be `met`
 without a reference to the evidence it rests on. The manifest holds no time of day, so identical
@@ -78,9 +87,11 @@ none, marking it `git_commit_source: "run_file"`. Nothing is inferred:
 | the candidate's commit | may be `met` | `verified` |
 | no commit, or `unknown` (`git describe` could not say) | `not_measured` | `unverified` |
 | the candidate's commit unknown | `not_measured` | `unverified` |
-| another commit, or `<sha>-dirty` | `incomparable` | `mismatch` |
+| another commit | `incomparable` | `mismatch` |
+| the candidate's commit, but both are `<sha>-dirty` | `not_measured` | `unverified` |
 
-This applies to `access_disclosure`, `postgres_workers` and the browser exercise alike. The
+This applies to `access_disclosure`, `postgres_workers`, the browser exercise and the workload
+measurement alike. A dirty tree names no reproducible source, so it never verifies. The
 browser producer keeps no private reference; it now records `evidence_recorded: true` per
 measured check, and readiness accepts that or an `evidence_ref`.
 
@@ -104,6 +115,7 @@ marked fake, is `workload-measurement.example.json`.
 |---|---|---|
 | `schema_version` | yes | exactly `workload-measurement-1` |
 | `run_id` | yes | non-empty string naming the load run |
+| `git_commit` | yes | the commit the measured runtime was built from; must be the candidate's, and clean |
 | `providers` | yes | `real` or `fake`; `fake` can only reach `contract_only` |
 | `environment` | yes | `{database, workers}`; only `{postgresql, independent_processes}` counts as real |
 | `started_at` | yes | timezone-aware ISO 8601; must be at or after the workload's `declared_at` |
@@ -116,9 +128,24 @@ Sample fields: `class` (`ordinary`, `deep` or `ingestion`); `outcome` (non-empty
 anything else, which counts as a failure); `usage_reported` (boolean); `cost_usd` (non-negative
 number, or `null` meaning no usage and no reservation, which makes cost unbounded); `queue_ms`
 and `total_ms` (non-negative; **required for `ordinary` and `deep`**, with `total_ms` >=
-`queue_ms` so latency is queue-inclusive); `tool_ms` and `model_ms` (optional, non-negative or
-`null`). The declared `mix` is the minimum samples per class. Latency percentiles and the cost
-per successful task include failed requests.
+`queue_ms` so latency is queue-inclusive); `tool_ms` and `model_ms` (optional in the shape, but the `workload` gate is
+`not_measured` while any `ordinary` or `deep` sample lacks either). Every number must be finite.
+The declared `mix` is the minimum samples per class. Latency percentiles and the cost per
+successful task include failed requests. A class in which every sample failed, ingestion
+included, is `not_met`; an ingestion sample with no cost leaves `cost` `not_measured`.
+
+The workload must be declared under the conditions the candidate's campaign ran under: its
+`corpus_snapshot_digest`, `model_ids`, `data_policy` and `cache_state` must equal the arm's
+recorded conditions, or both `workload` and `cost` are `incomparable`.
+
+## What readiness re-checks rather than trusts
+
+The campaign report is not sealed, so readiness recomputes what it can: every reported fraction
+from its numerator and denominator (a stated value that disagrees, NaN included, is
+`incomparable`); distinct cases and distinct repetitions (a run or case listed twice counts
+once); that `set_families` names every family the arm ran; and the report's own
+`enablement_blocked`, `blocking` and `excluded_runs`, which block the `comparison` gate. Campaign
+spend whose rows record no cold or warm cache state is not bounded and keeps `cost` open.
 
 ## IR-755 integration contract
 
@@ -136,3 +163,9 @@ IR-741 does not collect. A collector can be written against this alone:
 5. Run `eval_readiness --build`, then `--verify --assert-ready --expect-commit <sha>`.
 
 Until those exist the manifest is `blocked`, correctly.
+
+**The current set cannot clear `quality`.** `conversation_set_v1.json` has seven conversations
+per family, below the ten distinct cases each reported family needs, and families A04, A07 and
+A09-A13 have no supported cases. `quality` therefore stays `inconclusive` until IR-755 (or a
+later set) supplies ten distinct supported cases per family. This fails safely; it is not a
+defect of the gate.

@@ -116,7 +116,8 @@ def test_verify_accepts_a_sound_manifest_and_assert_ready_refuses_a_blocked_one(
     (written,) = (tmp_path / "out").glob("*.json")
     call_command("eval_readiness", verify=str(written))
     with pytest.raises(CommandError, match="blocked"):
-        call_command("eval_readiness", verify=str(written), assert_ready=True)
+        call_command("eval_readiness", verify=str(written), assert_ready=True,
+                     expect_commit="rt1")
 
 
 def test_verify_catches_a_manifest_edited_to_say_ready(tmp_path):
@@ -172,8 +173,10 @@ def test_assert_ready_re_hashes_inputs_so_a_hand_made_manifest_cannot_pass(tmp_p
     m = json.loads(written.read_text())
     assert m["status"] == "evidence_met"  # the synthetic fixture: plumbing only
     (tmp_path / "report.json").unlink()
-    with pytest.raises(CommandError, match="not on disk"):
-        call_command("eval_readiness", verify=str(written), assert_ready=True)
+    # The rebuild reads every input, so a missing one is named as unreadable.
+    with pytest.raises(CommandError, match="report.*cannot be read"):
+        call_command("eval_readiness", verify=str(written), assert_ready=True,
+                     expect_commit="rt1")
 
 
 def test_malformed_inputs_are_command_errors_not_tracebacks(tmp_path):
@@ -234,3 +237,19 @@ def test_build_prints_the_interpretations_that_await_confirmation(tmp_path, caps
     out = capsys.readouterr().out
     assert "CONFIRM objectives_on_point_estimate" in out
     assert "CONFIRM no_success_rate_threshold" in out
+
+
+def test_assert_ready_needs_a_commit_and_refuses_a_resealed_verdict(tmp_path):
+    call_command("eval_readiness", build=True, **_inputs(tmp_path))
+    (written,) = (tmp_path / "out").glob("*.json")
+    with pytest.raises(CommandError, match="needs --expect-commit"):
+        call_command("eval_readiness", verify=str(written), assert_ready=True)
+    call_command("eval_readiness", verify=str(written), assert_ready=True, expect_commit="rt1")
+    m = json.loads(written.read_text())
+    m["gates"]["cost"]["total_usd"] = 0.0
+    body = {k: v for k, v in m.items() if k not in ("manifest_sha256", "commit")}
+    m["manifest_sha256"] = canonical_digest(body)
+    path = _write(tmp_path / "resealed.json", m)
+    call_command("eval_readiness", verify=path)                 # internally consistent
+    with pytest.raises(CommandError, match="does not follow from its inputs"):
+        call_command("eval_readiness", verify=path, assert_ready=True, expect_commit="rt1")

@@ -520,41 +520,41 @@ def test_campaign_spend_with_missing_usage_keeps_the_cost_gate_open():
 
 def test_a_complete_declaration_profile_and_approvals_allow_live_collection():
     out = collection_preflight(WORKLOAD, PROFILE, APPROVED)
-    assert out["allowed"] is True and out["missing"] == []
-    assert full()["live_collection"] == {"allowed": True, "missing": []}
+    assert out["allowed"] is True and out["unrecorded"] == []
+    assert full()["live_collection"] == {"allowed": True, "unrecorded": []}
 
 
 def test_a_missing_operational_cap_blocks_live_collection_and_is_named():
     caps = {k: v for k, v in CAPS.items() if k != "max_cost_usd"}
     out = collection_preflight(WORKLOAD, {**PROFILE, "caps": caps}, APPROVED)
     assert out["allowed"] is False
-    assert out["missing"] == ["profile.caps.max_cost_usd"]
+    assert out["unrecorded"] == ["profile.caps.max_cost_usd"]
     zero = collection_preflight(WORKLOAD, {**PROFILE, "caps": {**CAPS, "deadline_seconds": 0}},
                                 APPROVED)
-    assert "profile.caps.deadline_seconds" in zero["missing"]
+    assert "profile.caps.deadline_seconds" in zero["unrecorded"]
 
 
 def test_missing_paid_provider_or_data_approvals_block_live_collection():
     out = collection_preflight(WORKLOAD, PROFILE, {k: v for k, v in APPROVED.items()
                                                     if k != "dataset_transmission"})
     assert out["allowed"] is False
-    assert out["missing"] == ["approvals.dataset_transmission"]
-    assert "approvals.funding" in collection_preflight(WORKLOAD, PROFILE, None)["missing"]
+    assert out["unrecorded"] == ["approvals.dataset_transmission"]
+    assert "approvals.funding" in collection_preflight(WORKLOAD, PROFILE, None)["unrecorded"]
 
 
 def test_an_unauthorized_profile_or_incomplete_declaration_blocks_live_collection():
     unsigned = {k: v for k, v in PROFILE.items() if k != "authorized_by"}
-    assert "profile.authorized_by" in collection_preflight(WORKLOAD, unsigned, APPROVED)["missing"]
+    assert "profile.authorized_by" in collection_preflight(WORKLOAD, unsigned, APPROVED)["unrecorded"]
     thin = {k: v for k, v in WORKLOAD.items() if k not in ("declared_at", "mix")}
-    missing = collection_preflight(thin, PROFILE, APPROVED)["missing"]
+    missing = collection_preflight(thin, PROFILE, APPROVED)["unrecorded"]
     assert "workload.declared_at" in missing and "workload.mix" in missing
     assert collection_preflight(None, None, APPROVED)["allowed"] is False
     no_deep = {**WORKLOAD, "mix": {"ordinary": 40, "ingestion": 5}}
-    assert "workload.mix.deep" in collection_preflight(no_deep, PROFILE, APPROVED)["missing"]
+    assert "workload.mix.deep" in collection_preflight(no_deep, PROFILE, APPROVED)["unrecorded"]
     for dropped in ("latency", "cost", "resources"):
         bare = {k: v for k, v in PROFILE.items() if k != dropped}
         assert any(m.startswith(f"profile.{dropped}") for m in
-                   collection_preflight(WORKLOAD, bare, APPROVED)["missing"])
+                   collection_preflight(WORKLOAD, bare, APPROVED)["unrecorded"])
 
 
 def test_without_authorization_the_manifest_says_so_and_is_blocked():
@@ -574,8 +574,10 @@ def test_a_missing_worker_and_browser_result_a_breach_and_unknown_usage_yield_bl
     m = full(campaign_report(revs=revs), measurements=unknown,
              scenarios=without(SCENARIOS_PASSED, "durability", "browser"))
     assert m["status"] == "blocked"
+    # The campaign report's own verdict blocks too (it read the breach): the comparison gate
+    # no longer ignores enablement_blocked.
     assert {name: g["status"] for name, g in m["gates"].items() if g["status"] != "met"} == {
-        "safety": "breached", "postgres_workers": "not_measured",
+        "comparison": "not_met", "safety": "breached", "postgres_workers": "not_measured",
         "browser_accessibility": "not_measured", "cost": "inconclusive"}
     assert gate(m, "quality")["status"] == "met"          # the average is fine; it does not matter
     assert len(m["blocking"]) >= 4
@@ -599,11 +601,26 @@ def test_the_manifest_is_versioned_self_digested_and_byte_for_byte_reproducible(
     assert verify_manifest(readiness()) == []              # a blocked manifest is also sound
 
 
+def read_full(**over):
+    """``read`` for assert_ready over the in-memory files ``full()`` was built from."""
+    report_ = campaign_report()
+    files = {"report": report_, "baseline": frozen(report_), "scenarios": SCENARIOS_PASSED,
+             "workload": WORKLOAD, "profile": PROFILE, "measurements": measurements(),
+             "approvals": APPROVED, **over}
+    by_path = {REFS[k]["path"]: (REFS[k]["sha256"], v) for k, v in files.items()}
+
+    def read(path):
+        if path not in by_path:
+            raise OSError(f"no such file {path}")
+        return by_path[path]
+    return read
+
+
 def test_a_ready_manifest_passes_the_cutover_check_and_a_blocked_one_is_refused_with_why():
-    assert_ready(full(), expect_commit="rt1")
+    assert_ready(full(), expect_commit="rt1", read=read_full())
     blocked = readiness()
     with pytest.raises(ReadinessRefused) as caught:
-        assert_ready(blocked, expect_commit="rt1")
+        assert_ready(blocked, expect_commit="rt1", read=read_full())
     assert "blocked" in str(caught.value) and "workload" in str(caught.value)
 
 
@@ -614,13 +631,13 @@ def test_a_manifest_edited_to_say_ready_is_caught_even_when_resealed():
     problems = verify_manifest(resealed)
     assert any("evidence_met" in p and "not met" in p for p in problems)
     with pytest.raises(ReadinessRefused):
-        assert_ready(resealed)
+        assert_ready(resealed, expect_commit="rt1", read=read_full())
 
 
 def test_a_manifest_for_another_commit_or_schema_or_with_a_gate_removed_is_refused():
     ready = full()
     with pytest.raises(ReadinessRefused, match="commit"):
-        assert_ready(ready, expect_commit="other")
+        assert_ready(ready, expect_commit="other", read=read_full())
     assert any("schema" in p for p in verify_manifest(sealed({**ready, "schema_version": "x"})))
     gates = {k: v for k, v in ready["gates"].items() if k != "safety"}
     assert any("safety" in p for p in verify_manifest(sealed({**ready, "gates": gates})))
@@ -904,3 +921,161 @@ def test_a_well_formed_file_is_still_not_evidence_when_it_declares_fake_provider
     assert validate_measurement(fake) == []
     assert gate(full(measurements=fake), "workload")["status"] == "contract_only"
     assert gate(full(measurements=fake), "cost")["status"] == "contract_only"
+
+
+# --- second review: evidence that cleared a gate it must not --------------------------------
+
+
+def _deep(value, *path):
+    out = copy.deepcopy(value)
+    node = out
+    for key in path[:-1]:
+        node = node[key]
+    return out, node, path[-1]
+
+
+def test_campaign_spend_with_no_cache_state_cannot_clear_the_cost_gate():
+    report_ = campaign_report()
+    spend = report_["arms"]["runtime"]["spend"]
+    spend["unknown_cache"] = spend["cold"]["conversations"]
+    spend["cold"] = {**spend["cold"], "conversations": 0}
+    g = gate(full(report_), "cost")
+    assert g["status"] != "met"
+    assert any("no cold or warm cache" in r for r in g["reasons"])
+    assert any("no cold or warm spend" in r for r in g["reasons"])
+
+
+@pytest.mark.parametrize("field,value", [("corpus_snapshot_digest", "other"),
+                                         ("model_ids", {"answer": "m2"}),
+                                         ("data_policy", "training-allowed"),
+                                         ("cache_state", "warm")])
+def test_a_workload_declared_under_other_conditions_is_incomparable(field, value):
+    other = {**WORKLOAD, field: value}
+    m = full(workload=other, measurements=measurements(workload=other))
+    for name in ("workload", "cost"):
+        assert gate(m, name)["status"] == "incomparable"
+        assert any("differ from the conditions" in r for r in gate(m, name)["reasons"])
+
+
+@pytest.mark.parametrize("commit,status", [("zzz", "incomparable"), (None, "not_measured")])
+def test_a_measurement_not_tied_to_the_candidates_commit_does_not_clear(commit, status):
+    m = full(measurements=measurements(git_commit=commit))
+    assert gate(m, "workload")["status"] == status and gate(m, "cost")["status"] == status
+
+
+def test_infinite_caps_and_measurements_are_not_numbers():
+    endless = copy.deepcopy(PROFILE)
+    endless["latency"]["ordinary_p95_ms"] = float("inf")
+    endless["caps"]["max_cost_usd"] = float("inf")
+    missing = collection_preflight(WORKLOAD, endless, APPROVED)["unrecorded"]
+    assert "profile.latency.ordinary_p95_ms" in missing and "profile.caps.max_cost_usd" in missing
+    slow = measurements()
+    slow["samples"][0] = dict(slow["samples"][0], total_ms=float("inf"))
+    assert any("total_ms" in d for d in validate_measurement(slow))
+    assert gate(full(measurements=slow), "workload")["status"] == "not_measured"
+
+
+def test_a_dirty_tree_never_verifies_even_against_the_same_dirty_candidate():
+    report_ = campaign_report(runs=campaign(runtime={"git_commit": "rt1-dirty"}))
+    rows = {k: {**v, "git_commit": "rt1-dirty"} for k, v in SCENARIOS_PASSED.items()}
+    m = full(report_, scenarios=rows, baseline=pinned(report_),
+             measurements=measurements(git_commit="rt1-dirty"))
+    for name in ("access_disclosure", "postgres_workers", "browser_accessibility", "workload"):
+        assert gate(m, name)["status"] == "not_measured", name
+    with pytest.raises(ReadinessRefused, match="clean commit"):
+        assert_ready(full(), expect_commit="rt1-dirty", read=read_full())
+
+
+def test_assert_ready_rebuilds_the_manifest_so_a_resealed_edit_does_not_pass():
+    ready = full()
+    gates = copy.deepcopy(ready["gates"])
+    gates["cost"]["cost_per_successful_task"] = 0.0001
+    edited = sealed({**ready, "gates": gates})
+    assert verify_manifest(edited) == []                      # consistent, so only a rebuild sees it
+    with pytest.raises(ReadinessRefused, match="does not follow from its inputs"):
+        assert_ready(edited, expect_commit="rt1", read=read_full())
+    with pytest.raises(ReadinessRefused, match="inputs do not record"):
+        assert_ready(sealed({**ready, "inputs": {}}), expect_commit="rt1", read=read_full())
+    with pytest.raises(ReadinessRefused, match="changed since"):
+        assert_ready(ready, expect_commit="rt1",
+                     read=lambda p: ("0" * 64, read_full()(p)[1]))
+
+
+def test_a_met_gate_citing_evidence_the_inputs_do_not_record_is_a_problem():
+    ready = full()
+    gates = copy.deepcopy(ready["gates"])
+    gates["quality"]["evidence"] = [{"name": "report", "path": "made/up.json", "sha256": "f" * 64}]
+    assert any("quality cites report" in p for p in verify_manifest(sealed({**ready,
+                                                                             "gates": gates})))
+
+
+def test_report_numbers_are_recomputed_from_their_counts():
+    report_ = campaign_report()
+    rep = report_["arms"]["runtime"]["repetitions"][0]
+    rep["scores"]["overall"]["task_completion"]["value"] = float("nan")
+    assert gate(full(report_), "quality")["status"] == "incomparable"
+
+    report_ = campaign_report()
+    fam = report_["arms"]["runtime"]["repetitions"][0]["scores"]["families"]["A01"]
+    fam["task_completion"] = {**fam["task_completion"], "numerator": 0, "value": 1.0}
+    g = gate(full(report_), "quality")
+    assert g["status"] != "met" and any("is not 0/" in r for r in g["reasons"])
+
+
+def test_repeated_cases_and_repetitions_count_once():
+    report_ = campaign_report()
+    report_["arms"]["runtime"]["family_cases"]["A01"] = ["A01-0"] * 10
+    assert gate(full(report_), "quality")["families"]["A01"]["distinct_cases"] == 1
+
+    report_ = campaign_report()
+    reps = report_["arms"]["runtime"]["repetitions"]
+    reps[1:] = [copy.deepcopy(reps[0]), copy.deepcopy(reps[0])]
+    g = gate(full(report_), "quality")
+    assert g["status"] != "met" and any("more than once" in r for r in g["reasons"])
+
+
+def test_set_families_must_name_every_family_that_ran():
+    report_ = campaign_report()
+    report_["set_families"] = ["A15"]
+    g = gate(full(report_), "quality")
+    assert g["status"] != "met"
+    assert any("not in the report's set_families" in r for r in g["reasons"])
+
+
+def test_the_campaign_reports_own_block_and_excluded_runs_are_read():
+    report_ = campaign_report()
+    report_.update(enablement_blocked=True, blocking=["controller: something"])
+    assert gate(full(report_), "comparison")["status"] == "not_met"
+    report_ = campaign_report()
+    report_["excluded_runs"] = [{"run_id": "runtime-9", "reason": "reused conversation"}]
+    assert gate(full(report_), "comparison")["status"] == "inconclusive"
+
+
+def test_a_candidate_cannot_be_its_own_baseline():
+    report_ = campaign_report()
+    g = gate(full(report_, baseline=pinned(report_, arm="runtime")), "baseline")
+    assert g["status"] == "incomparable" and any("own baseline" in r for r in g["reasons"])
+    assert g["pin_source"] == "operator_argument"
+
+
+def test_required_measures_cannot_be_absent_or_junk():
+    untimed = measurements()
+    for s in untimed["samples"]:
+        s.pop("tool_ms"), s.pop("model_ms")
+    assert gate(full(measurements=untimed), "workload")["status"] == "not_measured"
+
+    nobody = copy.deepcopy(SCENARIOS_PASSED)
+    nobody["browser"]["operator"] = ""
+    assert gate(full(scenarios=nobody), "browser_accessibility")["status"] == "not_measured"
+
+    junk = copy.deepcopy(SCENARIOS_PASSED)
+    junk["durability"]["tests"] = "many"
+    assert gate(full(scenarios=junk), "postgres_workers")["status"] == "not_measured"
+
+    broken = measurements()
+    for s in broken["samples"]:
+        if s["class"] == "ingestion":
+            s.update(outcome="failed", cost_usd=None)
+    m = full(measurements=broken)
+    assert gate(m, "workload")["status"] == "not_met"
+    assert gate(m, "cost")["status"] == "not_measured" and gate(m, "cost")["ingestion_usd"] is None
