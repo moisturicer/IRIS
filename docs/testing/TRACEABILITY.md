@@ -119,6 +119,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-434** | An overview citation names a page — no FR- id; part D of IR-425's spec | [details](traceability/IR-434.md) | **IMPLEMENTED** |
 | **IR-433** | The AI Overview is a structured account, not two paragraphs of prose — no FR- id; part C of IR-425's spec | [details](traceability/IR-433.md) | **IMPLEMENTED** |
 | **IR-604** | Each paper gets a one-sentence hook, written with the Overview — no FR- id; part H of IR-425's spec, needed by IR-567's Discover card | [details](traceability/IR-604.md) | **IMPLEMENTED** |
+| **IR-575** | My saved research shapes For you: saved Records' Areas join the chosen ones, saved Records sink, saves invalidate the feed — no FR- id; user stories 3, 7, 11 of IR-557's spec | [details](traceability/IR-575.md) | **IMPLEMENTED** |
 | **IR-665** | An uploaded PDF must really be one: its bytes carry the signature and it opens with at least one page; `uploads/create/` no longer skips … | [details](traceability/IR-665.md) | **IMPLEMENTED** |
 | **IR-383** | Question resolution runs as its own Inference task, on a model that exists — no FR- id; part E of IR-375's spec, and the ticket that closes … | [details](traceability/IR-383.md) | **IMPLEMENTED** |
 | **IR-382** | Groq dialect: the vendor's request shape behind the adapter, with citation-marker normalisation — no FR- id; part H of IR-375's spec, and … | [details](traceability/IR-382.md) | **IMPLEMENTED** |

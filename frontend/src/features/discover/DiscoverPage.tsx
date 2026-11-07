@@ -723,7 +723,7 @@ export default function DiscoverPage() {
           <InterestChoices title="Research classifications" options={interestOptions.classifications} selected={interestSelection.classification_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, classification_ids: ids }))} />
           <InterestChoices title="PSCED areas" options={interestOptions.psced} selected={interestSelection.psced_ids} onChange={(ids) => setInterestSelection((v) => ({ ...v, psced_ids: ids }))} />
           <div className="border-t border-stone-200 pt-4">
-            <p className="text-small text-stone-600">Resetting clears your Areas and everything you marked Not interested. Your saved papers and folders stay.</p>
+            <p className="text-small text-stone-600">Resetting clears your Areas and everything you marked Not interested. Your saved papers and folders stay, and the papers you saved still shape For you until you unsave them.</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               {resetConfirming ? <>
                 <button type="button" className={cn(PILL_PRIMARY, FOCUS_RING)} disabled={resetting} onClick={() => void resetInterests()}>{resetting ? "Resetting…" : "Reset"}</button>
