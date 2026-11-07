@@ -4,8 +4,9 @@ Playwright journeys against **one integrated build** under production
 settings. The plan, the acceptance-criterion mapping and the status rules are
 in [`docs/testing/CORE_JOURNEYS.md`](../docs/testing/CORE_JOURNEYS.md).
 
-The journeys are not a PR gate. The pinned run is the manually started workflow
-`.github/workflows/core-journeys.yml`; this folder is also runnable locally.
+The journeys are not a PR gate. The pinned run is the workflow
+`.github/workflows/core-journeys.yml`, started by hand or on a schedule against
+the head of `main` (IR-905); this folder is also runnable locally.
 
 ## Smoke tier (IR-904)
 
@@ -22,6 +23,15 @@ cd ../frontend && npm ci && npm run build   # the smoke tier does not build for 
 cd ../e2e && npm ci && npx playwright install chromium
 npm run test:smoke
 ```
+
+The smoke tier also holds the **viewport matrix** (IR-910): every routed screen at
+360, 768, 1280 and 1745 px, asserting the page does not scroll sideways and the
+screen's primary action can be reached. Each run writes the per-screen, per-width
+table to `test-results-smoke/viewport-matrix.md`; CI prints it in the run summary.
+The screens are listed in `smoke/support/screens.ts`; see
+[`docs/engineering/RESPONSIVE_LAYOUT.md`](../docs/engineering/RESPONSIVE_LAYOUT.md).
+
+The smoke tier also runs **axe in a real browser** (IR-908): on every routed screen (`axe-routes.spec.ts`), on every state of the UI states matrix (`axe-states.spec.ts`, cells in `smoke/support/states.ts`), and with every dialog open (`axe-dialogs.spec.ts`, cases in `smoke/support/dialogs.ts`). WCAG 2.0/2.1 A and AA, contrast included; serious and critical findings fail the test, with each screen's full axe result attached. A new route needs a row in `screens.ts`, and `dialog-coverage.spec.ts` fails when a dialog source file is neither opened by a case nor listed in `UNSCANNED` with a reason.
 
 Output goes to `playwright-report-smoke/` and `test-results-smoke/` (trace and
 video for a failure only). Mark the "Frontend smoke" check required in the

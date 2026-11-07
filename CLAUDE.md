@@ -171,6 +171,17 @@ python manage.py reextract_manuscripts --dry-run
                                    # the new one swaps in. --record N narrows it; --rollback reactivates the
                                    # previous ChunkSet. Verified 2026-11-03 on 5 proxy papers (55 pages,
                                    # 1,256 credits). Figure descriptions not exercised
+python manage.py read_review_texts --dry-run [--record N]
+                                   # give Versions from before IR-871 their review text (ADR-058 §1
+                                   # as amended): each read from its own manuscript file on this
+                                   # machine with pdfplumber, no network and no model, so it spends
+                                   # nothing and asks no embargo. A metadata-only Version shares the
+                                   # previous one's; a missing file reads "text not kept"; texts left
+                                   # `unavailable` are retried. Never re-reads a stored text. Needs
+                                   # every REVIEW_TEXT_* limit and Linux, else refuses before writing.
+                                   # Verified 2026-11-05 on a copy of the dev database: migrated from
+                                   # records 0021 to 0033, and it found nothing to read, because none
+                                   # of that copy's 18 Versions names a manuscript
 python manage.py inspect_chunks <record_id> --limit 50   # read a record's chunks (IR-116)
 python manage.py run_research_tool --user EMAIL --call TOOL='{json}' [--call ...]
                                    # run research-lane tools as a user, no model
@@ -368,11 +379,25 @@ python manage.py eval_campaign --report --set <s.json> --lock <lock.json> --runs
                                    # --campaign-cost-usd Y --planned-cases N measures a development
                                    # smoke's spend against proposed caps. Writes .json + .md. Test-only so
                                    # far: no campaign has run. Guide: docs/evaluation/general-tools/campaign.md
+python manage.py eval_readiness --build --report <campaign.json> --candidate runtime ...
+                                   # IR-741: release-readiness manifest over an eval_campaign report.
+                                   # Eleven gates, only `met` clears one; missing, fake, incomparable or
+                                   # breached evidence blocks. --preflight names every unrecorded cap/approval;
+                                   # --verify [--check-files] [--assert-ready --expect-commit SHA] is what
+                                   # IR-742 reads; --assert-ready rebuilds the manifest from its inputs;
+                                   # --validate-measurement checks a workload-measurement-1 file. Free: no DB, no vendor.
+                                   # Authorizes nothing. Verified locally on synthetic fixtures only (no
+                                   # real campaign, load run or human review exists). docs/evaluation/
+                                   # general-tools/readiness.md
 python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewer-name NAME --out <packets.json>
-                                   # one reviewer's packet (IR-607): rendered answers and citations
-                                   # checked by Record.visible_to(reviewer); a turn citing an
-                                   # unreadable record is withheld whole; no diagnostics or usage.
-                                   # Held-out output needs --lock and a run newer than it.
+                                   # one reviewer's packet (IR-607). Holds NO text (IR-721): which
+                                   # turns Record.visible_to(reviewer) allows, record ids, source
+                                   # revisions, citation pages and a blank review; a turn resting on
+                                   # an unreadable record is withheld whole. Held-out output needs
+                                   # --lock and a run newer than it. --show packets.json --run run.json
+                                   # --reviewer EMAIL --reviewer-name NAME re-checks access and
+                                   # revisions now and prints the text, writing nothing; --reopen
+                                   # --out F writes the packet again for an account
                                    # Test-only so far (test_review_packets.py, test Postgres);
                                    # not yet run against the dev database
 python manage.py eval_retrieval --questions <set.json> --dry-run   # recall@10 (IR-133/IR-394)

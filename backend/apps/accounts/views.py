@@ -1,6 +1,10 @@
 from django.db import transaction
+from django.http import FileResponse, Http404
 from django.utils import timezone
 from rest_framework import generics, status
+from django.utils.cache import add_never_cache_headers
+from rest_framework.throttling import UserRateThrottle
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -15,13 +19,17 @@ from core.permissions import (
 )
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
+from apps.audit import retention
 from apps.audit.models import AuditEvent
+from . import profile, public_profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
-    UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
+    UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
-    RoleRequestSerializer, SystemSettingSerializer,
+    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer,
 )
+from .models import DataNotice
+from .notice import answer_notice, answer_payload, notice_payload, requires_answer
 from .services import send_verification_email, activate_user, approve_role_request, decline_role_request
 
 #: RDCO's account acts leave a System Admin's account alone (ADR-051 §5).
@@ -41,7 +49,8 @@ from .sessions import (
     revoke_token,
 )
 from .lockout import LOCKED_BY_ADMIN
-from .throttles import LoginThrottle, RegisterThrottle
+from .throttles import LoginThrottle, PersonalDataExportThrottle, RegisterThrottle
+from .personal_data import EXPORT_FORMAT, SECTIONS, build_export
 
 
 class RegisterView(generics.CreateAPIView):
@@ -121,7 +130,54 @@ class LoginView(APIView):
             # The signed-in user's own payload, `review_access` included, so
             # the landing after sign-in needs no second request (IR-415).
             "user":    MeSerializer(user).data,
+            # ADR-054 (IR-789): true means every other request will be refused
+            # with `notice_acceptance_required` until the person answers, so the
+            # client shows the notice instead of loading the app.
+            "notice_answer_required": requires_answer(user),
         })
+
+
+class CurrentNoticeView(APIView):
+    """
+    GET /auth/notice/
+    The current data notice (ADR-054, IR-789). Public, because registration
+    shows it before there is an account. A signed-in caller also gets `answer`
+    (their last answer, or null) and `answer_required`, which is what the
+    frontend reads to decide whether to show the pop-up. Reachable while the
+    notice is unanswered: it is what the person must read.
+    """
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        notice = DataNotice.current()
+        if notice is None:
+            return Response({"detail": "No data notice has been published."}, status=status.HTTP_404_NOT_FOUND)
+        data = notice_payload(notice)
+        user = request.user
+        if user and user.is_authenticated:
+            data["answer"] = answer_payload(user)
+            data["answer_required"] = requires_answer(user)
+        return Response(data)
+
+
+class AnswerNoticeView(APIView):
+    """
+    POST /auth/notice/answer/   {notice_version, agree_dpa, ai_consent}
+    Answer the current notice (ADR-054 decisions 1-4). Everyone answers, office
+    staff and the System Admin included. 409 `notice_stale` with the current
+    notice when `notice_version` is not it. Saying No to AI is a complete answer.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = NoticeAnswerSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        answer_notice(request.user, notice_version=data["notice_version"], ai_consent=data["ai_consent"])
+        return Response(
+            {"answer": answer_payload(request.user), "answer_required": requires_answer(request.user)},
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class LogoutView(APIView):
@@ -143,6 +199,15 @@ class LogoutView(APIView):
 
 
 class ActivateView(APIView):
+    """
+    DEPRECATED (IR-928): the link as emailed before the token moved to the
+    fragment, `GET /auth/activate/<uid>/<token>/`. Kept only so those emails
+    work until their tokens expire -- Django's `PASSWORD_RESET_TIMEOUT`, 3 days
+    and not overridden here -- and so a bundle cached across the deploy still
+    works. Remove it, its URL, the SPA's `/activate/:uidb64/:token` route and
+    nginx's `/activate/` locations once 3 days have passed since IR-928 shipped,
+    or sooner with IR-643's single-use verification (ADR-045 §8). IR-937 tracks it.
+    """
     permission_classes = [AllowAny]
 
     def get(self, request, uidb64, token):
@@ -150,6 +215,35 @@ class ActivateView(APIView):
         if user:
             return Response({"detail": "Account activated."})
         return Response({"detail": "Invalid or expired link."}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class ActivateConfirmView(APIView):
+    """
+    `POST /auth/activate/` with `{"uid", "token"}` (IR-928, ASVS 8.3.1).
+
+    What the verification page calls after reading the secret from the URL
+    fragment: the credentials travel in the body, never in a path or query.
+    One answer for every refusal, as `ActivateView` gives, so nothing says why a
+    link failed. A secret in the query string is not read. No authentication is
+    attempted, so a stale bearer token the browser still holds cannot turn a
+    valid link into a 401 (as the reset views, ADR-045 §2).
+    """
+    authentication_classes = []
+    permission_classes = [AllowAny]
+    parser_classes = [JSONParser]
+
+    REFUSED = {"detail": "Invalid or expired link."}
+
+    def post(self, request):
+        data = request.data
+        uid, token = (data.get("uid"), data.get("token")) if isinstance(data, dict) else (None, None)
+        user = activate_user(uid, token) if isinstance(uid, str) and isinstance(token, str) else None
+        if user:
+            response = Response({"detail": "Account activated."})
+        else:
+            response = Response(self.REFUSED, status=status.HTTP_400_BAD_REQUEST)
+        response["Cache-Control"] = "no-store"
+        return response
 
 
 class ChangePasswordView(APIView):
@@ -182,6 +276,155 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class PersonalDataExportView(APIView):
+    """One JSON file of the signed-in person's own data (ADR-051 decision 13, IR-786).
+
+    There is no id in the address and none to guess: the data is always the
+    caller's, so no role can read another person's through it (the System Admin
+    and RDCO included). Each download is audited, counts against a budget of its
+    own, and is never cached -- by the browser or by a proxy on the way.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle, PersonalDataExportThrottle]
+
+    def get(self, request):
+        payload = build_export(request.user)
+        create_audit_event(
+            AuditEvent.PERSONAL_DATA_EXPORTED,
+            request.user,
+            metadata={"format": EXPORT_FORMAT, "sections": sorted(SECTIONS)},
+        )
+        response = Response(payload)
+        response["Content-Disposition"] = 'attachment; filename="iris-my-data.json"'
+        add_never_cache_headers(response)
+        response["Cache-Control"] = "no-store, private"
+        return response
+
+
+class MePhotoView(APIView):
+    """
+    `PUT /users/me/photo/` (multipart) and `DELETE /users/me/photo/` (IR-695).
+
+    Both act on `request.user` and on nobody else, so there is no path or body
+    that names another person's photo to change.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser]
+
+    def put(self, request):
+        serializer = PhotoUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile.set_photo(request.user, serializer.validated_data["photo"], serializer.crop)
+        return Response({"photo_url": profile.photo_url(request.user)})
+
+    def delete(self, request):
+        profile.remove_photo(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserPhotoView(APIView):
+    """
+    `GET /users/<id>/photo/`: a person's photo, for any signed-in user (IR-695).
+
+    The only way to read one. The file lives under MEDIA_ROOT, which no URL
+    serves, so reading it needs a valid token like every other route. A person
+    with no photo, a deactivated account and an id that does not exist all
+    answer the same 404.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        owner = User.objects.filter(pk=pk, is_active=True).only("id", "photo", "photo_version").first()
+        if owner is None or not owner.photo:
+            raise Http404
+        try:
+            stored = owner.photo.open("rb")
+        except FileNotFoundError:
+            raise Http404
+        response = FileResponse(stored, content_type="image/jpeg")
+        response["X-Content-Type-Options"] = "nosniff"
+        # `photo_url` carries `?v=`, which changes with the photo, so a copy
+        # fetched under the current version is never stale. Private: a shared
+        # cache must not keep a photo only signed-in users may read.
+        current = request.query_params.get("v") == str(owner.photo_version)
+        response["Cache-Control"] = "private, max-age=86400" if current else "private, no-cache"
+        return response
+
+
+class PublicProfileView(APIView):
+    """
+    `GET /users/<id>/profile/`: a person's public profile, for any signed-in
+    user (IR-696).
+
+    The person alone, with no lists: those are paged routes of their own. A
+    suspended, inactive, unverified or unapproved account, a System Admin and
+    a missing id all answer the same 404 (`public_profile.person_or_404`).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        return Response(public_profile.profile_payload(public_profile.person_or_404(pk)))
+
+
+class PublicProfilePapersView(APIView):
+    """
+    A person's published papers, newest first, ten at a time (IR-696).
+
+    Discover's visibility, so nothing unpublished is listed; each paper carries
+    its view count and there are no totals. A subclass says which papers.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def papers(self, viewer, person):
+        raise NotImplementedError
+
+    def get(self, request, pk):
+        person = public_profile.person_or_404(pk)
+        rows = self.papers(request.user, person)
+        return Response(public_profile.paginate(
+            request, rows, public_profile.PAPERS_PAGE_SIZE, public_profile.paper_payload,
+        ))
+
+
+class PublicProfileResearchView(PublicProfilePapersView):
+    """`GET /users/<id>/profile/research/`: the published papers the person owns."""
+
+    def papers(self, viewer, person):
+        return public_profile.research_papers(viewer, person)
+
+
+class PublicProfileAdvisedView(PublicProfilePapersView):
+    """`GET /users/<id>/profile/advised/`: the published papers they were the Adviser on."""
+
+    def papers(self, viewer, person):
+        return public_profile.advised_papers(viewer, person)
+
+
+class PublicProfileCollaboratorsView(APIView):
+    """
+    `GET /users/<id>/profile/collaborators/`: other accounts that shared a
+    published paper with the person, most papers shared first (IR-696).
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        person = public_profile.person_or_404(pk)
+        rows = public_profile.collaborators(request.user, person)
+        return Response(public_profile.paginate(
+            request, rows, public_profile.COLLABORATORS_PAGE_SIZE,
+            lambda row: public_profile.collaborator_payload(*row),
+        ))
+
+
+class InterestSuggestionsView(APIView):
+    """`GET /users/interests/?q=mach`: existing interests that contain `q` (IR-695)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(profile.suggest_interests(request.query_params.get("q", "")))
 
 
 class UserListView(generics.ListAPIView):
@@ -546,6 +789,9 @@ class SystemSettingView(APIView):
         value = request.data.get("value")
         if not isinstance(value, str):
             return Response({"value": ["A text value is required."]}, status=400)
+        # A retention period is whole days, or blank to erase nothing (IR-794).
+        if key in retention.setting_keys() and (error := retention.period_error(value)):
+            return Response({"value": [error]}, status=400)
         with transaction.atomic():
             setting = SystemSetting.objects.select_for_update().filter(key=key).first()
             if not setting:

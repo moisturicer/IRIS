@@ -11,57 +11,65 @@
 // one from the workflow's.
 import AxeBuilder from "@axe-core/playwright";
 import { expect, type Page, type TestInfo } from "@playwright/test";
+import { measureOverflow } from "./viewport";
+
+/**
+ * One axe pass over the page as it stands: WCAG 2.x A and AA, contrast included
+ * (a real browser). Returns every violation for the attachment and one line per
+ * serious or critical node for the verdict. Shared by the journeys' ledger and
+ * the smoke tier's scans of routes, states and dialogs (IR-908), so all fail on
+ * the same bar. With `testInfo`, every violation is attached as `axe-<label>.json`.
+ */
+export async function axeScan(page: Page, label: string, testInfo?: TestInfo) {
+  const results = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
+    .analyze();
+  if (testInfo) {
+    await testInfo.attach(`axe-${label}.json`, {
+      body: JSON.stringify(results.violations, null, 2),
+      contentType: "application/json",
+    });
+  }
+  const findings: string[] = [];
+  for (const v of results.violations) {
+    if (v.impact !== "serious" && v.impact !== "critical") continue;
+    for (const n of v.nodes) {
+      findings.push(
+        `[${label}] ${v.impact} ${v.id} @ ${n.target.join(" ")} :: ${n.html.slice(0, 160)} :: ` +
+        (n.failureSummary ?? "").replace(/\s+/g, " ").slice(0, 220),
+      );
+    }
+  }
+  return { violations: results.violations, findings };
+}
 
 export class A11yLedger {
   private readonly findings: string[] = [];
   private readonly checked: string[] = [];
 
   async scan(page: Page, testInfo: TestInfo, label: string) {
-    const results = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"])
-      .analyze();
-    await testInfo.attach(`axe-${label}.json`, {
-      body: JSON.stringify(results.violations, null, 2),
-      contentType: "application/json",
-    });
+    const { findings } = await axeScan(page, label, testInfo);
     this.checked.push(`axe ${label}`);
-    for (const v of results.violations) {
-      if (v.impact !== "serious" && v.impact !== "critical") continue;
-      for (const n of v.nodes) {
-        this.findings.push(
-          `[${label}] ${v.impact} ${v.id} @ ${n.target.join(" ")} :: ${n.html.slice(0, 160)} :: ` +
-          (n.failureSummary ?? "").replace(/\s+/g, " ").slice(0, 220),
-        );
-      }
-    }
+    this.findings.push(...findings);
   }
 
   /** WCAG 1.4.10 Reflow at 360 CSS px: nothing scrolls sideways. */
   async reflow360(page: Page, label: string) {
     const previous = page.viewportSize();
     await page.setViewportSize({ width: 360, height: 740 });
-    const { overflow, culprits } = await page.evaluate(() => {
-      const width = document.documentElement.clientWidth;
-      const overflow = document.documentElement.scrollWidth - width;
-      // Name what sticks out: the outermost elements whose right edge passes the
-      // viewport while their parent's doesn't, widest first. A diagnosis only;
-      // the verdict is still the overflow number above.
-      const describe = (el: Element) => {
-        const id = el.id ? `#${el.id}` : "";
-        const cls = typeof el.className === "string" && el.className.trim()
-          ? "." + el.className.trim().split(/\s+/).slice(0, 4).join(".") : "";
-        return `${el.tagName.toLowerCase()}${id}${cls}`;
-      };
-      const culprits = overflow > 0
-        ? Array.from(document.body.querySelectorAll("*"))
-          .map((el) => ({ el, right: el.getBoundingClientRect().right }))
-          .filter(({ el, right }) => right > width + 1 && (el.parentElement?.getBoundingClientRect().right ?? 0) <= width + 1)
-          .sort((a, b) => b.right - a.right)
-          .slice(0, 3)
-          .map(({ el, right }) => `${describe(el)} (right edge ${Math.round(right)}px)`)
-        : [];
-      return { overflow, culprits };
+    // Reflow is judged on the settled layout. The app shell animates its margin
+    // for 200 ms when the window narrows past `md`, and the sidebar's old
+    // margin pushes the page sideways until it finishes: a measurement taken
+    // straight after the resize reports that, which no one loading the page at
+    // 360px ever sees (IR-934). Only transitions are awaited, and for 3 s at most:
+    // an endless animation (a spinner, a skeleton) must not hang the check.
+    await page.evaluate(async () => {
+      const ended = Promise.all(
+        document.getAnimations().filter((a) => a instanceof CSSTransition).map((a) => a.finished.catch(() => undefined)),
+      );
+      await Promise.race([ended, new Promise((resolve) => setTimeout(resolve, 3000))]);
     });
+    const { overflow, culprits } = await measureOverflow(page);
     this.checked.push(`reflow ${label}`);
     if (overflow > 0) {
       const where = culprits.length ? `; widest: ${culprits.join(" | ")}` : "";

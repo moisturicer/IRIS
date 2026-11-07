@@ -16,7 +16,7 @@ const baseUser = {
   id: 7, email: "ana@cit.edu", first_name: "Ana", middle_initial: "L", last_name: "Reyes",
   role_name: "Student", college_name: "College of Computer Studies", department_name: "",
   course_name: "BS Computer Science",
-  bio: "", research_interests: [] as string[], orcid: null as string | null, photo_url: null as string | null,
+  bio: "", research_interests: [] as string[], photo_url: null as string | null,
 };
 
 function signIn(overrides: Partial<typeof baseUser> = {}) {
@@ -49,11 +49,33 @@ describe("the profile", () => {
     expect(screen.getByText("College of Computer Studies · BS Computer Science")).toBeVisible();
   });
 
-  it("shows the bio, the interests and the ORCID iD as a link", () => {
+  it("names the university under the affiliation, as another person's Profile does (IR-948)", () => {
+    renderScreen(<ProfilePage />, { route: "/profile" });
+
+    expect(screen.getByText("Cebu Institute of Technology – University")).toBeVisible();
+  });
+
+  it("leaves out Research, Advised and Collaborators, and does not say there are no papers (IR-948)", () => {
+    renderScreen(<ProfilePage />, { route: "/profile" });
+
+    for (const name of ["Research", "Advised", "Collaborators"]) {
+      expect(screen.queryByRole("heading", { name })).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText(/no published papers yet/i)).not.toBeInTheDocument();
+  });
+
+  it("shows no role line for a person who has no role yet", () => {
+    signIn({ role_name: null as never });
+    renderScreen(<ProfilePage />, { route: "/profile" });
+
+    expect(screen.getByRole("heading", { level: 1, name: "Ana L. Reyes" })).toBeVisible();
+    expect(screen.queryByText("Student")).not.toBeInTheDocument();
+  });
+
+  it("shows the bio and the interests", () => {
     signIn({
       bio: "Coastal flood mapping.",
       research_interests: ["GIS", "Remote sensing"],
-      orcid: "0000-0002-1825-0097",
     });
     renderScreen(<ProfilePage />, { route: "/profile" });
 
@@ -61,8 +83,6 @@ describe("the profile", () => {
     const interests = screen.getByRole("list", { name: "Research interests" });
     expect(interests).toHaveTextContent("GIS");
     expect(interests).toHaveTextContent("Remote sensing");
-    expect(screen.getByRole("link", { name: "0000-0002-1825-0097" }))
-      .toHaveAttribute("href", "https://orcid.org/0000-0002-1825-0097");
   });
 
   it("leaves out what was left empty, with no placeholder", () => {
@@ -70,7 +90,6 @@ describe("the profile", () => {
 
     expect(screen.queryByRole("heading", { name: "About" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Research interests" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/ORCID/)).not.toBeInTheDocument();
   });
 
   it("never prints the account's email address", () => {
@@ -114,7 +133,7 @@ describe("editing", () => {
   });
 
   it("has no blocking accessibility violations", async () => {
-    signIn({ bio: "Floods.", research_interests: ["GIS"], orcid: "0000-0002-1825-0097" });
+    signIn({ bio: "Floods.", research_interests: ["GIS"] });
     const { container } = renderScreen(<ProfilePage />, { route: "/profile" });
 
     await expectNoBlockingA11yViolations(container);

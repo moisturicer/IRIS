@@ -6,6 +6,9 @@ Run with:
 
     docker compose exec -T backend python manage.py test apps.accounts.tests
 """
+from contextlib import contextmanager
+
+from django.db.models.signals import pre_save
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -25,6 +28,39 @@ def make_user(email, role_name=None, **extra):
         email=email, password="pw12345!", first_name="Test", last_name="User",
         role=role, **extra,
     )
+
+
+def make_unanswered(user):
+    """Put `user` back as every real account starts: the data notice unanswered.
+
+    The suite gives a new user a Yes on the current notice (`conftest.py`), so
+    a test of the notice block starts by undoing it. Returns `user` refreshed.
+    """
+    User.objects.filter(pk=user.pk).update(
+        answered_notice_version=None, ai_consent=None, notice_answered_at=None,
+    )
+    user.refresh_from_db()
+    return user
+
+
+@contextmanager
+def real_accounts_start_unanswered():
+    """Switch off the suite's "new users have answered" default (`conftest.py`).
+
+    For a test whose subject is what *code* does about the notice -- `seed_demo`
+    answering Yes -- where the default would answer first and the test would
+    pass whether or not the code did anything. Inside the block a created user
+    starts as every real account does: unanswered.
+    """
+    uid = "iris-test-users-answer-the-notice"
+    disconnected = pre_save.disconnect(dispatch_uid=uid)
+    try:
+        yield
+    finally:
+        if disconnected:
+            from conftest import _new_users_answer_the_notice
+
+            pre_save.connect(_new_users_answer_the_notice, dispatch_uid=uid, weak=False)
 
 
 class SelfProfileUpdateTests(APITestCase):

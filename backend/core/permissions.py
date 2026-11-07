@@ -447,6 +447,11 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
         offered.append("withdraw_revision")
     elif revision["party"] is not None:
         offered.append("request_revision")
+    # `finish-review/`: anyone holding an open seat here, the party
+    # `revision.party` names (ADR-032 §7, IR-874). Each verdict it carries is
+    # still offered, and refused, by its own key above.
+    if revision["party"] is not None:
+        offered.append("finish_review")
 
     if is_record_owner(user, record):
         from apps.records.continuation import continuable
@@ -474,6 +479,16 @@ def record_capabilities(record, user, *, workflow, my_seats, routing, office_rev
 
         if may_release_ip(user, record) and why_not_releasable(record) is None:
             offered.append("release_ip")
+
+    # RDCO's three acts on a paper in review (ADR-051 §10, IR-797): `add-owner/`
+    # and `withdraw/`, and `replace-adviser/` while an Adviser review is open.
+    # The same predicates `rdco_acts` checks, so the hint cannot offer more.
+    from apps.records import rdco_acts
+
+    if rdco_acts.is_rdco(user) and record.pipeline_status == PipelineStatus.IN_REVIEW:
+        if rdco_acts.adviser_review(record) is not None:
+            offered.append("replace_adviser")
+        offered.extend(["add_owner", "withdraw_paper"])
 
     # `review-comments/`: the record's participants, once it is submitted
     # (ADR-032 §7, IR-419). A pool member reads the discussion but is not

@@ -366,7 +366,8 @@ def test_turn_citations_revision_and_journal_commit_together(runtime):
     assert failed["turn_id"] is None
     after = run(RunStore(runtime).reopen(grant, run_["conversation_id"]))
     assert after["revision"] == 1 and len(after["turns"]) == 1
-    assert [e["name"] for e in failed["events"]] == ["admitted", "started", "failed"]
+    # The second run was given Turn 1 as history, so its claim records that (IR-721).
+    assert [e["name"] for e in failed["events"]] == ["admitted", "started", "carried", "failed"]
 
 
 def _admit_and_claim(runtime, grant, key):

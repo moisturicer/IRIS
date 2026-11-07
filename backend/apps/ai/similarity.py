@@ -32,7 +32,7 @@ from django.conf import settings
 from django.core.exceptions import ImproperlyConfigured
 from pgvector.django import CosineDistance
 
-from apps.ai.models.embedding import RecordSpaceEmbedding
+from apps.ai.models.embedding import RecordEmbedding, RecordSpaceEmbedding
 from apps.ai.record_vectors import active_space, record_vectors
 from apps.ai.retrieval.scan_depth import scan_depth
 from apps.records.models import Record
@@ -60,6 +60,56 @@ class SimilarRecord:
     score: float
 
 
+#: Why a Related works list is what it is (IR-568). The reader is told only the
+#: seed Record's own coverage, which is a Record they can already open. Whether
+#: a close candidate exists but is withheld is never stated (IR-460), so
+#: `NO_MATCHES` is one answer for "nothing close" and "close but unreadable".
+READY = "ready"
+NO_MATCHES = "no_matches"
+NOT_INDEXED = "not_indexed"
+INCOMPATIBLE = "incompatible"
+#: Raised by the endpoint, not computed here: the comparison itself failed.
+UNAVAILABLE = "unavailable"
+
+
+@dataclass(frozen=True)
+class RelatedWorks:
+    """A Related works list and the reason it is the length it is."""
+
+    state: str
+    matches: list[SimilarRecord]
+
+
+def related_works(
+    record: Record, user, limit: int = DEFAULT_LIMIT
+) -> RelatedWorks:
+    """The same comparison as ``similar_records``, with the reason it was empty.
+
+    The ranking and the visibility predicate are exactly ``similar_records``':
+    one seed vector, ``_nearest`` over ``research_records(user)``. Only an
+    empty answer gains a label, and the label depends on the seed alone:
+
+    * the seed has no summary vector anywhere: ``NOT_INDEXED``;
+    * the seed has one, but none under the active Embedding Space (a model the
+      space does not hold, or no active space): ``INCOMPATIBLE``;
+    * the seed is indexed and nothing came back: ``NO_MATCHES``.
+    """
+    seed = _seed(record)
+    if seed is None:
+        return RelatedWorks(_missing_coverage(record), [])
+    matches = _nearest(seed, research_records(user), limit=limit)
+    return RelatedWorks(READY if matches else NO_MATCHES, matches)
+
+
+def _missing_coverage(record: Record) -> str:
+    """Why ``record`` has no vector to compare *from* under the active space."""
+    held_elsewhere = (
+        RecordSpaceEmbedding.objects.filter(record=record).exists()
+        or RecordEmbedding.objects.filter(record=record).exists()
+    )
+    return INCOMPATIBLE if held_elsewhere else NOT_INDEXED
+
+
 def similar_records(
     record: Record, user, limit: int = DEFAULT_LIMIT
 ) -> list[SimilarRecord]:
@@ -72,12 +122,12 @@ def similar_records(
     The seed record is excluded. A record seeded with its own vector matches
     itself perfectly, so leaving it in would fill the panel with the paper the
     reader already has open.
+
+    Just the matches of ``related_works``, which holds the one comparison. A
+    record with nothing to compare *from* has none: not an error, see the
+    module docstring.
     """
-    seed = _seed(record)
-    if seed is None:
-        # Nothing to compare *from*. Not an error — see the module docstring.
-        return []
-    return _nearest(seed, research_records(user), limit=limit)
+    return related_works(record, user, limit).matches
 
 
 def related_published_research(record: Record, user) -> Optional[list[SimilarRecord]]:

@@ -258,7 +258,7 @@ def test_the_exported_row_builds_a_review_packet_and_withholds_what_the_reviewer
     assert [c["record_id"] for c in packet["turns"][0]["citations"]] == [7, 5]
     assert packet["authorized_record_ids"] == [5, 7]
     withheld = build_packets(run, reviewer="Rev One", readable={7})["packets"][0]
-    assert withheld["turns"][0]["withheld"] is True and withheld["turns"][0]["answer"] is None
+    assert withheld["turns"][0]["withheld"] is True and "answer" not in withheld["turns"][0]
     assert withheld["turns"][0]["citations"] == []
 
 

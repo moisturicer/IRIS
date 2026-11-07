@@ -15,6 +15,8 @@ import { renderScreen, screen } from "@/test/render";
 import type { Citation } from "@/types/ai";
 
 import { CitationText } from "./CitationText";
+import { MAX_FORMULA_CHARS } from "./mathLimit";
+import { BREAK, MAX_RUN_CHARS } from "./runLimit";
 
 declare global {
   interface Window {
@@ -163,6 +165,82 @@ describe("HTML inside a citation marker or a code span", () => {
     expectInert(container);
     expect(container.textContent).toContain("<script>x</script>");
     expect(container.textContent).toContain("<img src=x onerror=alert(1)>");
+  });
+});
+
+describe("one very long unbroken run in an answer (IR-930)", () => {
+  /** Best of three renders, so one slow tick does not decide the result. */
+  function bestRenderMs(text: string): number {
+    let best = Infinity;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const started = performance.now();
+      const view = renderScreen(<CitationText text={text} citations={[]} />);
+      best = Math.min(best, performance.now() - started);
+      view.unmount();
+    }
+    return best;
+  }
+
+  // remark-gfm's email autolink retries from every `+`, `-`, `.` and `_` in a
+  // run with no space, so its cost grows with the square of the run. Timing
+  // one render against a wall clock would depend on the machine, so this
+  // compares two sizes: 4x the input is ~4x the work when linear and ~16x when
+  // quadratic. 8 sits between with room for noise either side.
+  it.each(["x+", "x-", "x.", "a.b+"])("renders a long run of %s in time linear in its length", (unit) => {
+    const small = bestRenderMs(unit.repeat(5_000));
+    const large = bestRenderMs(unit.repeat(20_000));
+
+    expect(large / small).toBeLessThan(8);
+  });
+
+  it("keeps all of the run's text and creates nothing but text", () => {
+    const run = "x+".repeat(20_000);
+    const container = render(run);
+
+    expectInert(container);
+    expect(container.textContent?.split(BREAK).join("")).toBe(run);
+  });
+
+  it("still links a bare https URL and an email address", () => {
+    const container = render("See https://example.org/spec?a=b+c and write to bob+tag@example.org today.");
+
+    const hrefs = anchors(container).map((link) => link.href);
+    expect(hrefs).toContain("https://example.org/spec?a=b+c");
+    expect(hrefs).toContain("mailto:bob+tag@example.org");
+  });
+
+  it("keeps a long URL under the limit exactly as written", () => {
+    const url = `https://example.org/${"a+b".repeat(150)}`;
+    const container = render(`See ${url} and [the spec](${url}).`);
+
+    expect(url.length).toBeLessThan(MAX_RUN_CHARS);
+    expect(anchors(container).map((link) => link.href)).toEqual([url, url]);
+  });
+
+  it.each([
+    ["inline", (body: string) => `Before $${body}$ after`],
+    ["displayed", (body: string) => `Before\n\n$$${body}$$\n\nafter`],
+  ])("typesets a spaceless %s formula past the limit without the break inside it", (_label, wrap) => {
+    // 601 characters with no space: over MAX_RUN_CHARS, under MAX_FORMULA_CHARS.
+    const body = "a+".repeat(300) + "a";
+    const container = render(wrap(body));
+
+    expect(container.querySelector(".katex")).not.toBeNull();
+    expect(container.textContent).not.toContain(BREAK);
+  });
+
+  it("shows an oversized spaceless formula as its source, without breaks", () => {
+    const body = "a+".repeat(MAX_FORMULA_CHARS);
+    const container = render(`Before $${body}$ after`);
+
+    expect(container.querySelector(".katex")).toBeNull();
+    expect(container.textContent).toContain(body);
+  });
+
+  it("still links a bare URL that follows a long run", () => {
+    const container = render(`${"x+".repeat(5_000)} https://example.org/after`);
+
+    expect(anchors(container).map((link) => link.href)).toContain("https://example.org/after");
   });
 });
 

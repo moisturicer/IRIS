@@ -44,6 +44,7 @@ import type { User } from "@/types/auth";
 import type { PaperDetails, PaperPerson, Readiness, ReadinessItem, RecordDetail, ReviewerSeat } from "@/types/records";
 
 import { recordsApi } from "@/api/records";
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { documentsApi } from "@/api/documents";
 import * as utils from "@/lib/utils";
 import { seatsApi } from "@/api/reviews";
@@ -715,6 +716,57 @@ describe("the byline credits the adviser (IR-472)", () => {
 
     await waitForRecord(record.title);
     expect(screen.queryByText(/^Adviser:/)).not.toBeInTheDocument();
+  });
+});
+
+describe("names that open a Profile (IR-700)", () => {
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  it("links the adviser only when the server says their Profile can be opened", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos", adviser_has_profile: true };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByRole("link", { name: "Maria Santos" })).toHaveAttribute("href", `/people/${ASSIGNED_ADVISER_ID}`);
+  });
+
+  it("leaves the adviser as plain text when the flag is false or absent", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos", adviser_has_profile: false };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByText("Adviser: Maria Santos")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Maria Santos" })).not.toBeInTheDocument();
+  });
+
+  it("lists the owners, linking those with a Profile, and shows nothing when none has one", async () => {
+    shownRecord = {
+      ...record,
+      owners: [
+        { id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true, has_profile: true },
+        { id: 2, user: 42, email: "j@x.edu", full_name: "Jomar Ybanez", is_primary: false, has_profile: false },
+      ],
+    };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByRole("link", { name: "Ana Reyes" })).toHaveAttribute("href", "/people/41");
+    expect(screen.queryByRole("link", { name: "Jomar Ybanez" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Owners:/)).toHaveTextContent("Jomar Ybanez");
+  });
+
+  it("shows no owners line, and no email, when no owner has a Profile", async () => {
+    shownRecord = {
+      ...record,
+      owners: [{ id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true }],
+    };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.queryByText(/Owners:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("a@x.edu")).not.toBeInTheDocument();
   });
 });
 
@@ -2709,6 +2761,46 @@ describe("a record the viewer cannot read (IR-411)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "Try again" }));
     await waitForRecord(record.title);
+  });
+
+  // IR-906. A refusal is a refusal whichever status carries it: a hidden Record
+  // and a missing id must not be told apart.
+  it("treats a 403 exactly like a 404", async () => {
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 403, data: { detail: "You do not have permission." } } });
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "We couldn't load this record" })).not.toBeInTheDocument();
+  });
+
+  it("shows a load that timed out as interrupted, and Retry reads again", async () => {
+    shownRecord = record;
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/records/1/"));
+    signInAs(99, "Student");
+    renderPaperView();
+
+    expect(await screen.findByRole("heading", { name: "This took too long" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Record not available" })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitForRecord(record.title);
+  });
+
+  it("falls to the same not-available state when a re-read finds access gone", async () => {
+    shownRecord = { ...inReview, can_request_document: ["ierc"], capabilities: ["cite", "request_document"] };
+    signInAs(2, "IERC");
+    renderPaper(`/records/${RECORD_ID}?section=review`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Request documents" }));
+    const dialog = screen.getByRole("dialog", { name: "Request documents" });
+    await userEvent.click(await within(dialog).findByRole("checkbox", { name: "Ethics Clearance" }));
+    await userEvent.type(within(dialog).getByRole("textbox", { name: /Message to the owner/ }), "Please.");
+    vi.mocked(recordsApi.detail).mockRejectedValueOnce({ response: { status: 404, data: { detail: "Not found." } } });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Send request" }));
+
+    expect(await screen.findByRole("heading", { name: "Record not available" })).toBeInTheDocument();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
   });
 });
 

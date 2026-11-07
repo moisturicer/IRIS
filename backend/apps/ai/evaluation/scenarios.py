@@ -76,5 +76,8 @@ def browser_result(evidence=None):
             "passed": complete and all(check.get("passed") is True for check in checks.values()),
             "kind": "manual_browser", "operator": evidence["operator"],
             "git_commit": evidence["git_commit"],
-            "checks": {key: {"status": value["status"], "passed": value.get("passed") is True}
+            # The reference itself stays private; only that one was recorded is kept, so the
+            # readiness gate can tell an attested check from a bare one.
+            "checks": {key: {"status": value["status"], "passed": value.get("passed") is True,
+                             "evidence_recorded": bool(value.get("evidence_ref"))}
                        for key, value in checks.items()}}

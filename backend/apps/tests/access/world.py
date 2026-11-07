@@ -29,12 +29,13 @@ from apps.documents.models import (
 )
 from apps.documents.testing import real_pdf_bytes
 from apps.documents.requests import ItemSpec, create_request, requesting_party
+from apps.library.models import SavedFeed
 from apps.records.management.commands.seed_demo import ADMIN_EMAIL, ROLE_ACCOUNTS
 from apps.records.models import DeleteRequest, DownloadRequest, Record, RecordOwner, RecordType
 from apps.reviews import revisions, seats
 from apps.reviews.models import ReviewComment, ReviewerSeat
 from apps.reviews.routing import accept_and_route, enter_at_adviser, route
-from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName
+from core.enums import Party, PipelineStatus, RecordTypeName, RequestStatus, RoleName, ThreadSeverity
 
 #: The matrix's columns, in the order every table row lists them.
 ROLES = (
@@ -121,6 +122,8 @@ class World:
         from apps.opportunities.models import Opportunity
         if isinstance(obj, Opportunity):
             return user is not None
+        if isinstance(obj, SavedFeed):
+            return user is not None and obj.owner_id == user.pk
         return Record.objects.visible_to(user).filter(pk=self.record_of(name).pk).exists()
 
 
@@ -150,6 +153,22 @@ def _users() -> dict[str, User | None]:
         "admin": admin,
         "sysadmin": _user("matrix-sysadmin@cit.edu", RoleName.SYSTEM_ADMIN),
     }
+
+
+def _user_with_photo(email) -> User:
+    """A Student who has an account photo (IR-695), for the route that serves one."""
+    import io
+
+    from django.core.files.base import ContentFile
+    from PIL import Image
+
+    user = _user(email, RoleName.STUDENT, "Photo", "Person")
+    jpeg = io.BytesIO()
+    Image.new("RGB", (8, 8), "gray").save(jpeg, "JPEG")
+    user.photo.save("photo.jpg", ContentFile(jpeg.getvalue()), save=False)
+    user.photo_version = 1
+    user.save(update_fields=["photo", "photo_version"])
+    return user
 
 
 def _record(title, owner, adviser=None, *, status=PipelineStatus.DRAFT, **extra) -> Record:
@@ -235,6 +254,12 @@ def build_world() -> World:
     o["review_comment"] = ReviewComment.objects.create(
         record=record, author=owner, body="Is the endorsement enough?", version=o["version"],
     )
+    # A sent ITSO Must fix thread (IR-874): ITSO's, so its seated reviewer
+    # owns its severity, and the owner answers it rather than resolving it.
+    o["review_thread"] = ReviewComment.objects.create(
+        record=record, author=itso, body="Cite the prior-art search.", version=o["version"],
+        party=Party.ITSO, severity=ThreadSeverity.MUST_FIX,
+    )
 
     # -- a record still at its Adviser's step, with the review opened ----
     # The acts that happen there (accept & route, decide) are fired on this
@@ -278,6 +303,7 @@ def build_world() -> World:
     o["session_token"] = OutstandingToken.objects.get(jti=token["jti"])
     o["reviewer_target"] = users["unseated"]
     o["target_user"] = users["other"]
+    o["photo_user"] = _user_with_photo("matrix-photo@cit.edu")
     o["role_request"] = RoleRequest.objects.create(user=other, requested_role=users["adviser"].role)
     SystemSetting.objects.get_or_create(key="matrix-setting", defaults={"value": "test"})
     o["assignment"] = record.assignments.get(party=Party.ITSO)
@@ -305,6 +331,11 @@ def build_world() -> World:
     o["opportunity"] = Opportunity.objects.create(
         title="Matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),
         posted_by=users["rdco"], opportunity_type="internal_call", posting_office="RDCO",
+    )
+    # IR-577: a saved feed is private to its owner, so every other account is
+    # refused it as it would a missing one.
+    o["feed"] = SavedFeed.objects.create(
+        owner=owner, name="Owner fixture feed", query={"q": "flood"},
     )
     o["adviser_opportunity"] = Opportunity.objects.create(
         title="Adviser's matrix opportunity", due_date=timezone.now().date()+timedelta(days=10),

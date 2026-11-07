@@ -10,8 +10,9 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { RequestTimeoutError } from "@/api/requestPolicy";
 import { expectNoBlockingA11yViolations } from "@/test/axe";
-import { renderScreen, screen, within } from "@/test/render";
+import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render";
 import type { RecordTracker, TrackerPartyRow } from "@/types/records";
 
 import { ReviewRoutingTracker } from "./ReviewRoutingTracker";
@@ -473,5 +474,24 @@ describe("ReviewRoutingTracker", () => {
     renderTracker();
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/could not load/i);
+  });
+
+  it("offers Try again rather than telling the reader to reload (IR-906)", async () => {
+    tracker.mockRejectedValueOnce(new Error("network")).mockResolvedValue({ data: payload({}) });
+    renderTracker();
+
+    await userEvent.click(await screen.findByRole("button", { name: "Try again" }));
+
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    expect(tracker).toHaveBeenCalledTimes(2);
+  });
+
+  it("says a timed-out tracker took too long, and Retry reads it again (IR-906)", async () => {
+    tracker.mockRejectedValueOnce(new RequestTimeoutError(30_000, "get", "/records/12/tracker/")).mockResolvedValue({ data: payload({}) });
+    renderTracker();
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("The review tracker took too long to load.");
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(tracker).toHaveBeenCalledTimes(2));
   });
 });

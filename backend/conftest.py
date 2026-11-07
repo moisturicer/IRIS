@@ -25,6 +25,8 @@ PDF_TEST_LIMITS = {
     "PDF_VALIDATION_WALL_SECONDS": 10, "PDF_VALIDATION_MEMORY_MIB": 256,
     "PDF_VALIDATION_MAX_PAGES": 1000, "PDF_VALIDATION_MAX_OBJECTS": 200000,
     "PDF_VALIDATION_MAX_DEPTH": 100,
+    # IR-871: the review text reader's own sandbox.
+    "REVIEW_TEXT_WALL_SECONDS": 60, "REVIEW_TEXT_MEMORY_MIB": 1024, "REVIEW_TEXT_MAX_PAGES": 1000,
 }
 
 from testing import run_lock
@@ -51,6 +53,7 @@ def pytest_configure(config):
     _use_fast_password_hashing()
     _use_in_process_celery_broker()
     _use_local_memory_cache()
+    _connect_the_notice_default()
 
     try:
         from testing.hypothesis_profiles import activate_profile
@@ -342,3 +345,47 @@ def pytest_unconfigure(config):
     if connection is not None:
         connection.close()
         os.environ.pop(run_lock.HELD_ENV_VAR, None)
+
+
+# --- the data notice (ADR-054, IR-789) -----------------------------------------
+#
+# In production an account starts **unanswered**, and until it answers the
+# current notice the server refuses every request but a handful
+# (`apps.accounts.notice`). Most of the suite is about something else and signs
+# in with a real token, so a user a test creates would be refused at the notice
+# before the test's own subject was reached. For the whole suite a new user
+# therefore starts having answered the current notice with a Yes, as `seed_demo`
+# does (ADR-054 decision 18). It is connected once per session, not per test,
+# because users made in `setUpTestData` exist before any function fixture runs.
+#
+# This is a test default, not a weakening of the rule: the block is exercised on
+# purpose by `apps/accounts/test_notice.py` and the authorization matrix, whose
+# tests make a user unanswered with `apps.accounts.tests.make_unanswered`. It
+# writes the mirror fields only (no `NoticeAnswer` row, no audit event), so a
+# test that counts either is not disturbed.
+
+def _new_users_answer_the_notice(sender, instance, raw=False, **kwargs):
+    from django.contrib.auth import get_user_model
+    from django.utils import timezone
+
+    if raw or not instance._state.adding or not isinstance(instance, get_user_model()):
+        return
+    if instance.answered_notice_version is not None:
+        return
+    from apps.accounts.notice import current_notice_number
+
+    number = current_notice_number()
+    if number is not None:
+        instance.answered_notice_version = number
+        instance.ai_consent = True
+        instance.notice_answered_at = timezone.now()
+
+
+def _connect_the_notice_default() -> None:
+    try:
+        from django.db.models.signals import pre_save
+    except ImportError:
+        return
+    pre_save.connect(
+        _new_users_answer_the_notice, dispatch_uid="iris-test-users-answer-the-notice", weak=False,
+    )

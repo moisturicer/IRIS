@@ -6,7 +6,7 @@
 
 Results: 6 Pass, 7 Fail, 2 Deferred and 1 N/A by decision, 5 not yet runnable. Every Fail has an `area-security` ticket: IR-923 (5.1.3 and 5.1.4, one defect), IR-924, IR-925, IR-926, IR-928 and IR-929. In `SECURITY_CHECKLIST.md` a Fail is a Gap, or Partial where the row says which part holds.
 
-`Confirmed` by Ashlee Sean that the group A and B results stand: ____ Date: ____
+`Confirmed` by Ashlee Sean that the group A and B results stand: Yes. Date: 2026-11-06
 
 **How to fill it in.** Replace each blank on an item's `Record` line.
 
@@ -63,7 +63,7 @@ The code has no `ImageField`, and no profile photo in `apps/accounts`, so the ch
 
 **Pass:** no password or token appears in a query string. Legacy activation links carry a token in the path (`/api/v1/auth/activate/<uid>/<token>/`), and nginx keeps it out of its logs. Record whether you accept that, or raise a ticket to retire them.
 
-`Record` Result: **Fail** Date: 2026-11-05 Person: AI agent, at Ashlee Sean's direction (her confirmation pending); decision by Ashlee Sean, as owner of S2 Epic QA & Security (IR-687) Evidence: credentials are posted in the body and the API takes a bearer header. Reset links carry the token in a fragment (`/password/reset#token=…`), which the browser never sends. Verification emails put it in the path (`/activate/<uid>/<token>/`). Registering and activating an account on the local Core journeys stack, production settings through nginx, `main` at `14768455` worked, and every `/activate/` line in the logs reads `[redacted]`, but the token still reaches browser history and `Referer`. Ashlee decided this is not accepted: [IR-928](https://citiris.atlassian.net/browse/IR-928).
+`Record` Result: **Fail** Date: 2026-11-05 Person: AI agent, at Ashlee Sean's direction (her confirmation pending); decision by Ashlee Sean, as owner of S2 Epic QA & Security (IR-687) Evidence: credentials are posted in the body and the API takes a bearer header. Reset links carry the token in a fragment (`/password/reset#token=…`), which the browser never sends. Verification emails put it in the path (`/activate/<uid>/<token>/`). Registering and activating an account on the local Core journeys stack, production settings through nginx, `main` at `14768455` worked, and every `/activate/` line in the logs reads `[redacted]`, but the token still reaches browser history and `Referer`. Ashlee decided this is not accepted: [IR-928](https://citiris.atlassian.net/browse/IR-928). **Update 2026-11-06 (IR-928, not a re-run on the stack):** new verification emails carry `uid` and token in the fragment and the page posts them in a body; the old path link stays until its token expires (3 days). The change is covered by `test_activation_fragment.py` and the page tests; re-run this item on the stack after it deploys.
 
 ### 14.4.1 Content-Type on every response
 **Requirement:** every response has a correct Content-Type, with a character set on text types.
