@@ -19,7 +19,38 @@ This decision permits implementation and, once the conditions below are met, act
 3. IR-827 links the owner's earlier Voyage confirmation and records the no-training and retention settings on the actual OpenRouter account and eligible endpoints. The owner reconfirmed on 2026-11-05 that Voyage was confirmed long ago; do not ask for a second Voyage approval. The original dated account-specific record was not found in the repository or Jira, so it still needs linking. A configuration label alone is not evidence of the OpenRouter account setting.
 4. Tool results and all text derived from them carry source dependencies through retries, repair, compaction and resume. A dependency that fails removes its dependent content or refuses the send; the guard cannot simply be disabled.
 
-**Current state:** conditions 2–4 are not yet fulfilled in the AI runtime. Its `SendGuard` continues to refuse tool-result evidence. The approval is a decision to enable the pilot when the code and evidence make it safe, not a claim that paid research is running today.
+**Current state (2026-11-07):** conditions 1 and 4 are implemented for public proxy and synthetic papers. Condition 3 is recorded for OpenRouter ([IR-827 evidence](https://citiris.atlassian.net/browse/IR-827?focusedCommentId=11157)); the Voyage link is still missing. Condition 2 holds for proxy papers only: institutional papers stay refused until IR-791. No paid send has run yet.
+
+## Luna declaration — amendment, 2026-11-07
+
+**Approved for development only by Jive Tyler I. Revalde, 2026-11-07.** Entered by an AI agent on his instruction in chat; not an independent signature.
+
+**Account evidence.** OpenRouter organization *Hackarambolas*. ZDR is required for all models, OpenAI first-party endpoints are disabled, and every training and publishing toggle is off, as observed 2026-11-07 and recorded on IR-827.
+
+**Routing (`AGENT_LLM_ROUTING`).** Two endpoints at the same listed price. `amazon-bedrock/us-east-1` accepts the adapter's `max_tokens`; `azure/us` lists only `max_completion_tokens` and may be skipped under `require_parameters`.
+
+```json
+{"only":["amazon-bedrock/us-east-1","azure/us"],"allow_fallbacks":false,"data_collection":"deny","zdr":true,"require_parameters":true,"max_price":{"prompt":0.22,"completion":0.825}}
+```
+
+Routing digest (`ai.admission.guard.routing_digest`): `4f7c200d54c9388dc4bb4da0a6c4b57b33bc01860c9d4814458e3fa2dee163fd`.
+
+**Price (`AI_ADMISSION_PRICES`).** `"openai/gpt-6-luna:floor": {"input": 0.22, "output": 0.825}` US$ per million tokens. This is both endpoints' long-prompt tier (base $0.11 / $0.55), so the ledger never charges below what a request can cost. Listings read from OpenRouter's endpoints API on 2026-11-07.
+
+**Capacity (`AGENT_LLM_CAPACITIES`).** Conservative, not measured:
+
+```json
+{"openai/gpt-6-luna:floor":{"context_tokens":272000,"max_output_tokens":8000,"max_reasoning_tokens":null,"max_request_bytes":1000000,"min_bytes_per_token":1.0,"framing_tokens_per_message":8}}
+```
+
+272,000 keeps a request below the long-prompt tier (listed context: 1,050,000). 8,000 matches `AI_ADMISSION_MAX_OUTPUT_TOKENS`, and reasoning counts as output. A byte floor of 1.0 bounds any tokenizer.
+
+**Still required before the first paid send:**
+
+* An OpenRouter API key for IRIS, created by the signer with a credit limit of at most US$30. Its digest goes into the approval's `account`.
+* `RUNS_PROXY_SEND_APPROVAL` naming the exact proxy sources, with an expiry.
+
+Both are local `ai/.env` values and are never committed.
 
 ## Fastest useful sequence
 
