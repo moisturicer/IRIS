@@ -479,7 +479,7 @@ class RunStore:
             """UPDATE iris_ai.ask_run r
                   SET state = 'running', fence = r.fence + 1, lease_owner = $2,
                       lease_expires_at = now() + make_interval(secs => $3),
-                      started_at = coalesce(r.started_at, now()), version = r.version + 1
+                      started_at = coalesce(r.started_at, clock_timestamp()), version = r.version + 1
                  FROM iris_ai.conversation c
                 WHERE r.id = $1 AND c.id = r.conversation_id AND c.deleted_at IS NULL
                   AND r.state IN ('queued', 'running') AND r.deadline_at > now()
