@@ -89,6 +89,11 @@ class AuditEvent(models.Model):
     PASSWORD_RESET_COMPLETED     = "PASSWORD_RESET_COMPLETED"
     EMAIL_VERIFICATION_COMPLETED = "EMAIL_VERIFICATION_COMPLETED"
 
+    # A person's answer to the data notice (ADR-054, IR-789). Metadata:
+    # `notice_version`, `ai_consent`, and the `previous_*` pair (None when it was
+    # their first answer). Written by `apps.accounts.notice.answer_notice`.
+    NOTICE_ANSWERED = "NOTICE_ANSWERED"
+
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
         (LOGOUT,           "Logout"),
@@ -152,6 +157,7 @@ class AuditEvent(models.Model):
         (RECOVERY_EMAIL_FAILED,        "Recovery Email Failed"),
         (PASSWORD_RESET_COMPLETED,     "Password Reset Completed"),
         (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
+        (NOTICE_ANSWERED,              "Data Notice Answered"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

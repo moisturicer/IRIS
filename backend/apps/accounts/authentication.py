@@ -17,7 +17,7 @@ from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.settings import api_settings
 from rest_framework_simplejwt.tokens import RefreshToken, UntypedToken
 
-from . import sessions
+from . import notice, sessions
 from .models import User
 
 
@@ -85,7 +85,24 @@ class IdleAwareJWTAuthentication(JWTAuthentication):
         if not current(token, user):
             refuse_stale(token)
         sessions.touch(token["sid"], request)
+        self._require_notice_answered(user, request)
         return user, token
+
+    @staticmethod
+    def _require_notice_answered(user, request) -> None:
+        """ADR-054 decision 3: nobody uses IRIS without answering the current notice.
+
+        Here rather than in a permission class so that no view can opt out and a
+        new route is covered without anyone remembering. Allowed by URL *name*
+        (`notice.ALLOWED_WHILE_UNANSWERED`); a request that resolved to nothing
+        is not allowed. The check runs for every account, staff and System Admin
+        included, and only after the token itself has proved good.
+        """
+        match = getattr(request, "resolver_match", None)
+        if match is not None and match.url_name in notice.ALLOWED_WHILE_UNANSWERED:
+            return
+        if notice.requires_answer(user):
+            raise notice.NoticeAcceptanceRequired(notice.current_notice_number())
 
 
 class IdleAwareTokenRefreshSerializer(TokenRefreshSerializer):
