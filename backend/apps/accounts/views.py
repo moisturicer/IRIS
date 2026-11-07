@@ -1,7 +1,8 @@
 from django.db import transaction
+from django.http import FileResponse, Http404
 from django.utils import timezone
 from rest_framework import generics, status
-from rest_framework.parsers import JSONParser
+from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -17,9 +18,10 @@ from core.permissions import (
 from core.pagination import LargeResultsPagination
 from apps.audit.services import create_audit_event
 from apps.audit.models import AuditEvent
+from . import profile
 from .models import User, College, Department, Course, RoleRequest, SystemSetting
 from .serializers import (
-    UserSerializer, AdviserOptionSerializer, MeSerializer, RegisterSerializer, ChangePasswordSerializer,
+    UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
     RoleRequestSerializer, SystemSettingSerializer,
 )
@@ -221,6 +223,64 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class MePhotoView(APIView):
+    """
+    `PUT /users/me/photo/` (multipart) and `DELETE /users/me/photo/` (IR-695).
+
+    Both act on `request.user` and on nobody else, so there is no path or body
+    that names another person's photo to change.
+    """
+    permission_classes = [IsAuthenticated]
+    parser_classes     = [MultiPartParser]
+
+    def put(self, request):
+        serializer = PhotoUploadSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        profile.set_photo(request.user, serializer.validated_data["photo"], serializer.crop)
+        return Response({"photo_url": profile.photo_url(request.user)})
+
+    def delete(self, request):
+        profile.remove_photo(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class UserPhotoView(APIView):
+    """
+    `GET /users/<id>/photo/`: a person's photo, for any signed-in user (IR-695).
+
+    The only way to read one. The file lives under MEDIA_ROOT, which no URL
+    serves, so reading it needs a valid token like every other route. A person
+    with no photo, a deactivated account and an id that does not exist all
+    answer the same 404.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        owner = User.objects.filter(pk=pk, is_active=True).only("id", "photo", "photo_version").first()
+        if owner is None or not owner.photo:
+            raise Http404
+        try:
+            stored = owner.photo.open("rb")
+        except FileNotFoundError:
+            raise Http404
+        response = FileResponse(stored, content_type="image/jpeg")
+        response["X-Content-Type-Options"] = "nosniff"
+        # `photo_url` carries `?v=`, which changes with the photo, so a copy
+        # fetched under the current version is never stale. Private: a shared
+        # cache must not keep a photo only signed-in users may read.
+        current = request.query_params.get("v") == str(owner.photo_version)
+        response["Cache-Control"] = "private, max-age=86400" if current else "private, no-cache"
+        return response
+
+
+class InterestSuggestionsView(APIView):
+    """`GET /users/interests/?q=mach`: existing interests that contain `q` (IR-695)."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        return Response(profile.suggest_interests(request.query_params.get("q", "")))
 
 
 class UserListView(generics.ListAPIView):

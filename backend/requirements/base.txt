@@ -70,3 +70,6 @@ reportlab>=5.0,<6
 # pins 20260107, past PYSEC-2026-1761 (CMap pickle) and PYSEC-2026-1762 (code
 # execution from a crafted PDF), which the security gate blocks on 0.11.4.
 pdfplumber==0.11.10
+# Pillow: opens and re-encodes an account photo (IR-695). pdfplumber already pulls it in; named here so a
+# change to that pin cannot silently remove what apps.accounts.profile imports.
+Pillow>=11.3,<14

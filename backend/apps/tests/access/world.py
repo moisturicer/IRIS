@@ -152,6 +152,22 @@ def _users() -> dict[str, User | None]:
     }
 
 
+def _user_with_photo(email) -> User:
+    """A Student who has an account photo (IR-695), for the route that serves one."""
+    import io
+
+    from django.core.files.base import ContentFile
+    from PIL import Image
+
+    user = _user(email, RoleName.STUDENT, "Photo", "Person")
+    jpeg = io.BytesIO()
+    Image.new("RGB", (8, 8), "gray").save(jpeg, "JPEG")
+    user.photo.save("photo.jpg", ContentFile(jpeg.getvalue()), save=False)
+    user.photo_version = 1
+    user.save(update_fields=["photo", "photo_version"])
+    return user
+
+
 def _record(title, owner, adviser=None, *, status=PipelineStatus.DRAFT, **extra) -> Record:
     record = Record.objects.create(
         title=title, abstract="A" * 60,
@@ -284,6 +300,7 @@ def build_world() -> World:
     o["session_token"] = OutstandingToken.objects.get(jti=token["jti"])
     o["reviewer_target"] = users["unseated"]
     o["target_user"] = users["other"]
+    o["photo_user"] = _user_with_photo("matrix-photo@cit.edu")
     o["role_request"] = RoleRequest.objects.create(user=other, requested_role=users["adviser"].role)
     SystemSetting.objects.get_or_create(key="matrix-setting", defaults={"value": "test"})
     o["assignment"] = record.assignments.get(party=Party.ITSO)

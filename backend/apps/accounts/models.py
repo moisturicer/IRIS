@@ -1,6 +1,9 @@
 import uuid
 
 from django.db import models, transaction
+from django.db.models.functions import Lower
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.utils import timezone
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 
@@ -59,6 +62,11 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
+def profile_photo_path(instance, filename):
+    """One unguessable name per stored photo; the uploaded filename is never used."""
+    return f"profile_photos/{uuid.uuid4().hex}.jpg"
+
+
 class User(AbstractBaseUser, PermissionsMixin):
     """
     Custom user model. Email is the login identifier.
@@ -88,6 +96,22 @@ class User(AbstractBaseUser, PermissionsMixin):
     #: sign-in on every device at once. Change it only through
     #: `apps.accounts.credentials.set_password_and_invalidate`.
     credential_version = models.PositiveIntegerField(default=0)
+
+    # -- Profile (IR-695, spec IR-694). Every one of these is optional and the
+    # person's alone to edit; `apps.accounts.profile` holds the rules.
+    #: Plain text, at most `profile.BIO_MAX_LENGTH` characters. Empty means none.
+    bio = models.TextField(blank=True, default="")
+    #: A square JPEG that `profile.set_photo` re-encodes from the upload. It is
+    #: stored under MEDIA_ROOT, which is never routed: the file is read only
+    #: through `GET /users/<id>/photo/`, behind sign-in.
+    photo = models.ImageField(upload_to=profile_photo_path, null=True, blank=True)
+    #: Bumped whenever the photo is set or removed. It is the `?v=` of
+    #: `photo_url`, so a cached copy of an old photo is never shown for a new one.
+    photo_version = models.PositiveIntegerField(default=0)
+    #: In the order the person gave them. See `UserInterest`.
+    research_interests = models.ManyToManyField(
+        "ResearchInterest", through="UserInterest", related_name="users", blank=True,
+    )
 
     objects = UserManager()
 
@@ -133,6 +157,53 @@ class User(AbstractBaseUser, PermissionsMixin):
         self.role = role
         self.is_office_coordinator = False
         self.save(update_fields=["role", "is_office_coordinator"])
+
+
+class ResearchInterest(models.Model):
+    """
+    One research-interest tag, shared by everyone who uses it (IR-695).
+
+    Matched case-insensitively -- "Machine Learning" and "machine learning" are
+    one row -- and the spelling of whoever added it first is the one everybody
+    sees. A tag nobody uses any more is deleted (`profile.set_interests`), so
+    suggestions only ever offer what a current account carries.
+    """
+    name = models.CharField(max_length=40)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(Lower("name"), name="researchinterest_name_ci_unique"),
+        ]
+
+    def __str__(self):
+        return self.name
+
+
+class UserInterest(models.Model):
+    """A person's use of a `ResearchInterest`, with its place in their list."""
+    user     = models.ForeignKey(User, on_delete=models.CASCADE, related_name="interest_links")
+    interest = models.ForeignKey(ResearchInterest, on_delete=models.CASCADE, related_name="user_links")
+    position = models.PositiveSmallIntegerField()
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "interest"], name="userinterest_once_per_user"),
+        ]
+        ordering = ["position"]
+
+
+@receiver(post_delete, sender=User)
+def delete_photo_with_account(sender, instance, using, **kwargs):
+    """Deleting an account deletes its stored photo (IR-695).
+
+    Runs once the row is really gone: a rolled-back deletion keeps the photo.
+    Django does not remove an ImageField's file with its row, so without this
+    the file would outlive the person it shows.
+    """
+    name = instance.photo.name if instance.photo else None
+    if name:
+        storage = instance.photo.storage
+        transaction.on_commit(lambda: storage.delete(name), using=using)
 
 
 class StudentProfile(models.Model):
