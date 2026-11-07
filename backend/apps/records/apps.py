@@ -7,6 +7,7 @@ class RecordsConfig(AppConfig):
 
     def ready(self):
         import apps.records.signals  # noqa: F401 — registers post_save handler
+        import apps.records.retention  # noqa: F401 — registers download notes with the cleanup job (IR-794)
 
         # Refuse to start on an unreadable resubmission policy (IR-137,
         # ADR-004). Validating here rather than at first use is the whole

@@ -108,6 +108,9 @@ export const SCREEN_ACCESS = {
   // Settings (your account) are separate pages since IR-933.
   profile:       { path: "/profile",       roles: EVERYONE },
   profileEdit:   { path: "/profile/edit",  roles: EVERYONE },
+  // Another person's Profile (IR-700), opened by clicking their name. Who may be
+  // opened is the server's decision: a hidden account answers 404.
+  person:        { path: "/people/:id",    roles: EVERYONE },
   settings:      { path: "/settings",      roles: EVERYONE },
   help:          { path: "/help",          roles: EVERYONE },
   // Reached from Discover and the queues, never from the nav. Which *records*
@@ -185,6 +188,11 @@ export function rolesFor(key: ScreenKey): RoleName[] {
  */
 export function pathFor(key: ScreenKey): string {
   return SCREEN_ACCESS[key].path;
+}
+
+/** `/people/<id>`: where a person's name leads. */
+export function personPath(id: number): string {
+  return SCREEN_ACCESS.person.path.replace(":id", String(id));
 }
 
 export function canAccess(role: RoleName | null | undefined, key: ScreenKey): boolean {

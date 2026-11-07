@@ -4,7 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_QUERY, parseDiscoverQuery, writeDiscoverQuery } from "./discoverQuery";
+import {
+  DEFAULT_QUERY, feedCriteria, feedQueryOf, feedSearchParams, parseDiscoverQuery, sameFeedQuery,
+  writeDiscoverQuery,
+} from "./discoverQuery";
 
 const parse = (search: string) => parseDiscoverQuery(new URLSearchParams(search));
 
@@ -62,5 +65,65 @@ describe("writeDiscoverQuery", () => {
   it("leaves keys it does not own, such as the Publish dialog's", () => {
     const written = writeDiscoverQuery(new URLSearchParams("publish=new&sort=bogus"), DEFAULT_QUERY);
     expect(written.toString()).toBe("publish=new");
+  });
+});
+
+describe("saved feeds use Discover's own query (IR-577)", () => {
+  it("stores a query in Discover's spelling, without the tab", () => {
+    const query = parse("q=flood&classification=7,4&college=5&year=2018&ip=patent&type=2&sort=viewed&feed=for_you");
+
+    expect(feedQueryOf(query)).toEqual({
+      q: "flood", type: "2", college: "5", classification: "4,7", year: "2018", ip: "patent", sort: "viewed",
+    });
+  });
+
+  it("saves Trending as most viewed and omits the default sort", () => {
+    expect(feedQueryOf(parse("q=flood&feed=trending"))).toEqual({ q: "flood", sort: "viewed" });
+    expect(feedQueryOf(parse("q=flood"))).toEqual({ q: "flood" });
+  });
+
+  it("opens a feed as the URL Discover would have written for it", () => {
+    const params = feedSearchParams({ q: "flood", classification: "4,7", sort: "viewed" }, {});
+
+    expect(params.toString()).toBe(writeDiscoverQuery(new URLSearchParams(), parse("q=flood&classification=4,7&sort=viewed")).toString());
+    expect(params.get("feed")).toBeNull();
+  });
+
+  it("leaves a stale value out of the URL, so it is corrected rather than silently queried", () => {
+    const stale = { classification: [7], college: [5] };
+
+    const params = feedSearchParams({ q: "flood", classification: "4,7", college: "5" }, stale);
+
+    expect(params.get("classification")).toBe("4");
+    expect(params.has("college")).toBe(false);
+    expect(params.get("q")).toBe("flood");
+  });
+
+  it("tells whether the filters on screen are the feed's own", () => {
+    const stored = { q: "flood", classification: "4,7" };
+
+    expect(sameFeedQuery(stored, parse("classification=7,4&q=flood"))).toBe(true);
+    expect(sameFeedQuery(stored, parse("classification=4&q=flood"))).toBe(false);
+    expect(sameFeedQuery(stored, parse("q=flood&classification=4,7&sort=viewed"))).toBe(false);
+  });
+
+  it("describes a feed in words, naming a value that no longer exists as unavailable", () => {
+    const options = {
+      classifications: [{ value: "4", label: "Civil Engineering" }],
+      colleges: [{ value: "5", label: "College of Engineering" }],
+      recordTypes: [{ value: "2", label: "Thesis" }],
+    };
+
+    expect(
+      feedCriteria({ q: "flood", classification: "4,7", college: "5", type: "2", year: "2018", ip: "has_ip", sort: "viewed" }, options),
+    ).toEqual([
+      "Keywords: flood",
+      "Areas: Civil Engineering, no longer available",
+      "Colleges: College of Engineering",
+      "Type: Thesis",
+      "Year: 2018",
+      "Intellectual property: any",
+      "Sorted by: Most viewed",
+    ]);
   });
 });

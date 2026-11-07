@@ -61,6 +61,7 @@ Decisions that shape IRIS, with the reasoning that produced them and the alterna
 | [059](059-dedicated-ai-runtime-direction.md) | Dedicated AI runtime direction, written as ADR-048 | **Superseded** by [049](049-dedicated-ai-runtime-and-local-research.md) · interview record | Architecture |
 | [060](060-forms-use-react-hook-form-and-zod.md) | Forms use react-hook-form and zod; formik and yup are removed | **Proposed** — 2026-11-06 (IR-911), awaiting a named approver | Architecture · Frontend |
 | [061](061-request-timeout-cancellation-and-retry.md) | The API client times out requests (30 s, 5 min for transfers), cancels reads with their screen, retries nothing on its own and never a write | **Proposed** — 2026-11-06 (IR-914), awaiting a named approver · values are the team's to set | Architecture · Frontend · Reliability |
+| [062](062-personal-discovery-recipe-signals-and-snapshots.md) | Personal discovery — a transparent metadata recipe, account-owned signals, and frozen feed snapshots | **Proposed** — 2026-11-07 (IR-946), awaiting a named approver · records what IR-567, IR-576 and IR-575 built | Architecture · Security |
 
 **ADR-034 takes the next free number** (added 2026-10-02, IR-453). 024–031 exist as files but were never added to this index; 033 and 034 were free under both the files on disk and this table. **ADR-033** is the IR-390 spec's written basis. Both it and ADR-034 cite ADRs **by filename** throughout because of the duplicate numbers noted above.
 

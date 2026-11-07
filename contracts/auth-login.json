@@ -29,7 +29,10 @@
         "offices": [],
         "is_coordinator": false
       },
-      "role_request": null
+      "role_request": null,
+      "bio": "",
+      "research_interests": [],
+      "photo_url": null
     }
   }
 }

@@ -6,7 +6,6 @@ import {
 } from "@/api/profile";
 import { authApi } from "@/api/auth";
 import { PageHeader } from "@/components/layout/PageHeader";
-import { FieldError } from "@/components/ui/FieldError";
 import { FieldLabel } from "@/components/ui/FieldLabel";
 import { fieldClasses, LOAD_ERROR } from "@/components/ui/fieldClasses";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
@@ -14,7 +13,6 @@ import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { useAuth } from "@/hooks/useAuth";
 import { pathFor } from "@/lib/access";
 import { errorDetail, fieldError } from "@/lib/errorDetail";
-import { ORCID_EXAMPLE, orcidProblem } from "@/lib/orcid";
 import { cn } from "@/lib/utils";
 
 import { affiliationOf } from "./names";
@@ -22,8 +20,9 @@ import { PhotoField } from "./PhotoField";
 
 /**
  * Edit profile (IR-933): the name and the optional Profile fields (IR-699:
- * photo, bio, research interests, ORCID iD), on a page of their own, apart
- * from Settings.
+ * photo, bio, research interests), on a page of their own, apart from
+ * Settings. The middle initial and the ORCID iD are not edited here: the
+ * Profile shows neither as a field of its own.
  *
  * Every optional field may be left empty, which is how a person keeps it off
  * their Profile: there is no privacy switch. The photo saves as soon as it is
@@ -40,36 +39,27 @@ export default function EditProfilePage() {
   const navigate = useNavigate();
 
   const [firstName, setFirstName] = useState(user?.first_name ?? "");
-  const [middle, setMiddle] = useState(user?.middle_initial ?? "");
   const [lastName, setLastName] = useState(user?.last_name ?? "");
   const [bio, setBio] = useState(user?.bio ?? "");
   const [interests, setInterests] = useState<string[]>(user?.research_interests ?? []);
-  const [orcid, setOrcid] = useState(user?.orcid ?? "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const firstId = useId();
-  const middleId = useId();
   const lastId = useId();
   const affiliationId = useId();
   const bioId = useId();
   const bioCountId = useId();
-  const orcidId = useId();
-  const orcidHintId = useId();
   const aboutId = useId();
   const nameSectionId = useId();
-
-  const orcidIssue = orcidProblem(orcid);
 
   const stored = user?.research_interests ?? [];
   const nameDirty = !!user && (
     firstName !== user.first_name ||
-    middle !== (user.middle_initial ?? "") ||
     lastName !== user.last_name
   );
   const fieldsDirty = !!user && (
     bio !== (user.bio ?? "") ||
-    orcid.trim() !== (user.orcid ?? "") ||
     interests.length !== stored.length ||
     interests.some((tag, i) => tag !== stored[i])
   );
@@ -79,7 +69,6 @@ export default function EditProfilePage() {
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (orcidIssue) return;
     setError(null);
     if (!firstName.trim() || !lastName.trim()) {
       setError("First and last name are required.");
@@ -90,7 +79,6 @@ export default function EditProfilePage() {
       if (nameDirty) {
         const { data } = await authApi.updateMe({
           first_name: firstName.trim(),
-          middle_initial: middle.trim(),
           last_name: lastName.trim(),
         });
         updateUser(data);
@@ -99,14 +87,13 @@ export default function EditProfilePage() {
         const { data } = await profileApi.updateFields({
           bio,
           research_interests: interests,
-          orcid: orcid.trim() || null,
         });
         updateUser(data);
       }
       navigate(pathFor("profile"), { state: { saved: true } });
     } catch (err) {
       setError(
-        fieldError(err, "bio", "research_interests", "orcid") ??
+        fieldError(err, "bio", "research_interests") ??
           errorDetail(err, "Could not save your profile. Please try again."),
       );
     } finally {
@@ -126,14 +113,10 @@ export default function EditProfilePage() {
       <Section id={nameSectionId} title="Photo and name" caption="Your name is attached to disclosures, paper citations and clearances.">
         <PhotoField user={user} onSaved={updateUser} />
 
-        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-[1fr_7rem_1fr]">
+        <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1">
             <FieldLabel htmlFor={firstId} label="First name" />
             <input id={firstId} className={fieldClasses(false)} value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <FieldLabel htmlFor={middleId} label="M.I." />
-            <input id={middleId} className={fieldClasses(false)} value={middle} maxLength={20} onChange={(e) => setMiddle(e.target.value)} />
           </div>
           <div className="space-y-1">
             <FieldLabel htmlFor={lastId} label="Last name" />
@@ -173,28 +156,6 @@ export default function EditProfilePage() {
         </div>
 
         <InterestsField interests={interests} onChange={setInterests} />
-
-        <div className="mt-6 max-w-sm space-y-1">
-          <FieldLabel htmlFor={orcidId} label="ORCID iD" />
-          <input
-            id={orcidId}
-            className={cn(fieldClasses(!!orcidIssue), "font-mono")}
-            value={orcid}
-            onChange={(e) => setOrcid(e.target.value)}
-            placeholder={ORCID_EXAMPLE}
-            autoComplete="off"
-            spellCheck={false}
-            aria-invalid={orcidIssue ? true : undefined}
-            aria-describedby={orcidHintId}
-          />
-          {orcidIssue ? (
-            <FieldError id={orcidHintId}>{orcidIssue}</FieldError>
-          ) : (
-            <p id={orcidHintId} className={HINT}>
-              Your own iD from orcid.org. IRIS shows it as you enter it and doesn't verify it with ORCID.
-            </p>
-          )}
-        </div>
       </Section>
 
       {error && <p role="alert" className={cn(LOAD_ERROR, "mt-6")}>{error}</p>}
@@ -203,7 +164,7 @@ export default function EditProfilePage() {
         <Link to={pathFor("profile")} className={cn(PILL_SECONDARY, FOCUS_RING)}>Cancel</Link>
         <button
           type="submit"
-          disabled={!dirty || saving || !!orcidIssue}
+          disabled={!dirty || saving}
           className={cn(PILL_PRIMARY, FOCUS_RING)}
         >
           {saving ? "Saving..." : "Save"}

@@ -150,7 +150,12 @@ export const recordsApi = {
   documentRequestSlots: (id: number) =>
     apiClient.get<DocumentRequestSlot[]>(`/records/${id}/document-requests/slots/`),
   similar:        (id: number) =>
-    apiClient.get<{ results: SemanticSearchResult[] }>(`/records/${id}/similar/`),
+    // `state` says why the list is the length it is (IR-568); a 503 carries
+    // `unavailable`. Absent on an older server, so readers must not require it.
+    apiClient.get<{
+      state?: "ready" | "no_matches" | "not_indexed" | "incompatible" | "unavailable";
+      results: SemanticSearchResult[];
+    }>(`/records/${id}/similar/`),
   /**
    * The manuscript's own title and abstract, read from its extracted structure
    * (IR-406), for the Publish dialog's prefill (IR-409). Owner-only; anyone

@@ -53,11 +53,10 @@ export interface User {
   /**
    * Profile fields the person sets in Settings (IR-695, IR-699). Optional on
    * the type until IR-695 ships them; the contract is the comment on IR-695.
-   * Empty is `""`, `[]`, `null` and `null` respectively.
+   * Empty is `""`, `[]` and `null` respectively.
    */
   bio?:                string;
   research_interests?: string[];
-  orcid?:              string | null;
   /** Relative to the API base, fetched with auth as a blob. Never an open media URL. */
   photo_url?:          string | null;
 }

@@ -203,6 +203,9 @@ REST_FRAMEWORK = {
         "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
         "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
         "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
+        # A person's own data download (IR-786): per signed-in person, because each
+        # one reads a whole account and is audited.
+        "personal_data_export": throttle_rate("API_THROTTLE_DATA_EXPORT", "5/hour"),
         # Per client address (IR-661). A campus shares one, so these allow a
         # class signing in together; the lockout still answers per account and address.
         "auth_login": throttle_rate("API_THROTTLE_LOGIN", "300/hour"),
@@ -356,6 +359,13 @@ CELERY_BEAT_SCHEDULE = {
     "embargo-reminders": {
         "task": "apps.records.tasks.send_embargo_reminders",
         "schedule": crontab(hour=0, minute=0),
+    },
+    # ADR-051 decision 19 (IR-794): erase personal data past the periods the System
+    # Admin set, daily at 03:00 Manila. Each type's period is a system setting, and
+    # a blank one erases nothing.
+    "retention-cleanup": {
+        "task": "apps.audit.tasks.erase_expired_personal_data",
+        "schedule": crontab(hour=19, minute=0),
     },
     # ADR-045 §6 (IR-642): the safety net under on-commit enqueueing. It
     # re-enqueues recovery mail whose broker message was lost, schedules due

@@ -90,6 +90,18 @@ const reviewAction = (
   dialog: anyDialog,
 });
 
+/** Discover with one saved feed, opened from the My feeds menu: its rename and delete dialogs. */
+const SAVED_FEED = { id: 5, name: "Flood studies", query: { q: "flood" }, stale: {}, created_at: "2026-11-01T08:00:00+08:00", updated_at: "2026-11-01T08:00:00+08:00" };
+const feedAction = (id: string, verb: string, title: string): DialogCase => ({
+  id, screen: "discover", sources: ["features/discover/MyFeeds.tsx"],
+  override: (api) => api.on("GET", "/library/feeds/", { results: [SAVED_FEED], limit: 10 }),
+  open: async (page) => {
+    await page.getByRole("button", { name: /^My feeds/ }).click();
+    await page.getByRole("button", { name: `${verb} ${SAVED_FEED.name}` }).click();
+  },
+  dialog: (page) => page.getByRole("dialog", { name: title }),
+});
+
 export const DIALOGS: DialogCase[] = [
   {
     id: "cite a paper", screen: "paper-view", sources: ["features/discover/PaperCiteModal.tsx", "features/discover/DiscoverPage.tsx", "components/ui/Modal.tsx"],
@@ -104,6 +116,16 @@ export const DIALOGS: DialogCase[] = [
     id: "discover filters", screen: "discover", sources: ["features/discover/DiscoverFilterBar.tsx"],
     open: press(/^Filters/), dialog: (page) => page.getByRole("dialog", { name: "Filters" }),
   },
+  {
+    id: "save a custom feed", screen: "discover", sources: ["features/discover/MyFeeds.tsx"],
+    open: async (page) => {
+      await page.getByRole("button", { name: /^My feeds/ }).click();
+      await page.getByRole("button", { name: /^Save these filters as a feed/ }).click();
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Save these filters as a feed" }),
+  },
+  feedAction("rename a custom feed", "Rename", "Rename feed"),
+  feedAction("delete a custom feed", "Delete", "Delete this feed?"),
   {
     id: "notifications", screen: "help", sources: ["components/layout/NotificationBell.tsx"],
     open: press(/^Notifications/), dialog: (page) => page.getByRole("dialog", { name: "Notifications" }),

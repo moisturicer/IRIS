@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 
 from rest_framework import mixins, serializers, status, viewsets
@@ -21,7 +22,7 @@ from core.enums import (
     RecordTypeName,
     RequestStatus,
 )
-from . import embargo, ip_release, lifecycle
+from . import embargo, ip_release, lifecycle, rdco_acts
 from core.permissions import (
     IsAdmin,
     IsAuthor,
@@ -64,6 +65,8 @@ from apps.notifications.services import (
 )
 from apps.audit.services import create_audit_event
 from apps.reviews.routing import RoutingError, enter_at_adviser
+
+logger = logging.getLogger(__name__)
 
 
 class RecordViewSet(viewsets.ModelViewSet):
@@ -157,6 +160,11 @@ class RecordViewSet(viewsets.ModelViewSet):
             return [IsAuthenticated(), MayReleaseEmbargo()]
         if self.action == "ip_release":
             return [IsAuthenticated(), MayReleaseIp()]
+        # RDCO's three acts on a paper in review (ADR-051 §10, IR-797): a role
+        # gate before any lookup, so a refusal reads the same for a paper that
+        # does not exist. What each does, and the lock it takes, is `rdco_acts`.
+        if self.action in ("replace_adviser", "add_owner", "rdco_withdraw"):
+            return [IsAuthenticated(), IsRDCO()]
         if self.action == "tags":
             # Staff-only per the action's own docstring -- ownership is not
             # enough here. Same dead-permission_classes-kwarg bug as "submit"
@@ -470,6 +478,50 @@ class RecordViewSet(viewsets.ModelViewSet):
             return Response({"detail": refused}, status=status.HTTP_400_BAD_REQUEST)
         return Response(ip_release.release_ip(record, actor=request.user))
 
+    @action(detail=True, methods=["post"], url_path="replace-adviser")
+    @transaction.atomic
+    def replace_adviser(self, request, pk=None):
+        """
+        POST /records/<id>/replace-adviser/  {"adviser": <user id>, "reason": optional}
+
+        RDCO names another account holding the Adviser role on a paper whose
+        Adviser review is open (ADR-051 §10, IR-797). The old Adviser's seat is
+        withdrawn and the new one is seated; both are told in-app.
+        """
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(rdco_acts.replace_adviser(
+            record, body.get(rdco_acts.ADVISER_FIELD), actor=request.user,
+            reason=body.get("reason", ""),
+        ))
+
+    @action(detail=True, methods=["post"], url_path="add-owner")
+    @transaction.atomic
+    def add_owner(self, request, pk=None):
+        """
+        POST /records/<id>/add-owner/  {"email": "..."}
+
+        RDCO adds an existing, active, verified account as an owner of a paper
+        in review (ADR-051 §10, IR-797). The Contact person does not change.
+        """
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(rdco_acts.add_owner(record, body.get("email"), actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="withdraw", url_name="withdraw")
+    @transaction.atomic
+    def rdco_withdraw(self, request, pk=None):
+        """
+        POST /records/<id>/withdraw/  {"reason": "..."}
+
+        RDCO withdraws a paper in review, with a required reason (ADR-051 §10,
+        IR-797), by the path an owner's deletion takes: the review ends, and the
+        owners and the people whose work ends are told.
+        """
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(rdco_acts.withdraw(record, body.get("reason"), actor=request.user))
+
     @action(detail=True, methods=["get"])
     def manuscript(self, request, pk=None):
         """
@@ -706,15 +758,31 @@ class RecordViewSet(viewsets.ModelViewSet):
         hasn't been released (ADR-052). That is a visible behaviour change from keyword
         matching, and it is the intended one — a keyword fallback would hide
         "nothing is indexed" behind plausible results.
+
+        **The answer carries a `state` (IR-568):** `ready`, `no_matches`,
+        `not_indexed` or `incompatible`, and a failure is a 503 whose body is
+        `{"state": "unavailable", "results": []}`. Only the seed's own coverage is
+        ever stated; `no_matches` is identical whether close candidates are
+        absent or unreadable (IR-460).
         """
         from apps.ai.presentation import record_card
-        from apps.ai.similarity import similar_records
+        from apps.ai.similarity import UNAVAILABLE, related_works
 
         record = self.get_object()
-        matches = similar_records(record, request.user)
-        return Response(
-            {"results": [record_card(m.record, m.score) for m in matches]}
-        )
+        try:
+            related = related_works(record, request.user)
+        except Exception:
+            # A temporary failure, said as one (IR-568). Nothing about the
+            # cause reaches the reader, and it is not an empty list.
+            logger.exception("Related works failed for record %s", record.pk)
+            return Response(
+                {"state": UNAVAILABLE, "results": []},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response({
+            "state": related.state,
+            "results": [record_card(m.record, m.score) for m in related.matches],
+        })
 
     @action(detail=True, methods=["get"], url_path="related-research")
     def related_research(self, request, pk=None):

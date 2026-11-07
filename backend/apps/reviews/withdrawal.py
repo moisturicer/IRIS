@@ -75,10 +75,13 @@ def open_review_work(record) -> OpenReviewWork:
     )
 
 
-def withdraw_review(record, actor) -> None:
+def withdraw_review(record, actor, *, reason=None) -> None:
     """
     Withdraw `record`'s active assignments, their open seats, its open revision
     requests and its open document requests.
+
+    `reason` is RDCO's, when RDCO withdraws the paper (IR-797); it is audited
+    with the withdrawal and nothing else changes.
     """
     from apps.documents.models import DocumentRequest
     from apps.records.models import Record
@@ -114,7 +117,9 @@ def withdraw_review(record, actor) -> None:
     # A record withdrawn from review says so; a soft-deleted draft or a
     # published record had no review to withdraw (IR-144).
     if active:
-        audit.record_withdrawn(record, actor, closed_parties=[a.party for a in active])
+        audit.record_withdrawn(
+            record, actor, closed_parties=[a.party for a in active], reason=reason,
+        )
     for assignment in active:
         audit.assignment_closed(
             assignment, actor, how=audit.WITHDRAWN,

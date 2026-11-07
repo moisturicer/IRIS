@@ -19,7 +19,11 @@ def registration(password, confirm=None, **extra):
         "last_name": "Comer",
         "password": password,
         "confirm_password": password if confirm is None else confirm,
-        "consent_given": True,
+        # IR-789: the notice version shown (migration 0019 creates version 1)
+        # and both answers, replacing the single `consent_given`.
+        "notice_version": 1,
+        "agree_dpa": True,
+        "ai_consent": True,
         **extra,
     }
 

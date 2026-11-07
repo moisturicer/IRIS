@@ -230,3 +230,152 @@ class SimilarEndpointTests:
         response = client.get(reverse("record-similar", args=[seed.pk]))
 
         assert response.json()["results"] == []
+
+    # -- IR-568: the endpoint says why a list is empty --------------------------
+    #
+    # The reader sees only the *seed's own* coverage (it is a Record they can
+    # already open) and never why a candidate is missing (IR-460).
+
+    def _get(self, reader, seed):
+        client = APIClient()
+        client.force_authenticate(user=reader)
+        return client.get(reverse("record-similar", args=[seed.pk]))
+
+    def test_a_list_with_matches_is_ready(self, embedder, space):
+        reader = make_user("reader@cit.edu")
+        seed = make_record(
+            title="Flood prediction", abstract="rainfall catchment", embedder=embedder
+        )
+        make_record(
+            title="Rainfall catchment study", abstract="rainfall catchment", embedder=embedder
+        )
+
+        response = self._get(reader, seed)
+
+        assert response.status_code == 200
+        assert response.json()["state"] == "ready"
+        assert len(response.json()["results"]) == 1
+
+    def test_an_indexed_seed_with_no_neighbour_is_no_matches(self, embedder, space):
+        reader = make_user("reader@cit.edu")
+        seed = make_record(
+            title="Flood prediction", abstract="rainfall catchment", embedder=embedder
+        )
+
+        response = self._get(reader, seed)
+
+        assert response.status_code == 200
+        assert response.json() == {"state": "no_matches", "results": []}
+
+    def test_hidden_candidates_and_no_candidates_answer_identically(self, embedder, space):
+        """IR-460: "no matches" never tells a reader whether something close
+        exists and is withheld. Whole bodies are compared, so a field added
+        later that differs between the two cases fails here."""
+        author = make_user("author@cit.edu")
+        stranger = make_user("stranger@cit.edu")
+        seed = make_record(
+            title="Flood prediction", abstract="rainfall catchment", embedder=embedder
+        )
+
+        without_hidden = self._get(stranger, seed)
+
+        for n in range(3):
+            make_record(
+                title=f"Rainfall catchment draft {n}",
+                abstract="rainfall catchment",
+                status=PipelineStatus.DRAFT,
+                owner=author,
+                embedder=embedder,
+            )
+        with_hidden = self._get(stranger, seed)
+
+        assert without_hidden.status_code == with_hidden.status_code == 200
+        assert with_hidden.json() == without_hidden.json()
+        assert with_hidden.json() == {"state": "no_matches", "results": []}
+        # The author, who may read the drafts, does see them: the equality
+        # above is about permission, not about the drafts being absent.
+        assert self._get(author, seed).json()["state"] == "ready"
+
+    def test_a_seed_with_no_vector_is_not_indexed(self, embedder, space):
+        reader = make_user("reader@cit.edu")
+        seed = make_record(
+            title="Flood prediction", abstract="rainfall", embedder=embedder, embedded=False
+        )
+        make_record(title="Rainfall", abstract="catchment", embedder=embedder)
+
+        response = self._get(reader, seed)
+
+        assert response.status_code == 200
+        assert response.json() == {"state": "not_indexed", "results": []}
+
+    def test_a_seed_vector_from_another_model_is_incompatible(self, embedder, space):
+        reader = make_user("reader@cit.edu")
+        seed = make_record(
+            title="Flood prediction", abstract="rainfall", embedder=embedder, embedded=False
+        )
+        seed_record_vector(
+            record=seed,
+            embedding=embedder.embed_documents(["rainfall"])[0],
+            model_name="some-older-model",
+            keyed=False,
+        )
+        make_record(title="Rainfall", abstract="catchment", embedder=embedder)
+
+        response = self._get(reader, seed)
+
+        assert response.status_code == 200
+        assert response.json() == {"state": "incompatible", "results": []}
+
+    def test_a_seed_vector_under_a_non_active_space_is_incompatible(self, embedder, space):
+        reader = make_user("reader@cit.edu")
+        seed = make_record(
+            title="Flood prediction", abstract="rainfall", embedder=embedder, embedded=False
+        )
+        retired = EmbeddingSpace.objects.create(
+            model_id="retired-model", dimensions=DIMENSIONS, metric="cosine", state="retired"
+        )
+        seed_record_vector(
+            record=seed,
+            embedding=embedder.embed_documents(["rainfall"])[0],
+            model_name="retired-model",
+            space=retired,
+        )
+        make_record(title="Rainfall", abstract="catchment", embedder=embedder)
+
+        response = self._get(reader, seed)
+
+        assert response.json() == {"state": "incompatible", "results": []}
+
+    def test_a_failure_while_comparing_is_a_temporary_failure(
+        self, embedder, space, monkeypatch
+    ):
+        reader = make_user("reader@cit.edu")
+        seed = make_record(
+            title="Flood prediction", abstract="rainfall catchment", embedder=embedder
+        )
+
+        def broken(*args, **kwargs):
+            raise RuntimeError("vector index unavailable")
+
+        monkeypatch.setattr("apps.ai.similarity._nearest", broken)
+
+        response = self._get(reader, seed)
+
+        assert response.status_code == 503
+        # No detail of the failure reaches the reader.
+        assert response.json() == {"state": "unavailable", "results": []}
+
+    def test_a_record_the_reader_cannot_open_is_still_a_404(self, embedder, space):
+        author = make_user("author@cit.edu")
+        stranger = make_user("stranger@cit.edu")
+        draft = make_record(
+            title="Private draft",
+            abstract="rainfall",
+            status=PipelineStatus.DRAFT,
+            owner=author,
+            embedder=embedder,
+            embedded=False,
+        )
+
+        # The seed's coverage is stated only for a Record the reader can open.
+        assert self._get(stranger, draft).status_code == 404

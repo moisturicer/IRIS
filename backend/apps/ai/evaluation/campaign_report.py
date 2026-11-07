@@ -399,6 +399,18 @@ def _interleave(lists):
     return out
 
 
+def _conditions(runs: Sequence[Mapping]) -> dict:
+    """The conditions in effect for this arm, so a saved report can be compared later (IR-741)."""
+    first = runs[0]["manifest"]
+    models = sorted({m for r in runs for m in effective_models(r["manifest"])})
+    return {"corpus_snapshot_digest": first.get("corpus_snapshot_digest"), "models": models,
+            "data_policy": first.get("data_policy"),
+            "limits": effective_limits(first.get("limits")),
+            "rubric_version": first.get("rubric_version"),
+            "cache_states": sorted({str(r["manifest"].get("cache_state")) for r in runs}),
+            "set_digests": first.get("set_digests")}
+
+
 def _arm(label: str, runs: Sequence[Mapping], data: Mapping, reviews, *, mode: str,
          min_examples: int) -> dict:
     families = {c["id"]: c["family"] for c in data["conversations"]}
@@ -446,11 +458,18 @@ def _arm(label: str, runs: Sequence[Mapping], data: Mapping, reviews, *, mode: s
                   else "reported")
         family_report[family] = {"status": status, "per_repetition": rows,
                                  "not_reviewed": sorted(unreviewed.get(family, ()))}
+    family_cases: dict[str, set] = {}
+    for run in runs:
+        for r in run.get("conversations", ()):
+            family_cases.setdefault(families.get(r.get("id"), r.get("family")),
+                                    set()).add(r.get("id"))
     return {"status": "measured", "architecture": runs[0].get("arm"),
             "git_commit": runs[0]["manifest"]["git_commit"],
             "engine_version": runs[0]["manifest"]["engine_version"],
             "identity": runs[0]["manifest"].get("identity"),
             "allowance": effective_limits(runs[0]["manifest"].get("limits")),
+            "conditions": _conditions(runs),
+            "family_cases": {f: sorted(ids) for f, ids in sorted(family_cases.items())},
             "repetitions": repetitions, "summary": summary, "families": family_report,
             "access_breaches": breaches, "spend": spend(runs, successes),
             "single_reviewed": singles,
@@ -557,6 +576,7 @@ def build_report(data: Mapping, lock: Optional[Mapping],
         "comparison": COMPARISONS[mode],
         "counted": counted and not reasons, "not_counted_reasons": reasons,
         "label_status": data.get("label_status"), "min_examples": min_examples,
+        "set_families": sorted({c["family"] for c in data["conversations"]}),
         "corpus": {"snapshot_id": corpus.get("snapshot_id"),
                    "paper_set_sha256": corpus.get("paper_set_sha256"), "claim": PROXY_NOTE},
         "approvals": approvals_status(approvals), "arms": arms, "scenarios": scenario_rows,
