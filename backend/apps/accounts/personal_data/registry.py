@@ -33,6 +33,7 @@ INCLUDED: dict[str, str] = {
     "accounts.StudentProfile": "account",
     "accounts.AdviserProfile": "account",
     "accounts.RoleRequest": "account",
+    "accounts.AccountDeletionRequest": "account",
     "accounts.UserInterest": "account",
     "accounts.NoticeAnswer": "consent",
     "accounts.UserSession": "sessions",

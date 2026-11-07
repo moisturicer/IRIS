@@ -24,7 +24,7 @@ from unittest import mock
 from django.core.cache import cache
 from rest_framework.test import APITestCase
 
-from apps.accounts.models import Role, RoleRequest, User
+from apps.accounts.models import AccountDeletionRequest, Role, RoleRequest, User
 from apps.accounts.personal_data import SECTIONS
 from apps.accounts.personal_data import registry
 from apps.accounts.throttles import PersonalDataExportThrottle
@@ -217,6 +217,12 @@ class ExportContentTests(APITestCase):
         self.assertEqual(account["role"], RoleName.STUDENT)
         self.assertTrue(account["signup_consent_given"])
         self.assertEqual(len(account["role_requests"]), 1)
+
+    def test_their_own_account_deletion_requests(self):
+        AccountDeletionRequest.objects.create(user=self.me, status=RequestStatus.DECLINED, reason="You still advise a paper.")
+        requests = self.export()["account"]["deletion_requests"]
+        self.assertEqual([(r["status"], r["reason"]) for r in requests], [(RequestStatus.DECLINED, "You still advise a paper.")])
+        self.assertNotIn("decided_by", requests[0])
 
     def test_the_details_of_a_paper_they_own(self):
         papers = self.export()["papers_owned"]

@@ -3,6 +3,7 @@
   "/",
   "/activate",
   "/activate/:uidb64/:token",
+  "/admin/account-deletion-requests",
   "/admin/audit",
   "/admin/users",
   "/ai",

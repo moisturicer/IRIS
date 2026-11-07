@@ -156,6 +156,16 @@ export const DIALOGS: DialogCase[] = [
     open: press("Decline"), dialog: anyDialog,
   },
   {
+    id: "reject an account deletion request", screen: "account-deletion-requests",
+    sources: ["features/admin/AccountDeletionRequestsPage.tsx"],
+    open: press("Reject"), dialog: anyDialog,
+  },
+  {
+    id: "confirm an account deletion", screen: "account-deletion-requests",
+    sources: ["features/admin/AccountDeletionRequestsPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    open: press("Confirm deletion"), dialog: anyDialog,
+  },
+  {
     id: "decline a download request", screen: "download-requests", sources: ["features/admin/DownloadRequestsPage.tsx"],
     open: press("Decline"), dialog: anyDialog,
   },

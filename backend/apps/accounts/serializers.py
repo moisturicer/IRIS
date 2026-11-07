@@ -420,6 +420,67 @@ class SystemSettingSerializer(serializers.ModelSerializer):
         read_only_fields = ["updated_by", "updated_at"]
 
 
+# ---- Account deletion (ADR-051 §8-§12, IR-785) ----------------------------
+
+class MyDeletionRequestSerializer(serializers.Serializer):
+    """The person's own request. A rejection's reason is theirs to read."""
+    id         = serializers.IntegerField()
+    status     = serializers.CharField()
+    created_at = serializers.DateTimeField()
+    decided_at = serializers.DateTimeField()
+    reason     = serializers.CharField()
+    can_cancel = serializers.SerializerMethodField()
+
+    def get_can_cancel(self, obj):
+        return obj.status == RequestStatus.PENDING
+
+
+class AccountDeletionRequestSerializer(serializers.Serializer):
+    """
+    A request as the System Admin sees it: who asked and when, what still blocks
+    it in plain words, and what the caller may do. The page reads `capabilities`
+    and compares no role names (IR-788).
+    """
+    id           = serializers.IntegerField()
+    status       = serializers.CharField()
+    created_at   = serializers.DateTimeField()
+    decided_at   = serializers.DateTimeField()
+    reason       = serializers.CharField()
+    user         = serializers.SerializerMethodField()
+    blockers     = serializers.SerializerMethodField()
+    capabilities = serializers.SerializerMethodField()
+
+    def _blockers(self, obj):
+        from .deletion.blockers import blockers_for
+
+        cache = self.__dict__.setdefault("_blocker_cache", {})
+        if obj.pk not in cache:
+            pending = obj.status == RequestStatus.PENDING
+            cache[obj.pk] = blockers_for(obj.user) if pending else []
+        return cache[obj.pk]
+
+    def get_user(self, obj):
+        person = obj.user
+        return {
+            "id": person.pk,
+            "name": person.get_full_name() or person.email,
+            "email": person.email,
+            "role": getattr(person.role, "name", "") or "",
+        }
+
+    def get_blockers(self, obj):
+        return [b.as_dict() for b in self._blockers(obj)]
+
+    def get_capabilities(self, obj):
+        request = self.context.get("request")
+        actor_id = getattr(getattr(request, "user", None), "pk", None)
+        decidable = obj.status == RequestStatus.PENDING and obj.user_id != actor_id
+        return {
+            "can_confirm": decidable and not self._blockers(obj),
+            "can_reject": decidable,
+        }
+
+
 class NoticeAnswerSerializer(serializers.Serializer):
     """The body of ``POST /auth/notice/answer/`` (ADR-054, IR-789).
 

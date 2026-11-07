@@ -648,6 +648,36 @@ def notify_embargo_review(record, recipient, *, type_name, message):
                           label="notify_embargo_review")
 
 
+def notify_account_deletion_rejected(person, actor, reason):
+    """In-app notice that a System Admin rejected an account deletion (IR-785)."""
+    try:
+        Notification.objects.create(
+            sender=actor, recipient=person,
+            notif_type=_get_type("Account Deletion Rejected"),
+            message=f"Your account deletion request was not accepted. Reason: {reason}",
+        )
+    except Exception:
+        _log_failure("notify_account_deletion_rejected", user=person)
+
+
+def notify_contact_person_took_over(record, user):
+    """
+    In-app notice to the owner who became a paper's Contact person because the
+    previous one's account was deleted (ADR-051 decision 28, IR-785).
+    """
+    try:
+        Notification.objects.create(
+            recipient=user, record=record,
+            notif_type=_get_type("Contact Person Changed"),
+            message=(
+                f'You are now the Contact person for "{record.title}", because the previous '
+                "Contact person's account was deleted."
+            ),
+        )
+    except Exception:
+        _log_failure("notify_contact_person_took_over", record=record, user=user)
+
+
 def notify_role_request(user, requested_role):
     """
     Broadcast to RDCO when a new role request is submitted.

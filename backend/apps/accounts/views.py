@@ -430,7 +430,8 @@ class InterestSuggestionsView(APIView):
 class UserListView(generics.ListAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAccountAdmin]
-    queryset           = User.objects.select_related("role").order_by("-date_joined")
+    # A deleted account leaves the Users page (ADR-051 §11, IR-785).
+    queryset           = User.objects.filter(deleted_at__isnull=True).select_related("role").order_by("-date_joined")
     # The default SearchFilter matches nothing until a view names its fields,
     # so the Users page's search box listed everyone (IR-478).
     search_fields      = ["email", "first_name", "last_name"]
@@ -460,7 +461,7 @@ class AdviserListView(generics.ListAPIView):
 class UserDetailView(generics.RetrieveUpdateAPIView):
     serializer_class   = UserSerializer
     permission_classes = [IsAuthenticated, IsAccountAdmin]
-    queryset           = User.objects.all()
+    queryset           = User.objects.filter(deleted_at__isnull=True)
 
     def update(self, request, *args, **kwargs):
         return _refuse_system_admin(self.get_object()) or super().update(request, *args, **kwargs)
@@ -609,7 +610,7 @@ class LockedUsersView(generics.ListAPIView):
         except ImportError:
             pass   # axes not installed — fall back to manual locks only
 
-        return User.objects.filter(q).select_related("role").distinct()
+        return User.objects.filter(q, deleted_at__isnull=True).select_related("role").distinct()
 
 
 class UnlockUserView(APIView):
@@ -805,3 +806,92 @@ class SystemSettingView(APIView):
                 setting.updated_by = request.user
                 setting.save()
         return Response(SystemSettingSerializer(setting).data)
+
+
+# ---- Account deletion (ADR-051 §8-§12, IR-785) ----------------------------
+
+def _deletion_refused(refused):
+    body = {"detail": refused.detail}
+    if refused.blockers:
+        body["blockers"] = [b.as_dict() for b in refused.blockers]
+    return Response(body, status=refused.status)
+
+
+class MyDeletionRequestView(APIView):
+    """
+    GET    /users/me/deletion-request/  the caller's latest request, or null
+    POST   /users/me/deletion-request/  ask for the caller's account to be deleted
+    DELETE /users/me/deletion-request/  cancel the pending one
+
+    Only ever the caller's own account, so there is no object to look up.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import AccountDeletionRequest
+        from .serializers import MyDeletionRequestSerializer
+
+        latest = AccountDeletionRequest.objects.filter(user=request.user).order_by("-created_at", "-pk").first()
+        return Response({"request": MyDeletionRequestSerializer(latest).data if latest else None})
+
+    def post(self, request):
+        from .deletion import service
+        from .serializers import MyDeletionRequestSerializer
+
+        try:
+            made = service.request_deletion(request.user)
+        except service.Refused as refused:
+            return _deletion_refused(refused)
+        return Response({"request": MyDeletionRequestSerializer(made).data}, status=status.HTTP_201_CREATED)
+
+    def delete(self, request):
+        from .deletion import service
+        from .serializers import MyDeletionRequestSerializer
+
+        try:
+            cancelled = service.cancel_deletion(request.user)
+        except service.Refused as refused:
+            return _deletion_refused(refused)
+        return Response({"request": MyDeletionRequestSerializer(cancelled).data})
+
+
+class AccountDeletionRequestListView(generics.ListAPIView):
+    """GET /users/deletion-requests/ -- pending requests, each with its blockers. System Admin only."""
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
+    pagination_class   = LargeResultsPagination
+
+    def get_serializer_class(self):
+        from .serializers import AccountDeletionRequestSerializer
+        return AccountDeletionRequestSerializer
+
+    def get_queryset(self):
+        from .models import AccountDeletionRequest
+        return (
+            AccountDeletionRequest.objects.filter(status=RequestStatus.PENDING)
+            .select_related("user", "user__role").order_by("created_at", "pk")
+        )
+
+
+class AccountDeletionDecisionView(APIView):
+    """
+    POST /users/deletion-requests/<id>/confirm/
+    POST /users/deletion-requests/<id>/reject/  {"reason": "..."}
+
+    System Admin only, never on their own request. A request no longer pending
+    gets 409, and confirmation is refused with its blockers while any remain.
+    """
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
+    action = None
+
+    def post(self, request, pk):
+        from .deletion import service
+        from .serializers import AccountDeletionRequestSerializer
+
+        try:
+            if self.action == "confirm":
+                decided = service.confirm_deletion(pk, request.user)
+            else:
+                decided = service.reject_deletion(pk, request.user, request.data.get("reason"))
+        except service.Refused as refused:
+            return _deletion_refused(refused)
+        return Response(AccountDeletionRequestSerializer(decided, context={"request": request}).data)
