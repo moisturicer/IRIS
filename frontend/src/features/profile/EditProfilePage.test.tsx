@@ -20,7 +20,7 @@ import EditProfilePage from "./EditProfilePage";
 const baseUser = {
   id: 7, email: "ana@cit.edu", first_name: "Ana", middle_initial: "", last_name: "Reyes",
   role_name: "Student", college_name: "CCS", department_name: "", course_name: "",
-  bio: "", research_interests: [] as string[], orcid: null as string | null, photo_url: null as string | null,
+  bio: "", research_interests: [] as string[], photo_url: null as string | null,
 };
 
 function signIn(overrides: Partial<typeof baseUser> = {}) {
@@ -109,19 +109,6 @@ describe("research interests", () => {
   });
 });
 
-describe("ORCID iD", () => {
-  it("checks the iD as you type and will not save a bad one", async () => {
-    const user = userEvent.setup();
-    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
-
-    await user.type(screen.getByLabelText("ORCID iD"), "0000-0002-1825-0098");
-
-    expect(screen.getByLabelText("ORCID iD")).toHaveAttribute("aria-invalid", "true");
-    expect(screen.getByLabelText("ORCID iD")).toHaveAccessibleDescription(/doesn't check out/);
-    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
-  });
-});
-
 describe("saving", () => {
   it("sends the profile fields and returns to the Profile", async () => {
     const user = userEvent.setup();
@@ -131,28 +118,13 @@ describe("saving", () => {
 
     await user.type(screen.getByLabelText("Bio"), "Floods.");
     await user.type(screen.getByLabelText("Research interests"), "GIS{Enter}");
-    await user.type(screen.getByLabelText("ORCID iD"), "0000-0002-1825-0097");
     await expectNoBlockingA11yViolations(container);
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(profileApi.updateFields).toHaveBeenCalledWith({
-      bio: "Floods.", research_interests: ["GIS"], orcid: "0000-0002-1825-0097",
-    });
+    expect(profileApi.updateFields).toHaveBeenCalledWith({ bio: "Floods.", research_interests: ["GIS"] });
     expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Profile saved.");
     expect(useAuthStore.getState().user?.bio).toBe("Floods.");
-  });
-
-  it("clears an emptied ORCID iD as null", async () => {
-    const user = userEvent.setup();
-    signIn({ orcid: "0000-0002-1825-0097" });
-    vi.spyOn(profileApi, "updateFields").mockResolvedValue({ data: baseUser } as never);
-    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
-
-    await user.clear(screen.getByLabelText("ORCID iD"));
-    await user.click(screen.getByRole("button", { name: "Save" }));
-
-    expect(profileApi.updateFields).toHaveBeenCalledWith({ bio: "", research_interests: [], orcid: null });
   });
 
   it("shows the server's message when it refuses a field", async () => {
@@ -202,7 +174,7 @@ describe("name", () => {
     await user.type(screen.getByLabelText("First name"), "Anna");
     await user.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(authApi.updateMe).toHaveBeenCalledWith({ first_name: "Anna", middle_initial: "", last_name: "Reyes" });
+    expect(authApi.updateMe).toHaveBeenCalledWith({ first_name: "Anna", last_name: "Reyes" });
     expect(await screen.findByRole("heading", { name: "Your profile" })).toBeVisible();
     expect(useAuthStore.getState().user?.first_name).toBe("Anna");
   });
@@ -225,6 +197,25 @@ describe("name", () => {
 
     expect(screen.getByLabelText("Affiliation")).toHaveAttribute("readonly");
     expect(screen.getByLabelText("Affiliation")).toHaveValue("CCS · BSCS");
+  });
+});
+
+describe("what is not edited here", () => {
+  it("has no middle initial or ORCID iD field, and leaves a recorded middle initial alone", async () => {
+    const user = userEvent.setup();
+    signIn({ middle_initial: "L" });
+    vi.spyOn(authApi, "updateMe").mockResolvedValue({ data: { ...baseUser, first_name: "Anna" } } as never);
+    renderScreen(<EditProfilePage />, { route: "/profile/edit" });
+
+    expect(screen.queryByLabelText("M.I.")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("ORCID iD")).not.toBeInTheDocument();
+
+    await user.clear(screen.getByLabelText("First name"));
+    await user.type(screen.getByLabelText("First name"), "Anna");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    // The initial is not sent, so saving the name cannot change or clear it.
+    expect(authApi.updateMe).toHaveBeenCalledWith({ first_name: "Anna", last_name: "Reyes" });
   });
 });
 
