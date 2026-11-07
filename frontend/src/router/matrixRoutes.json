@@ -13,6 +13,7 @@
   "/opportunities",
   "/password/forgot",
   "/password/reset",
+  "/people/:id",
   "/profile",
   "/profile/edit",
   "/rdco/delete-requests",

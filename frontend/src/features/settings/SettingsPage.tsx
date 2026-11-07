@@ -14,8 +14,8 @@ import { ROLE_CAPABILITIES } from "./roleCapabilities";
 import { Panel } from "./settingsParts";
 
 /**
- * Settings: the account. Who you are on IRIS (name, photo, bio, interests,
- * ORCID iD) is the Profile, a page of its own since IR-933.
+ * Settings: the account. Who you are on IRIS (name, photo, bio, interests)
+ * is the Profile, a page of its own since IR-933.
  *
  * Three sections, not the six the mockup drew. The two that are missing were cut
  * because nothing backs them, and shipping a panel that cannot persist is the

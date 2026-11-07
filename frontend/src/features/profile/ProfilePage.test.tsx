@@ -16,7 +16,7 @@ const baseUser = {
   id: 7, email: "ana@cit.edu", first_name: "Ana", middle_initial: "L", last_name: "Reyes",
   role_name: "Student", college_name: "College of Computer Studies", department_name: "",
   course_name: "BS Computer Science",
-  bio: "", research_interests: [] as string[], orcid: null as string | null, photo_url: null as string | null,
+  bio: "", research_interests: [] as string[], photo_url: null as string | null,
 };
 
 function signIn(overrides: Partial<typeof baseUser> = {}) {
@@ -49,11 +49,10 @@ describe("the profile", () => {
     expect(screen.getByText("College of Computer Studies · BS Computer Science")).toBeVisible();
   });
 
-  it("shows the bio, the interests and the ORCID iD as a link", () => {
+  it("shows the bio and the interests", () => {
     signIn({
       bio: "Coastal flood mapping.",
       research_interests: ["GIS", "Remote sensing"],
-      orcid: "0000-0002-1825-0097",
     });
     renderScreen(<ProfilePage />, { route: "/profile" });
 
@@ -61,8 +60,6 @@ describe("the profile", () => {
     const interests = screen.getByRole("list", { name: "Research interests" });
     expect(interests).toHaveTextContent("GIS");
     expect(interests).toHaveTextContent("Remote sensing");
-    expect(screen.getByRole("link", { name: "0000-0002-1825-0097" }))
-      .toHaveAttribute("href", "https://orcid.org/0000-0002-1825-0097");
   });
 
   it("leaves out what was left empty, with no placeholder", () => {
@@ -70,7 +67,6 @@ describe("the profile", () => {
 
     expect(screen.queryByRole("heading", { name: "About" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Research interests" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/ORCID/)).not.toBeInTheDocument();
   });
 
   it("never prints the account's email address", () => {
@@ -114,7 +110,7 @@ describe("editing", () => {
   });
 
   it("has no blocking accessibility violations", async () => {
-    signIn({ bio: "Floods.", research_interests: ["GIS"], orcid: "0000-0002-1825-0097" });
+    signIn({ bio: "Floods.", research_interests: ["GIS"] });
     const { container } = renderScreen(<ProfilePage />, { route: "/profile" });
 
     await expectNoBlockingA11yViolations(container);

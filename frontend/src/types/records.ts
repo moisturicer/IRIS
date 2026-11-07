@@ -17,6 +17,13 @@ export interface RecordOwner {
   email:      string;
   full_name:  string;
   is_primary: boolean;
+  /**
+   * Draft IR-696: true only when this person's Profile can be opened from a
+   * published paper's page. Absent or false means the name is plain text: a
+   * suspended or former user's Profile answers 404, and a link there would land
+   * on not-found. Never inferred from the id.
+   */
+  has_profile?: boolean;
 }
 
 export interface Author {
@@ -393,6 +400,8 @@ export interface RecordDetail extends RecordListItem {
   adviser:         number | null;
   /** The adviser's name, or their email when none is on file; null with no adviser (IR-472). */
   adviser_name:    string | null;
+  /** Draft IR-696: whether the Adviser's Profile can be opened; see `RecordOwner.has_profile`. */
+  adviser_has_profile?: boolean;
   added_by:        number | null;
   /** ADR-018: what the submitter requested; RDCO confirms at intake. */
   requires_ethics_review: boolean;
