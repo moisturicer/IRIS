@@ -216,6 +216,10 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
     if not deciding:
         closing = set()
 
+    # Parties whose open revision request the owner is already told about (IR-875):
+    # their seat stays open until a decision, so the card says what it waits for.
+    revision_asked = {r["party"] for r in revision.get(ResubmissionRequestState.OPEN.value) or []}
+
     for assignment in facts["assignments"]:
         party, label = assignment["party"], assignment["label"]
         if any(s["reviewer"] == viewer for s in assignment["seats"]):
@@ -231,8 +235,10 @@ def build_readiness(*, user, readable: bool, in_review: bool, decision: dict,
                 action=_action("claim", assignment["id"]) if claimable else _action("show_party", party),
             ))
             continue
+        waiting = " is reviewing, waiting for your revision." if facts.get("owner") and party in revision_asked \
+            else " is reviewing."
         items.append(_item(
-            "party_reviewing", INFO, f"{label} is reviewing.{_closing_suffix(party, closing)}", party=party,
+            "party_reviewing", INFO, f"{label}{waiting}{_closing_suffix(party, closing)}", party=party,
             actor_name=", ".join(s["name"] for s in assignment["seats"] if s["name"]) or None,
             since=assignment["opened_at"], action=_action("show_party", party),
         ))

@@ -187,6 +187,15 @@ class PartiesReviewingAndUnclaimedPoolsTests(ReadinessTestBase):
         # Neither is a blocker: a Decision would close them, not be refused by them.
         self.assertEqual(readiness["verdict"], "ready")
 
+    def test_the_owner_is_told_a_reviewer_waits_for_their_revision(self):
+        # IR-875: the seat stays open after a revision request, so the owner's
+        # card says what it waits for. Other viewers keep the plain wording.
+        record, _request = self.rdco_with_ierc_asking()
+        [owner_card] = self.of_kind(self.readiness(record, self.owner), "party_reviewing")
+        self.assertEqual(owner_card["label"], "IERC is reviewing, waiting for your revision.")
+        [rdco_card] = self.of_kind(self.readiness(record, self.rdco), "party_reviewing")
+        self.assertEqual(rdco_card["label"], "IERC is reviewing.")
+
     def test_claim_is_offered_only_to_an_ierc_member(self):
         # Beside `test_an_unclaimed_pool_is_information_with_claim_for_its_members`,
         # which has one office: here two run in parallel, and only IERC's own
