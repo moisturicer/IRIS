@@ -34,7 +34,10 @@ export interface ProfilePaper {
   classification_name: string;
   record_type_name:    string;
   publication_year:    number | null;
-  /** Distinct accounts that opened it (the glossary's View). Never summed. */
+  /**
+   * The paper's `access_count`: it rises on every opening, so it is not a count
+   * of distinct accounts (that counter is IR-369's, not built). Never summed.
+   */
   views:               number;
 }
 

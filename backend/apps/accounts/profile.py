@@ -16,6 +16,7 @@ carry a GPS position) and an animated image all stop at that step.
 from __future__ import annotations
 
 import io
+from typing import NamedTuple
 
 from django.core.files.base import ContentFile
 from django.db import IntegrityError, transaction
@@ -51,6 +52,44 @@ CROP_OUTSIDE = "The crop must fit inside the image."
 # Not in the contract's list; added for cases it did not foresee.
 PHOTO_TOO_MANY_PIXELS = "The photo is too large in pixels. Upload one up to 25 megapixels."
 CROP_INCOMPLETE = "Send crop_x, crop_y and crop_size together, or none of them."
+
+
+# -- Affiliation ---------------------------------------------------------------
+
+class Affiliation(NamedTuple):
+    college: str
+    department: str
+    course: str
+
+
+def affiliation(user: User) -> Affiliation:
+    """
+    The college, department and course names for `user`, each `""` when unknown.
+
+    A student's college and department are not stored on the student: they are
+    derived through `StudentProfile.course -> Department -> College`, while an
+    adviser carries college and department directly. Read-only everywhere; the
+    one place that knows the two shapes, shared by the signed-in user's payload
+    and a person's public profile (IR-696).
+    """
+    adviser = getattr(user, "adviser_profile", None)
+    student = getattr(user, "student_profile", None)
+    course = student.course if student and student.course else None
+    course_department = course.department if course and course.department else None
+
+    if adviser and adviser.college:
+        college = adviser.college
+    else:
+        college = course_department.college if course_department else None
+    if adviser and adviser.department:
+        department = adviser.department
+    else:
+        department = course_department
+    return Affiliation(
+        college=college.name if college else "",
+        department=department.name if department else "",
+        course=course.name if course else "",
+    )
 
 
 # -- Interests ---------------------------------------------------------------

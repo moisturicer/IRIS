@@ -89,6 +89,10 @@ class AuditEvent(models.Model):
     PASSWORD_RESET_COMPLETED     = "PASSWORD_RESET_COMPLETED"
     EMAIL_VERIFICATION_COMPLETED = "EMAIL_VERIFICATION_COMPLETED"
 
+    # A person's answer to the data notice (ADR-054, IR-789). Metadata:
+    # `notice_version`, `ai_consent`, and the `previous_*` pair (None when it was
+    # their first answer). Written by `apps.accounts.notice.answer_notice`.
+    NOTICE_ANSWERED = "NOTICE_ANSWERED"
     # A person downloaded their own data (ADR-051 decision 13, IR-786). Metadata
     # is `sections` and `format` only: never a byte of what was downloaded.
     PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
@@ -156,6 +160,7 @@ class AuditEvent(models.Model):
         (RECOVERY_EMAIL_FAILED,        "Recovery Email Failed"),
         (PASSWORD_RESET_COMPLETED,     "Password Reset Completed"),
         (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
+        (NOTICE_ANSWERED,              "Data Notice Answered"),
         (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
     ]
 

@@ -152,6 +152,14 @@ The Adviser's entry seat writes no seat event: `SUBMITTED` is that act.
 
 There is no backfill: answers saved before this have no row. The Record holds only who gave the latest answer or set the current date, and when.
 
+### A person's answer to the data notice (ADR-054, IR-789)
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `NOTICE_ANSWERED` | A person answers the current data notice, at registration or after a new one is published. `user` is the person. Each answer writes a row, including a later answer to the same version. `seed_demo` writes one for each account it answers for, with a Yes | `notice_version`, `ai_consent` (the Yes or No on AI), `previous_notice_version` and `previous_ai_consent` (`null` on a first answer) |
+
+It has no `record`. There is no backfill: accounts that existed before IR-789 start unanswered and write their first row at next sign-in.
+
 ### Withdrawal
 
 | Type | Written when | `metadata` |

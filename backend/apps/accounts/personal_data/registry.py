@@ -34,6 +34,7 @@ INCLUDED: dict[str, str] = {
     "accounts.AdviserProfile": "account",
     "accounts.RoleRequest": "account",
     "accounts.UserInterest": "account",
+    "accounts.NoticeAnswer": "consent",
     "accounts.UserSession": "sessions",
     "records.RecordOwner": "papers_owned",
     "records.Record": "papers_owned",
@@ -93,6 +94,11 @@ EXCLUDED: dict[str, str] = {
     "publication.ManuscriptWork": (
         "A download grant for a paper's file, holding a grant token: a credential, and the "
         "file itself is the paper."
+    ),
+    "accounts.DataNotice": (
+        "A published version of the data notice: one text for the whole system, the same for "
+        "everyone. The person appears only as its publisher. What a person answered to each "
+        "version is exported as their consent history."
     ),
     "accounts.SystemSetting": (
         "System configuration. The person appears only as its last editor, which is a fact "

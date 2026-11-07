@@ -327,10 +327,22 @@ class ExportContentTests(APITestCase):
         self.assertEqual(acts["reviews"][0]["comment"], "Looks sound.")
         self.assertEqual(acts["review_comments"][0]["body"], "One question on chapter 2.")
 
-    def test_what_exists_of_consent_says_it_has_no_history(self):
+    def test_consent_history_is_every_notice_answer_the_person_gave(self):
+        from apps.accounts.models import DataNotice
+        from apps.accounts.notice import answer_notice
+
+        number = DataNotice.current().number
+        answer_notice(self.me, notice_version=number, ai_consent=False)
+        answer_notice(self.me, notice_version=number, ai_consent=True)
+        answer_notice(self.stranger, notice_version=number, ai_consent=True)
         consent = self.export()["consent"]
         self.assertTrue(consent["signup_consent_given"])
-        self.assertEqual(consent["history"], "not_recorded")
+        self.assertEqual(consent["answered_notice_version"], number)
+        self.assertIs(consent["ai_consent"], True)
+        self.assertEqual(
+            [(h["notice_version"], h["ai_consent"], h["agreed_data_privacy_agreement"]) for h in consent["history"]],
+            [(number, False, True), (number, True, True)],
+        )
 
     def test_a_paper_consent_stamp_the_person_gave(self):
         from django.utils import timezone

@@ -106,6 +106,71 @@ class SeedDemoDeadlineTests(TestCase):
         self.assertFalse(Turnaround.objects.exists())
 
 
+class SeedDemoAnswersTheNoticeTests(TestCase):
+    """ADR-054 decision 18, IR-789: test data answers Yes.
+
+    Run with the suite's "new users have answered" default switched off, or
+    the default would answer first and these would pass whatever `seed_demo` did.
+    """
+
+    def test_every_account_it_makes_answers_yes_with_a_real_answer(self):
+        from apps.accounts.models import DataNotice, NoticeAnswer
+        from apps.accounts.tests import real_accounts_start_unanswered
+        from apps.audit.models import AuditEvent
+
+        with real_accounts_start_unanswered():
+            seed()
+
+        current = DataNotice.current().number
+        emails = (
+            [email for email, *_ in ROLE_ACCOUNTS]
+            + [email for email, *_ in COORDINATOR_ACCOUNTS] + [ADMIN_EMAIL]
+        )
+        for email in emails:
+            with self.subTest(email=email):
+                user = User.objects.get(email=email)
+                self.assertEqual(user.answered_notice_version, current)
+                self.assertIs(user.ai_consent, True)
+                self.assertEqual(NoticeAnswer.objects.filter(user=user, ai_consent=True).count(), 1)
+                self.assertTrue(AuditEvent.objects.filter(
+                    event_type=AuditEvent.NOTICE_ANSWERED, user=user).exists())
+        # The catalogue owners it makes are accounts too.
+        everyone = User.objects.exclude(email__in=emails)
+        self.assertTrue(everyone.exists())
+        self.assertFalse(everyone.filter(answered_notice_version__isnull=True).exists())
+        self.assertFalse(everyone.exclude(ai_consent=True).exists())
+
+    def test_running_it_again_adds_no_answers_and_restores_a_yes_changed_to_no(self):
+        from apps.accounts.models import NoticeAnswer
+        from apps.accounts.notice import answer_notice
+        from apps.accounts.tests import real_accounts_start_unanswered
+
+        with real_accounts_start_unanswered():
+            seed(accounts_only=True)
+            email = ROLE_ACCOUNTS[0][0]
+            before = NoticeAnswer.objects.count()
+            seed(accounts_only=True)
+            self.assertEqual(NoticeAnswer.objects.count(), before)
+
+            user = User.objects.get(email=email)
+            answer_notice(user, notice_version=user.answered_notice_version, ai_consent=False)
+            seed(accounts_only=True)
+
+        self.assertIs(User.objects.get(email=email).ai_consent, True)
+
+    def test_a_newer_notice_is_answered_on_the_next_run(self):
+        from apps.accounts.models import DataNotice
+        from apps.accounts.tests import real_accounts_start_unanswered
+
+        with real_accounts_start_unanswered():
+            seed(accounts_only=True)
+            newer = DataNotice.objects.create(number=DataNotice.current().number + 1, title="N",
+                                              sections=[])
+            seed(accounts_only=True)
+
+        self.assertEqual(User.objects.get(email=ADMIN_EMAIL).answered_notice_version, newer.number)
+
+
 class SeedDemoAccountTests(TestCase):
 
     def test_it_seeds_all_seven_accounts(self):

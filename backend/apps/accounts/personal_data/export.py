@@ -555,11 +555,12 @@ def workflow_acts(user) -> dict:
 def consent(user) -> dict:
     """What IRIS holds about the person's consent today.
 
-    Signup consent is one yes/no, and the only record of a paper's consent is
-    the stamp on the paper itself. Neither has a version or a withdrawal yet, so
-    there is no history to give: `history` says so rather than inventing one.
-    A later change adds the real history here (ADR-051 decision 14).
+    The notice answers (ADR-054, IR-789) are append-only, one row per answer to
+    one notice version, so `history` is every answer the person has given. The
+    signup yes/no and each paper's stamp are the older, unversioned records and
+    stay as they were.
     """
+    from apps.accounts.models import NoticeAnswer
     from apps.records.models import Record
 
     stamps = (Record.objects.with_deleted().filter(dpa_accepted_by=user)
@@ -567,7 +568,18 @@ def consent(user) -> dict:
     return {
         "signup_consent_given": user.consent_given,
         "paper_consents": [{"record_id": pk, "accepted_at": stamp} for pk, stamp in stamps],
-        "history": "not_recorded",
+        "answered_notice_version": user.answered_notice_version,
+        "ai_consent": user.ai_consent,
+        "notice_answered_at": user.notice_answered_at,
+        "history": [
+            {
+                "notice_version": row.notice.number,
+                "agreed_data_privacy_agreement": row.agreed_dpa,
+                "ai_consent": row.ai_consent,
+                "answered_at": row.answered_at,
+            }
+            for row in NoticeAnswer.objects.filter(user=user).select_related("notice").order_by("id")
+        ],
     }
 
 
