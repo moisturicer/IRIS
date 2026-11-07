@@ -168,6 +168,7 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/records/interests/", { classifications: [], psced: [] });
       api.on("GET", "/records/", paginated([PAPER]));
       api.on("GET", "/library/saves/", { results: [] });
+      api.on("GET", "/library/feeds/", { results: [], limit: 10 });
     },
     heading: "Discover",
     primary: (p) => p.getByRole("button", { name: "Publish" }), primaryLabel: "Publish",
