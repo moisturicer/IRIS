@@ -25,10 +25,15 @@ from .scope import RunBinding
 
 NO_TRAINING = "no-training"
 PROXY_ORIGINS = frozenset({"imported_reference", "synthetic"})
-CONTROL_KEYS = frozenset({"status", "reason", "coverage", "error", "revision"})
+CONTROL_KEYS = frozenset({"status", "reason", "coverage", "error", "revision", "search"})
 CONTROL_VALUES = frozenset({"ok", "no_match", "partial", "unavailable", "tool_limit",
                             "invalid_arguments", "unknown_tool", "unknown_handle",
-                            "source_replaced", "unauthorized", "run_ended", "exceeds_context"})
+                            "source_replaced", "unauthorized", "run_ended", "exceeds_context",
+                            "invalid_argument", "unknown_filter_value", "ambiguous_filter_value"})
+#: How a combined search ran (IR-886): fixed names and outcomes, never content.
+SEARCH_SIGNALS = frozenset({"keyword", "semantic", "rerank"})
+SEARCH_VALUES = frozenset({"ok", "off", "unavailable", "provider_gated", "provider_failed",
+                           "embedding_space_changed", "withheld"})
 OPENROUTER = "https://openrouter.ai/api/v1"
 LUNA_FLOOR = "openai/gpt-6-luna:floor"
 
@@ -124,6 +129,11 @@ def _control_only(entry: ToolResult) -> bool:
         return body == {"withheld": "exceeds_context", "coverage": "none"}
     for name in ("status", "reason", "error", "withheld"):
         if name in body and body[name] not in CONTROL_VALUES:
+            return False
+    if "search" in body:
+        search = body["search"]
+        if (not isinstance(search, dict) or set(search) - SEARCH_SIGNALS
+                or any(value not in SEARCH_VALUES for value in search.values())):
             return False
     if "coverage" in body:
         coverage = body["coverage"]

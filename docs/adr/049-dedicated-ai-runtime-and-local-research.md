@@ -99,3 +99,18 @@ Current code retains its existing behavior until implementation and controlled c
 ## Amendment — 2026-11-05 (IR-889): development paid-research decision
 
 **Status: Accepted for development only. Decider: Jive Tyler I. Revalde.** The owner instructed an AI assistant in chat to record him as approver and implement the paid-research approval. The scoped decision and sequence are in [the development record](../evaluation/fixed-workflow-pilot/runtime-paid-research-approval.md). This answers the ownership question in the 2026-11-04 amendment; it does not assert that IR-791, IR-827 or the runtime's source-aware send guard have landed. Until those conditions are satisfied, Record evidence remains withheld. Production, a reader cutover and a larger campaign need separate approval.
+
+## Amendment — 2026-11-07 (IR-886): search by meaning and metadata
+
+**Status: Decisions given by Jive Tyler I. Revalde, owner of the AI runtime, to an AI assistant in chat on 2026-11-07, and recorded here at his direction.** They settle the four decisions IR-886 left open. The decisions above stand except where this says otherwise.
+
+1. **One search tool.** The `research-5` tool version offers one `search` that combines keyword and meaning-based results, with optional Area (classification), PSCED area, record type and completion-year filters validated as `count_records` validates them. There is no separate semantic tool.
+   - **Gain:** the model has no retrieval strategy to choose wrongly. **Cost:** it cannot run one signal alone.
+2. **Reranking is available behind a setting.** `RUNS_RERANK_MODEL` names a Voyage rerank model; empty means off. A rerank is admitted against the run's allowance like any provider attempt, and passage text is sent only when the send guard admits every candidate's source. Under the current guard that means only sources in an approved development proxy manifest, so in production no rerank is sent and the result says `withheld`.
+   - **Gain:** Django measured most of its retrieval gain here (proxy recall@10 0.712 to 0.885). **Cost:** one more paid operation per search, and no gain at all until the disclosure decision in the 2026-11-04 amendment allows Record text to reach the reranker.
+3. **On by default.** New AGENT runs are pinned to `research-5`, and search by meaning runs whenever a Voyage key and the AGENT admission profile are configured. **This departs from ADR-033's off-until-measured rule for the runtime, at the owner's direction.** The comparison against keyword-only search IR-886 asks for has **not been run**; it is recorded as outstanding, not as passed.
+   - **Gain:** readers get meaning-based search immediately. **Cost:** no evidence yet that it helps on the labelled question set, and a regression would reach readers before a measurement could show it.
+4. **Both vector reads, fused with keyword results by rank.** A paper-first read (the 20 nearest Records by Record vector, then their Passages) and a flat read (the nearest permitted Passages anywhere) are merged with the keyword list by rank position with no weights, as Django's `fuse_by_rank` does. Both reads reuse one query vector.
+   - **Gain:** a Passage whose paper's abstract does not resemble the question can still be found. **Cost:** one more vector read per search, and flat and paper-first results compete for the same slots, so the net gain is unmeasured.
+
+Both vector reads order the rows of the policy-filtered `research_vectors` / `research_record_vectors` functions, so they are exact scans: no HNSW index, and so no `ef_search` depth, can cut a filtered read short. IR-886's tests record the `EXPLAIN` evidence. Runs pinned to `research-1` through `research-4` keep their tools.

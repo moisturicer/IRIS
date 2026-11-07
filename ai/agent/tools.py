@@ -20,7 +20,9 @@ import asyncpg
 
 from ai.agent.protocol import ToolCall, ToolSpec
 from ai.research import metadata
-from ai.research.tools import NO_MATCH, OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence
+from ai.research.tools import (
+    NO_MATCH, OK, PARTIAL, UNAVAILABLE, Count, PassageRef, Reading, ToolResult as Evidence, valid_filters,
+)
 
 log = logging.getLogger(__name__)
 
@@ -85,6 +87,20 @@ COUNT_RECORDS = ToolSpec(
         "year_from": _YEAR, "year_to": _YEAR, "is_ip": {"type": "boolean"},
         "group_by": {"type": "string", "enum": list(metadata.GROUPS)},
     }))
+
+#: research-5's search: keyword and meaning together, narrowed by metadata (IR-886).
+HYBRID_SEARCH = ToolSpec(
+    "search",
+    "Search the readable papers' passages by keyword and by meaning, optionally narrowed by Area "
+    "(classification), PSCED area, record type or completion years. Returns a sample of matching "
+    "passages, never all of them, and says when meaning search was unavailable.",
+    _object({
+        "query": {"type": "string"}, "limit": {"type": "integer", "minimum": 1, "maximum": 20},
+        "classification": _NAME, "psced": _NAME, "record_type": _NAME,
+        "year_from": _YEAR, "year_to": _YEAR,
+    }, ["query"]))
+#: Search signal outcomes the model is shown; any other reason is shown as unavailable.
+SIGNALS = ("ok", "off", "provider_gated", "provider_failed", "embedding_space_changed", "withheld")
 
 READ_MANUSCRIPT = ToolSpec(
     "read_manuscript",
@@ -222,6 +238,8 @@ class Investigation:
     manuscripts: bool = False
     #: Offer recover_turn (the research-4 tool version, IR-735).
     recovery: bool = False
+    #: Search by keyword and meaning with metadata filters (the research-5 tool version, IR-886).
+    hybrid: bool = False
     #: Original Turns this run recovered: ordinal -> answer, whose numbers were checked when delivered.
     recovered: dict[int, str] = field(default_factory=dict)
     #: Passage handle -> what was shown for it.
@@ -259,7 +277,8 @@ class Investigation:
 
     def specs(self) -> tuple[ToolSpec, ...]:
         extra = (ASK_CLARIFICATION,) if self.clarify else ()
-        return (*RESEARCH, *(METADATA if self.metadata else ()), *(MANUSCRIPTS if self.manuscripts else ()),
+        research = (HYBRID_SEARCH, *RESEARCH[1:]) if self.hybrid else RESEARCH
+        return (*research, *(METADATA if self.metadata else ()), *(MANUSCRIPTS if self.manuscripts else ()),
                 *(RECOVERY if self.recovery else ()),
                 UPDATE_PLAN, UPDATE_FOCUS, *extra)
 
@@ -373,6 +392,14 @@ class Investigation:
         return trimmed
 
     async def _research(self, spec: ToolSpec, args: dict) -> Evidence:
+        if spec is HYBRID_SEARCH:
+            if not _str(args["query"]) or ("limit" in args and not _int(args["limit"])):
+                raise InvalidArguments
+            filters = {k: v for k, v in args.items() if k not in ("query", "limit")}
+            if not valid_filters(filters):
+                raise InvalidArguments
+            self.searched = True
+            return await self.research.hybrid_search(args["query"], args.get("limit", 10), filters)
         if spec is SEARCH:
             if not _str(args["query"]) or ("limit" in args and not _int(args["limit"])):
                 raise InvalidArguments
@@ -480,6 +507,9 @@ class Investigation:
             body["sections"] = [{"section": s.section, "heading": s.heading, "level": s.level,
                                  "first_page": s.first_page, "last_page": s.last_page}
                                 for s in result.sections]
+        if result.signals:
+            # How the search ran, so a keyword-only result is never read as a meaning search (IR-886).
+            body["search"] = {name: value if value in SIGNALS else UNAVAILABLE for name, value in result.signals}
         coverage = result.coverage
         body["coverage"] = {"returned": coverage.returned, "total": coverage.total,
                             "truncated": coverage.truncated}
