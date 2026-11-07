@@ -24,7 +24,7 @@ def remove(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("accounts", "0019_profile_photo_bio_interests"),
+        ("accounts", "0019_data_notice_and_answers"),
     ]
 
     operations = [
