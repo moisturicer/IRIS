@@ -36,7 +36,7 @@ from apps.records.models import (
     Author, DeleteRequest, DiscoveryDismissal, DownloadRequest, Record, RecordOwner, RecordType,
 )
 from apps.reviews.models import Review, ReviewComment
-from core.enums import PipelineStatus, ReadingStatus, RequestStatus, RoleName
+from core.enums import Party, PipelineStatus, ReadingStatus, RequestStatus, ReviewVerdict, RoleName
 
 URL = "/api/v1/users/me/data/"
 
@@ -243,6 +243,38 @@ class ExportContentTests(APITestCase):
         self.assertEqual(saved[0]["record_id"], published.pk)
         self.assertEqual(saved[0]["title"], "Public work")
         self.assertEqual(saved[0]["reading_status"], ReadingStatus.READING)
+
+    def test_the_optional_profile_is_in_the_account_section(self):
+        from apps.accounts import profile
+
+        self.me.bio = "I study mangroves."
+        self.me.save(update_fields=["bio"])
+        profile.set_interests(self.me, ["Ecology", "Remote sensing"])
+        account = self.export()["account"]
+        self.assertEqual(account["bio"], "I study mangroves.")
+        self.assertEqual(account["research_interests"], ["Ecology", "Remote sensing"])
+        self.assertFalse(account["has_photo"])
+
+    def test_saved_feeds_are_the_persons_own(self):
+        from apps.library.models import SavedFeed
+
+        SavedFeed.objects.create(owner=self.me, name="Water", query={"q": "water"})
+        SavedFeed.objects.create(owner=self.stranger, name="Not mine", query={"q": "x"})
+        feeds = self.export()["saved_feeds"]
+        self.assertEqual([(f["name"], f["query"]) for f in feeds], [("Water", {"q": "water"})])
+
+    def test_a_finished_review_round_is_in_the_acts_of_its_actor_only(self):
+        from apps.reviews.models import ReviewRound
+
+        paper = _paper("Reviewed", self.stranger, status=PipelineStatus.PUBLISHED)
+        ReviewRound.objects.create(
+            record=paper, actor=self.me, party=Party.ADVISER, verdict=ReviewVerdict.COMMENT_ONLY, summary="Looks fine.",
+        )
+        mine = self.export()["workflow_acts"]["review_rounds"]
+        self.assertEqual([r["summary"] for r in mine], ["Looks fine."])
+        self.client.force_authenticate(self.stranger)
+        theirs = self.client.get(URL).json()["workflow_acts"]["review_rounds"]
+        self.assertEqual(theirs, [])
 
     def test_a_saved_paper_they_can_no_longer_read_is_listed_without_its_title(self):
         hidden = _paper("Someone's draft", self.stranger)

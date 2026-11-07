@@ -33,6 +33,7 @@ INCLUDED: dict[str, str] = {
     "accounts.StudentProfile": "account",
     "accounts.AdviserProfile": "account",
     "accounts.RoleRequest": "account",
+    "accounts.UserInterest": "account",
     "accounts.UserSession": "sessions",
     "records.RecordOwner": "papers_owned",
     "records.Record": "papers_owned",
@@ -46,6 +47,7 @@ INCLUDED: dict[str, str] = {
     "documents.RecordFile": "papers_owned",
     "documents.RecordUpload": "papers_owned",
     "library.SavedRecord": "saved_papers",
+    "library.SavedFeed": "saved_feeds",
     "records.DiscoveryInterests": "discovery",
     "records.DiscoveryDismissal": "discovery",
     "ai.Conversation": "conversations",
@@ -58,6 +60,7 @@ INCLUDED: dict[str, str] = {
     "opportunities.Opportunity": "opportunities_posted",
     "reviews.Review": "workflow_acts",
     "reviews.ReviewComment": "workflow_acts",
+    "reviews.ReviewRound": "workflow_acts",
     "reviews.RecordClearance": "workflow_acts",
     "reviews.ResubmissionRequest": "workflow_acts",
     "reviews.RoutingEvent": "workflow_acts",
@@ -138,6 +141,13 @@ EXCLUDED: dict[str, str] = {
     "reviews.ReviewerSeat": _WORKFLOW_MECHANICS,
     "reviews.Extension": _WORKFLOW_MECHANICS,
     "reviews.DeadlineMoment": _WORKFLOW_MECHANICS,
+    "reviews.ReviewThreadEvent": (
+        "The change history of a review thread (severity, resolved, reopened, answered). The "
+        "person appears only as the actor; the thread text they wrote is exported with their "
+        "review comments."
+    ),
+    "records.ReviewText": _PAPER_DERIVED,
+    "records.ReviewTextSection": _PAPER_DERIVED,
 }
 
 

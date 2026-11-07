@@ -75,6 +75,14 @@ def account(user) -> dict:
         "is_active": user.is_active,
         "date_joined": user.date_joined,
         "signup_consent_given": user.consent_given,
+        # The optional profile (IR-695). The photo is a file served only through
+        # Django, so the download says whether there is one, not its bytes.
+        "bio": user.bio,
+        "has_photo": bool(user.photo),
+        "research_interests": [
+            row.interest.name
+            for row in user.interest_links.select_related("interest").order_by("position")
+        ],
         "student_profile": None,
         "adviser_profile": None,
     }
@@ -199,7 +207,7 @@ def papers_owned(user) -> list[dict]:
             "last_resubmitted_at": record.last_resubmitted_at,
             "embargo_state": record.embargo_state.value,
             "embargoed_until": record.embargoed_until,
-            "embargo_answered_at": record.embargo_answered_at,
+            "embargo_date_set_at": record.embargo_date_set_at,
             "dpa_accepted_at": record.dpa_accepted_at,
             "manuscript_filename": record.manuscript_filename,
             "created_at": record.created_at,
@@ -263,6 +271,16 @@ def saved_papers(user) -> list[dict]:
             "updated_at": row.updated_at,
         }
         for row in rows
+    ]
+
+
+def saved_feeds(user) -> list[dict]:
+    """The person's private custom feeds: the name they gave and the filters they saved."""
+    from apps.library.models import SavedFeed
+
+    return [
+        {"name": row.name, "query": row.query, "created_at": row.created_at, "updated_at": row.updated_at}
+        for row in SavedFeed.objects.filter(owner=user).order_by("id")
     ]
 
 
@@ -459,13 +477,16 @@ def workflow_acts(user) -> dict:
     here, and nor are the decisions others took on the same papers.
     """
     from apps.documents.models import DocumentRequest, UploadReview
-    from apps.reviews.models import RecordClearance, ResubmissionRequest, Review, ReviewComment, RoutingEvent
+    from apps.reviews.models import (
+        RecordClearance, ResubmissionRequest, Review, ReviewComment, ReviewRound, RoutingEvent,
+    )
 
     reviews = list(Review.objects.filter(reviewed_by=user).order_by("id"))
     comments = list(ReviewComment.objects.filter(author=user).order_by("id"))
     clearances = list(RecordClearance.objects.filter(reviewed_by=user).order_by("id"))
     revisions = list(ResubmissionRequest.objects.filter(requested_by=user).order_by("id"))
     routings = list(RoutingEvent.objects.filter(actor=user).order_by("id"))
+    rounds = list(ReviewRound.objects.filter(actor=user).order_by("id"))
     doc_requests = list(
         DocumentRequest.objects.filter(requested_by=user).prefetch_related("items").order_by("id")
     )
@@ -475,7 +496,8 @@ def workflow_acts(user) -> dict:
     titles = _readable_titles(user, {
         *(r.record_id for r in reviews), *(c.record_id for c in comments),
         *(c.record_id for c in clearances), *(r.record_id for r in revisions),
-        *(r.record_id for r in routings), *(d.record_id for d in doc_requests),
+        *(r.record_id for r in routings), *(r.record_id for r in rounds),
+        *(d.record_id for d in doc_requests),
         *(u.upload.record_id for u in upload_reviews),
     })
     return {
@@ -488,6 +510,11 @@ def workflow_acts(user) -> dict:
             {"paper": _paper(c.record_id, titles), "body": c.body, "is_reply": c.reply_to_id is not None,
              "at": c.created_at}
             for c in comments
+        ],
+        "review_rounds": [
+            {"paper": _paper(r.record_id, titles), "party": r.party, "verdict": r.verdict,
+             "summary": r.summary, "at": r.created_at}
+            for r in rounds
         ],
         "office_clearances": [
             {"paper": _paper(c.record_id, titles), "office": c.office, "status": c.status,
@@ -552,6 +579,7 @@ SECTIONS: dict[str, Callable] = {
     "sessions": sessions,
     "papers_owned": papers_owned,
     "saved_papers": saved_papers,
+    "saved_feeds": saved_feeds,
     "discovery": discovery,
     "conversations": conversations,
     "download_requests": download_requests,
