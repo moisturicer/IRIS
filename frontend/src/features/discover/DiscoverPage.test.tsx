@@ -19,7 +19,8 @@ import { renderScreen, screen, userEvent, waitFor, within } from "@/test/render"
 import { recordsApi } from "@/api/records";
 import { RequestTimeoutError } from "@/api/requestPolicy";
 import { useAuthStore } from "@/store/auth.store";
-import { libraryApi } from "@/api/library";
+import { libraryApi, type SavedFeed } from "@/api/library";
+import { useFeedsStore } from "@/store/feeds.store";
 import { useLibraryStore } from "@/store/library.store";
 import type { ForYouItem, RecordListItem } from "@/types/records";
 import type { User } from "@/types/auth";
@@ -105,6 +106,11 @@ vi.mock("@/api/library", () => ({
       saved_at: "2026-11-01T08:00:00Z", updated_at: "2026-11-01T08:00:00Z", record: { id: recordId, title: "Saved" },
     } })),
     unsave: vi.fn(() => Promise.resolve({ status: 204 })),
+    // Saved feeds (IR-577): the menu reads them when Discover mounts.
+    feeds: vi.fn(() => Promise.resolve({ data: { results: [], limit: 10 } })),
+    createFeed: vi.fn(),
+    updateFeed: vi.fn(),
+    deleteFeed: vi.fn(),
   },
 }));
 
@@ -999,5 +1005,190 @@ describe("continuity: the search box follows the URL", () => {
     await waitFor(() => expect(box).toHaveValue(""));
     await new Promise((resolve) => setTimeout(resolve, 400));
     expect(lastListParams()).not.toHaveProperty("search");
+  });
+});
+
+
+describe("saved custom feeds (IR-577)", () => {
+  const savedFeed = (overrides: Partial<SavedFeed> = {}): SavedFeed => ({
+    id: 5,
+    name: "Coastal hazards",
+    query: { q: "flood", classification: "7", sort: "viewed" },
+    stale: {},
+    created_at: "2026-11-07T00:00:00Z",
+    updated_at: "2026-11-07T00:00:00Z",
+    ...overrides,
+  });
+  const withFeeds = (...feeds: SavedFeed[]) =>
+    vi.mocked(libraryApi.feeds).mockResolvedValue({ data: { results: feeds, limit: 10 } } as never);
+  const probe = () => screen.getByRole("status", { name: "Current query" });
+  const refused = (data: unknown) => Object.assign(new Error("refused"), { response: { status: 400, data } });
+
+  beforeEach(() => {
+    useFeedsStore.setState({ load: "idle", feeds: [], limit: 10, interrupted: false });
+  });
+
+  async function openFeed(name = "Coastal hazards") {
+    await userEvent.click(await screen.findByRole("button", { name: /My feeds/ }));
+    await userEvent.click(await screen.findByRole("button", { name: `Open ${name}` }));
+  }
+
+  it("opens a feed as the ordinary Discover query, asking the API for exactly its filters", async () => {
+    withFeeds(savedFeed());
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+
+    await openFeed();
+
+    await waitFor(() => expect(lastListParams()).toMatchObject({ search: "flood", classification: "7", ordering: "-access_count" }));
+    expect(probe()).toHaveTextContent("q=flood");
+    expect(probe()).toHaveTextContent("classification=7");
+    expect(probe()).toHaveTextContent("sort=viewed");
+    expect(probe()).toHaveTextContent("myfeed=5");
+    expect(await screen.findByRole("region", { name: "Feed Coastal hazards" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Search records" })).toHaveValue("flood");
+  });
+
+  it("remembers which feed is open after a reload", async () => {
+    withFeeds(savedFeed());
+    renderDiscover("/?q=flood&classification=7&sort=viewed&myfeed=5");
+
+    expect(await screen.findByRole("region", { name: "Feed Coastal hazards" })).toBeInTheDocument();
+  });
+
+  it("drops a feed that is not the reader's own from the URL without naming it", async () => {
+    withFeeds();
+    renderDiscover("/?q=flood&myfeed=999");
+
+    await waitFor(() => expect(probe()).not.toHaveTextContent("myfeed"));
+    expect(probe()).toHaveTextContent("q=flood");
+    expect(screen.queryByRole("region", { name: /^Feed / })).not.toBeInTheDocument();
+  });
+
+  it("holds the list back until a feed with a value that no longer exists is corrected", async () => {
+    withFeeds(savedFeed({ name: "Old Area", query: { classification: "7,99" }, stale: { classification: [99] } }));
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    const asked = vi.mocked(recordsApi.list).mock.calls.length;
+
+    await openFeed("Old Area");
+
+    const panel = await screen.findByRole("alert");
+    expect(panel).toHaveTextContent(/1 Area that no longer exists/);
+    expect(panel).toHaveTextContent(/never shows more than the feed was saved to show/i);
+    // The stale id is not queried, and nothing stands in for a list: no
+    // "no results" claim and no wider catalogue.
+    expect(probe()).toHaveTextContent("classification=7");
+    expect(probe()).not.toHaveTextContent("99");
+    expect(vi.mocked(recordsApi.list).mock.calls.length).toBe(asked);
+    expect(screen.queryByText(publishedThesis.title)).not.toBeInTheDocument();
+    expect(screen.queryByText("No research matches these filters")).not.toBeInTheDocument();
+  });
+
+  it("corrects a stale feed by removing what is gone, then runs it", async () => {
+    const stale = savedFeed({ name: "Old Area", query: { classification: "7,99" }, stale: { classification: [99] } });
+    withFeeds(stale);
+    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...stale, query: { classification: "7" }, stale: {} } } as never);
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await openFeed("Old Area");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Remove them and use the rest" }));
+
+    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { classification: "7" } }));
+    await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+    await waitFor(() => expect(lastListParams()).toMatchObject({ classification: "7" }));
+    expect(await screen.findByText(publishedThesis.title)).toBeInTheDocument();
+  });
+
+  it("keeps the correction on screen, with the reason, when nothing would be left", async () => {
+    const stale = savedFeed({ name: "Gone", query: { classification: "99" }, stale: { classification: [99] } });
+    withFeeds(stale);
+    vi.mocked(libraryApi.updateFeed).mockRejectedValue(
+      refused({ query: ["Add at least one Area, keyword, college, type, year or IP filter."] }),
+    );
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await openFeed("Gone");
+
+    await userEvent.click(await screen.findByRole("button", { name: "Remove them and use the rest" }));
+
+    expect(await screen.findByText("Add at least one Area, keyword, college, type, year or IP filter.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Remove them and use the rest" })).toBeInTheDocument();
+  });
+
+  it("offers to save changed filters into the open feed, and only when they differ", async () => {
+    const feed = savedFeed({ query: { q: "flood", classification: "7" } });
+    withFeeds(feed);
+    vi.mocked(libraryApi.updateFeed).mockResolvedValue({ data: { ...feed, query: { q: "flood", classification: "7", year: "2026" } } } as never);
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await openFeed();
+    await screen.findByRole("region", { name: "Feed Coastal hazards" });
+    expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument();
+
+    await choose(/^Year/, /2026/);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Save these filters to this feed" }));
+    await waitFor(() => expect(libraryApi.updateFeed).toHaveBeenCalledWith(5, { query: { q: "flood", classification: "7", year: "2026" } }));
+    await waitFor(() => expect(screen.queryByRole("button", { name: "Save these filters to this feed" })).not.toBeInTheDocument());
+  });
+
+  it("leaves the feed and keeps the filters it set", async () => {
+    withFeeds(savedFeed());
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await openFeed();
+    await screen.findByRole("region", { name: "Feed Coastal hazards" });
+
+    await userEvent.click(screen.getByRole("button", { name: "Leave feed" }));
+
+    await waitFor(() => expect(probe()).not.toHaveTextContent("myfeed"));
+    expect(probe()).toHaveTextContent("classification=7");
+    expect(screen.queryByRole("region", { name: /^Feed / })).not.toBeInTheDocument();
+  });
+
+  it("leaves a feed that is deleted while it is open", async () => {
+    withFeeds(savedFeed());
+    vi.mocked(libraryApi.deleteFeed).mockResolvedValue({ data: undefined } as never);
+    renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await openFeed();
+    await screen.findByRole("region", { name: "Feed Coastal hazards" });
+
+    await userEvent.click(screen.getByRole("button", { name: /My feeds/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Delete Coastal hazards" }));
+    await userEvent.click(within(await screen.findByRole("dialog")).getByRole("button", { name: "Delete feed" }));
+
+    await waitFor(() => expect(screen.queryByRole("region", { name: /^Feed / })).not.toBeInTheDocument());
+    expect(probe()).not.toHaveTextContent("myfeed");
+  });
+
+  it("saves the filters on screen from Latest, and then shows the new feed", async () => {
+    vi.mocked(libraryApi.createFeed).mockResolvedValue({
+      data: savedFeed({ id: 8, name: "Rain", query: { q: "rain" } }),
+    } as never);
+    renderDiscover("/?q=rain");
+    await screen.findByText(publishedThesis.title);
+    await userEvent.click(screen.getByRole("button", { name: /My feeds/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Save these filters as a feed/ }));
+    const dialog = await screen.findByRole("dialog");
+
+    await userEvent.type(within(dialog).getByRole("textbox", { name: /Feed name/ }), "Rain");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Save feed" }));
+
+    await waitFor(() => expect(libraryApi.createFeed).toHaveBeenCalledWith({ name: "Rain", query: { q: "rain" } }));
+    expect(await screen.findByRole("region", { name: "Feed Rain" })).toBeInTheDocument();
+    expect(probe()).toHaveTextContent("myfeed=8");
+  });
+
+  it("has no blocking accessibility violations with a feed open and with a correction pending", async () => {
+    withFeeds(savedFeed({ name: "Old Area", query: { classification: "7,99" }, stale: { classification: [99] } }));
+    const { container } = renderDiscover();
+    await screen.findByText(publishedThesis.title);
+    await openFeed("Old Area");
+    await screen.findByRole("alert");
+
+    await expectNoBlockingA11yViolations(container);
   });
 });

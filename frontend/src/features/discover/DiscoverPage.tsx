@@ -13,8 +13,10 @@ import { Spinner } from "@/components/ui/Spinner";
 import { COLOUR_TRANSITION, FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_PRIMARY, PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { PUBLISH_PARAM } from "@/features/publish/PublishDialog";
+import type { SavedFeed } from "@/api/library";
 import { useRole } from "@/hooks/useRole";
 import { canAccess } from "@/lib/access";
+import { useFeedsStore } from "@/store/feeds.store";
 import { cn } from "@/lib/utils";
 import { IP_TYPE_LABELS } from "@/types/records";
 import type { DiscoverInterests, ForYouItem, RecordListItem } from "@/types/records";
@@ -29,12 +31,16 @@ import {
 import { DiscoverResultCard } from "./DiscoverResultCard";
 import { DiscoverSearchComposer } from "./DiscoverSearchComposer";
 import { DiscoverTabs } from "./DiscoverTabs";
+import { MyFeeds } from "./MyFeeds";
 import { PaperCiteModal } from "./PaperCiteModal";
 import {
   DEFAULT_QUERY,
   discoverQueryKey,
+  feedQueryOf,
+  feedSearchParams,
   listParams,
   parseDiscoverQuery,
+  sameFeedQuery,
   writeDiscoverQuery,
   type DiscoverQuery,
 } from "./discoverQuery";
@@ -192,6 +198,62 @@ export default function DiscoverPage() {
   const setFilters = (next: DiscoverFilters) => updateQuery((current) => ({ ...current, filters: next }));
   const setSort = (next: DiscoverSort) => updateQuery((current) => ({ ...current, sort: next, feed: "latest" }));
 
+  /* ── A saved feed is this same query under a name (IR-577) ───────────
+     `myfeed` in the URL says which one is open, so a reload or a copied link
+     keeps the context. The query itself is still the ordinary one above. */
+  const rawFeedId = searchParams.get("myfeed");
+  const feedId = rawFeedId && /^\d{1,18}$/.test(rawFeedId) ? Number(rawFeedId) : null;
+  const savedFeeds = useFeedsStore((s) => s.feeds);
+  const feedsLoad = useFeedsStore((s) => s.load);
+  const updateSavedFeed = useFeedsStore((s) => s.update);
+  const activeFeed = feedId !== null ? savedFeeds.find((f) => f.id === feedId) ?? null : null;
+  /** A feed's values that no longer exist are never queried and never dropped
+   *  for the reader: the list waits until they correct the feed. */
+  const correctionPending = activeFeed !== null && Object.keys(activeFeed.stale).length > 0;
+  /** Until the reader's feeds are known there is no telling whether this one is
+   *  stale, and a stale one's remainder can be wider than it was saved to be. */
+  const awaitingFeed = feedId !== null && (feedsLoad === "idle" || feedsLoad === "loading");
+  const holdResults = correctionPending || awaitingFeed;
+  const [feedBusy, setFeedBusy] = useState(false);
+  const [feedError, setFeedError] = useState("");
+
+  const leaveFeed = useCallback(() => {
+    setFeedError("");
+    latestSetSearchParams.current((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete("myfeed");
+      return next;
+    }, { replace: true });
+  }, []);
+
+  /* A feed that is not the reader's (or is gone) is dropped from the URL
+     without being named: it reads exactly like one that never existed. */
+  useEffect(() => {
+    if (feedId !== null && ((feedsLoad === "ready" && !activeFeed) || feedsLoad === "error")) leaveFeed();
+  }, [feedId, feedsLoad, activeFeed, leaveFeed]);
+
+  const openFeed = (feed: SavedFeed) => {
+    setFeedNotice("");
+    setFeedError("");
+    latestSetSearchParams.current((prev) => {
+      // Discover's own keys are replaced by the feed's; any other key stays.
+      const next = writeDiscoverQuery(prev, DEFAULT_QUERY);
+      for (const [key, value] of feedSearchParams(feed.query, feed.stale)) next.set(key, value);
+      next.set("myfeed", String(feed.id));
+      return next;
+    });
+  };
+
+  const saveToFeed = async () => {
+    if (!activeFeed) return;
+    setFeedBusy(true);
+    setFeedError("");
+    const result = await updateSavedFeed(activeFeed.id, { query: feedQueryOf(query) });
+    setFeedBusy(false);
+    if (result.ok) setFeedNotice(`Saved these filters to “${result.feed.name}”.`);
+    else setFeedError(result.message);
+  };
+
   useEffect(() => {
     let cancelled = false;
     setRefLoading(true);
@@ -292,6 +354,20 @@ export default function DiscoverPage() {
   useEffect(() => {
     const current = ++generation.current;
     position.current = null;
+    if (holdResults) {
+      // A saved feed that cannot be trusted yet is not run (IR-577): not
+      // fetched, and not replaced by a "no results" claim or a wider list.
+      setFailed(null);
+      setInterrupted(false);
+      setLoadingMore(false);
+      setLoadMoreFailed(null);
+      setNextCursor(null);
+      setRecords([]);
+      setFeedRecords([]);
+      setTotalCount(null);
+      setLoading(awaitingFeed);
+      return;
+    }
     const restored = feed !== "for_you" ? readPosition(queryKey) : null;
     const pages = Math.min(Math.max(restored?.pages ?? 1, 1), MAX_RESTORED_PAGES);
     // A depth past the cap comes back shorter, so its scroll offset would land
@@ -347,7 +423,7 @@ export default function DiscoverPage() {
     // `query` is fully described by `feedKey`; keying on the string keeps an
     // unrelated URL change (the Publish dialog) from refetching.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [feedKey, attempt]);
+  }, [feedKey, attempt, holdResults, awaitingFeed]);
 
   const loadMore = useCallback(() => {
     const current = generation.current;
@@ -553,6 +629,14 @@ export default function DiscoverPage() {
           <i className="fas fa-compass text-[12px]" aria-hidden />
           <span className="hidden sm:inline">Areas</span>
         </button>
+        <MyFeeds
+          query={query}
+          matchCount={loading || correctionPending ? null : totalCount}
+          options={{ classifications, colleges, recordTypes }}
+          activeFeedId={activeFeed?.id ?? null}
+          onOpen={openFeed}
+          onDeleted={(id) => { if (id === feedId) leaveFeed(); }}
+        />
         <button type="button" onClick={() => chooseColumns(nextColumns)}
           aria-label={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
           title={`${columns} ${columns === 1 ? "column" : "columns"}; switch to ${nextColumns}`}
@@ -582,6 +666,36 @@ export default function DiscoverPage() {
           </button>
         )}
       </div>
+      {activeFeed && (
+        <section aria-label={`Feed ${activeFeed.name}`} className="mt-3 rounded-lg border border-stone-200 bg-white px-4 py-3">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+            <p className="text-small font-semibold text-stone-900">Feed: {activeFeed.name}</p>
+            {!correctionPending && !sameFeedQuery(activeFeed.query, query) && (
+              <button type="button" disabled={feedBusy} onClick={() => void saveToFeed()}
+                className={cn("text-small font-semibold text-brand underline-offset-2 hover:underline disabled:opacity-60", FOCUS_RING)}>
+                Save these filters to this feed
+              </button>
+            )}
+            <button type="button" onClick={leaveFeed}
+              className={cn("text-small font-medium text-stone-700 underline-offset-2 hover:text-brand hover:underline", FOCUS_RING)}>
+              Leave feed
+            </button>
+          </div>
+          {correctionPending && (
+            <div role="alert" className="mt-2 text-small text-stone-700">
+              <p>{describeStale(activeFeed.stale)}</p>
+              <p className="mt-1">
+                Remove them and keep the rest, or choose different filters and save them to this feed. The list is
+                held back until then, so it never shows more than the feed was saved to show.
+              </p>
+              <button type="button" disabled={feedBusy} onClick={() => void saveToFeed()} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-2")}>
+                Remove them and use the rest
+              </button>
+            </div>
+          )}
+          {feedError && <p role="alert" className="mt-2 text-small text-brand">{feedError}</p>}
+        </section>
+      )}
       {feedNotice && <p role="status" className="mt-3 text-small text-stone-700">{feedNotice}</p>}
       {feed === "for_you" && feedback && (
         <div className="mt-3 flex flex-wrap items-center gap-3 text-small text-stone-700">
@@ -610,7 +724,7 @@ export default function DiscoverPage() {
       </p>
 
       <div className="mt-4">
-      {loading ? (
+      {correctionPending ? null : loading ? (
         <ResultsSkeleton columns={gridColumns} />
       ) : failed && interrupted ? (
         <InterruptedState framed what="research" onRetry={() => setAttempt((n) => n + 1)} />
@@ -738,6 +852,19 @@ export default function DiscoverPage() {
       <PaperCiteModal record={citeRecord} isOpen={Boolean(citeRecord)} onClose={() => setCiteRecord(null)} />
     </div>
   );
+}
+
+/** What a feed holds that the taxonomy has lost, in the reader's words. */
+function describeStale(stale: SavedFeed["stale"]): string {
+  const names = { classification: "Area", college: "college", type: "type" } as const;
+  const parts = (Object.keys(names) as (keyof typeof names)[])
+    .filter((key) => stale[key]?.length)
+    .map((key) => {
+      const count = stale[key]!.length;
+      return `${count} ${names[key]}${count === 1 ? "" : "s"}`;
+    });
+  const total = Object.values(stale).reduce((sum, ids) => sum + (ids?.length ?? 0), 0);
+  return `This feed uses ${parts.join(", ")} that no longer ${total === 1 ? "exists" : "exist"}.`;
 }
 
 function InterestChoices({ title, options, selected, onChange }: {
