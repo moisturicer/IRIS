@@ -1,0 +1,16 @@
+{
+  "route": "classifications",
+  "method": "GET",
+  "as": "other",
+  "sample": {
+    "count": 1,
+    "next": null,
+    "previous": null,
+    "results": [
+      {
+        "id": 1,
+        "name": "Contract classification"
+      }
+    ]
+  }
+}

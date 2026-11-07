@@ -24,6 +24,7 @@
     "overdue": "`1`",
     "status": "a named status (legacy, read once and replaced)",
     "feed": "`for_you` or `trending`",
+    "myfeed": "the numeric id of one of the reader's own saved feeds (IR-577); an id is not an identity and the feed's name and query are never in the address",
     "ip": "a named IP status",
     "from": "`paper`",
     "context": "`page`",

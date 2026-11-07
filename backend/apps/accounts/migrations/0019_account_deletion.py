@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('accounts', '0018_seed_system_admin_role'),
+        ('accounts', '0019_profile_photo_bio_interests'),
     ]
 
     operations = [

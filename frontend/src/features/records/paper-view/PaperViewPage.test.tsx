@@ -719,6 +719,57 @@ describe("the byline credits the adviser (IR-472)", () => {
   });
 });
 
+describe("names that open a Profile (IR-700)", () => {
+  beforeEach(() => {
+    signInAs(99, "Student");
+  });
+
+  it("links the adviser only when the server says their Profile can be opened", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos", adviser_has_profile: true };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByRole("link", { name: "Maria Santos" })).toHaveAttribute("href", `/people/${ASSIGNED_ADVISER_ID}`);
+  });
+
+  it("leaves the adviser as plain text when the flag is false or absent", async () => {
+    shownRecord = { ...record, adviser: ASSIGNED_ADVISER_ID, adviser_name: "Maria Santos", adviser_has_profile: false };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByText("Adviser: Maria Santos")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Maria Santos" })).not.toBeInTheDocument();
+  });
+
+  it("lists the owners, linking those with a Profile, and shows nothing when none has one", async () => {
+    shownRecord = {
+      ...record,
+      owners: [
+        { id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true, has_profile: true },
+        { id: 2, user: 42, email: "j@x.edu", full_name: "Jomar Ybanez", is_primary: false, has_profile: false },
+      ],
+    };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.getByRole("link", { name: "Ana Reyes" })).toHaveAttribute("href", "/people/41");
+    expect(screen.queryByRole("link", { name: "Jomar Ybanez" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Owners:/)).toHaveTextContent("Jomar Ybanez");
+  });
+
+  it("shows no owners line, and no email, when no owner has a Profile", async () => {
+    shownRecord = {
+      ...record,
+      owners: [{ id: 1, user: 41, email: "a@x.edu", full_name: "Ana Reyes", is_primary: true }],
+    };
+    renderPaperView();
+
+    await waitForRecord(record.title);
+    expect(screen.queryByText(/Owners:/)).not.toBeInTheDocument();
+    expect(screen.queryByText("a@x.edu")).not.toBeInTheDocument();
+  });
+});
+
 describe("document requests (IR-262)", () => {
   beforeEach(() => {
     vi.clearAllMocks();

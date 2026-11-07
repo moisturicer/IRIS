@@ -87,8 +87,11 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-934** | Discover's Filters button names itself with the words it shows, its cover placeholder has enough contrast, and the 360px reflow check measures the settled layout — no FR- id; WCAG 2.5.3 and 1.4.10, found by IR-902's pinned run | [details](traceability/IR-934.md) | **VERIFIED** |
 | **IR-902** | Playwright journeys for Discover search and filters, opening a published paper, and opening its manuscript at `?page=N` — no FR- id; subtask of the browser-test work around IR-631 (its AC6 without Ask IRIS) | [details](traceability/IR-902.md) | **PARTIAL** |
 | **IR-904** | A small Playwright smoke tier gates every pull request that touches `frontend/`, against the built app with the network mocked — no FR- id; subtask … | [details](traceability/IR-904.md) | **PARTIAL** |
+| **IR-908** | Axe runs in a real browser on every routed screen, every dialog and every state of the UI states matrix in CI, failing on serious and critical findings, each finding fixed or filed; seven dialog sources are named as not yet scanned — no FR- id; subtask of IR-896 … | [details](traceability/IR-908.md) | **PARTIAL** |
 | **IR-918** | CI checks that the built frontend bundle holds no secrets or personal data, that no address carries personal data, and that `npm audit` is triaged — no FR- id; subtask of IR-900 | [details](traceability/IR-918.md) | **PARTIAL** |
 | **IR-910** | Every routed screen is opened at 360, 768, 1280 and 1745 px in CI: no sideways page scroll, a reachable primary action, a documented small-screen behaviour for tables — no FR- id; subtask of IR-897 … | [details](traceability/IR-910.md) | **PARTIAL** |
+| **IR-915** | A change to a covered response shape on the backend fails a test, and a covered response that no longer fits the frontend's type fails a test — no FR- id; subtask of IR-899; recorded fixtures checked by a backend test, no `drf-spectacular`; slice 1 of 2 (non-AI endpoints) | [details](traceability/IR-915.md) | **PARTIAL** |
+| **IR-695** | People add a photo, bio and research interests to their account, and no one else edits them; the photo is re-encoded and served only to signed-in users through Django — no FR- id (NFR-S4, FR-M6-06 touched); subtask of IR-694; ORCID iD dropped 2026-11-07 | [details](traceability/IR-695.md) | **IMPLEMENTED** |
 | **IR-778** | The account menu's accessible name begins with the name and role it shows — no FR- id; WCAG 2.1 2.5.3 Label in Name, found by IR-631's axe … | [details](traceability/IR-778.md) | **PARTIAL** |
 | **IR-777** | The notification bell's accessible name contains the count it shows — no FR- id; WCAG 2.1 2.5.3 Label in Name, found by IR-631's axe run … | [details](traceability/IR-777.md) | **PARTIAL** |
 | **IR-774** | Scrolling regions are reachable and scrollable from the keyboard: Workflow Analytics tables at 360px and the office Review pane at 200% — … | [details](traceability/IR-774.md) | **IMPLEMENTED** |
@@ -117,6 +120,9 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-434** | An overview citation names a page — no FR- id; part D of IR-425's spec | [details](traceability/IR-434.md) | **IMPLEMENTED** |
 | **IR-433** | The AI Overview is a structured account, not two paragraphs of prose — no FR- id; part C of IR-425's spec | [details](traceability/IR-433.md) | **IMPLEMENTED** |
 | **IR-604** | Each paper gets a one-sentence hook, written with the Overview — no FR- id; part H of IR-425's spec, needed by IR-567's Discover card | [details](traceability/IR-604.md) | **IMPLEMENTED** |
+| **IR-577** | Save a private custom feed from Discover's filters: owner-only `SavedFeed` holding Discover's own query, capped at 10, stale values corrected first — no FR- id; user stories 15 to 17 of IR-557's spec | [details](traceability/IR-577.md) | **IMPLEMENTED** |
+| **IR-567** | For you from the Areas the reader chooses, with a reason on every item and a stable cursor — no FR- id; user stories 1, 2, 4, 5, 8, 9, 12 of IR-557's spec (file written after the fact) | [details](traceability/IR-567.md) | **IMPLEMENTED** |
+| **IR-575** | My saved research shapes For you: saved Records' Areas join the chosen ones, saved Records sink, saves invalidate the feed — no FR- id; user stories 3, 7, 11 of IR-557's spec | [details](traceability/IR-575.md) | **IMPLEMENTED** |
 | **IR-665** | An uploaded PDF must really be one: its bytes carry the signature and it opens with at least one page; `uploads/create/` no longer skips … | [details](traceability/IR-665.md) | **IMPLEMENTED** |
 | **IR-383** | Question resolution runs as its own Inference task, on a model that exists — no FR- id; part E of IR-375's spec, and the ticket that closes … | [details](traceability/IR-383.md) | **IMPLEMENTED** |
 | **IR-382** | Groq dialect: the vendor's request shape behind the adapter, with citation-marker normalisation — no FR- id; part H of IR-375's spec, and … | [details](traceability/IR-382.md) | **IMPLEMENTED** |
@@ -159,6 +165,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-424** | Answer presentation: Markdown structure, delimited formulas and no invented images — no FR- id; changes answer-path behaviour (IR-426 … | [details](traceability/IR-424.md) | **IMPLEMENTED** |
 | **IR-440** | Retrieval looks past 40 candidates — no FR- id; a bug fix, not a technique | [details](traceability/IR-440.md) | **IMPLEMENTED** |
 | **IR-442** | A retrieval miss is detectable rather than silent — no FR- id; the checker for the failure class ADR-023 measures in aggregate but cannot … | [details](traceability/IR-442.md) | **IMPLEMENTED** |
+| **IR-568** | Related works says why it is empty (ready, no matches, not indexed, incompatible, unavailable) without revealing hidden Records — no FR- id; user story 14 of IR-557's spec | [details](traceability/IR-568.md) | **IMPLEMENTED** |
 | **IR-312** | A proposer sees when their idea was already done here — the Novelty check; FR-M4 (stable label only) | [details](traceability/IR-312.md) | **IMPLEMENTED** |
 | **IR-826** | The AI gateway gets no Django database login; ADR-014's accepted amendment allows its runs login only | [details](traceability/IR-826.md) | **VERIFIED** |
 | **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
@@ -199,6 +206,8 @@ Change a row here only when the requirement's status changes. To see every note 
 | NFR-R3, R4 | Reliability and recovery | [details](traceability/NFR-R3-R4.md) | **NOT STARTED** |
 | NFR-U1 | General usability | [details](traceability/NFR-U1.md) | **NOT STARTED** |
 | **NFR-U2** | Submission in under 10 min, 5 of 5 participants | [details](traceability/NFR-U2.md) | **NOT STARTED** |
+| **IR-700** | Another person's Profile at `/people/:id` over the draft IR-696 contract, with Adviser and owner names linking to it, and no middle-initial or ORCID iD field on Edit profile — IR-694; no FR- id; waits on IR-696 and IR-692 | [details](traceability/IR-700.md) | **PARTIAL** |
+| **IR-948** | Your own Profile mounts the same view as another person's; no papers or collaborators until IR-949 — IR-694; no FR- id | [details](traceability/IR-948.md) | **PARTIAL** |
 | **IR-326** | Streaming Ask IRIS endpoint — no FR- id; part C of IR-323's "event-shaped answer path", under ADR-028 (one deterministic retrieval call … | [details](traceability/IR-326.md) | **IMPLEMENTED** |
 | NFR-U3 | Responsive at 360 px, no horizontal scroll | [details](traceability/NFR-U3.md) | **PARTIAL** |
 | NFR-A1 | WCAG 2.1 AA on interactive controls | [details](traceability/NFR-A1.md) | **PARTIAL** |

@@ -1,3 +1,4 @@
+import logging
 from io import BytesIO
 
 from rest_framework import mixins, serializers, status, viewsets
@@ -64,6 +65,8 @@ from apps.notifications.services import (
 )
 from apps.audit.services import create_audit_event
 from apps.reviews.routing import RoutingError, enter_at_adviser
+
+logger = logging.getLogger(__name__)
 
 
 class RecordViewSet(viewsets.ModelViewSet):
@@ -706,15 +709,31 @@ class RecordViewSet(viewsets.ModelViewSet):
         hasn't been released (ADR-052). That is a visible behaviour change from keyword
         matching, and it is the intended one — a keyword fallback would hide
         "nothing is indexed" behind plausible results.
+
+        **The answer carries a `state` (IR-568):** `ready`, `no_matches`,
+        `not_indexed` or `incompatible`, and a failure is a 503 whose body is
+        `{"state": "unavailable", "results": []}`. Only the seed's own coverage is
+        ever stated; `no_matches` is identical whether close candidates are
+        absent or unreadable (IR-460).
         """
         from apps.ai.presentation import record_card
-        from apps.ai.similarity import similar_records
+        from apps.ai.similarity import UNAVAILABLE, related_works
 
         record = self.get_object()
-        matches = similar_records(record, request.user)
-        return Response(
-            {"results": [record_card(m.record, m.score) for m in matches]}
-        )
+        try:
+            related = related_works(record, request.user)
+        except Exception:
+            # A temporary failure, said as one (IR-568). Nothing about the
+            # cause reaches the reader, and it is not an empty list.
+            logger.exception("Related works failed for record %s", record.pk)
+            return Response(
+                {"state": UNAVAILABLE, "results": []},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return Response({
+            "state": related.state,
+            "results": [record_card(m.record, m.score) for m in related.matches],
+        })
 
     @action(detail=True, methods=["get"], url_path="related-research")
     def related_research(self, request, pk=None):

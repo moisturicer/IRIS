@@ -17,6 +17,13 @@ export interface RecordOwner {
   email:      string;
   full_name:  string;
   is_primary: boolean;
+  /**
+   * Draft IR-696: true only when this person's Profile can be opened from a
+   * published paper's page. Absent or false means the name is plain text: a
+   * suspended or former user's Profile answers 404, and a link there would land
+   * on not-found. Never inferred from the id.
+   */
+  has_profile?: boolean;
 }
 
 export interface Author {
@@ -32,7 +39,11 @@ export interface RecordListItem {
   title:                 string;
   abstract:              string;
   year_accomplished:     number | null;
-  classification_name:   string | null;
+  /**
+   * Absent, not null, when the record has no classification: the serializer's
+   * `source="classification.name"` skips the field (found by IR-915's contract check).
+   */
+  classification_name?:  string | null;
   record_type_name:      string | null;
   pipeline_status:       PipelineStatus;
   is_ip:                 boolean;
@@ -59,7 +70,7 @@ export interface DiscoverInterests {
   psced: DiscoverInterestOption[];
 }
 export interface ForYouItem extends RecordListItem {
-  reason: { kind: "selected_area" | "latest"; area?: string };
+  reason: { kind: "selected_area" | "saved_area" | "latest"; area?: string };
 }
 export interface ForYouPage {
   mode: "for_you" | "latest";
@@ -389,6 +400,8 @@ export interface RecordDetail extends RecordListItem {
   adviser:         number | null;
   /** The adviser's name, or their email when none is on file; null with no adviser (IR-472). */
   adviser_name:    string | null;
+  /** Draft IR-696: whether the Adviser's Profile can be opened; see `RecordOwner.has_profile`. */
+  adviser_has_profile?: boolean;
   added_by:        number | null;
   /** ADR-018: what the submitter requested; RDCO confirms at intake. */
   requires_ethics_review: boolean;

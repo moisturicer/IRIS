@@ -27,6 +27,7 @@ import NotificationsPage    from "@/features/notifications/NotificationsPage";
 import SettingsPage         from "@/features/settings/SettingsPage";
 import ProfilePage          from "@/features/profile/ProfilePage";
 import EditProfilePage      from "@/features/profile/EditProfilePage";
+import PersonProfilePage    from "@/features/profile/PersonProfilePage";
 import HelpPage             from "@/features/help/HelpPage";
 
 // Error screens (IR-745)
@@ -115,6 +116,8 @@ export const routes: RouteObject[] = [{
             ],
           },
           { path: "settings",              element: <SettingsPage />,    handle: { crumb: "Settings" } },
+          // Another person's Profile (IR-700). Prototype: sample people, no API yet.
+          { path: "people/:id",            element: <PersonProfilePage />, handle: { crumb: "Profile" } },
 
           {
             element: <ProtectedRoute allowedRoles={rolesFor("reviewQueue")} />,

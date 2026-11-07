@@ -63,6 +63,9 @@ RELEASES_EMBARGO = row(ANON, HIDE, DENY, OK, DENY, DENY, DENY, OK, HIDE, HIDE)
 RELEASES_IP = row(ANON, HIDE, DENY, DENY, DENY, DENY, DENY, DENY, HIDE, HIDE)
 #: `record`, the seated ITSO reviewer's act alone.
 SEAT_ACTS = row(ANON, HIDE, DENY, DENY, OK, DENY, DENY, DENY, HIDE, HIDE)
+#: `feed`, a reader's private saved feed (IR-577): its owner alone; everyone
+#: else cannot know it exists.
+OWNS_FEED = row(ANON, HIDE, OK, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE, HIDE)
 #: `record`'s documents: owner or office staff (`owns_or_staffs_record`, IR-153).
 DOCUMENTS = row(ANON, DENY, OK, DENY, OK, OK, OK, OK, DENY, DENY)
 
@@ -507,6 +510,16 @@ ACCOUNTS = {
         SYSTEM_ADMIN_ONLY, kwargs={"pk": Ref("deletion_request")}, data={"reason": "Matrix check."})}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                       for m in ("GET", "PUT", "PATCH")}),
+    # IR-695: a person's optional profile. Both writes act on `request.user` and
+    # name nobody else; the photo is read by any signed-in user, through Django
+    # only (MEDIA_URL is not routed). `photo_user` is an account that has one --
+    # a person with none answers 404 to everyone, which is not an access outcome.
+    "user-me-photo": Entry({
+        "PUT": _case(SIGNED_IN, data={}, format="multipart"),
+        "DELETE": _case(SIGNED_IN),
+    }),
+    "user-photo": Entry({"GET": _case(SIGNED_IN, kwargs={"pk": Ref("photo_user")})}),
+    "user-interest-suggestions": Entry({"GET": _case(SIGNED_IN, query={"q": "mach"})}),
     "user-detail": Entry({m: _case(ACCOUNT_ADMINS, kwargs={"pk": Ref("target_user")},
                                  **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                           for m in ("GET", "PUT", "PATCH")}),
@@ -611,6 +624,16 @@ LIBRARY = {
     "library-save": Entry({
         "PUT": _case(READS_RECORD, kwargs={"record_id": Ref("record")}, data={}),
         "DELETE": _case(SIGNED_IN, kwargs={"record_id": Ref("record")}),
+    }),
+    # IR-577: a saved feed is the caller's own, so listing and saving are
+    # anyone's, and another account's feed is the same 404 as a missing one.
+    "library-feeds": Entry({
+        "GET": _case(SIGNED_IN),
+        "POST": _case(SIGNED_IN, data={"name": "Matrix feed", "query": {"q": "flood"}}),
+    }),
+    "library-feed": Entry({
+        "PATCH": _case(OWNS_FEED, kwargs={"feed_id": Ref("feed")}, data={"name": "Renamed feed"}),
+        "DELETE": _case(OWNS_FEED, kwargs={"feed_id": Ref("feed")}),
     }),
 }
 TABLE: dict[str, dict[str, Entry | Shadowed]] = {

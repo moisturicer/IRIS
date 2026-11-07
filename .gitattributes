@@ -16,3 +16,6 @@ docs/evaluation/proxy_starter.json text eol=lf
 
 # Recordings stay byte for byte as LlamaParse returned them (IR-841).
 backend/apps/ai/extraction/tests/fixtures/llamaparse/** -text
+
+# Recorded API responses (IR-915): byte-stable, so a refresh diff shows only a real change.
+contracts/*.json text eol=lf
