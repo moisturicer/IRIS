@@ -379,6 +379,16 @@ python manage.py eval_campaign --report --set <s.json> --lock <lock.json> --runs
                                    # --campaign-cost-usd Y --planned-cases N measures a development
                                    # smoke's spend against proposed caps. Writes .json + .md. Test-only so
                                    # far: no campaign has run. Guide: docs/evaluation/general-tools/campaign.md
+python manage.py eval_readiness --build --report <campaign.json> --candidate runtime ...
+                                   # IR-741: release-readiness manifest over an eval_campaign report.
+                                   # Eleven gates, only `met` clears one; missing, fake, incomparable or
+                                   # breached evidence blocks. --preflight names every unrecorded cap/approval;
+                                   # --verify [--check-files] [--assert-ready --expect-commit SHA] is what
+                                   # IR-742 reads; --assert-ready rebuilds the manifest from its inputs;
+                                   # --validate-measurement checks a workload-measurement-1 file. Free: no DB, no vendor.
+                                   # Authorizes nothing. Verified locally on synthetic fixtures only (no
+                                   # real campaign, load run or human review exists). docs/evaluation/
+                                   # general-tools/readiness.md
 python manage.py eval_review_packets --run <run.json> --reviewer EMAIL --reviewer-name NAME --out <packets.json>
                                    # one reviewer's packet (IR-607). Holds NO text (IR-721): which
                                    # turns Record.visible_to(reviewer) allows, record ids, source
