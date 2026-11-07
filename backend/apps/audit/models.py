@@ -97,6 +97,9 @@ class AuditEvent(models.Model):
     # `notice_version`, `ai_consent`, and the `previous_*` pair (None when it was
     # their first answer). Written by `apps.accounts.notice.answer_notice`.
     NOTICE_ANSWERED = "NOTICE_ANSWERED"
+    # A person downloaded their own data (ADR-051 decision 13, IR-786). Metadata
+    # is `sections` and `format` only: never a byte of what was downloaded.
+    PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
 
     EVENT_TYPE_CHOICES = [
         (LOGIN,            "Login"),
@@ -163,6 +166,7 @@ class AuditEvent(models.Model):
         (EMAIL_VERIFICATION_COMPLETED, "Email Verification Completed"),
         (RETENTION_CLEANUP_RUN,        "Retention Cleanup Run"),
         (NOTICE_ANSWERED,              "Data Notice Answered"),
+        (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
     ]
 
     event_type = models.CharField(max_length=40, choices=EVENT_TYPE_CHOICES, db_index=True)

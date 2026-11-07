@@ -505,6 +505,9 @@ ACCOUNTS = {
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
     "user-me": Entry({m: _case(SIGNED_IN, **({} if m == "GET" else {"data": {"first_name": "Updated"}}))
                       for m in ("GET", "PUT", "PATCH")}),
+    # IR-786: the caller's own data, whoever they are. No id to name, so there is
+    # no other person's copy for any role to reach.
+    "user-me-data": Entry({"GET": _case(SIGNED_IN)}),
     # IR-695: a person's optional profile. Both writes act on `request.user` and
     # name nobody else; the photo is read by any signed-in user, through Django
     # only (MEDIA_URL is not routed). `photo_user` is an account that has one --

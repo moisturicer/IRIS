@@ -203,6 +203,9 @@ REST_FRAMEWORK = {
         "anon": throttle_rate("API_THROTTLE_ANON", "100/day"),
         "user": throttle_rate("API_THROTTLE_USER", "1000/day"),
         "ai_query": throttle_rate("API_THROTTLE_AI_QUERY", "60/hour"),
+        # A person's own data download (IR-786): per signed-in person, because each
+        # one reads a whole account and is audited.
+        "personal_data_export": throttle_rate("API_THROTTLE_DATA_EXPORT", "5/hour"),
         # Per client address (IR-661). A campus shares one, so these allow a
         # class signing in together; the lockout still answers per account and address.
         "auth_login": throttle_rate("API_THROTTLE_LOGIN", "300/hour"),

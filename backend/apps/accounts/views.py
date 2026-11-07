@@ -2,6 +2,8 @@ from django.db import transaction
 from django.http import FileResponse, Http404
 from django.utils import timezone
 from rest_framework import generics, status
+from django.utils.cache import add_never_cache_headers
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -47,7 +49,8 @@ from .sessions import (
     revoke_token,
 )
 from .lockout import LOCKED_BY_ADMIN
-from .throttles import LoginThrottle, RegisterThrottle
+from .throttles import LoginThrottle, PersonalDataExportThrottle, RegisterThrottle
+from .personal_data import EXPORT_FORMAT, SECTIONS, build_export
 
 
 class RegisterView(generics.CreateAPIView):
@@ -273,6 +276,32 @@ class MeView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         return self.request.user
+
+
+class PersonalDataExportView(APIView):
+    """One JSON file of the signed-in person's own data (ADR-051 decision 13, IR-786).
+
+    There is no id in the address and none to guess: the data is always the
+    caller's, so no role can read another person's through it (the System Admin
+    and RDCO included). Each download is audited, counts against a budget of its
+    own, and is never cached -- by the browser or by a proxy on the way.
+    """
+
+    permission_classes = [IsAuthenticated]
+    throttle_classes = [UserRateThrottle, PersonalDataExportThrottle]
+
+    def get(self, request):
+        payload = build_export(request.user)
+        create_audit_event(
+            AuditEvent.PERSONAL_DATA_EXPORTED,
+            request.user,
+            metadata={"format": EXPORT_FORMAT, "sections": sorted(SECTIONS)},
+        )
+        response = Response(payload)
+        response["Content-Disposition"] = 'attachment; filename="iris-my-data.json"'
+        add_never_cache_headers(response)
+        response["Cache-Control"] = "no-store, private"
+        return response
 
 
 class MePhotoView(APIView):
