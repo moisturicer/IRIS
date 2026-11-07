@@ -511,6 +511,9 @@ ACCOUNTS = {
     "password-reset-confirm": Entry({"POST": _case(PUBLIC, data={
         "token": "x" * 43, "new_password": "Recovery-test-42", "confirm_password": "Recovery-test-42",
     })}),
+    # IR-643: verification follows the same contract. Neither signs anyone in.
+    "verification-resend": Entry({"POST": _case(PUBLIC, data={"email": "unknown@cit.edu"})}),
+    "verification-confirm": Entry({"POST": _case(PUBLIC, data={"token": "x" * 43})}),
     "user-list": Entry({"GET": _case(ACCOUNT_ADMINS)}),
     "user-advisers": Entry({"GET": _case(SIGNED_IN)}),
     # IR-785: a person asks about, makes or cancels their own deletion request;

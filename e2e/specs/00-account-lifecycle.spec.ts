@@ -57,10 +57,12 @@ test("an unverified account is told so, and the emailed link verifies it", async
   expect(refused.status()).toBe(403);
   expect(await refused.text()).toContain("not verified");
 
+  // ADR-045 (IR-643): opening the link changes nothing; the button verifies.
   const mail = await waitForMail(email, /verify/i);
-  await page.goto(linkPath(mail.text || mail.html, "/activate"));
-  await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-  await expect(page.getByText(/verified|approval/i).first()).toBeVisible();
+  await page.goto(linkPath(mail.text || mail.html, "/verify-email"));
+  await page.getByRole("button", { name: "Verify email" }).click();
+  await expect(page.getByRole("heading", { name: "Email verified" })).toBeVisible();
+  await expect(page.getByText(/may still need to approve/i)).toBeVisible();
 });
 
 test("signed in before approval, the account waits; after RDCO approves, it has the Student role", async ({ page }) => {

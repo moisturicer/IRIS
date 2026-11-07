@@ -40,7 +40,7 @@ from apps.accounts.models import (
 from apps.audit.models import AuditEvent
 
 from . import audit, clock, crypto, service
-from .service import is_eligible, usable
+from .service import is_eligible, purpose_applies, usable
 
 logger = logging.getLogger(__name__)
 
@@ -135,7 +135,7 @@ def _issue(intent, at) -> None:
     if at >= intent.expires_at:
         _finish(intent, Status.EXPIRED, intent.expires_at)
         return
-    if user is None or user.email != address or not is_eligible(user) or not _purpose_applies(user, intent.purpose):
+    if user is None or user.email != address or not is_eligible(user) or not purpose_applies(user, intent.purpose):
         audit.record(AuditEvent.RECOVERY_SUPPRESSED, purpose=intent.purpose, outcome=RecoveryAuditOutcome.SUPPRESSED,
                      reason="not_eligible", correlation_id=intent.correlation_id)
         _finish(intent, Status.INELIGIBLE, at)
@@ -158,17 +158,12 @@ def _issue(intent, at) -> None:
     intent.save()
 
 
-def _purpose_applies(user, purpose) -> bool:
-    """A verified account is sent no verification email (ADR-045 §1)."""
-    return not (purpose == RecoveryPurpose.EMAIL_VERIFICATION and user.is_verified)
-
-
 def _sendable(intent, at) -> bool:
     if intent.purpose == RecoveryPurpose.PASSWORD_CHANGED:
         return at < intent.expires_at and intent.user is not None and bool(intent.user.email)
     token = RecoveryToken.objects.filter(intent=intent).select_related("user").first()
-    return token is not None and usable(token, token.user, intent.purpose, at) \
-        and _purpose_applies(token.user, intent.purpose)
+    # `usable` already refuses a verification link once the account is verified.
+    return token is not None and usable(token, token.user, intent.purpose, at)
 
 
 def _compose(intent) -> EmailMessage:
@@ -189,6 +184,22 @@ def _compose(intent) -> EmailMessage:
     token = RecoveryToken.objects.get(intent=intent)
     raw = crypto.decrypt(intent.payload_encrypted)
     expires = token.expires_at.astimezone(dt_timezone.utc)
+    if intent.purpose == RecoveryPurpose.EMAIL_VERIFICATION:
+        # Never a role decision or a restriction (§6): verifying proves the
+        # mailbox, and RDCO's approval is still a separate step.
+        return EmailMessage(
+            subject="Verify your IRIS email address",
+            body=(
+                "Someone asked to verify this email address for an IRIS account.\n\n"
+                "To verify it, open this link and choose \"Verify email\":\n\n"
+                f"{settings.FRONTEND_URL}/verify-email#token={raw}\n\n"
+                f"The link works once and expires at {expires.isoformat()} UTC.\n\n"
+                "If you did not request this, ignore this email.\n\n"
+                f"{help_line}\n"
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            to=[token.email],
+        )
     return EmailMessage(
         subject="Reset your IRIS password",
         body=(

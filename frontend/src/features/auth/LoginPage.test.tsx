@@ -427,6 +427,10 @@ describe("what a failed sign-in says", () => {
     const alert = await screen.findByRole("alert");
     expect(alert).toHaveTextContent("Email not verified");
     expect(alert).not.toHaveTextContent(/password/i);
+    // ADR-045 §7: a resend, never "register again" (IR-643).
+    expect(alert).not.toHaveTextContent(/register again/i);
+    expect(within(alert).getByRole("link", { name: "resend verification email" }))
+      .toHaveAttribute("href", "/verify-email/resend");
   });
 
   it("opens the account-locked dialog on a 403 'locked', as before", async () => {

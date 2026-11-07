@@ -454,6 +454,18 @@ export default function SignupPage() {
           <p className="mt-section text-pretty text-body text-stone-700">
             You can sign in once it is verified. Signing in shows that your request is waiting.
           </p>
+          {/* ADR-045 §7: a lost or expired link never means registering again (IR-643). */}
+          <p className="mt-section text-pretty text-body text-stone-700">
+            No email after a few minutes? Check spam, or{" "}
+            <Link
+              to="/verify-email/resend"
+              state={{ email: registered.email }}
+              className="font-semibold text-brand hover:underline"
+            >
+              resend verification email
+            </Link>
+            .
+          </p>
           {/* Not "contact RDCO": an email is read-only to every IRIS screen,
               RDCO's included, so the only fix IRIS offers is a fresh registration.
               Correcting it in place is IR-705. */}

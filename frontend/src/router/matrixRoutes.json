@@ -28,5 +28,7 @@
   "/review/analytics",
   "/review/office",
   "/settings",
-  "/signup"
+  "/signup",
+  "/verify-email",
+  "/verify-email/resend"
 ]
