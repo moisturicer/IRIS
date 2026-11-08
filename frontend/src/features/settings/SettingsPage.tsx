@@ -12,6 +12,7 @@ import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
 import { Panel } from "./settingsParts";
+import { AiAnswerPanel } from "./AiAnswerPanel";
 import { DeleteAccountPanel, DownloadMyDataPanel } from "./YourDataPanels";
 
 /**
@@ -270,6 +271,8 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
           account, which you can ask for below.
         </p>
       </Panel>
+
+      <AiAnswerPanel />
 
       <Panel
         title="Current disclosure notice"

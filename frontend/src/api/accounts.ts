@@ -1,5 +1,6 @@
 import { apiClient } from "./client";
 import type { AdviserOption, User, UserListItem, RoleRequest } from "@/types/auth";
+import type { NoticeAnswer } from "@/types/notice";
 
 interface College    { id: number; name: string; code: string; }
 interface Department { id: number; name: string; code: string; college: number; college_name: string; }
@@ -115,6 +116,13 @@ export const accountsApi = {
     apiClient.get<{ request: MyDeletionRequest | null }>("/users/me/deletion-request/", { signal: opts?.signal }),
   cancelMyDeletion: () =>
     apiClient.delete<{ request: MyDeletionRequest }>("/users/me/deletion-request/"),
+
+  /**
+   * Change the caller's own AI answer (ADR-054 decisions 11-13, IR-791). A No
+   * becoming a Yes needs `papers`; the server refuses it otherwise.
+   */
+  changeAiAnswer: (data: { ai_consent: boolean; papers?: "all" | "from_now" }) =>
+    apiClient.post<{ answer: NoticeAnswer; changed: boolean; papers_updated: number }>("/users/me/ai-answer/", data),
 
   /** One JSON file of the caller's own data (ADR-051 decision 13, IR-786). */
   downloadMyData: () => apiClient.get<Blob>("/users/me/data/", { responseType: "blob" }),
