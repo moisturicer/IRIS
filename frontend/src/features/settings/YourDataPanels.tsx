@@ -9,27 +9,11 @@ import { useCallback, useEffect, useState } from "react";
 import { accountsApi, type MyDeletionRequest } from "@/api/accounts";
 import { Button } from "@/components/ui";
 import { Spinner } from "@/components/ui/Spinner";
-import { TONES } from "@/components/ui/statusTones";
 import { errorDetail } from "@/lib/errorDetail";
-import { cn, formatDate } from "@/lib/utils";
-import { Panel } from "./settingsParts";
+import { formatDate } from "@/lib/utils";
+import { Message, Panel } from "./settingsParts";
 
 const FILE_NAME = "iris-my-data.json";
-
-function Message({ tone, role, children }: { tone: "ok" | "error"; role: "status" | "alert"; children: React.ReactNode }) {
-  return (
-    <p
-      role={role}
-      className={cn(
-        "text-[13px] rounded-lg px-3 py-2 flex items-start gap-2",
-        tone === "ok" ? TONES.settled : TONES.active,
-      )}
-    >
-      <i className={cn("fas mt-0.5 shrink-0", tone === "ok" ? "fa-check" : "fa-circle-exclamation")} aria-hidden />
-      <span>{children}</span>
-    </p>
-  );
-}
 
 /* -------------------------------------------------------------------------- */
 /* Download my data                                                           */

@@ -97,9 +97,6 @@ export function NoticeAnswerFields({
   const yesHelpId = useId();
   const noHelpId = useId();
   const recallId = useId();
-  const papersErrorId = useId();
-  const allHelpId = useId();
-  const fromNowHelpId = useId();
 
   return (
     <div className="space-y-5">
@@ -153,35 +150,52 @@ export function NoticeAnswerFields({
       </fieldset>
 
       {asksWhichPapers(previousAi, value) && (
-        <fieldset
-          aria-describedby={errors.papers ? papersErrorId : undefined}
-          aria-invalid={errors.papers ? true : undefined}
-        >
-          <legend className="text-small font-semibold text-stone-900">
-            You said No before. Which papers does your Yes cover?
-          </legend>
-          <div className="mt-2 space-y-2">
-            <Choice
-              name={`${aiLegendId}-papers`}
-              checked={value.papers === "all"}
-              onSelect={() => onChange({ ...value, papers: "all" })}
-              label="All my papers"
-              helpId={allHelpId}
-              help="Also every paper you're Contact person of that holds a No. Their text will be sent to AI companies, subject to the embargo and the IP mark, and can't be recalled."
-            />
-            <Choice
-              name={`${aiLegendId}-papers`}
-              checked={value.papers === "from_now"}
-              onSelect={() => onChange({ ...value, papers: "from_now" })}
-              label="Only papers from now on"
-              helpId={fromNowHelpId}
-              help="Papers you already have keep their No."
-            />
-          </div>
-          {errors.papers && <FieldMessage id={papersErrorId}>{errors.papers}</FieldMessage>}
-        </fieldset>
+        <WhichPapers
+          value={value.papers}
+          onChange={(papers) => onChange({ ...value, papers })}
+          error={errors.papers}
+        />
       )}
     </div>
+  );
+}
+
+/**
+ * The two choices a No becoming a Yes asks, neither preselected (ADR-054
+ * decision 13). The notice screen and Settings both ask it, in these words.
+ */
+export function WhichPapers({
+  value, onChange, error,
+}: { value: PapersChoice | null; onChange: (next: PapersChoice) => void; error?: string }) {
+  const name = useId();
+  const errorId = useId();
+  const allHelpId = useId();
+  const fromNowHelpId = useId();
+  return (
+    <fieldset aria-describedby={error ? errorId : undefined} aria-invalid={error ? true : undefined}>
+      <legend className="text-small font-semibold text-stone-900">
+        You said No before. Which papers does your Yes cover?
+      </legend>
+      <div className="mt-2 space-y-2">
+        <Choice
+          name={name}
+          checked={value === "all"}
+          onSelect={() => onChange("all")}
+          label="All my papers"
+          helpId={allHelpId}
+          help="Also every paper you're Contact person of that holds a No. Their text will be sent to AI companies, subject to the embargo and the IP mark, and can't be recalled."
+        />
+        <Choice
+          name={name}
+          checked={value === "from_now"}
+          onSelect={() => onChange("from_now")}
+          label="Only papers from now on"
+          helpId={fromNowHelpId}
+          help="Papers you already have keep their No."
+        />
+      </div>
+      {error && <FieldMessage id={errorId}>{error}</FieldMessage>}
+    </fieldset>
   );
 }
 
