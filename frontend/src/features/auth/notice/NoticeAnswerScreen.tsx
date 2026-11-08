@@ -13,6 +13,7 @@ import {
   NO_ANSWERS,
   NoticeAnswerFields,
   NoticeText,
+  asksWhichPapers,
   missingAnswers,
   type NoticeAnswerErrors,
   type NoticeAnswers,
@@ -41,6 +42,8 @@ export function NoticeAnswerScreen() {
 
   const [phase, setPhase] = useState<Phase>("loading");
   const [notice, setNotice] = useState<DataNotice | null>(null);
+  // Their last answer on AI: a No there makes a Yes ask which papers (IR-791).
+  const [previousAi, setPreviousAi] = useState<boolean | null>(null);
   const [answers, setAnswers] = useState<NoticeAnswers>(NO_ANSWERS);
   const [errors, setErrors] = useState<NoticeAnswerErrors>({});
   const [alert, setAlert] = useState<{ title: string; message: string } | null>(null);
@@ -66,6 +69,7 @@ export function NoticeAnswerScreen() {
   const load = useCallback(async () => {
     try {
       const { data } = await noticeApi.current();
+      setPreviousAi(data.answer?.ai_consent ?? null);
       showNotice(data);
       setPhase("ready");
     } catch {
@@ -98,13 +102,18 @@ export function NoticeAnswerScreen() {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!notice) return;
-    const missing = missingAnswers(answers);
+    const missing = missingAnswers(answers, previousAi);
     setErrors(missing);
-    if (missing.agree || missing.ai) return;
+    if (missing.agree || missing.ai || missing.papers) return;
     setSubmitting(true);
     setAlert(null);
     try {
-      await noticeApi.answer({ notice_version: notice.version, agree_dpa: true, ai_consent: answers.ai === true });
+      await noticeApi.answer({
+        notice_version: notice.version,
+        agree_dpa: true,
+        ai_consent: answers.ai === true,
+        ...(asksWhichPapers(previousAi, answers) && answers.papers ? { papers: answers.papers } : {}),
+      });
       // The account could not load while the notice was unanswered (a refresh
       // lands here with no user), so load it now, then let the page show.
       if (!user) {
@@ -176,7 +185,7 @@ export function NoticeAnswerScreen() {
             <div className="max-h-[50vh] overflow-y-auto rounded-lg border border-stone-200 bg-stone-50 px-4 py-3" tabIndex={0} role="region" aria-label="Data notice">
               <NoticeText notice={notice} />
             </div>
-            <NoticeAnswerFields value={answers} onChange={setAnswers} errors={errors} />
+            <NoticeAnswerFields value={answers} onChange={setAnswers} errors={errors} previousAi={previousAi} />
             <Button type="submit" loading={submitting} className="w-full sm:w-auto">
               Save my answer
             </Button>

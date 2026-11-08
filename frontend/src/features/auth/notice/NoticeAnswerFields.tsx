@@ -12,27 +12,40 @@ import { formatDate } from "@/lib/utils";
  * is never parsed as markup.
  */
 
+/** Which papers a No becoming a Yes covers (ADR-054 decision 13, IR-791). */
+export type PapersChoice = "all" | "from_now";
+
 export interface NoticeAnswers {
   agree: boolean;
   /** null until the person picks one: neither answer is preselected. */
   ai: boolean | null;
+  /** Asked only when a No becomes a Yes; null until chosen, never assumed. */
+  papers: PapersChoice | null;
 }
 
-export const NO_ANSWERS: NoticeAnswers = { agree: false, ai: null };
+export const NO_ANSWERS: NoticeAnswers = { agree: false, ai: null, papers: null };
 
 export interface NoticeAnswerErrors {
   agree?: string;
   ai?: string;
+  papers?: string;
 }
 
 export const AGREE_REQUIRED = "Agree to the data-privacy agreement to continue.";
 export const AI_REQUIRED = "Choose Yes or No.";
+export const PAPERS_REQUIRED = "Choose which papers your Yes covers.";
 
-/** What a form shows when one of the two answers is missing. */
-export function missingAnswers(value: NoticeAnswers): NoticeAnswerErrors {
+/** A No becoming a Yes, the one change that asks which papers (ADR-054 decision 13). */
+export function asksWhichPapers(previousAi: boolean | null | undefined, value: NoticeAnswers): boolean {
+  return previousAi === false && value.ai === true;
+}
+
+/** What a form shows when an answer is missing. */
+export function missingAnswers(value: NoticeAnswers, previousAi?: boolean | null): NoticeAnswerErrors {
   return {
     ...(value.agree ? {} : { agree: AGREE_REQUIRED }),
     ...(value.ai === null ? { ai: AI_REQUIRED } : {}),
+    ...(asksWhichPapers(previousAi, value) && value.papers === null ? { papers: PAPERS_REQUIRED } : {}),
   };
 }
 
@@ -69,10 +82,13 @@ export function NoticeAnswerFields({
   value,
   onChange,
   errors = {},
+  previousAi,
 }: {
   value: NoticeAnswers;
   onChange: (next: NoticeAnswers) => void;
   errors?: NoticeAnswerErrors;
+  /** The person's last answer on AI; a No there makes a Yes here ask which papers. */
+  previousAi?: boolean | null;
 }) {
   const agreeId = useId();
   const agreeErrorId = useId();
@@ -81,6 +97,9 @@ export function NoticeAnswerFields({
   const yesHelpId = useId();
   const noHelpId = useId();
   const recallId = useId();
+  const papersErrorId = useId();
+  const allHelpId = useId();
+  const fromNowHelpId = useId();
 
   return (
     <div className="space-y-5">
@@ -113,7 +132,7 @@ export function NoticeAnswerFields({
           <Choice
             name={aiLegendId}
             checked={value.ai === true}
-            onSelect={() => onChange({ ...value, ai: true })}
+            onSelect={() => onChange({ ...value, ai: true, papers: null })}
             label="Yes"
             helpId={yesHelpId}
             help="IRIS may send your papers' text to AI companies to read and index them, write their AI Overview and answer questions about them. The embargo and the IP mark still apply."
@@ -121,7 +140,7 @@ export function NoticeAnswerFields({
           <Choice
             name={aiLegendId}
             checked={value.ai === false}
-            onSelect={() => onChange({ ...value, ai: false })}
+            onSelect={() => onChange({ ...value, ai: false, papers: null })}
             label="No"
             helpId={noHelpId}
             help="Your account works normally, and AI doesn't touch your papers: you fill in their details yourself. Your own Ask IRIS questions still go to AI companies."
@@ -132,6 +151,36 @@ export function NoticeAnswerFields({
         </p>
         {errors.ai && <FieldMessage id={aiErrorId}>{errors.ai}</FieldMessage>}
       </fieldset>
+
+      {asksWhichPapers(previousAi, value) && (
+        <fieldset
+          aria-describedby={errors.papers ? papersErrorId : undefined}
+          aria-invalid={errors.papers ? true : undefined}
+        >
+          <legend className="text-small font-semibold text-stone-900">
+            You said No before. Which papers does your Yes cover?
+          </legend>
+          <div className="mt-2 space-y-2">
+            <Choice
+              name={`${aiLegendId}-papers`}
+              checked={value.papers === "all"}
+              onSelect={() => onChange({ ...value, papers: "all" })}
+              label="All my papers"
+              helpId={allHelpId}
+              help="Also every paper you're Contact person of that holds a No. Their text will be sent to AI companies, subject to the embargo and the IP mark, and can't be recalled."
+            />
+            <Choice
+              name={`${aiLegendId}-papers`}
+              checked={value.papers === "from_now"}
+              onSelect={() => onChange({ ...value, papers: "from_now" })}
+              label="Only papers from now on"
+              helpId={fromNowHelpId}
+              help="Papers you already have keep their No."
+            />
+          </div>
+          {errors.papers && <FieldMessage id={papersErrorId}>{errors.papers}</FieldMessage>}
+        </fieldset>
+      )}
     </div>
   );
 }
