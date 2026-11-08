@@ -5,6 +5,7 @@
   "/activate/:uidb64/:token",
   "/admin/account-deletion-requests",
   "/admin/audit",
+  "/admin/retention",
   "/admin/users",
   "/ai",
   "/ai/conversations/:conversationId",

@@ -17,8 +17,8 @@ export interface AuditListParams {
 }
 
 export const auditApi = {
-  list:     (params?: AuditListParams) =>
-    apiClient.get<PaginatedResponse<AuditEvent>>("/audit/", { params }),
+  list:     (params?: AuditListParams, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<PaginatedResponse<AuditEvent>>("/audit/", { params, signal: opts?.signal }),
   exportCsv: (params?: AuditListParams) =>
     apiClient.get<Blob>("/audit/export/", { params, responseType: "blob" }),
   /** Every event type the log can hold, with the server's labels (IR-913). */

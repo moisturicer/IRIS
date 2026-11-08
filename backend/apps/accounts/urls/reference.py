@@ -6,4 +6,5 @@ urlpatterns = [
     path("departments/",                  views.DepartmentListView.as_view(),  name="department-list"),
     path("courses/",                      views.CourseListView.as_view(),      name="course-list"),
     path("settings/<str:key>/",           views.SystemSettingView.as_view(),   name="system-setting"),
+    path("settings/<str:key>/erasure-preview/", views.RetentionPreviewView.as_view(), name="retention-preview"),
 ]

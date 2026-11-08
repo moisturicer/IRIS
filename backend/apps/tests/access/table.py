@@ -566,6 +566,9 @@ ACCOUNTS = {
     "course-list": Entry({"GET": _case(PUBLIC)}),
     "system-setting": Entry({"GET": _case(SYSTEM_ADMIN_ONLY, kwargs={"key": "matrix-setting"}),
                              "PATCH": _case(SYSTEM_ADMIN_ONLY, kwargs={"key": "matrix-setting"}, data={"value": "updated"})}),
+    # IR-795: a real retention key, since any other key is a 404 for everyone.
+    "retention-preview": Entry({"GET": _case(SYSTEM_ADMIN_ONLY, kwargs={"key": "retention.download_notes_days"},
+                                            query={"days": "30"})}),
 }
 
 ASSIGNMENT = {"pk": Ref("assignment")}

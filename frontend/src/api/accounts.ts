@@ -35,6 +35,22 @@ export interface AccountDeletionRequest {
   capabilities: { can_confirm: boolean; can_reject: boolean };
 }
 
+/** One system setting (IR-667). The System Admin alone reads or changes it. */
+export interface SystemSetting {
+  key:        string;
+  value:      string;
+  updated_by: number | null;
+  updated_at: string;
+}
+
+/** What a retention period would erase if saved now (ADR-051 §19, IR-795). */
+export interface RetentionPreview {
+  key:   string;
+  /** Null when the period is blank, which erases nothing. */
+  days:  number | null;
+  count: number;
+}
+
 export const accountsApi = {
   // Users
   listUsers:  (params?: Record<string, unknown>) =>
@@ -92,8 +108,12 @@ export const accountsApi = {
   courses:     (deptId?: number)    => apiClient.get<PaginatedResponse<Course>>("/courses/", { params: deptId ? { department: deptId } : {} }),
 
   // Settings
-  getSetting:    (key: string)             => apiClient.get(`/settings/${key}/`),
-  updateSetting: (key: string, value: string) => apiClient.patch(`/settings/${key}/`, { value }),
+  getSetting:    (key: string, opts?: { signal?: AbortSignal }) =>
+    apiClient.get<SystemSetting>(`/settings/${key}/`, { signal: opts?.signal }),
+  updateSetting: (key: string, value: string) => apiClient.patch<SystemSetting>(`/settings/${key}/`, { value }),
+  /** How many items the daily cleanup would erase now under `days` (IR-795). Reads only. */
+  retentionPreview: (key: string, days: string) =>
+    apiClient.get<RetentionPreview>(`/settings/${key}/erasure-preview/`, { params: { days } }),
 
   // Active sessions (admin)
   sessions:      () => apiClient.get<ActiveSession[]>("/users/sessions/"),
