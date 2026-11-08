@@ -18,7 +18,8 @@ for (const state of STATES) {
 
     await openScreen(page, api, { ...screen, path: state.path ?? screen.path }, {
       override: state.override,
-      timeOut: state.timeOut,
+      // Only the read under test times out: on a slow machine another read that did would put a second failure on screen.
+      timeOut: state.timeOut ? { only: state.read.path } : undefined,
     });
     await expect(state.shows(page), `${id}: the screen is not in this state`).toBeVisible();
     await expectNotCrashed(page);

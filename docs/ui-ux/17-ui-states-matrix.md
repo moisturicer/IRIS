@@ -40,3 +40,5 @@ Legend: **✓** already implemented · **●** added by IR-906 · **N/A** with t
 ## How it is proved
 
 Each ● cell has a test that queries by role and accessible name. They are listed in [`docs/testing/traceability/IR-906.md`](../testing/traceability/IR-906.md).
+
+Every cell that is not N/A has a test that forces it in a real browser (IR-907): the one request that decides the state is intercepted, and the test asserts what the reader sees and can do next. Two things it does not cover are named in the traceability record: a Paper View re-read after an act that finds access gone, and a Retry on an Ask IRIS answer that was cut off on the request-bound path. `e2e/smoke/forced-coverage.spec.ts` reads this table, so a cell added, resolved or marked N/A here without a matching change to `e2e/smoke/support/matrix-proofs.ts` fails CI. (It checks that each named test exists as a `test(` line; that the test passes is what the rest of the smoke tier shows.) See [`docs/testing/traceability/IR-907.md`](../testing/traceability/IR-907.md).

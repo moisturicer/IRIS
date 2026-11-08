@@ -1,4 +1,5 @@
-// The states of docs/ui-ux/17-ui-states-matrix.md (IR-906) that axe scans (IR-908).
+// The states of docs/ui-ux/17-ui-states-matrix.md (IR-906) that axe scans (IR-908)
+// and that forced-states.spec.ts forces and asserts on (IR-907).
 //
 // Each entry takes a screen from screens.ts as the page's ordinary mocks and
 // replaces the one read that decides the state. The matrix's five states are:
@@ -35,6 +36,17 @@ export interface UiState {
   /** Reads the test never answers time out (the interrupted state). */
   timeOut?: boolean;
   shows: (page: Page) => Locator;
+  // The three fields below are what forced-states.spec.ts (IR-907) adds to the
+  // catalogue: the axe scan needs only the state, the forced-state tests also
+  // need to answer the same read again and say what the reader does next.
+  /** The one read that decides the state, so a test can answer it differently. */
+  read: { method: string; path: string };
+  /** What that read answers when it works. */
+  ok: unknown;
+  /** Visible once the read has worked: proof the screen left the state for its content. */
+  recovered: (page: Page) => Locator;
+  /** A way on that is not a retry: the state's own next step, when it offers one (empty, revoked). */
+  next?: (page: Page) => Locator;
 }
 
 const failed = { detail: "smoke: the read failed" };
@@ -53,14 +65,23 @@ function reads(
     variant?: string;
     path?: string;
     loading: (page: Page) => Locator;
+    /** What the read answers when it works, and what then proves the screen drew it. */
+    ok: unknown;
+    recovered: (page: Page) => Locator;
     /** Mocks that put the screen where the read happens, applied before the read's own. */
     also?: (api: MockApi) => void;
     /** What an interrupted read says, when it is not the shared "This took too long". */
     interrupted?: string;
+    /** What the reader can do from an empty or a refused screen, when it offers anything. */
+    emptyNext?: (page: Page) => Locator;
+    revokedNext?: (page: Page) => Locator;
   },
 ): UiState[] {
   const also = options.also ?? (() => undefined);
-  const base = { screen, path: options.path, variant: options.variant };
+  const base = {
+    screen, path: options.path, variant: options.variant,
+    read: { method, path }, ok: options.ok, recovered: options.recovered,
+  };
   const states: UiState[] = [
     { ...base, state: "loading", override: (api) => { also(api); api.on(method, path, hang); }, shows: options.loading },
     { ...base, state: "error", override: (api) => { also(api); api.on(method, path, failed, 500); }, shows: text(copy.error) },
@@ -68,13 +89,14 @@ function reads(
   ];
   if (copy.empty) {
     const { reply, shows } = copy.empty;
-    states.push({ ...base, state: "empty", override: (api) => { also(api); api.on(method, path, reply); }, shows: text(shows) });
+    states.push({ ...base, state: "empty", override: (api) => { also(api); api.on(method, path, reply); }, shows: text(shows), next: options.emptyNext });
   }
   if (copy.revoked) {
     for (const status of [403, 404]) {
       states.push({
         ...base, state: "revoked", variant: [options.variant, String(status)].filter(Boolean).join(" "),
         override: (api) => { also(api); api.on(method, path, failed, status); }, shows: text(copy.revoked!),
+        next: options.revokedNext,
       });
     }
   }
@@ -87,18 +109,41 @@ function reads(
  */
 const asParticipant = (api: MockApi) => api.on("GET", `/records/${PAPER.id}/`, { ...PAPER_DETAIL, is_participant: true });
 
+/** The tracker as the review panels read it: nobody has acted yet, a viewer who may not read the review gets nulls. */
+export const TRACKER = {
+  record_id: PAPER.id, record_type: "Thesis / Research", workflow_state: "published", workflow_state_label: "Published",
+  current_holders: [{ party: "rdco", label: "RDCO" }], parties: [], routing_history: [], routing_recorded_from: null,
+  reviews: [], versions: [], review_comments: [], resubmissions: [],
+};
+
+export const CONVERSATION = {
+  id: 1, title: "", record: null, record_title: null, turn_count: 0,
+  created_at: "2026-11-05T08:00:00+08:00", updated_at: "2026-11-05T08:00:00+08:00", turns: [],
+};
+
+export const EMPTY_REVIEWS = { rows: [], counts: { to_review: 0, in_review: 0, done: 0 }, next: null };
+export const EMPTY_CONSOLE = { office: "rdco", office_label: "RDCO", rows: [], load: [] };
+
 export const STATES: UiState[] = [
   // Discover: nothing to revoke (the list is read under the visibility predicate every time).
   ...reads("discover", "GET", "/records/", {
     error: "We couldn't load research",
     empty: { reply: paginated([]), shows: "Nothing has been published yet." },
-  }, { loading: announced("Loading research") }),
+  }, {
+    loading: announced("Loading research"),
+    ok: paginated([PAPER]), recovered: text(PAPER.title),
+    emptyNext: (page) => page.getByRole("button", { name: "Publish" }).first(),
+  }),
 
   // Paper View: one Record that exists, so no empty state. A hidden Record and a missing id read alike.
   ...reads("paper-view", "GET", "/records/101/", {
     error: "We couldn't load this record",
     revoked: "Record not available",
-  }, { loading: (page) => page.locator(".animate-pulse").first() }),
+  }, {
+    loading: (page) => page.locator(".animate-pulse").first(),
+    ok: PAPER_DETAIL, recovered: (page) => page.getByRole("heading", { name: PAPER.title }),
+    revokedNext: (page) => page.getByRole("link", { name: "Go to Discover" }),
+  }),
 
   // Review panels in Paper View. Both read the record's tracker. The matrix marks their refused
   // cell N/A (a 403 or 404 reads as an ordinary failure, a known gap), so there is no entry for it.
@@ -106,6 +151,7 @@ export const STATES: UiState[] = [
     error: "Could not load the review tracker.",
   }, {
     variant: "review tracker", also: asParticipant, interrupted: "The review tracker took too long to load.",
+    ok: TRACKER, recovered: text("Currently with"),
     loading: (page) => page.getByRole("region", { name: /Review & Routing/ }).locator(".animate-pulse").first(),
   }),
   ...reads("paper-view", "GET", "/records/101/tracker/", {
@@ -113,6 +159,7 @@ export const STATES: UiState[] = [
   }, {
     variant: "review timeline", path: "/records/101?section=review", also: asParticipant,
     interrupted: "The review timeline took too long to load.",
+    ok: TRACKER, recovered: text("Nothing has happened in this review yet."),
     loading: (page) => page.getByRole("region", { name: "Timeline" }).locator(".animate-pulse").first(),
   }),
 
@@ -120,36 +167,58 @@ export const STATES: UiState[] = [
   ...reads("my-library", "GET", "/records/mine/", {
     error: "Could not load your research",
     empty: { reply: [], shows: "You haven’t published anything yet" },
-  }, { variant: "overview", loading: announced("Loading your research") }),
+  }, {
+    variant: "overview", loading: announced("Loading your research"),
+    ok: [], recovered: text("You haven’t published anything yet"),
+  }),
   ...reads("my-library", "GET", "/records/mine/", {
     error: "Could not load your research",
     empty: { reply: [], shows: "You haven’t published anything yet" },
-  }, { variant: "my research", path: "/records/mine?section=research", loading: announced("Loading your research") }),
+  }, {
+    variant: "my research", path: "/records/mine?section=research", loading: announced("Loading your research"),
+    ok: [], recovered: text("You haven’t published anything yet"),
+  }),
   ...reads("my-library", "GET", "/library/saves/", {
     error: /Could not load/,
-  }, { variant: "saved", path: "/records/mine?section=saved", loading: announced("Loading saved papers") }),
+  }, {
+    variant: "saved", path: "/records/mine?section=saved", loading: announced("Loading saved papers"),
+    ok: { results: [] }, recovered: text("No saved papers yet"),
+  }),
   ...reads("my-library", "GET", "/records/download-requests/mine/", {
     error: "Could not load your download requests",
     empty: { reply: [], shows: "No download requests yet" },
-  }, { variant: "download requests", path: "/records/mine?section=downloads", loading: announced("Loading your download requests") }),
+  }, {
+    variant: "download requests", path: "/records/mine?section=downloads", loading: announced("Loading your download requests"),
+    ok: [], recovered: text("No download requests yet"),
+  }),
 
   // Ask IRIS, Django path: an address that cannot be read says the conversation is not available.
   ...reads("ask-iris-conversation", "GET", "/ai/conversations/1/", {
     error: "Could not load this conversation",
     revoked: "This conversation is not available.",
-  }, { loading: announced("Loading this conversation") }),
+  }, {
+    loading: announced("Loading this conversation"),
+    ok: CONVERSATION, recovered: (page) => page.getByRole("heading", { name: /What do you want to ask/ }),
+    revokedNext: (page) => page.getByRole("button", { name: "Start a new chat" }),
+  }),
 
   // Review.
   ...reads("my-reviews", "GET", "/reviews/mine/", {
     error: "Could not load My Reviews",
-    empty: { reply: { rows: [], counts: { to_review: 0, in_review: 0, done: 0 }, next: null }, shows: "Nothing to review" },
+    empty: { reply: EMPTY_REVIEWS, shows: "Nothing to review" },
     revoked: "My Reviews isn't available to you",
-  }, { loading: (page) => page.locator('[aria-busy="true"]').first() }),
+  }, {
+    loading: (page) => page.locator('[aria-busy="true"]').first(),
+    ok: EMPTY_REVIEWS, recovered: text("Nothing to review"),
+  }),
   ...reads("office-console", "GET", "/reviews/office/", {
     error: "Could not load the console",
-    empty: { reply: { office: "rdco", office_label: "RDCO", rows: [], load: [] }, shows: /Nothing open at/ },
+    empty: { reply: EMPTY_CONSOLE, shows: /Nothing open at/ },
     revoked: "This console is for coordinators",
-  }, { loading: (page) => page.locator('[aria-busy="true"]').first() }),
+  }, {
+    loading: (page) => page.locator('[aria-busy="true"]').first(),
+    ok: EMPTY_CONSOLE, recovered: text(/Nothing open at/),
+  }),
 ];
 
 /** A stable name for the results and the test title. */

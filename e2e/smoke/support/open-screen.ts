@@ -17,18 +17,46 @@ export const hang = () => new Promise<void>(() => undefined);
  * request the test never answers times out the way a real one would, with the
  * same error the client sorts as "interrupted".
  */
-export async function makeReadsTimeOut(page: Page) {
-  await page.addInitScript(() => {
-    const own = Object.getOwnPropertyDescriptor(XMLHttpRequest.prototype, "timeout");
-    if (!own?.set || !own.get) return;
-    const set = own.set;
-    Object.defineProperty(XMLHttpRequest.prototype, "timeout", {
-      configurable: true,
-      get: own.get,
-      set(this: XMLHttpRequest, value: number) {
-        set.call(this, value ? Math.min(value, 300) : value);
-      },
-    });
+export async function makeReadsTimeOut(page: Page, only?: string) {
+  await page.addInitScript(capReadTimeouts, only);
+}
+
+/**
+ * The same cap for a page that is already open: only reads that start AFTER
+ * this call time out early. For a screen whose later read (Load more) is the
+ * one under test, so its opening reads are not cut short on a slow machine.
+ */
+export async function makeLaterReadsTimeOut(page: Page, only?: string) {
+  await page.evaluate(capReadTimeouts, only);
+}
+
+/**
+ * Runs in the page, so it must stand alone. With `only`, a path such as
+ * "/records/101/", just the requests whose address ENDS with it are capped: on
+ * a slow machine an unrelated read on the same screen must not time out too,
+ * or the screen shows two failures and the test is measuring the wrong one.
+ */
+function capReadTimeouts(only?: string) {
+  const own = Object.getOwnPropertyDescriptor(XMLHttpRequest.prototype, "timeout");
+  if (!own?.set || !own.get) return;
+  const set = own.set;
+  const open = XMLHttpRequest.prototype.open as (...args: unknown[]) => void;
+  const targets = new WeakMap<XMLHttpRequest, boolean>();
+  XMLHttpRequest.prototype.open = function (this: XMLHttpRequest, ...args: unknown[]) {
+    if (only) {
+      let path = "";
+      try { path = new URL(String(args[1]), location.href).pathname; } catch { /* not a URL: not capped */ }
+      targets.set(this, path.endsWith(only));
+    }
+    return open.apply(this, args);
+  } as typeof XMLHttpRequest.prototype.open;
+  Object.defineProperty(XMLHttpRequest.prototype, "timeout", {
+    configurable: true,
+    get: own.get,
+    set(this: XMLHttpRequest, value: number) {
+      const capped = !only || targets.get(this) === true;
+      set.call(this, value && capped ? Math.min(value, 300) : value);
+    },
   });
 }
 
@@ -52,13 +80,16 @@ export async function settle(page: Page) {
 export interface OpenOptions {
   /** Replaces or adds mocks after the screen's own, to put it in a state. */
   override?: (api: MockApi) => void;
-  /** Reads the test never answers time out (see `makeReadsTimeOut`). */
-  timeOut?: boolean;
+  /**
+   * Reads the test never answers time out (see `makeReadsTimeOut`). `{ only }` limits
+   * that to the read whose path ends with it, so no other read on the screen can time out.
+   */
+  timeOut?: boolean | { only: string };
 }
 
 /** Signs in, mocks and opens the screen. Does not wait for the network to go quiet: a state may be waiting on a request on purpose. */
 export async function openScreen(page: Page, api: MockApi, screen: Screen, options: OpenOptions = {}) {
-  if (options.timeOut) await makeReadsTimeOut(page);
+  if (options.timeOut) await makeReadsTimeOut(page, options.timeOut === true ? undefined : options.timeOut.only);
   if (screen.role) await signedIn(page, api, screen.role);
   screen.mocks?.(api);
   options.override?.(api);
