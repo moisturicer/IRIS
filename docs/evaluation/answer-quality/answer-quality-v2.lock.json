@@ -1,0 +1,10 @@
+{
+  "set_id": "answer-quality-v2",
+  "version": 2,
+  "set_sha256": "70360280eb166dae312a72d2b1d7e7ffed39e2d20f1c5795af118d4afe0e02fa",
+  "rubric_version": "aq-rubric-1",
+  "rubric_sha256": "abf0d8c931795bfb047623645811fafedf559e6a1a98074761d1a8c9ba0276b2",
+  "grader_model": "anthropic/claude-haiku-5.5",
+  "cases": 108,
+  "lock_sha256": "f1ea6d3f41b324855087e56d454c8c6a07a5bc1442657c777ba6a4bf60a5defc"
+}

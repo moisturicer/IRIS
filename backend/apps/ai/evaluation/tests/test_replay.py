@@ -135,3 +135,33 @@ def test_cited_public_answer_and_reopened_turn_keep_source_ids(
     assert paper.pk in turn["source_ids"]
     assert turn["saved_turn"]["id"] == result["reopened_transcript"][0]["id"]
     assert "routing" not in json.dumps(turn["public_answer"])
+
+
+def test_a_paper_chat_case_opens_a_scoped_conversation_and_compaction_sends_nothing(
+        client_for, embedder, space, settings):
+    """IR-956: Django has no compaction; the turn is recorded as not supported."""
+    settings.AI_DURABLE_ASK = False
+    user = make_user("ir956-scope@cit.edu")
+    paper = make_record(title="Flood Prediction", text=FLOOD_TEXT, embedder=embedder,
+                        space=space)
+    reader = Reader(client_for(user))
+    asked = []
+    original = reader.post
+
+    def ask(path, payload):
+        if path == reverse("ai-ask-stream"):
+            asked.append(payload)
+        return original(path, payload)
+
+    reader.post = ask
+    case = {"id": "scoped", "family": "F09", "scope_record_id": paper.pk, "turns": [
+        {"user": "one"}, {"action": "compact"}, {"user": "two"}]}
+    root = CompositionRoot(embedder=embedder, reranker=ScriptedReranker(),
+                           llm=ScriptedLLM(reply="An answer."))
+    with use_composition_root(root):
+        result = collect_case(reader, case)
+    assert Conversation.objects.get(pk=result["conversation_id"]).record_id == paper.pk
+    assert [t.get("action") for t in result["turns"]] == [None, "compact", None]
+    assert result["turns"][1]["outcome"] == "not_supported"
+    assert [p["question"] for p in asked] == ["one", "two"]
+    assert result["status"] == "complete"

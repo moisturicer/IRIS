@@ -8,11 +8,11 @@ import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { TONES } from "@/components/ui/statusTones";
 import { useAuth } from "@/hooks/useAuth";
 import { pathFor } from "@/lib/access";
-import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
 import { Panel } from "./settingsParts";
 import { AiAnswerPanel } from "./AiAnswerPanel";
+import { CurrentNoticePanel } from "./CurrentNoticePanel";
 import { DeleteAccountPanel, DownloadMyDataPanel } from "./YourDataPanels";
 
 /**
@@ -274,31 +274,7 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
 
       <AiAnswerPanel />
 
-      <Panel
-        title="Current disclosure notice"
-        caption="This is the current notice for research disclosures. Your account consent record does not confirm that you accepted this revised notice or its external AI processing terms."
-      >
-        <div className="space-y-5 max-h-[420px] overflow-y-auto scrollbar-thin pr-1">
-          {DPA_SECTIONS.map((section) => (
-            <div key={section.title}>
-              <h3 className="text-[14px] font-bold text-stone-900">{section.title}</h3>
-              {"body" in section && section.body && (
-                <p className="text-[13px] text-stone-600 leading-relaxed mt-1">{section.body}</p>
-              )}
-              {"list" in section && section.list && (
-                <ul className="mt-2 space-y-1.5">
-                  {section.list.map((item) => (
-                    <li key={item} className="text-[13px] text-stone-600 leading-relaxed flex gap-2">
-                      <span className="text-stone-300 mt-0.5" aria-hidden>—</span>
-                      <span>{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
-      </Panel>
+      <CurrentNoticePanel />
 
       <DownloadMyDataPanel />
       <DeleteAccountPanel />

@@ -177,6 +177,16 @@ export const DIALOGS: DialogCase[] = [
     dialog: (page) => page.getByRole("dialog", { name: "Erase existing data?" }),
   },
   {
+    id: "publish a new notice version", screen: "notices",
+    sources: ["features/admin/NoticesPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    override: (api) => api.on("GET", "/auth/notice/versions/impact/", { current_version: 1, accounts_to_answer: 41 }),
+    open: async (page) => {
+      await page.getByRole("textbox", { name: "Notice text" }).fill("IRIS data notice, version two");
+      await press("Publish version 2")(page);
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Publish version 2?" }),
+  },
+  {
     id: "decline a download request", screen: "download-requests", sources: ["features/admin/DownloadRequestsPage.tsx"],
     open: press("Decline"), dialog: anyDialog,
   },
@@ -317,8 +327,6 @@ export const UNSCANNED: Record<string, string> = {
     "Its dialogs set and release an embargo, which only the Adviser or RDCO may do on a submitted Record: a fixture with the embargo capabilities and an embargo state.",
   "features/records/paper-view/FilesSection.tsx":
     "Its dialogs replace a manuscript and remove a file: a Record the reader owns with files attached and the upload slots mocked.",
-  "components/compliance/DpaConsentModal.tsx":
-    "Not rendered by any screen: only `components/compliance/index.ts` imports it. There is nothing to open; when a screen mounts it, give it a case here.",
   "features/records/paper-view/PaperChatDock.tsx":
     "Paper Chat's modal form needs the dock opened on a Record with an indexed paper and a mocked conversation stream (SSE), which the smoke tier's JSON mock cannot answer yet.",
   "features/records/paper-view/ReviewDetails.tsx":

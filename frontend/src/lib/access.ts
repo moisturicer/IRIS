@@ -159,6 +159,11 @@ export const SCREEN_ACCESS = {
                  nav: { label: "Download Requests", icon: "fa-download", section: "RDCO" } },
   deleteRequests: { path: "/rdco/delete-requests", roles: COORDINATOR,
                  nav: { label: "Delete Requests", icon: "fa-trash-alt", section: "RDCO" } },
+  // ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-800): one
+  // Notices page at one address. RDCO publishes there; the System Admin reads
+  // it from `adminNotices`, the same page, in its own sidebar section.
+  notices:       { path: "/notices", roles: COORDINATOR,
+                 nav: { label: "Notices", icon: "fa-file-signature", section: "RDCO" } },
 
   // Both roles use the same Users page, with distinct addresses and server permissions.
   adminUsers:    { path: "/admin/users", roles: SYSTEM_ADMIN,
@@ -171,6 +176,9 @@ export const SCREEN_ACCESS = {
   // ADR-051 §3 and §19: the System Admin sets retention periods (IR-795).
   retention:     { path: "/admin/retention", roles: SYSTEM_ADMIN,
                  nav: { label: "Retention", icon: "fa-clock-rotate-left", section: "Administration" } },
+  // The Notices page above, read-only for the System Admin (IR-800).
+  adminNotices:  { path: "/notices", roles: SYSTEM_ADMIN,
+                 nav: { label: "Notices", icon: "fa-file-signature", section: "Administration" } },
 } as const satisfies Record<string, ScreenDef>;
 
 export type ScreenKey = keyof typeof SCREEN_ACCESS;

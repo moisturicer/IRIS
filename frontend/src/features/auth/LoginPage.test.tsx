@@ -16,6 +16,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { Route, Routes, useLocation } from "react-router-dom";
 
 import { authApi } from "@/api/auth";
+import { noticeApi } from "@/api/notice";
 import { useAuthStore } from "@/store/auth.store";
 import { useUIStore } from "@/store/ui.store";
 import { landingPathFor } from "@/lib/landing";
@@ -139,8 +140,14 @@ describe("the frame sign in opens in", () => {
     expect(footer).toHaveTextContent("© 2026 IRIS · Research and IP disclosure");
     expect(footer).not.toHaveTextContent(/Pilot institution/);
     await user.type(screen.getByRole("textbox", { name: "Email Address" }), "reader@example.edu");
+    // The server's current notice, not text kept in the frontend (IR-800).
+    vi.spyOn(noticeApi, "current").mockResolvedValue({
+      data: { version: 4, text: "What IRIS keeps\nYour name.", published_at: "2026-11-02T08:00:00Z" },
+    } as never);
     await user.click(within(footer).getByRole("link", { name: "Data privacy" }));
-    expect(screen.getByRole("dialog", { name: "Data privacy" })).toHaveTextContent("What IRIS keeps when you register");
+    const privacy = screen.getByRole("dialog", { name: "Data privacy" });
+    expect(await within(privacy).findByText(/^What IRIS keeps/)).toHaveTextContent("What IRIS keeps Your name.");
+    expect(privacy).toHaveTextContent("Version 4 · published Nov 2, 2026");
     await user.keyboard("{Escape}");
     expect(within(footer).getByRole("link", { name: "Data privacy" })).toHaveFocus();
     await user.click(within(footer).getByRole("link", { name: "Terms" }));
