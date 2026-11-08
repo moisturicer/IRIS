@@ -432,16 +432,27 @@ class SystemSettingSerializer(serializers.ModelSerializer):
 # ---- Account deletion (ADR-051 §8-§12, IR-785) ----------------------------
 
 class MyDeletionRequestSerializer(serializers.Serializer):
-    """The person's own request. A rejection's reason is theirs to read."""
+    """
+    The person's own request. A rejection's reason is theirs to read, and so is
+    what blocks a pending one: papers they own or reviews they hold (IR-787).
+    """
     id         = serializers.IntegerField()
     status     = serializers.CharField()
     created_at = serializers.DateTimeField()
     decided_at = serializers.DateTimeField()
     reason     = serializers.CharField()
     can_cancel = serializers.SerializerMethodField()
+    blockers   = serializers.SerializerMethodField()
 
     def get_can_cancel(self, obj):
         return obj.status == RequestStatus.PENDING
+
+    def get_blockers(self, obj):
+        from .deletion.blockers import blockers_for
+
+        if obj.status != RequestStatus.PENDING:
+            return []
+        return [b.as_dict() for b in blockers_for(obj.user)]
 
 
 class AccountDeletionRequestSerializer(serializers.Serializer):

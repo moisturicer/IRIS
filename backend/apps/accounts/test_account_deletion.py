@@ -200,6 +200,19 @@ class BlockerTests(DeletionBase):
         self.student.refresh_from_db()
         self.assertIsNone(self.student.deleted_at)
 
+    def test_the_person_sees_what_blocks_their_own_pending_request(self):
+        paper = self.paper("Sole paper", owners=[self.student])
+        self.ask(self.student)
+
+        mine = self.as_(self.student).get(reverse("user-me-deletion-request")).json()["request"]
+        self.assertEqual([(b["kind"], b["record"]) for b in mine["blockers"]],
+                         [("sole_owner_in_review", paper.pk)])
+        self.assertIn("RDCO must withdraw it or add an owner", mine["blockers"][0]["message"])
+
+        # A request no longer pending has nothing left to block it.
+        cancelled = self.as_(self.student).delete(reverse("user-me-deletion-request")).json()["request"]
+        self.assertEqual(cancelled["blockers"], [])
+
     def test_a_paper_in_review_with_another_owner_does_not_block(self):
         self.paper("Shared paper", owners=[self.student, self.coowner])
         self.ask(self.student)
