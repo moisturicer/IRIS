@@ -208,7 +208,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-874** | Review threads, backend: anchored threads, *Must fix* and *Suggestion*, drafts sent by Finish review, *Comment only*, resolving and answering, and what an open *Must fix* blocks — ADR-032 §7 (2026-11-04, corrected 2026-11-06); no FR- id | [details](traceability/IR-874.md) | **IMPLEMENTED** |
 | **IR-875** | Review threads, frontend: comment on a selection or find match, the Threads tab, and the Finish review dialog, driven by server capabilities — ADR-032 §7 (2026-11-04, corrected and noted 2026-11-06); no FR- id | [details](traceability/IR-875.md) | **IMPLEMENTED** |
 | **IR-878** | RDCO publishes an Unlisted paper later, only once its embargo is released, and the history keeps its Decision as *kept unlisted* — ADR-047 §10, ADR-052 decision 14 as amended; no FR- id | [details](traceability/IR-878.md) | **IMPLEMENTED** |
-| **IR-873** | Two Versions compared section by section and sentence by sentence, both read by one reader, with every change marked and what can't be trusted said; served only under `may_read_review`, never naming a reader — ADR-058 §3 as amended 2026-11-08; touches FR-M5-01 (stable label only); backend only so far, run on five Version pairs of real CIT-U papers | [details](traceability/IR-873.md) | **PARTIAL** |
+| **IR-873** | Two Versions compared section by section, both read by one reader, never naming it — ADR-058 §3 as amended 2026-11-08; FR-M5-01 (label only); backend only so far | [details](traceability/IR-873.md) | **PARTIAL** |
 
 ### Non-functional
 
