@@ -676,18 +676,16 @@ describe("submitting", () => {
     expect(screen.getByRole("button", { name: "Submit for review" })).toBeInTheDocument();
   });
 
-  it("needs consent, and sends the DPA flag", async () => {
+  it("asks no consent at submit and sends no consent flag (ADR-054, IR-791)", async () => {
     const user = userEvent.setup();
     await openNew();
     await completeManuscript(user);
     await completeDetails(user);
 
-    const submit = screen.getByRole("button", { name: "Submit for review" });
-    expect(submit).toBeDisabled();
-    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
-    await user.click(submit);
+    expect(screen.queryByRole("checkbox", { name: /I have read/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Submit for review" }));
 
-    await waitFor(() => expect(recordsApi.submit).toHaveBeenCalledWith(42, true));
+    await waitFor(() => expect(recordsApi.submit).toHaveBeenCalledWith(42));
   });
 
   it("keeps step 3 on a 400 and shows the field errors", async () => {
@@ -702,7 +700,6 @@ describe("submitting", () => {
     await completeManuscript(user);
     await completeDetails(user);
 
-    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
 
     const alert = await screen.findByRole("alert");
@@ -725,7 +722,6 @@ describe("a network failure", () => {
     await openNew();
     await completeManuscript(user);
     await completeDetails(user);
-    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/couldn't reach IRIS/);
@@ -748,7 +744,6 @@ describe("success", () => {
     const { container } = await openNew();
     await completeManuscript(user);
     await completeDetails(user);
-    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
     await screen.findByRole("heading", { name: "Submitted for review" });
 
@@ -768,7 +763,6 @@ describe("success", () => {
     await openNew();
     await completeManuscript(user);
     await completeDetails(user);
-    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
 
     expect(await screen.findByRole("heading", { name: "Submitted for review" })).toBeInTheDocument();
@@ -794,7 +788,6 @@ describe("success", () => {
     await openNew();
     await completeManuscript(user);
     await completeDetails(user);
-    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
 
     expect(await screen.findByRole("heading", { name: "Sent to Maria C. Santos for review" })).toBeInTheDocument();
@@ -808,7 +801,6 @@ describe("success", () => {
     await openNew();
     await completeManuscript(user);
     await completeDetails(user);
-    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
     await user.click(await screen.findByRole("button", { name: "Publish another" }));
 
@@ -1334,10 +1326,9 @@ describe("autofill from the manuscript (IR-833; supersedes IR-409's chips)", () 
     await screen.findByText(NEUTRAL);
 
     await completeDetails(user);
-    await user.click(screen.getByRole("checkbox", { name: /I have read/i }));
     await user.click(screen.getByRole("button", { name: "Submit for review" }));
 
-    await waitFor(() => expect(recordsApi.submit).toHaveBeenCalledWith(42, true));
+    await waitFor(() => expect(recordsApi.submit).toHaveBeenCalledWith(42));
   });
 
   it("shows no confidence value, and passes axe with notes and offers on screen", async () => {

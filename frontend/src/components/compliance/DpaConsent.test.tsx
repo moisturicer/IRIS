@@ -1,21 +1,17 @@
 import { describe, expect, it, vi } from "vitest";
 import { renderScreen, screen, userEvent, within } from "@/test/render";
-import { DpaConsentInline } from "./DpaConsentInline";
 import { DpaConsentModal } from "./DpaConsentModal";
 
 describe("disclosure processing notice (IR-123)", () => {
-  it("explains external AI processing before the author consents", async () => {
-    const user = userEvent.setup();
-    renderScreen(<DpaConsentInline accepted={false} onAcceptedChange={vi.fn()} />);
+  it("explains external AI processing in the DPA terms", () => {
+    renderScreen(<DpaConsentModal open onClose={vi.fn()} />);
+    const dialog = screen.getByRole("dialog");
 
-    await user.click(screen.getByRole("button", { name: /view DPA terms/i }));
-
-    expect(screen.getByText(/external AI providers outside CIT-U/i)).toBeVisible();
-    expect(screen.getByText(/Voyage AI.*embedding.*reranking/i)).toBeVisible();
-    expect(screen.getByText(/questions.*conversation context.*manuscript text/i)).toBeVisible();
-    expect(screen.getByText(/pending.*DPO.*review/i)).toBeVisible();
-    expect(screen.queryByText(/we do not.*share it outside CIT-U/i)).not.toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /external AI processing/i })).not.toBeChecked();
+    expect(within(dialog).getByText(/external AI providers outside CIT-U/i)).toBeVisible();
+    expect(within(dialog).getByText(/Voyage AI.*embedding.*reranking/i)).toBeVisible();
+    expect(within(dialog).getByText(/questions.*conversation context.*manuscript text/i)).toBeVisible();
+    expect(within(dialog).getByText(/pending.*DPO.*review/i)).toBeVisible();
+    expect(within(dialog).queryByText(/we do not.*share it outside CIT-U/i)).not.toBeInTheDocument();
   });
 
   it("copies every displayed notice paragraph, including external processing", async () => {

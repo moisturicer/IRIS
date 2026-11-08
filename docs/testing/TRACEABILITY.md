@@ -171,6 +171,7 @@ Change a row here only when the requirement's status changes. To see every note 
 | **IR-568** | Related works says why it is empty (ready, no matches, not indexed, incompatible, unavailable) without revealing hidden Records — no FR- id; user story 14 of IR-557's spec | [details](traceability/IR-568.md) | **IMPLEMENTED** |
 | **IR-312** | A proposer sees when their idea was already done here — the Novelty check; FR-M4 (stable label only) | [details](traceability/IR-312.md) | **IMPLEMENTED** |
 | **IR-786** | A person downloads a copy of their own data from one owner-only, audited, rate-limited endpoint — ADR-051 decision 13; FR-M6-06 (stable label only) | [details](traceability/IR-786.md) | **PARTIAL** |
+| **IR-791** | A paper keeps its Contact person's AI answer from draft creation, the disclosure gate reads it, submit asks no consent, and a person changes their own answer — ADR-054 decisions 5, 6, 9-13, 16-17; FR-M6-02 (stable label only) | [details](traceability/IR-791.md) | **IMPLEMENTED** |
 | **IR-826** | The AI gateway gets no Django database login; ADR-014's accepted amendment allows its runs login only | [details](traceability/IR-826.md) | **VERIFIED** |
 | **IR-832** | Publish blocks readable exact Manuscript duplicates and requires acknowledgement of likely matches | [details](traceability/IR-832.md) | **IN PROGRESS** |
 | **IR-833** | Publish fills in a reliable title and abstract from the PDF and never overwrites the author's edits — no FR- id; IR-830 decisions 14–18 | [details](traceability/IR-833.md) | **IMPLEMENTED** |

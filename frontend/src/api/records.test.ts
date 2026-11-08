@@ -42,8 +42,7 @@ const rows: Row[] = [
   ["create", () => recordsApi.create({ title: "T" }), "post", "/records/", { title: "T" }],
   ["update", () => recordsApi.update(9, { title: "New" }), "patch", "/records/9/", { title: "New" }],
   ["delete", () => recordsApi.delete(9), "delete", "/records/9/"],
-  ["submit", () => recordsApi.submit(9, true), "post", "/records/9/submit/", { dpa_accepted: true }],
-  ["submit without consent", () => recordsApi.submit(9, false), "post", "/records/9/submit/", { dpa_accepted: false }],
+  ["submit", () => recordsApi.submit(9), "post", "/records/9/submit/"],
   ["incrementAccess", () => recordsApi.incrementAccess(9), "post", "/records/9/increment_access/"],
   ["updateTags", () => recordsApi.updateTags(9, { is_ip: true, ip_type: "patent" }),
     "patch", "/records/9/tags/", { is_ip: true, ip_type: "patent" }],
@@ -258,7 +257,7 @@ describe("recordsApi: a refusal reaches the caller with its status and body", ()
   it.each([
     ["404, a record the caller cannot see", 404, { detail: "Not found." }, () => recordsApi.detail(9)],
     ["403, an act they may not do", 403, { detail: "No." }, () => recordsApi.releaseEmbargo(9)],
-    ["400, an act that is not possible now", 400, { detail: "Not now." }, () => recordsApi.submit(9, true)],
+    ["400, an act that is not possible now", 400, { detail: "Not now." }, () => recordsApi.submit(9)],
     ["409, a record that changed since the decision token", 409, { decision: { token: "fresh" } },
       () => recordsApi.decide(9, { outcome: "reject", comment: "No", token: "stale" })],
     ["403 with a code, a download without a grant", 403, { code: "download_grant_required" },
