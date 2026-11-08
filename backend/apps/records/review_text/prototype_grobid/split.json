@@ -1,0 +1,23 @@
+{
+  "note": "Fixed on 2026-11-08 before any GROBID output was read. Only the tuning set is looked at while designing the hybrid; scores are reported for each set apart. sample27 is the same file as sample26 and is left out.",
+  "tuning": ["sample1_v1.pdf", "sample1_v2.pdf", "sample6_v1.pdf", "sample6_v2.pdf", "Sample4_v1.pdf",
+             "sample14_v1.pdf", "sample19_v1.pdf", "sample21_v1.pdf", "sample29_v1.pdf", "sample30_v1.pdf"],
+  "held_out": ["sample2_v1.pdf", "sample2_v2.pdf", "sample12_v1.pdf", "sample12_v2.pdf", "sample12_v3.pdf",
+               "Sample3_v1.pdf", "sample5_v1.pdf", "sample7_v1.pdf", "sample8_v1.pdf", "sample9_v1.pdf",
+               "sample10_v1.pdf", "sample11_v1.pdf", "sample13_v1.pdf", "sample15_v1.pdf", "sample16_v1.pdf",
+               "sample17_v1.pdf", "sample18_v1.pdf", "sample20_v1.pdf", "sample22_v1.pdf", "sample23_v1.pdf",
+               "sample24_v1.pdf", "sample25_v1.pdf", "sample26_v1.pdf", "sample28_v1.pdf", "sample31_v1.pdf",
+               "sample32_v1.pdf", "test1_v1.pdf"],
+  "pairs": {
+    "sample1": {"files": ["sample1_v1.pdf", "sample1_v2.pdf"], "edited": ["abstract", "front matter"]},
+    "sample6": {"files": ["sample6_v1.pdf", "sample6_v2.pdf"],
+                "edited": ["analysis of results", "data collection instrument", "model evaluation",
+                           "revision to sampling population"]},
+    "sample2": {"files": ["sample2_v1.pdf", "sample2_v2.pdf"],
+                "edited": ["feature detection and motion tracking", "introduction"]},
+    "sample12a": {"files": ["sample12_v1.pdf", "sample12_v2.pdf"],
+                  "edited": ["conclusion", "introduction", "purpose of the study", "results and discussion"]},
+    "sample12b": {"files": ["sample12_v2.pdf", "sample12_v3.pdf"],
+                  "edited": ["conclusion", "introduction", "percentage of means", "purpose of the study"]}
+  }
+}
