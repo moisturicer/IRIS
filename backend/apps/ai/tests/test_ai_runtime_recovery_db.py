@@ -228,8 +228,16 @@ def test_a_takeover_does_not_renew_the_runs_allowance(runtime):
     assert (held[0].state, held[0].charge_attempts) == ("open", 1)
 
 
-def test_an_admitted_run_resumed_today_is_withheld_at_its_next_request(runtime):
-    """IR-725's guard: a restored Conversation carries tool results, so nothing more is sent."""
+def withheld_resumed(payload):
+    # IR-995: the restored step is a bare withheld status, so it may be sent; no Record text is.
+    assert call_ids(payload) == ["s1"], call_ids(payload)
+    assert tool_messages(payload)["s1"]["reason"] == "withheld"
+    assert FLOOD not in json.dumps(payload) and "Flood forecasting" not in json.dumps(payload)
+    return reply("No paper that could be shared answers this.")
+
+
+def test_an_admitted_run_resumed_today_sends_its_withheld_step_without_record_text(runtime):
+    """IR-725's guard withheld the evidence; since IR-995 the resumed run answers without it."""
     paper("Flood forecasting", {4: [("Methods", FLOOD)]})
     grant = session(make_user("recover-withheld@cit.edu"))
     queued = queue(worker(runtime, limits=ROOMY), grant, "recover-withheld")
@@ -239,18 +247,17 @@ def test_an_admitted_run_resumed_today_is_withheld_at_its_next_request(runtime):
     dead = [r.id for r in reservations(queued["id"])]
     lease_lapses(queued["id"])
 
-    vendor = Vendor(resumed, answered)
+    vendor = Vendor(withheld_resumed)
     assert run(worker(runtime, vendor, limits=ROOMY).run_next())
     assert events(queued["id"], "recovery") == [{"outcome": "resumed", "step": 1}]
-    assert vendor.requests == []
-    assert ended(queued["id"]) == ("failed", "unavailable", None)
-    assert turns(queued["conversation_id"]) == 0
-    # The dead worker's attempt stays charged; the withheld one was reserved and never sent.
+    assert len(vendor.requests) == 1
+    assert ended(queued["id"])[:2] == ("completed", "answered")
+    assert turns(queued["conversation_id"]) == 1
+    # The dead worker's attempt stays charged; the resumed one was reserved and sent.
     held = reservations(queued["id"])
     assert [r.id for r in held[:len(dead)]] == dead
     assert held[0].charge_attempts == 1
-    assert [r.sent for r in held[len(dead):]] == [False]
-    assert checkpoints(queued["id"]) == []
+    assert [r.sent for r in held[len(dead):]] == [True]
 
 
 def test_recovered_evidence_whose_source_changed_is_rebuilt_from_the_question(runtime):
