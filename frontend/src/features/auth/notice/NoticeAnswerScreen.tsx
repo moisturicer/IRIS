@@ -12,12 +12,13 @@ import type { DataNotice } from "@/types/notice";
 import {
   NO_ANSWERS,
   NoticeAnswerFields,
-  NoticeText,
+ 
   asksWhichPapers,
   missingAnswers,
   type NoticeAnswerErrors,
   type NoticeAnswers,
 } from "./NoticeAnswerFields";
+import { NoticeText } from "./NoticeText";
 
 /**
  * The screen a signed-in person sees until they answer the current data notice

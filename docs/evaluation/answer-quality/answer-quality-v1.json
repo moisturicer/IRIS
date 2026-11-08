@@ -1,0 +1,2963 @@
+{
+ "schema_version": 1,
+ "set_id": "answer-quality-v1",
+ "version": 1,
+ "label_status": "agent_drafted",
+ "notes": "IR-956. Labels drafted by an agent and open to the owner's correction; a corrected set is a new version with a new lock. Proxy corpus only: never a finding about CIT-U research.",
+ "corpus": {
+  "snapshot_id": "proxy-arxiv-40",
+  "paper_set_sha256": "6793dcadc793c1a3cdd831bc18b9091816e04d519e674e728e864aeef970c3d0",
+  "titles": [
+   "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+   "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+   "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+   "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+   "Towards Active Cross-View Object Geo-Localization",
+   "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+   "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+   "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+   "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
+   "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
+   "MATISSE in the era of GRAVITY+",
+   "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
+   "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+   "The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations",
+   "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation",
+   "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+   "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+   "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+   "State-Space-Based FIR Filtering on a Quantum Computer",
+   "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+   "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+   "Can Fingers of God be Resummed",
+   "Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations",
+   "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+   "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+   "Gauge Backreaction in Standard Model Warm Inflation",
+   "Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies",
+   "The abundance and emission of PAHs from the local to early Universe",
+   "The separate universe approach with non minimal coupling to gravity",
+   "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+   "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+   "Cosine metric as a structural economic similarity measure",
+   "Noise-adjusted turnover in estimated networks",
+   "Stable Policy Learning",
+   "Using machine learning metrics to provide deeper insights into the performance of choice models",
+   "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+   "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+   "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
+   "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+   "Nested Parallel von Neumann Architecture and Nested BSP"
+  ],
+  "private": {
+   "title": "Proving and Improving the Platonic Representation Hypothesis with JEPAs",
+   "readable_by": "a",
+   "note": "An unpublished paper owned by reader a, indexed for Ask IRIS; reader b must never see it."
+  }
+ },
+ "readers": {
+  "a": "owns the private paper",
+  "b": "an ordinary reader of the 40 papers"
+ },
+ "cases": [
+  {
+   "id": "F01-01",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how many qubits are needed to index the signal samples?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "State-Space-Based FIR Filtering on a Quantum Computer"
+    ],
+    "pages": [
+     {
+      "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+      "page": 2,
+      "quote": "qubits are needed for the sample position"
+     }
+    ],
+    "reference": "State-Space-Based FIR Filtering on a Quantum Computer: \"qubits are needed for the sample position\""
+   },
+   "sources": [
+    "proxy_starter:q19"
+   ]
+  },
+  {
+   "id": "F01-02",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how many commercially released reference tracks were used?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
+    ],
+    "pages": [
+     {
+      "record": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+      "page": 3,
+      "quote": "The reference collection comprises 100 commercially released tracks"
+     }
+    ],
+    "reference": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking: \"The reference collection comprises 100 commercially released tracks\""
+   },
+   "sources": [
+    "proxy_starter:q20"
+   ]
+  },
+  {
+   "id": "F01-03",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how many target entities went into the entity pool?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
+    ],
+    "pages": [
+     {
+      "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "page": 3,
+      "quote": "We select about 175k target entities"
+     }
+    ],
+    "reference": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark: \"We select about 175k target entities\""
+   },
+   "sources": [
+    "proxy_starter:q21"
+   ]
+  },
+  {
+   "id": "F01-04",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which model and numeric precision were instrumented to observe cache access patterns?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
+    ],
+    "pages": [
+     {
+      "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+      "page": 2,
+      "quote": "An instrumented FP16 decoder on LLaMA-2-7B"
+     }
+    ],
+    "reference": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators: \"An instrumented FP16 decoder on LLaMA-2-7B\""
+   },
+   "sources": [
+    "proxy_starter:q22"
+   ]
+  },
+  {
+   "id": "F01-05",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how many candidate protoclusters did the network flag?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning"
+    ],
+    "pages": [
+     {
+      "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+      "page": 3,
+      "quote": "121 protocluster candidates identified by PCFNet"
+     }
+    ],
+    "reference": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning: \"121 protocluster candidates identified by PCFNet\""
+   },
+   "sources": [
+    "proxy_starter:q30"
+   ]
+  },
+  {
+   "id": "F01-06",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how many recently-quenched objects hosting a bright active nucleus did they pick out?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release"
+    ],
+    "pages": [
+     {
+      "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+      "page": 3,
+      "quote": "identify ten post-starburst quasars"
+     }
+    ],
+    "reference": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release: \"identify ten post-starburst quasars\""
+   },
+   "sources": [
+    "proxy_starter:q33"
+   ]
+  },
+  {
+   "id": "F01-07",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "by how much did the total light reaching the instrument grow in the L band on the test star?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "MATISSE in the era of GRAVITY+"
+    ],
+    "pages": [
+     {
+      "record": "MATISSE in the era of GRAVITY+",
+      "page": 4,
+      "quote": "increases by a factor of 1.3 to 1.4 depending on the telescope"
+     }
+    ],
+    "reference": "MATISSE in the era of GRAVITY+: \"increases by a factor of 1.3 to 1.4 depending on the telescope\""
+   },
+   "sources": [
+    "proxy_starter:q37"
+   ]
+  },
+  {
+   "id": "F01-08",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how many galaxies were used to build the map of where galaxies cluster on the sky?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations"
+    ],
+    "pages": [
+     {
+      "record": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+      "page": 3,
+      "quote": "projected galaxy density map from the sky distribution of the full parent sample of 84 HAEs"
+     }
+    ],
+    "reference": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations: \"projected galaxy density map from the sky distribution of the full parent sample of 84 HAEs\""
+   },
+   "sources": [
+    "proxy_starter:q39"
+   ]
+  },
+  {
+   "id": "F01-09",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which two solvers did they implement, one for easy equations and one for hard ones?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Accelerating massive ensembles of ordinary differential equations-with-annotations"
+    ],
+    "pages": [
+     {
+      "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+      "page": 2,
+      "quote": "explicit Tsitouras 5(4) method for non-stiff systems and the fifth-order Rodas5P"
+     }
+    ],
+    "reference": "Accelerating massive ensembles of ordinary differential equations-with-annotations: \"explicit Tsitouras 5(4) method for non-stiff systems and the fifth-order Rodas5P\""
+   },
+   "sources": [
+    "proxy_starter:q42"
+   ]
+  },
+  {
+   "id": "F01-10",
+   "family": "F01",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how many regressions were reanalysed?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments"
+    ],
+    "pages": [
+     {
+      "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+      "page": 1,
+      "quote": "Reanalyzing 18 regressions across 11 studies"
+     }
+    ],
+    "reference": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments: \"Reanalyzing 18 regressions across 11 studies\""
+   },
+   "sources": [
+    "proxy_starter:q113"
+   ]
+  },
+  {
+   "id": "F02-01",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how did earlier work deal with not knowing exactly where the trade-off frontier sits?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
+    ],
+    "pages": [
+     {
+      "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+      "page": 2,
+      "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
+     }
+    ],
+    "reference": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties: \"quantify uncertainties around Pareto Fronts, either by considering them as random sets\""
+   },
+   "sources": [
+    "proxy_starter:q01"
+   ]
+  },
+  {
+   "id": "F02-02",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how do they avoid committing to one similarity assumption when they cannot tell which one fits?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
+    ],
+    "pages": [
+     {
+      "record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+      "page": 2,
+      "quote": "formulated as an expert-advice problem over a finite set of candidate kernels"
+     }
+    ],
+    "reference": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making: \"formulated as an expert-advice problem over a finite set of candidate kernels\""
+   },
+   "sources": [
+    "proxy_starter:q03"
+   ]
+  },
+  {
+   "id": "F02-03",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how do they make the generator produce the rare in-between arrangements instead of the common ones?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning"
+    ],
+    "pages": [
+     {
+      "record": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+      "page": 3,
+      "quote": "bias the sample generation towards regions in configuration space that are visited during transitions"
+     }
+    ],
+    "reference": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning: \"bias the sample generation towards regions in configuration space that are visited during transitions\""
+   },
+   "sources": [
+    "proxy_starter:q04"
+   ]
+  },
+  {
+   "id": "F02-04",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how did they simulate a conversation where the earlier turns have nothing to do with the new question?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
+    ],
+    "pages": [
+     {
+      "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "page": 4,
+      "quote": "models a topic shift. The history and current query concern unrelated topics"
+     }
+    ],
+    "reference": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark: \"models a topic shift. The history and current query concern unrelated topics\""
+   },
+   "sources": [
+    "proxy_starter:q07"
+   ]
+  },
+  {
+   "id": "F02-05",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "where is the waveform actually held in their scheme?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "State-Space-Based FIR Filtering on a Quantum Computer"
+    ],
+    "pages": [
+     {
+      "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+      "page": 2,
+      "quote": "signals are represented in the probability amplitudes of a quantum state"
+     }
+    ],
+    "reference": "State-Space-Based FIR Filtering on a Quantum Computer: \"signals are represented in the probability amplitudes of a quantum state\""
+   },
+   "sources": [
+    "proxy_starter:q08"
+   ]
+  },
+  {
+   "id": "F02-06",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what do the two fields each actually care about when they judge a model?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Using machine learning metrics to provide deeper insights into the performance of choice models"
+    ],
+    "pages": [
+     {
+      "record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+      "page": 2,
+      "quote": "the focus is mainly on individual-level classification accuracy"
+     }
+    ],
+    "reference": "Using machine learning metrics to provide deeper insights into the performance of choice models: \"the focus is mainly on individual-level classification accuracy\""
+   },
+   "sources": [
+    "proxy_starter:q13"
+   ]
+  },
+  {
+   "id": "F02-07",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "when the treatment has more than two levels, what do the existing fixes actually recover?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments"
+    ],
+    "pages": [
+     {
+      "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+      "page": 5,
+      "quote": "interpretable convex combinations of CATEs in settings with multi-valued discrete treatments"
+     }
+    ],
+    "reference": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments: \"interpretable convex combinations of CATEs in settings with multi-valued discrete treatments\""
+   },
+   "sources": [
+    "proxy_starter:q14"
+   ]
+  },
+  {
+   "id": "F02-08",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what happens to the correction when the assumed rate of spurious links is slightly wrong?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Noise-adjusted turnover in estimated networks"
+    ],
+    "pages": [
+     {
+      "record": "Noise-adjusted turnover in estimated networks",
+      "page": 2,
+      "quote": "the leading bias of the adjusted turnover is proportional to",
+      "also": [
+       1
+      ]
+     }
+    ],
+    "reference": "Noise-adjusted turnover in estimated networks: \"the leading bias of the adjusted turnover is proportional to\""
+   },
+   "sources": [
+    "proxy_starter:q15"
+   ]
+  },
+  {
+   "id": "F02-09",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "why was reaching memory on another machine historically so slow?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Nested Parallel von Neumann Architecture and Nested BSP"
+    ],
+    "pages": [
+     {
+      "record": "Nested Parallel von Neumann Architecture and Nested BSP",
+      "page": 4,
+      "quote": "A TCP/IP round trip cost tens of microseconds, mostly in software"
+     }
+    ],
+    "reference": "Nested Parallel von Neumann Architecture and Nested BSP: \"A TCP/IP round trip cost tens of microseconds, mostly in software\""
+   },
+   "sources": [
+    "proxy_starter:q16"
+   ]
+  },
+  {
+   "id": "F02-10",
+   "family": "F02",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what two different kinds of unevenness do they separate when analysing flash-held caches?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution"
+    ],
+    "pages": [
+     {
+      "record": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
+      "page": 2,
+      "quote": "distinguishing placement imbalance from access imbalance"
+     }
+    ],
+    "reference": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution: \"distinguishing placement imbalance from access imbalance\""
+   },
+   "sources": [
+    "proxy_starter:q17"
+   ]
+  },
+  {
+   "id": "F03-01",
+   "family": "F03",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which work puts a large language model at the centre of speech transcription?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+     "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
+    ],
+    "pages": [
+     {
+      "record": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+      "page": 2,
+      "quote": "The speech encoder extracts acoustic features, which the projector downsamples"
+     },
+     {
+      "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "page": 3,
+      "quote": "We formulate ASR as current-turn transcription conditioned on multimodal dialogue history"
+     }
+    ],
+    "reference": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition: \"The speech encoder extracts acoustic features, which the projector downsamples\"; Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark: \"We formulate ASR as current-turn transcription conditioned on multimodal dialogue history\""
+   },
+   "sources": [
+    "proxy_starter:q26"
+   ]
+  },
+  {
+   "id": "F03-02",
+   "family": "F03",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which work is about deciding who should get a treatment based on an experiment?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Stable Policy Learning",
+     "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments"
+    ],
+    "pages": [
+     {
+      "record": "Stable Policy Learning",
+      "page": 5,
+      "quote": "We distinguish the population that receives the policy"
+     },
+     {
+      "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+      "page": 4,
+      "quote": "We explain the identification issues related to contamination bias"
+     }
+    ],
+    "reference": "Stable Policy Learning: \"We distinguish the population that receives the policy\"; Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments: \"We explain the identification issues related to contamination bias\""
+   },
+   "sources": [
+    "proxy_starter:q27"
+   ]
+  },
+  {
+   "id": "F03-03",
+   "family": "F03",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which work simulates adiabatic logic gates in a 16 nm FinFET process?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+     "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology"
+    ],
+    "pages": [
+     {
+      "record": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+      "page": 3,
+      "quote": "Cadence transient simulations of the PFAL gate library"
+     },
+     {
+      "record": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+      "page": 2,
+      "quote": "the difference between conventional CMOS and adiabatic operation can be described"
+     }
+    ],
+    "reference": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock: \"Cadence transient simulations of the PFAL gate library\"; Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology: \"the difference between conventional CMOS and adiabatic operation can be described\""
+   },
+   "sources": [
+    "proxy_starter:q28"
+   ]
+  },
+  {
+   "id": "F03-04",
+   "family": "F03",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which work estimates how heavy a black hole is in the early universe?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+     "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release"
+    ],
+    "pages": [
+     {
+      "record": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+      "page": 2,
+      "quote": "single-epoch virial estimates yield black hole masses spanning"
+     },
+     {
+      "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+      "page": 4,
+      "quote": "obtain the black hole mass from the MgII flux and the continuum luminosity"
+     }
+    ],
+    "reference": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer: \"single-epoch virial estimates yield black hole masses spanning\"; Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release: \"obtain the black hole mass from the MgII flux and the continuum luminosity\""
+   },
+   "sources": [
+    "proxy_starter:q34"
+   ]
+  },
+  {
+   "id": "F03-05",
+   "family": "F03",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which papers present a new simulation tool rather than a new observation?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+     "The abundance and emission of PAHs from the local to early Universe"
+    ],
+    "pages": [
+     {
+      "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+      "page": 2,
+      "quote": "We implement two GPU-accelerated automatically differentiable ODE solvers optimised for massive ensembles"
+     },
+     {
+      "record": "The abundance and emission of PAHs from the local to early Universe",
+      "page": 3,
+      "quote": "the first large-volume cosmological simulation of galaxy evolution, based on a semi-analytic model"
+     }
+    ],
+    "reference": "Accelerating massive ensembles of ordinary differential equations-with-annotations: \"We implement two GPU-accelerated automatically differentiable ODE solvers optimised for massive ensembles\"; The abundance and emission of PAHs from the local to early Universe: \"the first large-volume cosmological simulation of galaxy evolution, based on a semi-analytic model\""
+   },
+   "sources": [
+    "proxy_starter:q52"
+   ]
+  },
+  {
+   "id": "F03-06",
+   "family": "F03",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Compare MeshKV and HBFlex: what does each one study about how LLM state is held in memory?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+     "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution"
+    ],
+    "pages": [
+     {
+      "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+      "page": 2,
+      "quote": "An instrumented FP16 decoder on LLaMA-2-7B"
+     },
+     {
+      "record": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
+      "page": 2,
+      "quote": "distinguishing placement imbalance from access imbalance"
+     }
+    ],
+    "reference": "MeshKV instruments an FP16 LLaMA-2-7B decoder to observe KV-cache access patterns for a network-on-chip cache fabric; HBFlex studies flash-held caches and separates placement imbalance from access imbalance."
+   },
+   "sources": [
+    "proxy_starter:q22",
+    "proxy_starter:q17",
+    "new:comparison"
+   ]
+  },
+  {
+   "id": "F03-07",
+   "family": "F03",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Compare the protocluster metallicity study and the IGM transmission study: how many objects does each start from?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+     "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations"
+    ],
+    "pages": [
+     {
+      "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+      "page": 3,
+      "quote": "121 protocluster candidates identified by PCFNet"
+     },
+     {
+      "record": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+      "page": 3,
+      "quote": "projected galaxy density map from the sky distribution of the full parent sample of 84 HAEs"
+     }
+    ],
+    "reference": "The protocluster study starts from 121 protocluster candidates flagged by PCFNet; the IGM study builds its density map from 84 H-alpha emitters."
+   },
+   "sources": [
+    "proxy_starter:q30",
+    "proxy_starter:q39",
+    "new:comparison"
+   ]
+  },
+  {
+   "id": "F03-08",
+   "family": "F03",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Compare TTM-Bench and the multimodal conversational ASR work: how large is the collection each one builds on?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+     "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
+    ],
+    "pages": [
+     {
+      "record": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+      "page": 3,
+      "quote": "The reference collection comprises 100 commercially released tracks"
+     },
+     {
+      "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "page": 3,
+      "quote": "We select about 175k target entities"
+     }
+    ],
+    "reference": "TTM-Bench uses 100 commercially released reference tracks; the ASR work selects about 175k target entities."
+   },
+   "sources": [
+    "proxy_starter:q20",
+    "proxy_starter:q21",
+    "new:comparison"
+   ]
+  },
+  {
+   "id": "F04-01",
+   "family": "F04",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "How many papers are under Audio and Speech Processing?"
+    }
+   ],
+   "expect": {
+    "outcome": "count",
+    "count": 5,
+    "records": [],
+    "pages": [],
+    "reference": "Exactly 5."
+   },
+   "sources": [
+    "conversation_set_v1:A06-D01"
+   ]
+  },
+  {
+   "id": "F04-02",
+   "family": "F04",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "How many papers are in Hardware Architecture?"
+    }
+   ],
+   "expect": {
+    "outcome": "count",
+    "count": 5,
+    "records": [],
+    "pages": [],
+    "reference": "Exactly 5."
+   },
+   "sources": [
+    "conversation_set_v1:A06-H01"
+   ]
+  },
+  {
+   "id": "F04-03",
+   "family": "F04",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "How many readable published papers are there?"
+    }
+   ],
+   "expect": {
+    "outcome": "count",
+    "count": 40,
+    "records": [],
+    "pages": [],
+    "reference": "Exactly 40."
+   },
+   "sources": [
+    "conversation_set_v1:A06-D02"
+   ]
+  },
+  {
+   "id": "F04-04",
+   "family": "F04",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "How many papers are in the econometrics category?"
+    }
+   ],
+   "expect": {
+    "outcome": "count",
+    "count": 5,
+    "records": [],
+    "pages": [],
+    "reference": "Exactly 5."
+   },
+   "sources": [
+    "new:count"
+   ]
+  },
+  {
+   "id": "F04-05",
+   "family": "F04",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "How many papers are filed under astrophysics of galaxies?"
+    }
+   ],
+   "expect": {
+    "outcome": "count",
+    "count": 10,
+    "records": [],
+    "pages": [],
+    "reference": "Exactly 10."
+   },
+   "sources": [
+    "new:count"
+   ]
+  },
+  {
+   "id": "F04-06",
+   "family": "F04",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "How many papers are in cosmology and nongalactic astrophysics?"
+    }
+   ],
+   "expect": {
+    "outcome": "count",
+    "count": 10,
+    "records": [],
+    "pages": [],
+    "reference": "Exactly 10."
+   },
+   "sources": [
+    "conversation_set_v1:A06-H02"
+   ]
+  },
+  {
+   "id": "F04-07",
+   "family": "F04",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "How many papers are listed under active learning?"
+    }
+   ],
+   "expect": {
+    "outcome": "count",
+    "count": 5,
+    "records": [],
+    "pages": [],
+    "reference": "Exactly 5."
+   },
+   "sources": [
+    "new:count"
+   ]
+  },
+  {
+   "id": "F04-08",
+   "family": "F04",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "How many papers are under Marine Biology?"
+    }
+   ],
+   "expect": {
+    "outcome": "count",
+    "count": 0,
+    "records": [],
+    "pages": [],
+    "reference": "Exactly 0."
+   },
+   "sources": [
+    "conversation_set_v1:A06-D01"
+   ]
+  },
+  {
+   "id": "F05-01",
+   "family": "F05",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "List the papers under Audio and Speech Processing."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [],
+    "pages": [],
+    "listing": [
+     "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+     "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+     "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+     "State-Space-Based FIR Filtering on a Quantum Computer",
+     "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
+    ],
+    "reference": "The audio-and-speech-processing papers: Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition; Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark; Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition; State-Space-Based FIR Filtering on a Quantum Computer; TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
+   },
+   "sources": [
+    "new:listing"
+   ]
+  },
+  {
+   "id": "F05-02",
+   "family": "F05",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "List the papers you have in hardware architecture."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [],
+    "pages": [],
+    "listing": [
+     "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+     "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+     "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
+     "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+     "Nested Parallel von Neumann Architecture and Nested BSP"
+    ],
+    "reference": "The hardware-architecture papers: Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock; Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology; HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution; MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators; Nested Parallel von Neumann Architecture and Nested BSP"
+   },
+   "sources": [
+    "conversation_set_v1:A03"
+   ]
+  },
+  {
+   "id": "F05-03",
+   "family": "F05",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "List the econometrics papers."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [],
+    "pages": [],
+    "listing": [
+     "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+     "Cosine metric as a structural economic similarity measure",
+     "Noise-adjusted turnover in estimated networks",
+     "Stable Policy Learning",
+     "Using machine learning metrics to provide deeper insights into the performance of choice models"
+    ],
+    "reference": "The econometrics papers: Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments; Cosine metric as a structural economic similarity measure; Noise-adjusted turnover in estimated networks; Stable Policy Learning; Using machine learning metrics to provide deeper insights into the performance of choice models"
+   },
+   "sources": [
+    "new:listing"
+   ]
+  },
+  {
+   "id": "F05-04",
+   "family": "F05",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "List the papers in active learning."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [],
+    "pages": [],
+    "listing": [
+     "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+     "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+     "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+     "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+     "Towards Active Cross-View Object Geo-Localization"
+    ],
+    "reference": "The active learning papers: Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning; Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties; Learning to Solve Hard Problems in RL for LLMs by Never Giving Up; Online Adaptive Kernel Mixing for Gaussian Process Decision Making; Towards Active Cross-View Object Geo-Localization"
+   },
+   "sources": [
+    "new:listing"
+   ]
+  },
+  {
+   "id": "F05-05",
+   "family": "F05",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "List the papers filed under astrophysics of galaxies."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [],
+    "pages": [],
+    "listing": [
+     "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+     "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+     "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+     "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
+     "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
+     "MATISSE in the era of GRAVITY+",
+     "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
+     "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+     "The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations",
+     "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation"
+    ],
+    "reference": "The astrophysics-of-galaxies papers: Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning; Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer; Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release; Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations; From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes; MATISSE in the era of GRAVITY+; Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy; Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations; The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations; ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation"
+   },
+   "sources": [
+    "new:listing"
+   ]
+  },
+  {
+   "id": "F05-06",
+   "family": "F05",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "List the papers in cosmology and nongalactic astrophysics."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [],
+    "pages": [],
+    "listing": [
+     "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+     "Can Fingers of God be Resummed",
+     "Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations",
+     "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+     "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+     "Gauge Backreaction in Standard Model Warm Inflation",
+     "Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies",
+     "The abundance and emission of PAHs from the local to early Universe",
+     "The separate universe approach with non minimal coupling to gravity",
+     "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations"
+    ],
+    "reference": "The cosmology-and-nongalactic-astrophysics papers: Accelerating massive ensembles of ordinary differential equations-with-annotations; Can Fingers of God be Resummed; Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations; Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal; GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations; Gauge Backreaction in Standard Model Warm Inflation; Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies; The abundance and emission of PAHs from the local to early Universe; The separate universe approach with non minimal coupling to gravity; Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations"
+   },
+   "sources": [
+    "new:listing"
+   ]
+  },
+  {
+   "id": "F05-07",
+   "family": "F05",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "List the papers you have in hardware architecture."
+    },
+    {
+     "user": "Only the ones about saving power."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [],
+    "pages": [],
+    "listing": [
+     "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+     "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology"
+    ],
+    "reference": "The two adiabatic-logic papers: Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock; Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology"
+   },
+   "sources": [
+    "conversation_set_v1:A03-D01"
+   ]
+  },
+  {
+   "id": "F05-08",
+   "family": "F05",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "List every paper whose title mentions dark matter."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [],
+    "pages": [],
+    "listing": [
+     "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
+     "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+     "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations"
+    ],
+    "reference": "Titles that mention dark matter: From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes; Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal; GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations"
+   },
+   "sources": [
+    "new:listing"
+   ]
+  },
+  {
+   "id": "F06-01",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Find the MeshKV paper."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
+    ],
+    "pages": [],
+    "reference": "The paper is \"MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-02",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Is there a paper called HBFlex?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution"
+    ],
+    "pages": [],
+    "reference": "The paper is \"HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-03",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Find the paper asking whether Fingers of God can be resummed."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Can Fingers of God be Resummed"
+    ],
+    "pages": [],
+    "reference": "The paper is \"Can Fingers of God be Resummed\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-04",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Do you have the TTM Bench paper?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
+    ],
+    "pages": [],
+    "reference": "The paper is \"TTM-Bench A Framework for Text-to-Music System Performance Benchmarking\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-05",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Look up the Never Giving Up paper about RL for LLMs."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up"
+    ],
+    "pages": [],
+    "reference": "The paper is \"Learning to Solve Hard Problems in RL for LLMs by Never Giving Up\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-06",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Find the Tide and Seek paper."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations"
+    ],
+    "pages": [],
+    "reference": "The paper is \"Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-07",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Find the paper where GAIA meets LZ."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations"
+    ],
+    "pages": [],
+    "reference": "The paper is \"GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-08",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Find the ViCTORIA project paper about M49."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation"
+    ],
+    "pages": [],
+    "reference": "The paper is \"ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-09",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Find Stabel Polcy Learning."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Stable Policy Learning"
+    ],
+    "pages": [],
+    "reference": "The paper is \"Stable Policy Learning\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F06-10",
+   "family": "F06",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Find the adiabatic logic paper that uses a realistic power-clock."
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock"
+    ],
+    "pages": [],
+    "reference": "The paper is \"Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock\"."
+   },
+   "sources": [
+    "conversation_set_v1:A04"
+   ]
+  },
+  {
+   "id": "F07-01",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the appendix of Learning to Solve Hard Problems in RL for LLMs by Never Giving Up, how does Reinforce-Ada relate to their method, and what goes wrong with it on unsolvable prompts?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up"
+    ],
+    "pages": [
+     {
+      "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+      "page": 17,
+      "quote": "equivalent to NGU with probability p = 1"
+     }
+    ],
+    "reference": "Reinforce-Ada does not stop sampling until a positive is reached, equivalent to NGU with p = 1, so it stalls on any prompt the model cannot solve."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-02",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the discussion of the extreme MgII emission paper, above what bolometric luminosity are quasars definitely excluded from their post-starburst selection?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release"
+    ],
+    "pages": [
+     {
+      "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+      "page": 15,
+      "quote": "we definitely exclude quasars with bolometric luminosities in excess of 1046 erg s-1"
+     }
+    ],
+    "reference": "Quasars with bolometric luminosities above about 10^46 erg/s are definitely excluded."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-03",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the JWST Little Red Dots simulation paper, what are the redshift and central black hole mass of the representative simulated candidate in its SED figure?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer"
+    ],
+    "pages": [
+     {
+      "record": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+      "page": 15,
+      "quote": "representative simulated LRD candidate at z = 6.3"
+     }
+    ],
+    "reference": "It is at z = 6.3 with a central black hole of about 3.5 x 10^8 solar masses."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-04",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the 2MIG isolated AGNs hot-dust reverberation paper, on what scale does IC 5287 show its dust response, and how firm is the wavelength ordering of its lags?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations"
+    ],
+    "pages": [
+     {
+      "record": "The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations",
+      "page": 13,
+      "quote": "IC 5287 shows a characteristic optical-MIR dust response on a scale of approximately 0.1 pc"
+     }
+    ],
+    "reference": "About 0.1 pc; its W2 delay is longer than W1 but the lag distributions overlap (probability about 0.65), so the ordering is only tentative."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-05",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In Gauge Backreaction in Standard Model Warm Inflation, what range does the gauge coupling take over the numerical parameter range?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Gauge Backreaction in Standard Model Warm Inflation"
+    ],
+    "pages": [
+     {
+      "record": "Gauge Backreaction in Standard Model Warm Inflation",
+      "page": 20,
+      "quote": "the gauge coupling is g ≃ 0.554 - 0.570"
+     }
+    ],
+    "reference": "g is about 0.554 to 0.570; the hard-soft hierarchy is checked numerically rather than assumed."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-06",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the appendix of Stable Policy Learning, why can the certainty equivalent never exceed mean welfare?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Stable Policy Learning"
+    ],
+    "pages": [
+     {
+      "record": "Stable Policy Learning",
+      "page": 41,
+      "quote": "The exponential function is convex, so Jensen's inequality gives"
+     }
+    ],
+    "reference": "Because the exponential function is convex, Jensen's inequality makes the logarithmic term nonnegative, so the certainty equivalent is at most mean welfare."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-07",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the paper on machine learning metrics for choice models, which two models have nearly the same overall accuracy on SwissMetro but different confusion matrices?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Using machine learning metrics to provide deeper insights into the performance of choice models"
+    ],
+    "pages": [
+     {
+      "record": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+      "page": 15,
+      "quote": "Scobit and XGB have a similar score on overall accuracy (0.604 and 0.605, respectively)"
+     }
+    ],
+    "reference": "Scobit and XGB (accuracy 0.604 and 0.605); on the test sample XGB identifies 29% of Train observations against Scobit's 22%."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-08",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the protocluster metallicity paper, which two protoclusters show a marginal metallicity enhancement, and what explanation do the authors offer?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning"
+    ],
+    "pages": [
+     {
+      "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+      "page": 12,
+      "quote": "more efficient recycling of metal-rich outflows in overdense environments"
+     }
+    ],
+    "reference": "COSMOS_ID0_PC3 and COSMOS_ID0_PC4; possibly more efficient recycling of metal-rich outflows in overdense environments."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-09",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the appendix of the contamination bias paper, where did the authors search for articles to replicate?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments"
+    ],
+    "pages": [
+     {
+      "record": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+      "page": 18,
+      "quote": "we searched articles published by the American Economic Association and articles published in Econometrica"
+     }
+    ],
+    "reference": "Articles from the American Economic Association and from Econometrica, the Journal of Political Economy, the Quarterly Journal of Economics and the Review of Economic Studies (the last two were not included in the replicated sample)."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F07-10",
+   "family": "F07",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the proofs appendix of Online Adaptive Kernel Mixing, which online learning algorithms do the weight-concentration results cover?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Online Adaptive Kernel Mixing for Gaussian Process Decision Making"
+    ],
+    "pages": [
+     {
+      "record": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+      "page": 23,
+      "quote": "proofs of the weight-concentration results with AdaHedge and Standard Hedge"
+     }
+    ],
+    "reference": "AdaHedge and standard Hedge."
+   },
+   "sources": [
+    "new:late-page-chunk"
+   ]
+  },
+  {
+   "id": "F08-01",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper deals with uncertainty around Pareto fronts in multiobjective optimization?"
+    },
+    {
+     "user": "what exactly did they say about that?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties"
+    ],
+    "pages": [
+     {
+      "record": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+      "page": 2,
+      "quote": "quantify uncertainties around Pareto Fronts, either by considering them as random sets"
+     }
+    ],
+    "reference": "what exactly did the authors say about quantifying uncertainties around Pareto fronts? \"quantify uncertainties around Pareto Fronts, either by considering them as random sets\""
+   },
+   "sources": [
+    "proxy_starter:q61"
+   ]
+  },
+  {
+   "id": "F08-02",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper keeps sampling hard prompts in RL for LLMs instead of giving up?"
+    },
+    {
+     "user": "and how does that paper define it?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up"
+    ],
+    "pages": [
+     {
+      "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+      "page": 2,
+      "quote": "puts the prompt back in the queue to continue sampling"
+     }
+    ],
+    "reference": "and how does Learning to Solve Hard Problems in RL for LLMs by Never Giving Up define continuing to sample a prompt? \"puts the prompt back in the queue to continue sampling\""
+   },
+   "sources": [
+    "proxy_starter:q62"
+   ]
+  },
+  {
+   "id": "F08-03",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "In the paper on FIR filtering on a quantum computer, what are qubits used for?"
+    },
+    {
+     "user": "and how many of those does it need?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "State-Space-Based FIR Filtering on a Quantum Computer"
+    ],
+    "pages": [
+     {
+      "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+      "page": 2,
+      "quote": "qubits are needed for the sample position"
+     }
+    ],
+    "reference": "and how many qubits does State-Space-Based FIR Filtering on a Quantum Computer need for the sample position? \"qubits are needed for the sample position\""
+   },
+   "sources": [
+    "proxy_starter:q75"
+   ]
+  },
+  {
+   "id": "F08-04",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper uses a deep learning network to find protocluster candidates?"
+    },
+    {
+     "user": "so how many did it flag?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning"
+    ],
+    "pages": [
+     {
+      "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+      "page": 3,
+      "quote": "121 protocluster candidates identified by PCFNet"
+     }
+    ],
+    "reference": "so how many protocluster candidates did PCFNet flag? \"121 protocluster candidates identified by PCFNet\""
+   },
+   "sources": [
+    "proxy_starter:q76"
+   ]
+  },
+  {
+   "id": "F08-05",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper builds GPU ODE solvers for massive ensembles?"
+    },
+    {
+     "user": "which two of those did they build?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Accelerating massive ensembles of ordinary differential equations-with-annotations"
+    ],
+    "pages": [
+     {
+      "record": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+      "page": 2,
+      "quote": "explicit Tsitouras 5(4) method for non-stiff systems and the fifth-order Rodas5P"
+     }
+    ],
+    "reference": "which two ODE solvers did the GPU-accelerated ensembles work implement, one for non-stiff and one for stiff systems? \"explicit Tsitouras 5(4) method for non-stiff systems and the fifth-order Rodas5P\""
+   },
+   "sources": [
+    "proxy_starter:q77"
+   ]
+  },
+  {
+   "id": "F08-06",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper benchmarks text-to-music systems against real reference tracks?"
+    },
+    {
+     "user": "and how many were there?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
+    ],
+    "pages": [
+     {
+      "record": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+      "page": 3,
+      "quote": "The reference collection comprises 100 commercially released tracks"
+     }
+    ],
+    "reference": "and how many commercially released reference tracks does TTM-Bench use? \"The reference collection comprises 100 commercially released tracks\""
+   },
+   "sources": [
+    "proxy_starter:q98"
+   ]
+  },
+  {
+   "id": "F08-07",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper builds speech recognition training data around a pool of target entities?"
+    },
+    {
+     "user": "what was the size of that pool?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark"
+    ],
+    "pages": [
+     {
+      "record": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+      "page": 3,
+      "quote": "We select about 175k target entities"
+     }
+    ],
+    "reference": "what was the size of the target entity pool in the multimodal conversational context ASR data construction work? \"We select about 175k target entities\""
+   },
+   "sources": [
+    "proxy_starter:q99"
+   ]
+  },
+  {
+   "id": "F08-08",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "What does MATISSE in the era of GRAVITY+ measure on its test star in the L band?"
+    },
+    {
+     "user": "by how much did it grow?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "MATISSE in the era of GRAVITY+"
+    ],
+    "pages": [
+     {
+      "record": "MATISSE in the era of GRAVITY+",
+      "page": 4,
+      "quote": "increases by a factor of 1.3 to 1.4 depending on the telescope"
+     }
+    ],
+    "reference": "by how much did the total light in the L band grow in MATISSE in the era of GRAVITY+? \"increases by a factor of 1.3 to 1.4 depending on the telescope\""
+   },
+   "sources": [
+    "proxy_starter:q100"
+   ]
+  },
+  {
+   "id": "F08-09",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper maps galaxy density around an H-alpha selected overdensity at z of about 6.2?"
+    },
+    {
+     "user": "how many went into that map?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations"
+    ],
+    "pages": [
+     {
+      "record": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+      "page": 3,
+      "quote": "projected galaxy density map from the sky distribution of the full parent sample of 84 HAEs"
+     }
+    ],
+    "reference": "how many galaxies were used for the galaxy density map in the IGM transmission and Lyman-alpha visibility work? \"projected galaxy density map from the sky distribution of the full parent sample of 84 HAEs\""
+   },
+   "sources": [
+    "proxy_starter:q101"
+   ]
+  },
+  {
+   "id": "F08-10",
+   "family": "F08",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper finds post-starburst quasars with extreme MgII emission?"
+    },
+    {
+     "user": "and how many did they pick out?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release"
+    ],
+    "pages": [
+     {
+      "record": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+      "page": 3,
+      "quote": "identify ten post-starburst quasars"
+     }
+    ],
+    "reference": "and how many post-starburst quasars did the extreme MgII emission work identify? \"identify ten post-starburst quasars\""
+   },
+   "sources": [
+    "proxy_starter:q102"
+   ]
+  },
+  {
+   "id": "F09-01",
+   "family": "F09",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how did they choose which text descriptions to keep for each track?"
+    },
+    {
+     "user": "Separately: how many papers are in the econometrics category?"
+    },
+    {
+     "action": "compact"
+    },
+    {
+     "user": "Going back to my first question: what exactly did the paper say about it, and on which page?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking"
+    ],
+    "pages": [
+     {
+      "record": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+      "page": 3,
+      "quote": "retain the 5 prompt variants with the highest LAION-CLAP similarity"
+     }
+    ],
+    "reference": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking: \"retain the 5 prompt variants with the highest LAION-CLAP similarity\""
+   },
+   "sources": [
+    "proxy_starter:q09",
+    "long-context-draft:L04"
+   ]
+  },
+  {
+   "id": "F09-02",
+   "family": "F09",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how did the older approach get the emotion label back out of the model?"
+    },
+    {
+     "user": "Separately: how many papers are in the econometrics category?"
+    },
+    {
+     "action": "compact"
+    },
+    {
+     "user": "Going back to my first question: what exactly did the paper say about it, and on which page?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition"
+    ],
+    "pages": [
+     {
+      "record": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+      "page": 3,
+      "quote": "read the predicted emotion off the LLM by decoding"
+     }
+    ],
+    "reference": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition: \"read the predicted emotion off the LLM by decoding\""
+   },
+   "sources": [
+    "proxy_starter:q10",
+    "long-context-draft:L04"
+   ]
+  },
+  {
+   "id": "F09-03",
+   "family": "F09",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how do they stop the two kinds of on-chip traffic from jamming each other?"
+    },
+    {
+     "user": "Separately: how many papers are in the econometrics category?"
+    },
+    {
+     "action": "compact"
+    },
+    {
+     "user": "Going back to my first question: what exactly did the paper say about it, and on which page?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators"
+    ],
+    "pages": [
+     {
+      "record": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+      "page": 3,
+      "quote": "VN0 carries unicast PART reductions on dimension-ordered XY routing"
+     }
+    ],
+    "reference": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators: \"VN0 carries unicast PART reductions on dimension-ordered XY routing\""
+   },
+   "sources": [
+    "proxy_starter:q18",
+    "long-context-draft:L04"
+   ]
+  },
+  {
+   "id": "F09-04",
+   "family": "F09",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how did they assemble the list of candidate young galaxy clusters to follow up?"
+    },
+    {
+     "user": "Separately: how many papers are in the econometrics category?"
+    },
+    {
+     "action": "compact"
+    },
+    {
+     "user": "Going back to my first question: what exactly did the paper say about it, and on which page?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning"
+    ],
+    "pages": [
+     {
+      "record": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+      "page": 2,
+      "quote": "protocluster candidate catalogue using the deep learning framework PCFNet"
+     }
+    ],
+    "reference": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning: \"protocluster candidate catalogue using the deep learning framework PCFNet\""
+   },
+   "sources": [
+    "proxy_starter:q29",
+    "long-context-draft:L04"
+   ]
+  },
+  {
+   "id": "F09-05",
+   "family": "F09",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what did they run the dust calculations on top of?"
+    },
+    {
+     "user": "Separately: how many papers are in the econometrics category?"
+    },
+    {
+     "action": "compact"
+    },
+    {
+     "user": "Going back to my first question: what exactly did the paper say about it, and on which page?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer"
+    ],
+    "pages": [
+     {
+      "record": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+      "page": 3,
+      "quote": "hydrodynamical cosmological zoom-in simulations developed by V21 with Radiative Transfer"
+     }
+    ],
+    "reference": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer: \"hydrodynamical cosmological zoom-in simulations developed by V21 with Radiative Transfer\""
+   },
+   "sources": [
+    "proxy_starter:q31",
+    "long-context-draft:L04"
+   ]
+  },
+  {
+   "id": "F09-06",
+   "family": "F09",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how do they show that the ultraviolet glow of the sky tracks how much dust dims starlight?"
+    },
+    {
+     "user": "Separately: how many papers are in the econometrics category?"
+    },
+    {
+     "action": "compact"
+    },
+    {
+     "user": "Going back to my first question: what exactly did the paper say about it, and on which page?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations"
+    ],
+    "pages": [
+     {
+      "record": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
+      "page": 2,
+      "quote": "surface brightness is correlated with the reddening from Planck Collaboration"
+     }
+    ],
+    "reference": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations: \"surface brightness is correlated with the reddening from Planck Collaboration\""
+   },
+   "sources": [
+    "proxy_starter:q35",
+    "long-context-draft:L04"
+   ]
+  },
+  {
+   "id": "F09-07",
+   "family": "F09",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how do they remove the distortion the upper atmosphere adds to the polarisation measurements?"
+    },
+    {
+     "user": "Separately: how many papers are in the econometrics category?"
+    },
+    {
+     "action": "compact"
+    },
+    {
+     "user": "Going back to my first question: what exactly did the paper say about it, and on which page?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation"
+    ],
+    "pages": [
+     {
+      "record": "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation",
+      "page": 3,
+      "quote": "correcting them scan-by-scan for the ionospheric RM with Spinifex and DP3"
+     }
+    ],
+    "reference": "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation: \"correcting them scan-by-scan for the ionospheric RM with Spinifex and DP3\""
+   },
+   "sources": [
+    "proxy_starter:q41",
+    "long-context-draft:L04"
+   ]
+  },
+  {
+   "id": "F09-08",
+   "family": "F09",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "with the next view not yet visible, how does the agent decide where to look?"
+    },
+    {
+     "user": "Separately: how many papers are in the econometrics category?"
+    },
+    {
+     "action": "compact"
+    },
+    {
+     "user": "Going back to my first question: what exactly did the paper say about it, and on which page?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Towards Active Cross-View Object Geo-Localization"
+    ],
+    "pages": [
+     {
+      "record": "Towards Active Cross-View Object Geo-Localization",
+      "page": 4,
+      "quote": "infer where to observe next from its current localization state and observation history"
+     }
+    ],
+    "reference": "Towards Active Cross-View Object Geo-Localization: \"infer where to observe next from its current localization state and observation history\""
+   },
+   "sources": [
+    "proxy_starter:q05",
+    "long-context-draft:L04"
+   ]
+  },
+  {
+   "id": "F10-01",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what did the 2019 survey of reinforcement learning for protein folding conclude?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q55"
+   ]
+  },
+  {
+   "id": "F10-02",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which paper in the repository introduced a diffusion model for weather forecasting?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q56"
+   ]
+  },
+  {
+   "id": "F10-03",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what did the 2021 trial of intermittent fasting on blood pressure conclude?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q66"
+   ]
+  },
+  {
+   "id": "F10-04",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which paper in the repository studied off-target effects of CRISPR gene editing?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q67"
+   ]
+  },
+  {
+   "id": "F10-05",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which thesis from CIT-U studied mangrove restoration in Cebu?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q68"
+   ]
+  },
+  {
+   "id": "F10-06",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what is known about coral bleaching recovery in the Philippines?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q83"
+   ]
+  },
+  {
+   "id": "F10-07",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which paper in the repository covers the rice blast fungus?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q84"
+   ]
+  },
+  {
+   "id": "F10-08",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what does Philippine labor law say about overtime pay?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q85"
+   ]
+  },
+  {
+   "id": "F10-09",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "which CIT-U research examined seismic design of bridges?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q86"
+   ]
+  },
+  {
+   "id": "F10-10",
+   "family": "F10",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how effective was the 2019 measles vaccination campaign in Southeast Asia?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No paper in the repository covers this."
+   },
+   "sources": [
+    "proxy_starter:q87"
+   ]
+  },
+  {
+   "id": "F11-01",
+   "family": "F11",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what does the training loop do with a problem the model has not managed to solve yet?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up"
+    ],
+    "pages": [
+     {
+      "record": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+      "page": 2,
+      "quote": "puts the prompt back in the queue to continue sampling"
+     }
+    ],
+    "reference": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up: \"puts the prompt back in the queue to continue sampling\""
+   },
+   "sources": [
+    "proxy_starter:q02",
+    "conversation_set_v1:A11"
+   ],
+   "scope": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up"
+  },
+  {
+   "id": "F11-02",
+   "family": "F11",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how does the smaller model learn where each word sits in the audio?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
+    ],
+    "pages": [
+     {
+      "record": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+      "page": 2,
+      "quote": "extract each text token's attention scores over audio embeddings"
+     }
+    ],
+    "reference": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition: \"extract each text token's attention scores over audio embeddings\""
+   },
+   "sources": [
+    "proxy_starter:q06",
+    "conversation_set_v1:A11"
+   ],
+   "scope": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition"
+  },
+  {
+   "id": "F11-03",
+   "family": "F11",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "has anyone asked what a similarity score between two economies actually means, instead of only using it to sort them into groups?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Cosine metric as a structural economic similarity measure"
+    ],
+    "pages": [
+     {
+      "record": "Cosine metric as a structural economic similarity measure",
+      "page": 2,
+      "quote": "little attention has been paid to the economic interpretation of the distance itself"
+     }
+    ],
+    "reference": "Cosine metric as a structural economic similarity measure: \"little attention has been paid to the economic interpretation of the distance itself\""
+   },
+   "sources": [
+    "proxy_starter:q11",
+    "conversation_set_v1:A11"
+   ],
+   "scope": "Cosine metric as a structural economic similarity measure"
+  },
+  {
+   "id": "F11-04",
+   "family": "F11",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what can settle down a learner that swings wildly when the data shifts a little?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Stable Policy Learning"
+    ],
+    "pages": [
+     {
+      "record": "Stable Policy Learning",
+      "page": 4,
+      "quote": "Bagging can stabilize an unstable base learner"
+     }
+    ],
+    "reference": "Stable Policy Learning: \"Bagging can stabilize an unstable base learner\""
+   },
+   "sources": [
+    "proxy_starter:q12",
+    "conversation_set_v1:A11"
+   ],
+   "scope": "Stable Policy Learning"
+  },
+  {
+   "id": "F11-05",
+   "family": "F11",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "instead of describing a dark-matter halo by its density, what do they describe it by?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes"
+    ],
+    "pages": [
+     {
+      "record": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
+      "page": 2,
+      "quote": "the gravitational field is directly parametrized in terms of the enclosed mass profile",
+      "also": [
+       1
+      ]
+     }
+    ],
+    "reference": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes: \"the gravitational field is directly parametrized in terms of the enclosed mass profile\""
+   },
+   "sources": [
+    "proxy_starter:q36",
+    "conversation_set_v1:A11"
+   ],
+   "scope": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes"
+  },
+  {
+   "id": "F11-06",
+   "family": "F11",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "why use a middle resolution rather than the coarsest one for these early galaxies?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy"
+    ],
+    "pages": [
+     {
+      "record": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
+      "page": 2,
+      "quote": "providing the ideal trade-off between spectral resolution and sensitivity"
+     }
+    ],
+    "reference": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy: \"providing the ideal trade-off between spectral resolution and sensitivity\""
+   },
+   "sources": [
+    "proxy_starter:q38",
+    "conversation_set_v1:A11"
+   ],
+   "scope": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy"
+  },
+  {
+   "id": "F11-07",
+   "family": "F11",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "what does choosing a Gaussian or Lorentzian damping shape quietly assume about how galaxies move?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Can Fingers of God be Resummed"
+    ],
+    "pages": [
+     {
+      "record": "Can Fingers of God be Resummed",
+      "page": 6,
+      "quote": "imply specific relations among the cumulants of the virial velocities of galaxies"
+     }
+    ],
+    "reference": "Can Fingers of God be Resummed: \"imply specific relations among the cumulants of the virial velocities of galaxies\""
+   },
+   "sources": [
+    "proxy_starter:q43",
+    "conversation_set_v1:A11"
+   ],
+   "scope": "Can Fingers of God be Resummed"
+  },
+  {
+   "id": "F11-08",
+   "family": "F11",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how does this approach treat regions larger than the horizon?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "The separate universe approach with non minimal coupling to gravity"
+    ],
+    "pages": [
+     {
+      "record": "The separate universe approach with non minimal coupling to gravity",
+      "page": 10,
+      "quote": "describe the universe at these scales as an ensemble of homogeneous and isotropic patches"
+     }
+    ],
+    "reference": "The separate universe approach with non minimal coupling to gravity: \"describe the universe at these scales as an ensemble of homogeneous and isotropic patches\""
+   },
+   "sources": [
+    "proxy_starter:q50",
+    "conversation_set_v1:A11"
+   ],
+   "scope": "The separate universe approach with non minimal coupling to gravity"
+  },
+  {
+   "id": "F12-01",
+   "family": "F12",
+   "reader": "a",
+   "turns": [
+    {
+     "user": "What CIDEr score on COCO does the captioning approach reach that joins frozen DINOv2 and DINOv3 image encoders to a text-only language model?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Proving and Improving the Platonic Representation Hypothesis with JEPAs"
+    ],
+    "pages": [
+     {
+      "record": "Proving and Improving the Platonic Representation Hypothesis with JEPAs",
+      "page": 2,
+      "quote": "reaching CIDEr .838 on COCO"
+     }
+    ],
+    "reference": "CIDEr .838 on COCO."
+   },
+   "sources": [
+    "new:private-paper-chunk"
+   ],
+   "pair": "P1"
+  },
+  {
+   "id": "F12-02",
+   "family": "F12",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "What CIDEr score on COCO does the captioning approach reach that joins frozen DINOv2 and DINOv3 image encoders to a text-only language model?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No readable paper covers this.",
+    "forbidden": [
+     "Proving and Improving the Platonic Representation Hypothesis with JEPAs"
+    ]
+   },
+   "sources": [
+    "new:private-paper-chunk"
+   ],
+   "pair": "P1"
+  },
+  {
+   "id": "F12-03",
+   "family": "F12",
+   "reader": "a",
+   "turns": [
+    {
+     "user": "Is there work showing that good views make representation alignment many times more sample-efficient? By how much?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Proving and Improving the Platonic Representation Hypothesis with JEPAs"
+    ],
+    "pages": [
+     {
+      "record": "Proving and Improving the Platonic Representation Hypothesis with JEPAs",
+      "page": 1,
+      "quote": "alignment 42 times more sample-efficient"
+     }
+    ],
+    "reference": "Yes: good views make alignment 42 times more sample-efficient."
+   },
+   "sources": [
+    "new:private-paper-chunk"
+   ],
+   "pair": "P2"
+  },
+  {
+   "id": "F12-04",
+   "family": "F12",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Is there work showing that good views make representation alignment many times more sample-efficient? By how much?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No readable paper covers this.",
+    "forbidden": [
+     "Proving and Improving the Platonic Representation Hypothesis with JEPAs"
+    ]
+   },
+   "sources": [
+    "new:private-paper-chunk"
+   ],
+   "pair": "P2"
+  },
+  {
+   "id": "F12-05",
+   "family": "F12",
+   "reader": "a",
+   "turns": [
+    {
+     "user": "Which paper turns the Platonic Representation Hypothesis into a theorem, and what does it prove?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "Proving and Improving the Platonic Representation Hypothesis with JEPAs"
+    ],
+    "pages": [
+     {
+      "record": "Proving and Improving the Platonic Representation Hypothesis with JEPAs",
+      "page": 2,
+      "quote": "any number of JEPAs trained separately on renderings of one world learn the same embedding up to one rotation each"
+     }
+    ],
+    "reference": "JEPAs trained separately on renderings of one world learn the same embedding up to one rotation each, when their positive pairs relate the same world states."
+   },
+   "sources": [
+    "new:private-paper-chunk"
+   ],
+   "pair": "P3"
+  },
+  {
+   "id": "F12-06",
+   "family": "F12",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "Which paper turns the Platonic Representation Hypothesis into a theorem, and what does it prove?"
+    }
+   ],
+   "expect": {
+    "outcome": "refuse",
+    "records": [],
+    "pages": [],
+    "reference": "No readable paper covers this.",
+    "forbidden": [
+     "Proving and Improving the Platonic Representation Hypothesis with JEPAs"
+    ]
+   },
+   "sources": [
+    "new:private-paper-chunk"
+   ],
+   "pair": "P3"
+  },
+  {
+   "id": "F12-07",
+   "family": "F12",
+   "reader": "a",
+   "turns": [
+    {
+     "user": "how many qubits are needed to index the signal samples?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "State-Space-Based FIR Filtering on a Quantum Computer"
+    ],
+    "pages": [
+     {
+      "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+      "page": 2,
+      "quote": "qubits are needed for the sample position"
+     }
+    ],
+    "reference": "State-Space-Based FIR Filtering on a Quantum Computer: \"qubits are needed for the sample position\""
+   },
+   "sources": [
+    "proxy_starter:q19"
+   ],
+   "pair": "P4"
+  },
+  {
+   "id": "F12-08",
+   "family": "F12",
+   "reader": "b",
+   "turns": [
+    {
+     "user": "how many qubits are needed to index the signal samples?"
+    }
+   ],
+   "expect": {
+    "outcome": "answer",
+    "records": [
+     "State-Space-Based FIR Filtering on a Quantum Computer"
+    ],
+    "pages": [
+     {
+      "record": "State-Space-Based FIR Filtering on a Quantum Computer",
+      "page": 2,
+      "quote": "qubits are needed for the sample position"
+     }
+    ],
+    "reference": "State-Space-Based FIR Filtering on a Quantum Computer: \"qubits are needed for the sample position\""
+   },
+   "sources": [
+    "proxy_starter:q19"
+   ],
+   "pair": "P4"
+  }
+ ]
+}

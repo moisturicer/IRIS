@@ -1,7 +1,9 @@
 import { apiClient } from "./client";
-import type { NoticeAnswer, NoticeAnswerPayload, CurrentNotice } from "@/types/notice";
+import type { NoticeAnswer, NoticeAnswerPayload, CurrentNotice, NoticeImpact, NoticeVersion } from "@/types/notice";
 
-export type { DataNotice, NoticeAnswer, NoticeAnswerPayload, CurrentNotice, NoticeSection } from "@/types/notice";
+export type {
+  DataNotice, NoticeAnswer, NoticeAnswerPayload, CurrentNotice, NoticeImpact, NoticeSection, NoticeVersion,
+} from "@/types/notice";
 export { ACCEPTANCE_REQUIRED_CODE, STALE_NOTICE_CODE, isAcceptanceRequired, staleNoticeFrom } from "@/lib/noticeErrors";
 
 /**
@@ -15,7 +17,18 @@ export { ACCEPTANCE_REQUIRED_CODE, STALE_NOTICE_CODE, isAcceptanceRequired, stal
  */
 
 export const noticeApi = {
-  current: () => apiClient.get<CurrentNotice>("/auth/notice/"),
+  current: (opts?: { signal?: AbortSignal }) =>
+    apiClient.get<CurrentNotice>("/auth/notice/", { signal: opts?.signal }),
   answer: (data: NoticeAnswerPayload) =>
     apiClient.post<{ answer: NoticeAnswer; answer_required: boolean }>("/auth/notice/answer/", data),
+
+  // The Notices page (ADR-051 decisions 16-17 as amended by ADR-063 decision 9,
+  // IR-799, IR-800). RDCO and the System Admin read the history; RDCO alone
+  // publishes and reads the impact.
+  versions: (opts?: { signal?: AbortSignal }) =>
+    apiClient.get<NoticeVersion[]>("/auth/notice/versions/", { signal: opts?.signal }),
+  impact: () => apiClient.get<NoticeImpact>("/auth/notice/versions/impact/"),
+  /** 409 `notice_stale`, carrying the current notice, when a newer version exists than `based_on_version`. */
+  publish: (data: { based_on_version: number; text: string }) =>
+    apiClient.post<NoticeVersion>("/auth/notice/versions/", data),
 };

@@ -121,16 +121,29 @@ test("RDCO's coordination screens, Import Records included, are one RDCO group",
   expect(labels(ROLES.RDCO, REVIEW_WORK)).toEqual([
     "Main: Discover", "Main: Ask IRIS", "Main: My Library", "Main: My Reviews", "Main: Calls & Conferences",
     "RDCO: Import Records", "RDCO: Users", "RDCO: Role Requests", "RDCO: Download Requests",
-    "RDCO: Delete Requests",
+    "RDCO: Delete Requests", "RDCO: Notices",
   ]);
 });
 
-test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions and Retention (IR-783, IR-788, IR-795)", () => {
+test("the System Admin's nav is Discover, Users, Audit Log, Account Deletions, Retention and Notices (IR-783, IR-788, IR-795, IR-800)", () => {
   expect(labels(ROLES.SYSTEM_ADMIN)).toEqual([
     "Main: Discover",
     "Administration: Users", "Administration: Audit Log", "Administration: Account Deletions",
-    "Administration: Retention",
+    "Administration: Retention", "Administration: Notices",
   ]);
+});
+
+// IR-800: one Notices page at one address, in RDCO's and the System Admin's
+// navigation and nobody else's. RDCO publishes there; the System Admin reads.
+test("the Notices page is RDCO's and the System Admin's alone, at /notices", () => {
+  for (const role of Object.values(ROLES)) {
+    const notices = navFor(role).filter((item) => item.label === "Notices");
+    const allowed = role === ROLES.RDCO || role === ROLES.SYSTEM_ADMIN;
+    expect(notices.map((item) => item.to), role).toEqual(allowed ? ["/notices"] : []);
+  }
+  expect(canAccess(ROLES.RDCO, "notices")).toBe(true);
+  expect(canAccess(ROLES.SYSTEM_ADMIN, "notices")).toBe(false);
+  expect(canAccess(ROLES.SYSTEM_ADMIN, "adminNotices")).toBe(true);
 });
 
 test("Profile and Settings are in the account menu, not the nav, and their pages stay open (IR-933)", () => {
@@ -248,5 +261,6 @@ test("RDCO coordination links use the RDCO section and addresses", () => {
     { label: "Role Requests", to: "/rdco/role-requests", section: "RDCO" },
     { label: "Download Requests", to: "/rdco/download-requests", section: "RDCO" },
     { label: "Delete Requests", to: "/rdco/delete-requests", section: "RDCO" },
+    { label: "Notices", to: "/notices", section: "RDCO" },
   ]);
 });

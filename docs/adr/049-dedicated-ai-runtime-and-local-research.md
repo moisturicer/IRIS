@@ -115,6 +115,32 @@ Current code retains its existing behavior until implementation and controlled c
 
 Both vector reads order the rows of the policy-filtered `research_vectors` / `research_record_vectors` functions, so they are exact scans: no HNSW index, and so no `ef_search` depth, can cut a filtered read short. IR-886's tests record the `EXPLAIN` evidence. Runs pinned to `research-1` through `research-4` keep their tools.
 
+## Amendment — 2026-11-07 (IR-955, IR-956): automatic answer-quality evaluation
+
+**Status: Proposed 2026-11-07, pending the owner's confirmation.** It records decisions the owner, Jive Tyler I. Revalde, already made in IR-955; an AI assistant wrote it down, and an AI does not accept an ADR. This amendment writes them into §24–26 so the ADR and IR-956 agree. §27 (the switch) is IR-957's to amend. Where this conflicts with §24–26, this wins.
+
+1. **§24, how answers are collected and scored.**
+   - One frozen set of twelve question families is collected through both engines: Django `lanes-v1` and the runtime agent. Each family has at least eight questions. The families and the labels are in [`docs/evaluation/answer-quality/`](../evaluation/answer-quality/README.md).
+   - Each engine is run **once**. Both runs use the same answer model, corpus, readers and access state. Failed, capped, cancelled, timed-out and not-run questions count as failures.
+   - Scoring is **automatic**. Exact checks cover cited Record and page hits, exact counts, correct refusals and access leaks. A pinned model grader with a fixed rubric judges correctness and whether each claim is supported by the passage it cites. The grader sees only what the reader could read.
+   - **Dropped:** independent human review, two-person adjudication, named label review, three repetitions, and the ten-case family minimum. Human spot-checks are allowed, never required.
+   - **Kept:** the runtime's distinct engine identity, failed attempts counted as failures, and the freeze. The freeze is a checksum over questions, labels, rubric and grader model, and a changed set is a new version.
+2. **§25, the acceptance bar.** The agent passes when all of these hold:
+   - it matches or beats `lanes-v1` on overall correctness;
+   - it matches or beats `lanes-v1` on overall citation support;
+   - it has **zero access leaks**;
+   - no family falls more than ten points below `lanes-v1` in correctness or in citation support.
+
+   This replaces the fixed 90%/95% thresholds and the per-repetition reporting. The report shows uncertainty only as per-family counts. It is a point comparison, not a statistical proof. Spend runs through provider admission and stays inside the campaign ceiling: a question whose worst case would not fit is not sent, and the report lists it as not run.
+3. **§26, what the report covers.** Per family and per engine, the report gives:
+   - correctness, citation support, page accuracy and refusal accuracy;
+   - leak count and failure count;
+   - cost per question and p95 latency including queueing.
+
+   §26's race, UI, accessibility and load-test evidence is unchanged and stays outside this measurement.
+   - **Gain:** one command, one paid run per engine and a verdict with no signing step.
+   - **Cost:** a model grades answer correctness, so the verdict can be no more reliable than that grader. The grader is pinned and its rubric is frozen, so its bias is at least the same for both engines. One run per engine also cannot separate a real difference from run-to-run variation.
+
 ## Amendment — 2026-11-08 (IR-994): follow-ups, exact counts and listings reach the model
 
 **Status: Decisions given by Jive Tyler I. Revalde, owner of the disclosure decision (2026-11-04 amendment), to an AI assistant in chat on 2026-11-08, and recorded here at his direction.** IR-956's paid run found 42 of the agent's 49 failed turns refused at the send guard (`source_unavailable`): every follow-up, every exact count and most listings. The decisions above stand except where this says otherwise.

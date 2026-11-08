@@ -153,7 +153,7 @@ describe("the sidebar's list", () => {
 
     await screen.findByRole("heading", { name: "Discover" });
     const nav = screen.getByRole("navigation", { name: "Main" });
-    expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Retention"]);
+    expect(within(nav).getAllByRole("link").map((link) => link.textContent?.trim())).toEqual(["Discover", "Users", "Audit Log", "Account Deletions", "Retention", "Notices"]);
     const admin = within(nav).getByRole("list", { name: "Administration" });
     expect(within(admin).getByRole("link", { name: "Users" })).toHaveAttribute("href", "/admin/users");
     expect(within(admin).getByRole("link", { name: "Audit Log" })).toHaveAttribute("href", "/admin/audit");
@@ -162,6 +162,8 @@ describe("the sidebar's list", () => {
       .toHaveAttribute("href", "/admin/account-deletion-requests");
     // IR-795 adds the retention periods.
     expect(within(admin).getByRole("link", { name: "Retention" })).toHaveAttribute("href", "/admin/retention");
+    // IR-800 adds the Notices page, read-only for the System Admin.
+    expect(within(admin).getByRole("link", { name: "Notices" })).toHaveAttribute("href", "/notices");
     expect(within(nav).queryByRole("list", { name: "RDCO" })).not.toBeInTheDocument();
     await expectNoBlockingA11yViolations(container);
   });
