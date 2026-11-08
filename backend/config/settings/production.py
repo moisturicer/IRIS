@@ -13,7 +13,7 @@ tested in `apps/tests/test_settings_validation.py` against crafted inputs.
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F401,F403
-from .base import csv_list, required
+from .base import csv_list, email_domains, required
 from .validation import production_problems, recovery_transport_problems
 
 DEBUG = False
@@ -46,6 +46,10 @@ if TRUSTED_PROXY_COUNT < 1:
     raise ImproperlyConfigured(
         "TRUSTED_PROXY_COUNT must be at least 1: production always runs behind nginx."
     )
+
+# Who may register is a per-deployment fact too (IR-660). Empty would let anyone
+# with any address make an account, so production refuses to start without it.
+REGISTRATION_EMAIL_DOMAINS = required("REGISTRATION_EMAIL_DOMAINS", cast=email_domains)
 
 # ---- Startup checks ------------------------------------------------------
 

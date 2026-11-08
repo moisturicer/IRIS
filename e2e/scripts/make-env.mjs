@@ -60,6 +60,8 @@ const lines = [
   "ALLOWED_HOSTS=localhost,127.0.0.1,backend",
   `CORS_ALLOWED_ORIGINS=${origin}`,
   "TRUSTED_PROXY_COUNT=1",
+  // Production settings require it (IR-660); every journey registers @cit.edu.
+  "REGISTRATION_EMAIL_DOMAINS=cit.edu",
   // Required by the production file; its caddy service is off in this stack.
   "IRIS_DOMAIN=localhost",
   // An https origin is a production requirement for recovery links. Nothing

@@ -890,6 +890,21 @@ describe("a refused registration", { timeout: 30_000 }, () => {
     await expectNoBlockingA11yViolations(container);
   });
 
+  it("shows the server's institutional-domain refusal on the email field, word for word (IR-660)", async () => {
+    // The server's setting is the one source for the accepted domains: the
+    // screen names none of its own and shows what the refusal says.
+    const user = userEvent.setup();
+    const message = "Register with your institutional email address, ending in @cit.edu.";
+    refuse({ email: [message] });
+    renderSignup();
+    await submit(user);
+
+    await waitFor(() => expect(stepHeading()).toHaveTextContent("Step 1 of 3 · Identity"));
+    expect(email()).toHaveFocus();
+    expect(email()).toHaveAccessibleDescription(message);
+    expect(email()).toHaveAttribute("aria-invalid", "true");
+  });
+
   it("takes a duplicate email back to Identity, on the email field, keeping everything else", async () => {
     const user = userEvent.setup();
     refuse({ email: ["This email address is already registered."] });
