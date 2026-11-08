@@ -678,6 +678,36 @@ def notify_contact_person_took_over(record, user):
         _log_failure("notify_contact_person_took_over", record=record, user=user)
 
 
+def notify_contact_person_changed(record, *, changed_by, previous, contact):
+    """
+    An owner named `contact` the Contact person of `record` (ADR-051 decision
+    27, IR-801). In-app only: the new Contact person hears the review emails now
+    come to them, and the old one, if any, hears they no longer do.
+    """
+    try:
+        title = record.title
+        notif_type = _get_type("Contact Person Changed")
+        who = "You" if changed_by.pk == contact.pk else _name(changed_by)
+        Notification.objects.create(
+            sender=changed_by, recipient=contact, record=record, notif_type=notif_type,
+            message=(
+                f'{who} made you the Contact person for "{title}". '
+                "Review emails for this paper now come to you."
+            ),
+        )
+        if previous is not None and previous.pk != contact.pk:
+            who = "You" if changed_by.pk == previous.pk else _name(changed_by)
+            Notification.objects.create(
+                sender=changed_by, recipient=previous, record=record, notif_type=notif_type,
+                message=(
+                    f'{who} made {_name(contact)} the Contact person for "{title}". '
+                    "Review emails for this paper now go to them, not to you."
+                ),
+            )
+    except Exception:
+        _log_failure("notify_contact_person_changed", record=record)
+
+
 def notify_role_request(user, requested_role):
     """
     Broadcast to RDCO when a new role request is submitted.
