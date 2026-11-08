@@ -151,7 +151,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "destroy", "duplicate_matches", "acknowledge_duplicates"):
+        # Naming the Contact person is an owner's alone (ADR-051 decision 27,
+        # IR-801): RDCO, the Adviser and the offices have no say.
+        if self.action in ("update", "partial_update", "submit", "destroy", "duplicate_matches",
+                           "acknowledge_duplicates", "contact_person"):
             return [IsAuthenticated(), IsRecordOwner()]
         if self.action == "embargo_set":
             return [IsAuthenticated(), MaySetEmbargo()]
@@ -488,6 +491,24 @@ class RecordViewSet(viewsets.ModelViewSet):
         record = self._paper_under_lock()
         body = request.data if isinstance(request.data, dict) else {}
         return Response(rdco_acts.add_owner(record, body.get("email"), actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="contact-person", url_name="contact-person")
+    @transaction.atomic
+    def contact_person(self, request, pk=None):
+        """
+        POST /records/<id>/contact-person/  {"owner": <user id>}
+
+        Any owner names another owner of the same paper its Contact person, who
+        gets the review emails from then on (ADR-051 decision 27, IR-801). Every
+        record type, any time until the paper is deleted. 404 for a paper the
+        caller can't see, 403 for one they don't own, 400 for a target who isn't
+        an owner, is closed, or already is the Contact person.
+        """
+        from .contact_person import OWNER_FIELD, change_contact_person
+
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(change_contact_person(record, body.get(OWNER_FIELD), actor=request.user))
 
     @action(detail=True, methods=["post"], url_path="withdraw", url_name="withdraw")
     @transaction.atomic

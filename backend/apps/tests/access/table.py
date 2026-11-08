@@ -161,6 +161,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # gate before the lookup; `record` is in review, not Unlisted, so RDCO gets
     # a 400 and the call changes nothing.
     "record-publish-unlisted": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
+    # ADR-051 decision 27 (IR-801): any owner names the Contact person, and no
+    # office, Adviser or RDCO does. An empty body is a 400 for the owner, so the
+    # call changes nothing.
+    "record-contact-person": Entry({"POST": _case(OWNER_ACTS, kwargs=RECORD, data={})}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),

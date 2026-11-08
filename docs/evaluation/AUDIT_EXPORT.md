@@ -190,6 +190,12 @@ Each act is one event. Withdrawing writes `RECORD_WITHDRAWN` above, with RDCO's 
 | `ADVISER_REPLACED` | RDCO names another Adviser while the paper's Adviser review is open. The old Adviser's seat is withdrawn and the new one seated in the same act, so no `SEAT_*` event is written | `assignment`, `previous_adviser` (null if that account is gone), `adviser`, `previous_seat`, `seat` (the new one), `reason` (optional, may be empty) |
 | `OWNER_ADDED` | RDCO adds an owner to a paper in review. The Contact person is unchanged | `owner` |
 
+### An owner names the Contact person (ADR-051 decision 27, IR-801)
+
+| Type | Written when | `metadata` |
+|---|---|---|
+| `CONTACT_PERSON_CHANGED` | An owner names another owner of the paper its Contact person. The event's user is the owner who made the change | `previous_contact` (null if the paper had none), `contact` |
+
 ### Document requests (ADR-022)
 
 Every document-request event carries `party` (the **requesting** party), `request` and
