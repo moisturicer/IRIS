@@ -12,6 +12,7 @@ import { DPA_SECTIONS } from "@/lib/dpaTerms";
 import { cn, formatDate } from "@/lib/utils";
 import { ROLE_CAPABILITIES } from "./roleCapabilities";
 import { Panel } from "./settingsParts";
+import { DeleteAccountPanel, DownloadMyDataPanel } from "./YourDataPanels";
 
 /**
  * Settings: the account. Who you are on IRIS (name, photo, bio, interests)
@@ -262,12 +263,11 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
         </div>
 
         {/* Read-only by design. `consent_given` is read-only server-side and
-            FR-M6-06 records it at registration; there is no withdrawal
-            mechanism, so offering a toggle here would be a control that
-            silently does nothing. The terms below say who to contact instead. */}
+            FR-M6-06 records it at registration. Withdrawing it means deleting
+            the account (ADR-051 decision 18), which the panel below offers. */}
         <p className="text-[13px] text-stone-500 mt-3">
-          Consent is recorded once, when your account is created, and cannot be changed from this
-          screen. To withdraw it, contact the Research and Development Coordinating Office.
+          Consent is recorded once, when your account is created. Withdrawing it means deleting your
+          account, which you can ask for below.
         </p>
       </Panel>
 
@@ -296,6 +296,9 @@ function PrivacyTab({ user }: { user: NonNullable<ReturnType<typeof useAuth>["us
           ))}
         </div>
       </Panel>
+
+      <DownloadMyDataPanel />
+      <DeleteAccountPanel />
     </div>
   );
 }
