@@ -7,17 +7,22 @@ source they were read from. Keyword search only; providers stay gated.
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
+import logging
 import re
 import secrets
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
+from types import SimpleNamespace
 
 import asyncpg
 
 from ai.research import metadata
 from ai.runs.store import CURRENT_HANDOFF, CURRENT_SOURCE_TURN, RunStore
+
+log = logging.getLogger(__name__)
 
 APP_NAME = "iris-ai-research"
 #: Mirrors Django's keyword index (`apps.ai.keyword_index.CONFIG`).
@@ -43,7 +48,17 @@ MIN_OVERLAP_CHARS = 24
 #: Element kinds whose rendering is not interpreted: the text carries them, never what they show.
 FORMULA, CAPTION = "formula", "caption"
 
+#: Passages each search signal contributes before fusion; a sample size, never a relevance cut-off (IR-886).
+CANDIDATES = 20
+#: Records the paper-first vector read keeps before ranking their Passages.
+PAPER_FIRST_RECORDS = 20
+
 OK, NO_MATCH, PARTIAL, UNAVAILABLE = "ok", "no_match", "partial", "unavailable"
+#: A search signal that is not configured, as opposed to one that failed (IR-886).
+OFF = "off"
+PROVIDER_GATED = "provider_gated"
+PROVIDER_FAILED = "provider_failed"
+SPACE_CHANGED = "embedding_space_changed"
 #: A reference fits several papers; the reader is asked, never answered for (IR-750).
 AMBIGUOUS = "ambiguous"
 #: A paper that can be named but has no Manuscript read: nothing to read, not nothing found (IR-731).
@@ -221,6 +236,8 @@ class ToolResult:
     dependencies: frozenset[Source] = frozenset()
     #: Provider calls the tool would make; none runs here.
     provider_operations: tuple[str, ...] = ()
+    #: (signal, "ok" or why not) for each part of a combined search (IR-886).
+    signals: tuple[tuple[str, str], ...] = ()
 
     @classmethod
     def unavailable(cls, reason: str, **kw) -> "ToolResult":
@@ -239,6 +256,76 @@ def section_id(path: tuple[str, ...]) -> str:
 
 def _is_int(value) -> bool:
     return type(value) is int
+
+
+def valid_filters(filters) -> bool:
+    """Metadata filters as `count` and `hybrid_search` both accept them (IR-750, IR-886)."""
+    return (isinstance(filters, dict) and not set(filters) - set(metadata.FILTERS)
+            and all(isinstance(filters[n], str) and filters[n].strip()
+                    for n in metadata.TAXONOMIES if n in filters)
+            and all(_is_int(filters[n]) and metadata.YEAR_RANGE[0] <= filters[n] <= metadata.YEAR_RANGE[1]
+                    for n in ("year_from", "year_to") if n in filters)
+            and ("is_ip" not in filters or type(filters["is_ip"]) is bool))
+
+
+def _filter_sql(first: int) -> str:
+    """Conditions on Record `r` for the six filter parameters starting at `$first`."""
+    n = range(first, first + 6)
+    return (f" AND (${n[0]}::bigint IS NULL OR r.classification_id = ${n[0]})"
+            f" AND (${n[1]}::bigint IS NULL OR r.psced_id = ${n[1]})"
+            f" AND (${n[2]}::bigint IS NULL OR r.record_type_id = ${n[2]})"
+            f" AND (${n[3]}::int IS NULL OR r.year_completed >= ${n[3]})"
+            f" AND (${n[4]}::int IS NULL OR r.year_completed <= ${n[4]})"
+            f" AND (${n[5]}::boolean IS NULL OR r.is_ip = ${n[5]})")
+
+
+_COLUMNS = ("c.id, c.record_id, c.chunk_set_id, cs.extraction_hash, c.source_page,"
+            " c.content, c.context_path, r.title")
+_CHUNKS = ("FROM iris_ai.research_chunks() c"
+           " JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active"
+           " JOIN public.records_record r ON r.id = c.record_id")
+#: $1 query, $2 scope, $3 limit, $4.. filters.
+KEYWORD_SQL = (
+    f"""WITH q AS (SELECT replace(plainto_tsquery('{CONFIG}', $1)::text, '&', '|')::tsquery AS q)
+        SELECT {_COLUMNS}, count(*) OVER () AS total {_CHUNKS}, q
+         WHERE c.deleted_at IS NULL AND c.search_vector @@ q.q
+           AND ($2::bigint IS NULL OR c.record_id = $2)""" + _filter_sql(4)
+    + " ORDER BY ts_rank(c.search_vector, q.q) DESC, c.id LIMIT $3")
+# Both vector reads order the policy-filtered rows of a set-returning function, so they are exact
+# scans and no HNSW index (nor its ef_search depth) applies; EXPLAIN proves it in the IR-886 tests.
+#: $1 space, $2 scope, $3 query vector, $4 limit, $5 papers kept, $6.. filters.
+PAPER_FIRST_SQL = (
+    """WITH papers AS (
+            SELECT rv.record_id FROM iris_ai.research_record_vectors($1) rv
+              JOIN public.records_record r ON r.id = rv.record_id
+             WHERE ($2::bigint IS NULL OR rv.record_id = $2)""" + _filter_sql(6)
+    + f""" ORDER BY rv.embedding OPERATOR(public.<=>) $3::public.vector, rv.record_id LIMIT $5)
+        SELECT {_COLUMNS} {_CHUNKS}
+          JOIN iris_ai.research_vectors($1) v ON v.chunk_id = c.id
+          JOIN papers p ON p.record_id = c.record_id
+         WHERE c.deleted_at IS NULL
+         ORDER BY v.embedding OPERATOR(public.<=>) $3::public.vector, c.id LIMIT $4""")
+#: $1 space, $2 scope, $3 query vector, $4 limit, $5.. filters.
+FLAT_SQL = (
+    f"""SELECT {_COLUMNS} {_CHUNKS}
+          JOIN iris_ai.research_vectors($1) v ON v.chunk_id = c.id
+         WHERE c.deleted_at IS NULL AND ($2::bigint IS NULL OR c.record_id = $2)""" + _filter_sql(5)
+    + " ORDER BY v.embedding OPERATOR(public.<=>) $3::public.vector, c.id LIMIT $4")
+
+
+def fuse_by_rank(lists, key) -> list:
+    """Interleave ranked lists by position, keeping each item's best rank.
+
+    Ports Django's `apps.ai.retrieval.fusion.fuse_by_rank`: no weight or threshold.
+    """
+    ranked = [list(items) for items in lists]
+    seen, merged = set(), []
+    for position in range(max((len(items) for items in ranked), default=0)):
+        for items in ranked:
+            if position < len(items) and key(items[position]) not in seen:
+                seen.add(key(items[position]))
+                merged.append(items[position])
+    return merged
 
 
 def overlap(previous: str, text: str) -> int:
@@ -288,7 +375,7 @@ class _Refused(Exception):
 class ResearchTools:
     def __init__(self, dsn: str, grant: str | None, run_id, fence: int,
                  scope_record_id: int | None = None, *, embedding_provider=None, embedding_ledger=None,
-                 follow_stored_grant: bool = False):
+                 reranker=None, guard=None, follow_stored_grant: bool = False):
         self.dsn = dsn
         self.grant = grant
         self.run_id = run_id
@@ -296,6 +383,11 @@ class ResearchTools:
         self.scope = scope_record_id
         self.embedding_provider = embedding_provider
         self.embedding_ledger = embedding_ledger
+        #: Off when None (IR-886); admitted through `embedding_ledger` and sent only past `guard`.
+        self.reranker = reranker
+        self.guard = guard
+        #: The Embedding Space this run's first semantic search read; a later one must match (IR-886).
+        self.space_id: int | None = None
         # A worker's tools read under the grant the run holds *now*, so a reader's
         # reconnect reaches a run already in progress (IR-880). Off, `grant` is the authority.
         self.follow_stored_grant = follow_stored_grant
@@ -689,31 +781,14 @@ class ResearchTools:
         lost access to is never counted. There is no topic filter: a topic total
         is a screened subset, never a count.
         """
-        if (not isinstance(filters, dict) or set(filters) - set(metadata.FILTERS)
-                or (group_by is not None and group_by not in metadata.GROUPS)
-                or not all(isinstance(filters[n], str) and filters[n].strip()
-                           for n in metadata.TAXONOMIES if n in filters)
-                or not all(_is_int(filters[n]) and metadata.YEAR_RANGE[0] <= filters[n] <= metadata.YEAR_RANGE[1]
-                           for n in ("year_from", "year_to") if n in filters)
-                or ("is_ip" in filters and type(filters["is_ip"]) is not bool)):
+        if not valid_filters(filters) or (group_by is not None and group_by not in metadata.GROUPS):
             return ToolResult.unavailable("invalid_argument")
 
         async def body(conn):
-            applied, ids = [], {}
-            for name, (table, _) in metadata.TAXONOMIES.items():
-                if name not in filters:
-                    continue
-                rows = await conn.fetch(
-                    f"SELECT id, name FROM public.{table} WHERE lower(name) = lower($1)",
-                    filters[name].strip())
-                if not rows:
-                    return ToolResult.unavailable("unknown_filter_value")
-                # Entries differing only by case are never chosen between.
-                if len(rows) > 1:
-                    return ToolResult.unavailable("ambiguous_filter_value")
-                ids[name] = rows[0]["id"]
-                applied.append((name, rows[0]["name"]))
-            applied += [(n, filters[n]) for n in ("year_from", "year_to", "is_ip") if n in filters]
+            try:
+                params, applied = await self._filters(conn, filters)
+            except _Refused as refused:
+                return ToolResult.unavailable(refused.reason)
             rows = await conn.fetch(
                 """SELECT r.id, c.name AS classification, p.name AS psced, t.name AS record_type,
                           r.year_completed AS year
@@ -721,15 +796,8 @@ class ResearchTools:
                      LEFT JOIN public.records_classification c ON c.id = r.classification_id
                      LEFT JOIN public.records_pscedclassification p ON p.id = r.psced_id
                      LEFT JOIN public.records_recordtype t ON t.id = r.record_type_id
-                    WHERE ($1::bigint IS NULL OR r.id = $1)
-                      AND ($2::bigint IS NULL OR r.classification_id = $2)
-                      AND ($3::bigint IS NULL OR r.psced_id = $3)
-                      AND ($4::bigint IS NULL OR r.record_type_id = $4)
-                      AND ($5::int IS NULL OR r.year_completed >= $5)
-                      AND ($6::int IS NULL OR r.year_completed <= $6)
-                      AND ($7::boolean IS NULL OR r.is_ip = $7)""",
-                self.scope, ids.get("classification"), ids.get("psced"), ids.get("record_type"),
-                filters.get("year_from"), filters.get("year_to"), filters.get("is_ip"),
+                    WHERE ($1::bigint IS NULL OR r.id = $1)""" + _filter_sql(2),
+                self.scope, *params,
             )
             groups: dict = {}
             for row in rows:
@@ -745,6 +813,28 @@ class ResearchTools:
                               coverage=Coverage(len(rows), len(rows)))
 
         return await self._call("count", body)
+
+    async def _filters(self, conn, filters: dict) -> tuple[list, list]:
+        """The six `_filter_sql` parameters and the filters as applied, or raise _Refused.
+
+        An unknown or case-ambiguous taxonomy name is refused, never ignored.
+        """
+        applied, ids = [], {}
+        for name, (table, _) in metadata.TAXONOMIES.items():
+            if name not in filters:
+                continue
+            rows = await conn.fetch(
+                f"SELECT id, name FROM public.{table} WHERE lower(name) = lower($1)", filters[name].strip())
+            if not rows:
+                raise _Refused("unknown_filter_value")
+            if len(rows) > 1:
+                raise _Refused("ambiguous_filter_value")
+            ids[name] = rows[0]["id"]
+            applied.append((name, rows[0]["name"]))
+        applied += [(n, filters[n]) for n in ("year_from", "year_to", "is_ip") if n in filters]
+        params = [ids.get("classification"), ids.get("psced"), ids.get("record_type"),
+                  filters.get("year_from"), filters.get("year_to"), filters.get("is_ip")]
+        return params, applied
 
     async def recall(self, record_ids) -> ToolResult:
         """Fresh paper handles for Records a Conversation showed, still readable now (IR-728).
@@ -987,6 +1077,183 @@ class ResearchTools:
                 coverage=Coverage(len(passages),None, len(passages)==SEARCH_LIMIT),
                 dependencies=frozenset(p.source for p in passages))
         return await self._call("semantic_search", body)
+
+    async def hybrid_search(self, query: str, limit: int = 10, filters: dict | None = None) -> ToolResult:
+        """Readable Passages by keyword and by meaning, narrowed by metadata (IR-886, ADR-049).
+
+        Keyword, paper-first vector and flat vector candidates are fused by rank
+        and, when configured and permitted, reranked. Every read is under the
+        run's grant and the same row policy; a missing provider leaves keyword
+        search answering and says so. Results are a sample, never a list of all.
+        """
+        filters = {} if filters is None else filters
+        if (not isinstance(query, str) or not query.strip() or not _is_int(limit)
+                or not valid_filters(filters)):
+            return ToolResult.unavailable("invalid_argument")
+        limit = max(1, min(limit, SEARCH_LIMIT))
+        try:
+            async with self._session() as conn:
+                params, applied = await self._filters(conn, filters)
+            vector, semantic = await self._query_vector(query)
+            async with self._session() as conn:
+                found = await self._candidates(conn, query, params, vector)
+        except _Refused as refused:
+            reason = refused.reason
+
+            async def refused_body(conn):
+                return ToolResult.unavailable(reason)
+            return await self._call("hybrid_search", refused_body)
+        fused = fuse_by_rank([found["keyword"], found["paper_first"], found["flat"]], key=lambda r: r["id"])
+        ordered, rerank = await self._reranked(query, fused)
+        semantic = found.get("semantic") or (semantic if vector is None else OK)
+        signals = (("keyword", OK), ("semantic", semantic), ("rerank", rerank))
+        truncated = (len(fused) > limit or found["keyword_total"] > CANDIDATES
+                     or (vector is not None and len(found["flat"]) == CANDIDATES))
+
+        async def body(conn):
+            # Rechecked under this call's grant: a Passage unreadable now is dropped, not shown.
+            still = set(await conn.fetchval(
+                """SELECT coalesce(array_agg(c.id), '{}') FROM iris_ai.research_chunks() c
+                     JOIN iris_ai.research_chunksets() cs ON cs.id = c.chunk_set_id AND cs.is_active
+                     JOIN public.records_record r ON r.id = c.record_id
+                    WHERE c.id = ANY($1::bigint[]) AND c.deleted_at IS NULL
+                      AND ($2::bigint IS NULL OR c.record_id = $2)""",
+                [r["id"] for r in ordered], self.scope))
+            rows = [r for r in ordered if r["id"] in still][:limit]
+            coverage = Coverage(len(rows), None, truncated, found["inspected"])
+            if not rows:
+                return ToolResult(NO_MATCH, coverage=coverage, signals=signals)
+            firsts = list({row["record_id"]: row for row in rows}.values())
+            record_handles = await self._handles(
+                conn, [("R", r["record_id"], r["chunk_set_id"], None) for r in firsts])
+            passage_handles = await self._handles(
+                conn, [("P", r["record_id"], r["chunk_set_id"], r["id"]) for r in rows])
+            passages = self._passages(None, rows, passage_handles)
+            records = tuple(
+                RecordRef(h, r["record_id"], r["title"],
+                          Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]))
+                for r, h in zip(firsts, record_handles))
+            return ToolResult(OK, records=records, passages=passages, coverage=coverage,
+                              dependencies=frozenset(p.source for p in passages), signals=signals)
+
+        return await self._call("hybrid_search", body)
+
+    async def _query_vector(self, query: str):
+        """(vector, None) from one admitted query embedding, or (None, why not)."""
+        provider, ledger = self.embedding_provider, self.embedding_ledger
+        if provider is None or ledger is None:
+            return None, PROVIDER_GATED
+        from ai.admission.errors import AdmissionDenied
+        from ai.admission.ledger import Request, Usage, estimate_tokens
+        from ai.admission.scope import RunBinding
+        from ai.ingestion.indexing import checked_vectors, space
+
+        binding = RunBinding(self.run_id, self.fence)
+        try:
+            async with self._session() as conn:
+                pinned = await space(conn, provider)
+            if self.space_id is not None and pinned["id"] != self.space_id:
+                return None, SPACE_CHANGED
+            ticket = await ledger.admit(Request(
+                operation="embed", purpose="query", purpose_version="query-1", lane="research",
+                account=provider.account, models=(provider.model,), input_tokens=estimate_tokens(query),
+                output_tokens=0), binding)
+            usage = Usage()
+            try:
+                await self._guard().check(binding, SimpleNamespace(data_policy=provider.data_policy))
+                usage.sent = True
+                try:
+                    response = await asyncio.wait_for(provider.embed([query], input_type="query"),
+                                                      ticket.timeout_seconds)
+                    vector = checked_vectors(response.vectors, 1, provider.dimensions)[0]
+                except Exception:
+                    log.warning("query embedding failed", exc_info=True)
+                    return None, PROVIDER_FAILED
+                usage.input_tokens, usage.output_tokens, usage.model = response.input_tokens, 0, provider.model
+            finally:
+                await ticket.settle(usage)
+        except AdmissionDenied as refused:
+            return None, refused.reason
+        self.space_id = pinned["id"]
+        return vector, None
+
+    async def _candidates(self, conn, query: str, params: list, vector) -> dict:
+        """Each signal's ranked candidate rows, read under the grant and the filters."""
+        inspected = await conn.fetchval(
+            """SELECT count(DISTINCT cs.record_id) FROM iris_ai.research_chunksets() cs
+                 JOIN public.records_record r ON r.id = cs.record_id
+                WHERE cs.is_active AND ($1::bigint IS NULL OR cs.record_id = $1)""" + _filter_sql(2),
+            self.scope, *params)
+        keyword = await conn.fetch(KEYWORD_SQL, query, self.scope, CANDIDATES, *params)
+        found = {"keyword": list(keyword), "keyword_total": keyword[0]["total"] if keyword else 0,
+                 "paper_first": [], "flat": [], "inspected": inspected}
+        if vector is None:
+            return found
+        from ai.admission.errors import AdmissionDenied
+        from ai.ingestion.indexing import space
+        try:
+            current = (await space(conn, self.embedding_provider))["id"]
+        except AdmissionDenied:
+            current = None
+        if current != self.space_id:
+            found["semantic"] = SPACE_CHANGED
+            return found
+        found["paper_first"] = list(await conn.fetch(
+            PAPER_FIRST_SQL, self.space_id, self.scope, json.dumps(vector), CANDIDATES, PAPER_FIRST_RECORDS,
+            *params))
+        found["flat"] = list(await conn.fetch(
+            FLAT_SQL, self.space_id, self.scope, json.dumps(vector), CANDIDATES, *params))
+        return found
+
+    async def _reranked(self, query: str, rows: list) -> tuple[list, str]:
+        """`rows` in the reranker's order, or unchanged with why not (IR-886).
+
+        Passage text goes to the vendor only when the send guard admits every
+        candidate's source; otherwise none is sent.
+        """
+        reranker, ledger = self.reranker, self.embedding_ledger
+        if reranker is None or ledger is None:
+            return rows, OFF
+        if len(rows) < 2:
+            return rows, OK
+        from ai.admission.errors import AdmissionDenied
+        from ai.admission.ledger import Request, Usage, estimate_tokens
+        from ai.admission.scope import RunBinding
+
+        binding = RunBinding(self.run_id, self.fence)
+        texts = [r["content"] for r in rows]
+        sources = frozenset(Source(r["record_id"], r["chunk_set_id"], r["extraction_hash"]) for r in rows)
+        try:
+            limits = getattr(ledger, "limits", None)
+            policy = {"account": reranker.account, "campaign": limits.campaign_key if limits else None,
+                      "price": limits.prices.get(reranker.model) if limits else None}
+            if await self._guard().eligible(binding, reranker, sources, **policy) != sources:
+                return rows, "withheld"
+            ticket = await ledger.admit(Request(
+                operation="rerank", purpose="query", purpose_version="query-1", lane="research",
+                account=reranker.account, models=(reranker.model,),
+                input_tokens=estimate_tokens(query, *texts), output_tokens=0), binding)
+            usage = Usage()
+            try:
+                usage.sent = True
+                try:
+                    response = await asyncio.wait_for(reranker.rerank(query, texts), ticket.timeout_seconds)
+                    order = list(response.order)
+                    if sorted(order) != list(range(len(rows))):
+                        raise ValueError("incomplete rerank output")
+                except Exception:
+                    log.warning("rerank failed", exc_info=True)
+                    return rows, PROVIDER_FAILED
+                usage.input_tokens, usage.output_tokens, usage.model = response.input_tokens, 0, reranker.model
+            finally:
+                await ticket.settle(usage)
+        except AdmissionDenied as refused:
+            return rows, refused.reason
+        return [rows[n] for n in order], OK
+
+    def _guard(self):
+        from ai.admission.guard import SendGuard
+        return self.guard or SendGuard(self.dsn)
 
     async def _call_on_handle(self, name: str, body) -> ToolResult:
         """`_call` in a savepoint; a refused handle is journalled like any outcome."""

@@ -241,7 +241,6 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   const [moreOpen, setMoreOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [stepFailure, setStepFailure] = useState<ApiFailure | null>(null);
-  const [dpaAccepted, setDpaAccepted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitFailure, setSubmitFailure] = useState<ApiFailure | null>(null);
   const [exactMatches, setExactMatches] = useState<ManuscriptMatch[]>([]);
@@ -627,11 +626,11 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
   /* ── Step 3: submit, then re-read who holds it ───────────────────────── */
   async function submit() {
     const id = draftIdRef.current;
-    if (id == null || !dpaAccepted) return;
+    if (id == null) return;
     setSubmitting(true);
     setSubmitFailure(null);
     try {
-      await recordsApi.submit(id, dpaAccepted);
+      await recordsApi.submit(id);
     } catch (err) {
       const data = (err as { response?: { data?: { code?: string; matches?: ManuscriptMatch[] } } })?.response?.data;
       if (data?.code === "exact_duplicate") setExactMatches(data.matches ?? []);
@@ -772,7 +771,7 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
             <button
               type="button"
               onClick={() => void submit()}
-              disabled={!dpaAccepted || submitting}
+              disabled={submitting}
               className={cn(PILL_PRIMARY, FOCUS_RING)}
             >
               {submitting && <i className="fas fa-spinner fa-spin" aria-hidden />}
@@ -951,8 +950,6 @@ function PublishFlow({ initialTarget, user, onDraftCreated, onClose, onRestart }
           {step === 3 && (
             <ReviewStep
               summary={summary}
-              dpaAccepted={dpaAccepted}
-              onDpaChange={setDpaAccepted}
               failure={submitFailure}
               exactMatches={exactMatches}
               likelyMatches={likelyMatches}

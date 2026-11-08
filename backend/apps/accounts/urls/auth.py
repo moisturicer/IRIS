@@ -10,6 +10,10 @@ urlpatterns = [
     # reachable while the current notice is unanswered (`notice.ALLOWED_WHILE_UNANSWERED`).
     path("notice/",               views.CurrentNoticeView.as_view(),  name="notice-current"),
     path("notice/answer/",        views.AnswerNoticeView.as_view(),   name="notice-answer"),
+    # IR-799: RDCO publishes a new version by pasting it; RDCO and the System
+    # Admin read the history. Both stay behind the sign-in block.
+    path("notice/versions/",        views.NoticeVersionsView.as_view(), name="notice-versions"),
+    path("notice/versions/impact/", views.NoticeImpactView.as_view(),   name="notice-impact"),
     path("logout/",               views.LogoutView.as_view(),         name="auth-logout"),
     path("token/refresh/",        TokenRefreshView.as_view(),         name="token-refresh"),
     # Retired by IR-643 (ADR-045 §8): both answer only "invalid link", so a

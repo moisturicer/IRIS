@@ -59,6 +59,7 @@ class AuditEvent(models.Model):
     # RDCO's two other acts on a paper in review (ADR-051 §10, IR-797).
     ADVISER_REPLACED           = "ADVISER_REPLACED"
     OWNER_ADDED                = "OWNER_ADDED"
+    CONTACT_PERSON_CHANGED     = "CONTACT_PERSON_CHANGED"
     DOCUMENT_REQUESTED         = "DOCUMENT_REQUESTED"
     DOCUMENT_REQUEST_FULFILLED = "DOCUMENT_REQUEST_FULFILLED"
     DOCUMENT_REQUEST_ACCEPTED  = "DOCUMENT_REQUEST_ACCEPTED"
@@ -100,6 +101,17 @@ class AuditEvent(models.Model):
     # `notice_version`, `ai_consent`, and the `previous_*` pair (None when it was
     # their first answer). Written by `apps.accounts.notice.answer_notice`.
     NOTICE_ANSWERED = "NOTICE_ANSWERED"
+    # RDCO published a new data notice version (ADR-051 decisions 16-17 as amended
+    # by ADR-063 decision 9, IR-799). `user` is the publisher. Metadata:
+    # `notice_version`, `previous_notice_version`, `characters` and `sha256` of
+    # the text, never the text itself, which the version row holds.
+    NOTICE_PUBLISHED = "NOTICE_PUBLISHED"
+    # A person changed their own AI answer from Settings, or a Yes at a new notice
+    # reached their earlier papers (ADR-054 decisions 11-13, IR-791). Metadata:
+    # `previous_ai_consent`, `ai_consent`, `papers` (`all` or `from_now`, only
+    # for a No becoming a Yes), `papers_updated` and `paper_ids`: ids and counts,
+    # never a title. Written by `apps.accounts.ai_answer`.
+    AI_ANSWER_CHANGED = "AI_ANSWER_CHANGED"
     # A person downloaded their own data (ADR-051 decision 13, IR-786). Metadata
     # is `sections` and `format` only: never a byte of what was downloaded.
     PERSONAL_DATA_EXPORTED = "PERSONAL_DATA_EXPORTED"
@@ -152,6 +164,7 @@ class AuditEvent(models.Model):
         (RECORD_WITHDRAWN,           "Record Withdrawn"),
         (ADVISER_REPLACED,           "Adviser Replaced"),
         (OWNER_ADDED,                "Owner Added"),
+        (CONTACT_PERSON_CHANGED,     "Contact Person Changed"),
         (EMBARGO_ANSWERED,           "Embargo Question Answered"),
         (EMBARGO_SET,                "Embargo Set"),
         (EMBARGO_EXTENDED,           "Embargo Date Moved"),
@@ -181,6 +194,8 @@ class AuditEvent(models.Model):
         (ACCOUNT_DELETION_REJECTED,  "Account Deletion Rejected"),
         (RETENTION_CLEANUP_RUN,        "Retention Cleanup Run"),
         (NOTICE_ANSWERED,              "Data Notice Answered"),
+        (NOTICE_PUBLISHED,             "Data Notice Published"),
+        (AI_ANSWER_CHANGED,            "AI Answer Changed"),
         (PERSONAL_DATA_EXPORTED,       "Personal Data Downloaded"),
     ]
 

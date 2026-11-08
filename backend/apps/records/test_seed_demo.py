@@ -312,20 +312,25 @@ class SeedDemoRecordTests(TestCase):
             # Only RDCO publishes (ADR-047 §5).
             self.assertTrue(record.reviews.filter(stage="rdco", status="approved").exists())
 
-    def test_submitted_records_carry_dpa_consent(self):
-        """The seed must not manufacture records that skipped the consent gate.
+    def test_every_seeded_paper_keeps_a_yes_and_no_stamp(self):
+        """Test data answers Yes (ADR-054 decision 18, IR-791).
 
-        `submit()` stamps consent (IR-226); the seed drives the service layer
-        directly, so it stamps it too. A seeded record past `draft` with no
-        consent would misrepresent the flow being demonstrated.
+        Reversed deliberately: this used to require IR-226's per-paper stamp,
+        which `submit()` no longer writes. The seed now stores its Contact
+        person's Yes on each draft, as the API does, and stamps nothing.
         """
-        past_draft = Record.objects.exclude(pipeline_status=PipelineStatus.DRAFT)
-        self.assertTrue(past_draft.exists())
-        for record in past_draft:
-            self.assertIsNotNone(
-                record.dpa_accepted_at,
-                f"{record.title} reached {record.pipeline_status} without consent",
-            )
+        papers = Record.objects.all()
+        self.assertTrue(papers.exists())
+        for record in papers:
+            self.assertIs(record.ai_consent, True, f"{record.title} stores no Yes")
+            self.assertIsNone(record.dpa_accepted_at, f"{record.title} was stamped")
+
+    def test_a_paper_seeded_before_ir_791_gets_its_yes_on_a_second_run(self):
+        Record.objects.update(ai_consent=None)
+
+        seed()  # again
+
+        self.assertFalse(Record.objects.exclude(ai_consent=True).exists())
 
     def test_running_twice_changes_nothing(self):
         before = dict(Record.objects.values_list("title", "pipeline_status"))

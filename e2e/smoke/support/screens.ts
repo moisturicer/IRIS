@@ -98,6 +98,11 @@ const DELETION_REQUEST = {
   blockers: [], capabilities: { can_confirm: true, can_reject: true },
 };
 
+const RETENTION_RUN = {
+  id: 2, event_type: "RETENTION_CLEANUP_RUN", user: null, user_name: null, record: null, record_title: null,
+  metadata: { counts: { download_notes: 3 } }, created_at: when("11-05"),
+};
+
 const AUDIT_EVENT = {
   id: 1, event_type: "LOGIN", user: 11, user_name: "Maria Cristina Dela Cruz-Santos",
   record: 101, record_title: LONG_TITLE, metadata: {}, created_at: when("11-05"),
@@ -130,6 +135,11 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/colleges/", paginated([]));
       api.on("GET", "/departments/", paginated([]));
       api.on("GET", "/courses/", paginated([]));
+      // The server's data notice, which registration shows and answers (IR-790).
+      api.on("GET", "/auth/notice/", {
+        version: 1, title: "IRIS data notice", subtitle: "", published_at: "2026-11-01T00:00:00Z",
+        sections: [{ title: "What IRIS keeps", body: "Your name and CIT-U email." }],
+      });
     },
     heading: "Create an Account",
     primary: (p) => p.getByRole("button", { name: "Continue to affiliation" }), primaryLabel: "Continue to affiliation",
@@ -376,6 +386,16 @@ export const SCREENS: Screen[] = [
     mocks: wrap("System Admin", (api) => api.on("GET", "/users/deletion-requests/", paginated([DELETION_REQUEST]))),
     heading: "Account Deletion Requests",
     primary: (p) => p.getByRole("button", { name: "Confirm deletion" }), primaryLabel: "Confirm deletion",
+  },
+  {
+    id: "retention", path: "/admin/retention", route: "/admin/retention", role: "System Admin",
+    mocks: wrap("System Admin", (api) => {
+      api.on("GET", "/settings/retention.download_notes_days/",
+        { key: "retention.download_notes_days", value: "", updated_by: null, updated_at: when("11-01") });
+      api.on("GET", "/audit/", paginated([RETENTION_RUN]));
+    }),
+    heading: "Retention",
+    primary: (p) => p.getByRole("button", { name: "Save period" }), primaryLabel: "Save period",
   },
   {
     id: "audit-log", path: "/admin/audit", route: "/admin/audit", role: "System Admin",

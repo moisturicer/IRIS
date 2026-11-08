@@ -1,5 +1,6 @@
 /**
- * Publish, step 3: exactly what will be submitted, then consent (spec §4.4).
+ * Publish, step 3: exactly what will be submitted (spec §4.4). It asks no consent:
+ * the paper carries its Contact person's AI answer from its draft (ADR-054, IR-791).
  *
  * Every value entered is shown, grouped as Manuscript · Details · Hints, and each
  * group's Edit goes back to the step that owns it. A note says the paper starts
@@ -8,7 +9,6 @@
  */
 import type { ReactNode } from "react";
 
-import { DpaConsentInline } from "@/components/compliance";
 import { FOCUS_RING } from "@/components/ui/interaction";
 import { PILL_SECONDARY } from "@/components/ui/pillStyles";
 import { cn } from "@/lib/utils";
@@ -41,8 +41,6 @@ export interface ReviewSummary {
 
 interface ReviewStepProps {
   summary:          ReviewSummary;
-  dpaAccepted:      boolean;
-  onDpaChange:      (accepted: boolean) => void;
   failure:          ApiFailure | null;
   exactMatches?: ManuscriptMatch[];
   likelyMatches?: ManuscriptMatch[];
@@ -63,8 +61,6 @@ interface ReviewStepProps {
 
 export function ReviewStep({
   summary,
-  dpaAccepted,
-  onDpaChange,
   failure,
   exactMatches = [],
   likelyMatches = [],
@@ -136,8 +132,6 @@ export function ReviewStep({
         <p>{matchFailure}</p>
         <button type="button" onClick={onCheckAgain} className={cn(PILL_SECONDARY, FOCUS_RING, "mt-2 min-h-9 px-4")}>Check again</button>
       </div>}
-
-      <DpaConsentInline accepted={dpaAccepted} onAcceptedChange={onDpaChange} />
 
       {failure && (
         <div role="alert" className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-3 text-body text-brand">

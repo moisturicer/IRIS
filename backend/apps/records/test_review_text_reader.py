@@ -5,7 +5,9 @@ import socket
 import pytest
 
 from apps.records.review_text import reader, sandbox
-from apps.records.review_text.testing import THESIS, blank, pdf, two_columns
+from apps.records.review_text.testing import (BODY, THESIS, below_the_page, blank, columns_around, drawn_twice, mixed_font_words,
+                                               pdf, placed, raised_bullets, sized_headings, two_columns,
+                                               unruled_table, white_boxed_columns)
 
 
 @pytest.fixture
@@ -30,6 +32,24 @@ def test_running_heads_and_page_numbers_are_dropped(read):
     joined = " ".join(texts(reading)) + " ".join(s["heading"] for s in reading["sections"])
     assert "Community Waste-to-Energy Feasibility" not in joined
     assert not any(t.strip().isdigit() for t in texts(reading))
+
+
+def test_a_page_number_above_the_bottom_band_is_dropped(read):
+    # A journal prints its page numbers (827, 828, ...) 120 pt up a page,
+    # above the band a footer is looked for in. In the same place on every
+    # page, one more each page, it is a page number wherever it sits.
+    words = ["first", "second", "third", "fourth"]
+    pages = [[("blank", None), ("para", [f"The {w} paragraph of the discussion runs on here."])] for w in words]
+    joined = " ".join(texts(read(pdf(pages, running_head=None, number_at=120, first_number=827))))
+    assert "The fourth paragraph of the discussion" in joined
+    assert not any(str(n) in joined for n in range(827, 831))
+
+
+def test_a_number_repeated_in_place_but_not_counting_up_is_kept(read):
+    # The same lone "12" in the same spot on each page is not a page count.
+    pages = [[("blank", None), ("para", [f"The {w} paragraph of the discussion."]), ("plain", "12")]
+             for w in ["first", "second", "third", "fourth"]]
+    assert " ".join(texts(read(pdf(pages, running_head=None)))).split().count("12") == 4
 
 
 def test_headings_are_found_by_bold_numbering_and_capitals(read):
@@ -69,6 +89,272 @@ def test_ruled_tables_are_read_as_rows(read):
     rows = [p for s in read(pdf(THESIS))["sections"] for p in s["passages"] if p["kind"] == "row"]
     assert [r["text"] for r in rows] == ["Technology | Output", "Digestion | 40 kW", "Gasification | 90 kW"]
     assert all(r["regions"] for r in rows)
+
+
+def test_invisible_boxes_behind_the_lines_make_no_table(read):
+    # sample15: every line sits on a white, borderless box. Its edges looked
+    # like a two-column grid, so the page read as table rows, a line at a time.
+    para = ["The construction industry adds much to the", "growth of the gross domestic product in the",
+            "country, as the statistics authority reports."]
+    left = [para, ["Delays raise the cost of a project and the", "time it takes, as earlier studies found."]] * 4
+    right = [para] * 6
+    reading = read(white_boxed_columns(left, right))
+    assert not [p for s in reading["sections"] for p in s["passages"] if p["kind"] == "row"]
+    assert ("The construction industry adds much to the growth of the gross domestic product in "
+            "the country, as the statistics authority reports.") in texts(reading)
+
+
+def test_a_word_set_partly_in_another_font_stays_whole(read):
+    # sample21: the fi ligature, the apostrophe and the dash came from a second
+    # font, and each font change split the word ("arti fi cial", "Nursing ' s").
+    other = "Helvetica"
+    reading = read(mixed_font_words([
+        [(BODY, "The use of arti"), (other, "fi"), (BODY, "cial intelligence in Nursing"),
+         (other, "'"), (BODY, "s care models grows.")],
+        [(BODY, "The Human"), (other, "-"), (BODY, "AI model guides the curriculum.")],
+        # A narrow justified space, still a space character, between two fonts.
+        [(BODY, "The students' ", 1.6), (other, "perceptions"), (BODY, " were mixed.")],
+    ]))
+    assert texts(reading) == ["The use of artificial intelligence in Nursing's care models grows.",
+                              "The Human-AI model guides the curriculum.",
+                              "The students' perceptions were mixed."]
+
+
+def test_a_captions_second_line_and_an_unruled_tables_header_are_not_headings(read):
+    # sample23: a bold caption ran onto a line of its own ("Sustainability"),
+    # read as a heading. sample14: an unruled table's bold header row, its
+    # cells far apart, read as one.
+    reading = read(unruled_table(
+        ["Table 3. Result of the test on energy as one of the key concepts of", "Sustainability"],
+        ["Cases", "Sum of Squares", "Mean Square"],
+        [["Between groups", "1.204", "0.602"], ["Within groups", "48.310", "0.211"]]))
+    assert keys(reading) == ["results", "discussion"]
+
+
+def test_a_table_row_led_by_a_number_far_from_its_word_is_no_heading(read):
+    # sample19: "2.91" and "Effective", a mean and its reading 134 pt apart,
+    # were each taken for a numbered heading. A heading's tab is 19 to 26 pt.
+    reading = read(mixed_font_words([[("Times-Bold", "RESULTS")],
+                                     [(BODY, "2.91", -60), (BODY, "Effective")],
+                                     [(BODY, "The respondents rated each of the coping mechanisms as effective.")]]))
+    assert keys(reading) == ["results"]
+
+
+def test_words_second_level_o_bullet_leads_its_item(read):
+    # sample29: Word's "o" in Courier New, 2.6 pt above its text, was read
+    # as a line of its own and kept as a passage holding only "o".
+    items = ["Brushless motors: efficient over long operation.", "PVC pipes: cheap and easily shaped."]
+    found = texts(read(raised_bullets("The parts were chosen as follows:", items)))
+    assert "o" not in found
+    assert [t for t in found if t.endswith(tuple(i[-12:] for i in items))] == [f"o {i}" for i in items]
+
+
+def test_text_drawn_twice_in_one_place_is_read_once(read):
+    # sample12 v3 prints a table twice over itself: "CONTROL CONTROL", "43 43".
+    reading = read(drawn_twice("SUMMARY", [["Dimension", "Score"], ["Control", "43"], ["Reach", "41"]]))
+    assert keys(reading) == ["summary"]
+    assert texts(reading) == ["Dimension | Score", "Control | 43", "Reach | 41"]
+
+
+def test_text_drawn_off_the_page_is_not_read(read):
+    # sample12: a chart's labels and a table sit below the page's bottom edge.
+    reading = read(below_the_page("The only paragraph a reader of this page can see.",
+                                  ["30 33 25 26 31 38", "CONTROL ORIGIN REACH"]))
+    assert texts(reading) == ["The only paragraph a reader of this page can see."]
+
+
+def test_each_contents_entry_is_one_passage_and_its_leader_one_mark(read):
+    # sample6, sample31: a table of contents' entries ran together, and dots
+    # left over from their leaders were kept as passages of their own.
+    entries = [("4.4 Model Evaluation ......................................... 13", "4.4 Model Evaluation … 13"),
+               ("4.5 Interpretation of Results ................................ 14",
+                "4.5 Interpretation of Results … 14"),
+               ("5.4 Limitations of the Study ..……………… ..... 18",
+                "5.4 Limitations of the Study … 18"),
+               ("Table of Contents ............................................. i", "Table of Contents … i")]
+    page = [(72, "Times-Bold", 12, "CONTENTS")] + [(72, BODY, 11, line) for line, _ in entries]
+    found = texts(read(placed([page])))
+    assert found == [shown for _, shown in entries]
+
+
+def test_a_full_width_block_between_two_columns_reads_in_bands(read):
+    # sample14, sample18: a table set across both columns mid-page made the
+    # gutter look crossed, so the whole page read as one column, line by line
+    # across both. Columns above, then the block, then columns below.
+    def column(name):
+        return [f"{name} line {n} of the column goes on" for n in range(1, 9)]
+    wide = [f"wide row {n} of a table set across the whole page, from one margin to the other" for n in range(1, 6)]
+    joined = " ".join(texts(read(columns_around((column("upper left"), column("upper right")), wide,
+                                                (column("lower left"), column("lower right"))))))
+    order = ["upper left", "upper right", "wide row", "lower left", "lower right"]
+    for name in order:
+        lines = [f"{name} line {n} of the column goes on" for n in range(1, 9)] if name != "wide row" else wide
+        assert " ".join(lines) in joined, name
+    assert [joined.index(name) for name in order] == sorted(joined.index(name) for name in order)
+
+
+def test_numbers_beside_prose_around_a_wide_block_are_no_columns(read):
+    # sample12, sample26: a one-column page with a chart or a table's numbers
+    # beside its lines was cut into bands, a paragraph halved mid-sentence.
+    prose = [f"row {n} label of the survey results goes on" for n in range(1, 9)]
+    numbers = [f"{10 + n} Agree" for n in range(1, 9)]
+    wide = [f"wide row {n} of a table set across the whole page, from one margin to the other" for n in range(1, 6)]
+    joined = " ".join(texts(read(columns_around((prose, numbers), wide, (prose, numbers)))))
+    assert "row 1 label of the survey results goes on 11 Agree" in joined
+
+
+def test_a_web_address_tail_in_capitals_is_no_heading(read):
+    # test1: an address cut at "HABITS-" went on as "OF-YOUTH-IN-OMAN", which
+    # the capitals rule took for a heading, and every later entry fell under it.
+    page = [(72, "Times-Bold", 12, "REFERENCES"),
+            (72, BODY, 12, "Chavali, K. (2020). Saving and spending habits of youth in Oman. Journal"),
+            (108, BODY, 12, "of Critical Reviews. https://www.example.org/paper/SAVING-AND-SPENDING-HABITS-"),
+            (108, BODY, 12, "OF-YOUTH-IN-OMAN"),
+            (72, BODY, 12, "Kotler, P. (2019). Principles of marketing. Pearson Education.")]
+    reading = read(placed([page]))
+    assert keys(reading) == ["references"]
+    assert texts(reading)[0].endswith("https://www.example.org/paper/SAVING-AND-SPENDING-HABITS-OF-YOUTH-IN-OMAN")
+    assert texts(reading)[1] == "Kotler, P. (2019). Principles of marketing. Pearson Education."
+
+
+def test_an_entry_after_an_address_ending_in_a_slash_starts_at_the_margin(read):
+    # test1: "Baron, R. (2008)..." back at the margin after an address ending
+    # ".../12/" was read as that address's tail, glued to the entry before.
+    page = [(72, "Times-Bold", 12, "REFERENCES"),
+            (72, BODY, 12, "Andres, K. (2022). Spending habits of senior high school learners during the pandemic. Animo"),
+            (108, BODY, 12, "Repository. https://animorepository.dlsu.edu.ph/conf/2022/bus_research/12/"),
+            (72, BODY, 12, "Baron, R. (2008). Distraction-conflict theory: Progress and problems in the study of attention and its"),
+            (108, BODY, 12, "limits. Retrieved from https://www.example.org/baron")]
+    found = texts(read(placed([page])))
+    assert found[0].endswith("bus_research/12/")
+    assert found[1].startswith("Baron, R. (2008).")
+
+
+def test_an_unruled_tables_number_columns_are_not_a_page_column(read):
+    # sample19 and a dozen others: on a one-column page, the gap between a
+    # table's labels and its numbers was taken for a gutter, so every label
+    # was read apart from its numbers.
+    rows = [["Firm Alpha", "91", "37.45"], ["Firm Beta", "88", "36.21"], ["Firm Charlie", "64", "26.34"],
+            ["Firm Delta", "52", "21.40"], ["Firm Echo", "33", "13.58"], ["Grand Total", "243", "100.0"]]
+    reading = read(unruled_table(["Table 1. Respondents by firm"], ["Firm", "Count", "Percent"], rows))
+    joined = " ".join(texts(reading))
+    assert all(" ".join(row) in joined for row in rows)
+
+
+@pytest.mark.parametrize("number", ["2.", "I.", "1"])
+def test_a_numbered_heading_with_a_wide_gap_after_its_number_is_found(read, number):
+    # sample16, sample30, Sample4: a tab after the number, 19 to 26 pt wide.
+    reading = read(mixed_font_words([[("Times-Bold", number, -22), ("Times-Bold", "RELATED LITERATURE")],
+                                     [(BODY, "Earlier studies of delays in construction are reviewed here.")]]))
+    assert keys(reading) == ["related literature"]
+
+
+def test_a_bold_word_off_to_the_right_is_a_table_cell_not_a_heading(read):
+    # sample13: a stacked header cell, "Standard" over "Deviation", in the
+    # right half of the page, read as two headings.
+    body = "The table shows the mean score of each statement that the students rated."
+    reading = read(placed([[
+        (72, "Times-Bold", 12, "Results"), (72, BODY, 11, body), (72, BODY, 11, body),
+        (400, "Times-Bold", 11, "Standard"), (400, "Times-Bold", 11, "Deviation"),
+        (72, BODY, 11, body), (72, BODY, 11, body),
+        (250, "Times-Bold", 12, "Discussion"), (72, BODY, 11, body),
+    ]]))
+    assert keys(reading) == ["results", "discussion"]
+
+
+@pytest.mark.parametrize("heading", ["References", "6. REFERENCES", "Bibliography", "Literature Cited"])
+def test_each_reference_entry_is_one_passage(read, heading):
+    # sample14 split an entry at its year, "(2024).", and smartcities at each
+    # abbreviated journal name, "J. Clean." / "Prod.". Body text still splits.
+    reading = read(placed([[
+        (72, "Times-Bold", 12, "Conclusion"),
+        (72, BODY, 11, "Enrolment grew in every program. Women gained the most in architecture."),
+        (72, "Times-Bold", 12, heading),
+        (72, BODY, 11, "Torres, C. S., & Narsico, P. G. (2024). Gender trends in engineering. J. Eng."),
+        (108, BODY, 11, "Educ. Res. 12(3), 45-60."),
+        (72, BODY, 11, "Lim, A. (2021). Waste to energy in Cebu. J. Clean. Prod. 8, 1-13."),
+    ]]))
+    by_key = {s["key"]: [p["text"] for p in s["passages"]] for s in reading["sections"]}
+    assert by_key["conclusion"] == ["Enrolment grew in every program.", "Women gained the most in architecture."]
+    assert list(by_key.values())[1] == [
+        "Torres, C. S., & Narsico, P. G. (2024). Gender trends in engineering. J. Eng. Educ. Res. 12(3), 45-60.",
+        "Lim, A. (2021). Waste to energy in Cebu. J. Clean. Prod. 8, 1-13.",
+    ]
+
+
+def test_a_web_address_broken_across_lines_stays_in_its_entry(read):
+    # sample1, 18, 20: a DOI broken after a hyphen, its tail on the next line
+    # at another position, opened an entry of its own or glued onto the next.
+    reading = read(placed([[
+        (72, "Times-Bold", 12, "References"),
+        (72, BODY, 11, "Navarro, A. (2016). Procurement reforms. Earth and Environmental Science, 1067(1)."),
+        (108, BODY, 11, "https://doi.org/10.1088/1755-"),
+        (200, BODY, 11, "1315/1067/1/012044"),
+        (72, BODY, 11, "Gefen, D. (2000). E-commerce: The role of familiarity and trust in online"),
+        (108, BODY, 11, "shopping. Omega, 28(6), 725-737."),
+        # sample20: an address ending on a full stop ends its entry.
+        (72, BODY, 11, "Abrigo, M. R. M., & Tam, Z. C. (2021). Public sector procurement of medicines in the"),
+        (108, BODY, 11, "Philippines. http://hdl.handle.net/11540/14719."),
+        (72, BODY, 11, "Cui, R. (2018). Problems of bidding for construction projects."),
+    ]]))
+    assert [p["text"] for s in reading["sections"] for p in s["passages"]] == [
+        "Navarro, A. (2016). Procurement reforms. Earth and Environmental Science, 1067(1). "
+        "https://doi.org/10.1088/1755-1315/1067/1/012044",
+        "Gefen, D. (2000). E-commerce: The role of familiarity and trust in online shopping. Omega, 28(6), 725-737.",
+        "Abrigo, M. R. M., & Tam, Z. C. (2021). Public sector procurement of medicines in the Philippines. "
+        "http://hdl.handle.net/11540/14719.",
+        "Cui, R. (2018). Problems of bidding for construction projects.",
+    ]
+
+
+def test_a_line_set_smaller_than_the_body_is_no_heading(read):
+    # sample25: an unruled table in 7.9 pt under a 10.1 pt body. Its score
+    # column, "3.23 Agree", read as numbered headings, and its bold
+    # "Overall Mean" row as another, so the paper looked like repeated headings.
+    body = "The students rated each statement on a four point scale from the survey."
+    reading = read(placed([[
+        (72, "Times-Bold", 11, "3.3 Academic Performance"), (72, BODY, 11, body), (72, BODY, 11, body),
+        *[(72, BODY, 8, f"3.{n} Agree") for n in (23, 10, 16, 4, 62, 2)],
+        (72, "Times-Bold", 8, "Overall Mean"),
+        (72, BODY, 11, body),
+        (72, "Times-Bold", 11, "3.4 Relationship Between Variables"), (72, BODY, 11, body),
+        # sample6: a questionnaire set small throughout keeps its bold capitals parts.
+        (72, "Times-Bold", 8, "II. ATTENDANCE HISTORY"),
+        (72, BODY, 8, "Approximately how many times were you absent from class this semester?"),
+    ]]))
+    assert keys(reading) == ["academic performance", "relationship between variables", "attendance history"]
+
+
+BODY_TEXT = ["The study asked how the curriculum prepares nurses for new tools in care.",
+             "It reads the literature and proposes a model for teaching the use of them."]
+
+
+@pytest.mark.parametrize("font", [BODY, "Times-Italic"])
+def test_a_heading_set_larger_than_the_body_is_found(read, font):
+    # sample21: 12 pt headings over a 10 pt body, in fonts not named bold.
+    reading = read(sized_headings([("Introduction", BODY_TEXT), ("Paper Design", BODY_TEXT),
+                                   ("Theoretical Framework", BODY_TEXT)], heading_font=font))
+    assert keys(reading) == ["introduction", "paper design", "theoretical framework"]
+
+
+@pytest.mark.parametrize("line", [
+    "Nurses must learn to question what a tool suggests.",
+    "Error = | predicted probability - actual class |",   # sample6: a formula
+    "Cando, Jean Marie *, Lizares, Estela, Villacastin",  # sample12: authors
+    "Judith Ismael, PhD 3 , Sitti Ali, MAN 1",           # sample21: authors and marks
+])
+def test_a_larger_line_that_is_no_heading_stays_text(read, line):
+    reading = read(sized_headings([("Introduction", BODY_TEXT), (line, BODY_TEXT)]))
+    assert keys(reading) == ["introduction"]
+
+
+@pytest.mark.parametrize("fontname, bold", [
+    ("NKOLOK+AdvOTab3e3698.B", True), ("ABCDEF+Arial-BoldMT", True), ("Calibri,Bold", True),
+    ("Helvetica-Black", True), ("MyriadPro-Semibold", True), ("Garamond-BI", True),
+    ("NKONAI+AdvOT29dffb6a.I", False), ("Times-Roman", False), ("Bodoni-Roman", False),
+])
+def test_bold_is_read_from_the_fonts_name(fontname, bold):
+    assert reader.is_bold(fontname) is bold
 
 
 def test_two_columns_are_split_at_the_gutter(read):
@@ -155,6 +441,16 @@ def test_about_as_many_headings_as_sentences_is_not_trusted():
 def test_one_heading_over_and_over_is_not_trusted():
     repeated = _sectioned(("journal", 9), *[(f"journal#{n}", 9) for n in range(2, 7)], ("methods", 9))
     assert "repeated_headings" in reader._unreliable(repeated)
+
+
+@pytest.mark.parametrize("back", ["appendices", "appendix a", "curriculum vitae"])
+def test_headings_repeated_in_the_appendices_are_trusted(back):
+    # test1: each researcher's CV repeats "Personal Information" and
+    # "Personal Statement", and the whole thesis read as one section.
+    cvs = [(f"personal information#{n}" if n > 1 else "personal information", 1) for n in range(1, 12)]
+    cvs += [(f"personal statement#{n}" if n > 1 else "personal statement", 3) for n in range(1, 9)]
+    thesis = _sectioned(*[(f"chapter heading {n}", 6) for n in range(30)], (back, 0), *cvs)
+    assert reader._unreliable(thesis) == []
 
 
 def test_headings_over_mostly_nothing_are_not_trusted():

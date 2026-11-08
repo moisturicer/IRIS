@@ -326,8 +326,8 @@ def test_replacement_during_embedding_cannot_persist_old_vectors(manuscript, mon
     client, record = manuscript
     record.is_embargoed = False
     record.embargo_released_at = timezone.now()
-    record.dpa_accepted_at = timezone.now()
-    record.save(update_fields=["is_embargoed", "embargo_released_at", "dpa_accepted_at"])
+    record.ai_consent = True
+    record.save(update_fields=["is_embargoed", "embargo_released_at", "ai_consent"])
     paper = NormalizedDocument(title="Research paper", elements=(
         DocumentElement(kind=PARAGRAPH, text="The paper contains a passage for deterministic local embedding.", page=1),
     ))

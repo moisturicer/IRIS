@@ -25,7 +25,7 @@ task fails loudly each day until it is fixed.
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Callable
+from typing import Callable, Optional
 
 from django.db import transaction
 from django.utils import timezone
@@ -43,12 +43,16 @@ class RetentionType:
     `key` names the type in the audit event's counts. `setting_key` is the
     `SystemSetting` holding its period in days. `erase(cutoff)` removes or blanks
     everything of this type older than `cutoff` and returns how many rows it
-    changed; it must change nothing it has already changed.
+    changed; it must change nothing it has already changed. `count(cutoff)`, when
+    given, says how many rows `erase(cutoff)` would change without changing any,
+    so the Retention page can warn before a period is saved (IR-795). A type
+    without one can't be previewed.
     """
 
     key: str
     setting_key: str
     erase: Callable[[datetime], int]
+    count: Optional[Callable[[datetime], int]] = None
 
 
 _REGISTRY: dict[str, RetentionType] = {}
@@ -91,6 +95,27 @@ def period_error(value: str) -> str | None:
     if parse_period(value) is None:
         return "Enter a whole number of days, or leave it blank to erase nothing."
     return None
+
+
+def type_for_setting(setting_key: str) -> RetentionType | None:
+    """The registered type whose period `setting_key` holds, or None."""
+    return next((t for t in _REGISTRY.values() if t.setting_key == setting_key), None)
+
+
+def preview(retention_type: RetentionType, value: str, now: datetime | None = None) -> int | None:
+    """
+    How many rows a run made now would erase if the period were `value` (IR-795).
+
+    Reads only. A blank period erases nothing, so it previews as 0; so does a
+    value that isn't a positive whole number, as `run_retention` treats it.
+    None means the type has no way to count.
+    """
+    if retention_type.count is None:
+        return None
+    days = parse_period(value)
+    if days is None:
+        return 0
+    return retention_type.count((now or timezone.now()) - timedelta(days=days))
 
 
 def run_retention(now: datetime | None = None) -> dict[str, int]:

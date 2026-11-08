@@ -219,7 +219,8 @@ export interface RecordFileItem {
  * `DELETE /records/<id>/`: `delete_record` (a draft or rejected record, gone
  * now), `withdraw_submission` (in review, ending every open turn) and
  * `request_deletion` (accepted work, for RDCO to decide). Nothing renders them
- * yet.
+ * yet. IR-797 adds RDCO's three acts on a paper in review, `replace_adviser`,
+ * `add_owner` and `withdraw_paper`, which Paper View offers (IR-798).
  */
 export type Capability =
   | "open_review"
@@ -246,6 +247,9 @@ export type Capability =
   | "release_embargo"
   | "release_ip"
   | "publish_unlisted"
+  | "replace_adviser"
+  | "add_owner"
+  | "withdraw_paper"
   | "set_visibility"
   | "tag_ip"
   | "attach_file"

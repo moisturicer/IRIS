@@ -83,7 +83,7 @@ def _record(title="A thesis", chunks=("alpha", "beta")) -> Record:
         title=title,
         abstract="An abstract.",
         is_ip=False,
-        dpa_accepted_at=timezone.now(),
+        ai_consent=True,
         is_embargoed=False, embargo_released_at=timezone.now(),
     )
     if chunks:
@@ -321,7 +321,7 @@ class StubUploadTests:
         record = Record.objects.create(
             title="Stub only",
             record_type=record_type,
-            dpa_accepted_at=timezone.now(),
+            ai_consent=True,
             is_embargoed=False, embargo_released_at=timezone.now(),
         )
         slot = UploadSlot.objects.create(name="Manuscript", record_type=record_type)

@@ -146,12 +146,11 @@ def test_the_reader_facing_limitation_names_no_withheld_source(reader):
 
 def released(title, *, owner=None):
     """A consented, non-IP paper whose embargo was released through the writer."""
-    from django.utils import timezone
 
     from apps.records.embargo import mark_released
 
     record = paper(title, owner=owner)
-    Record.objects.filter(pk=record.pk).update(is_ip=False, dpa_accepted_at=timezone.now())
+    Record.objects.filter(pk=record.pk).update(is_ip=False, ai_consent=True)
     record.refresh_from_db()
     mark_released(record, actor=owner)
     return record
@@ -183,7 +182,7 @@ def test_an_unreleased_paper_the_reader_owns_is_readable_but_never_sent(reader):
     assert result.denied == {passage(draft)}
 
 
-@pytest.mark.parametrize("change", [{"dpa_accepted_at": None}, {"is_ip": True}])
+@pytest.mark.parametrize("change", [{"ai_consent": None}, {"is_ip": True}])
 def test_withdrawn_consent_or_an_ip_mark_withholds_a_paper_read_earlier(reader, change):
     flood = released("Flood")
     read = passage(flood)

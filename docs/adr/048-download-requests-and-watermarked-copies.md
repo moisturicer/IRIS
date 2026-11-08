@@ -55,7 +55,7 @@ Downloading is the act that produces a copy leaving IRIS. Gating it, and later m
 ## Consequences
 
 - **The gate is a deterrent, not a control.** The reader fetches the full PDF to render it, so a determined reader can still save an unmarked copy using browser tools. Closing that gap means either watermarking the reader's copy too, which costs a per-request PDF rewrite and breaks range requests and caching, or gating the full text, the first alternative above. Either one is a later decision for a person to make.
-- **Until IR-676 lands, downloaded copies are unmarked.** They are still attributable through the audit log.
+- **Until IR-676 lands, downloaded copies are unmarked.** They are still attributable through the audit log. *(corrected 2026-11-07, IR-968: IR-676 is Done, so every downloaded copy is watermarked.)*
 - On a scanned page that is one opaque image, the background "CIT-U" is hidden beneath the image. The footer still identifies the copy.
 - Watermarked downloads cost CPU per request. The time for the largest dev-corpus manuscript is recorded in IR-676.
 - Links already emailed stop working when `DownloadRedeemView` is removed. Their holders get a grant through decision 8 and download while signed in.

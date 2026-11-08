@@ -3,7 +3,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState, type CSSProperties
 import { aiApi } from "@/api/ai";
 import type { RecordDetail } from "@/types/records";
 import type { ChatMessage } from "@/types/chat";
-import { newChatMessage } from "@/lib/chatMessages";
+import { newChatMessage, retryOffered } from "@/lib/chatMessages";
 import { CitationConversationContext, CitationOriginContext, type AnswerReturn } from "@/lib/citedPage";
 import { AskIrisMark } from "@/features/ai/components/AskIrisIcons";
 import { ChatMessageBubble } from "@/features/ai/components/ChatMessageBubble";
@@ -599,7 +599,10 @@ function LegacyPaperChatPanel({
         <CitationOriginContext.Provider value="paper-chat">
         <CitationConversationContext.Provider value={conversationId}>
           {messages.map((m) => (
-            <ChatMessageBubble key={m.id} message={m} compact retryDisabled={busy || !ready} onRetry={retry} />
+            <ChatMessageBubble
+              key={m.id} message={m} compact retryDisabled={busy || !ready}
+              onRetry={retryOffered(m, messages[messages.length - 1]?.id) ? retry : undefined}
+            />
           ))}
 
           {busy && streaming && <StreamingMessageBubble state={streaming} compact onStop={() => void client.stop()} />}

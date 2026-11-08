@@ -40,7 +40,10 @@ test("register through the three-step form", async ({ page }, testInfo) => {
 
   await page.getByLabel("Password", { exact: true }).fill(NEW_PASSWORD);
   await page.getByLabel("Confirm Password").fill(NEW_PASSWORD);
-  await page.getByRole("checkbox").check();
+  // The server's notice: the agreement, and a Yes or No on AI with neither
+  // preselected (ADR-054, IR-790).
+  await page.getByRole("checkbox", { name: /I have read the data notice/ }).check();
+  await page.getByRole("group", { name: "May AI use your papers?" }).getByRole("radio", { name: "Yes" }).check();
   await page.getByRole("button", { name: "Register" }).click();
 
   // The confirmation, not the form's own echo of the address: "Check your

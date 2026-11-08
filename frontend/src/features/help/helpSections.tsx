@@ -145,6 +145,12 @@ export const HELP_SECTIONS: HelpSection[] = [
           Text already sent can&rsquo;t be recalled.
         </p>
         <p>
+          Each paper keeps the answer its Contact person gave to &ldquo;may AI use my
+          papers?&rdquo; when its draft was created. When that answer is Yes and the embargo is
+          released, the text is sent as soon as you upload the manuscript, or as soon as the
+          release happens, not when you submit. Publish doesn&rsquo;t ask for consent.
+        </p>
+        <p>
           Once submitted, the record goes to your Adviser first. If anyone reviewing it asks for a
           revision, the record waits on you: make the changes and <strong>submit a new
           version</strong>. An accepted Proposal can be continued as a Thesis or Project.

@@ -190,7 +190,7 @@ def _at_itso(title, users) -> Record:
     owner, adviser, itso = users["owner"], users["adviser"], users["seated"]
     record = _record(
         title, owner, adviser, requested_itso=True,
-        dpa_accepted_at=timezone.now(), dpa_accepted_by=owner,
+        ai_consent=True,
     )
     entry = enter_at_adviser(record, owner)
     seats.open_review(entry.seats.get(), adviser)
@@ -270,7 +270,7 @@ def build_world() -> World:
     # say "not now", not "not you".
     o["at_adviser"] = at_adviser = _record(
         "Matrix: a Thesis at its Adviser", owner, users["adviser"], requested_itso=True,
-        dpa_accepted_at=timezone.now(), dpa_accepted_by=owner,
+        ai_consent=True,
     )
     seats.open_review(enter_at_adviser(at_adviser, owner).seats.get(), users["adviser"])
 

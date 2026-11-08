@@ -161,6 +161,10 @@ RECORDS: dict[str, Entry | Shadowed] = {
     # gate before the lookup; `record` is in review, not Unlisted, so RDCO gets
     # a 400 and the call changes nothing.
     "record-publish-unlisted": Entry({"POST": _case(RDCO_ONLY, kwargs=RECORD, data={})}),
+    # ADR-051 decision 27 (IR-801): any owner names the Contact person, and no
+    # office, Adviser or RDCO does. An empty body is a 400 for the owner, so the
+    # call changes nothing.
+    "record-contact-person": Entry({"POST": _case(OWNER_ACTS, kwargs=RECORD, data={})}),
     "record-continue-as": Entry({"POST": _case(
         OWNER_ACTS, kwargs=RECORD, data={"record_type": Ref("record", "record_type_id")},
     )}),
@@ -501,6 +505,14 @@ ACCOUNTS = {
     # An empty body is refused as invalid, which is not an access denial.
     "notice-current": Entry({"GET": _case(PUBLIC)}),
     "notice-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
+    # IR-799 (ADR-051 decisions 16-17, ADR-063 decision 9): RDCO and the System
+    # Admin read every version; only RDCO publishes, and only RDCO sees the
+    # impact count it publishes against. An empty body is invalid, not denied.
+    "notice-versions": Entry({
+        "GET": _case(ACCOUNT_ADMINS),
+        "POST": _case(RDCO_ONLY, data={}),
+    }),
+    "notice-impact": Entry({"GET": _case(RDCO_ONLY)}),
     "token-refresh": Entry({"POST": _case(PUBLIC, data={})}),
     "auth-activate": Entry({"GET": _case(PUBLIC, kwargs={"uidb64": "invalid", "token": "invalid"})}),
     "auth-activate-confirm": Entry({"POST": _case(PUBLIC, data={"uid": "invalid", "token": "invalid"})}),
@@ -531,6 +543,10 @@ ACCOUNTS = {
     # IR-786: the caller's own data, whoever they are. No id to name, so there is
     # no other person's copy for any role to reach.
     "user-me-data": Entry({"GET": _case(SIGNED_IN)}),
+    # IR-791: change one's own AI answer (ADR-054 decisions 11-13). No id to
+    # name, so nobody reaches another account's answer. An empty body is refused
+    # as invalid, which is not an access denial.
+    "user-me-ai-answer": Entry({"POST": _case(SIGNED_IN, data={})}),
     # IR-695: a person's optional profile. Both writes act on `request.user` and
     # name nobody else; the photo is read by any signed-in user, through Django
     # only (MEDIA_URL is not routed). `photo_user` is an account that has one --
@@ -566,6 +582,9 @@ ACCOUNTS = {
     "course-list": Entry({"GET": _case(PUBLIC)}),
     "system-setting": Entry({"GET": _case(SYSTEM_ADMIN_ONLY, kwargs={"key": "matrix-setting"}),
                              "PATCH": _case(SYSTEM_ADMIN_ONLY, kwargs={"key": "matrix-setting"}, data={"value": "updated"})}),
+    # IR-795: a real retention key, since any other key is a 404 for everyone.
+    "retention-preview": Entry({"GET": _case(SYSTEM_ADMIN_ONLY, kwargs={"key": "retention.download_notes_days"},
+                                            query={"days": "30"})}),
 }
 
 ASSIGNMENT = {"pk": Ref("assignment")}

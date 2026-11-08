@@ -168,6 +168,9 @@ export const SCREEN_ACCESS = {
   // ADR-051 §8: the System Admin confirms or rejects account deletions (IR-788).
   accountDeletionRequests: { path: "/admin/account-deletion-requests", roles: SYSTEM_ADMIN,
                  nav: { label: "Account Deletions", icon: "fa-user-slash", section: "Administration" } },
+  // ADR-051 §3 and §19: the System Admin sets retention periods (IR-795).
+  retention:     { path: "/admin/retention", roles: SYSTEM_ADMIN,
+                 nav: { label: "Retention", icon: "fa-clock-rotate-left", section: "Administration" } },
 } as const satisfies Record<string, ScreenDef>;
 
 export type ScreenKey = keyof typeof SCREEN_ACCESS;

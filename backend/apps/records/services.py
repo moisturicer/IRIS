@@ -20,12 +20,32 @@ def update_search_vector(record: Record):
     )
 
 
-def set_primary_owner(record: Record, user):
-    """Mark a user as the primary owner of a record, clearing any previous primary."""
-    RecordOwner.objects.filter(record=record, is_primary=True).update(is_primary=False)
-    RecordOwner.objects.update_or_create(
-        record=record, user=user, defaults={"is_primary": True}
-    )
+class NotAnOwner(ValueError):
+    """`set_primary_owner` was asked to make someone who doesn't own the paper its Contact person."""
+
+
+def set_primary_owner(record: Record, user) -> RecordOwner:
+    """
+    Make `user`, already an owner of `record`, its Contact person (ADR-051 decision 27).
+
+    Never adds an owner: a `user` with no ownership row raises `NotAnOwner`
+    before anything is written. The old Contact person is cleared and the new
+    one set in one transaction, with the paper's ownership rows locked, so the
+    paper never has zero or two. Returns the new Contact person's row.
+    """
+    from django.db import transaction
+
+    with transaction.atomic():
+        rows = list(RecordOwner.objects.select_for_update().filter(record=record).order_by("pk"))
+        target = next((row for row in rows if row.user_id == user.pk), None)
+        if target is None:
+            raise NotAnOwner(f"user {user.pk} does not own record {record.pk}")
+        RecordOwner.objects.filter(record=record, is_primary=True).exclude(pk=target.pk) \
+            .update(is_primary=False)
+        if not target.is_primary:
+            target.is_primary = True
+            target.save(update_fields=["is_primary"])
+    return target
 
 
 def soft_delete_record(record: Record, deleted_by, *, reason=None):

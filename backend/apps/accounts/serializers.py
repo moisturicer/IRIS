@@ -1,5 +1,6 @@
 import unicodedata
 
+from django.conf import settings
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -254,6 +255,14 @@ class RegisterSerializer(serializers.ModelSerializer):
         ]
 
     def validate_email(self, value):
+        # Only the institution's domains may register (IR-660). Exact and case-
+        # blind: the part after the last "@" must equal one of them, so neither
+        # "cit.edu.evil.com" nor "evilcit.edu" passes. Empty accepts any domain,
+        # which only development allows.
+        domains = settings.REGISTRATION_EMAIL_DOMAINS
+        if domains and value.rsplit("@", 1)[-1].strip().lower() not in domains:
+            named = " or ".join(f"@{domain}" for domain in domains)
+            raise serializers.ValidationError(f"Register with your institutional email address, ending in {named}.")
         if User.objects.filter(email__iexact=value).exists():
             raise serializers.ValidationError("This email address is already registered.")
         return value
@@ -423,16 +432,27 @@ class SystemSettingSerializer(serializers.ModelSerializer):
 # ---- Account deletion (ADR-051 §8-§12, IR-785) ----------------------------
 
 class MyDeletionRequestSerializer(serializers.Serializer):
-    """The person's own request. A rejection's reason is theirs to read."""
+    """
+    The person's own request. A rejection's reason is theirs to read, and so is
+    what blocks a pending one: papers they own or reviews they hold (IR-787).
+    """
     id         = serializers.IntegerField()
     status     = serializers.CharField()
     created_at = serializers.DateTimeField()
     decided_at = serializers.DateTimeField()
     reason     = serializers.CharField()
     can_cancel = serializers.SerializerMethodField()
+    blockers   = serializers.SerializerMethodField()
 
     def get_can_cancel(self, obj):
         return obj.status == RequestStatus.PENDING
+
+    def get_blockers(self, obj):
+        from .deletion.blockers import blockers_for
+
+        if obj.status != RequestStatus.PENDING:
+            return []
+        return [b.as_dict() for b in blockers_for(obj.user)]
 
 
 class AccountDeletionRequestSerializer(serializers.Serializer):
@@ -500,6 +520,53 @@ class NoticeAnswerSerializer(serializers.Serializer):
             raise serializers.ValidationError("You must agree to the data-privacy agreement to use IRIS.")
         return value
 
+    # Which papers a No-to-Yes answer covers (ADR-054 decision 13): neither is
+    # assumed, so it is optional here and required by `ai_answer` for that one
+    # change.
+    papers         = serializers.ChoiceField(choices=("all", "from_now"), required=False)
+
     def validate_notice_version(self, value):
         require_current(value)
         return value
+
+
+class AiAnswerChangeSerializer(serializers.Serializer):
+    """The body of ``POST /users/me/ai-answer/`` (ADR-054 decisions 11-13, IR-791).
+
+    The new answer is required with no default, so nothing is ever changed by
+    omission. `papers` is optional here because only a No becoming a Yes asks
+    about papers; `apps.accounts.ai_answer` refuses that change without it, and
+    ignores it for every other.
+    """
+
+    ai_consent = NoDefaultBoolean()
+    papers     = serializers.ChoiceField(choices=("all", "from_now"), required=False)
+
+
+class PublishNoticeSerializer(serializers.Serializer):
+    """The body of ``POST /auth/notice/versions/`` (ADR-051 decisions 16-17, IR-799).
+
+    `text` is the whole notice, pasted, kept as plain text: nothing is parsed,
+    rendered or sanitized into markup, so an angle bracket is stored and
+    returned as the character it is. `based_on_version` is the version the
+    publisher started from; `publish_notice` refuses it under a lock when a
+    newer one exists.
+    """
+
+    based_on_version = serializers.IntegerField(min_value=1)
+    # trim_whitespace off: the paste's own line breaks and indentation are kept.
+    text = serializers.CharField(trim_whitespace=False, allow_blank=True)
+
+    def validate_text(self, value):
+        from .notice import NOTICE_TEXT_MAX_LENGTH, normalize_notice_text
+
+        if "\x00" in value:
+            raise serializers.ValidationError("The notice can't contain a null character.")
+        text = normalize_notice_text(value)
+        if not text.strip():
+            raise serializers.ValidationError("The notice can't be blank.")
+        if len(text) > NOTICE_TEXT_MAX_LENGTH:
+            raise serializers.ValidationError(
+                f"The notice can be at most {NOTICE_TEXT_MAX_LENGTH} characters; this is {len(text)}."
+            )
+        return text

@@ -113,6 +113,8 @@ class ProductionSettingTests(APITestCase):
             "DEBUG": "False",
             "ALLOWED_HOSTS": "testserver",
             "CORS_ALLOWED_ORIGINS": "https://iris.example.edu",
+            # Who may register is required in production (IR-660).
+            "REGISTRATION_EMAIL_DOMAINS": "cit.edu",
             # Recovery transport (IR-642) is required in production too.
             "FRONTEND_URL": "https://iris.example.edu",
             "EMAIL_HOST": "smtp.example.edu",

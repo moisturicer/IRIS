@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import type { ChatMessage } from "@/types/chat";
+import { retryOffered } from "@/lib/chatMessages";
 import type { StreamingState } from "../conversation/answerStream";
 import { ChatMessageBubble } from "./ChatMessageBubble";
 import { AssistantMessageSkeleton } from "./AssistantMessageSkeleton";
@@ -23,7 +24,7 @@ interface ChatMessageListProps {
   onSuggestion?:      (prompt: string) => void;
   /** How many readable records retrieval can draw on. */
   indexedRecords?:    number | null;
-  /** Retry a queued question that ended unanswered (IR-548). */
+  /** Retry a queued question that ended unanswered (IR-548), or an answer that was cut off (IR-907). */
   onRetry?:           (message: ChatMessage) => void;
   /** Cancel the queued run in flight (IR-548). */
   onStop?:            () => void;
@@ -89,6 +90,8 @@ export function ChatMessageList({
     );
   }
 
+  const latestId = messages[messages.length - 1]?.id;
+
   return (
     <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-thin px-4 sm:px-6 py-6">
       {/* One shared column with ChatInput below it -- see CHAT_COLUMN. */}
@@ -98,7 +101,7 @@ export function ChatMessageList({
             key={m.id}
             message={m}
             retryDisabled={isLoading}
-            onRetry={onRetry}
+            onRetry={retryOffered(m, latestId) ? onRetry : undefined}
             sourcesSelected={m.id === selectedId}
             onSelectSources={onSelectSources}
           />

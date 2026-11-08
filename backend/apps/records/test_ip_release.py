@@ -47,7 +47,7 @@ class IpReleaseFixtures:
         now = timezone.now()
         stamps = {}
         if consent:
-            stamps.update(dpa_accepted_at=now, dpa_accepted_by=self.owner)
+            stamps.update(ai_consent=True)
         if until is not None:
             stamps.update(embargoed_until=until, embargo_date_set_at=now,
                           embargo_date_set_by=self.adviser)

@@ -354,6 +354,17 @@ class NobodyUsesIrisWithoutAnsweringTests(APITestCase):
         response = APIClient().post(LOGOUT, {"refresh": tokens["refresh"]}, format="json", **bearer(tokens))
         self.assertEqual(response.status_code, 200, response.content)
 
+    def test_requesting_account_deletion_works_while_unanswered(self):
+        # ADR-054 decision 3: answer, sign out or request deletion (IR-790).
+        user = self.account("deleting@cit.edu", RoleName.STUDENT)
+        tokens = sign_in(user.email)
+        url = reverse("user-me-deletion-request")
+        response = APIClient().post(url, {}, format="json", **bearer(tokens))
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()["request"]["status"], "pending")
+        # Only that route: the rest of the account stays closed.
+        self.assertEqual(APIClient().get(ME, **bearer(tokens)).status_code, 403)
+
     def test_refreshing_a_token_is_not_blocked(self):
         user = self.account("refresher@cit.edu", RoleName.STUDENT)
         tokens = sign_in(user.email)
@@ -419,5 +430,7 @@ class ALastAnswerStandsTests(TestCase):
         self.assertTrue(notice.requires_answer(legacy))
 
     def test_no_notice_yet_blocks_nobody(self):
-        DataNotice.objects.all().delete()
+        # A version can't be deleted through the model or a queryset (IR-799);
+        # the raw delete stands in for a database migration 0019 never ran on.
+        DataNotice.objects.all()._raw_delete(DataNotice.objects.db)
         self.assertFalse(notice.requires_answer(make_unanswered(make_user("early@cit.edu"))))

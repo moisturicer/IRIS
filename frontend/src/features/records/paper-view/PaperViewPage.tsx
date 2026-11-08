@@ -63,6 +63,7 @@ import { CommentsSection } from "./CommentsSection";
 import { PaperAiOverview } from "./PaperAiOverview";
 import { EmbargoCard } from "./EmbargoCard";
 import { UnlistedCard } from "./UnlistedCard";
+import { RdcoPaperControls } from "./RdcoPaperControls";
 import { PaperGovernance } from "./PaperGovernance";
 import { PaperDocuments } from "./PaperDocuments";
 import { FilesSection } from "./FilesSection";
@@ -341,6 +342,7 @@ export default function PaperViewPage() {
   const tier = readingTier(workspaceWidth);
   const enterReadingRail = useUIStore((s) => s.enterReadingRail);
   const leaveReadingRail = useUIStore((s) => s.leaveReadingRail);
+  const addToast = useUIStore((s) => s.addToast);
   const panelRef = useRef<HTMLElement>(null);
   const askButtonRef = useRef<HTMLButtonElement>(null);
   const refocusAsk = useRef(false);
@@ -532,6 +534,15 @@ export default function PaperViewPage() {
       if (readFailureKind(err) === "unavailable") setRecord(null);
       // Otherwise the control keeps its last state; a reload catches up.
     }
+  };
+
+  /**
+   * RDCO withdrew the paper (IR-798): it is deleted, so reading it again would
+   * only say it is gone. Say what happened and go to the review queue.
+   */
+  const handleRdcoWithdrawn = () => {
+    addToast({ type: "success", message: "Paper withdrawn. Its owners and reviewers have been told." });
+    navigate("/review", { replace: true });
   };
 
   /** A document or request changed: re-read what derives from it. */
@@ -1238,6 +1249,11 @@ export default function PaperViewPage() {
                 <PaperGovernance record={record} />
                 <EmbargoCard record={record} onChanged={reloadRecord} />
                 <UnlistedCard record={record} onChanged={reloadRecord} />
+                <RdcoPaperControls
+                  record={record}
+                  onChanged={reloadRecord}
+                  onWithdrawn={handleRdcoWithdrawn}
+                />
                 <PaperDocuments
                   files={record.files}
                   manageHref={participant ? `/records/${record.id}?section=review&documents=open` : null}

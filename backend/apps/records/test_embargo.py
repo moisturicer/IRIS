@@ -68,7 +68,7 @@ class EveryPaperStartsEmbargoedTests(DraftBase):
         self._assert_embargoed_with_no_date()
 
     def test_the_gate_refuses_it_even_with_consent(self):
-        Record.objects.filter(pk=self.record.pk).update(dpa_accepted_at=timezone.now())
+        Record.objects.filter(pk=self.record.pk).update(ai_consent=True)
         self.record.refresh_from_db()
 
         decision = decision_for_record(self.record)

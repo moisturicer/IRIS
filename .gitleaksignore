@@ -11,3 +11,8 @@ cb5ab9b95b04ef5c14629809989af82931c4ee18:frontend/scripts/bundle-scan.test.mjs:g
 cb5ab9b95b04ef5c14629809989af82931c4ee18:frontend/scripts/bundle-scan.test.mjs:generic-api-key:196
 # IR-928: a made-up wrong activation token in a test, to prove a bad token is refused. Not a credential.
 20e5aca3346b2f583352b8033f2432e2d3c67e6b:backend/apps/accounts/test_activation_fragment.py:generic-api-key:118
+# IR-886: run submission keys passed as key="hybrid-..." in a test, not credentials; renamed in 8ddf1b60.
+ea1f922a0d5524d7601f52ca73f6c6eb1b349cd3:backend/apps/ai/tests/test_ir886_hybrid_search_db.py:generic-api-key:131
+ea1f922a0d5524d7601f52ca73f6c6eb1b349cd3:backend/apps/ai/tests/test_ir886_hybrid_search_db.py:generic-api-key:191
+ea1f922a0d5524d7601f52ca73f6c6eb1b349cd3:backend/apps/ai/tests/test_ir886_hybrid_search_db.py:generic-api-key:210
+ea1f922a0d5524d7601f52ca73f6c6eb1b349cd3:backend/apps/ai/tests/test_ir886_hybrid_search_db.py:generic-api-key:308

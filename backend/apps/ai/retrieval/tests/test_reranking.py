@@ -13,7 +13,6 @@ Three properties, and the order they happen in is the point:
 
 import pytest
 from django.contrib.auth import get_user_model
-from django.utils import timezone
 
 from apps.ai.models import VECTOR_COLUMN_DIMENSIONS
 from apps.ai.models.chunk import ChunkEmbedding, ChunkSet, DocumentChunk
@@ -79,7 +78,7 @@ def make_record(title, owner, embedder, space, texts, *, is_ip=False, consented=
         title=title,
         pipeline_status=PipelineStatus.PUBLISHED,
         is_ip=is_ip,
-        dpa_accepted_at=timezone.now() if consented else None,
+        ai_consent=True if consented else None,
     )
     RecordOwner.objects.create(record=record, user=owner, is_primary=True)
     seed_record_vector(

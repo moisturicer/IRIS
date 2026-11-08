@@ -26,10 +26,14 @@ from .models import User, College, Department, Course, RoleRequest, SystemSettin
 from .serializers import (
     UserSerializer, AdviserOptionSerializer, MeSerializer, PhotoUploadSerializer, RegisterSerializer, ChangePasswordSerializer,
     CollegeSerializer, DepartmentSerializer, CourseSerializer,
-    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer,
+    RoleRequestSerializer, SystemSettingSerializer, NoticeAnswerSerializer, PublishNoticeSerializer, AiAnswerChangeSerializer,
 )
+from . import ai_answer
 from .models import DataNotice
-from .notice import answer_notice, answer_payload, notice_payload, requires_answer
+from .notice import (
+    accounts_to_answer, answer_notice, answer_payload, notice_payload, publish_notice,
+    requires_answer, version_payload,
+)
 from .models import RecoveryPurpose
 from .recovery import service as recovery_service
 from .recovery.views import INVALID_LINK
@@ -166,6 +170,50 @@ class CurrentNoticeView(APIView):
         return Response(data)
 
 
+class NoticeVersionsView(APIView):
+    """
+    GET  /auth/notice/versions/   every version, newest first, with who published it
+    POST /auth/notice/versions/   {based_on_version, text}: publish the next version
+
+    ADR-051 decisions 16-17 as amended by ADR-063 decision 9 (IR-799). RDCO and
+    the System Admin read the history; **only RDCO publishes**. A publish takes
+    effect at once and is refused with 409 `notice_stale` when a newer version
+    exists than the one it started from. Publishing is not answering: the
+    publisher answers the new version like everyone else, so this route stays
+    behind the sign-in block.
+    """
+
+    def get_permissions(self):
+        return [IsAdmin()] if self.request.method == "POST" else [IsAccountAdmin()]
+
+    def get(self, request):
+        notices = DataNotice.objects.select_related("published_by").order_by("-number")
+        return Response([version_payload(n) for n in notices])
+
+    def post(self, request):
+        serializer = PublishNoticeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        notice = publish_notice(request.user, **serializer.validated_data)
+        return Response(version_payload(notice), status=status.HTTP_201_CREATED)
+
+
+class NoticeImpactView(APIView):
+    """
+    GET /auth/notice/versions/impact/
+    How many accounts a new version would make answer, shown before publishing
+    (IR-799). Every live account: nobody can have answered a version not yet
+    published. RDCO only, as publishing is.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        current = DataNotice.current()
+        return Response({
+            "current_version": None if current is None else current.number,
+            "accounts_to_answer": accounts_to_answer(),
+        })
+
+
 class AnswerNoticeView(APIView):
     """
     POST /auth/notice/answer/   {notice_version, agree_dpa, ai_consent}
@@ -179,11 +227,51 @@ class AnswerNoticeView(APIView):
         serializer = NoticeAnswerSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        answer_notice(request.user, notice_version=data["notice_version"], ai_consent=data["ai_consent"])
+        papers = data.get("papers")
+        previous = request.user.ai_consent
+        # A No becoming a Yes says which papers it covers, here as in Settings
+        # (ADR-054 decision 13). Checked before anything is written.
+        ai_answer.require_papers_choice(previous, data["ai_consent"], papers)
+        with transaction.atomic():
+            answer_notice(request.user, notice_version=data["notice_version"], ai_consent=data["ai_consent"])
+            ids = ai_answer.include_papers(
+                request.user, papers=papers if ai_answer.becomes_yes(previous, data["ai_consent"]) else None,
+            )
+            ai_answer.audit_sweep(
+                request.user, previous=previous, new=data["ai_consent"], papers=papers, ids=ids,
+            )
         return Response(
-            {"answer": answer_payload(request.user), "answer_required": requires_answer(request.user)},
+            {
+                "answer": answer_payload(request.user),
+                "answer_required": requires_answer(request.user),
+                "papers_updated": len(ids),
+            },
             status=status.HTTP_201_CREATED,
         )
+
+
+class AiAnswerView(APIView):
+    """
+    POST /users/me/ai-answer/   {ai_consent, papers?}
+    Change the signed-in person's own AI answer (ADR-054 decisions 11-13, IR-791).
+    There is no id in the path or body: nobody changes another account's answer.
+    Blocked, like every route, until the current notice is answered.
+
+    Yes to No changes the answer and no paper. No to Yes requires `papers`:
+    `all` (also the papers they are Contact person of that hold a No, sent on
+    through the disclosure gate) or `from_now`; 400 `papers_choice_required`
+    otherwise. Saying the same thing again changes nothing: `changed: false`.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = AiAnswerChangeSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        result = ai_answer.change_ai_answer(
+            request.user, ai_consent=data["ai_consent"], papers=data.get("papers"),
+        )
+        return Response(result, status=status.HTTP_200_OK)
 
 
 class LogoutView(APIView):
@@ -798,6 +886,35 @@ class SystemSettingView(APIView):
                 setting.updated_by = request.user
                 setting.save()
         return Response(SystemSettingSerializer(setting).data)
+
+
+class RetentionPreviewView(APIView):
+    """
+    GET /settings/<key>/erasure-preview/?days=N
+    How many items the daily cleanup would erase now if retention setting `key`
+    held `days` (IR-795). The System Admin alone, like the setting itself.
+
+    Reads only: nothing is erased or saved. The Retention page asks this before
+    saving a period, so it can say how much would go and ask first. A blank
+    `days` erases nothing and previews as 0; one that isn't a positive whole
+    number is refused with the same message the PATCH gives. A key that isn't a
+    retention period is a 404.
+    """
+    permission_classes = [IsAuthenticated, IsSystemAdmin]
+
+    def get(self, request, key):
+        retention_type = retention.type_for_setting(key)
+        if retention_type is None:
+            return Response({"detail": "Not found."}, status=404)
+        value = request.query_params.get("days")
+        if value is None:
+            return Response({"days": ["A period is required, or blank to erase nothing."]}, status=400)
+        if error := retention.period_error(value):
+            return Response({"days": [error]}, status=400)
+        count = retention.preview(retention_type, value)
+        if count is None:
+            return Response({"detail": "This kind of data can't be counted in advance."}, status=501)
+        return Response({"key": key, "days": retention.parse_period(value), "count": count})
 
 
 # ---- Account deletion (ADR-051 §8-§12, IR-785) ----------------------------

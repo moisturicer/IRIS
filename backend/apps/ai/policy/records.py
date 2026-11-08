@@ -22,15 +22,18 @@ def inputs_for_record(record: Any) -> DisclosureInputs:
     The IP release is ``Record.ip_released`` (ADR-052 §11), KTTO's act. The mark
     itself stays on the paper, so ``is_ip`` alone still says it is IP.
 
-    Consent is ``Record.dpa_accepted`` (IR-226) -- the per-disclosure stamp,
-    not ``User.consent_given``, which records that a person accepted terms
-    once at signup and says nothing about this submission.
+    Consent is ``Record.ai_consent`` (ADR-054 decisions 9-10, IR-791) -- the
+    Contact person's answer, copied onto the paper when its draft was created and
+    kept. It is not the person's *current* answer (``User.ai_consent``), which can
+    change later without moving a paper, and not the old per-paper stamp
+    (``Record.dpa_accepted``), which stopped counting. Only ``True`` is consent:
+    ``False`` is a No, and ``None`` is no answer stored, which is refused too.
     """
     return DisclosureInputs(
         is_ip=bool(record.is_ip),
         ip_released=bool(record.ip_released),
         embargo=record.embargo_state,
-        consent_given=bool(record.dpa_accepted),
+        consent_given=record.ai_consent is True,
     )
 
 

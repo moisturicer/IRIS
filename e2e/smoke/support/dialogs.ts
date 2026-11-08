@@ -166,6 +166,17 @@ export const DIALOGS: DialogCase[] = [
     open: press("Confirm deletion"), dialog: anyDialog,
   },
   {
+    id: "confirm a retention period that erases data", screen: "retention",
+    sources: ["features/admin/RetentionPage.tsx", "components/shared/ConfirmDialog.tsx"],
+    override: (api) => api.on("GET", "/settings/retention.download_notes_days/erasure-preview/",
+      { key: "retention.download_notes_days", days: 30, count: 12 }),
+    open: async (page) => {
+      await page.getByRole("textbox", { name: /Period in days/ }).fill("30");
+      await press("Save period")(page);
+    },
+    dialog: (page) => page.getByRole("dialog", { name: "Erase existing data?" }),
+  },
+  {
     id: "decline a download request", screen: "download-requests", sources: ["features/admin/DownloadRequestsPage.tsx"],
     open: press("Decline"), dialog: anyDialog,
   },
@@ -218,6 +229,23 @@ export const DIALOGS: DialogCase[] = [
     },
     open: press("Publish to Discover"), dialog: anyDialog,
   },
+  // RDCO's three acts on a paper in review (ADR-051 §10, IR-798), one dialog each.
+  ...([
+    ["replace a paper's adviser", "Replace Adviser"],
+    ["add an owner to a paper", "Add owner"],
+    ["withdraw a paper in review", "Withdraw paper"],
+  ] as const).map(([id, button]): DialogCase => ({
+    id, screen: "paper-view", sources: ["features/records/paper-view/RdcoPaperControls.tsx"],
+    override: (api) => {
+      api.on("GET", `/records/${PAPER.id}/`, {
+        ...PAPER_DETAIL, pipeline_status: "in_review", workflow_state: "under_review",
+        workflow_state_label: "Under review", stage_label: "Under review",
+        capabilities: ["cite", "replace_adviser", "add_owner", "withdraw_paper"],
+      });
+      api.on("GET", "/users/advisers/", paginated([]));
+    },
+    open: press(button), dialog: anyDialog,
+  })),
   {
     id: "submit a new version", screen: "paper-view", sources: ["features/records/paper-view/NewVersionDialog.tsx"],
     override: (api) => {

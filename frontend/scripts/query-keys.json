@@ -2,6 +2,8 @@
   "_about": "Every query-string key the UI builds or reads (IR-918), and why it carries nothing personal. scripts/url-privacy.test.mjs fails on a key not listed here; src/lib/urlPrivacy.test.ts holds the builders to this list. Adding a key is a review decision: name it in the same change, with the reason it is safe -- an id, a number or a fixed vocabulary.",
   "keys": {
     "page": "page number",
+    "event_type": "a named audit event type from the server's fixed list, sent only by System Admin pages (IR-795)",
+    "days": "a retention period in whole days, or blank, sent only by the System Admin's Retention page (IR-795)",
     "record": "record id",
     "publish": "`new` or a draft record id",
     "conversation": "conversation id",

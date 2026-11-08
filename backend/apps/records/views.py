@@ -7,7 +7,6 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.conf import settings
 from django.http import FileResponse, Http404, HttpResponse
-from django.utils import timezone
 from django.db import transaction
 from django.db.models import Count
 from django_filters.rest_framework import DjangoFilterBackend
@@ -152,7 +151,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Deleting is an owner's too (IR-508): no office deletes a student's
         # draft or files a delete request in their name. What a delete does in
         # each state is `perform_destroy`'s, and `destroy()` refuses a second one.
-        if self.action in ("update", "partial_update", "submit", "destroy", "duplicate_matches", "acknowledge_duplicates"):
+        # Naming the Contact person is an owner's alone (ADR-051 decision 27,
+        # IR-801): RDCO, the Adviser and the offices have no say.
+        if self.action in ("update", "partial_update", "submit", "destroy", "duplicate_matches",
+                           "acknowledge_duplicates", "contact_person"):
             return [IsAuthenticated(), IsRecordOwner()]
         if self.action == "embargo_set":
             return [IsAuthenticated(), MaySetEmbargo()]
@@ -187,6 +189,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         )
         # Add the creator as the primary owner automatically
         RecordOwner.objects.create(record=record, user=self.request.user, is_primary=True)
+        # The paper keeps its Contact person's AI answer from here on (ADR-054
+        # decisions 9-10, IR-791). The creator is the Contact person.
+        from .ai_answer import store_on_new_draft
+        store_on_new_draft(record, self.request.user)
         # Record starts as draft — notification fires only when the owner calls /submit/
         self._queue_manuscript_extraction_if_present(serializer, record)
 
@@ -369,27 +375,6 @@ class RecordViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # Data Privacy Act consent, per disclosure (IR-226, FR-M6-02). The
-        # wizard's step-3 gate has always been browser-side only: nothing here
-        # checked it, and nothing recorded it, so any direct API call submitted
-        # without consent and left no trace either way.
-        #
-        # Checked *before* `lifecycle.apply` deliberately -- a refused submit
-        # must leave the record in `draft`, not in a review queue with no
-        # consent behind it.
-        #
-        # Consent already on the record is not re-asked. A resubmission after
-        # revision is the same disclosure under the same terms; re-prompting
-        # would either nag the owner or, worse, overwrite the original
-        # acceptance timestamp with a later one and lose when consent was
-        # actually given.
-        if not record.dpa_accepted:
-            if not request.data.get("dpa_accepted"):
-                return Response(
-                    {"detail": "You must accept the Data Privacy Act (RA 10173) terms "
-                               "before this disclosure can be submitted."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
         from .duplicates import acknowledgement_basis, enforce_exact, likely_matches, lock_digest
         lock_digest(record.manuscript_sha256)
         enforce_exact(request.user, record.pk, record.manuscript_sha256)
@@ -397,12 +382,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         if likely and record.duplicate_acknowledgement != acknowledgement_basis(record, likely):
             return Response({"code": "acknowledgement_required", "detail": "Review and acknowledge the likely matches before submitting.", "matches": likely}, status=409)
         try:
-            # Consent, assignment, entry seat and v1 commit together.
+            # Assignment, entry seat and v1 commit together. Submitting asks for
+            # no consent and stamps none (ADR-054 decision 1, IR-791): the paper
+            # already carries its Contact person's answer from its draft.
             with transaction.atomic():
-                if not record.dpa_accepted:
-                    record.dpa_accepted_at = timezone.now()
-                    record.dpa_accepted_by = request.user
-                    record.save(update_fields=["dpa_accepted_at", "dpa_accepted_by", "updated_at"])
                 enter_at_adviser(record, actor=request.user)
         except RoutingError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
@@ -410,9 +393,10 @@ class RecordViewSet(viewsets.ModelViewSet):
         # Notify the correct party — never raises (wrapped inside the service)
         notify_new_record(record, submitted_by=request.user)
 
-        from apps.ai.tasks import send_to_ai_on_commit
-
-        send_to_ai_on_commit(record.pk)
+        # Nothing is sent to AI from here (ADR-054 decision 16, IR-791): the
+        # paper's answer is stored with its draft, so the gate decided at upload
+        # and an act that opens it later (an embargo or IP release, or the
+        # owner's No-to-Yes choice) queues the paper itself.
 
         return Response(
             {"detail": "Record submitted successfully. The adviser has been notified."},
@@ -507,6 +491,24 @@ class RecordViewSet(viewsets.ModelViewSet):
         record = self._paper_under_lock()
         body = request.data if isinstance(request.data, dict) else {}
         return Response(rdco_acts.add_owner(record, body.get("email"), actor=request.user))
+
+    @action(detail=True, methods=["post"], url_path="contact-person", url_name="contact-person")
+    @transaction.atomic
+    def contact_person(self, request, pk=None):
+        """
+        POST /records/<id>/contact-person/  {"owner": <user id>}
+
+        Any owner names another owner of the same paper its Contact person, who
+        gets the review emails from then on (ADR-051 decision 27, IR-801). Every
+        record type, any time until the paper is deleted. 404 for a paper the
+        caller can't see, 403 for one they don't own, 400 for a target who isn't
+        an owner, is closed, or already is the Contact person.
+        """
+        from .contact_person import OWNER_FIELD, change_contact_person
+
+        record = self._paper_under_lock()
+        body = request.data if isinstance(request.data, dict) else {}
+        return Response(change_contact_person(record, body.get(OWNER_FIELD), actor=request.user))
 
     @action(detail=True, methods=["post"], url_path="withdraw", url_name="withdraw")
     @transaction.atomic

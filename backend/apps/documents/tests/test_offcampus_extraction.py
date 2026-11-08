@@ -73,7 +73,7 @@ def _record(*, consent=True, embargo=None, released=True):
         embargo_released_at=timezone.now() if released and embargo is None else None,
         embargoed_until=embargo,
         embargo_date_set_at=timezone.now() if embargo is not None else None,
-        dpa_accepted_at=timezone.now() if consent else None,
+        ai_consent=True if consent else None,
     )
     PdfExtraction.objects.create(
         record=record, kind=DocumentKind.MANUSCRIPT, source_revision=record.manuscript_revision,
@@ -287,7 +287,7 @@ def test_a_consent_withdrawn_while_queued_is_honoured_at_send(enforced, queued):
     extractor = _offcampus()
     with use_extractor(extractor):
         _queue(record)
-    Record.objects.filter(pk=record.pk).update(dpa_accepted_at=None)
+    Record.objects.filter(pk=record.pk).update(ai_consent=None)
 
     _run(extractor, record)
 
@@ -342,7 +342,7 @@ def test_a_later_yes_queues_the_read(enforced, queued, ai_sends):
     with use_extractor(_offcampus()):
         _queue(record)
         with transaction.atomic():
-            Record.objects.filter(pk=record.pk).update(dpa_accepted_at=timezone.now())
+            Record.objects.filter(pk=record.pk).update(ai_consent=True)
             send_to_ai_on_commit(record.pk)
 
     assert _read_of(record) in queued

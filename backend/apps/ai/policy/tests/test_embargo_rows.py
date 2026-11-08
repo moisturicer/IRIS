@@ -22,7 +22,7 @@ def _paper(**fields) -> Record:
     """A consented paper with no IP mark, so only its embargo decides."""
     return Record.objects.create(
         title="A thesis", abstract="An abstract.", is_ip=False,
-        dpa_accepted_at=timezone.now(), **fields,
+        ai_consent=True, **fields,
     )
 
 
@@ -89,7 +89,7 @@ class TestIndependentFacts:
     def test_a_release_does_not_clear_an_ip_mark(self):
         record = Record.objects.create(
             title="A thesis", abstract="An abstract.", is_ip=True,
-            dpa_accepted_at=timezone.now(), **_released(),
+            ai_consent=True, **_released(),
         )
 
         assert decision_for_record(record).reasons == (Reason.UNRELEASED_IP,)

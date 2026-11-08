@@ -269,6 +269,14 @@ def owner_added(record, actor, *, owner):
     _write(AuditEvent.OWNER_ADDED, actor, record, owner=owner.pk)
 
 
+def contact_person_changed(record, actor, *, previous, contact):
+    """An owner named `contact` the paper's Contact person (ADR-051 decision 27, IR-801)."""
+    _write(
+        AuditEvent.CONTACT_PERSON_CHANGED, actor, record,
+        previous_contact=previous.pk if previous else None, contact=contact.pk,
+    )
+
+
 # --- document requests (ADR-022) -----------------------------------------------------
 
 def _items(items):

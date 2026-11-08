@@ -24,6 +24,8 @@ carries the current notice so the person can read it before answering.
 
 from __future__ import annotations
 
+import hashlib
+
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import status
@@ -40,14 +42,15 @@ ACCEPTANCE_REQUIRED_CODE = "notice_acceptance_required"
 STALE_NOTICE_CODE = "notice_stale"
 
 #: URL names reachable while the current notice is unanswered: read the notice,
-#: answer it, sign out -- and request account deletion, which ADR-054 decision 3
-#: keeps open and which joins this set when its route exists (ADR-051). Keep
-#: this to *names*, never prefixes: a new route is blocked until someone
-#: decides it belongs here.
+#: answer it, sign out, and request account deletion, which ADR-054 decision 3
+#: keeps open (ADR-051; the route arrived with IR-785, and IR-790's notice
+#: screen offers it). Keep this to *names*, never prefixes: a new route is
+#: blocked until someone decides it belongs here.
 ALLOWED_WHILE_UNANSWERED = frozenset({
     "notice-current",
     "notice-answer",
     "auth-logout",
+    "user-me-deletion-request",
 })
 
 
@@ -103,13 +106,43 @@ def requires_answer(user: User) -> bool:
     return answered is None or answered < current
 
 
+#: The heading a pasted version is shown under by readers that still render
+#: `title` and `sections` (IR-799). A paste has no separate title.
+PASTED_NOTICE_TITLE = "Data notice"
+
+
 def notice_payload(notice: DataNotice) -> dict:
+    """The notice as the API serves it.
+
+    `text` is the whole notice as plain text, for every version (IR-799). The
+    `title`/`subtitle`/`sections` shape stays for the screens that render it
+    today: a pasted version fills it with its text as one untitled section, so
+    a registrant can read it before those screens read `text` (IR-800).
+    """
+    if notice.text:
+        title, subtitle, sections = PASTED_NOTICE_TITLE, "", [{"title": "", "body": notice.text}]
+    else:
+        title, subtitle, sections = notice.title, notice.subtitle, notice.sections
     return {
         "version": notice.number,
-        "title": notice.title,
-        "subtitle": notice.subtitle,
-        "sections": notice.sections,
+        "title": title,
+        "subtitle": subtitle,
+        "sections": sections,
+        "text": notice.display_text(),
         "published_at": notice.published_at,
+    }
+
+
+def version_payload(notice: DataNotice) -> dict:
+    """One row of the version history: the notice plus who published it."""
+    publisher = notice.published_by
+    return {
+        **notice_payload(notice),
+        "published_by": None if publisher is None else {
+            "id": publisher.pk,
+            "name": publisher.get_full_name(),
+            "email": publisher.email,
+        },
     }
 
 
@@ -183,3 +216,48 @@ def answer_notice(user: User, *, notice_version: int, ai_consent: bool) -> Notic
         },
     )
     return answer
+
+
+# -- Publishing a new version (ADR-051 decisions 16-17, ADR-063 decision 9; IR-799)
+
+#: The longest notice text accepted, in characters. Version 1 laid out as text
+#: is well under this; the limit exists so a paste cannot be unbounded.
+NOTICE_TEXT_MAX_LENGTH = 50_000
+
+
+def normalize_notice_text(text: str) -> str:
+    """Line endings as ``\n`` and no trailing whitespace; the text is otherwise kept as pasted."""
+    return text.replace("\r\n", "\n").replace("\r", "\n").rstrip()
+
+
+def accounts_to_answer() -> int:
+    """How many accounts a new version would make answer: every live one."""
+    return User.objects.filter(is_active=True, deleted_at__isnull=True).count()
+
+
+@transaction.atomic
+def publish_notice(publisher: User, *, based_on_version: int, text: str) -> DataNotice:
+    """Publish `text` as the next version, which is current at once.
+
+    Raises `StaleNotice` when `based_on_version` is not the current notice, so
+    a second person's paste never replaces the first unseen. Publishing is not
+    answering: the publisher's own answer is left as it was.
+    """
+    current = DataNotice.objects.select_for_update().order_by("-number").first()
+    if current is None or current.number != based_on_version:
+        if current is None:
+            raise APIException("No data notice has been published.")
+        raise StaleNotice(current)
+    notice = DataNotice.objects.create(
+        number=current.number + 1, text=text, published_by=publisher, published_at=timezone.now(),
+    )
+    create_audit_event(
+        AuditEvent.NOTICE_PUBLISHED, publisher,
+        metadata={
+            "notice_version": notice.number,
+            "previous_notice_version": current.number,
+            "characters": len(text),
+            "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
+        },
+    )
+    return notice

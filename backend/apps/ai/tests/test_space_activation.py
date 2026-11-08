@@ -68,7 +68,7 @@ def record(title, chunks=("alpha", "beta"), abstract="An abstract.", released=Tr
     # Every paper starts embargoed (IR-882); released, so only what a test asks holds it.
     stamps = {"is_embargoed": False, "embargo_released_at": timezone.now()} if released else {}
     rec = Record.objects.create(
-        title=title, abstract=abstract, is_ip=False, dpa_accepted_at=timezone.now(),
+        title=title, abstract=abstract, is_ip=False, ai_consent=True,
         pipeline_status=PipelineStatus.PUBLISHED, **stamps)
     values = tuple(
         Chunk(text=t, content=t, context_path=(), sequence=i, token_count=len(t.split()))

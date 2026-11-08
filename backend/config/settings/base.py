@@ -1291,6 +1291,19 @@ if _recovery_problems:
 del _recovery_problems
 CELERY_BEAT_SCHEDULE["recovery-dispatch"]["schedule"] = float(RECOVERY_DISPATCH_INTERVAL_SECONDS)
 
+# ---- Registration -----------------------------------------------------------
+
+def email_domains(value):
+    """Domains as registration compares them: lower case, no leading "@" (IR-660)."""
+    return [domain.strip().lower().lstrip("@") for domain in csv_list(value)]
+
+
+# The email domains registration accepts, comma-separated, e.g. "cit.edu" (IR-660).
+# Matching is exact and ignores case, so "cit.edu.evil.com" and "evilcit.edu" are
+# refused. Development may leave it empty to accept any domain; production
+# requires it (settings/production.py). Existing accounts are never re-checked.
+REGISTRATION_EMAIL_DOMAINS = config("REGISTRATION_EMAIL_DOMAINS", default="", cast=email_domains)
+
 # ---- Axes (brute force protection) --------------------------------------
 
 # Off for now (IR-865): the lockout got in the way of development. AXES_ENABLED=True
