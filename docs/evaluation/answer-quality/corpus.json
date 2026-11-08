@@ -1,0 +1,206 @@
+{
+ "snapshot_id": "proxy-arxiv-40",
+ "note": "Exported 2026-11-07 from the development database: each published proxy paper's exact Record title, its classification and the last page its active chunk set reaches. A proxy corpus, not CIT-U research.",
+ "papers": [
+  {
+   "title": "Correlation-Free Transition Path Sampling through Shooting Point Generation Guided by Committor Learning",
+   "category": "active learning",
+   "pages": 18
+  },
+  {
+   "title": "Expected Hypervolume Maximization for Multiobjective Optimization under Uncertainties",
+   "category": "active learning",
+   "pages": 19
+  },
+  {
+   "title": "Learning to Solve Hard Problems in RL for LLMs by Never Giving Up",
+   "category": "active learning",
+   "pages": 22
+  },
+  {
+   "title": "Online Adaptive Kernel Mixing for Gaussian Process Decision Making",
+   "category": "active learning",
+   "pages": 35
+  },
+  {
+   "title": "Towards Active Cross-View Object Geo-Localization",
+   "category": "active learning",
+   "pages": 17
+  },
+  {
+   "title": "Diverse Metallicities in Protoclusters at $z sim 3.4$ detected by Deep Learning",
+   "category": "astrophysics-of-galaxies",
+   "pages": 20
+  },
+  {
+   "title": "Exploring the observed properties of JWST Little Red Dots with cosmological simulations and dust radiative transfer",
+   "category": "astrophysics-of-galaxies",
+   "pages": 24
+  },
+  {
+   "title": "Extreme MgII Emission in Recently-Quenched Galaxies A New Sample of Intermediate-Redshift Post-Starburst Quasars from the DESI Early Data Release",
+   "category": "astrophysics-of-galaxies",
+   "pages": 27
+  },
+  {
+   "title": "Far-Ultraviolet diffuse emission as a tracer of Galactic extinction at the North Galactic Pole-with-annotations",
+   "category": "astrophysics-of-galaxies",
+   "pages": 10
+  },
+  {
+   "title": "From Density to Mass A New Parametrized Framework for Dark Matter Environment Around Black Holes",
+   "category": "astrophysics-of-galaxies",
+   "pages": 18
+  },
+  {
+   "title": "MATISSE in the era of GRAVITY+",
+   "category": "astrophysics-of-galaxies",
+   "pages": 17
+  },
+  {
+   "title": "Precise C-N-O Abundances of Individual Galaxies in the First Billion Years from Ultra-Deep, Rest-UV-to-Optical JWST Spectroscopy",
+   "category": "astrophysics-of-galaxies",
+   "pages": 16
+  },
+  {
+   "title": "Probing Spatial Variations in IGM Transmission Higher Ly$α$ Visibility in an H$α$-Selected Galaxy Overdensity at $zsimeq6.2$-with-annotations",
+   "category": "astrophysics-of-galaxies",
+   "pages": 10
+  },
+  {
+   "title": "The 2MIG isolated AGNs -- 4. Linking hot-dust reverberation to spectroscopically predicted BLR scales in IC~5287 and Mrk~845-with-annotations",
+   "category": "astrophysics-of-galaxies",
+   "pages": 23
+  },
+  {
+   "title": "ViCTORIA project A pilot study of the M49 region in the Virgo cluster in polarisation",
+   "category": "astrophysics-of-galaxies",
+   "pages": 20
+  },
+  {
+   "title": "Alignment-Path Distillation from Non-streaming ASR-LLMs for Streaming Speech Recognition",
+   "category": "audio-and-speech-processing",
+   "pages": 4
+  },
+  {
+   "title": "Multimodal Conversational Context for LLM-Based ASR Data Construction, Training, and Benchmark",
+   "category": "audio-and-speech-processing",
+   "pages": 14
+  },
+  {
+   "title": "Reading Emotions in the Token Space Discriminative Adaptation of SpeechLLMs for Emotion Recognition",
+   "category": "audio-and-speech-processing",
+   "pages": 7
+  },
+  {
+   "title": "State-Space-Based FIR Filtering on a Quantum Computer",
+   "category": "audio-and-speech-processing",
+   "pages": 5
+  },
+  {
+   "title": "TTM-Bench A Framework for Text-to-Music System Performance Benchmarking",
+   "category": "audio-and-speech-processing",
+   "pages": 5
+  },
+  {
+   "title": "Accelerating massive ensembles of ordinary differential equations-with-annotations",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 16
+  },
+  {
+   "title": "Can Fingers of God be Resummed",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 26
+  },
+  {
+   "title": "Empirical determination of the Galactic neutron star--black hole merger rate using StarTrack models-with-annotations",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 10
+  },
+  {
+   "title": "Freeze-in of anapole and charge-radius inelastic dark matter X-ray probes of a decoupled vector portal",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 19
+  },
+  {
+   "title": "GAIA meets LZ a high velocity tail-tale sign for dark matter-with-annotations",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 16
+  },
+  {
+   "title": "Gauge Backreaction in Standard Model Warm Inflation",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 35
+  },
+  {
+   "title": "Localized Enhancements of the Primordial Power Spectrum and the Abundance of Early Bright Galaxies",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 10
+  },
+  {
+   "title": "The abundance and emission of PAHs from the local to early Universe",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 24
+  },
+  {
+   "title": "The separate universe approach with non minimal coupling to gravity",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 19
+  },
+  {
+   "title": "Tide-and-Seek Anisotropic scale-dependent bias in the Lyman-alpha forest and designer samples-with-annotations",
+   "category": "cosmology-and-nongalactic-astrophysics",
+   "pages": 15
+  },
+  {
+   "title": "Beyond Linearity Semiparametric Solutions to Contamination Bias with Multi-valued Treatments",
+   "category": "econometrics",
+   "pages": 29
+  },
+  {
+   "title": "Cosine metric as a structural economic similarity measure",
+   "category": "econometrics",
+   "pages": 19
+  },
+  {
+   "title": "Noise-adjusted turnover in estimated networks",
+   "category": "econometrics",
+   "pages": 7
+  },
+  {
+   "title": "Stable Policy Learning",
+   "category": "econometrics",
+   "pages": 73
+  },
+  {
+   "title": "Using machine learning metrics to provide deeper insights into the performance of choice models",
+   "category": "econometrics",
+   "pages": 27
+  },
+  {
+   "title": "Evaluating Positive Feedback Adiabatic Logic in 16nm FinFET with a Realistic Power-Clock",
+   "category": "hardware-architecture",
+   "pages": 11
+  },
+  {
+   "title": "Evaluation of Power-Clock Waveforms for Positive Feedback Adiabatic Logic in 16 nm FinFET Technology",
+   "category": "hardware-architecture",
+   "pages": 17
+  },
+  {
+   "title": "HBFlex A Flexible Memory System for Bridging Fine-Grained LLM States and Coarse-Grained HBF Parallel Execution",
+   "category": "hardware-architecture",
+   "pages": 12
+  },
+  {
+   "title": "MeshKV A Network-on-Chip KV Cache Fabric for Scalable Transformer Decoding Accelerators",
+   "category": "hardware-architecture",
+   "pages": 5
+  },
+  {
+   "title": "Nested Parallel von Neumann Architecture and Nested BSP",
+   "category": "hardware-architecture",
+   "pages": 6
+  }
+ ]
+}

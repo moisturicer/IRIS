@@ -293,3 +293,65 @@ def test_the_seam_builds_the_edge_and_the_granted_requests_from_one_client():
     assert direct.calls[0][1] == "/api/v1/ai/runs"
     assert direct.calls[0][3] == {"X-IRIS-Reader-Grant": "g", "X-IRIS-Protocol": "runs-reader-1",
                                   "Idempotency-Key": "k2"}
+
+
+class CompactingSeam(Seam):
+    def __init__(self, *, compact_status=201, **kw):
+        super().__init__(**kw)
+        self.compact_status = compact_status
+
+    def compact(self, conversation_id, base_revision, key):
+        self.calls.append(("compact", conversation_id, base_revision))
+        if self.compact_status != 201:
+            return Response(self.compact_status, {"status": "conflict"})
+        return Response(201, run_view("33333333-3333-4333-8333-000000000001", "queued",
+                                      kind="compact", turn_id=None))
+
+
+def compaction_case():
+    case = conv("c1", split="development")
+    case["turns"] = [case["turns"][0], {"action": "compact"}, case["turns"][0]]
+    return case
+
+
+def test_a_compaction_turn_condenses_the_conversation_then_the_next_question_continues():
+    seam = CompactingSeam()
+    row = collect(seam, compaction_case())
+    assert [t.get("action") for t in row["turns"]] == [None, "compact", None]
+    assert [t["outcome"] for t in row["turns"]] == ["answered", "compacted", "answered"]
+    assert row["status"] == "complete"
+    assert ("compact", CID, 1) in seam.calls
+    last_submit = [c for c in seam.calls if c[0] == "submit"][-1]
+    assert last_submit[1]["conversation_id"] == CID
+    assert seam.calls.index(last_submit) > seam.calls.index(("compact", CID, 1))
+
+
+def test_a_refused_compaction_fails_the_case_and_asks_nothing_more():
+    seam = CompactingSeam(compact_status=409)
+    row = collect(seam, compaction_case())
+    assert [t["outcome"] for t in row["turns"]] == ["answered", "failure"]
+    assert row["status"] == "incomplete"
+    assert sum(c[0] == "submit" for c in seam.calls) == 1
+
+
+class Client:
+    def __init__(self):
+        self.headers = []
+
+    def post(self, path, json=None, headers=None):
+        self.headers.append(headers)
+        return Response(201, run_view("22222222-2222-4222-8222-000000000009", "completed"))
+
+    def get(self, path, headers=None):
+        self.headers.append(headers)
+        return Response(200, {})
+
+
+def test_a_scoped_seam_asks_through_paper_chat_for_one_record():
+    client = Client()
+    seam = RuntimeSeam(client).scoped(53)
+    seam.submit({"question": "q"}, "eval-key")
+    seam.status("x")
+    seam.reopen(CID)
+    assert all(h and h["X-IRIS-Record"] == "53" for h in client.headers)
+    assert client.headers[0]["Idempotency-Key"] == "eval-key"

@@ -24,6 +24,11 @@ CONVERSATIONS = "/api/v1/ai/conversations/"
 ASK_STREAM = "/api/v1/ai/ask/stream/"
 SCHEMA_VERSION = 1
 STOP_OUTCOMES = frozenset({"timeout", "cancellation", "cap_stop", "failure", "empty"})
+#: A compaction turn (IR-956): the runtime condensed the Conversation, or this
+#: engine has no compaction and the turn passed with nothing sent.
+COMPACTED = "compacted"
+NOT_SUPPORTED = "not_supported"
+TURN_OK = frozenset({"answered", COMPACTED, NOT_SUPPORTED})
 
 #: Private diagnostic stages (IR-607); never a human verdict.
 NOT_TRACED = "not_traced"
@@ -106,7 +111,10 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
                  observe=None, faults=None) -> dict:
     """A fresh saved Conversation, then ordered turns and a final public reopen."""
     limits = limits or {}
-    created = reader.post(CONVERSATIONS, {"title": f"Evaluation {case['id']}"})
+    opening = {"title": f"Evaluation {case['id']}"}
+    if case.get("scope_record_id"):
+        opening["record"] = case["scope_record_id"]  # Paper Chat (IR-956)
+    created = reader.post(CONVERSATIONS, opening)
     if created.status_code != 201:
         raise ValueError(f"conversation creation failed with HTTP {created.status_code}")
     conversation_id = _body(created)["id"]
@@ -118,6 +126,12 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
     previous_turns: set[int] = set()
     traced: set[str] = set()
     for number, source in enumerate(case["turns"], 1):
+        if source.get("action") == "compact":
+            recorded.append({"number": number, "action": "compact", "outcome": NOT_SUPPORTED,
+                             "public_answer": None, "citation_record_ids": [], "source_ids": [],
+                             "saved_turn": None, "reopened_transcript": None, "latency_ms": 0,
+                             "physical_attempts": [], "usage_status": "missing"})
+            continue
         if ((limits.get("case_attempts") is not None and
              total_attempts + limits.get("turn_max_attempts", 1) > limits["case_attempts"]) or
             (limits.get("case_cost_usd") is not None and
@@ -190,9 +204,9 @@ def collect_case(reader, case: Mapping, *, attempts=None, limits: Mapping | None
     if final.status_code != 200:
         raise ValueError(f"final reopen failed with HTTP {final.status_code}")
     complete = len(recorded) == len(case["turns"]) and all(
-        turn["outcome"] == "answered" for turn in recorded)
+        turn["outcome"] in TURN_OK for turn in recorded)
     return {
-        "id": case["id"], "family": case["family"], "split": case["split"],
+        "id": case["id"], "family": case["family"], "split": case.get("split"),
         "conversation_id": conversation_id, "status": "complete" if complete else "incomplete",
         "turns": recorded, "reopened_transcript": _body(final).get("turns", []),
         "latency_ms": round((clock() - start) * 1000), "cost": total_cost,
