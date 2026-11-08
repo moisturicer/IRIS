@@ -5,7 +5,7 @@ import socket
 import pytest
 
 from apps.records.review_text import reader, sandbox
-from apps.records.review_text.testing import (BODY, THESIS, below_the_page, blank, drawn_twice, mixed_font_words,
+from apps.records.review_text.testing import (BODY, THESIS, below_the_page, blank, columns_around, drawn_twice, mixed_font_words,
                                                pdf, placed, raised_bullets, sized_headings, two_columns,
                                                unruled_table, white_boxed_columns)
 
@@ -175,6 +175,32 @@ def test_each_contents_entry_is_one_passage_and_its_leader_one_mark(read):
     page = [(72, "Times-Bold", 12, "CONTENTS")] + [(72, BODY, 11, line) for line, _ in entries]
     found = texts(read(placed([page])))
     assert found == [shown for _, shown in entries]
+
+
+def test_a_full_width_block_between_two_columns_reads_in_bands(read):
+    # sample14, sample18: a table set across both columns mid-page made the
+    # gutter look crossed, so the whole page read as one column, line by line
+    # across both. Columns above, then the block, then columns below.
+    def column(name):
+        return [f"{name} line {n} of the column goes on" for n in range(1, 9)]
+    wide = [f"wide row {n} of a table set across the whole page, from one margin to the other" for n in range(1, 6)]
+    joined = " ".join(texts(read(columns_around((column("upper left"), column("upper right")), wide,
+                                                (column("lower left"), column("lower right"))))))
+    order = ["upper left", "upper right", "wide row", "lower left", "lower right"]
+    for name in order:
+        lines = [f"{name} line {n} of the column goes on" for n in range(1, 9)] if name != "wide row" else wide
+        assert " ".join(lines) in joined, name
+    assert [joined.index(name) for name in order] == sorted(joined.index(name) for name in order)
+
+
+def test_numbers_beside_prose_around_a_wide_block_are_no_columns(read):
+    # sample12, sample26: a one-column page with a chart or a table's numbers
+    # beside its lines was cut into bands, a paragraph halved mid-sentence.
+    prose = [f"row {n} label of the survey results goes on" for n in range(1, 9)]
+    numbers = [f"{10 + n} Agree" for n in range(1, 9)]
+    wide = [f"wide row {n} of a table set across the whole page, from one margin to the other" for n in range(1, 6)]
+    joined = " ".join(texts(read(columns_around((prose, numbers), wide, (prose, numbers)))))
+    assert "row 1 label of the survey results goes on 11 Agree" in joined
 
 
 def test_an_unruled_tables_number_columns_are_not_a_page_column(read):

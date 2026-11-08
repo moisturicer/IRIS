@@ -56,6 +56,10 @@ HEADING_LINES = 3
 RAN_ON = 0.10
 #: The fewest lines a two-column band can be.
 MIN_COLUMN_LINES = 5
+# Blocks of full-width lines (a table, a figure) a two-column page may hold.
+MAX_BLOCKS = 2
+# Words a line each side of a gutter that make a band's columns prose.
+PROSE_WORDS = 3
 #: How far right of its column's left edge a line starts to be a first-line
 #: indent. A journal's 17 pt indent was missed at the prototype's 20.
 INDENT = 10
@@ -385,6 +389,12 @@ def _columns(words, width, height, margin):
     between them, which must be at least `MIN_COLUMN_LINES` lines tall, so
     two lines of prose that happen to share a gap are never columns. Spanning lines are read whole, with the left column; the
     rest split at the gutter. With none, the page is one column.
+
+    More spanning lines than that are allowed when they stand together in at
+    most `MAX_BLOCKS` blocks, as a table or figure set across both columns
+    does, and at least `MIN_COLUMN_LINES` lines on each side of the gutter
+    remain. The page then reads in bands: both columns above a block, the
+    block, both columns below.
     """
     body = [w for w in words if margin < w["top"] < height - margin]
     if len(body) < 20:
@@ -402,8 +412,9 @@ def _columns(words, width, height, margin):
         # Only spanning lines inside the columns' height interrupt them.
         band = [line for line in lines if min(right_tops) <= line[0]["top"] <= max(right_tops)]
         inside = sum(1 for line in crossing if min(right_tops) <= line[0]["top"] <= max(right_tops))
-        if (len(band) < MIN_COLUMN_LINES or inside > 0.1 * len(band)
-                or (best and inside >= best[0])):
+        banded = inside > 0.1 * len(band)
+        if (len(band) < MIN_COLUMN_LINES or (best and inside >= best[0])
+                or (banded and not _blocks_between_columns(band, span, x))):
             continue
         left_words = [w for w in body if id(w) not in span and w["x1"] <= x]
         if left_words and all(LIST_NUMBER.fullmatch(w["text"]) or w["text"].isdigit() for w in left_words):
@@ -413,15 +424,54 @@ def _columns(words, width, height, margin):
             continue   # a table's number columns beside its labels are no page column
         left = len(left_words)
         if left > 10 and len(right_tops) > 10:
-            best = (inside, x, span)
+            best = (inside, x, span, banded, (min(right_tops), max(right_tops)))
             if not inside:
                 break
     if best is None:
         return [words]
-    _, x, span = best
+    _, x, span, banded, (low, high) = best
+    if banded:
+        return _bands(words, x, span, low, high)
     in_body = lambda w: margin < w["top"] < height - margin  # noqa: E731
     return [[w for w in words if id(w) in span or not in_body(w) or w["x1"] <= x],
             [w for w in words if id(w) not in span and in_body(w) and w["x0"] >= x]]
+
+
+def _blocks_between_columns(band, span, x) -> bool:
+    """Do a band's spanning lines stand together, a block or two across both
+    columns, beside split lines of prose on both sides? Lines of one-column
+    prose cross a gutter scattered, not in blocks, and a table or chart beside
+    a paragraph has few words a line on one side (3 to 10 in columns measured
+    across the samples, 2 or fewer beside a table)."""
+    crossing = [id(line[0]) in span for line in band]
+    blocks = sum(1 for i, c in enumerate(crossing) if c and (i == 0 or not crossing[i - 1]))
+    split = [line for line, c in zip(band, crossing) if not c]
+    if blocks > MAX_BLOCKS or len(split) < 2 * MIN_COLUMN_LINES or len(split) < len(band) / 2:
+        return False
+
+    def words_a_line(side):
+        return statistics.median(sum(1 for w in line if side(w) and WORD.search(w["text"])) for line in split)
+    return (words_a_line(lambda w: w["x1"] <= x) >= PROSE_WORDS
+            and words_a_line(lambda w: w["x0"] >= x) >= PROSE_WORDS)
+
+
+def _bands(words, x, span, low, high):
+    """A page read in bands: above the columns and each spanning block read
+    whole, each stretch of split lines as its left column, then its right."""
+    pieces = []   # [split?, words]
+    for line in _lines(words):
+        split = low <= line[0]["top"] <= high and id(line[0]) not in span
+        if pieces and pieces[-1][0] == split:
+            pieces[-1][1].extend(line)
+        else:
+            pieces.append([split, list(line)])
+    columns = []
+    for split, piece in pieces:
+        if split:
+            columns += [[w for w in piece if w["x1"] <= x], [w for w in piece if w["x0"] >= x]]
+        else:
+            columns.append(piece)
+    return [column for column in columns if column]
 
 
 def _column_left(lines) -> float:

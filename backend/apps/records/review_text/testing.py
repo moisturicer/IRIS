@@ -81,6 +81,32 @@ def two_columns(left_lines, right_lines, size=letter) -> bytes:
     return out.getvalue()
 
 
+def columns_around(above, wide, below, size=letter) -> bytes:
+    """A two-column page with a block of full-width lines between its halves,
+    as a table set across both columns. ``above`` and ``below`` are each
+    ``(left_lines, right_lines)``."""
+    out = BytesIO()
+    c = canvas.Canvas(out, pagesize=size)
+    width, height = size
+    c.setFont(BODY, 11)
+    y = height - 90
+
+    def halves(pair, y):
+        for x, lines in ((LEFT, pair[0]), (width / 2 + 18, pair[1])):
+            for i, line in enumerate(lines):
+                c.drawString(x, y - 14 * i, line)
+        return y - 14 * max(len(pair[0]), len(pair[1])) - 10
+
+    y = halves(above, y)
+    for line in wide:
+        c.drawString(LEFT, y, line)
+        y -= 14
+    halves(below, y - 10)
+    c.showPage()
+    c.save()
+    return out.getvalue()
+
+
 def blank(pages=1, size=letter) -> bytes:
     """A PDF with pages and no text layer, as a scan is."""
     out = BytesIO()
