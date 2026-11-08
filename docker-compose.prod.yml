@@ -138,8 +138,11 @@ services:
       # that login and no other.
       - UVICORN_WORKERS=4
       - MAX_CONCURRENT_LLM=80
+      - RUNS_REDIS_URL=redis://:${REDIS_PASSWORD:?run python scripts/setup_env.py to set REDIS_PASSWORD in the repo-root .env}@redis:6379/2
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:8001/health || exit 1" ]
