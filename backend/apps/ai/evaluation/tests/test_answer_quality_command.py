@@ -177,3 +177,15 @@ def test_in_process_requests_use_a_host_django_allows(settings):
     settings.ALLOWED_HOSTS = ["iris.example", "*.example"]
     reader = _Reader(SimpleNamespace(id=7, pk=7))
     assert reader.client.defaults["HTTP_HOST"] == "iris.example"
+
+
+def test_a_paper_the_disclosure_gate_withholds_is_a_condition_problem():
+    from types import SimpleNamespace
+
+    from apps.ai.management.commands.eval_answer_quality import _withheld_problems
+
+    papers = [SimpleNamespace(pk=20, title="Open"), SimpleNamespace(pk=21, title="Held")]
+    explain = {20: None, 21: "the author has not consented to this disclosure"}
+    assert _withheld_problems(papers[:1], explain.get) == []
+    problems = _withheld_problems(papers, explain.get)
+    assert len(problems) == 1 and "1 of 2" in problems[0] and "consented" in problems[0]

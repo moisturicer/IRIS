@@ -111,6 +111,17 @@ def _stray_attempts(since, rows) -> list[str]:
             "other work shared the campaign during the run"]
 
 
+def _withheld_problems(records, refusal) -> list[str]:
+    """Papers the disclosure gate keeps from the vendor; `refusal` returns a reason or None."""
+    held = [(r, refusal(r.pk)) for r in records]
+    held = [(r, why) for r, why in held if why]
+    if not held:
+        return []
+    record, why = held[0]
+    return [f"the disclosure gate withholds {len(held)} of {len(records)} papers, "
+            f"e.g. record {record.pk} ({why})"]
+
+
 def measure_access(data, users) -> tuple[aq.Access, list[str]]:
     """Every corpus title's Record and what each reader can read, measured now."""
     from apps.records.models import Record
@@ -137,6 +148,15 @@ def measure_access(data, users) -> tuple[aq.Access, list[str]]:
     if listed != len(corpus["titles"]):
         problems.append(f"the catalogue lists {listed} published Records, the count labels "
                         f"assume exactly the {len(corpus['titles'])} corpus papers")
+    from apps.ai.policy import decision_for_record
+
+    papers = list(Record.objects.filter(pk__in=ids.values()).order_by("pk"))
+    by_pk = {r.pk: r for r in papers}
+
+    def refusal(pk):
+        decision = decision_for_record(by_pk[pk])
+        return None if decision.allowed else decision.explain()
+    problems += _withheld_problems(papers, refusal)
     if private and private in ids:
         owner = corpus["private"]["readable_by"]
         for reader in aq.READERS:
