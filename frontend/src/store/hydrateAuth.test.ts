@@ -22,6 +22,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useAuthStore } from "./auth.store";
+import { useNoticeStore } from "./notice.store";
 import { __resetRefreshState } from "@/lib/tokenRefresh";
 
 const REFRESH_KEY = "iris_refresh_token";
@@ -140,5 +141,21 @@ describe("hydrateAuth", () => {
     await useAuthStore.getState().hydrateAuth();
 
     expect(useAuthStore.getState().authReady).toBe(true);
+  });
+
+  it("keeps the session on a refresh while the data notice is unanswered (IR-790)", async () => {
+    // The server refuses `me` until the notice is answered. That is not a
+    // broken session: the guard shows the notice and the account loads after.
+    sessionStorage.setItem(REFRESH_KEY, "refresh-0");
+    me.mockRejectedValueOnce({ response: { status: 403, data: { code: "notice_acceptance_required" } } });
+
+    await useAuthStore.getState().hydrateAuth();
+
+    const state = useAuthStore.getState();
+    expect(state.accessToken).toBe("access-1");
+    expect(state.isAuthenticated).toBe(true);
+    expect(state.authReady).toBe(true);
+    expect(useNoticeStore.getState().required).toBe(true);
+    useNoticeStore.setState({ required: false });
   });
 });

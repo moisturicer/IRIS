@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { useNoticeStore } from "@/store/notice.store";
 import { authApi } from "@/api/auth";
 import { useAuth } from "@/hooks/useAuth";
 import { AuthAlert } from "@/components/auth/AuthAlert";
@@ -152,6 +153,9 @@ export default function LoginPage() {
       resetLoginAttempts(loginId);
       clearLockout(loginId);
       login(res.data.user, res.data.access, res.data.refresh);
+      // Every other request is refused until they answer, so the guard shows
+      // the notice before the page loads (IR-790).
+      if (res.data.notice_answer_required) useNoticeStore.getState().require();
       // Back to the page they asked for, or -- when they simply came to sign
       // in, or asked for somewhere `safeRedirectPath` refused -- My Reviews
       // when they have review work, otherwise Discover (IR-534).

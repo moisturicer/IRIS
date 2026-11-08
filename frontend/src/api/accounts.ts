@@ -93,6 +93,9 @@ export const accountsApi = {
     apiClient.post<AccountDeletionRequest>(`/users/deletion-requests/${id}/confirm/`, {}),
   rejectDeletion: (id: number, reason: string) =>
     apiClient.post<AccountDeletionRequest>(`/users/deletion-requests/${id}/reject/`, { reason }),
+  // The caller's own request (ADR-051 §8, IR-785). Open even while the data
+  // notice is unanswered (ADR-054 decision 3, IR-790).
+  requestMyDeletion: () => apiClient.post("/users/me/deletion-request/", {}),
 
   // Role requests
   roleRequests:  () => apiClient.get<PaginatedResponse<RoleRequest>>("/users/role-requests/"),

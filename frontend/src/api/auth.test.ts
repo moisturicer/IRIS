@@ -27,7 +27,7 @@ describe("authApi", () => {
   it("register posts the form to /auth/register/", async () => {
     const payload = {
       email: "a@cit.edu", first_name: "A", last_name: "B", password: "pw", confirm_password: "pw",
-      consent_given: true as const,
+      agree_dpa: true as const, ai_consent: false, notice_version: 1,
     };
 
     await authApi.register(payload);

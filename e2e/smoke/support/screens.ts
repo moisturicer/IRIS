@@ -135,6 +135,11 @@ export const SCREENS: Screen[] = [
       api.on("GET", "/colleges/", paginated([]));
       api.on("GET", "/departments/", paginated([]));
       api.on("GET", "/courses/", paginated([]));
+      // The server's data notice, which registration shows and answers (IR-790).
+      api.on("GET", "/auth/notice/", {
+        version: 1, title: "IRIS data notice", subtitle: "", published_at: "2026-11-01T00:00:00Z",
+        sections: [{ title: "What IRIS keeps", body: "Your name and CIT-U email." }],
+      });
     },
     heading: "Create an Account",
     primary: (p) => p.getByRole("button", { name: "Continue to affiliation" }), primaryLabel: "Continue to affiliation",
