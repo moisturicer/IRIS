@@ -297,20 +297,12 @@ def output_cap() -> Optional[int]:
 def verify_admission_configuration() -> None:
     """Startup check, from `AiConfig.ready()`.
 
-    Refuses an unknown mode, a malformed limit under `enforce`, and a queued
-    Ask IRIS (`AI_DURABLE_ASK`) without enforcement: the pilot README §6 gates
-    concurrent runs on shared quotas, and this is where that gate is held.
-    Unset limits are *not* a startup error -- they refuse paid work instead.
+    Refuses an unknown mode and a malformed limit under `enforce`. Unset
+    limits are *not* a startup error -- they refuse paid work instead.
     """
     if mode() not in MODES:
         raise ImproperlyConfigured(
             f"AI_PROVIDER_ADMISSION must be one of {', '.join(MODES)}, not {mode()!r}"
-        )
-    if getattr(settings, "AI_DURABLE_ASK", False) and not enforcing():
-        raise ImproperlyConfigured(
-            "AI_DURABLE_ASK needs AI_PROVIDER_ADMISSION=enforce: queued questions "
-            "run concurrently, and their provider attempts must be admitted against "
-            "shared limits (IR-545, ADR-041)."
         )
     if enforcing():
         for read in (read_limits, read_extraction_price, read_metadata_price):

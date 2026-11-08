@@ -1,43 +1,7 @@
-import { useEffect, useState } from "react";
 import { apiClient } from "./client";
 
 export const READER_PROTOCOL = "runs-reader-1";
 
-/** Which path answers Ask IRIS: the deployment's choice, never the browser's (IR-863). */
-export type ReaderPath = "runtime" | "django";
-let knownPath: ReaderPath | undefined;
-let readingPath: Promise<ReaderPath> | undefined;
-
-/**
- * Reads `AI_RUNTIME_READER` once per page load. Unreadable means Django, the
- * path that answered before the switch existed; that is not remembered, so the
- * next surface to open asks again.
- */
-export function loadReaderPath(): Promise<ReaderPath> {
-  readingPath ??= apiClient.get<{ path: string }>("/ai/reader/").then(
-    ({ data }) => (knownPath = data.path === "runtime" ? "runtime" : "django"),
-    () => { readingPath = undefined; return "django" as const; },
-  );
-  return readingPath;
-}
-
-/** `undefined` until the switch has been read. */
-export function useReaderPath(): ReaderPath | undefined {
-  const [path, setPath] = useState(knownPath);
-  useEffect(() => {
-    if (path) return;
-    let current = true;
-    void loadReaderPath().then((next) => { if (current) setPath(next); });
-    return () => { current = false; };
-  }, [path]);
-  return path;
-}
-
-/** Forget the switch, so the next surface reads it again. */
-export function resetReaderPath() {
-  knownPath = undefined;
-  readingPath = undefined;
-}
 export type Depth = "ordinary" | "deep";
 export interface ReaderRun {
   protocol: typeof READER_PROTOCOL;

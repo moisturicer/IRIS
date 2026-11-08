@@ -7,19 +7,13 @@ from defusedxml.common import DefusedXmlException
 # Fixed suites: an operator cannot turn an unrelated passing test into safety evidence.
 SUITES = {
     "access_and_recovery": ("deterministic_provider_contract", [
-        "apps/ai/evaluation/tests/test_scenario_http.py",
-        "apps/ai/tests/test_controller_http.py",
-        "apps/ai/tests/test_controller_security_http.py",
-        "apps/ai/tests/test_public_protocol_http.py",
-        "apps/ai/tests/test_public_history_http.py",
-        "apps/ai/research/tests/test_general_tools.py",
+        # Django's controller and research-lane suites went with its answer
+        # path (IR-957); the retired routes and replay are pinned here instead.
+        "apps/ai/tests/test_django_answer_path_retired.py",
         # The AI runtime's reader journal replay and Retry link (IR-726).
         "apps/ai/tests/test_ai_runtime_lifecycle_public.py",
     ]),
     "durability": ("postgres_independent_processes_scripted_provider", [
-        "apps/ai/tests/test_durable_processes.py",
-        "apps/ai/tests/test_durable_ask_http.py",
-        "apps/ai/tests/test_conversation_state.py",
         # The AI runtime's Stop, reconnect and Retry across worker races (IR-726).
         "apps/ai/tests/test_ai_runtime_lifecycle_db.py",
     ]),

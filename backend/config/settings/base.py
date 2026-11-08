@@ -14,7 +14,6 @@ restrict_dotenv(config)
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-
 def csv_list(value):
     """A comma-separated environment variable as a list, blanks dropped.
 
@@ -23,7 +22,6 @@ def csv_list(value):
     through this instead.
     """
     return list(non_blank(str(value).split(",")))
-
 
 def required(name, cast=str):
     """Read a mandatory setting, or refuse to start (IR-154).
@@ -45,7 +43,6 @@ def required(name, cast=str):
             "for every variable this deployment must supply."
         )
     return value
-
 
 SECRET_KEY = required("SECRET_KEY")
 DEBUG = config("DEBUG", default=False, cast=bool)
@@ -178,7 +175,6 @@ def throttle_rate(name, default):
             "see backend/.env.example."
         )
     return value
-
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -343,7 +339,6 @@ CELERY_TASK_ROUTES = {
     "apps.ai.tasks.generate_record_overview": {"queue": "embedding"},
     "apps.ai.tasks.generate_paper_brief": {"queue": "embedding"},
     # IR-466: its own concurrency-1 worker, apart from reader work.
-    "apps.ai.tasks.decide_evidence_shadow": {"queue": "shadow"},
 }
 
 # The `celery-beat` service's entries. Each reminder task asks the database what
@@ -581,7 +576,6 @@ LLM_PLAN_FALLBACK_MODELS = config("LLM_PLAN_FALLBACK_MODELS", default="")
 LLM_PLAN_REASONING = config("LLM_PLAN_REASONING", default=False, cast=bool)
 LLM_PLAN_PROVIDER_ONLY = config("LLM_PLAN_PROVIDER_ONLY", default="")
 LLM_PLAN_PROVIDER_PINS = config("LLM_PLAN_PROVIDER_PINS", default="")
-AI_RESEARCH_PLAN_TIMEOUT_SECONDS = config("AI_RESEARCH_PLAN_TIMEOUT_SECONDS", default=30.0, cast=float)
 
 # IR-501: independent, off until a screening model/account is configured.
 LLM_SCREEN_VENDOR = config("LLM_SCREEN_VENDOR", default="")
@@ -592,31 +586,11 @@ LLM_SCREEN_FALLBACK_MODELS = config("LLM_SCREEN_FALLBACK_MODELS", default="")
 LLM_SCREEN_REASONING = config("LLM_SCREEN_REASONING", default=False, cast=bool)
 LLM_SCREEN_PROVIDER_ONLY = config("LLM_SCREEN_PROVIDER_ONLY", default="")
 LLM_SCREEN_PROVIDER_PINS = config("LLM_SCREEN_PROVIDER_PINS", default="")
-AI_SCREEN_MAX_RECORDS = config("AI_SCREEN_MAX_RECORDS", default=500, cast=int)
-AI_SCREEN_BATCH_SIZE = config("AI_SCREEN_BATCH_SIZE", default=20, cast=int)
-AI_SCREEN_TIMEOUT_SECONDS = config("AI_SCREEN_TIMEOUT_SECONDS", default=20.0, cast=float)
-AI_SCREEN_DUPLICATE_MIN_SIMILARITY = config("AI_SCREEN_DUPLICATE_MIN_SIMILARITY", default=0.98, cast=float)
 # The Novelty check's "close" (IR-312, ADR-029 amendment item 7): the cosine
 # similarity at which published work is shown on a Proposal as related
 # research. UNTUNED -- the AI track sets it against real proposals once
 # indexing is unblocked (IR-250).
 AI_NOVELTY_MIN_SIMILARITY = config("AI_NOVELTY_MIN_SIMILARITY", default=0.70, cast=float)
-# IR-546: screening batches in flight at once, passages read for an uncertain
-# paper, and uncertain papers rechecked. Initial pilot values, not measured.
-AI_SCREEN_CONCURRENCY = config("AI_SCREEN_CONCURRENCY", default=3, cast=int)
-AI_SCREEN_RECHECK_PASSAGES = config("AI_SCREEN_RECHECK_PASSAGES", default=2, cast=int)
-AI_SCREEN_RECHECK_MAX_RECORDS = config("AI_SCREEN_RECHECK_MAX_RECORDS", default=5, cast=int)
-# IR-546: hard deadline for an ordinary listing, from the start of its workflow.
-AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS = config(
-    "AI_ORDINARY_WORKFLOW_DEADLINE_SECONDS", default=30.0, cast=float
-)
-# IR-547: remember a reader's own screening verdicts so a repeat is not sent to
-# the model again. Per reader only: cross-user sharing is a count channel
-# (ADR-027 §3, ADR-038) and is not built until a person approves it. Off until
-# someone with authority enables it and sets the policy version, which belongs
-# in every key so a changed approval stops old verdicts being reused.
-AI_SCREEN_CACHE = config("AI_SCREEN_CACHE", default=False, cast=bool)
-AI_SCREEN_CACHE_POLICY = config("AI_SCREEN_CACHE_POLICY", default="")
 
 LLM_ROUTE_VENDOR = config("LLM_ROUTE_VENDOR", default="")
 LLM_ROUTE_BASE_URL = config("LLM_ROUTE_BASE_URL", default="")
@@ -626,30 +600,16 @@ LLM_ROUTE_FALLBACK_MODELS = config("LLM_ROUTE_FALLBACK_MODELS", default="")
 LLM_ROUTE_REASONING = config("LLM_ROUTE_REASONING", default=False, cast=bool)
 LLM_ROUTE_PROVIDER_ONLY = config("LLM_ROUTE_PROVIDER_ONLY", default="")
 LLM_ROUTE_PROVIDER_PINS = config("LLM_ROUTE_PROVIDER_PINS", default="")
-# off | staff | on (IR-504): staff routes office staff only, ahead of readers.
-AI_RESEARCH_LANE = config("AI_RESEARCH_LANE", default="off")
-# IR-544: when on, EVERY `/ask/stream/` question asked inside a Conversation,
-# from any client, is answered by a worker on `default` and can be resumed.
-# Off until IR-545's queue sizing and spend gates are approved (fixed-workflow
-# pilot README §6).
-AI_DURABLE_ASK = config("AI_DURABLE_ASK", default=False, cast=bool)
-# IR-863: which path answers a reader's Ask IRIS question. Off, Django answers
-# exactly as before; on, the reader opens AI-runtime runs (ADR-049) through the
-# same-origin edge, which issues no grant while this is off. The browser reads
-# it from /ai/reader/ and cannot choose for itself. Enabling it on a real
-# deployment needs IR-861's recorded limits and a person's approval.
-AI_RUNTIME_READER = config("AI_RUNTIME_READER", default=False, cast=bool)
-# Fixed at submission and never moved by a redelivery (pilot contract §1).
-AI_DURABLE_ASK_DEADLINE_SECONDS = config("AI_DURABLE_ASK_DEADLINE_SECONDS", default=30, cast=int)
-# How long past its deadline an unfinished run waits before a reader expires it.
+
+# Replaying Django questions asked before IR-957, which no longer answers: how
+# long past its deadline an unfinished run waits before a reader expires it.
 AI_DURABLE_ASK_STALE_SECONDS = config("AI_DURABLE_ASK_STALE_SECONDS", default=30, cast=int)
 # How often a following stream checks the journal for new events.
 AI_DURABLE_ASK_POLL_SECONDS = config("AI_DURABLE_ASK_POLL_SECONDS", default=0.25, cast=float)
 
 # IR-545 (ADR-041): every paid provider attempt is admitted against shared
 # limits held in Postgres, or refused. `off` admits nothing and checks
-# nothing (today's behaviour); `enforce` checks every attempt. Django refuses
-# to start with AI_DURABLE_ASK on and this off.
+# nothing (today's behaviour); `enforce` checks every attempt.
 #
 # FAIL CLOSED: none of the limits below has a default. Under `enforce`, an
 # unset limit refuses paid work rather than guessing a number. No value has
@@ -721,14 +681,6 @@ if AI_RESEARCH_READ_POLICY == "database":
             "application_name": "iris-research-read",
         },
     }
-AI_JEV_ROUTING_ENABLED = config("AI_JEV_ROUTING_ENABLED", default=False, cast=bool)
-AI_JEV_API_KEY = config("AI_JEV_API_KEY", default="")
-AI_ROUTE_GROQ_APPROVED = config("AI_ROUTE_GROQ_APPROVED", default=False, cast=bool)
-AI_ROUTE_UNCERTAIN_MIN = config("AI_ROUTE_UNCERTAIN_MIN", default=0.4, cast=float)
-AI_ROUTE_UNCERTAIN_MAX = config("AI_ROUTE_UNCERTAIN_MAX", default=0.6, cast=float)
-AI_ROUTE_INJECTION_THRESHOLD = config(
-    "AI_ROUTE_INJECTION_THRESHOLD", default=0.5, cast=float
-)
 
 LLM_SUMMARY_VENDOR   = config("LLM_SUMMARY_VENDOR", default="")
 LLM_SUMMARY_BASE_URL = config("LLM_SUMMARY_BASE_URL", default="")
@@ -753,95 +705,6 @@ LLM_DESCRIBE_FIGURE_REASONING = config(
 )
 LLM_DESCRIBE_FIGURE_PROVIDER_ONLY = config("LLM_DESCRIBE_FIGURE_PROVIDER_ONLY", default="")
 LLM_DESCRIBE_FIGURE_PROVIDER_PINS = config("LLM_DESCRIBE_FIGURE_PROVIDER_PINS", default="")
-
-# ---- Question resolution (IR-296, ADR-026 Decisions 1 and 8) -------------
-#
-# "what about its limitations?" has no subject on its own -- retrieval finds
-# every paper's future-work section. When a Conversation has history, this
-# configures the model that rewrites the question into one that stands alone,
-# before retrieval runs. The model itself is the `resolve` Profile above
-# (LLM_RESOLVE_MODEL) as of IR-383 -- only the on/off switch lives here.
-#
-# Independently switchable, so retrieval quality with and without it is
-# measurable under ADR-023 -- the point of putting each enhancement technique
-# behind its own switch rather than shipping it as an unconditional change.
-AI_QUESTION_RESOLUTION_ENABLED = config(
-    "AI_QUESTION_RESOLUTION_ENABLED", default=True, cast=bool
-)
-
-# ---- Conversation memory (IR-297, ADR-026 Decision 6) -------------------
-#
-# Older Turns are found by search rather than summarised or dropped. No
-# vendor key: recall reuses the vector retrieval already computed.
-AI_CONVERSATION_MEMORY_ENABLED = config(
-    "AI_CONVERSATION_MEMORY_ENABLED", default=True, cast=bool
-)
-
-# ---- Memory recall relevance (ADR-026 §6, ADR-027 §1c's shape; IR-446) --
-#
-# Recall offers its Turns to the model under the heading "Relevant earlier in
-# this conversation:", so closeness alone is not enough: without a floor the
-# four least-far Turns are presented as relevant even when none of them are.
-# Turns at or beyond this cosine distance are dropped; when none clear it the
-# heading does not appear at all. Non-positive disables the cut-off, the same
-# escape hatch AI_EMBEDDING_TOKEN_CEILING's 0 gives. Mirrored by
-# apps.ai.memory.DEFAULT_MAX_RECALL_DISTANCE, which a test holds to this value.
-#
-# PROVISIONAL, and measured rather than guessed -- real `voyage-context-4`
-# query vectors, 2026-10-02. The question pairs were written by hand, not
-# taken from Conversations a reader actually had: no corpus is indexed yet
-# (IR-250), so no real Conversation exists to read distances off. Treat the
-# separation below as indicative, not as a measurement of live traffic:
-#
-#   0.26   a reworded repeat of an earlier question
-#   0.48-0.52  Turns a reader calls plainly related
-#   0.62   same domain, different paper
-#   0.74   a method-level question across papers
-#   0.83-1.01  Turns a reader calls unrelated
-#
-# They separated on every pair tried, and 0.80 sits in the gap, deliberately
-# at its loose end: it keeps the weaker relations and drops the unrelated
-# ones. Retune against a real corpus once one is indexed (IR-250).
-AI_MEMORY_RECALL_MAX_DISTANCE = config(
-    "AI_MEMORY_RECALL_MAX_DISTANCE", default=0.80, cast=float
-)
-
-# ---- A Turn's answer vector (IR-447, ADR-026 §7 as amended) -------------
-#
-# A Turn is stored with two vectors, not one: its question -- the vector
-# retrieval already computed, free -- and its answer, which is a real Voyage
-# call on every Turn that gets answered.
-#
-# Why the second one exists. Indexing the question alone cannot find a Turn
-# whose *answer* states a fact its question never named: ask "what does the
-# paper conclude?" at Turn 3 and "what was that figure for the Jordan frame
-# bound?" at Turn 20, and recall cannot reach Turn 3, because the words to
-# match on are only in the answer. ADR-026 §7 originally claimed a question
-# and its answer are a pair and so answer recall came for free; that was an
-# assumption, was never measured, and IR-444 reversed it.
-#
-# ON by default, unlike ADR-033 §5's techniques. That rule governs its own
-# six switches; here the amended ADR decides the answer *is* embedded, and
-# this setting exists so the with-and-without comparison ADR-023 requires can
-# be run at all -- not because the feature ships off. Turning it off restores
-# pre-IR-447 behaviour exactly: question vectors only, no second call.
-#
-# It is a real cost and is stated here rather than discovered on an invoice:
-# roughly one extra embedding call per answered question. Failures and no_sources
-# Turns are not embedded -- their text is an explanation, not an answer -- so
-# the ceiling is one call per Turn a reader actually got an answer to.
-#
-# PROVISIONAL in design, not just in default. Both vectors are stored under
-# the *query* input type so that recall stays a single ORDER BY distance;
-# questions as queries and answers as documents would rank two
-# non-comparable distance scales in one list and would make
-# AI_MEMORY_RECALL_MAX_DISTANCE unsettable. ADR-015 rule 3 carries a note
-# recording that this use of embed_query is deliberate. If it measures badly,
-# the named fallback is two ranked lists merged by rank position, in the
-# shape of apps/ai/retrieval/fusion.py's fuse_by_rank -- not a flag here.
-AI_MEMORY_ANSWER_VECTOR_ENABLED = config(
-    "AI_MEMORY_ANSWER_VECTOR_ENABLED", default=True, cast=bool
-)
 
 # ---- The verbatim history window (IR-449, ADR-026 §6) -------------------
 #
@@ -879,8 +742,6 @@ AI_MEMORY_ANSWER_VECTOR_ENABLED = config(
 # owns reconciling the sources half against that total, and bounding the
 # recall half if it chooses to.
 AI_HISTORY_TOKEN_BUDGET = config("AI_HISTORY_TOKEN_BUDGET", default=3000, cast=int)
-# Older questions listed beside the verbatim window, with their cited ids (IR-592).
-AI_HISTORY_EARLIER_TOKEN_BUDGET = config("AI_HISTORY_EARLIER_TOKEN_BUDGET", default=500, cast=int)
 
 # Safety margin on every count made against the budget above. Mirrored by
 # apps.ai.history.DEFAULT_TOKEN_MARGIN.
@@ -939,57 +800,11 @@ AI_RETRIEVAL_FUSION_ENABLED = config(
 # pgvector's HNSW default (40) capped filtered queries at 40 rows. 1..1000.
 AI_HNSW_EF_SEARCH = config("AI_HNSW_EF_SEARCH", default=200, cast=int)
 
-# ---- Research lane limits (ADR-038 §5, IR-500) ---------------------------
-# Carried on every run's Budget and enforced by its Spend.
-AI_RESEARCH_MAX_OUTER_ROUNDS = config("AI_RESEARCH_MAX_OUTER_ROUNDS", default=3, cast=int)
-AI_RESEARCH_MAX_CALLS_PER_SUBTASK = config(
-    "AI_RESEARCH_MAX_CALLS_PER_SUBTASK", default=4, cast=int
-)
-AI_RESEARCH_MAX_TOOL_CALLS = config("AI_RESEARCH_MAX_TOOL_CALLS", default=10, cast=int)
-AI_RESEARCH_WALL_CLOCK_SECONDS = config(
-    "AI_RESEARCH_WALL_CLOCK_SECONDS", default=90.0, cast=float
-)
-AI_RESEARCH_MAX_PROMPT_TOKENS = config(
-    "AI_RESEARCH_MAX_PROMPT_TOKENS", default=120_000, cast=int
-)
-# A single planner/synthesis request, including schemas. The run-wide
-# cumulative ceiling above still applies to all calls (IR-513).
-AI_RESEARCH_CONTEXT_TOKEN_BUDGET = config(
-    "AI_RESEARCH_CONTEXT_TOKEN_BUDGET", default=16_000, cast=int
-)
-AI_RESEARCH_MAX_LEDGER_PASSAGES = config(
-    "AI_RESEARCH_MAX_LEDGER_PASSAGES", default=30, cast=int
-)
-# Tokens one read_record_sections call may return (ADR-038 §2).
-AI_RESEARCH_READ_TOKEN_CAP = config("AI_RESEARCH_READ_TOKEN_CAP", default=3000, cast=int)
-
 # ---- Conversational controller limits (IR-593, spec §7) -------------------
 # No defaults: unset, the controller refuses (fail closed). Tests use
 # `apps.ai.controller.budget.FAKE_TEST_PROFILE`, never production numbers.
 def _optional(cast):
     return lambda value: None if value in ("", None) else cast(value)
-
-
-AI_CONTROLLER_MAX_ROUNDS = config("AI_CONTROLLER_MAX_ROUNDS", default="", cast=_optional(int))
-AI_CONTROLLER_MAX_TOOL_CALLS = config("AI_CONTROLLER_MAX_TOOL_CALLS", default="", cast=_optional(int))
-AI_CONTROLLER_MAX_CONCURRENT_READS = config(
-    "AI_CONTROLLER_MAX_CONCURRENT_READS", default="", cast=_optional(int)
-)
-AI_CONTROLLER_REPAIR_ATTEMPTS = config("AI_CONTROLLER_REPAIR_ATTEMPTS", default="", cast=_optional(int))
-AI_CONTROLLER_ANSWER_RESERVE_TOKENS = config(
-    "AI_CONTROLLER_ANSWER_RESERVE_TOKENS", default="", cast=_optional(int)
-)
-AI_CONTROLLER_ANSWER_RESERVE_SECONDS = config(
-    "AI_CONTROLLER_ANSWER_RESERVE_SECONDS", default="", cast=_optional(float)
-)
-# ADR-027 §1d: corpus_facets refuses below this many visible records. The
-# ADR sets no value; this default is a placeholder until a corpus exists.
-AI_LANDSCAPE_MIN_RECORDS = config("AI_LANDSCAPE_MIN_RECORDS", default=20, cast=int)
-# ADR-027 §1b: corpus_facets refuses above this unclassified share. Also a
-# placeholder; the ADR sets no value.
-AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE = config(
-    "AI_LANDSCAPE_MAX_UNCLASSIFIED_SHARE", default=0.5, cast=float
-)
 
 # ---- Voyage (ADR-015, IR-128) -------------------------------------------
 #
@@ -1019,38 +834,10 @@ VOYAGE_EMBED_MODEL     = config("VOYAGE_EMBED_MODEL", default="voyage-context-4"
 VOYAGE_RERANK_MODEL    = config("VOYAGE_RERANK_MODEL", default="rerank-3")
 VOYAGE_TIMEOUT_SECONDS = config("VOYAGE_TIMEOUT_SECONDS", default=60, cast=int)
 
-# ---- The evidence decision (IR-464, ADR-035) -----------------------------
-#
-# Whether Ask IRIS establishes, before retrieval, that a question needs corpus
-# evidence at all. **`off` or `shadow` only.** `on` is rejected as an invalid
-# value rather than left unimplemented (ADR-035 §1): a mode a parser accepts is
-# one somebody enters by accident, and production routing is a separate
-# approval on a measurement. `shadow` records a decision per sampled Turn and
-# changes no answer (IR-466). Not on real reader questions until the vendor's
-# data retention is verified (ADR-035 §11).
-AI_EVIDENCE_DECISION = config("AI_EVIDENCE_DECISION", default="off")
-
-# Fraction of chat Turns shadowed, 0.0-1.0; zero records nothing.
-AI_EVIDENCE_SHADOW_SAMPLE_RATE = config(
-    "AI_EVIDENCE_SHADOW_SAMPLE_RATE", default=0.0, cast=float
-)
-# Shadow's own token budget per minute; past it a decision is skipped.
-# The reader path stays unenforced (IR-468).
-AI_EVIDENCE_SHADOW_TOKENS_PER_MINUTE = config(
-    "AI_EVIDENCE_SHADOW_TOKENS_PER_MINUTE", default=20_000, cast=int
-)
-# Seconds before a running decision may be reclaimed, once.
-AI_EVIDENCE_SHADOW_STALE_SECONDS = config(
-    "AI_EVIDENCE_SHADOW_STALE_SECONDS", default=600, cast=int
-)
-
 # The institution and Area terms the `institution_term` rule raises on.
 # Deployment-specific under ADR-005's instance-per-tenant posture, while the
-# other four rules' generic English terms are in code. Read **at startup**, not
-# per request (ADR-035 §5): a per-request read would let a `.env` edit silently
-# remove an evidence requirement between two questions. `apps.ai.evidence`
-# refuses to start when this is empty and the decision is enabled, so the rule
-# is disabled by turning the feature off, never by blanking the string.
+# other four rules' generic English terms are in code. Read only by the
+# offline detector (`manage.py eval_evidence`) since IR-957 retired the shadow.
 AI_EVIDENCE_INSTITUTION_TERMS = config(
     "AI_EVIDENCE_INSTITUTION_TERMS",
     default=(
@@ -1094,14 +881,6 @@ AI_OVERVIEW_CLAIM_TIMEOUT_SECONDS = config(
 # Full-paper briefs remain off pending acceptance of their proposed ADR.
 # Generation additionally requires enforced shared provider admission.
 AI_PAPER_BRIEFS_ENABLED = config("AI_PAPER_BRIEFS_ENABLED", default=False, cast=bool)
-# Full-reading comparisons are opt-in while their governing proposals await approval.
-AI_COMPARISON_ENABLED = config("AI_COMPARISON_ENABLED", default=False, cast=bool)
-AI_COMPARISON_MAX_RECORDS = config("AI_COMPARISON_MAX_RECORDS", default=6, cast=int)
-AI_COMPARISON_DEADLINE_SECONDS = config("AI_COMPARISON_DEADLINE_SECONDS", default=300, cast=int)
-AI_COMPARISON_MAX_ATTEMPTS = config("AI_COMPARISON_MAX_ATTEMPTS", default="")
-AI_COMPARISON_MAX_INPUT_TOKENS = config("AI_COMPARISON_MAX_INPUT_TOKENS", default="")
-AI_COMPARISON_MAX_OUTPUT_TOKENS = config("AI_COMPARISON_MAX_OUTPUT_TOKENS", default="")
-AI_COMPARISON_MAX_COST_USD = config("AI_COMPARISON_MAX_COST_USD", default="")
 # Approximate, and printed as approximate. Vendor pricing is not in this
 # repository's control, so this is a figure for deciding whether a run is
 # worth starting, never a quote. Voyage's contextualized-embedding list price
@@ -1155,7 +934,6 @@ LLAMAEXTRACT_TIER = config("LLAMAEXTRACT_TIER", default="agentic")
 LLAMAEXTRACT_VERSION = config("LLAMAEXTRACT_VERSION", default="")
 LLAMAEXTRACT_TIMEOUT_SECONDS = config("LLAMAEXTRACT_TIMEOUT_SECONDS", default=600, cast=int)
 
-
 def _unit_interval(value):
     """Empty is unset; anything else must be a number from 0 to 1."""
     if value in (None, ""):
@@ -1164,7 +942,6 @@ def _unit_interval(value):
     if not 0 <= number <= 1:
         raise ValueError(f"must be between 0 and 1, not {value!r}")
     return number
-
 
 # The LlamaExtract confidence at or above which Publish may fill in a title or
 # abstract unasked (IR-846). No default: unset offers every value for the
@@ -1296,7 +1073,6 @@ CELERY_BEAT_SCHEDULE["recovery-dispatch"]["schedule"] = float(RECOVERY_DISPATCH_
 def email_domains(value):
     """Domains as registration compares them: lower case, no leading "@" (IR-660)."""
     return [domain.strip().lower().lstrip("@") for domain in csv_list(value)]
-
 
 # The email domains registration accepts, comma-separated, e.g. "cit.edu" (IR-660).
 # Matching is exact and ignores case, so "cit.edu.evil.com" and "evilcit.edu" are

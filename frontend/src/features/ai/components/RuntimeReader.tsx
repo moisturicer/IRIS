@@ -97,16 +97,23 @@ function trouble(failure: unknown): Trouble {
 interface Props {
   recordId?: number;
   conversationId?: string;
+  /** A question handed over from elsewhere (IR-559): shown as a draft, never sent. */
+  initialDraft?: string;
+  /** The unsent draft as it changes, so a page can keep it across a close (IR-569). */
+  onDraftChange?: (draft: string) => void;
   onConversation?: (id: string) => void;
 }
 
 /** Both reader surfaces use the same persisted snapshot and transport (IR-730). */
-export function RuntimeReader({ recordId, conversationId, onConversation }: Props) {
+export function RuntimeReader({ recordId, conversationId, initialDraft, onDraftChange, onConversation }: Props) {
   const api = useMemo(() => runtimeReader(recordId), [recordId]);
   const [conversation, setConversation] = useState<ReaderConversation>();
   const [run, setRun] = useState<ReaderRun>();
   const [depth, setDepth] = useState<Depth>("deep");
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(initialDraft ?? "");
+  const reportDraft = useRef(onDraftChange);
+  reportDraft.current = onDraftChange;
+  useEffect(() => { reportDraft.current?.(draft); }, [draft]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<Trouble>();
   const generation = useRef(0);

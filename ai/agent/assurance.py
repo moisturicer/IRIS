@@ -1,7 +1,7 @@
 """Deterministic checks on the AGENT's drafts (IR-728, IR-729, ADR-049 §15).
 
-The rules of Django's research validation (`apps.ai.research.validation`,
-IR-512), applied to passage handles: cited handles must be ones this run
+The rules of Django's research validation (`apps.ai.research.validation`, retired
+in IR-957; IR-512), applied to passage handles: cited handles must be ones this run
 was shown, numbers must come from cited text or tool coverage, marked
 titles must be papers the run saw, and completeness is never claimed from
 keyword search. They catch literal mistakes, never prove a claim true.
